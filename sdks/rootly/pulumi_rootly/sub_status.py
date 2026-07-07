@@ -19,16 +19,16 @@ __all__ = ['SubStatusArgs', 'SubStatus']
 @pulumi.input_type
 class SubStatusArgs:
     def __init__(__self__, *,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 parent_status: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 sub_status_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 parent_status: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 sub_status_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a SubStatus resource.
 
-        :param pulumi.Input[_builtins.str] parent_status: Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`">`in_triage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`">`started`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`planning`" pulumi-lang-dotnet="`Planning`" pulumi-lang-go="`planning`" pulumi-lang-python="`planning`" pulumi-lang-yaml="`planning`" pulumi-lang-java="`planning`">`planning`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`verifying`" pulumi-lang-dotnet="`Verifying`" pulumi-lang-go="`verifying`" pulumi-lang-python="`verifying`" pulumi-lang-yaml="`verifying`" pulumi-lang-java="`verifying`">`verifying`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`">`completed`</span>.
+        :param pulumi.Input[_builtins.str] parent_status: Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`" pulumi-lang-hcl="`in_triage`">`inTriage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`" pulumi-lang-hcl="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`planning`" pulumi-lang-dotnet="`Planning`" pulumi-lang-go="`planning`" pulumi-lang-python="`planning`" pulumi-lang-yaml="`planning`" pulumi-lang-java="`planning`" pulumi-lang-hcl="`planning`">`planning`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`verifying`" pulumi-lang-dotnet="`Verifying`" pulumi-lang-go="`verifying`" pulumi-lang-python="`verifying`" pulumi-lang-yaml="`verifying`" pulumi-lang-java="`verifying`" pulumi-lang-hcl="`verifying`">`verifying`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`" pulumi-lang-hcl="`completed`">`completed`</span>.
         """
         if description is not None:
             pulumi.set(__self__, "description", description)
@@ -45,75 +45,75 @@ class SubStatusArgs:
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="parentStatus")
-    def parent_status(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def parent_status(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`">`in_triage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`">`started`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`planning`" pulumi-lang-dotnet="`Planning`" pulumi-lang-go="`planning`" pulumi-lang-python="`planning`" pulumi-lang-yaml="`planning`" pulumi-lang-java="`planning`">`planning`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`verifying`" pulumi-lang-dotnet="`Verifying`" pulumi-lang-go="`verifying`" pulumi-lang-python="`verifying`" pulumi-lang-yaml="`verifying`" pulumi-lang-java="`verifying`">`verifying`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`">`completed`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`" pulumi-lang-hcl="`in_triage`">`inTriage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`" pulumi-lang-hcl="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`planning`" pulumi-lang-dotnet="`Planning`" pulumi-lang-go="`planning`" pulumi-lang-python="`planning`" pulumi-lang-yaml="`planning`" pulumi-lang-java="`planning`" pulumi-lang-hcl="`planning`">`planning`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`verifying`" pulumi-lang-dotnet="`Verifying`" pulumi-lang-go="`verifying`" pulumi-lang-python="`verifying`" pulumi-lang-yaml="`verifying`" pulumi-lang-java="`verifying`" pulumi-lang-hcl="`verifying`">`verifying`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`" pulumi-lang-hcl="`completed`">`completed`</span>.
         """
         return pulumi.get(self, "parent_status")
 
     @parent_status.setter
-    def parent_status(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def parent_status(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "parent_status", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
     @_builtins.property
     @pulumi.getter(name="subStatusId")
-    def sub_status_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def sub_status_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "sub_status_id")
 
     @sub_status_id.setter
-    def sub_status_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def sub_status_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "sub_status_id", value)
 
 
 @pulumi.input_type
 class _SubStatusState:
     def __init__(__self__, *,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 parent_status: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 sub_status_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 parent_status: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 sub_status_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering SubStatus resources.
 
-        :param pulumi.Input[_builtins.str] parent_status: Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`">`in_triage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`">`started`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`planning`" pulumi-lang-dotnet="`Planning`" pulumi-lang-go="`planning`" pulumi-lang-python="`planning`" pulumi-lang-yaml="`planning`" pulumi-lang-java="`planning`">`planning`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`verifying`" pulumi-lang-dotnet="`Verifying`" pulumi-lang-go="`verifying`" pulumi-lang-python="`verifying`" pulumi-lang-yaml="`verifying`" pulumi-lang-java="`verifying`">`verifying`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`">`completed`</span>.
+        :param pulumi.Input[_builtins.str] parent_status: Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`" pulumi-lang-hcl="`in_triage`">`inTriage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`" pulumi-lang-hcl="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`planning`" pulumi-lang-dotnet="`Planning`" pulumi-lang-go="`planning`" pulumi-lang-python="`planning`" pulumi-lang-yaml="`planning`" pulumi-lang-java="`planning`" pulumi-lang-hcl="`planning`">`planning`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`verifying`" pulumi-lang-dotnet="`Verifying`" pulumi-lang-go="`verifying`" pulumi-lang-python="`verifying`" pulumi-lang-yaml="`verifying`" pulumi-lang-java="`verifying`" pulumi-lang-hcl="`verifying`">`verifying`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`" pulumi-lang-hcl="`completed`">`completed`</span>.
         """
         if description is not None:
             pulumi.set(__self__, "description", description)
@@ -130,59 +130,59 @@ class _SubStatusState:
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="parentStatus")
-    def parent_status(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def parent_status(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`">`in_triage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`">`started`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`planning`" pulumi-lang-dotnet="`Planning`" pulumi-lang-go="`planning`" pulumi-lang-python="`planning`" pulumi-lang-yaml="`planning`" pulumi-lang-java="`planning`">`planning`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`verifying`" pulumi-lang-dotnet="`Verifying`" pulumi-lang-go="`verifying`" pulumi-lang-python="`verifying`" pulumi-lang-yaml="`verifying`" pulumi-lang-java="`verifying`">`verifying`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`">`completed`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`" pulumi-lang-hcl="`in_triage`">`inTriage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`" pulumi-lang-hcl="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`planning`" pulumi-lang-dotnet="`Planning`" pulumi-lang-go="`planning`" pulumi-lang-python="`planning`" pulumi-lang-yaml="`planning`" pulumi-lang-java="`planning`" pulumi-lang-hcl="`planning`">`planning`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`verifying`" pulumi-lang-dotnet="`Verifying`" pulumi-lang-go="`verifying`" pulumi-lang-python="`verifying`" pulumi-lang-yaml="`verifying`" pulumi-lang-java="`verifying`" pulumi-lang-hcl="`verifying`">`verifying`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`" pulumi-lang-hcl="`completed`">`completed`</span>.
         """
         return pulumi.get(self, "parent_status")
 
     @parent_status.setter
-    def parent_status(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def parent_status(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "parent_status", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
     @_builtins.property
     @pulumi.getter(name="subStatusId")
-    def sub_status_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def sub_status_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "sub_status_id")
 
     @sub_status_id.setter
-    def sub_status_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def sub_status_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "sub_status_id", value)
 
 
@@ -192,19 +192,19 @@ class SubStatus(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 parent_status: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 sub_status_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 parent_status: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 sub_status_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a SubStatus resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] parent_status: Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`">`in_triage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`">`started`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`planning`" pulumi-lang-dotnet="`Planning`" pulumi-lang-go="`planning`" pulumi-lang-python="`planning`" pulumi-lang-yaml="`planning`" pulumi-lang-java="`planning`">`planning`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`verifying`" pulumi-lang-dotnet="`Verifying`" pulumi-lang-go="`verifying`" pulumi-lang-python="`verifying`" pulumi-lang-yaml="`verifying`" pulumi-lang-java="`verifying`">`verifying`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`">`completed`</span>.
+        :param pulumi.Input[_builtins.str] parent_status: Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`" pulumi-lang-hcl="`in_triage`">`inTriage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`" pulumi-lang-hcl="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`planning`" pulumi-lang-dotnet="`Planning`" pulumi-lang-go="`planning`" pulumi-lang-python="`planning`" pulumi-lang-yaml="`planning`" pulumi-lang-java="`planning`" pulumi-lang-hcl="`planning`">`planning`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`verifying`" pulumi-lang-dotnet="`Verifying`" pulumi-lang-go="`verifying`" pulumi-lang-python="`verifying`" pulumi-lang-yaml="`verifying`" pulumi-lang-java="`verifying`" pulumi-lang-hcl="`verifying`">`verifying`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`" pulumi-lang-hcl="`completed`">`completed`</span>.
         """
         ...
     @overload
@@ -230,12 +230,12 @@ class SubStatus(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 parent_status: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 sub_status_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 parent_status: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 sub_status_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -262,12 +262,12 @@ class SubStatus(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            parent_status: Optional[pulumi.Input[_builtins.str]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None,
-            slug: Optional[pulumi.Input[_builtins.str]] = None,
-            sub_status_id: Optional[pulumi.Input[_builtins.str]] = None) -> 'SubStatus':
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            parent_status: pulumi.Input[Optional[_builtins.str]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None,
+            slug: pulumi.Input[Optional[_builtins.str]] = None,
+            sub_status_id: pulumi.Input[Optional[_builtins.str]] = None) -> 'SubStatus':
         """
         Get an existing SubStatus resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -275,7 +275,7 @@ class SubStatus(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] parent_status: Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`">`in_triage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`">`started`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`planning`" pulumi-lang-dotnet="`Planning`" pulumi-lang-go="`planning`" pulumi-lang-python="`planning`" pulumi-lang-yaml="`planning`" pulumi-lang-java="`planning`">`planning`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`verifying`" pulumi-lang-dotnet="`Verifying`" pulumi-lang-go="`verifying`" pulumi-lang-python="`verifying`" pulumi-lang-yaml="`verifying`" pulumi-lang-java="`verifying`">`verifying`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`">`completed`</span>.
+        :param pulumi.Input[_builtins.str] parent_status: Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`" pulumi-lang-hcl="`in_triage`">`inTriage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`" pulumi-lang-hcl="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`planning`" pulumi-lang-dotnet="`Planning`" pulumi-lang-go="`planning`" pulumi-lang-python="`planning`" pulumi-lang-yaml="`planning`" pulumi-lang-java="`planning`" pulumi-lang-hcl="`planning`">`planning`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`verifying`" pulumi-lang-dotnet="`Verifying`" pulumi-lang-go="`verifying`" pulumi-lang-python="`verifying`" pulumi-lang-yaml="`verifying`" pulumi-lang-java="`verifying`" pulumi-lang-hcl="`verifying`">`verifying`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`" pulumi-lang-hcl="`completed`">`completed`</span>.
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
@@ -303,7 +303,7 @@ class SubStatus(pulumi.CustomResource):
     @pulumi.getter(name="parentStatus")
     def parent_status(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`">`in_triage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`">`started`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`planning`" pulumi-lang-dotnet="`Planning`" pulumi-lang-go="`planning`" pulumi-lang-python="`planning`" pulumi-lang-yaml="`planning`" pulumi-lang-java="`planning`">`planning`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`verifying`" pulumi-lang-dotnet="`Verifying`" pulumi-lang-go="`verifying`" pulumi-lang-python="`verifying`" pulumi-lang-yaml="`verifying`" pulumi-lang-java="`verifying`">`verifying`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`">`completed`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`" pulumi-lang-hcl="`in_triage`">`inTriage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`" pulumi-lang-hcl="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`planning`" pulumi-lang-dotnet="`Planning`" pulumi-lang-go="`planning`" pulumi-lang-python="`planning`" pulumi-lang-yaml="`planning`" pulumi-lang-java="`planning`" pulumi-lang-hcl="`planning`">`planning`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`verifying`" pulumi-lang-dotnet="`Verifying`" pulumi-lang-go="`verifying`" pulumi-lang-python="`verifying`" pulumi-lang-yaml="`verifying`" pulumi-lang-java="`verifying`" pulumi-lang-hcl="`verifying`">`verifying`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`" pulumi-lang-hcl="`completed`">`completed`</span>.
         """
         return pulumi.get(self, "parent_status")
 
@@ -321,3 +321,4 @@ class SubStatus(pulumi.CustomResource):
     @pulumi.getter(name="subStatusId")
     def sub_status_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "sub_status_id")
+

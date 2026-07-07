@@ -152,14 +152,14 @@ def get_service(alert_broadcast_enabled: Optional[_builtins.bool] = None,
         incident_broadcast_enabled=pulumi.get(__ret__, 'incident_broadcast_enabled'),
         name=pulumi.get(__ret__, 'name'),
         slug=pulumi.get(__ret__, 'slug'))
-def get_service_output(alert_broadcast_enabled: Optional[pulumi.Input[Optional[_builtins.bool]]] = None,
-                       backstage_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                       cortex_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                       created_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
-                       external_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                       incident_broadcast_enabled: Optional[pulumi.Input[Optional[_builtins.bool]]] = None,
-                       name: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                       slug: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_service_output(alert_broadcast_enabled: pulumi.Input[Optional[Optional[_builtins.bool]]] = None,
+                       backstage_id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                       cortex_id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                       created_at: pulumi.Input[Optional[Optional[Mapping[str, _builtins.str]]]] = None,
+                       external_id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                       incident_broadcast_enabled: pulumi.Input[Optional[Optional[_builtins.bool]]] = None,
+                       name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                       slug: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                        opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetServiceResult]:
     """
     Use this data source to access information about an existing resource.

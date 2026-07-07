@@ -116,11 +116,11 @@ def get_incident_post_mortem(created_at: Optional[Mapping[str, _builtins.str]] =
         resolved_at=pulumi.get(__ret__, 'resolved_at'),
         started_at=pulumi.get(__ret__, 'started_at'),
         status=pulumi.get(__ret__, 'status'))
-def get_incident_post_mortem_output(created_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
-                                    mitigated_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
-                                    resolved_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
-                                    started_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
-                                    status: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_incident_post_mortem_output(created_at: pulumi.Input[Optional[Optional[Mapping[str, _builtins.str]]]] = None,
+                                    mitigated_at: pulumi.Input[Optional[Optional[Mapping[str, _builtins.str]]]] = None,
+                                    resolved_at: pulumi.Input[Optional[Optional[Mapping[str, _builtins.str]]]] = None,
+                                    started_at: pulumi.Input[Optional[Optional[Mapping[str, _builtins.str]]]] = None,
+                                    status: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                                     opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetIncidentPostMortemResult]:
     """
     Use this data source to access information about an existing resource.

@@ -21,15 +21,15 @@ __all__ = ['EscalationPolicyArgs', 'EscalationPolicy']
 @pulumi.input_type
 class EscalationPolicyArgs:
     def __init__(__self__, *,
-                 business_hours: Optional[pulumi.Input['EscalationPolicyBusinessHoursArgs']] = None,
-                 created_by_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 last_updated_by_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 repeat_count: Optional[pulumi.Input[_builtins.float]] = None,
-                 service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None):
+                 business_hours: pulumi.Input[Optional['EscalationPolicyBusinessHoursArgs']] = None,
+                 created_by_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 last_updated_by_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 repeat_count: pulumi.Input[Optional[_builtins.float]] = None,
+                 service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None):
         """
         The set of arguments for constructing a EscalationPolicy resource.
 
@@ -62,119 +62,119 @@ class EscalationPolicyArgs:
 
     @_builtins.property
     @pulumi.getter(name="businessHours")
-    def business_hours(self) -> Optional[pulumi.Input['EscalationPolicyBusinessHoursArgs']]:
+    def business_hours(self) -> pulumi.Input[Optional['EscalationPolicyBusinessHoursArgs']]:
         return pulumi.get(self, "business_hours")
 
     @business_hours.setter
-    def business_hours(self, value: Optional[pulumi.Input['EscalationPolicyBusinessHoursArgs']]):
+    def business_hours(self, value: pulumi.Input[Optional['EscalationPolicyBusinessHoursArgs']]):
         pulumi.set(self, "business_hours", value)
 
     @_builtins.property
     @pulumi.getter(name="createdByUserId")
-    def created_by_user_id(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def created_by_user_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         User who created the escalation policy
         """
         return pulumi.get(self, "created_by_user_id")
 
     @created_by_user_id.setter
-    def created_by_user_id(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def created_by_user_id(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "created_by_user_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the escalation policy
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="escalationPolicyId")
-    def escalation_policy_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def escalation_policy_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "escalation_policy_id")
 
     @escalation_policy_id.setter
-    def escalation_policy_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def escalation_policy_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "escalation_policy_id", value)
 
     @_builtins.property
     @pulumi.getter(name="groupIds")
-    def group_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def group_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Associated groups (alerting the group will trigger escalation policy)
         """
         return pulumi.get(self, "group_ids")
 
     @group_ids.setter
-    def group_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def group_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "group_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="lastUpdatedByUserId")
-    def last_updated_by_user_id(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def last_updated_by_user_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         User who updated the escalation policy
         """
         return pulumi.get(self, "last_updated_by_user_id")
 
     @last_updated_by_user_id.setter
-    def last_updated_by_user_id(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def last_updated_by_user_id(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "last_updated_by_user_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the escalation policy
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="repeatCount")
-    def repeat_count(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def repeat_count(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The number of times this policy will be executed until someone acknowledges the alert
         """
         return pulumi.get(self, "repeat_count")
 
     @repeat_count.setter
-    def repeat_count(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def repeat_count(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "repeat_count", value)
 
     @_builtins.property
     @pulumi.getter(name="serviceIds")
-    def service_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def service_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Associated services (alerting the service will trigger escalation policy)
         """
         return pulumi.get(self, "service_ids")
 
     @service_ids.setter
-    def service_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def service_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "service_ids", value)
 
 
 @pulumi.input_type
 class _EscalationPolicyState:
     def __init__(__self__, *,
-                 business_hours: Optional[pulumi.Input['EscalationPolicyBusinessHoursArgs']] = None,
-                 created_by_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 last_updated_by_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 repeat_count: Optional[pulumi.Input[_builtins.float]] = None,
-                 service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None):
+                 business_hours: pulumi.Input[Optional['EscalationPolicyBusinessHoursArgs']] = None,
+                 created_by_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 last_updated_by_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 repeat_count: pulumi.Input[Optional[_builtins.float]] = None,
+                 service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None):
         """
         Input properties used for looking up and filtering EscalationPolicy resources.
 
@@ -207,104 +207,104 @@ class _EscalationPolicyState:
 
     @_builtins.property
     @pulumi.getter(name="businessHours")
-    def business_hours(self) -> Optional[pulumi.Input['EscalationPolicyBusinessHoursArgs']]:
+    def business_hours(self) -> pulumi.Input[Optional['EscalationPolicyBusinessHoursArgs']]:
         return pulumi.get(self, "business_hours")
 
     @business_hours.setter
-    def business_hours(self, value: Optional[pulumi.Input['EscalationPolicyBusinessHoursArgs']]):
+    def business_hours(self, value: pulumi.Input[Optional['EscalationPolicyBusinessHoursArgs']]):
         pulumi.set(self, "business_hours", value)
 
     @_builtins.property
     @pulumi.getter(name="createdByUserId")
-    def created_by_user_id(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def created_by_user_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         User who created the escalation policy
         """
         return pulumi.get(self, "created_by_user_id")
 
     @created_by_user_id.setter
-    def created_by_user_id(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def created_by_user_id(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "created_by_user_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the escalation policy
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="escalationPolicyId")
-    def escalation_policy_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def escalation_policy_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "escalation_policy_id")
 
     @escalation_policy_id.setter
-    def escalation_policy_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def escalation_policy_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "escalation_policy_id", value)
 
     @_builtins.property
     @pulumi.getter(name="groupIds")
-    def group_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def group_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Associated groups (alerting the group will trigger escalation policy)
         """
         return pulumi.get(self, "group_ids")
 
     @group_ids.setter
-    def group_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def group_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "group_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="lastUpdatedByUserId")
-    def last_updated_by_user_id(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def last_updated_by_user_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         User who updated the escalation policy
         """
         return pulumi.get(self, "last_updated_by_user_id")
 
     @last_updated_by_user_id.setter
-    def last_updated_by_user_id(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def last_updated_by_user_id(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "last_updated_by_user_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the escalation policy
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="repeatCount")
-    def repeat_count(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def repeat_count(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The number of times this policy will be executed until someone acknowledges the alert
         """
         return pulumi.get(self, "repeat_count")
 
     @repeat_count.setter
-    def repeat_count(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def repeat_count(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "repeat_count", value)
 
     @_builtins.property
     @pulumi.getter(name="serviceIds")
-    def service_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def service_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Associated services (alerting the service will trigger escalation policy)
         """
         return pulumi.get(self, "service_ids")
 
     @service_ids.setter
-    def service_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def service_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "service_ids", value)
 
 
@@ -314,15 +314,15 @@ class EscalationPolicy(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 business_hours: Optional[pulumi.Input[Union['EscalationPolicyBusinessHoursArgs', 'EscalationPolicyBusinessHoursArgsDict']]] = None,
-                 created_by_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 last_updated_by_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 repeat_count: Optional[pulumi.Input[_builtins.float]] = None,
-                 service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 business_hours: pulumi.Input[Optional[Union['EscalationPolicyBusinessHoursArgs', 'EscalationPolicyBusinessHoursArgsDict']]] = None,
+                 created_by_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 last_updated_by_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 repeat_count: pulumi.Input[Optional[_builtins.float]] = None,
+                 service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  __props__=None):
         """
         Create a EscalationPolicy resource with the given unique name, props, and options.
@@ -361,15 +361,15 @@ class EscalationPolicy(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 business_hours: Optional[pulumi.Input[Union['EscalationPolicyBusinessHoursArgs', 'EscalationPolicyBusinessHoursArgsDict']]] = None,
-                 created_by_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 last_updated_by_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 repeat_count: Optional[pulumi.Input[_builtins.float]] = None,
-                 service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 business_hours: pulumi.Input[Optional[Union['EscalationPolicyBusinessHoursArgs', 'EscalationPolicyBusinessHoursArgsDict']]] = None,
+                 created_by_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 last_updated_by_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 repeat_count: pulumi.Input[Optional[_builtins.float]] = None,
+                 service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -399,15 +399,15 @@ class EscalationPolicy(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            business_hours: Optional[pulumi.Input[Union['EscalationPolicyBusinessHoursArgs', 'EscalationPolicyBusinessHoursArgsDict']]] = None,
-            created_by_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
-            group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            last_updated_by_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            repeat_count: Optional[pulumi.Input[_builtins.float]] = None,
-            service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None) -> 'EscalationPolicy':
+            business_hours: pulumi.Input[Optional[Union['EscalationPolicyBusinessHoursArgs', 'EscalationPolicyBusinessHoursArgsDict']]] = None,
+            created_by_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
+            group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            last_updated_by_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            repeat_count: pulumi.Input[Optional[_builtins.float]] = None,
+            service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None) -> 'EscalationPolicy':
         """
         Get an existing EscalationPolicy resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -503,3 +503,4 @@ class EscalationPolicy(pulumi.CustomResource):
         Associated services (alerting the service will trigger escalation policy)
         """
         return pulumi.get(self, "service_ids")
+

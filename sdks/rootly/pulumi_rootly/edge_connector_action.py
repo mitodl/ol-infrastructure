@@ -22,20 +22,20 @@ __all__ = ['EdgeConnectorActionArgs', 'EdgeConnectorAction']
 class EdgeConnectorActionArgs:
     def __init__(__self__, *,
                  edge_connector_id: pulumi.Input[_builtins.str],
-                 action_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 edge_connector_action_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 icon: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 parameters: Optional[pulumi.Input[Sequence[pulumi.Input['EdgeConnectorActionParameterArgs']]]] = None,
-                 timeout: Optional[pulumi.Input[_builtins.float]] = None):
+                 action_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 edge_connector_action_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 icon: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 parameters: pulumi.Input[Optional[Sequence[pulumi.Input['EdgeConnectorActionParameterArgs']]]] = None,
+                 timeout: pulumi.Input[Optional[_builtins.float]] = None):
         """
         The set of arguments for constructing a EdgeConnectorAction resource.
 
         :param pulumi.Input[_builtins.str] edge_connector_id: The ID of the edge connector
-        :param pulumi.Input[_builtins.str] action_type: Action type. Value must be one of <span pulumi-lang-nodejs="`script`" pulumi-lang-dotnet="`Script`" pulumi-lang-go="`script`" pulumi-lang-python="`script`" pulumi-lang-yaml="`script`" pulumi-lang-java="`script`">`script`</span>, <span pulumi-lang-nodejs="`http`" pulumi-lang-dotnet="`Http`" pulumi-lang-go="`http`" pulumi-lang-python="`http`" pulumi-lang-yaml="`http`" pulumi-lang-java="`http`">`http`</span>.
+        :param pulumi.Input[_builtins.str] action_type: Action type. Value must be one of <span pulumi-lang-nodejs="`script`" pulumi-lang-dotnet="`Script`" pulumi-lang-go="`script`" pulumi-lang-python="`script`" pulumi-lang-yaml="`script`" pulumi-lang-java="`script`" pulumi-lang-hcl="`script`">`script`</span>, <span pulumi-lang-nodejs="`http`" pulumi-lang-dotnet="`Http`" pulumi-lang-go="`http`" pulumi-lang-python="`http`" pulumi-lang-yaml="`http`" pulumi-lang-java="`http`" pulumi-lang-hcl="`http`">`http`</span>.
         :param pulumi.Input[_builtins.str] description: Action description
-        :param pulumi.Input[_builtins.str] icon: Action icon. Value must be one of <span pulumi-lang-nodejs="`bolt`" pulumi-lang-dotnet="`Bolt`" pulumi-lang-go="`bolt`" pulumi-lang-python="`bolt`" pulumi-lang-yaml="`bolt`" pulumi-lang-java="`bolt`">`bolt`</span>, `bolt-slash`, <span pulumi-lang-nodejs="`cog`" pulumi-lang-dotnet="`Cog`" pulumi-lang-go="`cog`" pulumi-lang-python="`cog`" pulumi-lang-yaml="`cog`" pulumi-lang-java="`cog`">`cog`</span>, `command-line`, `code-bracket`, <span pulumi-lang-nodejs="`server`" pulumi-lang-dotnet="`Server`" pulumi-lang-go="`server`" pulumi-lang-python="`server`" pulumi-lang-yaml="`server`" pulumi-lang-java="`server`">`server`</span>, `server-stack`, <span pulumi-lang-nodejs="`play`" pulumi-lang-dotnet="`Play`" pulumi-lang-go="`play`" pulumi-lang-python="`play`" pulumi-lang-yaml="`play`" pulumi-lang-java="`play`">`play`</span>, `arrow-path`, `wrench-screwdriver`, <span pulumi-lang-nodejs="`cube`" pulumi-lang-dotnet="`Cube`" pulumi-lang-go="`cube`" pulumi-lang-python="`cube`" pulumi-lang-yaml="`cube`" pulumi-lang-java="`cube`">`cube`</span>, `rocket-launch`.
+        :param pulumi.Input[_builtins.str] icon: Action icon. Value must be one of <span pulumi-lang-nodejs="`bolt`" pulumi-lang-dotnet="`Bolt`" pulumi-lang-go="`bolt`" pulumi-lang-python="`bolt`" pulumi-lang-yaml="`bolt`" pulumi-lang-java="`bolt`" pulumi-lang-hcl="`bolt`">`bolt`</span>, `bolt-slash`, <span pulumi-lang-nodejs="`cog`" pulumi-lang-dotnet="`Cog`" pulumi-lang-go="`cog`" pulumi-lang-python="`cog`" pulumi-lang-yaml="`cog`" pulumi-lang-java="`cog`" pulumi-lang-hcl="`cog`">`cog`</span>, `command-line`, `code-bracket`, <span pulumi-lang-nodejs="`server`" pulumi-lang-dotnet="`Server`" pulumi-lang-go="`server`" pulumi-lang-python="`server`" pulumi-lang-yaml="`server`" pulumi-lang-java="`server`" pulumi-lang-hcl="`server`">`server`</span>, `server-stack`, <span pulumi-lang-nodejs="`play`" pulumi-lang-dotnet="`Play`" pulumi-lang-go="`play`" pulumi-lang-python="`play`" pulumi-lang-yaml="`play`" pulumi-lang-java="`play`" pulumi-lang-hcl="`play`">`play`</span>, `arrow-path`, `wrench-screwdriver`, <span pulumi-lang-nodejs="`cube`" pulumi-lang-dotnet="`Cube`" pulumi-lang-go="`cube`" pulumi-lang-python="`cube`" pulumi-lang-yaml="`cube`" pulumi-lang-java="`cube`" pulumi-lang-hcl="`cube`">`cube`</span>, `rocket-launch`.
         :param pulumi.Input[_builtins.str] name: Action name
         :param pulumi.Input[Sequence[pulumi.Input['EdgeConnectorActionParameterArgs']]] parameters: Parameter definitions
         :param pulumi.Input[_builtins.float] timeout: Timeout in seconds
@@ -70,108 +70,108 @@ class EdgeConnectorActionArgs:
 
     @_builtins.property
     @pulumi.getter(name="actionType")
-    def action_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def action_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Action type. Value must be one of <span pulumi-lang-nodejs="`script`" pulumi-lang-dotnet="`Script`" pulumi-lang-go="`script`" pulumi-lang-python="`script`" pulumi-lang-yaml="`script`" pulumi-lang-java="`script`">`script`</span>, <span pulumi-lang-nodejs="`http`" pulumi-lang-dotnet="`Http`" pulumi-lang-go="`http`" pulumi-lang-python="`http`" pulumi-lang-yaml="`http`" pulumi-lang-java="`http`">`http`</span>.
+        Action type. Value must be one of <span pulumi-lang-nodejs="`script`" pulumi-lang-dotnet="`Script`" pulumi-lang-go="`script`" pulumi-lang-python="`script`" pulumi-lang-yaml="`script`" pulumi-lang-java="`script`" pulumi-lang-hcl="`script`">`script`</span>, <span pulumi-lang-nodejs="`http`" pulumi-lang-dotnet="`Http`" pulumi-lang-go="`http`" pulumi-lang-python="`http`" pulumi-lang-yaml="`http`" pulumi-lang-java="`http`" pulumi-lang-hcl="`http`">`http`</span>.
         """
         return pulumi.get(self, "action_type")
 
     @action_type.setter
-    def action_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def action_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "action_type", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Action description
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="edgeConnectorActionId")
-    def edge_connector_action_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def edge_connector_action_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "edge_connector_action_id")
 
     @edge_connector_action_id.setter
-    def edge_connector_action_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def edge_connector_action_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "edge_connector_action_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def icon(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def icon(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Action icon. Value must be one of <span pulumi-lang-nodejs="`bolt`" pulumi-lang-dotnet="`Bolt`" pulumi-lang-go="`bolt`" pulumi-lang-python="`bolt`" pulumi-lang-yaml="`bolt`" pulumi-lang-java="`bolt`">`bolt`</span>, `bolt-slash`, <span pulumi-lang-nodejs="`cog`" pulumi-lang-dotnet="`Cog`" pulumi-lang-go="`cog`" pulumi-lang-python="`cog`" pulumi-lang-yaml="`cog`" pulumi-lang-java="`cog`">`cog`</span>, `command-line`, `code-bracket`, <span pulumi-lang-nodejs="`server`" pulumi-lang-dotnet="`Server`" pulumi-lang-go="`server`" pulumi-lang-python="`server`" pulumi-lang-yaml="`server`" pulumi-lang-java="`server`">`server`</span>, `server-stack`, <span pulumi-lang-nodejs="`play`" pulumi-lang-dotnet="`Play`" pulumi-lang-go="`play`" pulumi-lang-python="`play`" pulumi-lang-yaml="`play`" pulumi-lang-java="`play`">`play`</span>, `arrow-path`, `wrench-screwdriver`, <span pulumi-lang-nodejs="`cube`" pulumi-lang-dotnet="`Cube`" pulumi-lang-go="`cube`" pulumi-lang-python="`cube`" pulumi-lang-yaml="`cube`" pulumi-lang-java="`cube`">`cube`</span>, `rocket-launch`.
+        Action icon. Value must be one of <span pulumi-lang-nodejs="`bolt`" pulumi-lang-dotnet="`Bolt`" pulumi-lang-go="`bolt`" pulumi-lang-python="`bolt`" pulumi-lang-yaml="`bolt`" pulumi-lang-java="`bolt`" pulumi-lang-hcl="`bolt`">`bolt`</span>, `bolt-slash`, <span pulumi-lang-nodejs="`cog`" pulumi-lang-dotnet="`Cog`" pulumi-lang-go="`cog`" pulumi-lang-python="`cog`" pulumi-lang-yaml="`cog`" pulumi-lang-java="`cog`" pulumi-lang-hcl="`cog`">`cog`</span>, `command-line`, `code-bracket`, <span pulumi-lang-nodejs="`server`" pulumi-lang-dotnet="`Server`" pulumi-lang-go="`server`" pulumi-lang-python="`server`" pulumi-lang-yaml="`server`" pulumi-lang-java="`server`" pulumi-lang-hcl="`server`">`server`</span>, `server-stack`, <span pulumi-lang-nodejs="`play`" pulumi-lang-dotnet="`Play`" pulumi-lang-go="`play`" pulumi-lang-python="`play`" pulumi-lang-yaml="`play`" pulumi-lang-java="`play`" pulumi-lang-hcl="`play`">`play`</span>, `arrow-path`, `wrench-screwdriver`, <span pulumi-lang-nodejs="`cube`" pulumi-lang-dotnet="`Cube`" pulumi-lang-go="`cube`" pulumi-lang-python="`cube`" pulumi-lang-yaml="`cube`" pulumi-lang-java="`cube`" pulumi-lang-hcl="`cube`">`cube`</span>, `rocket-launch`.
         """
         return pulumi.get(self, "icon")
 
     @icon.setter
-    def icon(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def icon(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "icon", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Action name
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def parameters(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['EdgeConnectorActionParameterArgs']]]]:
+    def parameters(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['EdgeConnectorActionParameterArgs']]]]:
         """
         Parameter definitions
         """
         return pulumi.get(self, "parameters")
 
     @parameters.setter
-    def parameters(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['EdgeConnectorActionParameterArgs']]]]):
+    def parameters(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['EdgeConnectorActionParameterArgs']]]]):
         pulumi.set(self, "parameters", value)
 
     @_builtins.property
     @pulumi.getter
-    def timeout(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def timeout(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Timeout in seconds
         """
         return pulumi.get(self, "timeout")
 
     @timeout.setter
-    def timeout(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def timeout(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "timeout", value)
 
 
 @pulumi.input_type
 class _EdgeConnectorActionState:
     def __init__(__self__, *,
-                 action_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 created_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 edge_connector_action_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 edge_connector_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 icon: Optional[pulumi.Input[_builtins.str]] = None,
-                 last_executed_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 parameters: Optional[pulumi.Input[Sequence[pulumi.Input['EdgeConnectorActionParameterArgs']]]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 timeout: Optional[pulumi.Input[_builtins.float]] = None,
-                 updated_at: Optional[pulumi.Input[_builtins.str]] = None):
+                 action_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 created_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 edge_connector_action_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 edge_connector_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 icon: pulumi.Input[Optional[_builtins.str]] = None,
+                 last_executed_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 parameters: pulumi.Input[Optional[Sequence[pulumi.Input['EdgeConnectorActionParameterArgs']]]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 timeout: pulumi.Input[Optional[_builtins.float]] = None,
+                 updated_at: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering EdgeConnectorAction resources.
 
-        :param pulumi.Input[_builtins.str] action_type: Action type. Value must be one of <span pulumi-lang-nodejs="`script`" pulumi-lang-dotnet="`Script`" pulumi-lang-go="`script`" pulumi-lang-python="`script`" pulumi-lang-yaml="`script`" pulumi-lang-java="`script`">`script`</span>, <span pulumi-lang-nodejs="`http`" pulumi-lang-dotnet="`Http`" pulumi-lang-go="`http`" pulumi-lang-python="`http`" pulumi-lang-yaml="`http`" pulumi-lang-java="`http`">`http`</span>.
+        :param pulumi.Input[_builtins.str] action_type: Action type. Value must be one of <span pulumi-lang-nodejs="`script`" pulumi-lang-dotnet="`Script`" pulumi-lang-go="`script`" pulumi-lang-python="`script`" pulumi-lang-yaml="`script`" pulumi-lang-java="`script`" pulumi-lang-hcl="`script`">`script`</span>, <span pulumi-lang-nodejs="`http`" pulumi-lang-dotnet="`Http`" pulumi-lang-go="`http`" pulumi-lang-python="`http`" pulumi-lang-yaml="`http`" pulumi-lang-java="`http`" pulumi-lang-hcl="`http`">`http`</span>.
         :param pulumi.Input[_builtins.str] description: Action description
         :param pulumi.Input[_builtins.str] edge_connector_id: The ID of the edge connector
-        :param pulumi.Input[_builtins.str] icon: Action icon. Value must be one of <span pulumi-lang-nodejs="`bolt`" pulumi-lang-dotnet="`Bolt`" pulumi-lang-go="`bolt`" pulumi-lang-python="`bolt`" pulumi-lang-yaml="`bolt`" pulumi-lang-java="`bolt`">`bolt`</span>, `bolt-slash`, <span pulumi-lang-nodejs="`cog`" pulumi-lang-dotnet="`Cog`" pulumi-lang-go="`cog`" pulumi-lang-python="`cog`" pulumi-lang-yaml="`cog`" pulumi-lang-java="`cog`">`cog`</span>, `command-line`, `code-bracket`, <span pulumi-lang-nodejs="`server`" pulumi-lang-dotnet="`Server`" pulumi-lang-go="`server`" pulumi-lang-python="`server`" pulumi-lang-yaml="`server`" pulumi-lang-java="`server`">`server`</span>, `server-stack`, <span pulumi-lang-nodejs="`play`" pulumi-lang-dotnet="`Play`" pulumi-lang-go="`play`" pulumi-lang-python="`play`" pulumi-lang-yaml="`play`" pulumi-lang-java="`play`">`play`</span>, `arrow-path`, `wrench-screwdriver`, <span pulumi-lang-nodejs="`cube`" pulumi-lang-dotnet="`Cube`" pulumi-lang-go="`cube`" pulumi-lang-python="`cube`" pulumi-lang-yaml="`cube`" pulumi-lang-java="`cube`">`cube`</span>, `rocket-launch`.
+        :param pulumi.Input[_builtins.str] icon: Action icon. Value must be one of <span pulumi-lang-nodejs="`bolt`" pulumi-lang-dotnet="`Bolt`" pulumi-lang-go="`bolt`" pulumi-lang-python="`bolt`" pulumi-lang-yaml="`bolt`" pulumi-lang-java="`bolt`" pulumi-lang-hcl="`bolt`">`bolt`</span>, `bolt-slash`, <span pulumi-lang-nodejs="`cog`" pulumi-lang-dotnet="`Cog`" pulumi-lang-go="`cog`" pulumi-lang-python="`cog`" pulumi-lang-yaml="`cog`" pulumi-lang-java="`cog`" pulumi-lang-hcl="`cog`">`cog`</span>, `command-line`, `code-bracket`, <span pulumi-lang-nodejs="`server`" pulumi-lang-dotnet="`Server`" pulumi-lang-go="`server`" pulumi-lang-python="`server`" pulumi-lang-yaml="`server`" pulumi-lang-java="`server`" pulumi-lang-hcl="`server`">`server`</span>, `server-stack`, <span pulumi-lang-nodejs="`play`" pulumi-lang-dotnet="`Play`" pulumi-lang-go="`play`" pulumi-lang-python="`play`" pulumi-lang-yaml="`play`" pulumi-lang-java="`play`" pulumi-lang-hcl="`play`">`play`</span>, `arrow-path`, `wrench-screwdriver`, <span pulumi-lang-nodejs="`cube`" pulumi-lang-dotnet="`Cube`" pulumi-lang-go="`cube`" pulumi-lang-python="`cube`" pulumi-lang-yaml="`cube`" pulumi-lang-java="`cube`" pulumi-lang-hcl="`cube`">`cube`</span>, `rocket-launch`.
         :param pulumi.Input[_builtins.str] name: Action name
         :param pulumi.Input[Sequence[pulumi.Input['EdgeConnectorActionParameterArgs']]] parameters: Parameter definitions
         :param pulumi.Input[_builtins.str] slug: Action slug
@@ -204,134 +204,134 @@ class _EdgeConnectorActionState:
 
     @_builtins.property
     @pulumi.getter(name="actionType")
-    def action_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def action_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Action type. Value must be one of <span pulumi-lang-nodejs="`script`" pulumi-lang-dotnet="`Script`" pulumi-lang-go="`script`" pulumi-lang-python="`script`" pulumi-lang-yaml="`script`" pulumi-lang-java="`script`">`script`</span>, <span pulumi-lang-nodejs="`http`" pulumi-lang-dotnet="`Http`" pulumi-lang-go="`http`" pulumi-lang-python="`http`" pulumi-lang-yaml="`http`" pulumi-lang-java="`http`">`http`</span>.
+        Action type. Value must be one of <span pulumi-lang-nodejs="`script`" pulumi-lang-dotnet="`Script`" pulumi-lang-go="`script`" pulumi-lang-python="`script`" pulumi-lang-yaml="`script`" pulumi-lang-java="`script`" pulumi-lang-hcl="`script`">`script`</span>, <span pulumi-lang-nodejs="`http`" pulumi-lang-dotnet="`Http`" pulumi-lang-go="`http`" pulumi-lang-python="`http`" pulumi-lang-yaml="`http`" pulumi-lang-java="`http`" pulumi-lang-hcl="`http`">`http`</span>.
         """
         return pulumi.get(self, "action_type")
 
     @action_type.setter
-    def action_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def action_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "action_type", value)
 
     @_builtins.property
     @pulumi.getter(name="createdAt")
-    def created_at(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def created_at(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "created_at")
 
     @created_at.setter
-    def created_at(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def created_at(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "created_at", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Action description
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="edgeConnectorActionId")
-    def edge_connector_action_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def edge_connector_action_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "edge_connector_action_id")
 
     @edge_connector_action_id.setter
-    def edge_connector_action_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def edge_connector_action_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "edge_connector_action_id", value)
 
     @_builtins.property
     @pulumi.getter(name="edgeConnectorId")
-    def edge_connector_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def edge_connector_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The ID of the edge connector
         """
         return pulumi.get(self, "edge_connector_id")
 
     @edge_connector_id.setter
-    def edge_connector_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def edge_connector_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "edge_connector_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def icon(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def icon(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Action icon. Value must be one of <span pulumi-lang-nodejs="`bolt`" pulumi-lang-dotnet="`Bolt`" pulumi-lang-go="`bolt`" pulumi-lang-python="`bolt`" pulumi-lang-yaml="`bolt`" pulumi-lang-java="`bolt`">`bolt`</span>, `bolt-slash`, <span pulumi-lang-nodejs="`cog`" pulumi-lang-dotnet="`Cog`" pulumi-lang-go="`cog`" pulumi-lang-python="`cog`" pulumi-lang-yaml="`cog`" pulumi-lang-java="`cog`">`cog`</span>, `command-line`, `code-bracket`, <span pulumi-lang-nodejs="`server`" pulumi-lang-dotnet="`Server`" pulumi-lang-go="`server`" pulumi-lang-python="`server`" pulumi-lang-yaml="`server`" pulumi-lang-java="`server`">`server`</span>, `server-stack`, <span pulumi-lang-nodejs="`play`" pulumi-lang-dotnet="`Play`" pulumi-lang-go="`play`" pulumi-lang-python="`play`" pulumi-lang-yaml="`play`" pulumi-lang-java="`play`">`play`</span>, `arrow-path`, `wrench-screwdriver`, <span pulumi-lang-nodejs="`cube`" pulumi-lang-dotnet="`Cube`" pulumi-lang-go="`cube`" pulumi-lang-python="`cube`" pulumi-lang-yaml="`cube`" pulumi-lang-java="`cube`">`cube`</span>, `rocket-launch`.
+        Action icon. Value must be one of <span pulumi-lang-nodejs="`bolt`" pulumi-lang-dotnet="`Bolt`" pulumi-lang-go="`bolt`" pulumi-lang-python="`bolt`" pulumi-lang-yaml="`bolt`" pulumi-lang-java="`bolt`" pulumi-lang-hcl="`bolt`">`bolt`</span>, `bolt-slash`, <span pulumi-lang-nodejs="`cog`" pulumi-lang-dotnet="`Cog`" pulumi-lang-go="`cog`" pulumi-lang-python="`cog`" pulumi-lang-yaml="`cog`" pulumi-lang-java="`cog`" pulumi-lang-hcl="`cog`">`cog`</span>, `command-line`, `code-bracket`, <span pulumi-lang-nodejs="`server`" pulumi-lang-dotnet="`Server`" pulumi-lang-go="`server`" pulumi-lang-python="`server`" pulumi-lang-yaml="`server`" pulumi-lang-java="`server`" pulumi-lang-hcl="`server`">`server`</span>, `server-stack`, <span pulumi-lang-nodejs="`play`" pulumi-lang-dotnet="`Play`" pulumi-lang-go="`play`" pulumi-lang-python="`play`" pulumi-lang-yaml="`play`" pulumi-lang-java="`play`" pulumi-lang-hcl="`play`">`play`</span>, `arrow-path`, `wrench-screwdriver`, <span pulumi-lang-nodejs="`cube`" pulumi-lang-dotnet="`Cube`" pulumi-lang-go="`cube`" pulumi-lang-python="`cube`" pulumi-lang-yaml="`cube`" pulumi-lang-java="`cube`" pulumi-lang-hcl="`cube`">`cube`</span>, `rocket-launch`.
         """
         return pulumi.get(self, "icon")
 
     @icon.setter
-    def icon(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def icon(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "icon", value)
 
     @_builtins.property
     @pulumi.getter(name="lastExecutedAt")
-    def last_executed_at(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def last_executed_at(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "last_executed_at")
 
     @last_executed_at.setter
-    def last_executed_at(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def last_executed_at(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "last_executed_at", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Action name
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def parameters(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['EdgeConnectorActionParameterArgs']]]]:
+    def parameters(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['EdgeConnectorActionParameterArgs']]]]:
         """
         Parameter definitions
         """
         return pulumi.get(self, "parameters")
 
     @parameters.setter
-    def parameters(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['EdgeConnectorActionParameterArgs']]]]):
+    def parameters(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['EdgeConnectorActionParameterArgs']]]]):
         pulumi.set(self, "parameters", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Action slug
         """
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
     @_builtins.property
     @pulumi.getter
-    def timeout(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def timeout(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Timeout in seconds
         """
         return pulumi.get(self, "timeout")
 
     @timeout.setter
-    def timeout(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def timeout(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "timeout", value)
 
     @_builtins.property
     @pulumi.getter(name="updatedAt")
-    def updated_at(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def updated_at(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "updated_at")
 
     @updated_at.setter
-    def updated_at(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def updated_at(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "updated_at", value)
 
 
@@ -341,24 +341,24 @@ class EdgeConnectorAction(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 action_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 edge_connector_action_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 edge_connector_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 icon: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 parameters: Optional[pulumi.Input[Sequence[pulumi.Input[Union['EdgeConnectorActionParameterArgs', 'EdgeConnectorActionParameterArgsDict']]]]] = None,
-                 timeout: Optional[pulumi.Input[_builtins.float]] = None,
+                 action_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 edge_connector_action_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 edge_connector_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 icon: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 parameters: pulumi.Input[Optional[Sequence[pulumi.Input[Union['EdgeConnectorActionParameterArgs', 'EdgeConnectorActionParameterArgsDict']]]]] = None,
+                 timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         """
         Create a EdgeConnectorAction resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] action_type: Action type. Value must be one of <span pulumi-lang-nodejs="`script`" pulumi-lang-dotnet="`Script`" pulumi-lang-go="`script`" pulumi-lang-python="`script`" pulumi-lang-yaml="`script`" pulumi-lang-java="`script`">`script`</span>, <span pulumi-lang-nodejs="`http`" pulumi-lang-dotnet="`Http`" pulumi-lang-go="`http`" pulumi-lang-python="`http`" pulumi-lang-yaml="`http`" pulumi-lang-java="`http`">`http`</span>.
+        :param pulumi.Input[_builtins.str] action_type: Action type. Value must be one of <span pulumi-lang-nodejs="`script`" pulumi-lang-dotnet="`Script`" pulumi-lang-go="`script`" pulumi-lang-python="`script`" pulumi-lang-yaml="`script`" pulumi-lang-java="`script`" pulumi-lang-hcl="`script`">`script`</span>, <span pulumi-lang-nodejs="`http`" pulumi-lang-dotnet="`Http`" pulumi-lang-go="`http`" pulumi-lang-python="`http`" pulumi-lang-yaml="`http`" pulumi-lang-java="`http`" pulumi-lang-hcl="`http`">`http`</span>.
         :param pulumi.Input[_builtins.str] description: Action description
         :param pulumi.Input[_builtins.str] edge_connector_id: The ID of the edge connector
-        :param pulumi.Input[_builtins.str] icon: Action icon. Value must be one of <span pulumi-lang-nodejs="`bolt`" pulumi-lang-dotnet="`Bolt`" pulumi-lang-go="`bolt`" pulumi-lang-python="`bolt`" pulumi-lang-yaml="`bolt`" pulumi-lang-java="`bolt`">`bolt`</span>, `bolt-slash`, <span pulumi-lang-nodejs="`cog`" pulumi-lang-dotnet="`Cog`" pulumi-lang-go="`cog`" pulumi-lang-python="`cog`" pulumi-lang-yaml="`cog`" pulumi-lang-java="`cog`">`cog`</span>, `command-line`, `code-bracket`, <span pulumi-lang-nodejs="`server`" pulumi-lang-dotnet="`Server`" pulumi-lang-go="`server`" pulumi-lang-python="`server`" pulumi-lang-yaml="`server`" pulumi-lang-java="`server`">`server`</span>, `server-stack`, <span pulumi-lang-nodejs="`play`" pulumi-lang-dotnet="`Play`" pulumi-lang-go="`play`" pulumi-lang-python="`play`" pulumi-lang-yaml="`play`" pulumi-lang-java="`play`">`play`</span>, `arrow-path`, `wrench-screwdriver`, <span pulumi-lang-nodejs="`cube`" pulumi-lang-dotnet="`Cube`" pulumi-lang-go="`cube`" pulumi-lang-python="`cube`" pulumi-lang-yaml="`cube`" pulumi-lang-java="`cube`">`cube`</span>, `rocket-launch`.
+        :param pulumi.Input[_builtins.str] icon: Action icon. Value must be one of <span pulumi-lang-nodejs="`bolt`" pulumi-lang-dotnet="`Bolt`" pulumi-lang-go="`bolt`" pulumi-lang-python="`bolt`" pulumi-lang-yaml="`bolt`" pulumi-lang-java="`bolt`" pulumi-lang-hcl="`bolt`">`bolt`</span>, `bolt-slash`, <span pulumi-lang-nodejs="`cog`" pulumi-lang-dotnet="`Cog`" pulumi-lang-go="`cog`" pulumi-lang-python="`cog`" pulumi-lang-yaml="`cog`" pulumi-lang-java="`cog`" pulumi-lang-hcl="`cog`">`cog`</span>, `command-line`, `code-bracket`, <span pulumi-lang-nodejs="`server`" pulumi-lang-dotnet="`Server`" pulumi-lang-go="`server`" pulumi-lang-python="`server`" pulumi-lang-yaml="`server`" pulumi-lang-java="`server`" pulumi-lang-hcl="`server`">`server`</span>, `server-stack`, <span pulumi-lang-nodejs="`play`" pulumi-lang-dotnet="`Play`" pulumi-lang-go="`play`" pulumi-lang-python="`play`" pulumi-lang-yaml="`play`" pulumi-lang-java="`play`" pulumi-lang-hcl="`play`">`play`</span>, `arrow-path`, `wrench-screwdriver`, <span pulumi-lang-nodejs="`cube`" pulumi-lang-dotnet="`Cube`" pulumi-lang-go="`cube`" pulumi-lang-python="`cube`" pulumi-lang-yaml="`cube`" pulumi-lang-java="`cube`" pulumi-lang-hcl="`cube`">`cube`</span>, `rocket-launch`.
         :param pulumi.Input[_builtins.str] name: Action name
         :param pulumi.Input[Sequence[pulumi.Input[Union['EdgeConnectorActionParameterArgs', 'EdgeConnectorActionParameterArgsDict']]]] parameters: Parameter definitions
         :param pulumi.Input[_builtins.float] timeout: Timeout in seconds
@@ -387,14 +387,14 @@ class EdgeConnectorAction(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 action_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 edge_connector_action_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 edge_connector_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 icon: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 parameters: Optional[pulumi.Input[Sequence[pulumi.Input[Union['EdgeConnectorActionParameterArgs', 'EdgeConnectorActionParameterArgsDict']]]]] = None,
-                 timeout: Optional[pulumi.Input[_builtins.float]] = None,
+                 action_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 edge_connector_action_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 edge_connector_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 icon: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 parameters: pulumi.Input[Optional[Sequence[pulumi.Input[Union['EdgeConnectorActionParameterArgs', 'EdgeConnectorActionParameterArgsDict']]]]] = None,
+                 timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -429,18 +429,18 @@ class EdgeConnectorAction(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            action_type: Optional[pulumi.Input[_builtins.str]] = None,
-            created_at: Optional[pulumi.Input[_builtins.str]] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            edge_connector_action_id: Optional[pulumi.Input[_builtins.str]] = None,
-            edge_connector_id: Optional[pulumi.Input[_builtins.str]] = None,
-            icon: Optional[pulumi.Input[_builtins.str]] = None,
-            last_executed_at: Optional[pulumi.Input[_builtins.str]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            parameters: Optional[pulumi.Input[Sequence[pulumi.Input[Union['EdgeConnectorActionParameterArgs', 'EdgeConnectorActionParameterArgsDict']]]]] = None,
-            slug: Optional[pulumi.Input[_builtins.str]] = None,
-            timeout: Optional[pulumi.Input[_builtins.float]] = None,
-            updated_at: Optional[pulumi.Input[_builtins.str]] = None) -> 'EdgeConnectorAction':
+            action_type: pulumi.Input[Optional[_builtins.str]] = None,
+            created_at: pulumi.Input[Optional[_builtins.str]] = None,
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            edge_connector_action_id: pulumi.Input[Optional[_builtins.str]] = None,
+            edge_connector_id: pulumi.Input[Optional[_builtins.str]] = None,
+            icon: pulumi.Input[Optional[_builtins.str]] = None,
+            last_executed_at: pulumi.Input[Optional[_builtins.str]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            parameters: pulumi.Input[Optional[Sequence[pulumi.Input[Union['EdgeConnectorActionParameterArgs', 'EdgeConnectorActionParameterArgsDict']]]]] = None,
+            slug: pulumi.Input[Optional[_builtins.str]] = None,
+            timeout: pulumi.Input[Optional[_builtins.float]] = None,
+            updated_at: pulumi.Input[Optional[_builtins.str]] = None) -> 'EdgeConnectorAction':
         """
         Get an existing EdgeConnectorAction resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -448,10 +448,10 @@ class EdgeConnectorAction(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] action_type: Action type. Value must be one of <span pulumi-lang-nodejs="`script`" pulumi-lang-dotnet="`Script`" pulumi-lang-go="`script`" pulumi-lang-python="`script`" pulumi-lang-yaml="`script`" pulumi-lang-java="`script`">`script`</span>, <span pulumi-lang-nodejs="`http`" pulumi-lang-dotnet="`Http`" pulumi-lang-go="`http`" pulumi-lang-python="`http`" pulumi-lang-yaml="`http`" pulumi-lang-java="`http`">`http`</span>.
+        :param pulumi.Input[_builtins.str] action_type: Action type. Value must be one of <span pulumi-lang-nodejs="`script`" pulumi-lang-dotnet="`Script`" pulumi-lang-go="`script`" pulumi-lang-python="`script`" pulumi-lang-yaml="`script`" pulumi-lang-java="`script`" pulumi-lang-hcl="`script`">`script`</span>, <span pulumi-lang-nodejs="`http`" pulumi-lang-dotnet="`Http`" pulumi-lang-go="`http`" pulumi-lang-python="`http`" pulumi-lang-yaml="`http`" pulumi-lang-java="`http`" pulumi-lang-hcl="`http`">`http`</span>.
         :param pulumi.Input[_builtins.str] description: Action description
         :param pulumi.Input[_builtins.str] edge_connector_id: The ID of the edge connector
-        :param pulumi.Input[_builtins.str] icon: Action icon. Value must be one of <span pulumi-lang-nodejs="`bolt`" pulumi-lang-dotnet="`Bolt`" pulumi-lang-go="`bolt`" pulumi-lang-python="`bolt`" pulumi-lang-yaml="`bolt`" pulumi-lang-java="`bolt`">`bolt`</span>, `bolt-slash`, <span pulumi-lang-nodejs="`cog`" pulumi-lang-dotnet="`Cog`" pulumi-lang-go="`cog`" pulumi-lang-python="`cog`" pulumi-lang-yaml="`cog`" pulumi-lang-java="`cog`">`cog`</span>, `command-line`, `code-bracket`, <span pulumi-lang-nodejs="`server`" pulumi-lang-dotnet="`Server`" pulumi-lang-go="`server`" pulumi-lang-python="`server`" pulumi-lang-yaml="`server`" pulumi-lang-java="`server`">`server`</span>, `server-stack`, <span pulumi-lang-nodejs="`play`" pulumi-lang-dotnet="`Play`" pulumi-lang-go="`play`" pulumi-lang-python="`play`" pulumi-lang-yaml="`play`" pulumi-lang-java="`play`">`play`</span>, `arrow-path`, `wrench-screwdriver`, <span pulumi-lang-nodejs="`cube`" pulumi-lang-dotnet="`Cube`" pulumi-lang-go="`cube`" pulumi-lang-python="`cube`" pulumi-lang-yaml="`cube`" pulumi-lang-java="`cube`">`cube`</span>, `rocket-launch`.
+        :param pulumi.Input[_builtins.str] icon: Action icon. Value must be one of <span pulumi-lang-nodejs="`bolt`" pulumi-lang-dotnet="`Bolt`" pulumi-lang-go="`bolt`" pulumi-lang-python="`bolt`" pulumi-lang-yaml="`bolt`" pulumi-lang-java="`bolt`" pulumi-lang-hcl="`bolt`">`bolt`</span>, `bolt-slash`, <span pulumi-lang-nodejs="`cog`" pulumi-lang-dotnet="`Cog`" pulumi-lang-go="`cog`" pulumi-lang-python="`cog`" pulumi-lang-yaml="`cog`" pulumi-lang-java="`cog`" pulumi-lang-hcl="`cog`">`cog`</span>, `command-line`, `code-bracket`, <span pulumi-lang-nodejs="`server`" pulumi-lang-dotnet="`Server`" pulumi-lang-go="`server`" pulumi-lang-python="`server`" pulumi-lang-yaml="`server`" pulumi-lang-java="`server`" pulumi-lang-hcl="`server`">`server`</span>, `server-stack`, <span pulumi-lang-nodejs="`play`" pulumi-lang-dotnet="`Play`" pulumi-lang-go="`play`" pulumi-lang-python="`play`" pulumi-lang-yaml="`play`" pulumi-lang-java="`play`" pulumi-lang-hcl="`play`">`play`</span>, `arrow-path`, `wrench-screwdriver`, <span pulumi-lang-nodejs="`cube`" pulumi-lang-dotnet="`Cube`" pulumi-lang-go="`cube`" pulumi-lang-python="`cube`" pulumi-lang-yaml="`cube`" pulumi-lang-java="`cube`" pulumi-lang-hcl="`cube`">`cube`</span>, `rocket-launch`.
         :param pulumi.Input[_builtins.str] name: Action name
         :param pulumi.Input[Sequence[pulumi.Input[Union['EdgeConnectorActionParameterArgs', 'EdgeConnectorActionParameterArgsDict']]]] parameters: Parameter definitions
         :param pulumi.Input[_builtins.str] slug: Action slug
@@ -479,7 +479,7 @@ class EdgeConnectorAction(pulumi.CustomResource):
     @pulumi.getter(name="actionType")
     def action_type(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Action type. Value must be one of <span pulumi-lang-nodejs="`script`" pulumi-lang-dotnet="`Script`" pulumi-lang-go="`script`" pulumi-lang-python="`script`" pulumi-lang-yaml="`script`" pulumi-lang-java="`script`">`script`</span>, <span pulumi-lang-nodejs="`http`" pulumi-lang-dotnet="`Http`" pulumi-lang-go="`http`" pulumi-lang-python="`http`" pulumi-lang-yaml="`http`" pulumi-lang-java="`http`">`http`</span>.
+        Action type. Value must be one of <span pulumi-lang-nodejs="`script`" pulumi-lang-dotnet="`Script`" pulumi-lang-go="`script`" pulumi-lang-python="`script`" pulumi-lang-yaml="`script`" pulumi-lang-java="`script`" pulumi-lang-hcl="`script`">`script`</span>, <span pulumi-lang-nodejs="`http`" pulumi-lang-dotnet="`Http`" pulumi-lang-go="`http`" pulumi-lang-python="`http`" pulumi-lang-yaml="`http`" pulumi-lang-java="`http`" pulumi-lang-hcl="`http`">`http`</span>.
         """
         return pulumi.get(self, "action_type")
 
@@ -513,7 +513,7 @@ class EdgeConnectorAction(pulumi.CustomResource):
     @pulumi.getter
     def icon(self) -> pulumi.Output[_builtins.str]:
         """
-        Action icon. Value must be one of <span pulumi-lang-nodejs="`bolt`" pulumi-lang-dotnet="`Bolt`" pulumi-lang-go="`bolt`" pulumi-lang-python="`bolt`" pulumi-lang-yaml="`bolt`" pulumi-lang-java="`bolt`">`bolt`</span>, `bolt-slash`, <span pulumi-lang-nodejs="`cog`" pulumi-lang-dotnet="`Cog`" pulumi-lang-go="`cog`" pulumi-lang-python="`cog`" pulumi-lang-yaml="`cog`" pulumi-lang-java="`cog`">`cog`</span>, `command-line`, `code-bracket`, <span pulumi-lang-nodejs="`server`" pulumi-lang-dotnet="`Server`" pulumi-lang-go="`server`" pulumi-lang-python="`server`" pulumi-lang-yaml="`server`" pulumi-lang-java="`server`">`server`</span>, `server-stack`, <span pulumi-lang-nodejs="`play`" pulumi-lang-dotnet="`Play`" pulumi-lang-go="`play`" pulumi-lang-python="`play`" pulumi-lang-yaml="`play`" pulumi-lang-java="`play`">`play`</span>, `arrow-path`, `wrench-screwdriver`, <span pulumi-lang-nodejs="`cube`" pulumi-lang-dotnet="`Cube`" pulumi-lang-go="`cube`" pulumi-lang-python="`cube`" pulumi-lang-yaml="`cube`" pulumi-lang-java="`cube`">`cube`</span>, `rocket-launch`.
+        Action icon. Value must be one of <span pulumi-lang-nodejs="`bolt`" pulumi-lang-dotnet="`Bolt`" pulumi-lang-go="`bolt`" pulumi-lang-python="`bolt`" pulumi-lang-yaml="`bolt`" pulumi-lang-java="`bolt`" pulumi-lang-hcl="`bolt`">`bolt`</span>, `bolt-slash`, <span pulumi-lang-nodejs="`cog`" pulumi-lang-dotnet="`Cog`" pulumi-lang-go="`cog`" pulumi-lang-python="`cog`" pulumi-lang-yaml="`cog`" pulumi-lang-java="`cog`" pulumi-lang-hcl="`cog`">`cog`</span>, `command-line`, `code-bracket`, <span pulumi-lang-nodejs="`server`" pulumi-lang-dotnet="`Server`" pulumi-lang-go="`server`" pulumi-lang-python="`server`" pulumi-lang-yaml="`server`" pulumi-lang-java="`server`" pulumi-lang-hcl="`server`">`server`</span>, `server-stack`, <span pulumi-lang-nodejs="`play`" pulumi-lang-dotnet="`Play`" pulumi-lang-go="`play`" pulumi-lang-python="`play`" pulumi-lang-yaml="`play`" pulumi-lang-java="`play`" pulumi-lang-hcl="`play`">`play`</span>, `arrow-path`, `wrench-screwdriver`, <span pulumi-lang-nodejs="`cube`" pulumi-lang-dotnet="`Cube`" pulumi-lang-go="`cube`" pulumi-lang-python="`cube`" pulumi-lang-yaml="`cube`" pulumi-lang-java="`cube`" pulumi-lang-hcl="`cube`">`cube`</span>, `rocket-launch`.
         """
         return pulumi.get(self, "icon")
 
@@ -558,3 +558,4 @@ class EdgeConnectorAction(pulumi.CustomResource):
     @pulumi.getter(name="updatedAt")
     def updated_at(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "updated_at")
+

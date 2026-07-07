@@ -21,38 +21,38 @@ __all__ = ['TeamArgs', 'Team']
 @pulumi.input_type
 class TeamArgs:
     def __init__(__self__, *,
-                 admin_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-                 alert_broadcast_channel: Optional[pulumi.Input['TeamAlertBroadcastChannelArgs']] = None,
-                 alert_broadcast_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 auto_add_members_when_attached: Optional[pulumi.Input[_builtins.bool]] = None,
-                 backstage_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 color: Optional[pulumi.Input[_builtins.str]] = None,
-                 cortex_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 external_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_broadcast_channel: Optional[pulumi.Input['TeamIncidentBroadcastChannelArgs']] = None,
-                 incident_broadcast_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 notify_emails: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 opsgenie_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 pagerduty_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 pagerduty_service_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 pagertree_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 properties: Optional[pulumi.Input[Sequence[pulumi.Input['TeamPropertyArgs']]]] = None,
-                 service_now_ci_sys_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 slack_aliases: Optional[pulumi.Input[Sequence[pulumi.Input['TeamSlackAliasArgs']]]] = None,
-                 slack_channels: Optional[pulumi.Input[Sequence[pulumi.Input['TeamSlackChannelArgs']]]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 team_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 user_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-                 victor_ops_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 admin_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 alert_broadcast_channel: pulumi.Input[Optional['TeamAlertBroadcastChannelArgs']] = None,
+                 alert_broadcast_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 auto_add_members_when_attached: pulumi.Input[Optional[_builtins.bool]] = None,
+                 backstage_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 cortex_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 external_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_broadcast_channel: pulumi.Input[Optional['TeamIncidentBroadcastChannelArgs']] = None,
+                 incident_broadcast_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 notify_emails: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 opsgenie_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 pagerduty_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 pagerduty_service_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 pagertree_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 properties: pulumi.Input[Optional[Sequence[pulumi.Input['TeamPropertyArgs']]]] = None,
+                 service_now_ci_sys_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input['TeamSlackAliasArgs']]]] = None,
+                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input['TeamSlackChannelArgs']]]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 team_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 user_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 victor_ops_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a Team resource.
 
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.float]]] admin_ids: The user ids of the admins of this team. These users must also be present in<span pulumi-lang-nodejs=" userIds " pulumi-lang-dotnet=" UserIds " pulumi-lang-go=" userIds " pulumi-lang-python=" user_ids " pulumi-lang-yaml=" userIds " pulumi-lang-java=" userIds "> user_ids </span>attribute.
-        :param pulumi.Input['TeamAlertBroadcastChannelArgs'] alert_broadcast_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Slack channel to broadcast alerts to
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.float]]] admin_ids: The user ids of the admins of this team. These users must also be present in<span pulumi-lang-nodejs=" userIds " pulumi-lang-dotnet=" UserIds " pulumi-lang-go=" userIds " pulumi-lang-python=" user_ids " pulumi-lang-yaml=" userIds " pulumi-lang-java=" userIds " pulumi-lang-hcl=" user_ids "> userIds </span>attribute.
+        :param pulumi.Input['TeamAlertBroadcastChannelArgs'] alert_broadcast_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Slack channel to broadcast alerts to
         :param pulumi.Input[_builtins.bool] alert_broadcast_enabled: Enable alerts to be broadcasted to a specific channel. Value must be one of true or false
         :param pulumi.Input[_builtins.str] alert_urgency_id: The alert urgency id of the team
         :param pulumi.Input[_builtins.bool] auto_add_members_when_attached: Auto add members to incident channel when team is attached. Value must be one of true or false
@@ -61,7 +61,7 @@ class TeamArgs:
         :param pulumi.Input[_builtins.str] cortex_id: The Cortex group id associated to this team
         :param pulumi.Input[_builtins.str] description: The description of the team
         :param pulumi.Input[_builtins.str] external_id: The external id associated to this team
-        :param pulumi.Input['TeamIncidentBroadcastChannelArgs'] incident_broadcast_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Slack channel to broadcast incidents to
+        :param pulumi.Input['TeamIncidentBroadcastChannelArgs'] incident_broadcast_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Slack channel to broadcast incidents to
         :param pulumi.Input[_builtins.bool] incident_broadcast_enabled: Enable incidents to be broadcasted to a specific channel. Value must be one of true or false
         :param pulumi.Input[_builtins.str] name: The name of the team
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] notify_emails: Emails to attach to the team
@@ -134,358 +134,358 @@ class TeamArgs:
 
     @_builtins.property
     @pulumi.getter(name="adminIds")
-    def admin_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]]:
+    def admin_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]:
         """
-        The user ids of the admins of this team. These users must also be present in<span pulumi-lang-nodejs=" userIds " pulumi-lang-dotnet=" UserIds " pulumi-lang-go=" userIds " pulumi-lang-python=" user_ids " pulumi-lang-yaml=" userIds " pulumi-lang-java=" userIds "> user_ids </span>attribute.
+        The user ids of the admins of this team. These users must also be present in<span pulumi-lang-nodejs=" userIds " pulumi-lang-dotnet=" UserIds " pulumi-lang-go=" userIds " pulumi-lang-python=" user_ids " pulumi-lang-yaml=" userIds " pulumi-lang-java=" userIds " pulumi-lang-hcl=" user_ids "> userIds </span>attribute.
         """
         return pulumi.get(self, "admin_ids")
 
     @admin_ids.setter
-    def admin_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]]):
+    def admin_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]):
         pulumi.set(self, "admin_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="alertBroadcastChannel")
-    def alert_broadcast_channel(self) -> Optional[pulumi.Input['TeamAlertBroadcastChannelArgs']]:
+    def alert_broadcast_channel(self) -> pulumi.Input[Optional['TeamAlertBroadcastChannelArgs']]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Slack channel to broadcast alerts to
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Slack channel to broadcast alerts to
         """
         return pulumi.get(self, "alert_broadcast_channel")
 
     @alert_broadcast_channel.setter
-    def alert_broadcast_channel(self, value: Optional[pulumi.Input['TeamAlertBroadcastChannelArgs']]):
+    def alert_broadcast_channel(self, value: pulumi.Input[Optional['TeamAlertBroadcastChannelArgs']]):
         pulumi.set(self, "alert_broadcast_channel", value)
 
     @_builtins.property
     @pulumi.getter(name="alertBroadcastEnabled")
-    def alert_broadcast_enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def alert_broadcast_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Enable alerts to be broadcasted to a specific channel. Value must be one of true or false
         """
         return pulumi.get(self, "alert_broadcast_enabled")
 
     @alert_broadcast_enabled.setter
-    def alert_broadcast_enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def alert_broadcast_enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "alert_broadcast_enabled", value)
 
     @_builtins.property
     @pulumi.getter(name="alertUrgencyId")
-    def alert_urgency_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alert_urgency_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The alert urgency id of the team
         """
         return pulumi.get(self, "alert_urgency_id")
 
     @alert_urgency_id.setter
-    def alert_urgency_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alert_urgency_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alert_urgency_id", value)
 
     @_builtins.property
     @pulumi.getter(name="autoAddMembersWhenAttached")
-    def auto_add_members_when_attached(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def auto_add_members_when_attached(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Auto add members to incident channel when team is attached. Value must be one of true or false
         """
         return pulumi.get(self, "auto_add_members_when_attached")
 
     @auto_add_members_when_attached.setter
-    def auto_add_members_when_attached(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def auto_add_members_when_attached(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "auto_add_members_when_attached", value)
 
     @_builtins.property
     @pulumi.getter(name="backstageId")
-    def backstage_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def backstage_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Backstage entity id associated to this team. eg: :namespace/:kind/:entity_name
         """
         return pulumi.get(self, "backstage_id")
 
     @backstage_id.setter
-    def backstage_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def backstage_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "backstage_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def color(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def color(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The hex color of the team
         """
         return pulumi.get(self, "color")
 
     @color.setter
-    def color(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def color(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "color", value)
 
     @_builtins.property
     @pulumi.getter(name="cortexId")
-    def cortex_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def cortex_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Cortex group id associated to this team
         """
         return pulumi.get(self, "cortex_id")
 
     @cortex_id.setter
-    def cortex_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def cortex_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "cortex_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the team
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="externalId")
-    def external_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def external_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The external id associated to this team
         """
         return pulumi.get(self, "external_id")
 
     @external_id.setter
-    def external_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def external_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "external_id", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentBroadcastChannel")
-    def incident_broadcast_channel(self) -> Optional[pulumi.Input['TeamIncidentBroadcastChannelArgs']]:
+    def incident_broadcast_channel(self) -> pulumi.Input[Optional['TeamIncidentBroadcastChannelArgs']]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Slack channel to broadcast incidents to
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Slack channel to broadcast incidents to
         """
         return pulumi.get(self, "incident_broadcast_channel")
 
     @incident_broadcast_channel.setter
-    def incident_broadcast_channel(self, value: Optional[pulumi.Input['TeamIncidentBroadcastChannelArgs']]):
+    def incident_broadcast_channel(self, value: pulumi.Input[Optional['TeamIncidentBroadcastChannelArgs']]):
         pulumi.set(self, "incident_broadcast_channel", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentBroadcastEnabled")
-    def incident_broadcast_enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def incident_broadcast_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Enable incidents to be broadcasted to a specific channel. Value must be one of true or false
         """
         return pulumi.get(self, "incident_broadcast_enabled")
 
     @incident_broadcast_enabled.setter
-    def incident_broadcast_enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def incident_broadcast_enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "incident_broadcast_enabled", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the team
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="notifyEmails")
-    def notify_emails(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def notify_emails(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Emails to attach to the team
         """
         return pulumi.get(self, "notify_emails")
 
     @notify_emails.setter
-    def notify_emails(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def notify_emails(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "notify_emails", value)
 
     @_builtins.property
     @pulumi.getter(name="opsgenieId")
-    def opsgenie_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def opsgenie_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Opsgenie group id associated to this team
         """
         return pulumi.get(self, "opsgenie_id")
 
     @opsgenie_id.setter
-    def opsgenie_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def opsgenie_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "opsgenie_id", value)
 
     @_builtins.property
     @pulumi.getter(name="pagerdutyId")
-    def pagerduty_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def pagerduty_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The PagerDuty group id associated to this team
         """
         return pulumi.get(self, "pagerduty_id")
 
     @pagerduty_id.setter
-    def pagerduty_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def pagerduty_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "pagerduty_id", value)
 
     @_builtins.property
     @pulumi.getter(name="pagerdutyServiceId")
-    def pagerduty_service_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def pagerduty_service_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The PagerDuty service id associated to this team
         """
         return pulumi.get(self, "pagerduty_service_id")
 
     @pagerduty_service_id.setter
-    def pagerduty_service_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def pagerduty_service_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "pagerduty_service_id", value)
 
     @_builtins.property
     @pulumi.getter(name="pagertreeId")
-    def pagertree_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def pagertree_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The PagerTree group id associated to this team
         """
         return pulumi.get(self, "pagertree_id")
 
     @pagertree_id.setter
-    def pagertree_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def pagertree_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "pagertree_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Position of the team
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter
-    def properties(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['TeamPropertyArgs']]]]:
+    def properties(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['TeamPropertyArgs']]]]:
         """
         Array of property values for this team.
         """
         return pulumi.get(self, "properties")
 
     @properties.setter
-    def properties(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['TeamPropertyArgs']]]]):
+    def properties(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['TeamPropertyArgs']]]]):
         pulumi.set(self, "properties", value)
 
     @_builtins.property
     @pulumi.getter(name="serviceNowCiSysId")
-    def service_now_ci_sys_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def service_now_ci_sys_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Service Now CI sys id associated to this team
         """
         return pulumi.get(self, "service_now_ci_sys_id")
 
     @service_now_ci_sys_id.setter
-    def service_now_ci_sys_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def service_now_ci_sys_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "service_now_ci_sys_id", value)
 
     @_builtins.property
     @pulumi.getter(name="slackAliases")
-    def slack_aliases(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['TeamSlackAliasArgs']]]]:
+    def slack_aliases(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['TeamSlackAliasArgs']]]]:
         """
         Slack Aliases associated with this team
         """
         return pulumi.get(self, "slack_aliases")
 
     @slack_aliases.setter
-    def slack_aliases(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['TeamSlackAliasArgs']]]]):
+    def slack_aliases(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['TeamSlackAliasArgs']]]]):
         pulumi.set(self, "slack_aliases", value)
 
     @_builtins.property
     @pulumi.getter(name="slackChannels")
-    def slack_channels(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['TeamSlackChannelArgs']]]]:
+    def slack_channels(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['TeamSlackChannelArgs']]]]:
         """
         Slack Channels associated with this team
         """
         return pulumi.get(self, "slack_channels")
 
     @slack_channels.setter
-    def slack_channels(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['TeamSlackChannelArgs']]]]):
+    def slack_channels(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['TeamSlackChannelArgs']]]]):
         pulumi.set(self, "slack_channels", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
     @_builtins.property
     @pulumi.getter(name="teamId")
-    def team_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def team_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "team_id")
 
     @team_id.setter
-    def team_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def team_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "team_id", value)
 
     @_builtins.property
     @pulumi.getter(name="userIds")
-    def user_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]]:
+    def user_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]:
         """
         The user ids of the members of this team.
         """
         return pulumi.get(self, "user_ids")
 
     @user_ids.setter
-    def user_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]]):
+    def user_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]):
         pulumi.set(self, "user_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="victorOpsId")
-    def victor_ops_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def victor_ops_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The VictorOps group id associated to this team
         """
         return pulumi.get(self, "victor_ops_id")
 
     @victor_ops_id.setter
-    def victor_ops_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def victor_ops_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "victor_ops_id", value)
 
 
 @pulumi.input_type
 class _TeamState:
     def __init__(__self__, *,
-                 admin_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-                 alert_broadcast_channel: Optional[pulumi.Input['TeamAlertBroadcastChannelArgs']] = None,
-                 alert_broadcast_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 auto_add_members_when_attached: Optional[pulumi.Input[_builtins.bool]] = None,
-                 backstage_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 color: Optional[pulumi.Input[_builtins.str]] = None,
-                 cortex_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 external_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_broadcast_channel: Optional[pulumi.Input['TeamIncidentBroadcastChannelArgs']] = None,
-                 incident_broadcast_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 notify_emails: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 opsgenie_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 pagerduty_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 pagerduty_service_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 pagertree_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 properties: Optional[pulumi.Input[Sequence[pulumi.Input['TeamPropertyArgs']]]] = None,
-                 service_now_ci_sys_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 slack_aliases: Optional[pulumi.Input[Sequence[pulumi.Input['TeamSlackAliasArgs']]]] = None,
-                 slack_channels: Optional[pulumi.Input[Sequence[pulumi.Input['TeamSlackChannelArgs']]]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 team_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 user_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-                 victor_ops_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 admin_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 alert_broadcast_channel: pulumi.Input[Optional['TeamAlertBroadcastChannelArgs']] = None,
+                 alert_broadcast_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 auto_add_members_when_attached: pulumi.Input[Optional[_builtins.bool]] = None,
+                 backstage_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 cortex_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 external_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_broadcast_channel: pulumi.Input[Optional['TeamIncidentBroadcastChannelArgs']] = None,
+                 incident_broadcast_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 notify_emails: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 opsgenie_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 pagerduty_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 pagerduty_service_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 pagertree_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 properties: pulumi.Input[Optional[Sequence[pulumi.Input['TeamPropertyArgs']]]] = None,
+                 service_now_ci_sys_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input['TeamSlackAliasArgs']]]] = None,
+                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input['TeamSlackChannelArgs']]]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 team_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 user_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 victor_ops_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering Team resources.
 
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.float]]] admin_ids: The user ids of the admins of this team. These users must also be present in<span pulumi-lang-nodejs=" userIds " pulumi-lang-dotnet=" UserIds " pulumi-lang-go=" userIds " pulumi-lang-python=" user_ids " pulumi-lang-yaml=" userIds " pulumi-lang-java=" userIds "> user_ids </span>attribute.
-        :param pulumi.Input['TeamAlertBroadcastChannelArgs'] alert_broadcast_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Slack channel to broadcast alerts to
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.float]]] admin_ids: The user ids of the admins of this team. These users must also be present in<span pulumi-lang-nodejs=" userIds " pulumi-lang-dotnet=" UserIds " pulumi-lang-go=" userIds " pulumi-lang-python=" user_ids " pulumi-lang-yaml=" userIds " pulumi-lang-java=" userIds " pulumi-lang-hcl=" user_ids "> userIds </span>attribute.
+        :param pulumi.Input['TeamAlertBroadcastChannelArgs'] alert_broadcast_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Slack channel to broadcast alerts to
         :param pulumi.Input[_builtins.bool] alert_broadcast_enabled: Enable alerts to be broadcasted to a specific channel. Value must be one of true or false
         :param pulumi.Input[_builtins.str] alert_urgency_id: The alert urgency id of the team
         :param pulumi.Input[_builtins.bool] auto_add_members_when_attached: Auto add members to incident channel when team is attached. Value must be one of true or false
@@ -494,7 +494,7 @@ class _TeamState:
         :param pulumi.Input[_builtins.str] cortex_id: The Cortex group id associated to this team
         :param pulumi.Input[_builtins.str] description: The description of the team
         :param pulumi.Input[_builtins.str] external_id: The external id associated to this team
-        :param pulumi.Input['TeamIncidentBroadcastChannelArgs'] incident_broadcast_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Slack channel to broadcast incidents to
+        :param pulumi.Input['TeamIncidentBroadcastChannelArgs'] incident_broadcast_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Slack channel to broadcast incidents to
         :param pulumi.Input[_builtins.bool] incident_broadcast_enabled: Enable incidents to be broadcasted to a specific channel. Value must be one of true or false
         :param pulumi.Input[_builtins.str] name: The name of the team
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] notify_emails: Emails to attach to the team
@@ -567,320 +567,320 @@ class _TeamState:
 
     @_builtins.property
     @pulumi.getter(name="adminIds")
-    def admin_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]]:
+    def admin_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]:
         """
-        The user ids of the admins of this team. These users must also be present in<span pulumi-lang-nodejs=" userIds " pulumi-lang-dotnet=" UserIds " pulumi-lang-go=" userIds " pulumi-lang-python=" user_ids " pulumi-lang-yaml=" userIds " pulumi-lang-java=" userIds "> user_ids </span>attribute.
+        The user ids of the admins of this team. These users must also be present in<span pulumi-lang-nodejs=" userIds " pulumi-lang-dotnet=" UserIds " pulumi-lang-go=" userIds " pulumi-lang-python=" user_ids " pulumi-lang-yaml=" userIds " pulumi-lang-java=" userIds " pulumi-lang-hcl=" user_ids "> userIds </span>attribute.
         """
         return pulumi.get(self, "admin_ids")
 
     @admin_ids.setter
-    def admin_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]]):
+    def admin_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]):
         pulumi.set(self, "admin_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="alertBroadcastChannel")
-    def alert_broadcast_channel(self) -> Optional[pulumi.Input['TeamAlertBroadcastChannelArgs']]:
+    def alert_broadcast_channel(self) -> pulumi.Input[Optional['TeamAlertBroadcastChannelArgs']]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Slack channel to broadcast alerts to
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Slack channel to broadcast alerts to
         """
         return pulumi.get(self, "alert_broadcast_channel")
 
     @alert_broadcast_channel.setter
-    def alert_broadcast_channel(self, value: Optional[pulumi.Input['TeamAlertBroadcastChannelArgs']]):
+    def alert_broadcast_channel(self, value: pulumi.Input[Optional['TeamAlertBroadcastChannelArgs']]):
         pulumi.set(self, "alert_broadcast_channel", value)
 
     @_builtins.property
     @pulumi.getter(name="alertBroadcastEnabled")
-    def alert_broadcast_enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def alert_broadcast_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Enable alerts to be broadcasted to a specific channel. Value must be one of true or false
         """
         return pulumi.get(self, "alert_broadcast_enabled")
 
     @alert_broadcast_enabled.setter
-    def alert_broadcast_enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def alert_broadcast_enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "alert_broadcast_enabled", value)
 
     @_builtins.property
     @pulumi.getter(name="alertUrgencyId")
-    def alert_urgency_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alert_urgency_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The alert urgency id of the team
         """
         return pulumi.get(self, "alert_urgency_id")
 
     @alert_urgency_id.setter
-    def alert_urgency_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alert_urgency_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alert_urgency_id", value)
 
     @_builtins.property
     @pulumi.getter(name="autoAddMembersWhenAttached")
-    def auto_add_members_when_attached(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def auto_add_members_when_attached(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Auto add members to incident channel when team is attached. Value must be one of true or false
         """
         return pulumi.get(self, "auto_add_members_when_attached")
 
     @auto_add_members_when_attached.setter
-    def auto_add_members_when_attached(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def auto_add_members_when_attached(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "auto_add_members_when_attached", value)
 
     @_builtins.property
     @pulumi.getter(name="backstageId")
-    def backstage_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def backstage_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Backstage entity id associated to this team. eg: :namespace/:kind/:entity_name
         """
         return pulumi.get(self, "backstage_id")
 
     @backstage_id.setter
-    def backstage_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def backstage_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "backstage_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def color(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def color(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The hex color of the team
         """
         return pulumi.get(self, "color")
 
     @color.setter
-    def color(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def color(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "color", value)
 
     @_builtins.property
     @pulumi.getter(name="cortexId")
-    def cortex_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def cortex_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Cortex group id associated to this team
         """
         return pulumi.get(self, "cortex_id")
 
     @cortex_id.setter
-    def cortex_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def cortex_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "cortex_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the team
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="externalId")
-    def external_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def external_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The external id associated to this team
         """
         return pulumi.get(self, "external_id")
 
     @external_id.setter
-    def external_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def external_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "external_id", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentBroadcastChannel")
-    def incident_broadcast_channel(self) -> Optional[pulumi.Input['TeamIncidentBroadcastChannelArgs']]:
+    def incident_broadcast_channel(self) -> pulumi.Input[Optional['TeamIncidentBroadcastChannelArgs']]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Slack channel to broadcast incidents to
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Slack channel to broadcast incidents to
         """
         return pulumi.get(self, "incident_broadcast_channel")
 
     @incident_broadcast_channel.setter
-    def incident_broadcast_channel(self, value: Optional[pulumi.Input['TeamIncidentBroadcastChannelArgs']]):
+    def incident_broadcast_channel(self, value: pulumi.Input[Optional['TeamIncidentBroadcastChannelArgs']]):
         pulumi.set(self, "incident_broadcast_channel", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentBroadcastEnabled")
-    def incident_broadcast_enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def incident_broadcast_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Enable incidents to be broadcasted to a specific channel. Value must be one of true or false
         """
         return pulumi.get(self, "incident_broadcast_enabled")
 
     @incident_broadcast_enabled.setter
-    def incident_broadcast_enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def incident_broadcast_enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "incident_broadcast_enabled", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the team
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="notifyEmails")
-    def notify_emails(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def notify_emails(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Emails to attach to the team
         """
         return pulumi.get(self, "notify_emails")
 
     @notify_emails.setter
-    def notify_emails(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def notify_emails(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "notify_emails", value)
 
     @_builtins.property
     @pulumi.getter(name="opsgenieId")
-    def opsgenie_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def opsgenie_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Opsgenie group id associated to this team
         """
         return pulumi.get(self, "opsgenie_id")
 
     @opsgenie_id.setter
-    def opsgenie_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def opsgenie_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "opsgenie_id", value)
 
     @_builtins.property
     @pulumi.getter(name="pagerdutyId")
-    def pagerduty_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def pagerduty_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The PagerDuty group id associated to this team
         """
         return pulumi.get(self, "pagerduty_id")
 
     @pagerduty_id.setter
-    def pagerduty_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def pagerduty_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "pagerduty_id", value)
 
     @_builtins.property
     @pulumi.getter(name="pagerdutyServiceId")
-    def pagerduty_service_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def pagerduty_service_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The PagerDuty service id associated to this team
         """
         return pulumi.get(self, "pagerduty_service_id")
 
     @pagerduty_service_id.setter
-    def pagerduty_service_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def pagerduty_service_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "pagerduty_service_id", value)
 
     @_builtins.property
     @pulumi.getter(name="pagertreeId")
-    def pagertree_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def pagertree_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The PagerTree group id associated to this team
         """
         return pulumi.get(self, "pagertree_id")
 
     @pagertree_id.setter
-    def pagertree_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def pagertree_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "pagertree_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Position of the team
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter
-    def properties(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['TeamPropertyArgs']]]]:
+    def properties(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['TeamPropertyArgs']]]]:
         """
         Array of property values for this team.
         """
         return pulumi.get(self, "properties")
 
     @properties.setter
-    def properties(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['TeamPropertyArgs']]]]):
+    def properties(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['TeamPropertyArgs']]]]):
         pulumi.set(self, "properties", value)
 
     @_builtins.property
     @pulumi.getter(name="serviceNowCiSysId")
-    def service_now_ci_sys_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def service_now_ci_sys_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Service Now CI sys id associated to this team
         """
         return pulumi.get(self, "service_now_ci_sys_id")
 
     @service_now_ci_sys_id.setter
-    def service_now_ci_sys_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def service_now_ci_sys_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "service_now_ci_sys_id", value)
 
     @_builtins.property
     @pulumi.getter(name="slackAliases")
-    def slack_aliases(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['TeamSlackAliasArgs']]]]:
+    def slack_aliases(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['TeamSlackAliasArgs']]]]:
         """
         Slack Aliases associated with this team
         """
         return pulumi.get(self, "slack_aliases")
 
     @slack_aliases.setter
-    def slack_aliases(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['TeamSlackAliasArgs']]]]):
+    def slack_aliases(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['TeamSlackAliasArgs']]]]):
         pulumi.set(self, "slack_aliases", value)
 
     @_builtins.property
     @pulumi.getter(name="slackChannels")
-    def slack_channels(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['TeamSlackChannelArgs']]]]:
+    def slack_channels(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['TeamSlackChannelArgs']]]]:
         """
         Slack Channels associated with this team
         """
         return pulumi.get(self, "slack_channels")
 
     @slack_channels.setter
-    def slack_channels(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['TeamSlackChannelArgs']]]]):
+    def slack_channels(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['TeamSlackChannelArgs']]]]):
         pulumi.set(self, "slack_channels", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
     @_builtins.property
     @pulumi.getter(name="teamId")
-    def team_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def team_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "team_id")
 
     @team_id.setter
-    def team_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def team_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "team_id", value)
 
     @_builtins.property
     @pulumi.getter(name="userIds")
-    def user_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]]:
+    def user_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]:
         """
         The user ids of the members of this team.
         """
         return pulumi.get(self, "user_ids")
 
     @user_ids.setter
-    def user_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]]):
+    def user_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]):
         pulumi.set(self, "user_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="victorOpsId")
-    def victor_ops_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def victor_ops_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The VictorOps group id associated to this team
         """
         return pulumi.get(self, "victor_ops_id")
 
     @victor_ops_id.setter
-    def victor_ops_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def victor_ops_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "victor_ops_id", value)
 
 
@@ -890,41 +890,41 @@ class Team(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 admin_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-                 alert_broadcast_channel: Optional[pulumi.Input[Union['TeamAlertBroadcastChannelArgs', 'TeamAlertBroadcastChannelArgsDict']]] = None,
-                 alert_broadcast_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 auto_add_members_when_attached: Optional[pulumi.Input[_builtins.bool]] = None,
-                 backstage_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 color: Optional[pulumi.Input[_builtins.str]] = None,
-                 cortex_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 external_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_broadcast_channel: Optional[pulumi.Input[Union['TeamIncidentBroadcastChannelArgs', 'TeamIncidentBroadcastChannelArgsDict']]] = None,
-                 incident_broadcast_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 notify_emails: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 opsgenie_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 pagerduty_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 pagerduty_service_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 pagertree_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 properties: Optional[pulumi.Input[Sequence[pulumi.Input[Union['TeamPropertyArgs', 'TeamPropertyArgsDict']]]]] = None,
-                 service_now_ci_sys_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 slack_aliases: Optional[pulumi.Input[Sequence[pulumi.Input[Union['TeamSlackAliasArgs', 'TeamSlackAliasArgsDict']]]]] = None,
-                 slack_channels: Optional[pulumi.Input[Sequence[pulumi.Input[Union['TeamSlackChannelArgs', 'TeamSlackChannelArgsDict']]]]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 team_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 user_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-                 victor_ops_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 admin_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 alert_broadcast_channel: pulumi.Input[Optional[Union['TeamAlertBroadcastChannelArgs', 'TeamAlertBroadcastChannelArgsDict']]] = None,
+                 alert_broadcast_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 auto_add_members_when_attached: pulumi.Input[Optional[_builtins.bool]] = None,
+                 backstage_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 cortex_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 external_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_broadcast_channel: pulumi.Input[Optional[Union['TeamIncidentBroadcastChannelArgs', 'TeamIncidentBroadcastChannelArgsDict']]] = None,
+                 incident_broadcast_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 notify_emails: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 opsgenie_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 pagerduty_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 pagerduty_service_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 pagertree_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 properties: pulumi.Input[Optional[Sequence[pulumi.Input[Union['TeamPropertyArgs', 'TeamPropertyArgsDict']]]]] = None,
+                 service_now_ci_sys_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input[Union['TeamSlackAliasArgs', 'TeamSlackAliasArgsDict']]]]] = None,
+                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input[Union['TeamSlackChannelArgs', 'TeamSlackChannelArgsDict']]]]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 team_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 user_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 victor_ops_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a Team resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.float]]] admin_ids: The user ids of the admins of this team. These users must also be present in<span pulumi-lang-nodejs=" userIds " pulumi-lang-dotnet=" UserIds " pulumi-lang-go=" userIds " pulumi-lang-python=" user_ids " pulumi-lang-yaml=" userIds " pulumi-lang-java=" userIds "> user_ids </span>attribute.
-        :param pulumi.Input[Union['TeamAlertBroadcastChannelArgs', 'TeamAlertBroadcastChannelArgsDict']] alert_broadcast_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Slack channel to broadcast alerts to
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.float]]] admin_ids: The user ids of the admins of this team. These users must also be present in<span pulumi-lang-nodejs=" userIds " pulumi-lang-dotnet=" UserIds " pulumi-lang-go=" userIds " pulumi-lang-python=" user_ids " pulumi-lang-yaml=" userIds " pulumi-lang-java=" userIds " pulumi-lang-hcl=" user_ids "> userIds </span>attribute.
+        :param pulumi.Input[Union['TeamAlertBroadcastChannelArgs', 'TeamAlertBroadcastChannelArgsDict']] alert_broadcast_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Slack channel to broadcast alerts to
         :param pulumi.Input[_builtins.bool] alert_broadcast_enabled: Enable alerts to be broadcasted to a specific channel. Value must be one of true or false
         :param pulumi.Input[_builtins.str] alert_urgency_id: The alert urgency id of the team
         :param pulumi.Input[_builtins.bool] auto_add_members_when_attached: Auto add members to incident channel when team is attached. Value must be one of true or false
@@ -933,7 +933,7 @@ class Team(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] cortex_id: The Cortex group id associated to this team
         :param pulumi.Input[_builtins.str] description: The description of the team
         :param pulumi.Input[_builtins.str] external_id: The external id associated to this team
-        :param pulumi.Input[Union['TeamIncidentBroadcastChannelArgs', 'TeamIncidentBroadcastChannelArgsDict']] incident_broadcast_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Slack channel to broadcast incidents to
+        :param pulumi.Input[Union['TeamIncidentBroadcastChannelArgs', 'TeamIncidentBroadcastChannelArgsDict']] incident_broadcast_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Slack channel to broadcast incidents to
         :param pulumi.Input[_builtins.bool] incident_broadcast_enabled: Enable incidents to be broadcasted to a specific channel. Value must be one of true or false
         :param pulumi.Input[_builtins.str] name: The name of the team
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] notify_emails: Emails to attach to the team
@@ -973,33 +973,33 @@ class Team(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 admin_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-                 alert_broadcast_channel: Optional[pulumi.Input[Union['TeamAlertBroadcastChannelArgs', 'TeamAlertBroadcastChannelArgsDict']]] = None,
-                 alert_broadcast_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 auto_add_members_when_attached: Optional[pulumi.Input[_builtins.bool]] = None,
-                 backstage_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 color: Optional[pulumi.Input[_builtins.str]] = None,
-                 cortex_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 external_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_broadcast_channel: Optional[pulumi.Input[Union['TeamIncidentBroadcastChannelArgs', 'TeamIncidentBroadcastChannelArgsDict']]] = None,
-                 incident_broadcast_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 notify_emails: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 opsgenie_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 pagerduty_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 pagerduty_service_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 pagertree_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 properties: Optional[pulumi.Input[Sequence[pulumi.Input[Union['TeamPropertyArgs', 'TeamPropertyArgsDict']]]]] = None,
-                 service_now_ci_sys_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 slack_aliases: Optional[pulumi.Input[Sequence[pulumi.Input[Union['TeamSlackAliasArgs', 'TeamSlackAliasArgsDict']]]]] = None,
-                 slack_channels: Optional[pulumi.Input[Sequence[pulumi.Input[Union['TeamSlackChannelArgs', 'TeamSlackChannelArgsDict']]]]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 team_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 user_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-                 victor_ops_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 admin_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 alert_broadcast_channel: pulumi.Input[Optional[Union['TeamAlertBroadcastChannelArgs', 'TeamAlertBroadcastChannelArgsDict']]] = None,
+                 alert_broadcast_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 auto_add_members_when_attached: pulumi.Input[Optional[_builtins.bool]] = None,
+                 backstage_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 cortex_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 external_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_broadcast_channel: pulumi.Input[Optional[Union['TeamIncidentBroadcastChannelArgs', 'TeamIncidentBroadcastChannelArgsDict']]] = None,
+                 incident_broadcast_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 notify_emails: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 opsgenie_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 pagerduty_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 pagerduty_service_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 pagertree_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 properties: pulumi.Input[Optional[Sequence[pulumi.Input[Union['TeamPropertyArgs', 'TeamPropertyArgsDict']]]]] = None,
+                 service_now_ci_sys_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input[Union['TeamSlackAliasArgs', 'TeamSlackAliasArgsDict']]]]] = None,
+                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input[Union['TeamSlackChannelArgs', 'TeamSlackChannelArgsDict']]]]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 team_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 user_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 victor_ops_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -1047,33 +1047,33 @@ class Team(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            admin_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-            alert_broadcast_channel: Optional[pulumi.Input[Union['TeamAlertBroadcastChannelArgs', 'TeamAlertBroadcastChannelArgsDict']]] = None,
-            alert_broadcast_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-            alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-            auto_add_members_when_attached: Optional[pulumi.Input[_builtins.bool]] = None,
-            backstage_id: Optional[pulumi.Input[_builtins.str]] = None,
-            color: Optional[pulumi.Input[_builtins.str]] = None,
-            cortex_id: Optional[pulumi.Input[_builtins.str]] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            external_id: Optional[pulumi.Input[_builtins.str]] = None,
-            incident_broadcast_channel: Optional[pulumi.Input[Union['TeamIncidentBroadcastChannelArgs', 'TeamIncidentBroadcastChannelArgsDict']]] = None,
-            incident_broadcast_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            notify_emails: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            opsgenie_id: Optional[pulumi.Input[_builtins.str]] = None,
-            pagerduty_id: Optional[pulumi.Input[_builtins.str]] = None,
-            pagerduty_service_id: Optional[pulumi.Input[_builtins.str]] = None,
-            pagertree_id: Optional[pulumi.Input[_builtins.str]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None,
-            properties: Optional[pulumi.Input[Sequence[pulumi.Input[Union['TeamPropertyArgs', 'TeamPropertyArgsDict']]]]] = None,
-            service_now_ci_sys_id: Optional[pulumi.Input[_builtins.str]] = None,
-            slack_aliases: Optional[pulumi.Input[Sequence[pulumi.Input[Union['TeamSlackAliasArgs', 'TeamSlackAliasArgsDict']]]]] = None,
-            slack_channels: Optional[pulumi.Input[Sequence[pulumi.Input[Union['TeamSlackChannelArgs', 'TeamSlackChannelArgsDict']]]]] = None,
-            slug: Optional[pulumi.Input[_builtins.str]] = None,
-            team_id: Optional[pulumi.Input[_builtins.str]] = None,
-            user_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-            victor_ops_id: Optional[pulumi.Input[_builtins.str]] = None) -> 'Team':
+            admin_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+            alert_broadcast_channel: pulumi.Input[Optional[Union['TeamAlertBroadcastChannelArgs', 'TeamAlertBroadcastChannelArgsDict']]] = None,
+            alert_broadcast_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+            alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+            auto_add_members_when_attached: pulumi.Input[Optional[_builtins.bool]] = None,
+            backstage_id: pulumi.Input[Optional[_builtins.str]] = None,
+            color: pulumi.Input[Optional[_builtins.str]] = None,
+            cortex_id: pulumi.Input[Optional[_builtins.str]] = None,
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            external_id: pulumi.Input[Optional[_builtins.str]] = None,
+            incident_broadcast_channel: pulumi.Input[Optional[Union['TeamIncidentBroadcastChannelArgs', 'TeamIncidentBroadcastChannelArgsDict']]] = None,
+            incident_broadcast_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            notify_emails: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            opsgenie_id: pulumi.Input[Optional[_builtins.str]] = None,
+            pagerduty_id: pulumi.Input[Optional[_builtins.str]] = None,
+            pagerduty_service_id: pulumi.Input[Optional[_builtins.str]] = None,
+            pagertree_id: pulumi.Input[Optional[_builtins.str]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None,
+            properties: pulumi.Input[Optional[Sequence[pulumi.Input[Union['TeamPropertyArgs', 'TeamPropertyArgsDict']]]]] = None,
+            service_now_ci_sys_id: pulumi.Input[Optional[_builtins.str]] = None,
+            slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input[Union['TeamSlackAliasArgs', 'TeamSlackAliasArgsDict']]]]] = None,
+            slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input[Union['TeamSlackChannelArgs', 'TeamSlackChannelArgsDict']]]]] = None,
+            slug: pulumi.Input[Optional[_builtins.str]] = None,
+            team_id: pulumi.Input[Optional[_builtins.str]] = None,
+            user_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+            victor_ops_id: pulumi.Input[Optional[_builtins.str]] = None) -> 'Team':
         """
         Get an existing Team resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -1081,8 +1081,8 @@ class Team(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.float]]] admin_ids: The user ids of the admins of this team. These users must also be present in<span pulumi-lang-nodejs=" userIds " pulumi-lang-dotnet=" UserIds " pulumi-lang-go=" userIds " pulumi-lang-python=" user_ids " pulumi-lang-yaml=" userIds " pulumi-lang-java=" userIds "> user_ids </span>attribute.
-        :param pulumi.Input[Union['TeamAlertBroadcastChannelArgs', 'TeamAlertBroadcastChannelArgsDict']] alert_broadcast_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Slack channel to broadcast alerts to
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.float]]] admin_ids: The user ids of the admins of this team. These users must also be present in<span pulumi-lang-nodejs=" userIds " pulumi-lang-dotnet=" UserIds " pulumi-lang-go=" userIds " pulumi-lang-python=" user_ids " pulumi-lang-yaml=" userIds " pulumi-lang-java=" userIds " pulumi-lang-hcl=" user_ids "> userIds </span>attribute.
+        :param pulumi.Input[Union['TeamAlertBroadcastChannelArgs', 'TeamAlertBroadcastChannelArgsDict']] alert_broadcast_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Slack channel to broadcast alerts to
         :param pulumi.Input[_builtins.bool] alert_broadcast_enabled: Enable alerts to be broadcasted to a specific channel. Value must be one of true or false
         :param pulumi.Input[_builtins.str] alert_urgency_id: The alert urgency id of the team
         :param pulumi.Input[_builtins.bool] auto_add_members_when_attached: Auto add members to incident channel when team is attached. Value must be one of true or false
@@ -1091,7 +1091,7 @@ class Team(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] cortex_id: The Cortex group id associated to this team
         :param pulumi.Input[_builtins.str] description: The description of the team
         :param pulumi.Input[_builtins.str] external_id: The external id associated to this team
-        :param pulumi.Input[Union['TeamIncidentBroadcastChannelArgs', 'TeamIncidentBroadcastChannelArgsDict']] incident_broadcast_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Slack channel to broadcast incidents to
+        :param pulumi.Input[Union['TeamIncidentBroadcastChannelArgs', 'TeamIncidentBroadcastChannelArgsDict']] incident_broadcast_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Slack channel to broadcast incidents to
         :param pulumi.Input[_builtins.bool] incident_broadcast_enabled: Enable incidents to be broadcasted to a specific channel. Value must be one of true or false
         :param pulumi.Input[_builtins.str] name: The name of the team
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] notify_emails: Emails to attach to the team
@@ -1144,7 +1144,7 @@ class Team(pulumi.CustomResource):
     @pulumi.getter(name="adminIds")
     def admin_ids(self) -> pulumi.Output[Sequence[_builtins.float]]:
         """
-        The user ids of the admins of this team. These users must also be present in<span pulumi-lang-nodejs=" userIds " pulumi-lang-dotnet=" UserIds " pulumi-lang-go=" userIds " pulumi-lang-python=" user_ids " pulumi-lang-yaml=" userIds " pulumi-lang-java=" userIds "> user_ids </span>attribute.
+        The user ids of the admins of this team. These users must also be present in<span pulumi-lang-nodejs=" userIds " pulumi-lang-dotnet=" UserIds " pulumi-lang-go=" userIds " pulumi-lang-python=" user_ids " pulumi-lang-yaml=" userIds " pulumi-lang-java=" userIds " pulumi-lang-hcl=" user_ids "> userIds </span>attribute.
         """
         return pulumi.get(self, "admin_ids")
 
@@ -1152,7 +1152,7 @@ class Team(pulumi.CustomResource):
     @pulumi.getter(name="alertBroadcastChannel")
     def alert_broadcast_channel(self) -> pulumi.Output[Optional['outputs.TeamAlertBroadcastChannel']]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Slack channel to broadcast alerts to
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Slack channel to broadcast alerts to
         """
         return pulumi.get(self, "alert_broadcast_channel")
 
@@ -1224,7 +1224,7 @@ class Team(pulumi.CustomResource):
     @pulumi.getter(name="incidentBroadcastChannel")
     def incident_broadcast_channel(self) -> pulumi.Output[Optional['outputs.TeamIncidentBroadcastChannel']]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Slack channel to broadcast incidents to
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Slack channel to broadcast incidents to
         """
         return pulumi.get(self, "incident_broadcast_channel")
 
@@ -1349,3 +1349,4 @@ class Team(pulumi.CustomResource):
         The VictorOps group id associated to this team
         """
         return pulumi.get(self, "victor_ops_id")
+

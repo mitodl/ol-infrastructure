@@ -20,14 +20,14 @@ __all__ = ['RetrospectiveStepArgs', 'RetrospectiveStep']
 class RetrospectiveStepArgs:
     def __init__(__self__, *,
                  title: pulumi.Input[_builtins.str],
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 due_after_days: Optional[pulumi.Input[_builtins.float]] = None,
-                 incident_role_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 retrospective_process_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 retrospective_step_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 skippable: Optional[pulumi.Input[_builtins.bool]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None):
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 due_after_days: pulumi.Input[Optional[_builtins.float]] = None,
+                 incident_role_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 retrospective_process_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 retrospective_step_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 skippable: pulumi.Input[Optional[_builtins.bool]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a RetrospectiveStep resource.
 
@@ -71,107 +71,107 @@ class RetrospectiveStepArgs:
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the step
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="dueAfterDays")
-    def due_after_days(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def due_after_days(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Due date in days
         """
         return pulumi.get(self, "due_after_days")
 
     @due_after_days.setter
-    def due_after_days(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def due_after_days(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "due_after_days", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentRoleId")
-    def incident_role_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def incident_role_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Users assigned to the selected incident role will be the default owners for this step
         """
         return pulumi.get(self, "incident_role_id")
 
     @incident_role_id.setter
-    def incident_role_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def incident_role_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "incident_role_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Position of the step
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter(name="retrospectiveProcessId")
-    def retrospective_process_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def retrospective_process_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "retrospective_process_id")
 
     @retrospective_process_id.setter
-    def retrospective_process_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def retrospective_process_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "retrospective_process_id", value)
 
     @_builtins.property
     @pulumi.getter(name="retrospectiveStepId")
-    def retrospective_step_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def retrospective_step_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "retrospective_step_id")
 
     @retrospective_step_id.setter
-    def retrospective_step_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def retrospective_step_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "retrospective_step_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def skippable(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def skippable(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Is the step skippable?. Value must be one of true or false
         """
         return pulumi.get(self, "skippable")
 
     @skippable.setter
-    def skippable(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def skippable(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "skippable", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The slug of the step
         """
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
 
 @pulumi.input_type
 class _RetrospectiveStepState:
     def __init__(__self__, *,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 due_after_days: Optional[pulumi.Input[_builtins.float]] = None,
-                 incident_role_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 retrospective_process_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 retrospective_step_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 skippable: Optional[pulumi.Input[_builtins.bool]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 title: Optional[pulumi.Input[_builtins.str]] = None):
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 due_after_days: pulumi.Input[Optional[_builtins.float]] = None,
+                 incident_role_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 retrospective_process_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 retrospective_step_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 skippable: pulumi.Input[Optional[_builtins.bool]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 title: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering RetrospectiveStep resources.
 
@@ -204,104 +204,104 @@ class _RetrospectiveStepState:
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the step
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="dueAfterDays")
-    def due_after_days(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def due_after_days(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Due date in days
         """
         return pulumi.get(self, "due_after_days")
 
     @due_after_days.setter
-    def due_after_days(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def due_after_days(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "due_after_days", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentRoleId")
-    def incident_role_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def incident_role_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Users assigned to the selected incident role will be the default owners for this step
         """
         return pulumi.get(self, "incident_role_id")
 
     @incident_role_id.setter
-    def incident_role_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def incident_role_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "incident_role_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Position of the step
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter(name="retrospectiveProcessId")
-    def retrospective_process_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def retrospective_process_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "retrospective_process_id")
 
     @retrospective_process_id.setter
-    def retrospective_process_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def retrospective_process_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "retrospective_process_id", value)
 
     @_builtins.property
     @pulumi.getter(name="retrospectiveStepId")
-    def retrospective_step_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def retrospective_step_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "retrospective_step_id")
 
     @retrospective_step_id.setter
-    def retrospective_step_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def retrospective_step_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "retrospective_step_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def skippable(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def skippable(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Is the step skippable?. Value must be one of true or false
         """
         return pulumi.get(self, "skippable")
 
     @skippable.setter
-    def skippable(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def skippable(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "skippable", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The slug of the step
         """
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
     @_builtins.property
     @pulumi.getter
-    def title(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def title(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the step
         """
         return pulumi.get(self, "title")
 
     @title.setter
-    def title(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def title(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "title", value)
 
 
@@ -311,15 +311,15 @@ class RetrospectiveStep(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 due_after_days: Optional[pulumi.Input[_builtins.float]] = None,
-                 incident_role_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 retrospective_process_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 retrospective_step_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 skippable: Optional[pulumi.Input[_builtins.bool]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 title: Optional[pulumi.Input[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 due_after_days: pulumi.Input[Optional[_builtins.float]] = None,
+                 incident_role_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 retrospective_process_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 retrospective_step_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 skippable: pulumi.Input[Optional[_builtins.bool]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 title: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a RetrospectiveStep resource with the given unique name, props, and options.
@@ -358,15 +358,15 @@ class RetrospectiveStep(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 due_after_days: Optional[pulumi.Input[_builtins.float]] = None,
-                 incident_role_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 retrospective_process_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 retrospective_step_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 skippable: Optional[pulumi.Input[_builtins.bool]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 title: Optional[pulumi.Input[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 due_after_days: pulumi.Input[Optional[_builtins.float]] = None,
+                 incident_role_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 retrospective_process_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 retrospective_step_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 skippable: pulumi.Input[Optional[_builtins.bool]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 title: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -398,15 +398,15 @@ class RetrospectiveStep(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            due_after_days: Optional[pulumi.Input[_builtins.float]] = None,
-            incident_role_id: Optional[pulumi.Input[_builtins.str]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None,
-            retrospective_process_id: Optional[pulumi.Input[_builtins.str]] = None,
-            retrospective_step_id: Optional[pulumi.Input[_builtins.str]] = None,
-            skippable: Optional[pulumi.Input[_builtins.bool]] = None,
-            slug: Optional[pulumi.Input[_builtins.str]] = None,
-            title: Optional[pulumi.Input[_builtins.str]] = None) -> 'RetrospectiveStep':
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            due_after_days: pulumi.Input[Optional[_builtins.float]] = None,
+            incident_role_id: pulumi.Input[Optional[_builtins.str]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None,
+            retrospective_process_id: pulumi.Input[Optional[_builtins.str]] = None,
+            retrospective_step_id: pulumi.Input[Optional[_builtins.str]] = None,
+            skippable: pulumi.Input[Optional[_builtins.bool]] = None,
+            slug: pulumi.Input[Optional[_builtins.str]] = None,
+            title: pulumi.Input[Optional[_builtins.str]] = None) -> 'RetrospectiveStep':
         """
         Get an existing RetrospectiveStep resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -502,3 +502,4 @@ class RetrospectiveStep(pulumi.CustomResource):
         The name of the step
         """
         return pulumi.get(self, "title")
+

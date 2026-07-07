@@ -968,13 +968,15 @@ for purpose in ("draft", "live", "test"):
                 name="not course media or old akamai",
                 statement=(
                     'req.url.path !~ "^/coursemedia" && req.url.path !~ "^/ans\\d+"'
+                    ' && req.url.path !~ "^/largefiles" && req.url.path !~ "^/zipfiles"'
                 ),
                 type="REQUEST",
             ),
             fastly.ServiceVclConditionArgs(
                 name="is old Akamai file",
                 statement=(
-                    'req.url.path ~ "^/ans\\d+" && req.url.path !~'
+                    '(req.url.path ~ "^/ans\\d+" || req.url.path ~ "^/largefiles"'
+                    ' || req.url.path ~ "^/zipfiles") && req.url.path !~'
                     ' "/ans7870/21f/21f.027"'
                 ),
                 type="REQUEST",
@@ -1123,6 +1125,13 @@ for purpose in ("draft", "live", "test"):
                     "set_correct_content_type_for_S3_assets.vcl"
                 ).read_text(),
                 name="Set correct Content-type for S3 assets",
+                type="fetch",
+            ),
+            fastly.ServiceVclSnippetArgs(
+                content=snippets_dir.joinpath(
+                    "enable_streaming_for_mp4.vcl"
+                ).read_text(),
+                name="Enable streaming for mp4 files",
                 type="fetch",
             ),
             fastly.ServiceVclSnippetArgs(

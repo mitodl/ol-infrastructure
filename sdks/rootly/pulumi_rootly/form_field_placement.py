@@ -21,13 +21,13 @@ class FormFieldPlacementArgs:
     def __init__(__self__, *,
                  form: pulumi.Input[_builtins.str],
                  form_set_id: pulumi.Input[_builtins.str],
-                 form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_placement_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 non_editable: Optional[pulumi.Input[_builtins.bool]] = None,
-                 placement_operator: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 required: Optional[pulumi.Input[_builtins.bool]] = None,
-                 required_operator: Optional[pulumi.Input[_builtins.str]] = None):
+                 form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_placement_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 non_editable: pulumi.Input[Optional[_builtins.bool]] = None,
+                 placement_operator: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 required: pulumi.Input[Optional[_builtins.bool]] = None,
+                 required_operator: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a FormFieldPlacement resource.
 
@@ -35,10 +35,10 @@ class FormFieldPlacementArgs:
         :param pulumi.Input[_builtins.str] form_set_id: The form set this field is placed in.
         :param pulumi.Input[_builtins.str] form_field_id: The form field that is placed.
         :param pulumi.Input[_builtins.bool] non_editable: Whether the field is read-only and cannot be edited by users.. Value must be one of true or false
-        :param pulumi.Input[_builtins.str] placement_operator: Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions "> form_field_placement_conditions </span>with conditioned=placement. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`">`or`</span>.
+        :param pulumi.Input[_builtins.str] placement_operator: Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions " pulumi-lang-hcl=" form_field_placement_conditions "> formFieldPlacementConditions </span>with conditioned=placement. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`" pulumi-lang-hcl="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`" pulumi-lang-hcl="`or`">`or`</span>.
         :param pulumi.Input[_builtins.float] position: The position of the field placement.
         :param pulumi.Input[_builtins.bool] required: Whether the field is unconditionally required on this form.. Value must be one of true or false
-        :param pulumi.Input[_builtins.str] required_operator: Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions "> form_field_placement_conditions </span>with conditioned=required. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`">`or`</span>.
+        :param pulumi.Input[_builtins.str] required_operator: Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions " pulumi-lang-hcl=" form_field_placement_conditions "> formFieldPlacementConditions </span>with conditioned=required. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`" pulumi-lang-hcl="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`" pulumi-lang-hcl="`or`">`or`</span>.
         """
         pulumi.set(__self__, "form", form)
         pulumi.set(__self__, "form_set_id", form_set_id)
@@ -83,98 +83,98 @@ class FormFieldPlacementArgs:
 
     @_builtins.property
     @pulumi.getter(name="formFieldId")
-    def form_field_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def form_field_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The form field that is placed.
         """
         return pulumi.get(self, "form_field_id")
 
     @form_field_id.setter
-    def form_field_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def form_field_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form_field_id", value)
 
     @_builtins.property
     @pulumi.getter(name="formFieldPlacementId")
-    def form_field_placement_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def form_field_placement_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "form_field_placement_id")
 
     @form_field_placement_id.setter
-    def form_field_placement_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def form_field_placement_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form_field_placement_id", value)
 
     @_builtins.property
     @pulumi.getter(name="nonEditable")
-    def non_editable(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def non_editable(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Whether the field is read-only and cannot be edited by users.. Value must be one of true or false
         """
         return pulumi.get(self, "non_editable")
 
     @non_editable.setter
-    def non_editable(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def non_editable(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "non_editable", value)
 
     @_builtins.property
     @pulumi.getter(name="placementOperator")
-    def placement_operator(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def placement_operator(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions "> form_field_placement_conditions </span>with conditioned=placement. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`">`or`</span>.
+        Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions " pulumi-lang-hcl=" form_field_placement_conditions "> formFieldPlacementConditions </span>with conditioned=placement. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`" pulumi-lang-hcl="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`" pulumi-lang-hcl="`or`">`or`</span>.
         """
         return pulumi.get(self, "placement_operator")
 
     @placement_operator.setter
-    def placement_operator(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def placement_operator(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "placement_operator", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The position of the field placement.
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter
-    def required(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def required(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Whether the field is unconditionally required on this form.. Value must be one of true or false
         """
         return pulumi.get(self, "required")
 
     @required.setter
-    def required(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def required(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "required", value)
 
     @_builtins.property
     @pulumi.getter(name="requiredOperator")
-    def required_operator(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def required_operator(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions "> form_field_placement_conditions </span>with conditioned=required. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`">`or`</span>.
+        Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions " pulumi-lang-hcl=" form_field_placement_conditions "> formFieldPlacementConditions </span>with conditioned=required. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`" pulumi-lang-hcl="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`" pulumi-lang-hcl="`or`">`or`</span>.
         """
         return pulumi.get(self, "required_operator")
 
     @required_operator.setter
-    def required_operator(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def required_operator(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "required_operator", value)
 
 
 @pulumi.input_type
 class _FormFieldPlacementState:
     def __init__(__self__, *,
-                 form: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_placement_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_set_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 non_editable: Optional[pulumi.Input[_builtins.bool]] = None,
-                 placement_operator: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 required: Optional[pulumi.Input[_builtins.bool]] = None,
-                 required_operator: Optional[pulumi.Input[_builtins.str]] = None):
+                 form: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_placement_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_set_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 non_editable: pulumi.Input[Optional[_builtins.bool]] = None,
+                 placement_operator: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 required: pulumi.Input[Optional[_builtins.bool]] = None,
+                 required_operator: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering FormFieldPlacement resources.
 
@@ -182,10 +182,10 @@ class _FormFieldPlacementState:
         :param pulumi.Input[_builtins.str] form_field_id: The form field that is placed.
         :param pulumi.Input[_builtins.str] form_set_id: The form set this field is placed in.
         :param pulumi.Input[_builtins.bool] non_editable: Whether the field is read-only and cannot be edited by users.. Value must be one of true or false
-        :param pulumi.Input[_builtins.str] placement_operator: Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions "> form_field_placement_conditions </span>with conditioned=placement. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`">`or`</span>.
+        :param pulumi.Input[_builtins.str] placement_operator: Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions " pulumi-lang-hcl=" form_field_placement_conditions "> formFieldPlacementConditions </span>with conditioned=placement. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`" pulumi-lang-hcl="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`" pulumi-lang-hcl="`or`">`or`</span>.
         :param pulumi.Input[_builtins.float] position: The position of the field placement.
         :param pulumi.Input[_builtins.bool] required: Whether the field is unconditionally required on this form.. Value must be one of true or false
-        :param pulumi.Input[_builtins.str] required_operator: Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions "> form_field_placement_conditions </span>with conditioned=required. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`">`or`</span>.
+        :param pulumi.Input[_builtins.str] required_operator: Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions " pulumi-lang-hcl=" form_field_placement_conditions "> formFieldPlacementConditions </span>with conditioned=required. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`" pulumi-lang-hcl="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`" pulumi-lang-hcl="`or`">`or`</span>.
         """
         if form is not None:
             pulumi.set(__self__, "form", form)
@@ -208,107 +208,107 @@ class _FormFieldPlacementState:
 
     @_builtins.property
     @pulumi.getter
-    def form(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def form(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The form this field is placed on.
         """
         return pulumi.get(self, "form")
 
     @form.setter
-    def form(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def form(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form", value)
 
     @_builtins.property
     @pulumi.getter(name="formFieldId")
-    def form_field_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def form_field_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The form field that is placed.
         """
         return pulumi.get(self, "form_field_id")
 
     @form_field_id.setter
-    def form_field_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def form_field_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form_field_id", value)
 
     @_builtins.property
     @pulumi.getter(name="formFieldPlacementId")
-    def form_field_placement_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def form_field_placement_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "form_field_placement_id")
 
     @form_field_placement_id.setter
-    def form_field_placement_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def form_field_placement_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form_field_placement_id", value)
 
     @_builtins.property
     @pulumi.getter(name="formSetId")
-    def form_set_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def form_set_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The form set this field is placed in.
         """
         return pulumi.get(self, "form_set_id")
 
     @form_set_id.setter
-    def form_set_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def form_set_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form_set_id", value)
 
     @_builtins.property
     @pulumi.getter(name="nonEditable")
-    def non_editable(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def non_editable(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Whether the field is read-only and cannot be edited by users.. Value must be one of true or false
         """
         return pulumi.get(self, "non_editable")
 
     @non_editable.setter
-    def non_editable(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def non_editable(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "non_editable", value)
 
     @_builtins.property
     @pulumi.getter(name="placementOperator")
-    def placement_operator(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def placement_operator(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions "> form_field_placement_conditions </span>with conditioned=placement. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`">`or`</span>.
+        Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions " pulumi-lang-hcl=" form_field_placement_conditions "> formFieldPlacementConditions </span>with conditioned=placement. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`" pulumi-lang-hcl="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`" pulumi-lang-hcl="`or`">`or`</span>.
         """
         return pulumi.get(self, "placement_operator")
 
     @placement_operator.setter
-    def placement_operator(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def placement_operator(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "placement_operator", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The position of the field placement.
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter
-    def required(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def required(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Whether the field is unconditionally required on this form.. Value must be one of true or false
         """
         return pulumi.get(self, "required")
 
     @required.setter
-    def required(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def required(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "required", value)
 
     @_builtins.property
     @pulumi.getter(name="requiredOperator")
-    def required_operator(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def required_operator(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions "> form_field_placement_conditions </span>with conditioned=required. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`">`or`</span>.
+        Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions " pulumi-lang-hcl=" form_field_placement_conditions "> formFieldPlacementConditions </span>with conditioned=required. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`" pulumi-lang-hcl="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`" pulumi-lang-hcl="`or`">`or`</span>.
         """
         return pulumi.get(self, "required_operator")
 
     @required_operator.setter
-    def required_operator(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def required_operator(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "required_operator", value)
 
 
@@ -318,15 +318,15 @@ class FormFieldPlacement(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 form: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_placement_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_set_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 non_editable: Optional[pulumi.Input[_builtins.bool]] = None,
-                 placement_operator: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 required: Optional[pulumi.Input[_builtins.bool]] = None,
-                 required_operator: Optional[pulumi.Input[_builtins.str]] = None,
+                 form: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_placement_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_set_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 non_editable: pulumi.Input[Optional[_builtins.bool]] = None,
+                 placement_operator: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 required: pulumi.Input[Optional[_builtins.bool]] = None,
+                 required_operator: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a FormFieldPlacement resource with the given unique name, props, and options.
@@ -337,10 +337,10 @@ class FormFieldPlacement(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] form_field_id: The form field that is placed.
         :param pulumi.Input[_builtins.str] form_set_id: The form set this field is placed in.
         :param pulumi.Input[_builtins.bool] non_editable: Whether the field is read-only and cannot be edited by users.. Value must be one of true or false
-        :param pulumi.Input[_builtins.str] placement_operator: Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions "> form_field_placement_conditions </span>with conditioned=placement. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`">`or`</span>.
+        :param pulumi.Input[_builtins.str] placement_operator: Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions " pulumi-lang-hcl=" form_field_placement_conditions "> formFieldPlacementConditions </span>with conditioned=placement. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`" pulumi-lang-hcl="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`" pulumi-lang-hcl="`or`">`or`</span>.
         :param pulumi.Input[_builtins.float] position: The position of the field placement.
         :param pulumi.Input[_builtins.bool] required: Whether the field is unconditionally required on this form.. Value must be one of true or false
-        :param pulumi.Input[_builtins.str] required_operator: Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions "> form_field_placement_conditions </span>with conditioned=required. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`">`or`</span>.
+        :param pulumi.Input[_builtins.str] required_operator: Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions " pulumi-lang-hcl=" form_field_placement_conditions "> formFieldPlacementConditions </span>with conditioned=required. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`" pulumi-lang-hcl="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`" pulumi-lang-hcl="`or`">`or`</span>.
         """
         ...
     @overload
@@ -366,15 +366,15 @@ class FormFieldPlacement(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 form: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_placement_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_set_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 non_editable: Optional[pulumi.Input[_builtins.bool]] = None,
-                 placement_operator: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 required: Optional[pulumi.Input[_builtins.bool]] = None,
-                 required_operator: Optional[pulumi.Input[_builtins.str]] = None,
+                 form: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_placement_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_set_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 non_editable: pulumi.Input[Optional[_builtins.bool]] = None,
+                 placement_operator: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 required: pulumi.Input[Optional[_builtins.bool]] = None,
+                 required_operator: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -408,15 +408,15 @@ class FormFieldPlacement(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            form: Optional[pulumi.Input[_builtins.str]] = None,
-            form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-            form_field_placement_id: Optional[pulumi.Input[_builtins.str]] = None,
-            form_set_id: Optional[pulumi.Input[_builtins.str]] = None,
-            non_editable: Optional[pulumi.Input[_builtins.bool]] = None,
-            placement_operator: Optional[pulumi.Input[_builtins.str]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None,
-            required: Optional[pulumi.Input[_builtins.bool]] = None,
-            required_operator: Optional[pulumi.Input[_builtins.str]] = None) -> 'FormFieldPlacement':
+            form: pulumi.Input[Optional[_builtins.str]] = None,
+            form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+            form_field_placement_id: pulumi.Input[Optional[_builtins.str]] = None,
+            form_set_id: pulumi.Input[Optional[_builtins.str]] = None,
+            non_editable: pulumi.Input[Optional[_builtins.bool]] = None,
+            placement_operator: pulumi.Input[Optional[_builtins.str]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None,
+            required: pulumi.Input[Optional[_builtins.bool]] = None,
+            required_operator: pulumi.Input[Optional[_builtins.str]] = None) -> 'FormFieldPlacement':
         """
         Get an existing FormFieldPlacement resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -428,10 +428,10 @@ class FormFieldPlacement(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] form_field_id: The form field that is placed.
         :param pulumi.Input[_builtins.str] form_set_id: The form set this field is placed in.
         :param pulumi.Input[_builtins.bool] non_editable: Whether the field is read-only and cannot be edited by users.. Value must be one of true or false
-        :param pulumi.Input[_builtins.str] placement_operator: Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions "> form_field_placement_conditions </span>with conditioned=placement. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`">`or`</span>.
+        :param pulumi.Input[_builtins.str] placement_operator: Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions " pulumi-lang-hcl=" form_field_placement_conditions "> formFieldPlacementConditions </span>with conditioned=placement. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`" pulumi-lang-hcl="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`" pulumi-lang-hcl="`or`">`or`</span>.
         :param pulumi.Input[_builtins.float] position: The position of the field placement.
         :param pulumi.Input[_builtins.bool] required: Whether the field is unconditionally required on this form.. Value must be one of true or false
-        :param pulumi.Input[_builtins.str] required_operator: Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions "> form_field_placement_conditions </span>with conditioned=required. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`">`or`</span>.
+        :param pulumi.Input[_builtins.str] required_operator: Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions " pulumi-lang-hcl=" form_field_placement_conditions "> formFieldPlacementConditions </span>with conditioned=required. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`" pulumi-lang-hcl="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`" pulumi-lang-hcl="`or`">`or`</span>.
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
@@ -489,7 +489,7 @@ class FormFieldPlacement(pulumi.CustomResource):
     @pulumi.getter(name="placementOperator")
     def placement_operator(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions "> form_field_placement_conditions </span>with conditioned=placement. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`">`or`</span>.
+        Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions " pulumi-lang-hcl=" form_field_placement_conditions "> formFieldPlacementConditions </span>with conditioned=placement. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`" pulumi-lang-hcl="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`" pulumi-lang-hcl="`or`">`or`</span>.
         """
         return pulumi.get(self, "placement_operator")
 
@@ -513,6 +513,7 @@ class FormFieldPlacement(pulumi.CustomResource):
     @pulumi.getter(name="requiredOperator")
     def required_operator(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions "> form_field_placement_conditions </span>with conditioned=required. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`">`or`</span>.
+        Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions " pulumi-lang-hcl=" form_field_placement_conditions "> formFieldPlacementConditions </span>with conditioned=required. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`" pulumi-lang-hcl="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`" pulumi-lang-hcl="`or`">`or`</span>.
         """
         return pulumi.get(self, "required_operator")
+

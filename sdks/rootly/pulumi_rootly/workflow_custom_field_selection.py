@@ -20,11 +20,11 @@ __all__ = ['WorkflowCustomFieldSelectionArgs', 'WorkflowCustomFieldSelection']
 class WorkflowCustomFieldSelectionArgs:
     def __init__(__self__, *,
                  custom_field_id: pulumi.Input[_builtins.float],
-                 incident_condition: Optional[pulumi.Input[_builtins.str]] = None,
-                 selected_option_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-                 values: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 workflow_custom_field_selection_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 workflow_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 incident_condition: pulumi.Input[Optional[_builtins.str]] = None,
+                 selected_option_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 values: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 workflow_custom_field_selection_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a WorkflowCustomFieldSelection resource.
 
@@ -58,65 +58,65 @@ class WorkflowCustomFieldSelectionArgs:
 
     @_builtins.property
     @pulumi.getter(name="incidentCondition")
-    def incident_condition(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def incident_condition(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The trigger condition. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition")
 
     @incident_condition.setter
-    def incident_condition(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def incident_condition(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "incident_condition", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedOptionIds")
-    def selected_option_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]]:
+    def selected_option_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]:
         return pulumi.get(self, "selected_option_ids")
 
     @selected_option_ids.setter
-    def selected_option_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]]):
+    def selected_option_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]):
         pulumi.set(self, "selected_option_ids", value)
 
     @_builtins.property
     @pulumi.getter
-    def values(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def values(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "values")
 
     @values.setter
-    def values(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def values(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "values", value)
 
     @_builtins.property
     @pulumi.getter(name="workflowCustomFieldSelectionId")
-    def workflow_custom_field_selection_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def workflow_custom_field_selection_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "workflow_custom_field_selection_id")
 
     @workflow_custom_field_selection_id.setter
-    def workflow_custom_field_selection_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def workflow_custom_field_selection_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "workflow_custom_field_selection_id", value)
 
     @_builtins.property
     @pulumi.getter(name="workflowId")
-    def workflow_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def workflow_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The workflow for this selection
         """
         return pulumi.get(self, "workflow_id")
 
     @workflow_id.setter
-    def workflow_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def workflow_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "workflow_id", value)
 
 
 @pulumi.input_type
 class _WorkflowCustomFieldSelectionState:
     def __init__(__self__, *,
-                 custom_field_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 incident_condition: Optional[pulumi.Input[_builtins.str]] = None,
-                 selected_option_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-                 values: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 workflow_custom_field_selection_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 workflow_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 custom_field_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 incident_condition: pulumi.Input[Optional[_builtins.str]] = None,
+                 selected_option_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 values: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 workflow_custom_field_selection_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering WorkflowCustomFieldSelection resources.
 
@@ -139,65 +139,65 @@ class _WorkflowCustomFieldSelectionState:
 
     @_builtins.property
     @pulumi.getter(name="customFieldId")
-    def custom_field_id(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def custom_field_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The custom field for this selection
         """
         return pulumi.get(self, "custom_field_id")
 
     @custom_field_id.setter
-    def custom_field_id(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def custom_field_id(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "custom_field_id", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentCondition")
-    def incident_condition(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def incident_condition(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The trigger condition. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition")
 
     @incident_condition.setter
-    def incident_condition(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def incident_condition(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "incident_condition", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedOptionIds")
-    def selected_option_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]]:
+    def selected_option_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]:
         return pulumi.get(self, "selected_option_ids")
 
     @selected_option_ids.setter
-    def selected_option_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]]):
+    def selected_option_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]):
         pulumi.set(self, "selected_option_ids", value)
 
     @_builtins.property
     @pulumi.getter
-    def values(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def values(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "values")
 
     @values.setter
-    def values(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def values(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "values", value)
 
     @_builtins.property
     @pulumi.getter(name="workflowCustomFieldSelectionId")
-    def workflow_custom_field_selection_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def workflow_custom_field_selection_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "workflow_custom_field_selection_id")
 
     @workflow_custom_field_selection_id.setter
-    def workflow_custom_field_selection_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def workflow_custom_field_selection_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "workflow_custom_field_selection_id", value)
 
     @_builtins.property
     @pulumi.getter(name="workflowId")
-    def workflow_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def workflow_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The workflow for this selection
         """
         return pulumi.get(self, "workflow_id")
 
     @workflow_id.setter
-    def workflow_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def workflow_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "workflow_id", value)
 
 
@@ -207,12 +207,12 @@ class WorkflowCustomFieldSelection(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 custom_field_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 incident_condition: Optional[pulumi.Input[_builtins.str]] = None,
-                 selected_option_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-                 values: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 workflow_custom_field_selection_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 workflow_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 custom_field_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 incident_condition: pulumi.Input[Optional[_builtins.str]] = None,
+                 selected_option_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 values: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 workflow_custom_field_selection_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a WorkflowCustomFieldSelection resource with the given unique name, props, and options.
@@ -247,12 +247,12 @@ class WorkflowCustomFieldSelection(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 custom_field_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 incident_condition: Optional[pulumi.Input[_builtins.str]] = None,
-                 selected_option_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-                 values: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 workflow_custom_field_selection_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 workflow_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 custom_field_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 incident_condition: pulumi.Input[Optional[_builtins.str]] = None,
+                 selected_option_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 values: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 workflow_custom_field_selection_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -281,12 +281,12 @@ class WorkflowCustomFieldSelection(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            custom_field_id: Optional[pulumi.Input[_builtins.float]] = None,
-            incident_condition: Optional[pulumi.Input[_builtins.str]] = None,
-            selected_option_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-            values: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            workflow_custom_field_selection_id: Optional[pulumi.Input[_builtins.str]] = None,
-            workflow_id: Optional[pulumi.Input[_builtins.str]] = None) -> 'WorkflowCustomFieldSelection':
+            custom_field_id: pulumi.Input[Optional[_builtins.float]] = None,
+            incident_condition: pulumi.Input[Optional[_builtins.str]] = None,
+            selected_option_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+            values: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            workflow_custom_field_selection_id: pulumi.Input[Optional[_builtins.str]] = None,
+            workflow_id: pulumi.Input[Optional[_builtins.str]] = None) -> 'WorkflowCustomFieldSelection':
         """
         Get an existing WorkflowCustomFieldSelection resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -348,3 +348,4 @@ class WorkflowCustomFieldSelection(pulumi.CustomResource):
         The workflow for this selection
         """
         return pulumi.get(self, "workflow_id")
+

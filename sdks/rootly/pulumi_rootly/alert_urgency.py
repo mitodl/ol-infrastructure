@@ -20,9 +20,9 @@ __all__ = ['AlertUrgencyArgs', 'AlertUrgency']
 class AlertUrgencyArgs:
     def __init__(__self__, *,
                  description: pulumi.Input[_builtins.str],
-                 alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None):
+                 alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None):
         """
         The set of arguments for constructing a AlertUrgency resource.
 
@@ -52,45 +52,45 @@ class AlertUrgencyArgs:
 
     @_builtins.property
     @pulumi.getter(name="alertUrgencyId")
-    def alert_urgency_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alert_urgency_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "alert_urgency_id")
 
     @alert_urgency_id.setter
-    def alert_urgency_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alert_urgency_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alert_urgency_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the alert urgency
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Position of the alert urgency
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
 
 @pulumi.input_type
 class _AlertUrgencyState:
     def __init__(__self__, *,
-                 alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None):
+                 alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None):
         """
         Input properties used for looking up and filtering AlertUrgency resources.
 
@@ -109,47 +109,47 @@ class _AlertUrgencyState:
 
     @_builtins.property
     @pulumi.getter(name="alertUrgencyId")
-    def alert_urgency_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alert_urgency_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "alert_urgency_id")
 
     @alert_urgency_id.setter
-    def alert_urgency_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alert_urgency_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alert_urgency_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the alert urgency
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the alert urgency
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Position of the alert urgency
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
 
@@ -159,10 +159,10 @@ class AlertUrgency(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
+                 alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         """
         Create a AlertUrgency resource with the given unique name, props, and options.
@@ -197,10 +197,10 @@ class AlertUrgency(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
+                 alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -227,10 +227,10 @@ class AlertUrgency(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None) -> 'AlertUrgency':
+            alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None) -> 'AlertUrgency':
         """
         Get an existing AlertUrgency resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -280,3 +280,4 @@ class AlertUrgency(pulumi.CustomResource):
         Position of the alert urgency
         """
         return pulumi.get(self, "position")
+

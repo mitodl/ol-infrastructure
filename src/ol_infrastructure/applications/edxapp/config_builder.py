@@ -108,7 +108,6 @@ def build_base_general_config() -> ConfigDict:
         "BUGS_EMAIL": "odl-devops@mit.edu",
         "BULK_EMAIL_EMAILS_PER_TASK": 500,
         "BULK_EMAIL_LOG_SENT_EMAILS": False,
-        "CELERYBEAT_SCHEDULER": "redbeat.RedBeatScheduler",
         "CELERY_BROKER_TRANSPORT": "rediss",
         "CELERY_BROKER_USER": "default",
         "CELERY_BROKER_USE_SSL": {
@@ -239,7 +238,6 @@ def build_base_general_config() -> ConfigDict:
         "PLATFORM_TWITTER_ACCOUNT": "@YourPlatformTwitterAccount",
         "POLICY_CHANGE_GRADES_ROUTING_KEY": "edx.lms.core.default",
         "PROCTORING_SETTINGS": {},
-        "REDBEAT_KEY_PREFIX": "redbeat_lms",
         "REGISTRATION_EXTRA_FIELDS": {
             "city": "hidden",
             "confirm_email": "hidden",
@@ -383,6 +381,8 @@ def build_base_general_config() -> ConfigDict:
             "ENABLE_EXPORT_GIT": True,
             "ENABLE_GIT_AUTO_EXPORT": True,
             "ENABLE_AUTO_GITHUB_REPO_CREATION": True,
+            "ENABLE_GIT_AUTO_LIBRARY_EXPORT": True,
+            "ENABLE_AUTO_GITHUB_LIBRARY_REPO_CREATION": True,
             "ENABLE_GRADE_DOWNLOADS": True,
             "ENABLE_INSTRUCTOR_ANALYTICS": False,
             "ENABLE_INSTRUCTOR_EMAIL": True,

@@ -19,17 +19,17 @@ __all__ = ['PostMortemTemplateArgs', 'PostMortemTemplate']
 @pulumi.input_type
 class PostMortemTemplateArgs:
     def __init__(__self__, *,
-                 content: Optional[pulumi.Input[_builtins.str]] = None,
-                 default: Optional[pulumi.Input[_builtins.bool]] = None,
-                 format: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 post_mortem_template_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 content: pulumi.Input[Optional[_builtins.str]] = None,
+                 default: pulumi.Input[Optional[_builtins.bool]] = None,
+                 format: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 post_mortem_template_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a PostMortemTemplate resource.
 
         :param pulumi.Input[_builtins.str] content: The postmortem template. Liquid syntax and markdown are supported
         :param pulumi.Input[_builtins.bool] default: Default selected template when editing a postmortem. Value must be one of true or false
-        :param pulumi.Input[_builtins.str] format: The format of the input. Value must be one of <span pulumi-lang-nodejs="`html`" pulumi-lang-dotnet="`Html`" pulumi-lang-go="`html`" pulumi-lang-python="`html`" pulumi-lang-yaml="`html`" pulumi-lang-java="`html`">`html`</span>, <span pulumi-lang-nodejs="`markdown`" pulumi-lang-dotnet="`Markdown`" pulumi-lang-go="`markdown`" pulumi-lang-python="`markdown`" pulumi-lang-yaml="`markdown`" pulumi-lang-java="`markdown`">`markdown`</span>.
+        :param pulumi.Input[_builtins.str] format: The format of the input. Value must be one of <span pulumi-lang-nodejs="`html`" pulumi-lang-dotnet="`Html`" pulumi-lang-go="`html`" pulumi-lang-python="`html`" pulumi-lang-yaml="`html`" pulumi-lang-java="`html`" pulumi-lang-hcl="`html`">`html`</span>, <span pulumi-lang-nodejs="`markdown`" pulumi-lang-dotnet="`Markdown`" pulumi-lang-go="`markdown`" pulumi-lang-python="`markdown`" pulumi-lang-yaml="`markdown`" pulumi-lang-java="`markdown`" pulumi-lang-hcl="`markdown`">`markdown`</span>.
         :param pulumi.Input[_builtins.str] name: The name of the postmortem template
         """
         if content is not None:
@@ -45,76 +45,76 @@ class PostMortemTemplateArgs:
 
     @_builtins.property
     @pulumi.getter
-    def content(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def content(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The postmortem template. Liquid syntax and markdown are supported
         """
         return pulumi.get(self, "content")
 
     @content.setter
-    def content(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def content(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "content", value)
 
     @_builtins.property
     @pulumi.getter
-    def default(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def default(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Default selected template when editing a postmortem. Value must be one of true or false
         """
         return pulumi.get(self, "default")
 
     @default.setter
-    def default(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def default(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "default", value)
 
     @_builtins.property
     @pulumi.getter
-    def format(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def format(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The format of the input. Value must be one of <span pulumi-lang-nodejs="`html`" pulumi-lang-dotnet="`Html`" pulumi-lang-go="`html`" pulumi-lang-python="`html`" pulumi-lang-yaml="`html`" pulumi-lang-java="`html`">`html`</span>, <span pulumi-lang-nodejs="`markdown`" pulumi-lang-dotnet="`Markdown`" pulumi-lang-go="`markdown`" pulumi-lang-python="`markdown`" pulumi-lang-yaml="`markdown`" pulumi-lang-java="`markdown`">`markdown`</span>.
+        The format of the input. Value must be one of <span pulumi-lang-nodejs="`html`" pulumi-lang-dotnet="`Html`" pulumi-lang-go="`html`" pulumi-lang-python="`html`" pulumi-lang-yaml="`html`" pulumi-lang-java="`html`" pulumi-lang-hcl="`html`">`html`</span>, <span pulumi-lang-nodejs="`markdown`" pulumi-lang-dotnet="`Markdown`" pulumi-lang-go="`markdown`" pulumi-lang-python="`markdown`" pulumi-lang-yaml="`markdown`" pulumi-lang-java="`markdown`" pulumi-lang-hcl="`markdown`">`markdown`</span>.
         """
         return pulumi.get(self, "format")
 
     @format.setter
-    def format(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def format(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "format", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the postmortem template
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="postMortemTemplateId")
-    def post_mortem_template_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def post_mortem_template_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "post_mortem_template_id")
 
     @post_mortem_template_id.setter
-    def post_mortem_template_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def post_mortem_template_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "post_mortem_template_id", value)
 
 
 @pulumi.input_type
 class _PostMortemTemplateState:
     def __init__(__self__, *,
-                 content: Optional[pulumi.Input[_builtins.str]] = None,
-                 default: Optional[pulumi.Input[_builtins.bool]] = None,
-                 format: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 post_mortem_template_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 content: pulumi.Input[Optional[_builtins.str]] = None,
+                 default: pulumi.Input[Optional[_builtins.bool]] = None,
+                 format: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 post_mortem_template_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering PostMortemTemplate resources.
 
         :param pulumi.Input[_builtins.str] content: The postmortem template. Liquid syntax and markdown are supported
         :param pulumi.Input[_builtins.bool] default: Default selected template when editing a postmortem. Value must be one of true or false
-        :param pulumi.Input[_builtins.str] format: The format of the input. Value must be one of <span pulumi-lang-nodejs="`html`" pulumi-lang-dotnet="`Html`" pulumi-lang-go="`html`" pulumi-lang-python="`html`" pulumi-lang-yaml="`html`" pulumi-lang-java="`html`">`html`</span>, <span pulumi-lang-nodejs="`markdown`" pulumi-lang-dotnet="`Markdown`" pulumi-lang-go="`markdown`" pulumi-lang-python="`markdown`" pulumi-lang-yaml="`markdown`" pulumi-lang-java="`markdown`">`markdown`</span>.
+        :param pulumi.Input[_builtins.str] format: The format of the input. Value must be one of <span pulumi-lang-nodejs="`html`" pulumi-lang-dotnet="`Html`" pulumi-lang-go="`html`" pulumi-lang-python="`html`" pulumi-lang-yaml="`html`" pulumi-lang-java="`html`" pulumi-lang-hcl="`html`">`html`</span>, <span pulumi-lang-nodejs="`markdown`" pulumi-lang-dotnet="`Markdown`" pulumi-lang-go="`markdown`" pulumi-lang-python="`markdown`" pulumi-lang-yaml="`markdown`" pulumi-lang-java="`markdown`" pulumi-lang-hcl="`markdown`">`markdown`</span>.
         :param pulumi.Input[_builtins.str] name: The name of the postmortem template
         """
         if content is not None:
@@ -130,59 +130,59 @@ class _PostMortemTemplateState:
 
     @_builtins.property
     @pulumi.getter
-    def content(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def content(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The postmortem template. Liquid syntax and markdown are supported
         """
         return pulumi.get(self, "content")
 
     @content.setter
-    def content(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def content(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "content", value)
 
     @_builtins.property
     @pulumi.getter
-    def default(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def default(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Default selected template when editing a postmortem. Value must be one of true or false
         """
         return pulumi.get(self, "default")
 
     @default.setter
-    def default(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def default(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "default", value)
 
     @_builtins.property
     @pulumi.getter
-    def format(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def format(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The format of the input. Value must be one of <span pulumi-lang-nodejs="`html`" pulumi-lang-dotnet="`Html`" pulumi-lang-go="`html`" pulumi-lang-python="`html`" pulumi-lang-yaml="`html`" pulumi-lang-java="`html`">`html`</span>, <span pulumi-lang-nodejs="`markdown`" pulumi-lang-dotnet="`Markdown`" pulumi-lang-go="`markdown`" pulumi-lang-python="`markdown`" pulumi-lang-yaml="`markdown`" pulumi-lang-java="`markdown`">`markdown`</span>.
+        The format of the input. Value must be one of <span pulumi-lang-nodejs="`html`" pulumi-lang-dotnet="`Html`" pulumi-lang-go="`html`" pulumi-lang-python="`html`" pulumi-lang-yaml="`html`" pulumi-lang-java="`html`" pulumi-lang-hcl="`html`">`html`</span>, <span pulumi-lang-nodejs="`markdown`" pulumi-lang-dotnet="`Markdown`" pulumi-lang-go="`markdown`" pulumi-lang-python="`markdown`" pulumi-lang-yaml="`markdown`" pulumi-lang-java="`markdown`" pulumi-lang-hcl="`markdown`">`markdown`</span>.
         """
         return pulumi.get(self, "format")
 
     @format.setter
-    def format(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def format(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "format", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the postmortem template
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="postMortemTemplateId")
-    def post_mortem_template_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def post_mortem_template_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "post_mortem_template_id")
 
     @post_mortem_template_id.setter
-    def post_mortem_template_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def post_mortem_template_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "post_mortem_template_id", value)
 
 
@@ -192,11 +192,11 @@ class PostMortemTemplate(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 content: Optional[pulumi.Input[_builtins.str]] = None,
-                 default: Optional[pulumi.Input[_builtins.bool]] = None,
-                 format: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 post_mortem_template_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 content: pulumi.Input[Optional[_builtins.str]] = None,
+                 default: pulumi.Input[Optional[_builtins.bool]] = None,
+                 format: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 post_mortem_template_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a PostMortemTemplate resource with the given unique name, props, and options.
@@ -205,7 +205,7 @@ class PostMortemTemplate(pulumi.CustomResource):
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.str] content: The postmortem template. Liquid syntax and markdown are supported
         :param pulumi.Input[_builtins.bool] default: Default selected template when editing a postmortem. Value must be one of true or false
-        :param pulumi.Input[_builtins.str] format: The format of the input. Value must be one of <span pulumi-lang-nodejs="`html`" pulumi-lang-dotnet="`Html`" pulumi-lang-go="`html`" pulumi-lang-python="`html`" pulumi-lang-yaml="`html`" pulumi-lang-java="`html`">`html`</span>, <span pulumi-lang-nodejs="`markdown`" pulumi-lang-dotnet="`Markdown`" pulumi-lang-go="`markdown`" pulumi-lang-python="`markdown`" pulumi-lang-yaml="`markdown`" pulumi-lang-java="`markdown`">`markdown`</span>.
+        :param pulumi.Input[_builtins.str] format: The format of the input. Value must be one of <span pulumi-lang-nodejs="`html`" pulumi-lang-dotnet="`Html`" pulumi-lang-go="`html`" pulumi-lang-python="`html`" pulumi-lang-yaml="`html`" pulumi-lang-java="`html`" pulumi-lang-hcl="`html`">`html`</span>, <span pulumi-lang-nodejs="`markdown`" pulumi-lang-dotnet="`Markdown`" pulumi-lang-go="`markdown`" pulumi-lang-python="`markdown`" pulumi-lang-yaml="`markdown`" pulumi-lang-java="`markdown`" pulumi-lang-hcl="`markdown`">`markdown`</span>.
         :param pulumi.Input[_builtins.str] name: The name of the postmortem template
         """
         ...
@@ -232,11 +232,11 @@ class PostMortemTemplate(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 content: Optional[pulumi.Input[_builtins.str]] = None,
-                 default: Optional[pulumi.Input[_builtins.bool]] = None,
-                 format: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 post_mortem_template_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 content: pulumi.Input[Optional[_builtins.str]] = None,
+                 default: pulumi.Input[Optional[_builtins.bool]] = None,
+                 format: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 post_mortem_template_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -262,11 +262,11 @@ class PostMortemTemplate(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            content: Optional[pulumi.Input[_builtins.str]] = None,
-            default: Optional[pulumi.Input[_builtins.bool]] = None,
-            format: Optional[pulumi.Input[_builtins.str]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            post_mortem_template_id: Optional[pulumi.Input[_builtins.str]] = None) -> 'PostMortemTemplate':
+            content: pulumi.Input[Optional[_builtins.str]] = None,
+            default: pulumi.Input[Optional[_builtins.bool]] = None,
+            format: pulumi.Input[Optional[_builtins.str]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            post_mortem_template_id: pulumi.Input[Optional[_builtins.str]] = None) -> 'PostMortemTemplate':
         """
         Get an existing PostMortemTemplate resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -276,7 +276,7 @@ class PostMortemTemplate(pulumi.CustomResource):
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.str] content: The postmortem template. Liquid syntax and markdown are supported
         :param pulumi.Input[_builtins.bool] default: Default selected template when editing a postmortem. Value must be one of true or false
-        :param pulumi.Input[_builtins.str] format: The format of the input. Value must be one of <span pulumi-lang-nodejs="`html`" pulumi-lang-dotnet="`Html`" pulumi-lang-go="`html`" pulumi-lang-python="`html`" pulumi-lang-yaml="`html`" pulumi-lang-java="`html`">`html`</span>, <span pulumi-lang-nodejs="`markdown`" pulumi-lang-dotnet="`Markdown`" pulumi-lang-go="`markdown`" pulumi-lang-python="`markdown`" pulumi-lang-yaml="`markdown`" pulumi-lang-java="`markdown`">`markdown`</span>.
+        :param pulumi.Input[_builtins.str] format: The format of the input. Value must be one of <span pulumi-lang-nodejs="`html`" pulumi-lang-dotnet="`Html`" pulumi-lang-go="`html`" pulumi-lang-python="`html`" pulumi-lang-yaml="`html`" pulumi-lang-java="`html`" pulumi-lang-hcl="`html`">`html`</span>, <span pulumi-lang-nodejs="`markdown`" pulumi-lang-dotnet="`Markdown`" pulumi-lang-go="`markdown`" pulumi-lang-python="`markdown`" pulumi-lang-yaml="`markdown`" pulumi-lang-java="`markdown`" pulumi-lang-hcl="`markdown`">`markdown`</span>.
         :param pulumi.Input[_builtins.str] name: The name of the postmortem template
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
@@ -310,7 +310,7 @@ class PostMortemTemplate(pulumi.CustomResource):
     @pulumi.getter
     def format(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        The format of the input. Value must be one of <span pulumi-lang-nodejs="`html`" pulumi-lang-dotnet="`Html`" pulumi-lang-go="`html`" pulumi-lang-python="`html`" pulumi-lang-yaml="`html`" pulumi-lang-java="`html`">`html`</span>, <span pulumi-lang-nodejs="`markdown`" pulumi-lang-dotnet="`Markdown`" pulumi-lang-go="`markdown`" pulumi-lang-python="`markdown`" pulumi-lang-yaml="`markdown`" pulumi-lang-java="`markdown`">`markdown`</span>.
+        The format of the input. Value must be one of <span pulumi-lang-nodejs="`html`" pulumi-lang-dotnet="`Html`" pulumi-lang-go="`html`" pulumi-lang-python="`html`" pulumi-lang-yaml="`html`" pulumi-lang-java="`html`" pulumi-lang-hcl="`html`">`html`</span>, <span pulumi-lang-nodejs="`markdown`" pulumi-lang-dotnet="`Markdown`" pulumi-lang-go="`markdown`" pulumi-lang-python="`markdown`" pulumi-lang-yaml="`markdown`" pulumi-lang-java="`markdown`" pulumi-lang-hcl="`markdown`">`markdown`</span>.
         """
         return pulumi.get(self, "format")
 
@@ -326,3 +326,4 @@ class PostMortemTemplate(pulumi.CustomResource):
     @pulumi.getter(name="postMortemTemplateId")
     def post_mortem_template_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "post_mortem_template_id")
+

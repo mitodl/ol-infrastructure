@@ -22,11 +22,11 @@ __all__ = ['RetrospectiveProcessArgs', 'RetrospectiveProcess']
 class RetrospectiveProcessArgs:
     def __init__(__self__, *,
                  retrospective_process_matching_criteria: pulumi.Input['RetrospectiveProcessRetrospectiveProcessMatchingCriteriaArgs'],
-                 copy_from: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 is_default: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 retrospective_process_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 copy_from: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 is_default: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 retrospective_process_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a RetrospectiveProcess resource.
 
@@ -58,71 +58,71 @@ class RetrospectiveProcessArgs:
 
     @_builtins.property
     @pulumi.getter(name="copyFrom")
-    def copy_from(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def copy_from(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Retrospective process ID from which retrospective steps have to be copied. To use starter template for retrospective steps provide value: 'starter_template'
         """
         return pulumi.get(self, "copy_from")
 
     @copy_from.setter
-    def copy_from(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def copy_from(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "copy_from", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the retrospective process
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="isDefault")
-    def is_default(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def is_default(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Is the retrospective process default?. Value must be one of true or false
         """
         return pulumi.get(self, "is_default")
 
     @is_default.setter
-    def is_default(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def is_default(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "is_default", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the retrospective process
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="retrospectiveProcessId")
-    def retrospective_process_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def retrospective_process_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "retrospective_process_id")
 
     @retrospective_process_id.setter
-    def retrospective_process_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def retrospective_process_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "retrospective_process_id", value)
 
 
 @pulumi.input_type
 class _RetrospectiveProcessState:
     def __init__(__self__, *,
-                 copy_from: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 is_default: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 retrospective_process_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 retrospective_process_matching_criteria: Optional[pulumi.Input['RetrospectiveProcessRetrospectiveProcessMatchingCriteriaArgs']] = None):
+                 copy_from: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 is_default: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 retrospective_process_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 retrospective_process_matching_criteria: pulumi.Input[Optional['RetrospectiveProcessRetrospectiveProcessMatchingCriteriaArgs']] = None):
         """
         Input properties used for looking up and filtering RetrospectiveProcess resources.
 
@@ -146,68 +146,68 @@ class _RetrospectiveProcessState:
 
     @_builtins.property
     @pulumi.getter(name="copyFrom")
-    def copy_from(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def copy_from(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Retrospective process ID from which retrospective steps have to be copied. To use starter template for retrospective steps provide value: 'starter_template'
         """
         return pulumi.get(self, "copy_from")
 
     @copy_from.setter
-    def copy_from(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def copy_from(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "copy_from", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the retrospective process
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="isDefault")
-    def is_default(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def is_default(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Is the retrospective process default?. Value must be one of true or false
         """
         return pulumi.get(self, "is_default")
 
     @is_default.setter
-    def is_default(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def is_default(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "is_default", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the retrospective process
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="retrospectiveProcessId")
-    def retrospective_process_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def retrospective_process_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "retrospective_process_id")
 
     @retrospective_process_id.setter
-    def retrospective_process_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def retrospective_process_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "retrospective_process_id", value)
 
     @_builtins.property
     @pulumi.getter(name="retrospectiveProcessMatchingCriteria")
-    def retrospective_process_matching_criteria(self) -> Optional[pulumi.Input['RetrospectiveProcessRetrospectiveProcessMatchingCriteriaArgs']]:
+    def retrospective_process_matching_criteria(self) -> pulumi.Input[Optional['RetrospectiveProcessRetrospectiveProcessMatchingCriteriaArgs']]:
         return pulumi.get(self, "retrospective_process_matching_criteria")
 
     @retrospective_process_matching_criteria.setter
-    def retrospective_process_matching_criteria(self, value: Optional[pulumi.Input['RetrospectiveProcessRetrospectiveProcessMatchingCriteriaArgs']]):
+    def retrospective_process_matching_criteria(self, value: pulumi.Input[Optional['RetrospectiveProcessRetrospectiveProcessMatchingCriteriaArgs']]):
         pulumi.set(self, "retrospective_process_matching_criteria", value)
 
 
@@ -217,12 +217,12 @@ class RetrospectiveProcess(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 copy_from: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 is_default: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 retrospective_process_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 retrospective_process_matching_criteria: Optional[pulumi.Input[Union['RetrospectiveProcessRetrospectiveProcessMatchingCriteriaArgs', 'RetrospectiveProcessRetrospectiveProcessMatchingCriteriaArgsDict']]] = None,
+                 copy_from: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 is_default: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 retrospective_process_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 retrospective_process_matching_criteria: pulumi.Input[Optional[Union['RetrospectiveProcessRetrospectiveProcessMatchingCriteriaArgs', 'RetrospectiveProcessRetrospectiveProcessMatchingCriteriaArgsDict']]] = None,
                  __props__=None):
         """
         Create a RetrospectiveProcess resource with the given unique name, props, and options.
@@ -258,12 +258,12 @@ class RetrospectiveProcess(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 copy_from: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 is_default: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 retrospective_process_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 retrospective_process_matching_criteria: Optional[pulumi.Input[Union['RetrospectiveProcessRetrospectiveProcessMatchingCriteriaArgs', 'RetrospectiveProcessRetrospectiveProcessMatchingCriteriaArgsDict']]] = None,
+                 copy_from: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 is_default: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 retrospective_process_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 retrospective_process_matching_criteria: pulumi.Input[Optional[Union['RetrospectiveProcessRetrospectiveProcessMatchingCriteriaArgs', 'RetrospectiveProcessRetrospectiveProcessMatchingCriteriaArgsDict']]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -292,12 +292,12 @@ class RetrospectiveProcess(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            copy_from: Optional[pulumi.Input[_builtins.str]] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            is_default: Optional[pulumi.Input[_builtins.bool]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            retrospective_process_id: Optional[pulumi.Input[_builtins.str]] = None,
-            retrospective_process_matching_criteria: Optional[pulumi.Input[Union['RetrospectiveProcessRetrospectiveProcessMatchingCriteriaArgs', 'RetrospectiveProcessRetrospectiveProcessMatchingCriteriaArgsDict']]] = None) -> 'RetrospectiveProcess':
+            copy_from: pulumi.Input[Optional[_builtins.str]] = None,
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            is_default: pulumi.Input[Optional[_builtins.bool]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            retrospective_process_id: pulumi.Input[Optional[_builtins.str]] = None,
+            retrospective_process_matching_criteria: pulumi.Input[Optional[Union['RetrospectiveProcessRetrospectiveProcessMatchingCriteriaArgs', 'RetrospectiveProcessRetrospectiveProcessMatchingCriteriaArgsDict']]] = None) -> 'RetrospectiveProcess':
         """
         Get an existing RetrospectiveProcess resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -363,3 +363,4 @@ class RetrospectiveProcess(pulumi.CustomResource):
     @pulumi.getter(name="retrospectiveProcessMatchingCriteria")
     def retrospective_process_matching_criteria(self) -> pulumi.Output['outputs.RetrospectiveProcessRetrospectiveProcessMatchingCriteria']:
         return pulumi.get(self, "retrospective_process_matching_criteria")
+

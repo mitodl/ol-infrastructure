@@ -20,11 +20,11 @@ __all__ = ['CustomFieldOptionArgs', 'CustomFieldOption']
 class CustomFieldOptionArgs:
     def __init__(__self__, *,
                  value: pulumi.Input[_builtins.str],
-                 color: Optional[pulumi.Input[_builtins.str]] = None,
-                 custom_field_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 custom_field_option_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 default: Optional[pulumi.Input[_builtins.bool]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None):
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 custom_field_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 custom_field_option_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 default: pulumi.Input[Optional[_builtins.bool]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None):
         """
         The set of arguments for constructing a CustomFieldOption resource.
 
@@ -59,68 +59,68 @@ class CustomFieldOptionArgs:
 
     @_builtins.property
     @pulumi.getter
-    def color(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def color(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The hex color of the custom_field_option
         """
         return pulumi.get(self, "color")
 
     @color.setter
-    def color(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def color(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "color", value)
 
     @_builtins.property
     @pulumi.getter(name="customFieldId")
-    def custom_field_id(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def custom_field_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The ID of the parent custom field
         """
         return pulumi.get(self, "custom_field_id")
 
     @custom_field_id.setter
-    def custom_field_id(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def custom_field_id(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "custom_field_id", value)
 
     @_builtins.property
     @pulumi.getter(name="customFieldOptionId")
-    def custom_field_option_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def custom_field_option_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "custom_field_option_id")
 
     @custom_field_option_id.setter
-    def custom_field_option_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def custom_field_option_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "custom_field_option_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def default(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def default(self) -> pulumi.Input[Optional[_builtins.bool]]:
         return pulumi.get(self, "default")
 
     @default.setter
-    def default(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def default(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "default", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The position of the custom_field_option
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
 
 @pulumi.input_type
 class _CustomFieldOptionState:
     def __init__(__self__, *,
-                 color: Optional[pulumi.Input[_builtins.str]] = None,
-                 custom_field_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 custom_field_option_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 default: Optional[pulumi.Input[_builtins.bool]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 value: Optional[pulumi.Input[_builtins.str]] = None):
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 custom_field_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 custom_field_option_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 default: pulumi.Input[Optional[_builtins.bool]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 value: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering CustomFieldOption resources.
 
@@ -144,68 +144,68 @@ class _CustomFieldOptionState:
 
     @_builtins.property
     @pulumi.getter
-    def color(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def color(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The hex color of the custom_field_option
         """
         return pulumi.get(self, "color")
 
     @color.setter
-    def color(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def color(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "color", value)
 
     @_builtins.property
     @pulumi.getter(name="customFieldId")
-    def custom_field_id(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def custom_field_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The ID of the parent custom field
         """
         return pulumi.get(self, "custom_field_id")
 
     @custom_field_id.setter
-    def custom_field_id(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def custom_field_id(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "custom_field_id", value)
 
     @_builtins.property
     @pulumi.getter(name="customFieldOptionId")
-    def custom_field_option_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def custom_field_option_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "custom_field_option_id")
 
     @custom_field_option_id.setter
-    def custom_field_option_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def custom_field_option_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "custom_field_option_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def default(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def default(self) -> pulumi.Input[Optional[_builtins.bool]]:
         return pulumi.get(self, "default")
 
     @default.setter
-    def default(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def default(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "default", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The position of the custom_field_option
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter
-    def value(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def value(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The value of the custom_field_option
         """
         return pulumi.get(self, "value")
 
     @value.setter
-    def value(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def value(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "value", value)
 
 
@@ -215,12 +215,12 @@ class CustomFieldOption(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 color: Optional[pulumi.Input[_builtins.str]] = None,
-                 custom_field_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 custom_field_option_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 default: Optional[pulumi.Input[_builtins.bool]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 value: Optional[pulumi.Input[_builtins.str]] = None,
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 custom_field_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 custom_field_option_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 default: pulumi.Input[Optional[_builtins.bool]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 value: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a CustomFieldOption resource with the given unique name, props, and options.
@@ -256,12 +256,12 @@ class CustomFieldOption(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 color: Optional[pulumi.Input[_builtins.str]] = None,
-                 custom_field_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 custom_field_option_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 default: Optional[pulumi.Input[_builtins.bool]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 value: Optional[pulumi.Input[_builtins.str]] = None,
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 custom_field_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 custom_field_option_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 default: pulumi.Input[Optional[_builtins.bool]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 value: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -290,12 +290,12 @@ class CustomFieldOption(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            color: Optional[pulumi.Input[_builtins.str]] = None,
-            custom_field_id: Optional[pulumi.Input[_builtins.float]] = None,
-            custom_field_option_id: Optional[pulumi.Input[_builtins.str]] = None,
-            default: Optional[pulumi.Input[_builtins.bool]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None,
-            value: Optional[pulumi.Input[_builtins.str]] = None) -> 'CustomFieldOption':
+            color: pulumi.Input[Optional[_builtins.str]] = None,
+            custom_field_id: pulumi.Input[Optional[_builtins.float]] = None,
+            custom_field_option_id: pulumi.Input[Optional[_builtins.str]] = None,
+            default: pulumi.Input[Optional[_builtins.bool]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None,
+            value: pulumi.Input[Optional[_builtins.str]] = None) -> 'CustomFieldOption':
         """
         Get an existing CustomFieldOption resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -361,3 +361,4 @@ class CustomFieldOption(pulumi.CustomResource):
         The value of the custom_field_option
         """
         return pulumi.get(self, "value")
+

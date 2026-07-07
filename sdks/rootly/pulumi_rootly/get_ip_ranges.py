@@ -98,7 +98,7 @@ def get_ip_ranges(id: Optional[_builtins.str] = None,
         integrations_ipv6s=pulumi.get(__ret__, 'integrations_ipv6s'),
         webhooks_ipv4s=pulumi.get(__ret__, 'webhooks_ipv4s'),
         webhooks_ipv6s=pulumi.get(__ret__, 'webhooks_ipv6s'))
-def get_ip_ranges_output(id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_ip_ranges_output(id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                          opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetIpRangesResult]:
     """
     Use this data source to access information about an existing resource.

@@ -19,17 +19,17 @@ __all__ = ['EdgeConnectorArgs', 'EdgeConnector']
 @pulumi.input_type
 class EdgeConnectorArgs:
     def __init__(__self__, *,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 edge_connector_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 status: Optional[pulumi.Input[_builtins.str]] = None,
-                 subscriptions: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None):
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 edge_connector_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 status: pulumi.Input[Optional[_builtins.str]] = None,
+                 subscriptions: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None):
         """
         The set of arguments for constructing a EdgeConnector resource.
 
         :param pulumi.Input[_builtins.str] description: Connector description
         :param pulumi.Input[_builtins.str] name: Connector name
-        :param pulumi.Input[_builtins.str] status: Connector status. Value must be one of <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`">`active`</span>, <span pulumi-lang-nodejs="`paused`" pulumi-lang-dotnet="`Paused`" pulumi-lang-go="`paused`" pulumi-lang-python="`paused`" pulumi-lang-yaml="`paused`" pulumi-lang-java="`paused`">`paused`</span>.
+        :param pulumi.Input[_builtins.str] status: Connector status. Value must be one of <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`" pulumi-lang-hcl="`active`">`active`</span>, <span pulumi-lang-nodejs="`paused`" pulumi-lang-dotnet="`Paused`" pulumi-lang-go="`paused`" pulumi-lang-python="`paused`" pulumi-lang-yaml="`paused`" pulumi-lang-java="`paused`" pulumi-lang-hcl="`paused`">`paused`</span>.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] subscriptions: Array of event types to subscribe to
         """
         if description is not None:
@@ -45,80 +45,80 @@ class EdgeConnectorArgs:
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Connector description
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="edgeConnectorId")
-    def edge_connector_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def edge_connector_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "edge_connector_id")
 
     @edge_connector_id.setter
-    def edge_connector_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def edge_connector_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "edge_connector_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Connector name
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def status(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def status(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Connector status. Value must be one of <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`">`active`</span>, <span pulumi-lang-nodejs="`paused`" pulumi-lang-dotnet="`Paused`" pulumi-lang-go="`paused`" pulumi-lang-python="`paused`" pulumi-lang-yaml="`paused`" pulumi-lang-java="`paused`">`paused`</span>.
+        Connector status. Value must be one of <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`" pulumi-lang-hcl="`active`">`active`</span>, <span pulumi-lang-nodejs="`paused`" pulumi-lang-dotnet="`Paused`" pulumi-lang-go="`paused`" pulumi-lang-python="`paused`" pulumi-lang-yaml="`paused`" pulumi-lang-java="`paused`" pulumi-lang-hcl="`paused`">`paused`</span>.
         """
         return pulumi.get(self, "status")
 
     @status.setter
-    def status(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def status(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "status", value)
 
     @_builtins.property
     @pulumi.getter
-    def subscriptions(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def subscriptions(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Array of event types to subscribe to
         """
         return pulumi.get(self, "subscriptions")
 
     @subscriptions.setter
-    def subscriptions(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def subscriptions(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "subscriptions", value)
 
 
 @pulumi.input_type
 class _EdgeConnectorState:
     def __init__(__self__, *,
-                 created_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 edge_connector_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 online: Optional[pulumi.Input[_builtins.bool]] = None,
-                 status: Optional[pulumi.Input[_builtins.str]] = None,
-                 subscriptions: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 updated_at: Optional[pulumi.Input[_builtins.str]] = None):
+                 created_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 edge_connector_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 online: pulumi.Input[Optional[_builtins.bool]] = None,
+                 status: pulumi.Input[Optional[_builtins.str]] = None,
+                 subscriptions: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 updated_at: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering EdgeConnector resources.
 
         :param pulumi.Input[_builtins.str] description: Connector description
         :param pulumi.Input[_builtins.str] name: Connector name
         :param pulumi.Input[_builtins.bool] online: Whether connector is currently online
-        :param pulumi.Input[_builtins.str] status: Connector status. Value must be one of <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`">`active`</span>, <span pulumi-lang-nodejs="`paused`" pulumi-lang-dotnet="`Paused`" pulumi-lang-go="`paused`" pulumi-lang-python="`paused`" pulumi-lang-yaml="`paused`" pulumi-lang-java="`paused`">`paused`</span>.
+        :param pulumi.Input[_builtins.str] status: Connector status. Value must be one of <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`" pulumi-lang-hcl="`active`">`active`</span>, <span pulumi-lang-nodejs="`paused`" pulumi-lang-dotnet="`Paused`" pulumi-lang-go="`paused`" pulumi-lang-python="`paused`" pulumi-lang-yaml="`paused`" pulumi-lang-java="`paused`" pulumi-lang-hcl="`paused`">`paused`</span>.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] subscriptions: Array of event types to subscribe to
         """
         if created_at is not None:
@@ -140,89 +140,89 @@ class _EdgeConnectorState:
 
     @_builtins.property
     @pulumi.getter(name="createdAt")
-    def created_at(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def created_at(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "created_at")
 
     @created_at.setter
-    def created_at(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def created_at(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "created_at", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Connector description
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="edgeConnectorId")
-    def edge_connector_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def edge_connector_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "edge_connector_id")
 
     @edge_connector_id.setter
-    def edge_connector_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def edge_connector_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "edge_connector_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Connector name
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def online(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def online(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Whether connector is currently online
         """
         return pulumi.get(self, "online")
 
     @online.setter
-    def online(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def online(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "online", value)
 
     @_builtins.property
     @pulumi.getter
-    def status(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def status(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Connector status. Value must be one of <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`">`active`</span>, <span pulumi-lang-nodejs="`paused`" pulumi-lang-dotnet="`Paused`" pulumi-lang-go="`paused`" pulumi-lang-python="`paused`" pulumi-lang-yaml="`paused`" pulumi-lang-java="`paused`">`paused`</span>.
+        Connector status. Value must be one of <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`" pulumi-lang-hcl="`active`">`active`</span>, <span pulumi-lang-nodejs="`paused`" pulumi-lang-dotnet="`Paused`" pulumi-lang-go="`paused`" pulumi-lang-python="`paused`" pulumi-lang-yaml="`paused`" pulumi-lang-java="`paused`" pulumi-lang-hcl="`paused`">`paused`</span>.
         """
         return pulumi.get(self, "status")
 
     @status.setter
-    def status(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def status(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "status", value)
 
     @_builtins.property
     @pulumi.getter
-    def subscriptions(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def subscriptions(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Array of event types to subscribe to
         """
         return pulumi.get(self, "subscriptions")
 
     @subscriptions.setter
-    def subscriptions(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def subscriptions(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "subscriptions", value)
 
     @_builtins.property
     @pulumi.getter(name="updatedAt")
-    def updated_at(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def updated_at(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "updated_at")
 
     @updated_at.setter
-    def updated_at(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def updated_at(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "updated_at", value)
 
 
@@ -232,11 +232,11 @@ class EdgeConnector(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 edge_connector_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 status: Optional[pulumi.Input[_builtins.str]] = None,
-                 subscriptions: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 edge_connector_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 status: pulumi.Input[Optional[_builtins.str]] = None,
+                 subscriptions: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  __props__=None):
         """
         Create a EdgeConnector resource with the given unique name, props, and options.
@@ -245,7 +245,7 @@ class EdgeConnector(pulumi.CustomResource):
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.str] description: Connector description
         :param pulumi.Input[_builtins.str] name: Connector name
-        :param pulumi.Input[_builtins.str] status: Connector status. Value must be one of <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`">`active`</span>, <span pulumi-lang-nodejs="`paused`" pulumi-lang-dotnet="`Paused`" pulumi-lang-go="`paused`" pulumi-lang-python="`paused`" pulumi-lang-yaml="`paused`" pulumi-lang-java="`paused`">`paused`</span>.
+        :param pulumi.Input[_builtins.str] status: Connector status. Value must be one of <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`" pulumi-lang-hcl="`active`">`active`</span>, <span pulumi-lang-nodejs="`paused`" pulumi-lang-dotnet="`Paused`" pulumi-lang-go="`paused`" pulumi-lang-python="`paused`" pulumi-lang-yaml="`paused`" pulumi-lang-java="`paused`" pulumi-lang-hcl="`paused`">`paused`</span>.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] subscriptions: Array of event types to subscribe to
         """
         ...
@@ -272,11 +272,11 @@ class EdgeConnector(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 edge_connector_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 status: Optional[pulumi.Input[_builtins.str]] = None,
-                 subscriptions: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 edge_connector_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 status: pulumi.Input[Optional[_builtins.str]] = None,
+                 subscriptions: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -305,14 +305,14 @@ class EdgeConnector(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            created_at: Optional[pulumi.Input[_builtins.str]] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            edge_connector_id: Optional[pulumi.Input[_builtins.str]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            online: Optional[pulumi.Input[_builtins.bool]] = None,
-            status: Optional[pulumi.Input[_builtins.str]] = None,
-            subscriptions: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            updated_at: Optional[pulumi.Input[_builtins.str]] = None) -> 'EdgeConnector':
+            created_at: pulumi.Input[Optional[_builtins.str]] = None,
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            edge_connector_id: pulumi.Input[Optional[_builtins.str]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            online: pulumi.Input[Optional[_builtins.bool]] = None,
+            status: pulumi.Input[Optional[_builtins.str]] = None,
+            subscriptions: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            updated_at: pulumi.Input[Optional[_builtins.str]] = None) -> 'EdgeConnector':
         """
         Get an existing EdgeConnector resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -323,7 +323,7 @@ class EdgeConnector(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] description: Connector description
         :param pulumi.Input[_builtins.str] name: Connector name
         :param pulumi.Input[_builtins.bool] online: Whether connector is currently online
-        :param pulumi.Input[_builtins.str] status: Connector status. Value must be one of <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`">`active`</span>, <span pulumi-lang-nodejs="`paused`" pulumi-lang-dotnet="`Paused`" pulumi-lang-go="`paused`" pulumi-lang-python="`paused`" pulumi-lang-yaml="`paused`" pulumi-lang-java="`paused`">`paused`</span>.
+        :param pulumi.Input[_builtins.str] status: Connector status. Value must be one of <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`" pulumi-lang-hcl="`active`">`active`</span>, <span pulumi-lang-nodejs="`paused`" pulumi-lang-dotnet="`Paused`" pulumi-lang-go="`paused`" pulumi-lang-python="`paused`" pulumi-lang-yaml="`paused`" pulumi-lang-java="`paused`" pulumi-lang-hcl="`paused`">`paused`</span>.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] subscriptions: Array of event types to subscribe to
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
@@ -378,7 +378,7 @@ class EdgeConnector(pulumi.CustomResource):
     @pulumi.getter
     def status(self) -> pulumi.Output[_builtins.str]:
         """
-        Connector status. Value must be one of <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`">`active`</span>, <span pulumi-lang-nodejs="`paused`" pulumi-lang-dotnet="`Paused`" pulumi-lang-go="`paused`" pulumi-lang-python="`paused`" pulumi-lang-yaml="`paused`" pulumi-lang-java="`paused`">`paused`</span>.
+        Connector status. Value must be one of <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`" pulumi-lang-hcl="`active`">`active`</span>, <span pulumi-lang-nodejs="`paused`" pulumi-lang-dotnet="`Paused`" pulumi-lang-go="`paused`" pulumi-lang-python="`paused`" pulumi-lang-yaml="`paused`" pulumi-lang-java="`paused`" pulumi-lang-hcl="`paused`">`paused`</span>.
         """
         return pulumi.get(self, "status")
 
@@ -394,3 +394,4 @@ class EdgeConnector(pulumi.CustomResource):
     @pulumi.getter(name="updatedAt")
     def updated_at(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "updated_at")
+

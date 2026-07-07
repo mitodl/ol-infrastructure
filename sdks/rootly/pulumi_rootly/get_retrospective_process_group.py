@@ -80,8 +80,8 @@ def get_retrospective_process_group(retrospective_process_id: Optional[_builtins
         id=pulumi.get(__ret__, 'id'),
         retrospective_process_id=pulumi.get(__ret__, 'retrospective_process_id'),
         sub_status_id=pulumi.get(__ret__, 'sub_status_id'))
-def get_retrospective_process_group_output(retrospective_process_id: Optional[pulumi.Input[_builtins.str]] = None,
-                                           sub_status_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_retrospective_process_group_output(retrospective_process_id: pulumi.Input[Optional[_builtins.str]] = None,
+                                           sub_status_id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                                            opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetRetrospectiveProcessGroupResult]:
     """
     Use this data source to access information about an existing resource.

@@ -154,18 +154,156 @@ iam.RolePolicyAttachment(
     opts=ResourceOptions(parent=ingestion_irsa_role),
 )
 
-# Annotate the existing openmetadata-ingestion SA (created by the helm chart)
-# with the IRSA ARN so pods can assume the role.
-kubernetes.core.v1.ServiceAccountPatch(
-    f"om-ingestion-sa-irsa-annotation-{stack_info.env_suffix}",
-    metadata=kubernetes.meta.v1.ObjectMetaPatchArgs(
+# Pipeline RBAC for k8s ingestion jobs.
+#
+# The OpenMetadata Helm chart can create these via k8s-pipeline-rbac.yaml, but it
+# stamps the shared `serviceAccount.annotations` (the *server* IRSA role) onto the
+# ingestion SA, colliding with the distinct ingestion role we need here. So the app
+# stack sets `pipelineServiceClientConfig.k8s.rbac.enabled: false` and we own the
+# full set of resources here, giving the ingestion SA its own IRSA role-arn and
+# keeping clear lines of ownership between the two stacks.
+#
+# This mirrors the five resources from the chart's k8s-pipeline-rbac.yaml: the
+# ingestion ServiceAccount + Role + RoleBinding, plus the server pipeline-manager
+# Role + RoleBinding that lets the OpenMetadata server SA launch ingestion jobs.
+server_sa_name = "openmetadata"
+
+ingestion_service_account = kubernetes.core.v1.ServiceAccount(
+    f"om-ingestion-sa-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=ingestion_sa_name,
         namespace=open_metadata_namespace,
+        labels={"app.kubernetes.io/component": "ingestion"},
         annotations={
             "eks.amazonaws.com/role-arn": ingestion_irsa_role.role.arn,
         },
     ),
     opts=ResourceOptions(depends_on=[ingestion_irsa_role]),
+)
+
+# Core pipeline-job permissions shared by the ingestion SA and the server SA.
+# The server additionally needs the OMJob/CronOMJob rules appended below. Keeping
+# one source of truth avoids the two Roles drifting apart on a chart version bump.
+pipeline_job_rules = [
+    kubernetes.rbac.v1.PolicyRuleArgs(
+        api_groups=[""],
+        resources=["pods"],
+        verbs=["get", "list", "create", "update", "patch", "delete"],
+    ),
+    kubernetes.rbac.v1.PolicyRuleArgs(
+        api_groups=[""],
+        resources=["pods/log"],
+        verbs=["get", "list", "watch"],
+    ),
+    kubernetes.rbac.v1.PolicyRuleArgs(
+        api_groups=[""],
+        resources=["configmaps"],
+        verbs=["get", "list", "create", "update", "patch", "delete"],
+    ),
+    kubernetes.rbac.v1.PolicyRuleArgs(
+        api_groups=[""],
+        resources=["secrets"],
+        verbs=["get", "list", "create", "update", "patch", "delete"],
+    ),
+    kubernetes.rbac.v1.PolicyRuleArgs(
+        api_groups=[""],
+        resources=["events"],
+        verbs=["get", "list"],
+    ),
+    kubernetes.rbac.v1.PolicyRuleArgs(
+        api_groups=["batch"],
+        resources=["jobs", "cronjobs"],
+        verbs=["get", "list", "create", "update", "patch", "delete"],
+    ),
+]
+
+# Permissions the ingestion SA needs to run pipeline jobs in its own namespace.
+ingestion_role = kubernetes.rbac.v1.Role(
+    f"om-ingestion-role-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=ingestion_sa_name,
+        namespace=open_metadata_namespace,
+        labels={"app.kubernetes.io/component": "ingestion"},
+    ),
+    rules=pipeline_job_rules,
+)
+
+kubernetes.rbac.v1.RoleBinding(
+    f"om-ingestion-rolebinding-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=ingestion_sa_name,
+        namespace=open_metadata_namespace,
+        labels={"app.kubernetes.io/component": "ingestion"},
+    ),
+    subjects=[
+        kubernetes.rbac.v1.SubjectArgs(
+            kind="ServiceAccount",
+            name=ingestion_sa_name,
+            namespace=open_metadata_namespace,
+        )
+    ],
+    role_ref=kubernetes.rbac.v1.RoleRefArgs(
+        kind="Role",
+        name=ingestion_sa_name,
+        api_group="rbac.authorization.k8s.io",
+    ),
+    opts=ResourceOptions(depends_on=[ingestion_service_account, ingestion_role]),
+)
+
+# Permissions the OpenMetadata server SA needs to manage pipeline jobs and the
+# OMJob/CronOMJob custom resources used by the k8s pipeline client.
+server_pipeline_manager_role = kubernetes.rbac.v1.Role(
+    f"om-server-pipeline-manager-role-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="openmetadata-server-pipeline-manager",
+        namespace=open_metadata_namespace,
+        labels={"app.kubernetes.io/component": "server"},
+    ),
+    rules=[
+        *pipeline_job_rules,
+        kubernetes.rbac.v1.PolicyRuleArgs(
+            api_groups=["pipelines.openmetadata.org"],
+            resources=["omjobs"],
+            verbs=["get", "list", "create", "update", "patch", "delete"],
+        ),
+        kubernetes.rbac.v1.PolicyRuleArgs(
+            api_groups=["pipelines.openmetadata.org"],
+            resources=["omjobs/status"],
+            verbs=["get", "patch"],
+        ),
+        kubernetes.rbac.v1.PolicyRuleArgs(
+            api_groups=["pipelines.openmetadata.org"],
+            resources=["cronomjobs"],
+            verbs=["get", "list", "create", "update", "patch", "delete"],
+        ),
+        kubernetes.rbac.v1.PolicyRuleArgs(
+            api_groups=["pipelines.openmetadata.org"],
+            resources=["cronomjobs/status"],
+            verbs=["get", "patch"],
+        ),
+    ],
+)
+
+kubernetes.rbac.v1.RoleBinding(
+    f"om-server-pipeline-manager-rolebinding-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="openmetadata-server-pipeline-manager",
+        namespace=open_metadata_namespace,
+        labels={"app.kubernetes.io/component": "server"},
+    ),
+    subjects=[
+        kubernetes.rbac.v1.SubjectArgs(
+            kind="ServiceAccount",
+            name=server_sa_name,
+            namespace=open_metadata_namespace,
+        )
+    ],
+    role_ref=kubernetes.rbac.v1.RoleRefArgs(
+        kind="Role",
+        name="openmetadata-server-pipeline-manager",
+        api_group="rbac.authorization.k8s.io",
+    ),
+    opts=ResourceOptions(depends_on=[server_pipeline_manager_role]),
 )
 
 # ---------------------------------------------------------------------------
@@ -186,6 +324,10 @@ _POD_SECURITY_CONTEXT = {
     "runAsGroup": 1000,
     "runAsNonRoot": True,
 }
+
+# Enable JSON-structured logs from the Python ingestion-base container.
+# Supported by the ingestion-base image; passed through as LOG_FORMAT env var.
+_LOG_FORMAT_ENV = {"name": "LOG_FORMAT", "value": "json"}
 
 
 def _bot_jwt_env(bot_secret_name: str) -> dict[str, object]:
@@ -253,7 +395,7 @@ def _make_cronjob(  # noqa: PLR0913
         ``_POD_RESOURCES`` (500m/1Gi request, 2/4Gi limit). Override for
         connectors that require more memory (e.g. Trino full-catalog ingestion).
     """
-    env = [_bot_jwt_env(bot_secret_name), *(extra_env or [])]
+    env = [_bot_jwt_env(bot_secret_name), _LOG_FORMAT_ENV, *(extra_env or [])]
     command = Output.from_input(python_script).apply(lambda s: ["python", "-c", s])
 
     return kubernetes.apiextensions.CustomResource(

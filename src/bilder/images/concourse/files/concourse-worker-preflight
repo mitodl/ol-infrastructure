@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# Validate that this worker can actually reach the external services builds
+# depend on -- IMDS, GitHub, Docker Hub, and the Pulumi state bucket -- before
+# concourse.service starts and the worker registers with the TSA. A worker
+# that boots but has a broken NIC or a stale/poisoned DNS cache would
+# otherwise join the pool and fail every build routed to it (instead of being
+# replaced) since Concourse has no way to know a "running" worker is actually
+# unreachable from the outside. This is wired as a hard dependency of
+# concourse.service via [Unit] Requires=/After= (worker units only).
+set -uo pipefail
+
+RETRY_BUDGET_SECONDS=${RETRY_BUDGET_SECONDS:-180}
+RETRY_INTERVAL_SECONDS=${RETRY_INTERVAL_SECONDS:-10}
+METADATA_BASE="http://169.254.169.254/latest/meta-data"
+TOKEN_URL="http://169.254.169.254/latest/api/token"
+CHECK_ENDPOINTS=(
+    "github.com:443"
+    "registry-1.docker.io:443"
+    "auth.docker.io:443"
+    "mitol-pulumi-state.s3.amazonaws.com:443"
+)
+
+log() {
+    echo "[concourse-worker-preflight] $*" | systemd-cat -t concourse-worker-preflight -p info
+}
+
+get_imds_token() {
+    curl -s -X PUT "${TOKEN_URL}" \
+        -H "X-aws-ec2-metadata-token-ttl-seconds: 60" \
+        --connect-timeout 2 --max-time 5 2>/dev/null
+}
+
+imds_get() {
+    local path="$1"
+    local token="$2"
+    curl -s -H "X-aws-ec2-metadata-token: ${token}" \
+        --connect-timeout 2 --max-time 5 \
+        "${METADATA_BASE}/${path}" 2>/dev/null
+}
+
+check_tcp() {
+    local host="$1"
+    local port="$2"
+    timeout 5 bash -c "exec 3<>/dev/tcp/${host}/${port}" 2>/dev/null
+}
+
+run_checks() {
+    local token
+    token=$(get_imds_token)
+    if [ -z "${token}" ]; then
+        log "IMDS token fetch failed"
+        return 1
+    fi
+
+    local ok=0
+    for endpoint in "${CHECK_ENDPOINTS[@]}"; do
+        if ! check_tcp "${endpoint%%:*}" "${endpoint##*:}"; then
+            log "TCP connect failed: ${endpoint}"
+            ok=1
+        fi
+    done
+    return "${ok}"
+}
+
+deadline=$(($(date +%s) + RETRY_BUDGET_SECONDS))
+while true; do
+    if run_checks; then
+        log "All network preflight checks passed"
+        exit 0
+    fi
+    if [ "$(date +%s)" -ge "${deadline}" ]; then
+        break
+    fi
+    log "Preflight checks failed; retrying in ${RETRY_INTERVAL_SECONDS}s"
+    sleep "${RETRY_INTERVAL_SECONDS}"
+done
+
+log "Preflight checks did not pass within ${RETRY_BUDGET_SECONDS}s"
+
+TOKEN=$(get_imds_token)
+INSTANCE_ID=$(imds_get "instance-id" "${TOKEN}")
+REGION=$(imds_get "placement/region" "${TOKEN}")
+
+if [ -n "${INSTANCE_ID}" ] && [ -n "${REGION}" ] && \
+   aws autoscaling set-instance-health \
+        --instance-id "${INSTANCE_ID}" \
+        --health-status Unhealthy \
+        --region "${REGION}" 2>/dev/null; then
+    log "Marked instance Unhealthy; ASG will replace it before this worker joins the pool"
+else
+    log "set-instance-health unavailable; failing preflight anyway so concourse.service does not start"
+fi
+
+exit 1

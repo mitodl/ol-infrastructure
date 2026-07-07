@@ -1,0 +1,55 @@
+# mitxonline Tiltfile
+# Builds the mitxonline Django app (granian) and deploys it to the mitxonline namespace.
+# When the sibling mitxonline repo is not checked out, Tilt uses the prebuilt
+# DockerHub image (mitodl/mitxonline-app:latest) without attempting a local build.
+
+load("../../tiltlib.star", "k8s_yaml_with_domain")
+
+workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
+APP_DIR = os.path.join(workspace_root, "mitxonline")
+IMAGE = 'mitodl/mitxonline-app'
+NAMESPACE = 'mitxonline'
+DEPLOY_NAME = 'mitxonline-webapp'
+
+if os.path.exists(os.path.join(APP_DIR, '.git')):
+    # Build the `local-dev` target: `production` (the only target that bakes in
+    # the compiled webpack frontend, which checkout needs since that flow still
+    # runs through mitxonline.mit.dev) plus dev deps (pytest, ipdb, ...) and
+    # watchfiles so granian can --reload (see deployment.yaml).
+    docker_build(
+        IMAGE,
+        context=APP_DIR,
+        target='local-dev',
+        dockerfile=APP_DIR + '/Dockerfile',
+        # Sync the whole repo: Django apps are top-level dirs (courses,
+        # ecommerce, cms, ...). granian's --reload-ignore-dirs filters the
+        # non-Python churn.
+        live_update=[
+            sync(APP_DIR, '/src'),
+            # Reinstall deps on pyproject.toml/uv.lock change (uv, not pip;
+            # dev deps included, matching the local-dev image; --inexact keeps
+            # the image's extra watchfiles install).
+            run(
+                'cd /src && uv sync --frozen --inexact',
+                trigger=[APP_DIR + '/pyproject.toml', APP_DIR + '/uv.lock'],
+            ),
+        ],
+    )
+
+k8s_yaml_with_domain([
+    'configmaps/app-env.yaml',
+    'configmaps/nginx.yaml',
+    'secrets.yaml',
+    'deployment.yaml',
+    'apisix-routes.yaml',
+])
+
+k8s_resource(
+    DEPLOY_NAME,
+    port_forwards=['8010:8010'],
+    labels=['mitxonline'],
+    resource_deps=['local-infra-apps'],
+)
+
+k8s_resource('mitxonline-celery', labels=['mitxonline'], resource_deps=['local-infra-apps'])
+k8s_resource('mitxonline-celery-beat', labels=['mitxonline'], resource_deps=['local-infra-apps'])

@@ -22,9 +22,9 @@ __all__ = ['ScheduleRotationActiveDayArgs', 'ScheduleRotationActiveDay']
 class ScheduleRotationActiveDayArgs:
     def __init__(__self__, *,
                  active_time_attributes: pulumi.Input[Sequence[pulumi.Input['ScheduleRotationActiveDayActiveTimeAttributeArgs']]],
-                 day_name: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_rotation_active_day_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_rotation_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 day_name: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_rotation_active_day_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_rotation_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a ScheduleRotationActiveDay resource.
 
@@ -53,42 +53,42 @@ class ScheduleRotationActiveDayArgs:
 
     @_builtins.property
     @pulumi.getter(name="dayName")
-    def day_name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def day_name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Schedule rotation day name for which active times to be created. Value must be one of `S`, `M`, `T`, `W`, `R`, `F`, `U`.
         """
         return pulumi.get(self, "day_name")
 
     @day_name.setter
-    def day_name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def day_name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "day_name", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleRotationActiveDayId")
-    def schedule_rotation_active_day_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def schedule_rotation_active_day_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "schedule_rotation_active_day_id")
 
     @schedule_rotation_active_day_id.setter
-    def schedule_rotation_active_day_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def schedule_rotation_active_day_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "schedule_rotation_active_day_id", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleRotationId")
-    def schedule_rotation_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def schedule_rotation_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "schedule_rotation_id")
 
     @schedule_rotation_id.setter
-    def schedule_rotation_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def schedule_rotation_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "schedule_rotation_id", value)
 
 
 @pulumi.input_type
 class _ScheduleRotationActiveDayState:
     def __init__(__self__, *,
-                 active_time_attributes: Optional[pulumi.Input[Sequence[pulumi.Input['ScheduleRotationActiveDayActiveTimeAttributeArgs']]]] = None,
-                 day_name: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_rotation_active_day_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_rotation_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 active_time_attributes: pulumi.Input[Optional[Sequence[pulumi.Input['ScheduleRotationActiveDayActiveTimeAttributeArgs']]]] = None,
+                 day_name: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_rotation_active_day_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_rotation_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering ScheduleRotationActiveDay resources.
 
@@ -106,44 +106,44 @@ class _ScheduleRotationActiveDayState:
 
     @_builtins.property
     @pulumi.getter(name="activeTimeAttributes")
-    def active_time_attributes(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['ScheduleRotationActiveDayActiveTimeAttributeArgs']]]]:
+    def active_time_attributes(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['ScheduleRotationActiveDayActiveTimeAttributeArgs']]]]:
         """
         Schedule rotation active times per day
         """
         return pulumi.get(self, "active_time_attributes")
 
     @active_time_attributes.setter
-    def active_time_attributes(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['ScheduleRotationActiveDayActiveTimeAttributeArgs']]]]):
+    def active_time_attributes(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['ScheduleRotationActiveDayActiveTimeAttributeArgs']]]]):
         pulumi.set(self, "active_time_attributes", value)
 
     @_builtins.property
     @pulumi.getter(name="dayName")
-    def day_name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def day_name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Schedule rotation day name for which active times to be created. Value must be one of `S`, `M`, `T`, `W`, `R`, `F`, `U`.
         """
         return pulumi.get(self, "day_name")
 
     @day_name.setter
-    def day_name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def day_name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "day_name", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleRotationActiveDayId")
-    def schedule_rotation_active_day_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def schedule_rotation_active_day_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "schedule_rotation_active_day_id")
 
     @schedule_rotation_active_day_id.setter
-    def schedule_rotation_active_day_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def schedule_rotation_active_day_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "schedule_rotation_active_day_id", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleRotationId")
-    def schedule_rotation_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def schedule_rotation_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "schedule_rotation_id")
 
     @schedule_rotation_id.setter
-    def schedule_rotation_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def schedule_rotation_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "schedule_rotation_id", value)
 
 
@@ -153,10 +153,10 @@ class ScheduleRotationActiveDay(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 active_time_attributes: Optional[pulumi.Input[Sequence[pulumi.Input[Union['ScheduleRotationActiveDayActiveTimeAttributeArgs', 'ScheduleRotationActiveDayActiveTimeAttributeArgsDict']]]]] = None,
-                 day_name: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_rotation_active_day_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_rotation_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 active_time_attributes: pulumi.Input[Optional[Sequence[pulumi.Input[Union['ScheduleRotationActiveDayActiveTimeAttributeArgs', 'ScheduleRotationActiveDayActiveTimeAttributeArgsDict']]]]] = None,
+                 day_name: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_rotation_active_day_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_rotation_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a ScheduleRotationActiveDay resource with the given unique name, props, and options.
@@ -190,10 +190,10 @@ class ScheduleRotationActiveDay(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 active_time_attributes: Optional[pulumi.Input[Sequence[pulumi.Input[Union['ScheduleRotationActiveDayActiveTimeAttributeArgs', 'ScheduleRotationActiveDayActiveTimeAttributeArgsDict']]]]] = None,
-                 day_name: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_rotation_active_day_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_rotation_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 active_time_attributes: pulumi.Input[Optional[Sequence[pulumi.Input[Union['ScheduleRotationActiveDayActiveTimeAttributeArgs', 'ScheduleRotationActiveDayActiveTimeAttributeArgsDict']]]]] = None,
+                 day_name: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_rotation_active_day_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_rotation_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -220,10 +220,10 @@ class ScheduleRotationActiveDay(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            active_time_attributes: Optional[pulumi.Input[Sequence[pulumi.Input[Union['ScheduleRotationActiveDayActiveTimeAttributeArgs', 'ScheduleRotationActiveDayActiveTimeAttributeArgsDict']]]]] = None,
-            day_name: Optional[pulumi.Input[_builtins.str]] = None,
-            schedule_rotation_active_day_id: Optional[pulumi.Input[_builtins.str]] = None,
-            schedule_rotation_id: Optional[pulumi.Input[_builtins.str]] = None) -> 'ScheduleRotationActiveDay':
+            active_time_attributes: pulumi.Input[Optional[Sequence[pulumi.Input[Union['ScheduleRotationActiveDayActiveTimeAttributeArgs', 'ScheduleRotationActiveDayActiveTimeAttributeArgsDict']]]]] = None,
+            day_name: pulumi.Input[Optional[_builtins.str]] = None,
+            schedule_rotation_active_day_id: pulumi.Input[Optional[_builtins.str]] = None,
+            schedule_rotation_id: pulumi.Input[Optional[_builtins.str]] = None) -> 'ScheduleRotationActiveDay':
         """
         Get an existing ScheduleRotationActiveDay resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -269,3 +269,4 @@ class ScheduleRotationActiveDay(pulumi.CustomResource):
     @pulumi.getter(name="scheduleRotationId")
     def schedule_rotation_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "schedule_rotation_id")
+

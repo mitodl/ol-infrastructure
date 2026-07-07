@@ -21,34 +21,34 @@ __all__ = ['EscalationPathArgs', 'EscalationPath']
 @pulumi.input_type
 class EscalationPathArgs:
     def __init__(__self__, *,
-                 after_deferral_behavior: Optional[pulumi.Input[_builtins.str]] = None,
-                 after_deferral_path_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 default: Optional[pulumi.Input[_builtins.bool]] = None,
-                 escalation_path_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 initial_delay: Optional[pulumi.Input[_builtins.float]] = None,
-                 match_mode: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 notification_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 path_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 repeat: Optional[pulumi.Input[_builtins.bool]] = None,
-                 repeat_count: Optional[pulumi.Input[_builtins.float]] = None,
-                 rules: Optional[pulumi.Input[Sequence[pulumi.Input['EscalationPathRuleArgs']]]] = None,
-                 time_restriction_time_zone: Optional[pulumi.Input[_builtins.str]] = None,
-                 time_restrictions: Optional[pulumi.Input[Sequence[pulumi.Input['EscalationPathTimeRestrictionArgs']]]] = None):
+                 after_deferral_behavior: pulumi.Input[Optional[_builtins.str]] = None,
+                 after_deferral_path_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 default: pulumi.Input[Optional[_builtins.bool]] = None,
+                 escalation_path_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 initial_delay: pulumi.Input[Optional[_builtins.float]] = None,
+                 match_mode: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 notification_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 path_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 repeat: pulumi.Input[Optional[_builtins.bool]] = None,
+                 repeat_count: pulumi.Input[Optional[_builtins.float]] = None,
+                 rules: pulumi.Input[Optional[Sequence[pulumi.Input['EscalationPathRuleArgs']]]] = None,
+                 time_restriction_time_zone: pulumi.Input[Optional[_builtins.str]] = None,
+                 time_restrictions: pulumi.Input[Optional[Sequence[pulumi.Input['EscalationPathTimeRestrictionArgs']]]] = None):
         """
         The set of arguments for constructing a EscalationPath resource.
 
-        :param pulumi.Input[_builtins.str] after_deferral_behavior: What happens after a deferral path finishes. Required for deferral paths.. Value must be one of <span pulumi-lang-nodejs="`reEvaluate`" pulumi-lang-dotnet="`ReEvaluate`" pulumi-lang-go="`reEvaluate`" pulumi-lang-python="`re_evaluate`" pulumi-lang-yaml="`reEvaluate`" pulumi-lang-java="`reEvaluate`">`re_evaluate`</span>, <span pulumi-lang-nodejs="`executePath`" pulumi-lang-dotnet="`ExecutePath`" pulumi-lang-go="`executePath`" pulumi-lang-python="`execute_path`" pulumi-lang-yaml="`executePath`" pulumi-lang-java="`executePath`">`execute_path`</span>.
-        :param pulumi.Input[_builtins.str] after_deferral_path_id: The escalation path to execute after this deferral path when<span pulumi-lang-nodejs=" afterDeferralBehavior " pulumi-lang-dotnet=" AfterDeferralBehavior " pulumi-lang-go=" afterDeferralBehavior " pulumi-lang-python=" after_deferral_behavior " pulumi-lang-yaml=" afterDeferralBehavior " pulumi-lang-java=" afterDeferralBehavior "> after_deferral_behavior </span>is execute_path.
+        :param pulumi.Input[_builtins.str] after_deferral_behavior: What happens after a deferral path finishes. Required for deferral paths.. Value must be one of <span pulumi-lang-nodejs="`reEvaluate`" pulumi-lang-dotnet="`ReEvaluate`" pulumi-lang-go="`reEvaluate`" pulumi-lang-python="`re_evaluate`" pulumi-lang-yaml="`reEvaluate`" pulumi-lang-java="`reEvaluate`" pulumi-lang-hcl="`re_evaluate`">`reEvaluate`</span>, <span pulumi-lang-nodejs="`executePath`" pulumi-lang-dotnet="`ExecutePath`" pulumi-lang-go="`executePath`" pulumi-lang-python="`execute_path`" pulumi-lang-yaml="`executePath`" pulumi-lang-java="`executePath`" pulumi-lang-hcl="`execute_path`">`executePath`</span>.
+        :param pulumi.Input[_builtins.str] after_deferral_path_id: The escalation path to execute after this deferral path when<span pulumi-lang-nodejs=" afterDeferralBehavior " pulumi-lang-dotnet=" AfterDeferralBehavior " pulumi-lang-go=" afterDeferralBehavior " pulumi-lang-python=" after_deferral_behavior " pulumi-lang-yaml=" afterDeferralBehavior " pulumi-lang-java=" afterDeferralBehavior " pulumi-lang-hcl=" after_deferral_behavior "> afterDeferralBehavior </span>is execute_path.
         :param pulumi.Input[_builtins.bool] default: Whether this escalation path is the default path. Value must be one of true or false
         :param pulumi.Input[_builtins.str] escalation_policy_id: The ID of the escalation policy
         :param pulumi.Input[_builtins.float] initial_delay: Initial delay for escalation path in minutes. Maximum 1 week (10080).
         :param pulumi.Input[_builtins.str] match_mode: How path rules are matched.. Value must be one of `match-all-rules`, `match-any-rule`.
         :param pulumi.Input[_builtins.str] name: The name of the escalation path
         :param pulumi.Input[_builtins.str] notification_type: Notification rule type
-        :param pulumi.Input[_builtins.str] path_type: The type of escalation path. Cannot be changed after creation.. Value must be one of <span pulumi-lang-nodejs="`escalation`" pulumi-lang-dotnet="`Escalation`" pulumi-lang-go="`escalation`" pulumi-lang-python="`escalation`" pulumi-lang-yaml="`escalation`" pulumi-lang-java="`escalation`">`escalation`</span>, <span pulumi-lang-nodejs="`deferral`" pulumi-lang-dotnet="`Deferral`" pulumi-lang-go="`deferral`" pulumi-lang-python="`deferral`" pulumi-lang-yaml="`deferral`" pulumi-lang-java="`deferral`">`deferral`</span>.
+        :param pulumi.Input[_builtins.str] path_type: The type of escalation path. Cannot be changed after creation.. Value must be one of <span pulumi-lang-nodejs="`escalation`" pulumi-lang-dotnet="`Escalation`" pulumi-lang-go="`escalation`" pulumi-lang-python="`escalation`" pulumi-lang-yaml="`escalation`" pulumi-lang-java="`escalation`" pulumi-lang-hcl="`escalation`">`escalation`</span>, <span pulumi-lang-nodejs="`deferral`" pulumi-lang-dotnet="`Deferral`" pulumi-lang-go="`deferral`" pulumi-lang-python="`deferral`" pulumi-lang-yaml="`deferral`" pulumi-lang-java="`deferral`" pulumi-lang-hcl="`deferral`">`deferral`</span>.
         :param pulumi.Input[_builtins.float] position: The position of this path in the paths for this EP.
         :param pulumi.Input[_builtins.bool] repeat: Whether this path should be repeated until someone acknowledges the alert. Value must be one of true or false
         :param pulumi.Input[_builtins.float] repeat_count: The number of times this path will be executed until someone acknowledges the alert
@@ -91,225 +91,225 @@ class EscalationPathArgs:
 
     @_builtins.property
     @pulumi.getter(name="afterDeferralBehavior")
-    def after_deferral_behavior(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def after_deferral_behavior(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        What happens after a deferral path finishes. Required for deferral paths.. Value must be one of <span pulumi-lang-nodejs="`reEvaluate`" pulumi-lang-dotnet="`ReEvaluate`" pulumi-lang-go="`reEvaluate`" pulumi-lang-python="`re_evaluate`" pulumi-lang-yaml="`reEvaluate`" pulumi-lang-java="`reEvaluate`">`re_evaluate`</span>, <span pulumi-lang-nodejs="`executePath`" pulumi-lang-dotnet="`ExecutePath`" pulumi-lang-go="`executePath`" pulumi-lang-python="`execute_path`" pulumi-lang-yaml="`executePath`" pulumi-lang-java="`executePath`">`execute_path`</span>.
+        What happens after a deferral path finishes. Required for deferral paths.. Value must be one of <span pulumi-lang-nodejs="`reEvaluate`" pulumi-lang-dotnet="`ReEvaluate`" pulumi-lang-go="`reEvaluate`" pulumi-lang-python="`re_evaluate`" pulumi-lang-yaml="`reEvaluate`" pulumi-lang-java="`reEvaluate`" pulumi-lang-hcl="`re_evaluate`">`reEvaluate`</span>, <span pulumi-lang-nodejs="`executePath`" pulumi-lang-dotnet="`ExecutePath`" pulumi-lang-go="`executePath`" pulumi-lang-python="`execute_path`" pulumi-lang-yaml="`executePath`" pulumi-lang-java="`executePath`" pulumi-lang-hcl="`execute_path`">`executePath`</span>.
         """
         return pulumi.get(self, "after_deferral_behavior")
 
     @after_deferral_behavior.setter
-    def after_deferral_behavior(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def after_deferral_behavior(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "after_deferral_behavior", value)
 
     @_builtins.property
     @pulumi.getter(name="afterDeferralPathId")
-    def after_deferral_path_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def after_deferral_path_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The escalation path to execute after this deferral path when<span pulumi-lang-nodejs=" afterDeferralBehavior " pulumi-lang-dotnet=" AfterDeferralBehavior " pulumi-lang-go=" afterDeferralBehavior " pulumi-lang-python=" after_deferral_behavior " pulumi-lang-yaml=" afterDeferralBehavior " pulumi-lang-java=" afterDeferralBehavior "> after_deferral_behavior </span>is execute_path.
+        The escalation path to execute after this deferral path when<span pulumi-lang-nodejs=" afterDeferralBehavior " pulumi-lang-dotnet=" AfterDeferralBehavior " pulumi-lang-go=" afterDeferralBehavior " pulumi-lang-python=" after_deferral_behavior " pulumi-lang-yaml=" afterDeferralBehavior " pulumi-lang-java=" afterDeferralBehavior " pulumi-lang-hcl=" after_deferral_behavior "> afterDeferralBehavior </span>is execute_path.
         """
         return pulumi.get(self, "after_deferral_path_id")
 
     @after_deferral_path_id.setter
-    def after_deferral_path_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def after_deferral_path_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "after_deferral_path_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def default(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def default(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Whether this escalation path is the default path. Value must be one of true or false
         """
         return pulumi.get(self, "default")
 
     @default.setter
-    def default(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def default(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "default", value)
 
     @_builtins.property
     @pulumi.getter(name="escalationPathId")
-    def escalation_path_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def escalation_path_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "escalation_path_id")
 
     @escalation_path_id.setter
-    def escalation_path_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def escalation_path_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "escalation_path_id", value)
 
     @_builtins.property
     @pulumi.getter(name="escalationPolicyId")
-    def escalation_policy_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def escalation_policy_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The ID of the escalation policy
         """
         return pulumi.get(self, "escalation_policy_id")
 
     @escalation_policy_id.setter
-    def escalation_policy_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def escalation_policy_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "escalation_policy_id", value)
 
     @_builtins.property
     @pulumi.getter(name="initialDelay")
-    def initial_delay(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def initial_delay(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Initial delay for escalation path in minutes. Maximum 1 week (10080).
         """
         return pulumi.get(self, "initial_delay")
 
     @initial_delay.setter
-    def initial_delay(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def initial_delay(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "initial_delay", value)
 
     @_builtins.property
     @pulumi.getter(name="matchMode")
-    def match_mode(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def match_mode(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         How path rules are matched.. Value must be one of `match-all-rules`, `match-any-rule`.
         """
         return pulumi.get(self, "match_mode")
 
     @match_mode.setter
-    def match_mode(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def match_mode(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "match_mode", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the escalation path
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="notificationType")
-    def notification_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def notification_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Notification rule type
         """
         return pulumi.get(self, "notification_type")
 
     @notification_type.setter
-    def notification_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def notification_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "notification_type", value)
 
     @_builtins.property
     @pulumi.getter(name="pathType")
-    def path_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def path_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The type of escalation path. Cannot be changed after creation.. Value must be one of <span pulumi-lang-nodejs="`escalation`" pulumi-lang-dotnet="`Escalation`" pulumi-lang-go="`escalation`" pulumi-lang-python="`escalation`" pulumi-lang-yaml="`escalation`" pulumi-lang-java="`escalation`">`escalation`</span>, <span pulumi-lang-nodejs="`deferral`" pulumi-lang-dotnet="`Deferral`" pulumi-lang-go="`deferral`" pulumi-lang-python="`deferral`" pulumi-lang-yaml="`deferral`" pulumi-lang-java="`deferral`">`deferral`</span>.
+        The type of escalation path. Cannot be changed after creation.. Value must be one of <span pulumi-lang-nodejs="`escalation`" pulumi-lang-dotnet="`Escalation`" pulumi-lang-go="`escalation`" pulumi-lang-python="`escalation`" pulumi-lang-yaml="`escalation`" pulumi-lang-java="`escalation`" pulumi-lang-hcl="`escalation`">`escalation`</span>, <span pulumi-lang-nodejs="`deferral`" pulumi-lang-dotnet="`Deferral`" pulumi-lang-go="`deferral`" pulumi-lang-python="`deferral`" pulumi-lang-yaml="`deferral`" pulumi-lang-java="`deferral`" pulumi-lang-hcl="`deferral`">`deferral`</span>.
         """
         return pulumi.get(self, "path_type")
 
     @path_type.setter
-    def path_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def path_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "path_type", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The position of this path in the paths for this EP.
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter
-    def repeat(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def repeat(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Whether this path should be repeated until someone acknowledges the alert. Value must be one of true or false
         """
         return pulumi.get(self, "repeat")
 
     @repeat.setter
-    def repeat(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def repeat(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "repeat", value)
 
     @_builtins.property
     @pulumi.getter(name="repeatCount")
-    def repeat_count(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def repeat_count(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The number of times this path will be executed until someone acknowledges the alert
         """
         return pulumi.get(self, "repeat_count")
 
     @repeat_count.setter
-    def repeat_count(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def repeat_count(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "repeat_count", value)
 
     @_builtins.property
     @pulumi.getter
-    def rules(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['EscalationPathRuleArgs']]]]:
+    def rules(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['EscalationPathRuleArgs']]]]:
         """
         Escalation path rules
         """
         return pulumi.get(self, "rules")
 
     @rules.setter
-    def rules(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['EscalationPathRuleArgs']]]]):
+    def rules(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['EscalationPathRuleArgs']]]]):
         pulumi.set(self, "rules", value)
 
     @_builtins.property
     @pulumi.getter(name="timeRestrictionTimeZone")
-    def time_restriction_time_zone(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def time_restriction_time_zone(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Time zone used for time restrictions.. Value must be one of `International Date Line West`, `Etc/GMT+12`, `American Samoa`, `Pacific/Pago_Pago`, `Midway Island`, `Pacific/Midway`, `Hawaii`, `Pacific/Honolulu`, `Alaska`, `America/Juneau`, `Pacific Time (US & Canada)`, `America/Los_Angeles`, `Tijuana`, `America/Tijuana`, `Arizona`, `America/Phoenix`, `Mazatlan`, `America/Mazatlan`, `Mountain Time (US & Canada)`, `America/Denver`, `Central America`, `America/Guatemala`, `Central Time (US & Canada)`, `America/Chicago`, `Chihuahua`, `America/Chihuahua`, `Guadalajara`, `America/Mexico_City`, `Mexico City`, `America/Mexico_City`, `Monterrey`, `America/Monterrey`, `Saskatchewan`, `America/Regina`, `Bogota`, `America/Bogota`, `Eastern Time (US & Canada)`, `America/New_York`, `Indiana (East)`, `America/Indiana/Indianapolis`, `Lima`, `America/Lima`, `Quito`, `America/Lima`, `Atlantic Time (Canada)`, `America/Halifax`, `Caracas`, `America/Caracas`, `Georgetown`, `America/Guyana`, `La Paz`, `America/La_Paz`, `Puerto Rico`, `America/Puerto_Rico`, `Santiago`, `America/Santiago`, `Newfoundland`, `America/St_Johns`, `Brasilia`, `America/Sao_Paulo`, `Buenos Aires`, `America/Argentina/Buenos_Aires`, `Montevideo`, `America/Montevideo`, `Greenland`, `America/Godthab`, `Mid-Atlantic`, `Atlantic/South_Georgia`, `Azores`, `Atlantic/Azores`, `Cape Verde Is.`, `Atlantic/Cape_Verde`, `Casablanca`, `Africa/Casablanca`, `Dublin`, `Europe/Dublin`, `Edinburgh`, `Europe/London`, `Lisbon`, `Europe/Lisbon`, `London`, `Europe/London`, `Monrovia`, `Africa/Monrovia`, `UTC`, `Etc/UTC`, `Amsterdam`, `Europe/Amsterdam`, `Belgrade`, `Europe/Belgrade`, `Berlin`, `Europe/Berlin`, `Bern`, `Europe/Zurich`, `Bratislava`, `Europe/Bratislava`, `Brussels`, `Europe/Brussels`, `Budapest`, `Europe/Budapest`, `Copenhagen`, `Europe/Copenhagen`, `Ljubljana`, `Europe/Ljubljana`, `Madrid`, `Europe/Madrid`, `Paris`, `Europe/Paris`, `Prague`, `Europe/Prague`, `Rome`, `Europe/Rome`, `Sarajevo`, `Europe/Sarajevo`, `Skopje`, `Europe/Skopje`, `Stockholm`, `Europe/Stockholm`, `Vienna`, `Europe/Vienna`, `Warsaw`, `Europe/Warsaw`, `West Central Africa`, `Africa/Algiers`, `Zagreb`, `Europe/Zagreb`, `Zurich`, `Europe/Zurich`, `Athens`, `Europe/Athens`, `Bucharest`, `Europe/Bucharest`, `Cairo`, `Africa/Cairo`, `Harare`, `Africa/Harare`, `Helsinki`, `Europe/Helsinki`, `Jerusalem`, `Asia/Jerusalem`, `Kaliningrad`, `Europe/Kaliningrad`, `Kyiv`, `Europe/Kiev`, `Pretoria`, `Africa/Johannesburg`, `Riga`, `Europe/Riga`, `Sofia`, `Europe/Sofia`, `Tallinn`, `Europe/Tallinn`, `Vilnius`, `Europe/Vilnius`, `Baghdad`, `Asia/Baghdad`, `Istanbul`, `Europe/Istanbul`, `Kuwait`, `Asia/Kuwait`, `Minsk`, `Europe/Minsk`, `Moscow`, `Europe/Moscow`, `Nairobi`, `Africa/Nairobi`, `Riyadh`, `Asia/Riyadh`, `St. Petersburg`, `Europe/Moscow`, `Volgograd`, `Europe/Volgograd`, `Tehran`, `Asia/Tehran`, `Abu Dhabi`, `Asia/Muscat`, `Baku`, `Asia/Baku`, `Muscat`, `Asia/Muscat`, `Samara`, `Europe/Samara`, `Tbilisi`, `Asia/Tbilisi`, `Yerevan`, `Asia/Yerevan`, `Kabul`, `Asia/Kabul`, `Almaty`, `Asia/Almaty`, `Astana`, `Asia/Almaty`, `Ekaterinburg`, `Asia/Yekaterinburg`, `Islamabad`, `Asia/Karachi`, `Karachi`, `Asia/Karachi`, `Tashkent`, `Asia/Tashkent`, `Chennai`, `Asia/Kolkata`, `Kolkata`, `Asia/Kolkata`, `Mumbai`, `Asia/Kolkata`, `New Delhi`, `Asia/Kolkata`, `Sri Jayawardenepura`, `Asia/Colombo`, `Kathmandu`, `Asia/Kathmandu`, `Dhaka`, `Asia/Dhaka`, `Urumqi`, `Asia/Urumqi`, `Rangoon`, `Asia/Rangoon`, `Bangkok`, `Asia/Bangkok`, `Hanoi`, `Asia/Bangkok`, `Jakarta`, `Asia/Jakarta`, `Krasnoyarsk`, `Asia/Krasnoyarsk`, `Novosibirsk`, `Asia/Novosibirsk`, `Beijing`, `Asia/Shanghai`, `Chongqing`, `Asia/Chongqing`, `Hong Kong`, `Asia/Hong_Kong`, `Irkutsk`, `Asia/Irkutsk`, `Kuala Lumpur`, `Asia/Kuala_Lumpur`, `Perth`, `Australia/Perth`, `Singapore`, `Asia/Singapore`, `Taipei`, `Asia/Taipei`, `Ulaanbaatar`, `Asia/Ulaanbaatar`, `Osaka`, `Asia/Tokyo`, `Sapporo`, `Asia/Tokyo`, `Seoul`, `Asia/Seoul`, `Tokyo`, `Asia/Tokyo`, `Yakutsk`, `Asia/Yakutsk`, `Adelaide`, `Australia/Adelaide`, `Darwin`, `Australia/Darwin`, `Brisbane`, `Australia/Brisbane`, `Canberra`, `Australia/Canberra`, `Guam`, `Pacific/Guam`, `Hobart`, `Australia/Hobart`, `Melbourne`, `Australia/Melbourne`, `Port Moresby`, `Pacific/Port_Moresby`, `Sydney`, `Australia/Sydney`, `Vladivostok`, `Asia/Vladivostok`, `Magadan`, `Asia/Magadan`, `New Caledonia`, `Pacific/Noumea`, `Solomon Is.`, `Pacific/Guadalcanal`, `Srednekolymsk`, `Asia/Srednekolymsk`, `Auckland`, `Pacific/Auckland`, `Fiji`, `Pacific/Fiji`, `Kamchatka`, `Asia/Kamchatka`, `Marshall Is.`, `Pacific/Majuro`, `Wellington`, `Pacific/Auckland`, `Chatham Is.`, `Pacific/Chatham`, `Nuku'alofa`, `Pacific/Tongatapu`, `Samoa`, `Pacific/Apia`, `Tokelau Is.`, `Pacific/Fakaofo`.
         """
         return pulumi.get(self, "time_restriction_time_zone")
 
     @time_restriction_time_zone.setter
-    def time_restriction_time_zone(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def time_restriction_time_zone(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "time_restriction_time_zone", value)
 
     @_builtins.property
     @pulumi.getter(name="timeRestrictions")
-    def time_restrictions(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['EscalationPathTimeRestrictionArgs']]]]:
+    def time_restrictions(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['EscalationPathTimeRestrictionArgs']]]]:
         """
         If time restrictions are set, alerts will follow this path when they arrive within the specified time ranges and meet the rules.
         """
         return pulumi.get(self, "time_restrictions")
 
     @time_restrictions.setter
-    def time_restrictions(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['EscalationPathTimeRestrictionArgs']]]]):
+    def time_restrictions(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['EscalationPathTimeRestrictionArgs']]]]):
         pulumi.set(self, "time_restrictions", value)
 
 
 @pulumi.input_type
 class _EscalationPathState:
     def __init__(__self__, *,
-                 after_deferral_behavior: Optional[pulumi.Input[_builtins.str]] = None,
-                 after_deferral_path_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 default: Optional[pulumi.Input[_builtins.bool]] = None,
-                 escalation_path_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 initial_delay: Optional[pulumi.Input[_builtins.float]] = None,
-                 match_mode: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 notification_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 path_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 repeat: Optional[pulumi.Input[_builtins.bool]] = None,
-                 repeat_count: Optional[pulumi.Input[_builtins.float]] = None,
-                 rules: Optional[pulumi.Input[Sequence[pulumi.Input['EscalationPathRuleArgs']]]] = None,
-                 time_restriction_time_zone: Optional[pulumi.Input[_builtins.str]] = None,
-                 time_restrictions: Optional[pulumi.Input[Sequence[pulumi.Input['EscalationPathTimeRestrictionArgs']]]] = None):
+                 after_deferral_behavior: pulumi.Input[Optional[_builtins.str]] = None,
+                 after_deferral_path_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 default: pulumi.Input[Optional[_builtins.bool]] = None,
+                 escalation_path_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 initial_delay: pulumi.Input[Optional[_builtins.float]] = None,
+                 match_mode: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 notification_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 path_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 repeat: pulumi.Input[Optional[_builtins.bool]] = None,
+                 repeat_count: pulumi.Input[Optional[_builtins.float]] = None,
+                 rules: pulumi.Input[Optional[Sequence[pulumi.Input['EscalationPathRuleArgs']]]] = None,
+                 time_restriction_time_zone: pulumi.Input[Optional[_builtins.str]] = None,
+                 time_restrictions: pulumi.Input[Optional[Sequence[pulumi.Input['EscalationPathTimeRestrictionArgs']]]] = None):
         """
         Input properties used for looking up and filtering EscalationPath resources.
 
-        :param pulumi.Input[_builtins.str] after_deferral_behavior: What happens after a deferral path finishes. Required for deferral paths.. Value must be one of <span pulumi-lang-nodejs="`reEvaluate`" pulumi-lang-dotnet="`ReEvaluate`" pulumi-lang-go="`reEvaluate`" pulumi-lang-python="`re_evaluate`" pulumi-lang-yaml="`reEvaluate`" pulumi-lang-java="`reEvaluate`">`re_evaluate`</span>, <span pulumi-lang-nodejs="`executePath`" pulumi-lang-dotnet="`ExecutePath`" pulumi-lang-go="`executePath`" pulumi-lang-python="`execute_path`" pulumi-lang-yaml="`executePath`" pulumi-lang-java="`executePath`">`execute_path`</span>.
-        :param pulumi.Input[_builtins.str] after_deferral_path_id: The escalation path to execute after this deferral path when<span pulumi-lang-nodejs=" afterDeferralBehavior " pulumi-lang-dotnet=" AfterDeferralBehavior " pulumi-lang-go=" afterDeferralBehavior " pulumi-lang-python=" after_deferral_behavior " pulumi-lang-yaml=" afterDeferralBehavior " pulumi-lang-java=" afterDeferralBehavior "> after_deferral_behavior </span>is execute_path.
+        :param pulumi.Input[_builtins.str] after_deferral_behavior: What happens after a deferral path finishes. Required for deferral paths.. Value must be one of <span pulumi-lang-nodejs="`reEvaluate`" pulumi-lang-dotnet="`ReEvaluate`" pulumi-lang-go="`reEvaluate`" pulumi-lang-python="`re_evaluate`" pulumi-lang-yaml="`reEvaluate`" pulumi-lang-java="`reEvaluate`" pulumi-lang-hcl="`re_evaluate`">`reEvaluate`</span>, <span pulumi-lang-nodejs="`executePath`" pulumi-lang-dotnet="`ExecutePath`" pulumi-lang-go="`executePath`" pulumi-lang-python="`execute_path`" pulumi-lang-yaml="`executePath`" pulumi-lang-java="`executePath`" pulumi-lang-hcl="`execute_path`">`executePath`</span>.
+        :param pulumi.Input[_builtins.str] after_deferral_path_id: The escalation path to execute after this deferral path when<span pulumi-lang-nodejs=" afterDeferralBehavior " pulumi-lang-dotnet=" AfterDeferralBehavior " pulumi-lang-go=" afterDeferralBehavior " pulumi-lang-python=" after_deferral_behavior " pulumi-lang-yaml=" afterDeferralBehavior " pulumi-lang-java=" afterDeferralBehavior " pulumi-lang-hcl=" after_deferral_behavior "> afterDeferralBehavior </span>is execute_path.
         :param pulumi.Input[_builtins.bool] default: Whether this escalation path is the default path. Value must be one of true or false
         :param pulumi.Input[_builtins.str] escalation_policy_id: The ID of the escalation policy
         :param pulumi.Input[_builtins.float] initial_delay: Initial delay for escalation path in minutes. Maximum 1 week (10080).
         :param pulumi.Input[_builtins.str] match_mode: How path rules are matched.. Value must be one of `match-all-rules`, `match-any-rule`.
         :param pulumi.Input[_builtins.str] name: The name of the escalation path
         :param pulumi.Input[_builtins.str] notification_type: Notification rule type
-        :param pulumi.Input[_builtins.str] path_type: The type of escalation path. Cannot be changed after creation.. Value must be one of <span pulumi-lang-nodejs="`escalation`" pulumi-lang-dotnet="`Escalation`" pulumi-lang-go="`escalation`" pulumi-lang-python="`escalation`" pulumi-lang-yaml="`escalation`" pulumi-lang-java="`escalation`">`escalation`</span>, <span pulumi-lang-nodejs="`deferral`" pulumi-lang-dotnet="`Deferral`" pulumi-lang-go="`deferral`" pulumi-lang-python="`deferral`" pulumi-lang-yaml="`deferral`" pulumi-lang-java="`deferral`">`deferral`</span>.
+        :param pulumi.Input[_builtins.str] path_type: The type of escalation path. Cannot be changed after creation.. Value must be one of <span pulumi-lang-nodejs="`escalation`" pulumi-lang-dotnet="`Escalation`" pulumi-lang-go="`escalation`" pulumi-lang-python="`escalation`" pulumi-lang-yaml="`escalation`" pulumi-lang-java="`escalation`" pulumi-lang-hcl="`escalation`">`escalation`</span>, <span pulumi-lang-nodejs="`deferral`" pulumi-lang-dotnet="`Deferral`" pulumi-lang-go="`deferral`" pulumi-lang-python="`deferral`" pulumi-lang-yaml="`deferral`" pulumi-lang-java="`deferral`" pulumi-lang-hcl="`deferral`">`deferral`</span>.
         :param pulumi.Input[_builtins.float] position: The position of this path in the paths for this EP.
         :param pulumi.Input[_builtins.bool] repeat: Whether this path should be repeated until someone acknowledges the alert. Value must be one of true or false
         :param pulumi.Input[_builtins.float] repeat_count: The number of times this path will be executed until someone acknowledges the alert
@@ -352,191 +352,191 @@ class _EscalationPathState:
 
     @_builtins.property
     @pulumi.getter(name="afterDeferralBehavior")
-    def after_deferral_behavior(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def after_deferral_behavior(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        What happens after a deferral path finishes. Required for deferral paths.. Value must be one of <span pulumi-lang-nodejs="`reEvaluate`" pulumi-lang-dotnet="`ReEvaluate`" pulumi-lang-go="`reEvaluate`" pulumi-lang-python="`re_evaluate`" pulumi-lang-yaml="`reEvaluate`" pulumi-lang-java="`reEvaluate`">`re_evaluate`</span>, <span pulumi-lang-nodejs="`executePath`" pulumi-lang-dotnet="`ExecutePath`" pulumi-lang-go="`executePath`" pulumi-lang-python="`execute_path`" pulumi-lang-yaml="`executePath`" pulumi-lang-java="`executePath`">`execute_path`</span>.
+        What happens after a deferral path finishes. Required for deferral paths.. Value must be one of <span pulumi-lang-nodejs="`reEvaluate`" pulumi-lang-dotnet="`ReEvaluate`" pulumi-lang-go="`reEvaluate`" pulumi-lang-python="`re_evaluate`" pulumi-lang-yaml="`reEvaluate`" pulumi-lang-java="`reEvaluate`" pulumi-lang-hcl="`re_evaluate`">`reEvaluate`</span>, <span pulumi-lang-nodejs="`executePath`" pulumi-lang-dotnet="`ExecutePath`" pulumi-lang-go="`executePath`" pulumi-lang-python="`execute_path`" pulumi-lang-yaml="`executePath`" pulumi-lang-java="`executePath`" pulumi-lang-hcl="`execute_path`">`executePath`</span>.
         """
         return pulumi.get(self, "after_deferral_behavior")
 
     @after_deferral_behavior.setter
-    def after_deferral_behavior(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def after_deferral_behavior(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "after_deferral_behavior", value)
 
     @_builtins.property
     @pulumi.getter(name="afterDeferralPathId")
-    def after_deferral_path_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def after_deferral_path_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The escalation path to execute after this deferral path when<span pulumi-lang-nodejs=" afterDeferralBehavior " pulumi-lang-dotnet=" AfterDeferralBehavior " pulumi-lang-go=" afterDeferralBehavior " pulumi-lang-python=" after_deferral_behavior " pulumi-lang-yaml=" afterDeferralBehavior " pulumi-lang-java=" afterDeferralBehavior "> after_deferral_behavior </span>is execute_path.
+        The escalation path to execute after this deferral path when<span pulumi-lang-nodejs=" afterDeferralBehavior " pulumi-lang-dotnet=" AfterDeferralBehavior " pulumi-lang-go=" afterDeferralBehavior " pulumi-lang-python=" after_deferral_behavior " pulumi-lang-yaml=" afterDeferralBehavior " pulumi-lang-java=" afterDeferralBehavior " pulumi-lang-hcl=" after_deferral_behavior "> afterDeferralBehavior </span>is execute_path.
         """
         return pulumi.get(self, "after_deferral_path_id")
 
     @after_deferral_path_id.setter
-    def after_deferral_path_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def after_deferral_path_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "after_deferral_path_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def default(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def default(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Whether this escalation path is the default path. Value must be one of true or false
         """
         return pulumi.get(self, "default")
 
     @default.setter
-    def default(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def default(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "default", value)
 
     @_builtins.property
     @pulumi.getter(name="escalationPathId")
-    def escalation_path_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def escalation_path_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "escalation_path_id")
 
     @escalation_path_id.setter
-    def escalation_path_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def escalation_path_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "escalation_path_id", value)
 
     @_builtins.property
     @pulumi.getter(name="escalationPolicyId")
-    def escalation_policy_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def escalation_policy_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The ID of the escalation policy
         """
         return pulumi.get(self, "escalation_policy_id")
 
     @escalation_policy_id.setter
-    def escalation_policy_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def escalation_policy_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "escalation_policy_id", value)
 
     @_builtins.property
     @pulumi.getter(name="initialDelay")
-    def initial_delay(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def initial_delay(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Initial delay for escalation path in minutes. Maximum 1 week (10080).
         """
         return pulumi.get(self, "initial_delay")
 
     @initial_delay.setter
-    def initial_delay(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def initial_delay(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "initial_delay", value)
 
     @_builtins.property
     @pulumi.getter(name="matchMode")
-    def match_mode(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def match_mode(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         How path rules are matched.. Value must be one of `match-all-rules`, `match-any-rule`.
         """
         return pulumi.get(self, "match_mode")
 
     @match_mode.setter
-    def match_mode(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def match_mode(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "match_mode", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the escalation path
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="notificationType")
-    def notification_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def notification_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Notification rule type
         """
         return pulumi.get(self, "notification_type")
 
     @notification_type.setter
-    def notification_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def notification_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "notification_type", value)
 
     @_builtins.property
     @pulumi.getter(name="pathType")
-    def path_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def path_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The type of escalation path. Cannot be changed after creation.. Value must be one of <span pulumi-lang-nodejs="`escalation`" pulumi-lang-dotnet="`Escalation`" pulumi-lang-go="`escalation`" pulumi-lang-python="`escalation`" pulumi-lang-yaml="`escalation`" pulumi-lang-java="`escalation`">`escalation`</span>, <span pulumi-lang-nodejs="`deferral`" pulumi-lang-dotnet="`Deferral`" pulumi-lang-go="`deferral`" pulumi-lang-python="`deferral`" pulumi-lang-yaml="`deferral`" pulumi-lang-java="`deferral`">`deferral`</span>.
+        The type of escalation path. Cannot be changed after creation.. Value must be one of <span pulumi-lang-nodejs="`escalation`" pulumi-lang-dotnet="`Escalation`" pulumi-lang-go="`escalation`" pulumi-lang-python="`escalation`" pulumi-lang-yaml="`escalation`" pulumi-lang-java="`escalation`" pulumi-lang-hcl="`escalation`">`escalation`</span>, <span pulumi-lang-nodejs="`deferral`" pulumi-lang-dotnet="`Deferral`" pulumi-lang-go="`deferral`" pulumi-lang-python="`deferral`" pulumi-lang-yaml="`deferral`" pulumi-lang-java="`deferral`" pulumi-lang-hcl="`deferral`">`deferral`</span>.
         """
         return pulumi.get(self, "path_type")
 
     @path_type.setter
-    def path_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def path_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "path_type", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The position of this path in the paths for this EP.
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter
-    def repeat(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def repeat(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Whether this path should be repeated until someone acknowledges the alert. Value must be one of true or false
         """
         return pulumi.get(self, "repeat")
 
     @repeat.setter
-    def repeat(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def repeat(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "repeat", value)
 
     @_builtins.property
     @pulumi.getter(name="repeatCount")
-    def repeat_count(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def repeat_count(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The number of times this path will be executed until someone acknowledges the alert
         """
         return pulumi.get(self, "repeat_count")
 
     @repeat_count.setter
-    def repeat_count(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def repeat_count(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "repeat_count", value)
 
     @_builtins.property
     @pulumi.getter
-    def rules(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['EscalationPathRuleArgs']]]]:
+    def rules(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['EscalationPathRuleArgs']]]]:
         """
         Escalation path rules
         """
         return pulumi.get(self, "rules")
 
     @rules.setter
-    def rules(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['EscalationPathRuleArgs']]]]):
+    def rules(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['EscalationPathRuleArgs']]]]):
         pulumi.set(self, "rules", value)
 
     @_builtins.property
     @pulumi.getter(name="timeRestrictionTimeZone")
-    def time_restriction_time_zone(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def time_restriction_time_zone(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Time zone used for time restrictions.. Value must be one of `International Date Line West`, `Etc/GMT+12`, `American Samoa`, `Pacific/Pago_Pago`, `Midway Island`, `Pacific/Midway`, `Hawaii`, `Pacific/Honolulu`, `Alaska`, `America/Juneau`, `Pacific Time (US & Canada)`, `America/Los_Angeles`, `Tijuana`, `America/Tijuana`, `Arizona`, `America/Phoenix`, `Mazatlan`, `America/Mazatlan`, `Mountain Time (US & Canada)`, `America/Denver`, `Central America`, `America/Guatemala`, `Central Time (US & Canada)`, `America/Chicago`, `Chihuahua`, `America/Chihuahua`, `Guadalajara`, `America/Mexico_City`, `Mexico City`, `America/Mexico_City`, `Monterrey`, `America/Monterrey`, `Saskatchewan`, `America/Regina`, `Bogota`, `America/Bogota`, `Eastern Time (US & Canada)`, `America/New_York`, `Indiana (East)`, `America/Indiana/Indianapolis`, `Lima`, `America/Lima`, `Quito`, `America/Lima`, `Atlantic Time (Canada)`, `America/Halifax`, `Caracas`, `America/Caracas`, `Georgetown`, `America/Guyana`, `La Paz`, `America/La_Paz`, `Puerto Rico`, `America/Puerto_Rico`, `Santiago`, `America/Santiago`, `Newfoundland`, `America/St_Johns`, `Brasilia`, `America/Sao_Paulo`, `Buenos Aires`, `America/Argentina/Buenos_Aires`, `Montevideo`, `America/Montevideo`, `Greenland`, `America/Godthab`, `Mid-Atlantic`, `Atlantic/South_Georgia`, `Azores`, `Atlantic/Azores`, `Cape Verde Is.`, `Atlantic/Cape_Verde`, `Casablanca`, `Africa/Casablanca`, `Dublin`, `Europe/Dublin`, `Edinburgh`, `Europe/London`, `Lisbon`, `Europe/Lisbon`, `London`, `Europe/London`, `Monrovia`, `Africa/Monrovia`, `UTC`, `Etc/UTC`, `Amsterdam`, `Europe/Amsterdam`, `Belgrade`, `Europe/Belgrade`, `Berlin`, `Europe/Berlin`, `Bern`, `Europe/Zurich`, `Bratislava`, `Europe/Bratislava`, `Brussels`, `Europe/Brussels`, `Budapest`, `Europe/Budapest`, `Copenhagen`, `Europe/Copenhagen`, `Ljubljana`, `Europe/Ljubljana`, `Madrid`, `Europe/Madrid`, `Paris`, `Europe/Paris`, `Prague`, `Europe/Prague`, `Rome`, `Europe/Rome`, `Sarajevo`, `Europe/Sarajevo`, `Skopje`, `Europe/Skopje`, `Stockholm`, `Europe/Stockholm`, `Vienna`, `Europe/Vienna`, `Warsaw`, `Europe/Warsaw`, `West Central Africa`, `Africa/Algiers`, `Zagreb`, `Europe/Zagreb`, `Zurich`, `Europe/Zurich`, `Athens`, `Europe/Athens`, `Bucharest`, `Europe/Bucharest`, `Cairo`, `Africa/Cairo`, `Harare`, `Africa/Harare`, `Helsinki`, `Europe/Helsinki`, `Jerusalem`, `Asia/Jerusalem`, `Kaliningrad`, `Europe/Kaliningrad`, `Kyiv`, `Europe/Kiev`, `Pretoria`, `Africa/Johannesburg`, `Riga`, `Europe/Riga`, `Sofia`, `Europe/Sofia`, `Tallinn`, `Europe/Tallinn`, `Vilnius`, `Europe/Vilnius`, `Baghdad`, `Asia/Baghdad`, `Istanbul`, `Europe/Istanbul`, `Kuwait`, `Asia/Kuwait`, `Minsk`, `Europe/Minsk`, `Moscow`, `Europe/Moscow`, `Nairobi`, `Africa/Nairobi`, `Riyadh`, `Asia/Riyadh`, `St. Petersburg`, `Europe/Moscow`, `Volgograd`, `Europe/Volgograd`, `Tehran`, `Asia/Tehran`, `Abu Dhabi`, `Asia/Muscat`, `Baku`, `Asia/Baku`, `Muscat`, `Asia/Muscat`, `Samara`, `Europe/Samara`, `Tbilisi`, `Asia/Tbilisi`, `Yerevan`, `Asia/Yerevan`, `Kabul`, `Asia/Kabul`, `Almaty`, `Asia/Almaty`, `Astana`, `Asia/Almaty`, `Ekaterinburg`, `Asia/Yekaterinburg`, `Islamabad`, `Asia/Karachi`, `Karachi`, `Asia/Karachi`, `Tashkent`, `Asia/Tashkent`, `Chennai`, `Asia/Kolkata`, `Kolkata`, `Asia/Kolkata`, `Mumbai`, `Asia/Kolkata`, `New Delhi`, `Asia/Kolkata`, `Sri Jayawardenepura`, `Asia/Colombo`, `Kathmandu`, `Asia/Kathmandu`, `Dhaka`, `Asia/Dhaka`, `Urumqi`, `Asia/Urumqi`, `Rangoon`, `Asia/Rangoon`, `Bangkok`, `Asia/Bangkok`, `Hanoi`, `Asia/Bangkok`, `Jakarta`, `Asia/Jakarta`, `Krasnoyarsk`, `Asia/Krasnoyarsk`, `Novosibirsk`, `Asia/Novosibirsk`, `Beijing`, `Asia/Shanghai`, `Chongqing`, `Asia/Chongqing`, `Hong Kong`, `Asia/Hong_Kong`, `Irkutsk`, `Asia/Irkutsk`, `Kuala Lumpur`, `Asia/Kuala_Lumpur`, `Perth`, `Australia/Perth`, `Singapore`, `Asia/Singapore`, `Taipei`, `Asia/Taipei`, `Ulaanbaatar`, `Asia/Ulaanbaatar`, `Osaka`, `Asia/Tokyo`, `Sapporo`, `Asia/Tokyo`, `Seoul`, `Asia/Seoul`, `Tokyo`, `Asia/Tokyo`, `Yakutsk`, `Asia/Yakutsk`, `Adelaide`, `Australia/Adelaide`, `Darwin`, `Australia/Darwin`, `Brisbane`, `Australia/Brisbane`, `Canberra`, `Australia/Canberra`, `Guam`, `Pacific/Guam`, `Hobart`, `Australia/Hobart`, `Melbourne`, `Australia/Melbourne`, `Port Moresby`, `Pacific/Port_Moresby`, `Sydney`, `Australia/Sydney`, `Vladivostok`, `Asia/Vladivostok`, `Magadan`, `Asia/Magadan`, `New Caledonia`, `Pacific/Noumea`, `Solomon Is.`, `Pacific/Guadalcanal`, `Srednekolymsk`, `Asia/Srednekolymsk`, `Auckland`, `Pacific/Auckland`, `Fiji`, `Pacific/Fiji`, `Kamchatka`, `Asia/Kamchatka`, `Marshall Is.`, `Pacific/Majuro`, `Wellington`, `Pacific/Auckland`, `Chatham Is.`, `Pacific/Chatham`, `Nuku'alofa`, `Pacific/Tongatapu`, `Samoa`, `Pacific/Apia`, `Tokelau Is.`, `Pacific/Fakaofo`.
         """
         return pulumi.get(self, "time_restriction_time_zone")
 
     @time_restriction_time_zone.setter
-    def time_restriction_time_zone(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def time_restriction_time_zone(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "time_restriction_time_zone", value)
 
     @_builtins.property
     @pulumi.getter(name="timeRestrictions")
-    def time_restrictions(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['EscalationPathTimeRestrictionArgs']]]]:
+    def time_restrictions(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['EscalationPathTimeRestrictionArgs']]]]:
         """
         If time restrictions are set, alerts will follow this path when they arrive within the specified time ranges and meet the rules.
         """
         return pulumi.get(self, "time_restrictions")
 
     @time_restrictions.setter
-    def time_restrictions(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['EscalationPathTimeRestrictionArgs']]]]):
+    def time_restrictions(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['EscalationPathTimeRestrictionArgs']]]]):
         pulumi.set(self, "time_restrictions", value)
 
 
@@ -546,37 +546,37 @@ class EscalationPath(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 after_deferral_behavior: Optional[pulumi.Input[_builtins.str]] = None,
-                 after_deferral_path_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 default: Optional[pulumi.Input[_builtins.bool]] = None,
-                 escalation_path_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 initial_delay: Optional[pulumi.Input[_builtins.float]] = None,
-                 match_mode: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 notification_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 path_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 repeat: Optional[pulumi.Input[_builtins.bool]] = None,
-                 repeat_count: Optional[pulumi.Input[_builtins.float]] = None,
-                 rules: Optional[pulumi.Input[Sequence[pulumi.Input[Union['EscalationPathRuleArgs', 'EscalationPathRuleArgsDict']]]]] = None,
-                 time_restriction_time_zone: Optional[pulumi.Input[_builtins.str]] = None,
-                 time_restrictions: Optional[pulumi.Input[Sequence[pulumi.Input[Union['EscalationPathTimeRestrictionArgs', 'EscalationPathTimeRestrictionArgsDict']]]]] = None,
+                 after_deferral_behavior: pulumi.Input[Optional[_builtins.str]] = None,
+                 after_deferral_path_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 default: pulumi.Input[Optional[_builtins.bool]] = None,
+                 escalation_path_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 initial_delay: pulumi.Input[Optional[_builtins.float]] = None,
+                 match_mode: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 notification_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 path_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 repeat: pulumi.Input[Optional[_builtins.bool]] = None,
+                 repeat_count: pulumi.Input[Optional[_builtins.float]] = None,
+                 rules: pulumi.Input[Optional[Sequence[pulumi.Input[Union['EscalationPathRuleArgs', 'EscalationPathRuleArgsDict']]]]] = None,
+                 time_restriction_time_zone: pulumi.Input[Optional[_builtins.str]] = None,
+                 time_restrictions: pulumi.Input[Optional[Sequence[pulumi.Input[Union['EscalationPathTimeRestrictionArgs', 'EscalationPathTimeRestrictionArgsDict']]]]] = None,
                  __props__=None):
         """
         Create a EscalationPath resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] after_deferral_behavior: What happens after a deferral path finishes. Required for deferral paths.. Value must be one of <span pulumi-lang-nodejs="`reEvaluate`" pulumi-lang-dotnet="`ReEvaluate`" pulumi-lang-go="`reEvaluate`" pulumi-lang-python="`re_evaluate`" pulumi-lang-yaml="`reEvaluate`" pulumi-lang-java="`reEvaluate`">`re_evaluate`</span>, <span pulumi-lang-nodejs="`executePath`" pulumi-lang-dotnet="`ExecutePath`" pulumi-lang-go="`executePath`" pulumi-lang-python="`execute_path`" pulumi-lang-yaml="`executePath`" pulumi-lang-java="`executePath`">`execute_path`</span>.
-        :param pulumi.Input[_builtins.str] after_deferral_path_id: The escalation path to execute after this deferral path when<span pulumi-lang-nodejs=" afterDeferralBehavior " pulumi-lang-dotnet=" AfterDeferralBehavior " pulumi-lang-go=" afterDeferralBehavior " pulumi-lang-python=" after_deferral_behavior " pulumi-lang-yaml=" afterDeferralBehavior " pulumi-lang-java=" afterDeferralBehavior "> after_deferral_behavior </span>is execute_path.
+        :param pulumi.Input[_builtins.str] after_deferral_behavior: What happens after a deferral path finishes. Required for deferral paths.. Value must be one of <span pulumi-lang-nodejs="`reEvaluate`" pulumi-lang-dotnet="`ReEvaluate`" pulumi-lang-go="`reEvaluate`" pulumi-lang-python="`re_evaluate`" pulumi-lang-yaml="`reEvaluate`" pulumi-lang-java="`reEvaluate`" pulumi-lang-hcl="`re_evaluate`">`reEvaluate`</span>, <span pulumi-lang-nodejs="`executePath`" pulumi-lang-dotnet="`ExecutePath`" pulumi-lang-go="`executePath`" pulumi-lang-python="`execute_path`" pulumi-lang-yaml="`executePath`" pulumi-lang-java="`executePath`" pulumi-lang-hcl="`execute_path`">`executePath`</span>.
+        :param pulumi.Input[_builtins.str] after_deferral_path_id: The escalation path to execute after this deferral path when<span pulumi-lang-nodejs=" afterDeferralBehavior " pulumi-lang-dotnet=" AfterDeferralBehavior " pulumi-lang-go=" afterDeferralBehavior " pulumi-lang-python=" after_deferral_behavior " pulumi-lang-yaml=" afterDeferralBehavior " pulumi-lang-java=" afterDeferralBehavior " pulumi-lang-hcl=" after_deferral_behavior "> afterDeferralBehavior </span>is execute_path.
         :param pulumi.Input[_builtins.bool] default: Whether this escalation path is the default path. Value must be one of true or false
         :param pulumi.Input[_builtins.str] escalation_policy_id: The ID of the escalation policy
         :param pulumi.Input[_builtins.float] initial_delay: Initial delay for escalation path in minutes. Maximum 1 week (10080).
         :param pulumi.Input[_builtins.str] match_mode: How path rules are matched.. Value must be one of `match-all-rules`, `match-any-rule`.
         :param pulumi.Input[_builtins.str] name: The name of the escalation path
         :param pulumi.Input[_builtins.str] notification_type: Notification rule type
-        :param pulumi.Input[_builtins.str] path_type: The type of escalation path. Cannot be changed after creation.. Value must be one of <span pulumi-lang-nodejs="`escalation`" pulumi-lang-dotnet="`Escalation`" pulumi-lang-go="`escalation`" pulumi-lang-python="`escalation`" pulumi-lang-yaml="`escalation`" pulumi-lang-java="`escalation`">`escalation`</span>, <span pulumi-lang-nodejs="`deferral`" pulumi-lang-dotnet="`Deferral`" pulumi-lang-go="`deferral`" pulumi-lang-python="`deferral`" pulumi-lang-yaml="`deferral`" pulumi-lang-java="`deferral`">`deferral`</span>.
+        :param pulumi.Input[_builtins.str] path_type: The type of escalation path. Cannot be changed after creation.. Value must be one of <span pulumi-lang-nodejs="`escalation`" pulumi-lang-dotnet="`Escalation`" pulumi-lang-go="`escalation`" pulumi-lang-python="`escalation`" pulumi-lang-yaml="`escalation`" pulumi-lang-java="`escalation`" pulumi-lang-hcl="`escalation`">`escalation`</span>, <span pulumi-lang-nodejs="`deferral`" pulumi-lang-dotnet="`Deferral`" pulumi-lang-go="`deferral`" pulumi-lang-python="`deferral`" pulumi-lang-yaml="`deferral`" pulumi-lang-java="`deferral`" pulumi-lang-hcl="`deferral`">`deferral`</span>.
         :param pulumi.Input[_builtins.float] position: The position of this path in the paths for this EP.
         :param pulumi.Input[_builtins.bool] repeat: Whether this path should be repeated until someone acknowledges the alert. Value must be one of true or false
         :param pulumi.Input[_builtins.float] repeat_count: The number of times this path will be executed until someone acknowledges the alert
@@ -608,22 +608,22 @@ class EscalationPath(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 after_deferral_behavior: Optional[pulumi.Input[_builtins.str]] = None,
-                 after_deferral_path_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 default: Optional[pulumi.Input[_builtins.bool]] = None,
-                 escalation_path_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 initial_delay: Optional[pulumi.Input[_builtins.float]] = None,
-                 match_mode: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 notification_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 path_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 repeat: Optional[pulumi.Input[_builtins.bool]] = None,
-                 repeat_count: Optional[pulumi.Input[_builtins.float]] = None,
-                 rules: Optional[pulumi.Input[Sequence[pulumi.Input[Union['EscalationPathRuleArgs', 'EscalationPathRuleArgsDict']]]]] = None,
-                 time_restriction_time_zone: Optional[pulumi.Input[_builtins.str]] = None,
-                 time_restrictions: Optional[pulumi.Input[Sequence[pulumi.Input[Union['EscalationPathTimeRestrictionArgs', 'EscalationPathTimeRestrictionArgsDict']]]]] = None,
+                 after_deferral_behavior: pulumi.Input[Optional[_builtins.str]] = None,
+                 after_deferral_path_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 default: pulumi.Input[Optional[_builtins.bool]] = None,
+                 escalation_path_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 initial_delay: pulumi.Input[Optional[_builtins.float]] = None,
+                 match_mode: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 notification_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 path_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 repeat: pulumi.Input[Optional[_builtins.bool]] = None,
+                 repeat_count: pulumi.Input[Optional[_builtins.float]] = None,
+                 rules: pulumi.Input[Optional[Sequence[pulumi.Input[Union['EscalationPathRuleArgs', 'EscalationPathRuleArgsDict']]]]] = None,
+                 time_restriction_time_zone: pulumi.Input[Optional[_builtins.str]] = None,
+                 time_restrictions: pulumi.Input[Optional[Sequence[pulumi.Input[Union['EscalationPathTimeRestrictionArgs', 'EscalationPathTimeRestrictionArgsDict']]]]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -660,22 +660,22 @@ class EscalationPath(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            after_deferral_behavior: Optional[pulumi.Input[_builtins.str]] = None,
-            after_deferral_path_id: Optional[pulumi.Input[_builtins.str]] = None,
-            default: Optional[pulumi.Input[_builtins.bool]] = None,
-            escalation_path_id: Optional[pulumi.Input[_builtins.str]] = None,
-            escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
-            initial_delay: Optional[pulumi.Input[_builtins.float]] = None,
-            match_mode: Optional[pulumi.Input[_builtins.str]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            notification_type: Optional[pulumi.Input[_builtins.str]] = None,
-            path_type: Optional[pulumi.Input[_builtins.str]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None,
-            repeat: Optional[pulumi.Input[_builtins.bool]] = None,
-            repeat_count: Optional[pulumi.Input[_builtins.float]] = None,
-            rules: Optional[pulumi.Input[Sequence[pulumi.Input[Union['EscalationPathRuleArgs', 'EscalationPathRuleArgsDict']]]]] = None,
-            time_restriction_time_zone: Optional[pulumi.Input[_builtins.str]] = None,
-            time_restrictions: Optional[pulumi.Input[Sequence[pulumi.Input[Union['EscalationPathTimeRestrictionArgs', 'EscalationPathTimeRestrictionArgsDict']]]]] = None) -> 'EscalationPath':
+            after_deferral_behavior: pulumi.Input[Optional[_builtins.str]] = None,
+            after_deferral_path_id: pulumi.Input[Optional[_builtins.str]] = None,
+            default: pulumi.Input[Optional[_builtins.bool]] = None,
+            escalation_path_id: pulumi.Input[Optional[_builtins.str]] = None,
+            escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
+            initial_delay: pulumi.Input[Optional[_builtins.float]] = None,
+            match_mode: pulumi.Input[Optional[_builtins.str]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            notification_type: pulumi.Input[Optional[_builtins.str]] = None,
+            path_type: pulumi.Input[Optional[_builtins.str]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None,
+            repeat: pulumi.Input[Optional[_builtins.bool]] = None,
+            repeat_count: pulumi.Input[Optional[_builtins.float]] = None,
+            rules: pulumi.Input[Optional[Sequence[pulumi.Input[Union['EscalationPathRuleArgs', 'EscalationPathRuleArgsDict']]]]] = None,
+            time_restriction_time_zone: pulumi.Input[Optional[_builtins.str]] = None,
+            time_restrictions: pulumi.Input[Optional[Sequence[pulumi.Input[Union['EscalationPathTimeRestrictionArgs', 'EscalationPathTimeRestrictionArgsDict']]]]] = None) -> 'EscalationPath':
         """
         Get an existing EscalationPath resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -683,15 +683,15 @@ class EscalationPath(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] after_deferral_behavior: What happens after a deferral path finishes. Required for deferral paths.. Value must be one of <span pulumi-lang-nodejs="`reEvaluate`" pulumi-lang-dotnet="`ReEvaluate`" pulumi-lang-go="`reEvaluate`" pulumi-lang-python="`re_evaluate`" pulumi-lang-yaml="`reEvaluate`" pulumi-lang-java="`reEvaluate`">`re_evaluate`</span>, <span pulumi-lang-nodejs="`executePath`" pulumi-lang-dotnet="`ExecutePath`" pulumi-lang-go="`executePath`" pulumi-lang-python="`execute_path`" pulumi-lang-yaml="`executePath`" pulumi-lang-java="`executePath`">`execute_path`</span>.
-        :param pulumi.Input[_builtins.str] after_deferral_path_id: The escalation path to execute after this deferral path when<span pulumi-lang-nodejs=" afterDeferralBehavior " pulumi-lang-dotnet=" AfterDeferralBehavior " pulumi-lang-go=" afterDeferralBehavior " pulumi-lang-python=" after_deferral_behavior " pulumi-lang-yaml=" afterDeferralBehavior " pulumi-lang-java=" afterDeferralBehavior "> after_deferral_behavior </span>is execute_path.
+        :param pulumi.Input[_builtins.str] after_deferral_behavior: What happens after a deferral path finishes. Required for deferral paths.. Value must be one of <span pulumi-lang-nodejs="`reEvaluate`" pulumi-lang-dotnet="`ReEvaluate`" pulumi-lang-go="`reEvaluate`" pulumi-lang-python="`re_evaluate`" pulumi-lang-yaml="`reEvaluate`" pulumi-lang-java="`reEvaluate`" pulumi-lang-hcl="`re_evaluate`">`reEvaluate`</span>, <span pulumi-lang-nodejs="`executePath`" pulumi-lang-dotnet="`ExecutePath`" pulumi-lang-go="`executePath`" pulumi-lang-python="`execute_path`" pulumi-lang-yaml="`executePath`" pulumi-lang-java="`executePath`" pulumi-lang-hcl="`execute_path`">`executePath`</span>.
+        :param pulumi.Input[_builtins.str] after_deferral_path_id: The escalation path to execute after this deferral path when<span pulumi-lang-nodejs=" afterDeferralBehavior " pulumi-lang-dotnet=" AfterDeferralBehavior " pulumi-lang-go=" afterDeferralBehavior " pulumi-lang-python=" after_deferral_behavior " pulumi-lang-yaml=" afterDeferralBehavior " pulumi-lang-java=" afterDeferralBehavior " pulumi-lang-hcl=" after_deferral_behavior "> afterDeferralBehavior </span>is execute_path.
         :param pulumi.Input[_builtins.bool] default: Whether this escalation path is the default path. Value must be one of true or false
         :param pulumi.Input[_builtins.str] escalation_policy_id: The ID of the escalation policy
         :param pulumi.Input[_builtins.float] initial_delay: Initial delay for escalation path in minutes. Maximum 1 week (10080).
         :param pulumi.Input[_builtins.str] match_mode: How path rules are matched.. Value must be one of `match-all-rules`, `match-any-rule`.
         :param pulumi.Input[_builtins.str] name: The name of the escalation path
         :param pulumi.Input[_builtins.str] notification_type: Notification rule type
-        :param pulumi.Input[_builtins.str] path_type: The type of escalation path. Cannot be changed after creation.. Value must be one of <span pulumi-lang-nodejs="`escalation`" pulumi-lang-dotnet="`Escalation`" pulumi-lang-go="`escalation`" pulumi-lang-python="`escalation`" pulumi-lang-yaml="`escalation`" pulumi-lang-java="`escalation`">`escalation`</span>, <span pulumi-lang-nodejs="`deferral`" pulumi-lang-dotnet="`Deferral`" pulumi-lang-go="`deferral`" pulumi-lang-python="`deferral`" pulumi-lang-yaml="`deferral`" pulumi-lang-java="`deferral`">`deferral`</span>.
+        :param pulumi.Input[_builtins.str] path_type: The type of escalation path. Cannot be changed after creation.. Value must be one of <span pulumi-lang-nodejs="`escalation`" pulumi-lang-dotnet="`Escalation`" pulumi-lang-go="`escalation`" pulumi-lang-python="`escalation`" pulumi-lang-yaml="`escalation`" pulumi-lang-java="`escalation`" pulumi-lang-hcl="`escalation`">`escalation`</span>, <span pulumi-lang-nodejs="`deferral`" pulumi-lang-dotnet="`Deferral`" pulumi-lang-go="`deferral`" pulumi-lang-python="`deferral`" pulumi-lang-yaml="`deferral`" pulumi-lang-java="`deferral`" pulumi-lang-hcl="`deferral`">`deferral`</span>.
         :param pulumi.Input[_builtins.float] position: The position of this path in the paths for this EP.
         :param pulumi.Input[_builtins.bool] repeat: Whether this path should be repeated until someone acknowledges the alert. Value must be one of true or false
         :param pulumi.Input[_builtins.float] repeat_count: The number of times this path will be executed until someone acknowledges the alert
@@ -725,7 +725,7 @@ class EscalationPath(pulumi.CustomResource):
     @pulumi.getter(name="afterDeferralBehavior")
     def after_deferral_behavior(self) -> pulumi.Output[_builtins.str]:
         """
-        What happens after a deferral path finishes. Required for deferral paths.. Value must be one of <span pulumi-lang-nodejs="`reEvaluate`" pulumi-lang-dotnet="`ReEvaluate`" pulumi-lang-go="`reEvaluate`" pulumi-lang-python="`re_evaluate`" pulumi-lang-yaml="`reEvaluate`" pulumi-lang-java="`reEvaluate`">`re_evaluate`</span>, <span pulumi-lang-nodejs="`executePath`" pulumi-lang-dotnet="`ExecutePath`" pulumi-lang-go="`executePath`" pulumi-lang-python="`execute_path`" pulumi-lang-yaml="`executePath`" pulumi-lang-java="`executePath`">`execute_path`</span>.
+        What happens after a deferral path finishes. Required for deferral paths.. Value must be one of <span pulumi-lang-nodejs="`reEvaluate`" pulumi-lang-dotnet="`ReEvaluate`" pulumi-lang-go="`reEvaluate`" pulumi-lang-python="`re_evaluate`" pulumi-lang-yaml="`reEvaluate`" pulumi-lang-java="`reEvaluate`" pulumi-lang-hcl="`re_evaluate`">`reEvaluate`</span>, <span pulumi-lang-nodejs="`executePath`" pulumi-lang-dotnet="`ExecutePath`" pulumi-lang-go="`executePath`" pulumi-lang-python="`execute_path`" pulumi-lang-yaml="`executePath`" pulumi-lang-java="`executePath`" pulumi-lang-hcl="`execute_path`">`executePath`</span>.
         """
         return pulumi.get(self, "after_deferral_behavior")
 
@@ -733,7 +733,7 @@ class EscalationPath(pulumi.CustomResource):
     @pulumi.getter(name="afterDeferralPathId")
     def after_deferral_path_id(self) -> pulumi.Output[_builtins.str]:
         """
-        The escalation path to execute after this deferral path when<span pulumi-lang-nodejs=" afterDeferralBehavior " pulumi-lang-dotnet=" AfterDeferralBehavior " pulumi-lang-go=" afterDeferralBehavior " pulumi-lang-python=" after_deferral_behavior " pulumi-lang-yaml=" afterDeferralBehavior " pulumi-lang-java=" afterDeferralBehavior "> after_deferral_behavior </span>is execute_path.
+        The escalation path to execute after this deferral path when<span pulumi-lang-nodejs=" afterDeferralBehavior " pulumi-lang-dotnet=" AfterDeferralBehavior " pulumi-lang-go=" afterDeferralBehavior " pulumi-lang-python=" after_deferral_behavior " pulumi-lang-yaml=" afterDeferralBehavior " pulumi-lang-java=" afterDeferralBehavior " pulumi-lang-hcl=" after_deferral_behavior "> afterDeferralBehavior </span>is execute_path.
         """
         return pulumi.get(self, "after_deferral_path_id")
 
@@ -794,7 +794,7 @@ class EscalationPath(pulumi.CustomResource):
     @pulumi.getter(name="pathType")
     def path_type(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        The type of escalation path. Cannot be changed after creation.. Value must be one of <span pulumi-lang-nodejs="`escalation`" pulumi-lang-dotnet="`Escalation`" pulumi-lang-go="`escalation`" pulumi-lang-python="`escalation`" pulumi-lang-yaml="`escalation`" pulumi-lang-java="`escalation`">`escalation`</span>, <span pulumi-lang-nodejs="`deferral`" pulumi-lang-dotnet="`Deferral`" pulumi-lang-go="`deferral`" pulumi-lang-python="`deferral`" pulumi-lang-yaml="`deferral`" pulumi-lang-java="`deferral`">`deferral`</span>.
+        The type of escalation path. Cannot be changed after creation.. Value must be one of <span pulumi-lang-nodejs="`escalation`" pulumi-lang-dotnet="`Escalation`" pulumi-lang-go="`escalation`" pulumi-lang-python="`escalation`" pulumi-lang-yaml="`escalation`" pulumi-lang-java="`escalation`" pulumi-lang-hcl="`escalation`">`escalation`</span>, <span pulumi-lang-nodejs="`deferral`" pulumi-lang-dotnet="`Deferral`" pulumi-lang-go="`deferral`" pulumi-lang-python="`deferral`" pulumi-lang-yaml="`deferral`" pulumi-lang-java="`deferral`" pulumi-lang-hcl="`deferral`">`deferral`</span>.
         """
         return pulumi.get(self, "path_type")
 
@@ -845,3 +845,4 @@ class EscalationPath(pulumi.CustomResource):
         If time restrictions are set, alerts will follow this path when they arrive within the specified time ranges and meet the rules.
         """
         return pulumi.get(self, "time_restrictions")
+

@@ -22,17 +22,17 @@ __all__ = ['CommunicationsGroupArgs', 'CommunicationsGroup']
 class CommunicationsGroupArgs:
     def __init__(__self__, *,
                  communication_type_id: pulumi.Input[_builtins.str],
-                 communication_external_group_members: Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationExternalGroupMemberArgs']]]] = None,
-                 communication_group_conditions: Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupConditionArgs']]]] = None,
-                 communication_group_members: Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupMemberArgs']]]] = None,
-                 communications_group_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 condition_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 email_channel: Optional[pulumi.Input[_builtins.bool]] = None,
-                 is_private: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 sms_channel: Optional[pulumi.Input[_builtins.bool]] = None):
+                 communication_external_group_members: pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsGroupCommunicationExternalGroupMemberArgs']]]] = None,
+                 communication_group_conditions: pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupConditionArgs']]]] = None,
+                 communication_group_members: pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupMemberArgs']]]] = None,
+                 communications_group_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 condition_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 email_channel: pulumi.Input[Optional[_builtins.bool]] = None,
+                 is_private: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 sms_channel: pulumi.Input[Optional[_builtins.bool]] = None):
         """
         The set of arguments for constructing a CommunicationsGroup resource.
 
@@ -40,7 +40,7 @@ class CommunicationsGroupArgs:
         :param pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationExternalGroupMemberArgs']]] communication_external_group_members: External group members
         :param pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupConditionArgs']]] communication_group_conditions: Group conditions
         :param pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupMemberArgs']]] communication_group_members: Group members
-        :param pulumi.Input[_builtins.str] condition_type: Condition type. Value must be one of <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`">`any`</span>, <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`">`all`</span>.
+        :param pulumi.Input[_builtins.str] condition_type: Condition type. Value must be one of <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`" pulumi-lang-hcl="`any`">`any`</span>, <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`" pulumi-lang-hcl="`all`">`all`</span>.
         :param pulumi.Input[_builtins.str] description: The description of the communications group
         :param pulumi.Input[_builtins.bool] email_channel: Email channel enabled. Value must be one of true or false
         :param pulumi.Input[_builtins.bool] is_private: Whether the group is private. Value must be one of true or false
@@ -86,149 +86,149 @@ class CommunicationsGroupArgs:
 
     @_builtins.property
     @pulumi.getter(name="communicationExternalGroupMembers")
-    def communication_external_group_members(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationExternalGroupMemberArgs']]]]:
+    def communication_external_group_members(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsGroupCommunicationExternalGroupMemberArgs']]]]:
         """
         External group members
         """
         return pulumi.get(self, "communication_external_group_members")
 
     @communication_external_group_members.setter
-    def communication_external_group_members(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationExternalGroupMemberArgs']]]]):
+    def communication_external_group_members(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsGroupCommunicationExternalGroupMemberArgs']]]]):
         pulumi.set(self, "communication_external_group_members", value)
 
     @_builtins.property
     @pulumi.getter(name="communicationGroupConditions")
-    def communication_group_conditions(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupConditionArgs']]]]:
+    def communication_group_conditions(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupConditionArgs']]]]:
         """
         Group conditions
         """
         return pulumi.get(self, "communication_group_conditions")
 
     @communication_group_conditions.setter
-    def communication_group_conditions(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupConditionArgs']]]]):
+    def communication_group_conditions(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupConditionArgs']]]]):
         pulumi.set(self, "communication_group_conditions", value)
 
     @_builtins.property
     @pulumi.getter(name="communicationGroupMembers")
-    def communication_group_members(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupMemberArgs']]]]:
+    def communication_group_members(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupMemberArgs']]]]:
         """
         Group members
         """
         return pulumi.get(self, "communication_group_members")
 
     @communication_group_members.setter
-    def communication_group_members(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupMemberArgs']]]]):
+    def communication_group_members(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupMemberArgs']]]]):
         pulumi.set(self, "communication_group_members", value)
 
     @_builtins.property
     @pulumi.getter(name="communicationsGroupId")
-    def communications_group_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def communications_group_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "communications_group_id")
 
     @communications_group_id.setter
-    def communications_group_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def communications_group_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "communications_group_id", value)
 
     @_builtins.property
     @pulumi.getter(name="conditionType")
-    def condition_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def condition_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Condition type. Value must be one of <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`">`any`</span>, <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`">`all`</span>.
+        Condition type. Value must be one of <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`" pulumi-lang-hcl="`any`">`any`</span>, <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`" pulumi-lang-hcl="`all`">`all`</span>.
         """
         return pulumi.get(self, "condition_type")
 
     @condition_type.setter
-    def condition_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def condition_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "condition_type", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the communications group
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="emailChannel")
-    def email_channel(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def email_channel(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Email channel enabled. Value must be one of true or false
         """
         return pulumi.get(self, "email_channel")
 
     @email_channel.setter
-    def email_channel(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def email_channel(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "email_channel", value)
 
     @_builtins.property
     @pulumi.getter(name="isPrivate")
-    def is_private(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def is_private(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Whether the group is private. Value must be one of true or false
         """
         return pulumi.get(self, "is_private")
 
     @is_private.setter
-    def is_private(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def is_private(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "is_private", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the communications group
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The slug of the communications group
         """
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
     @_builtins.property
     @pulumi.getter(name="smsChannel")
-    def sms_channel(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def sms_channel(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         SMS channel enabled. Value must be one of true or false
         """
         return pulumi.get(self, "sms_channel")
 
     @sms_channel.setter
-    def sms_channel(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def sms_channel(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "sms_channel", value)
 
 
 @pulumi.input_type
 class _CommunicationsGroupState:
     def __init__(__self__, *,
-                 communication_external_group_members: Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationExternalGroupMemberArgs']]]] = None,
-                 communication_group_conditions: Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupConditionArgs']]]] = None,
-                 communication_group_members: Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupMemberArgs']]]] = None,
-                 communication_type_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 communications_group_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 condition_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 email_channel: Optional[pulumi.Input[_builtins.bool]] = None,
-                 is_private: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 sms_channel: Optional[pulumi.Input[_builtins.bool]] = None):
+                 communication_external_group_members: pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsGroupCommunicationExternalGroupMemberArgs']]]] = None,
+                 communication_group_conditions: pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupConditionArgs']]]] = None,
+                 communication_group_members: pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupMemberArgs']]]] = None,
+                 communication_type_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 communications_group_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 condition_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 email_channel: pulumi.Input[Optional[_builtins.bool]] = None,
+                 is_private: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 sms_channel: pulumi.Input[Optional[_builtins.bool]] = None):
         """
         Input properties used for looking up and filtering CommunicationsGroup resources.
 
@@ -236,7 +236,7 @@ class _CommunicationsGroupState:
         :param pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupConditionArgs']]] communication_group_conditions: Group conditions
         :param pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupMemberArgs']]] communication_group_members: Group members
         :param pulumi.Input[_builtins.str] communication_type_id: The communication type ID
-        :param pulumi.Input[_builtins.str] condition_type: Condition type. Value must be one of <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`">`any`</span>, <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`">`all`</span>.
+        :param pulumi.Input[_builtins.str] condition_type: Condition type. Value must be one of <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`" pulumi-lang-hcl="`any`">`any`</span>, <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`" pulumi-lang-hcl="`all`">`all`</span>.
         :param pulumi.Input[_builtins.str] description: The description of the communications group
         :param pulumi.Input[_builtins.bool] email_channel: Email channel enabled. Value must be one of true or false
         :param pulumi.Input[_builtins.bool] is_private: Whether the group is private. Value must be one of true or false
@@ -271,143 +271,143 @@ class _CommunicationsGroupState:
 
     @_builtins.property
     @pulumi.getter(name="communicationExternalGroupMembers")
-    def communication_external_group_members(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationExternalGroupMemberArgs']]]]:
+    def communication_external_group_members(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsGroupCommunicationExternalGroupMemberArgs']]]]:
         """
         External group members
         """
         return pulumi.get(self, "communication_external_group_members")
 
     @communication_external_group_members.setter
-    def communication_external_group_members(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationExternalGroupMemberArgs']]]]):
+    def communication_external_group_members(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsGroupCommunicationExternalGroupMemberArgs']]]]):
         pulumi.set(self, "communication_external_group_members", value)
 
     @_builtins.property
     @pulumi.getter(name="communicationGroupConditions")
-    def communication_group_conditions(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupConditionArgs']]]]:
+    def communication_group_conditions(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupConditionArgs']]]]:
         """
         Group conditions
         """
         return pulumi.get(self, "communication_group_conditions")
 
     @communication_group_conditions.setter
-    def communication_group_conditions(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupConditionArgs']]]]):
+    def communication_group_conditions(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupConditionArgs']]]]):
         pulumi.set(self, "communication_group_conditions", value)
 
     @_builtins.property
     @pulumi.getter(name="communicationGroupMembers")
-    def communication_group_members(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupMemberArgs']]]]:
+    def communication_group_members(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupMemberArgs']]]]:
         """
         Group members
         """
         return pulumi.get(self, "communication_group_members")
 
     @communication_group_members.setter
-    def communication_group_members(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupMemberArgs']]]]):
+    def communication_group_members(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsGroupCommunicationGroupMemberArgs']]]]):
         pulumi.set(self, "communication_group_members", value)
 
     @_builtins.property
     @pulumi.getter(name="communicationTypeId")
-    def communication_type_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def communication_type_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The communication type ID
         """
         return pulumi.get(self, "communication_type_id")
 
     @communication_type_id.setter
-    def communication_type_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def communication_type_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "communication_type_id", value)
 
     @_builtins.property
     @pulumi.getter(name="communicationsGroupId")
-    def communications_group_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def communications_group_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "communications_group_id")
 
     @communications_group_id.setter
-    def communications_group_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def communications_group_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "communications_group_id", value)
 
     @_builtins.property
     @pulumi.getter(name="conditionType")
-    def condition_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def condition_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Condition type. Value must be one of <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`">`any`</span>, <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`">`all`</span>.
+        Condition type. Value must be one of <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`" pulumi-lang-hcl="`any`">`any`</span>, <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`" pulumi-lang-hcl="`all`">`all`</span>.
         """
         return pulumi.get(self, "condition_type")
 
     @condition_type.setter
-    def condition_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def condition_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "condition_type", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the communications group
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="emailChannel")
-    def email_channel(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def email_channel(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Email channel enabled. Value must be one of true or false
         """
         return pulumi.get(self, "email_channel")
 
     @email_channel.setter
-    def email_channel(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def email_channel(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "email_channel", value)
 
     @_builtins.property
     @pulumi.getter(name="isPrivate")
-    def is_private(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def is_private(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Whether the group is private. Value must be one of true or false
         """
         return pulumi.get(self, "is_private")
 
     @is_private.setter
-    def is_private(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def is_private(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "is_private", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the communications group
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The slug of the communications group
         """
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
     @_builtins.property
     @pulumi.getter(name="smsChannel")
-    def sms_channel(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def sms_channel(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         SMS channel enabled. Value must be one of true or false
         """
         return pulumi.get(self, "sms_channel")
 
     @sms_channel.setter
-    def sms_channel(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def sms_channel(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "sms_channel", value)
 
 
@@ -417,18 +417,18 @@ class CommunicationsGroup(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 communication_external_group_members: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationExternalGroupMemberArgs', 'CommunicationsGroupCommunicationExternalGroupMemberArgsDict']]]]] = None,
-                 communication_group_conditions: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationGroupConditionArgs', 'CommunicationsGroupCommunicationGroupConditionArgsDict']]]]] = None,
-                 communication_group_members: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationGroupMemberArgs', 'CommunicationsGroupCommunicationGroupMemberArgsDict']]]]] = None,
-                 communication_type_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 communications_group_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 condition_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 email_channel: Optional[pulumi.Input[_builtins.bool]] = None,
-                 is_private: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 sms_channel: Optional[pulumi.Input[_builtins.bool]] = None,
+                 communication_external_group_members: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationExternalGroupMemberArgs', 'CommunicationsGroupCommunicationExternalGroupMemberArgsDict']]]]] = None,
+                 communication_group_conditions: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationGroupConditionArgs', 'CommunicationsGroupCommunicationGroupConditionArgsDict']]]]] = None,
+                 communication_group_members: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationGroupMemberArgs', 'CommunicationsGroupCommunicationGroupMemberArgsDict']]]]] = None,
+                 communication_type_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 communications_group_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 condition_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 email_channel: pulumi.Input[Optional[_builtins.bool]] = None,
+                 is_private: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 sms_channel: pulumi.Input[Optional[_builtins.bool]] = None,
                  __props__=None):
         """
         Create a CommunicationsGroup resource with the given unique name, props, and options.
@@ -439,7 +439,7 @@ class CommunicationsGroup(pulumi.CustomResource):
         :param pulumi.Input[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationGroupConditionArgs', 'CommunicationsGroupCommunicationGroupConditionArgsDict']]]] communication_group_conditions: Group conditions
         :param pulumi.Input[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationGroupMemberArgs', 'CommunicationsGroupCommunicationGroupMemberArgsDict']]]] communication_group_members: Group members
         :param pulumi.Input[_builtins.str] communication_type_id: The communication type ID
-        :param pulumi.Input[_builtins.str] condition_type: Condition type. Value must be one of <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`">`any`</span>, <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`">`all`</span>.
+        :param pulumi.Input[_builtins.str] condition_type: Condition type. Value must be one of <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`" pulumi-lang-hcl="`any`">`any`</span>, <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`" pulumi-lang-hcl="`all`">`all`</span>.
         :param pulumi.Input[_builtins.str] description: The description of the communications group
         :param pulumi.Input[_builtins.bool] email_channel: Email channel enabled. Value must be one of true or false
         :param pulumi.Input[_builtins.bool] is_private: Whether the group is private. Value must be one of true or false
@@ -471,18 +471,18 @@ class CommunicationsGroup(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 communication_external_group_members: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationExternalGroupMemberArgs', 'CommunicationsGroupCommunicationExternalGroupMemberArgsDict']]]]] = None,
-                 communication_group_conditions: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationGroupConditionArgs', 'CommunicationsGroupCommunicationGroupConditionArgsDict']]]]] = None,
-                 communication_group_members: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationGroupMemberArgs', 'CommunicationsGroupCommunicationGroupMemberArgsDict']]]]] = None,
-                 communication_type_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 communications_group_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 condition_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 email_channel: Optional[pulumi.Input[_builtins.bool]] = None,
-                 is_private: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 sms_channel: Optional[pulumi.Input[_builtins.bool]] = None,
+                 communication_external_group_members: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationExternalGroupMemberArgs', 'CommunicationsGroupCommunicationExternalGroupMemberArgsDict']]]]] = None,
+                 communication_group_conditions: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationGroupConditionArgs', 'CommunicationsGroupCommunicationGroupConditionArgsDict']]]]] = None,
+                 communication_group_members: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationGroupMemberArgs', 'CommunicationsGroupCommunicationGroupMemberArgsDict']]]]] = None,
+                 communication_type_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 communications_group_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 condition_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 email_channel: pulumi.Input[Optional[_builtins.bool]] = None,
+                 is_private: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 sms_channel: pulumi.Input[Optional[_builtins.bool]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -517,18 +517,18 @@ class CommunicationsGroup(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            communication_external_group_members: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationExternalGroupMemberArgs', 'CommunicationsGroupCommunicationExternalGroupMemberArgsDict']]]]] = None,
-            communication_group_conditions: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationGroupConditionArgs', 'CommunicationsGroupCommunicationGroupConditionArgsDict']]]]] = None,
-            communication_group_members: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationGroupMemberArgs', 'CommunicationsGroupCommunicationGroupMemberArgsDict']]]]] = None,
-            communication_type_id: Optional[pulumi.Input[_builtins.str]] = None,
-            communications_group_id: Optional[pulumi.Input[_builtins.str]] = None,
-            condition_type: Optional[pulumi.Input[_builtins.str]] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            email_channel: Optional[pulumi.Input[_builtins.bool]] = None,
-            is_private: Optional[pulumi.Input[_builtins.bool]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            slug: Optional[pulumi.Input[_builtins.str]] = None,
-            sms_channel: Optional[pulumi.Input[_builtins.bool]] = None) -> 'CommunicationsGroup':
+            communication_external_group_members: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationExternalGroupMemberArgs', 'CommunicationsGroupCommunicationExternalGroupMemberArgsDict']]]]] = None,
+            communication_group_conditions: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationGroupConditionArgs', 'CommunicationsGroupCommunicationGroupConditionArgsDict']]]]] = None,
+            communication_group_members: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationGroupMemberArgs', 'CommunicationsGroupCommunicationGroupMemberArgsDict']]]]] = None,
+            communication_type_id: pulumi.Input[Optional[_builtins.str]] = None,
+            communications_group_id: pulumi.Input[Optional[_builtins.str]] = None,
+            condition_type: pulumi.Input[Optional[_builtins.str]] = None,
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            email_channel: pulumi.Input[Optional[_builtins.bool]] = None,
+            is_private: pulumi.Input[Optional[_builtins.bool]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            slug: pulumi.Input[Optional[_builtins.str]] = None,
+            sms_channel: pulumi.Input[Optional[_builtins.bool]] = None) -> 'CommunicationsGroup':
         """
         Get an existing CommunicationsGroup resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -540,7 +540,7 @@ class CommunicationsGroup(pulumi.CustomResource):
         :param pulumi.Input[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationGroupConditionArgs', 'CommunicationsGroupCommunicationGroupConditionArgsDict']]]] communication_group_conditions: Group conditions
         :param pulumi.Input[Sequence[pulumi.Input[Union['CommunicationsGroupCommunicationGroupMemberArgs', 'CommunicationsGroupCommunicationGroupMemberArgsDict']]]] communication_group_members: Group members
         :param pulumi.Input[_builtins.str] communication_type_id: The communication type ID
-        :param pulumi.Input[_builtins.str] condition_type: Condition type. Value must be one of <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`">`any`</span>, <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`">`all`</span>.
+        :param pulumi.Input[_builtins.str] condition_type: Condition type. Value must be one of <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`" pulumi-lang-hcl="`any`">`any`</span>, <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`" pulumi-lang-hcl="`all`">`all`</span>.
         :param pulumi.Input[_builtins.str] description: The description of the communications group
         :param pulumi.Input[_builtins.bool] email_channel: Email channel enabled. Value must be one of true or false
         :param pulumi.Input[_builtins.bool] is_private: Whether the group is private. Value must be one of true or false
@@ -607,7 +607,7 @@ class CommunicationsGroup(pulumi.CustomResource):
     @pulumi.getter(name="conditionType")
     def condition_type(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Condition type. Value must be one of <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`">`any`</span>, <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`">`all`</span>.
+        Condition type. Value must be one of <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`" pulumi-lang-hcl="`any`">`any`</span>, <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`" pulumi-lang-hcl="`all`">`all`</span>.
         """
         return pulumi.get(self, "condition_type")
 
@@ -658,3 +658,4 @@ class CommunicationsGroup(pulumi.CustomResource):
         SMS channel enabled. Value must be one of true or false
         """
         return pulumi.get(self, "sms_channel")
+

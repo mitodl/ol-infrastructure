@@ -1,0 +1,32 @@
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: odlvideo-tls
+  namespace: odl-video-service
+spec:
+  ingressClassName: apache-apisix
+  hosts:
+  - "video.odl.mit.dev"
+  secret:
+    name: local-dev-tls
+    namespace: odl-video-service
+---
+# odl-video-service does not use OIDC (uses Shibboleth in prod; disabled locally)
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: odlvideo-route
+  namespace: odl-video-service
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: public
+    match:
+      hosts:
+      - "video.odl.mit.dev"
+      paths:
+      - "/*"
+    backends:
+    - serviceName: odlvideo-webapp
+      servicePort: 8088

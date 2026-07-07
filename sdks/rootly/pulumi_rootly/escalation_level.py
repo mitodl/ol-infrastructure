@@ -23,12 +23,12 @@ class EscalationLevelArgs:
     def __init__(__self__, *,
                  notification_target_params: pulumi.Input[Sequence[pulumi.Input['EscalationLevelNotificationTargetParamArgs']]],
                  position: pulumi.Input[_builtins.float],
-                 delay: Optional[pulumi.Input[_builtins.float]] = None,
-                 escalation_level_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 escalation_policy_path_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 paging_strategy_configuration_schedule_strategy: Optional[pulumi.Input[_builtins.str]] = None,
-                 paging_strategy_configuration_strategy: Optional[pulumi.Input[_builtins.str]] = None):
+                 delay: pulumi.Input[Optional[_builtins.float]] = None,
+                 escalation_level_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 escalation_policy_path_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 paging_strategy_configuration_schedule_strategy: pulumi.Input[Optional[_builtins.str]] = None,
+                 paging_strategy_configuration_strategy: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a EscalationLevel resource.
 
@@ -37,8 +37,8 @@ class EscalationLevelArgs:
         :param pulumi.Input[_builtins.float] delay: Delay before notifying targets in the next Escalation Level.
         :param pulumi.Input[_builtins.str] escalation_policy_id: The ID of the escalation policy
         :param pulumi.Input[_builtins.str] escalation_policy_path_id: The ID of the dynamic escalation policy path the level will belong to. If nothing is specified it will add the level to your default path.
-        :param pulumi.Input[_builtins.str] paging_strategy_configuration_schedule_strategy: Value must be one of <span pulumi-lang-nodejs="`onCallOnly`" pulumi-lang-dotnet="`OnCallOnly`" pulumi-lang-go="`onCallOnly`" pulumi-lang-python="`on_call_only`" pulumi-lang-yaml="`onCallOnly`" pulumi-lang-java="`onCallOnly`">`on_call_only`</span>, <span pulumi-lang-nodejs="`everyone`" pulumi-lang-dotnet="`Everyone`" pulumi-lang-go="`everyone`" pulumi-lang-python="`everyone`" pulumi-lang-yaml="`everyone`" pulumi-lang-java="`everyone`">`everyone`</span>.
-        :param pulumi.Input[_builtins.str] paging_strategy_configuration_strategy: Value must be one of <span pulumi-lang-nodejs="`default`" pulumi-lang-dotnet="`Default`" pulumi-lang-go="`default`" pulumi-lang-python="`default`" pulumi-lang-yaml="`default`" pulumi-lang-java="`default`">`default`</span>, <span pulumi-lang-nodejs="`random`" pulumi-lang-dotnet="`Random`" pulumi-lang-go="`random`" pulumi-lang-python="`random`" pulumi-lang-yaml="`random`" pulumi-lang-java="`random`">`random`</span>, <span pulumi-lang-nodejs="`cycle`" pulumi-lang-dotnet="`Cycle`" pulumi-lang-go="`cycle`" pulumi-lang-python="`cycle`" pulumi-lang-yaml="`cycle`" pulumi-lang-java="`cycle`">`cycle`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`">`alert`</span>.
+        :param pulumi.Input[_builtins.str] paging_strategy_configuration_schedule_strategy: Value must be one of <span pulumi-lang-nodejs="`onCallOnly`" pulumi-lang-dotnet="`OnCallOnly`" pulumi-lang-go="`onCallOnly`" pulumi-lang-python="`on_call_only`" pulumi-lang-yaml="`onCallOnly`" pulumi-lang-java="`onCallOnly`" pulumi-lang-hcl="`on_call_only`">`onCallOnly`</span>, <span pulumi-lang-nodejs="`everyone`" pulumi-lang-dotnet="`Everyone`" pulumi-lang-go="`everyone`" pulumi-lang-python="`everyone`" pulumi-lang-yaml="`everyone`" pulumi-lang-java="`everyone`" pulumi-lang-hcl="`everyone`">`everyone`</span>.
+        :param pulumi.Input[_builtins.str] paging_strategy_configuration_strategy: Value must be one of <span pulumi-lang-nodejs="`default`" pulumi-lang-dotnet="`Default`" pulumi-lang-go="`default`" pulumi-lang-python="`default`" pulumi-lang-yaml="`default`" pulumi-lang-java="`default`" pulumi-lang-hcl="`default`">`default`</span>, <span pulumi-lang-nodejs="`random`" pulumi-lang-dotnet="`Random`" pulumi-lang-go="`random`" pulumi-lang-python="`random`" pulumi-lang-yaml="`random`" pulumi-lang-java="`random`" pulumi-lang-hcl="`random`">`random`</span>, <span pulumi-lang-nodejs="`cycle`" pulumi-lang-dotnet="`Cycle`" pulumi-lang-go="`cycle`" pulumi-lang-python="`cycle`" pulumi-lang-yaml="`cycle`" pulumi-lang-java="`cycle`" pulumi-lang-hcl="`cycle`">`cycle`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`" pulumi-lang-hcl="`alert`">`alert`</span>.
         """
         pulumi.set(__self__, "notification_target_params", notification_target_params)
         pulumi.set(__self__, "position", position)
@@ -81,85 +81,85 @@ class EscalationLevelArgs:
 
     @_builtins.property
     @pulumi.getter
-    def delay(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def delay(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Delay before notifying targets in the next Escalation Level.
         """
         return pulumi.get(self, "delay")
 
     @delay.setter
-    def delay(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def delay(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "delay", value)
 
     @_builtins.property
     @pulumi.getter(name="escalationLevelId")
-    def escalation_level_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def escalation_level_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "escalation_level_id")
 
     @escalation_level_id.setter
-    def escalation_level_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def escalation_level_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "escalation_level_id", value)
 
     @_builtins.property
     @pulumi.getter(name="escalationPolicyId")
-    def escalation_policy_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def escalation_policy_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The ID of the escalation policy
         """
         return pulumi.get(self, "escalation_policy_id")
 
     @escalation_policy_id.setter
-    def escalation_policy_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def escalation_policy_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "escalation_policy_id", value)
 
     @_builtins.property
     @pulumi.getter(name="escalationPolicyPathId")
-    def escalation_policy_path_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def escalation_policy_path_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The ID of the dynamic escalation policy path the level will belong to. If nothing is specified it will add the level to your default path.
         """
         return pulumi.get(self, "escalation_policy_path_id")
 
     @escalation_policy_path_id.setter
-    def escalation_policy_path_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def escalation_policy_path_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "escalation_policy_path_id", value)
 
     @_builtins.property
     @pulumi.getter(name="pagingStrategyConfigurationScheduleStrategy")
-    def paging_strategy_configuration_schedule_strategy(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def paging_strategy_configuration_schedule_strategy(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`onCallOnly`" pulumi-lang-dotnet="`OnCallOnly`" pulumi-lang-go="`onCallOnly`" pulumi-lang-python="`on_call_only`" pulumi-lang-yaml="`onCallOnly`" pulumi-lang-java="`onCallOnly`">`on_call_only`</span>, <span pulumi-lang-nodejs="`everyone`" pulumi-lang-dotnet="`Everyone`" pulumi-lang-go="`everyone`" pulumi-lang-python="`everyone`" pulumi-lang-yaml="`everyone`" pulumi-lang-java="`everyone`">`everyone`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`onCallOnly`" pulumi-lang-dotnet="`OnCallOnly`" pulumi-lang-go="`onCallOnly`" pulumi-lang-python="`on_call_only`" pulumi-lang-yaml="`onCallOnly`" pulumi-lang-java="`onCallOnly`" pulumi-lang-hcl="`on_call_only`">`onCallOnly`</span>, <span pulumi-lang-nodejs="`everyone`" pulumi-lang-dotnet="`Everyone`" pulumi-lang-go="`everyone`" pulumi-lang-python="`everyone`" pulumi-lang-yaml="`everyone`" pulumi-lang-java="`everyone`" pulumi-lang-hcl="`everyone`">`everyone`</span>.
         """
         return pulumi.get(self, "paging_strategy_configuration_schedule_strategy")
 
     @paging_strategy_configuration_schedule_strategy.setter
-    def paging_strategy_configuration_schedule_strategy(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def paging_strategy_configuration_schedule_strategy(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "paging_strategy_configuration_schedule_strategy", value)
 
     @_builtins.property
     @pulumi.getter(name="pagingStrategyConfigurationStrategy")
-    def paging_strategy_configuration_strategy(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def paging_strategy_configuration_strategy(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`default`" pulumi-lang-dotnet="`Default`" pulumi-lang-go="`default`" pulumi-lang-python="`default`" pulumi-lang-yaml="`default`" pulumi-lang-java="`default`">`default`</span>, <span pulumi-lang-nodejs="`random`" pulumi-lang-dotnet="`Random`" pulumi-lang-go="`random`" pulumi-lang-python="`random`" pulumi-lang-yaml="`random`" pulumi-lang-java="`random`">`random`</span>, <span pulumi-lang-nodejs="`cycle`" pulumi-lang-dotnet="`Cycle`" pulumi-lang-go="`cycle`" pulumi-lang-python="`cycle`" pulumi-lang-yaml="`cycle`" pulumi-lang-java="`cycle`">`cycle`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`">`alert`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`default`" pulumi-lang-dotnet="`Default`" pulumi-lang-go="`default`" pulumi-lang-python="`default`" pulumi-lang-yaml="`default`" pulumi-lang-java="`default`" pulumi-lang-hcl="`default`">`default`</span>, <span pulumi-lang-nodejs="`random`" pulumi-lang-dotnet="`Random`" pulumi-lang-go="`random`" pulumi-lang-python="`random`" pulumi-lang-yaml="`random`" pulumi-lang-java="`random`" pulumi-lang-hcl="`random`">`random`</span>, <span pulumi-lang-nodejs="`cycle`" pulumi-lang-dotnet="`Cycle`" pulumi-lang-go="`cycle`" pulumi-lang-python="`cycle`" pulumi-lang-yaml="`cycle`" pulumi-lang-java="`cycle`" pulumi-lang-hcl="`cycle`">`cycle`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`" pulumi-lang-hcl="`alert`">`alert`</span>.
         """
         return pulumi.get(self, "paging_strategy_configuration_strategy")
 
     @paging_strategy_configuration_strategy.setter
-    def paging_strategy_configuration_strategy(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def paging_strategy_configuration_strategy(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "paging_strategy_configuration_strategy", value)
 
 
 @pulumi.input_type
 class _EscalationLevelState:
     def __init__(__self__, *,
-                 delay: Optional[pulumi.Input[_builtins.float]] = None,
-                 escalation_level_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 escalation_policy_path_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 notification_target_params: Optional[pulumi.Input[Sequence[pulumi.Input['EscalationLevelNotificationTargetParamArgs']]]] = None,
-                 paging_strategy_configuration_schedule_strategy: Optional[pulumi.Input[_builtins.str]] = None,
-                 paging_strategy_configuration_strategy: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None):
+                 delay: pulumi.Input[Optional[_builtins.float]] = None,
+                 escalation_level_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 escalation_policy_path_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 notification_target_params: pulumi.Input[Optional[Sequence[pulumi.Input['EscalationLevelNotificationTargetParamArgs']]]] = None,
+                 paging_strategy_configuration_schedule_strategy: pulumi.Input[Optional[_builtins.str]] = None,
+                 paging_strategy_configuration_strategy: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None):
         """
         Input properties used for looking up and filtering EscalationLevel resources.
 
@@ -167,8 +167,8 @@ class _EscalationLevelState:
         :param pulumi.Input[_builtins.str] escalation_policy_id: The ID of the escalation policy
         :param pulumi.Input[_builtins.str] escalation_policy_path_id: The ID of the dynamic escalation policy path the level will belong to. If nothing is specified it will add the level to your default path.
         :param pulumi.Input[Sequence[pulumi.Input['EscalationLevelNotificationTargetParamArgs']]] notification_target_params: Escalation level's notification targets
-        :param pulumi.Input[_builtins.str] paging_strategy_configuration_schedule_strategy: Value must be one of <span pulumi-lang-nodejs="`onCallOnly`" pulumi-lang-dotnet="`OnCallOnly`" pulumi-lang-go="`onCallOnly`" pulumi-lang-python="`on_call_only`" pulumi-lang-yaml="`onCallOnly`" pulumi-lang-java="`onCallOnly`">`on_call_only`</span>, <span pulumi-lang-nodejs="`everyone`" pulumi-lang-dotnet="`Everyone`" pulumi-lang-go="`everyone`" pulumi-lang-python="`everyone`" pulumi-lang-yaml="`everyone`" pulumi-lang-java="`everyone`">`everyone`</span>.
-        :param pulumi.Input[_builtins.str] paging_strategy_configuration_strategy: Value must be one of <span pulumi-lang-nodejs="`default`" pulumi-lang-dotnet="`Default`" pulumi-lang-go="`default`" pulumi-lang-python="`default`" pulumi-lang-yaml="`default`" pulumi-lang-java="`default`">`default`</span>, <span pulumi-lang-nodejs="`random`" pulumi-lang-dotnet="`Random`" pulumi-lang-go="`random`" pulumi-lang-python="`random`" pulumi-lang-yaml="`random`" pulumi-lang-java="`random`">`random`</span>, <span pulumi-lang-nodejs="`cycle`" pulumi-lang-dotnet="`Cycle`" pulumi-lang-go="`cycle`" pulumi-lang-python="`cycle`" pulumi-lang-yaml="`cycle`" pulumi-lang-java="`cycle`">`cycle`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`">`alert`</span>.
+        :param pulumi.Input[_builtins.str] paging_strategy_configuration_schedule_strategy: Value must be one of <span pulumi-lang-nodejs="`onCallOnly`" pulumi-lang-dotnet="`OnCallOnly`" pulumi-lang-go="`onCallOnly`" pulumi-lang-python="`on_call_only`" pulumi-lang-yaml="`onCallOnly`" pulumi-lang-java="`onCallOnly`" pulumi-lang-hcl="`on_call_only`">`onCallOnly`</span>, <span pulumi-lang-nodejs="`everyone`" pulumi-lang-dotnet="`Everyone`" pulumi-lang-go="`everyone`" pulumi-lang-python="`everyone`" pulumi-lang-yaml="`everyone`" pulumi-lang-java="`everyone`" pulumi-lang-hcl="`everyone`">`everyone`</span>.
+        :param pulumi.Input[_builtins.str] paging_strategy_configuration_strategy: Value must be one of <span pulumi-lang-nodejs="`default`" pulumi-lang-dotnet="`Default`" pulumi-lang-go="`default`" pulumi-lang-python="`default`" pulumi-lang-yaml="`default`" pulumi-lang-java="`default`" pulumi-lang-hcl="`default`">`default`</span>, <span pulumi-lang-nodejs="`random`" pulumi-lang-dotnet="`Random`" pulumi-lang-go="`random`" pulumi-lang-python="`random`" pulumi-lang-yaml="`random`" pulumi-lang-java="`random`" pulumi-lang-hcl="`random`">`random`</span>, <span pulumi-lang-nodejs="`cycle`" pulumi-lang-dotnet="`Cycle`" pulumi-lang-go="`cycle`" pulumi-lang-python="`cycle`" pulumi-lang-yaml="`cycle`" pulumi-lang-java="`cycle`" pulumi-lang-hcl="`cycle`">`cycle`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`" pulumi-lang-hcl="`alert`">`alert`</span>.
         :param pulumi.Input[_builtins.float] position: Position of the escalation policy level
         """
         if delay is not None:
@@ -190,95 +190,95 @@ class _EscalationLevelState:
 
     @_builtins.property
     @pulumi.getter
-    def delay(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def delay(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Delay before notifying targets in the next Escalation Level.
         """
         return pulumi.get(self, "delay")
 
     @delay.setter
-    def delay(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def delay(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "delay", value)
 
     @_builtins.property
     @pulumi.getter(name="escalationLevelId")
-    def escalation_level_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def escalation_level_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "escalation_level_id")
 
     @escalation_level_id.setter
-    def escalation_level_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def escalation_level_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "escalation_level_id", value)
 
     @_builtins.property
     @pulumi.getter(name="escalationPolicyId")
-    def escalation_policy_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def escalation_policy_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The ID of the escalation policy
         """
         return pulumi.get(self, "escalation_policy_id")
 
     @escalation_policy_id.setter
-    def escalation_policy_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def escalation_policy_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "escalation_policy_id", value)
 
     @_builtins.property
     @pulumi.getter(name="escalationPolicyPathId")
-    def escalation_policy_path_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def escalation_policy_path_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The ID of the dynamic escalation policy path the level will belong to. If nothing is specified it will add the level to your default path.
         """
         return pulumi.get(self, "escalation_policy_path_id")
 
     @escalation_policy_path_id.setter
-    def escalation_policy_path_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def escalation_policy_path_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "escalation_policy_path_id", value)
 
     @_builtins.property
     @pulumi.getter(name="notificationTargetParams")
-    def notification_target_params(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['EscalationLevelNotificationTargetParamArgs']]]]:
+    def notification_target_params(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['EscalationLevelNotificationTargetParamArgs']]]]:
         """
         Escalation level's notification targets
         """
         return pulumi.get(self, "notification_target_params")
 
     @notification_target_params.setter
-    def notification_target_params(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['EscalationLevelNotificationTargetParamArgs']]]]):
+    def notification_target_params(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['EscalationLevelNotificationTargetParamArgs']]]]):
         pulumi.set(self, "notification_target_params", value)
 
     @_builtins.property
     @pulumi.getter(name="pagingStrategyConfigurationScheduleStrategy")
-    def paging_strategy_configuration_schedule_strategy(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def paging_strategy_configuration_schedule_strategy(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`onCallOnly`" pulumi-lang-dotnet="`OnCallOnly`" pulumi-lang-go="`onCallOnly`" pulumi-lang-python="`on_call_only`" pulumi-lang-yaml="`onCallOnly`" pulumi-lang-java="`onCallOnly`">`on_call_only`</span>, <span pulumi-lang-nodejs="`everyone`" pulumi-lang-dotnet="`Everyone`" pulumi-lang-go="`everyone`" pulumi-lang-python="`everyone`" pulumi-lang-yaml="`everyone`" pulumi-lang-java="`everyone`">`everyone`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`onCallOnly`" pulumi-lang-dotnet="`OnCallOnly`" pulumi-lang-go="`onCallOnly`" pulumi-lang-python="`on_call_only`" pulumi-lang-yaml="`onCallOnly`" pulumi-lang-java="`onCallOnly`" pulumi-lang-hcl="`on_call_only`">`onCallOnly`</span>, <span pulumi-lang-nodejs="`everyone`" pulumi-lang-dotnet="`Everyone`" pulumi-lang-go="`everyone`" pulumi-lang-python="`everyone`" pulumi-lang-yaml="`everyone`" pulumi-lang-java="`everyone`" pulumi-lang-hcl="`everyone`">`everyone`</span>.
         """
         return pulumi.get(self, "paging_strategy_configuration_schedule_strategy")
 
     @paging_strategy_configuration_schedule_strategy.setter
-    def paging_strategy_configuration_schedule_strategy(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def paging_strategy_configuration_schedule_strategy(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "paging_strategy_configuration_schedule_strategy", value)
 
     @_builtins.property
     @pulumi.getter(name="pagingStrategyConfigurationStrategy")
-    def paging_strategy_configuration_strategy(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def paging_strategy_configuration_strategy(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`default`" pulumi-lang-dotnet="`Default`" pulumi-lang-go="`default`" pulumi-lang-python="`default`" pulumi-lang-yaml="`default`" pulumi-lang-java="`default`">`default`</span>, <span pulumi-lang-nodejs="`random`" pulumi-lang-dotnet="`Random`" pulumi-lang-go="`random`" pulumi-lang-python="`random`" pulumi-lang-yaml="`random`" pulumi-lang-java="`random`">`random`</span>, <span pulumi-lang-nodejs="`cycle`" pulumi-lang-dotnet="`Cycle`" pulumi-lang-go="`cycle`" pulumi-lang-python="`cycle`" pulumi-lang-yaml="`cycle`" pulumi-lang-java="`cycle`">`cycle`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`">`alert`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`default`" pulumi-lang-dotnet="`Default`" pulumi-lang-go="`default`" pulumi-lang-python="`default`" pulumi-lang-yaml="`default`" pulumi-lang-java="`default`" pulumi-lang-hcl="`default`">`default`</span>, <span pulumi-lang-nodejs="`random`" pulumi-lang-dotnet="`Random`" pulumi-lang-go="`random`" pulumi-lang-python="`random`" pulumi-lang-yaml="`random`" pulumi-lang-java="`random`" pulumi-lang-hcl="`random`">`random`</span>, <span pulumi-lang-nodejs="`cycle`" pulumi-lang-dotnet="`Cycle`" pulumi-lang-go="`cycle`" pulumi-lang-python="`cycle`" pulumi-lang-yaml="`cycle`" pulumi-lang-java="`cycle`" pulumi-lang-hcl="`cycle`">`cycle`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`" pulumi-lang-hcl="`alert`">`alert`</span>.
         """
         return pulumi.get(self, "paging_strategy_configuration_strategy")
 
     @paging_strategy_configuration_strategy.setter
-    def paging_strategy_configuration_strategy(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def paging_strategy_configuration_strategy(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "paging_strategy_configuration_strategy", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Position of the escalation policy level
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
 
@@ -288,14 +288,14 @@ class EscalationLevel(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 delay: Optional[pulumi.Input[_builtins.float]] = None,
-                 escalation_level_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 escalation_policy_path_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 notification_target_params: Optional[pulumi.Input[Sequence[pulumi.Input[Union['EscalationLevelNotificationTargetParamArgs', 'EscalationLevelNotificationTargetParamArgsDict']]]]] = None,
-                 paging_strategy_configuration_schedule_strategy: Optional[pulumi.Input[_builtins.str]] = None,
-                 paging_strategy_configuration_strategy: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
+                 delay: pulumi.Input[Optional[_builtins.float]] = None,
+                 escalation_level_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 escalation_policy_path_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 notification_target_params: pulumi.Input[Optional[Sequence[pulumi.Input[Union['EscalationLevelNotificationTargetParamArgs', 'EscalationLevelNotificationTargetParamArgsDict']]]]] = None,
+                 paging_strategy_configuration_schedule_strategy: pulumi.Input[Optional[_builtins.str]] = None,
+                 paging_strategy_configuration_strategy: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         """
         Create a EscalationLevel resource with the given unique name, props, and options.
@@ -306,8 +306,8 @@ class EscalationLevel(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] escalation_policy_id: The ID of the escalation policy
         :param pulumi.Input[_builtins.str] escalation_policy_path_id: The ID of the dynamic escalation policy path the level will belong to. If nothing is specified it will add the level to your default path.
         :param pulumi.Input[Sequence[pulumi.Input[Union['EscalationLevelNotificationTargetParamArgs', 'EscalationLevelNotificationTargetParamArgsDict']]]] notification_target_params: Escalation level's notification targets
-        :param pulumi.Input[_builtins.str] paging_strategy_configuration_schedule_strategy: Value must be one of <span pulumi-lang-nodejs="`onCallOnly`" pulumi-lang-dotnet="`OnCallOnly`" pulumi-lang-go="`onCallOnly`" pulumi-lang-python="`on_call_only`" pulumi-lang-yaml="`onCallOnly`" pulumi-lang-java="`onCallOnly`">`on_call_only`</span>, <span pulumi-lang-nodejs="`everyone`" pulumi-lang-dotnet="`Everyone`" pulumi-lang-go="`everyone`" pulumi-lang-python="`everyone`" pulumi-lang-yaml="`everyone`" pulumi-lang-java="`everyone`">`everyone`</span>.
-        :param pulumi.Input[_builtins.str] paging_strategy_configuration_strategy: Value must be one of <span pulumi-lang-nodejs="`default`" pulumi-lang-dotnet="`Default`" pulumi-lang-go="`default`" pulumi-lang-python="`default`" pulumi-lang-yaml="`default`" pulumi-lang-java="`default`">`default`</span>, <span pulumi-lang-nodejs="`random`" pulumi-lang-dotnet="`Random`" pulumi-lang-go="`random`" pulumi-lang-python="`random`" pulumi-lang-yaml="`random`" pulumi-lang-java="`random`">`random`</span>, <span pulumi-lang-nodejs="`cycle`" pulumi-lang-dotnet="`Cycle`" pulumi-lang-go="`cycle`" pulumi-lang-python="`cycle`" pulumi-lang-yaml="`cycle`" pulumi-lang-java="`cycle`">`cycle`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`">`alert`</span>.
+        :param pulumi.Input[_builtins.str] paging_strategy_configuration_schedule_strategy: Value must be one of <span pulumi-lang-nodejs="`onCallOnly`" pulumi-lang-dotnet="`OnCallOnly`" pulumi-lang-go="`onCallOnly`" pulumi-lang-python="`on_call_only`" pulumi-lang-yaml="`onCallOnly`" pulumi-lang-java="`onCallOnly`" pulumi-lang-hcl="`on_call_only`">`onCallOnly`</span>, <span pulumi-lang-nodejs="`everyone`" pulumi-lang-dotnet="`Everyone`" pulumi-lang-go="`everyone`" pulumi-lang-python="`everyone`" pulumi-lang-yaml="`everyone`" pulumi-lang-java="`everyone`" pulumi-lang-hcl="`everyone`">`everyone`</span>.
+        :param pulumi.Input[_builtins.str] paging_strategy_configuration_strategy: Value must be one of <span pulumi-lang-nodejs="`default`" pulumi-lang-dotnet="`Default`" pulumi-lang-go="`default`" pulumi-lang-python="`default`" pulumi-lang-yaml="`default`" pulumi-lang-java="`default`" pulumi-lang-hcl="`default`">`default`</span>, <span pulumi-lang-nodejs="`random`" pulumi-lang-dotnet="`Random`" pulumi-lang-go="`random`" pulumi-lang-python="`random`" pulumi-lang-yaml="`random`" pulumi-lang-java="`random`" pulumi-lang-hcl="`random`">`random`</span>, <span pulumi-lang-nodejs="`cycle`" pulumi-lang-dotnet="`Cycle`" pulumi-lang-go="`cycle`" pulumi-lang-python="`cycle`" pulumi-lang-yaml="`cycle`" pulumi-lang-java="`cycle`" pulumi-lang-hcl="`cycle`">`cycle`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`" pulumi-lang-hcl="`alert`">`alert`</span>.
         :param pulumi.Input[_builtins.float] position: Position of the escalation policy level
         """
         ...
@@ -334,14 +334,14 @@ class EscalationLevel(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 delay: Optional[pulumi.Input[_builtins.float]] = None,
-                 escalation_level_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 escalation_policy_path_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 notification_target_params: Optional[pulumi.Input[Sequence[pulumi.Input[Union['EscalationLevelNotificationTargetParamArgs', 'EscalationLevelNotificationTargetParamArgsDict']]]]] = None,
-                 paging_strategy_configuration_schedule_strategy: Optional[pulumi.Input[_builtins.str]] = None,
-                 paging_strategy_configuration_strategy: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
+                 delay: pulumi.Input[Optional[_builtins.float]] = None,
+                 escalation_level_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 escalation_policy_path_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 notification_target_params: pulumi.Input[Optional[Sequence[pulumi.Input[Union['EscalationLevelNotificationTargetParamArgs', 'EscalationLevelNotificationTargetParamArgsDict']]]]] = None,
+                 paging_strategy_configuration_schedule_strategy: pulumi.Input[Optional[_builtins.str]] = None,
+                 paging_strategy_configuration_strategy: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -374,14 +374,14 @@ class EscalationLevel(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            delay: Optional[pulumi.Input[_builtins.float]] = None,
-            escalation_level_id: Optional[pulumi.Input[_builtins.str]] = None,
-            escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
-            escalation_policy_path_id: Optional[pulumi.Input[_builtins.str]] = None,
-            notification_target_params: Optional[pulumi.Input[Sequence[pulumi.Input[Union['EscalationLevelNotificationTargetParamArgs', 'EscalationLevelNotificationTargetParamArgsDict']]]]] = None,
-            paging_strategy_configuration_schedule_strategy: Optional[pulumi.Input[_builtins.str]] = None,
-            paging_strategy_configuration_strategy: Optional[pulumi.Input[_builtins.str]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None) -> 'EscalationLevel':
+            delay: pulumi.Input[Optional[_builtins.float]] = None,
+            escalation_level_id: pulumi.Input[Optional[_builtins.str]] = None,
+            escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
+            escalation_policy_path_id: pulumi.Input[Optional[_builtins.str]] = None,
+            notification_target_params: pulumi.Input[Optional[Sequence[pulumi.Input[Union['EscalationLevelNotificationTargetParamArgs', 'EscalationLevelNotificationTargetParamArgsDict']]]]] = None,
+            paging_strategy_configuration_schedule_strategy: pulumi.Input[Optional[_builtins.str]] = None,
+            paging_strategy_configuration_strategy: pulumi.Input[Optional[_builtins.str]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None) -> 'EscalationLevel':
         """
         Get an existing EscalationLevel resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -393,8 +393,8 @@ class EscalationLevel(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] escalation_policy_id: The ID of the escalation policy
         :param pulumi.Input[_builtins.str] escalation_policy_path_id: The ID of the dynamic escalation policy path the level will belong to. If nothing is specified it will add the level to your default path.
         :param pulumi.Input[Sequence[pulumi.Input[Union['EscalationLevelNotificationTargetParamArgs', 'EscalationLevelNotificationTargetParamArgsDict']]]] notification_target_params: Escalation level's notification targets
-        :param pulumi.Input[_builtins.str] paging_strategy_configuration_schedule_strategy: Value must be one of <span pulumi-lang-nodejs="`onCallOnly`" pulumi-lang-dotnet="`OnCallOnly`" pulumi-lang-go="`onCallOnly`" pulumi-lang-python="`on_call_only`" pulumi-lang-yaml="`onCallOnly`" pulumi-lang-java="`onCallOnly`">`on_call_only`</span>, <span pulumi-lang-nodejs="`everyone`" pulumi-lang-dotnet="`Everyone`" pulumi-lang-go="`everyone`" pulumi-lang-python="`everyone`" pulumi-lang-yaml="`everyone`" pulumi-lang-java="`everyone`">`everyone`</span>.
-        :param pulumi.Input[_builtins.str] paging_strategy_configuration_strategy: Value must be one of <span pulumi-lang-nodejs="`default`" pulumi-lang-dotnet="`Default`" pulumi-lang-go="`default`" pulumi-lang-python="`default`" pulumi-lang-yaml="`default`" pulumi-lang-java="`default`">`default`</span>, <span pulumi-lang-nodejs="`random`" pulumi-lang-dotnet="`Random`" pulumi-lang-go="`random`" pulumi-lang-python="`random`" pulumi-lang-yaml="`random`" pulumi-lang-java="`random`">`random`</span>, <span pulumi-lang-nodejs="`cycle`" pulumi-lang-dotnet="`Cycle`" pulumi-lang-go="`cycle`" pulumi-lang-python="`cycle`" pulumi-lang-yaml="`cycle`" pulumi-lang-java="`cycle`">`cycle`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`">`alert`</span>.
+        :param pulumi.Input[_builtins.str] paging_strategy_configuration_schedule_strategy: Value must be one of <span pulumi-lang-nodejs="`onCallOnly`" pulumi-lang-dotnet="`OnCallOnly`" pulumi-lang-go="`onCallOnly`" pulumi-lang-python="`on_call_only`" pulumi-lang-yaml="`onCallOnly`" pulumi-lang-java="`onCallOnly`" pulumi-lang-hcl="`on_call_only`">`onCallOnly`</span>, <span pulumi-lang-nodejs="`everyone`" pulumi-lang-dotnet="`Everyone`" pulumi-lang-go="`everyone`" pulumi-lang-python="`everyone`" pulumi-lang-yaml="`everyone`" pulumi-lang-java="`everyone`" pulumi-lang-hcl="`everyone`">`everyone`</span>.
+        :param pulumi.Input[_builtins.str] paging_strategy_configuration_strategy: Value must be one of <span pulumi-lang-nodejs="`default`" pulumi-lang-dotnet="`Default`" pulumi-lang-go="`default`" pulumi-lang-python="`default`" pulumi-lang-yaml="`default`" pulumi-lang-java="`default`" pulumi-lang-hcl="`default`">`default`</span>, <span pulumi-lang-nodejs="`random`" pulumi-lang-dotnet="`Random`" pulumi-lang-go="`random`" pulumi-lang-python="`random`" pulumi-lang-yaml="`random`" pulumi-lang-java="`random`" pulumi-lang-hcl="`random`">`random`</span>, <span pulumi-lang-nodejs="`cycle`" pulumi-lang-dotnet="`Cycle`" pulumi-lang-go="`cycle`" pulumi-lang-python="`cycle`" pulumi-lang-yaml="`cycle`" pulumi-lang-java="`cycle`" pulumi-lang-hcl="`cycle`">`cycle`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`" pulumi-lang-hcl="`alert`">`alert`</span>.
         :param pulumi.Input[_builtins.float] position: Position of the escalation policy level
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
@@ -452,7 +452,7 @@ class EscalationLevel(pulumi.CustomResource):
     @pulumi.getter(name="pagingStrategyConfigurationScheduleStrategy")
     def paging_strategy_configuration_schedule_strategy(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`onCallOnly`" pulumi-lang-dotnet="`OnCallOnly`" pulumi-lang-go="`onCallOnly`" pulumi-lang-python="`on_call_only`" pulumi-lang-yaml="`onCallOnly`" pulumi-lang-java="`onCallOnly`">`on_call_only`</span>, <span pulumi-lang-nodejs="`everyone`" pulumi-lang-dotnet="`Everyone`" pulumi-lang-go="`everyone`" pulumi-lang-python="`everyone`" pulumi-lang-yaml="`everyone`" pulumi-lang-java="`everyone`">`everyone`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`onCallOnly`" pulumi-lang-dotnet="`OnCallOnly`" pulumi-lang-go="`onCallOnly`" pulumi-lang-python="`on_call_only`" pulumi-lang-yaml="`onCallOnly`" pulumi-lang-java="`onCallOnly`" pulumi-lang-hcl="`on_call_only`">`onCallOnly`</span>, <span pulumi-lang-nodejs="`everyone`" pulumi-lang-dotnet="`Everyone`" pulumi-lang-go="`everyone`" pulumi-lang-python="`everyone`" pulumi-lang-yaml="`everyone`" pulumi-lang-java="`everyone`" pulumi-lang-hcl="`everyone`">`everyone`</span>.
         """
         return pulumi.get(self, "paging_strategy_configuration_schedule_strategy")
 
@@ -460,7 +460,7 @@ class EscalationLevel(pulumi.CustomResource):
     @pulumi.getter(name="pagingStrategyConfigurationStrategy")
     def paging_strategy_configuration_strategy(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`default`" pulumi-lang-dotnet="`Default`" pulumi-lang-go="`default`" pulumi-lang-python="`default`" pulumi-lang-yaml="`default`" pulumi-lang-java="`default`">`default`</span>, <span pulumi-lang-nodejs="`random`" pulumi-lang-dotnet="`Random`" pulumi-lang-go="`random`" pulumi-lang-python="`random`" pulumi-lang-yaml="`random`" pulumi-lang-java="`random`">`random`</span>, <span pulumi-lang-nodejs="`cycle`" pulumi-lang-dotnet="`Cycle`" pulumi-lang-go="`cycle`" pulumi-lang-python="`cycle`" pulumi-lang-yaml="`cycle`" pulumi-lang-java="`cycle`">`cycle`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`">`alert`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`default`" pulumi-lang-dotnet="`Default`" pulumi-lang-go="`default`" pulumi-lang-python="`default`" pulumi-lang-yaml="`default`" pulumi-lang-java="`default`" pulumi-lang-hcl="`default`">`default`</span>, <span pulumi-lang-nodejs="`random`" pulumi-lang-dotnet="`Random`" pulumi-lang-go="`random`" pulumi-lang-python="`random`" pulumi-lang-yaml="`random`" pulumi-lang-java="`random`" pulumi-lang-hcl="`random`">`random`</span>, <span pulumi-lang-nodejs="`cycle`" pulumi-lang-dotnet="`Cycle`" pulumi-lang-go="`cycle`" pulumi-lang-python="`cycle`" pulumi-lang-yaml="`cycle`" pulumi-lang-java="`cycle`" pulumi-lang-hcl="`cycle`">`cycle`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`" pulumi-lang-hcl="`alert`">`alert`</span>.
         """
         return pulumi.get(self, "paging_strategy_configuration_strategy")
 
@@ -471,3 +471,4 @@ class EscalationLevel(pulumi.CustomResource):
         Position of the escalation policy level
         """
         return pulumi.get(self, "position")
+

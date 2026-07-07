@@ -21,13 +21,13 @@ __all__ = ['CatalogEntityArgs', 'CatalogEntity']
 @pulumi.input_type
 class CatalogEntityArgs:
     def __init__(__self__, *,
-                 backstage_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 catalog_entity_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 properties: Optional[pulumi.Input[Sequence[pulumi.Input['CatalogEntityPropertyArgs']]]] = None):
+                 backstage_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 catalog_entity_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 properties: pulumi.Input[Optional[Sequence[pulumi.Input['CatalogEntityPropertyArgs']]]] = None):
         """
         The set of arguments for constructing a CatalogEntity resource.
 
@@ -53,90 +53,90 @@ class CatalogEntityArgs:
 
     @_builtins.property
     @pulumi.getter(name="backstageId")
-    def backstage_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def backstage_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Backstage entity ID this catalog entity is linked to.
         """
         return pulumi.get(self, "backstage_id")
 
     @backstage_id.setter
-    def backstage_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def backstage_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "backstage_id", value)
 
     @_builtins.property
     @pulumi.getter(name="catalogEntityId")
-    def catalog_entity_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def catalog_entity_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "catalog_entity_id")
 
     @catalog_entity_id.setter
-    def catalog_entity_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def catalog_entity_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "catalog_entity_id", value)
 
     @_builtins.property
     @pulumi.getter(name="catalogId")
-    def catalog_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def catalog_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The ID of the parent catalog
         """
         return pulumi.get(self, "catalog_id")
 
     @catalog_id.setter
-    def catalog_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def catalog_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "catalog_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Default position of the item when displayed in a list.
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter
-    def properties(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['CatalogEntityPropertyArgs']]]]:
+    def properties(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['CatalogEntityPropertyArgs']]]]:
         """
         Array of property values for this catalog entity
         """
         return pulumi.get(self, "properties")
 
     @properties.setter
-    def properties(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['CatalogEntityPropertyArgs']]]]):
+    def properties(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['CatalogEntityPropertyArgs']]]]):
         pulumi.set(self, "properties", value)
 
 
 @pulumi.input_type
 class _CatalogEntityState:
     def __init__(__self__, *,
-                 backstage_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 catalog_entity_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 properties: Optional[pulumi.Input[Sequence[pulumi.Input['CatalogEntityPropertyArgs']]]] = None):
+                 backstage_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 catalog_entity_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 properties: pulumi.Input[Optional[Sequence[pulumi.Input['CatalogEntityPropertyArgs']]]] = None):
         """
         Input properties used for looking up and filtering CatalogEntity resources.
 
@@ -162,77 +162,77 @@ class _CatalogEntityState:
 
     @_builtins.property
     @pulumi.getter(name="backstageId")
-    def backstage_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def backstage_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Backstage entity ID this catalog entity is linked to.
         """
         return pulumi.get(self, "backstage_id")
 
     @backstage_id.setter
-    def backstage_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def backstage_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "backstage_id", value)
 
     @_builtins.property
     @pulumi.getter(name="catalogEntityId")
-    def catalog_entity_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def catalog_entity_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "catalog_entity_id")
 
     @catalog_entity_id.setter
-    def catalog_entity_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def catalog_entity_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "catalog_entity_id", value)
 
     @_builtins.property
     @pulumi.getter(name="catalogId")
-    def catalog_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def catalog_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The ID of the parent catalog
         """
         return pulumi.get(self, "catalog_id")
 
     @catalog_id.setter
-    def catalog_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def catalog_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "catalog_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Default position of the item when displayed in a list.
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter
-    def properties(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['CatalogEntityPropertyArgs']]]]:
+    def properties(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['CatalogEntityPropertyArgs']]]]:
         """
         Array of property values for this catalog entity
         """
         return pulumi.get(self, "properties")
 
     @properties.setter
-    def properties(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['CatalogEntityPropertyArgs']]]]):
+    def properties(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['CatalogEntityPropertyArgs']]]]):
         pulumi.set(self, "properties", value)
 
 
@@ -242,13 +242,13 @@ class CatalogEntity(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 backstage_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 catalog_entity_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 properties: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CatalogEntityPropertyArgs', 'CatalogEntityPropertyArgsDict']]]]] = None,
+                 backstage_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 catalog_entity_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 properties: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CatalogEntityPropertyArgs', 'CatalogEntityPropertyArgsDict']]]]] = None,
                  __props__=None):
         """
         Create a CatalogEntity resource with the given unique name, props, and options.
@@ -284,13 +284,13 @@ class CatalogEntity(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 backstage_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 catalog_entity_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 properties: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CatalogEntityPropertyArgs', 'CatalogEntityPropertyArgsDict']]]]] = None,
+                 backstage_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 catalog_entity_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 properties: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CatalogEntityPropertyArgs', 'CatalogEntityPropertyArgsDict']]]]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -318,13 +318,13 @@ class CatalogEntity(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            backstage_id: Optional[pulumi.Input[_builtins.str]] = None,
-            catalog_entity_id: Optional[pulumi.Input[_builtins.str]] = None,
-            catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None,
-            properties: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CatalogEntityPropertyArgs', 'CatalogEntityPropertyArgsDict']]]]] = None) -> 'CatalogEntity':
+            backstage_id: pulumi.Input[Optional[_builtins.str]] = None,
+            catalog_entity_id: pulumi.Input[Optional[_builtins.str]] = None,
+            catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None,
+            properties: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CatalogEntityPropertyArgs', 'CatalogEntityPropertyArgsDict']]]]] = None) -> 'CatalogEntity':
         """
         Get an existing CatalogEntity resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -396,3 +396,4 @@ class CatalogEntity(pulumi.CustomResource):
         Array of property values for this catalog entity
         """
         return pulumi.get(self, "properties")
+

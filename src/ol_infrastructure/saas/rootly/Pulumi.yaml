@@ -1,0 +1,12 @@
+---
+name: ol-saas-rootly
+runtime: python
+description: Management of Rootly incident management resources
+backend:
+  url: s3://mitol-pulumi-state/
+packages:
+  rootly:
+    source: terraform-provider
+    parameters:
+    - registry.opentofu.org/rootlyhq/rootly
+    - 5.16.1

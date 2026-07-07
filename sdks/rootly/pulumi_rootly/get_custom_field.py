@@ -116,11 +116,11 @@ def get_custom_field(created_at: Optional[Mapping[str, _builtins.str]] = None,
         kind=pulumi.get(__ret__, 'kind'),
         label=pulumi.get(__ret__, 'label'),
         slug=pulumi.get(__ret__, 'slug'))
-def get_custom_field_output(created_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
-                            enabled: Optional[pulumi.Input[Optional[_builtins.bool]]] = None,
-                            kind: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                            label: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                            slug: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_custom_field_output(created_at: pulumi.Input[Optional[Optional[Mapping[str, _builtins.str]]]] = None,
+                            enabled: pulumi.Input[Optional[Optional[_builtins.bool]]] = None,
+                            kind: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                            label: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                            slug: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                             opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetCustomFieldResult]:
     """
     Use this data source to access information about an existing resource.

@@ -21,38 +21,38 @@ __all__ = ['WorkflowActionItemArgs', 'WorkflowActionItem']
 @pulumi.input_type
 class WorkflowActionItemArgs:
     def __init__(__self__, *,
-                 cause_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 command: Optional[pulumi.Input[_builtins.str]] = None,
-                 command_feedback_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 continuously_repeat: Optional[pulumi.Input[_builtins.bool]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 incident_role_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 locked: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 repeat_condition_duration_since_first_run: Optional[pulumi.Input[_builtins.str]] = None,
-                 repeat_condition_number_of_repeats: Optional[pulumi.Input[_builtins.float]] = None,
-                 repeat_every_duration: Optional[pulumi.Input[_builtins.str]] = None,
-                 repeat_ons: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 severity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 sub_status_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 trigger_params: Optional[pulumi.Input['WorkflowActionItemTriggerParamsArgs']] = None,
-                 wait: Optional[pulumi.Input[_builtins.str]] = None,
-                 workflow_action_item_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 workflow_group_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 cause_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 command: pulumi.Input[Optional[_builtins.str]] = None,
+                 command_feedback_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 continuously_repeat: pulumi.Input[Optional[_builtins.bool]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 environment_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 functionality_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 incident_role_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 incident_type_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 locked: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 repeat_condition_duration_since_first_run: pulumi.Input[Optional[_builtins.str]] = None,
+                 repeat_condition_number_of_repeats: pulumi.Input[Optional[_builtins.float]] = None,
+                 repeat_every_duration: pulumi.Input[Optional[_builtins.str]] = None,
+                 repeat_ons: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 severity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 sub_status_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 trigger_params: pulumi.Input[Optional['WorkflowActionItemTriggerParamsArgs']] = None,
+                 wait: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_action_item_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_group_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a WorkflowActionItem resource.
 
         :param pulumi.Input[_builtins.str] command: Workflow command
         :param pulumi.Input[_builtins.bool] command_feedback_enabled: This will notify you back when the workflow is starting. Value must be one of true or false
-        :param pulumi.Input[_builtins.bool] continuously_repeat: When continuously repeat is true, repeat workflows aren't automatically stopped when conditions aren't met. This setting won't override your conditions set by<span pulumi-lang-nodejs=" repeatConditionDurationSinceFirstRun " pulumi-lang-dotnet=" RepeatConditionDurationSinceFirstRun " pulumi-lang-go=" repeatConditionDurationSinceFirstRun " pulumi-lang-python=" repeat_condition_duration_since_first_run " pulumi-lang-yaml=" repeatConditionDurationSinceFirstRun " pulumi-lang-java=" repeatConditionDurationSinceFirstRun "> repeat_condition_duration_since_first_run </span>and<span pulumi-lang-nodejs=" repeatConditionNumberOfRepeats " pulumi-lang-dotnet=" RepeatConditionNumberOfRepeats " pulumi-lang-go=" repeatConditionNumberOfRepeats " pulumi-lang-python=" repeat_condition_number_of_repeats " pulumi-lang-yaml=" repeatConditionNumberOfRepeats " pulumi-lang-java=" repeatConditionNumberOfRepeats "> repeat_condition_number_of_repeats </span>parameters.. Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] continuously_repeat: When continuously repeat is true, repeat workflows aren't automatically stopped when conditions aren't met. This setting won't override your conditions set by<span pulumi-lang-nodejs=" repeatConditionDurationSinceFirstRun " pulumi-lang-dotnet=" RepeatConditionDurationSinceFirstRun " pulumi-lang-go=" repeatConditionDurationSinceFirstRun " pulumi-lang-python=" repeat_condition_duration_since_first_run " pulumi-lang-yaml=" repeatConditionDurationSinceFirstRun " pulumi-lang-java=" repeatConditionDurationSinceFirstRun " pulumi-lang-hcl=" repeat_condition_duration_since_first_run "> repeatConditionDurationSinceFirstRun </span>and<span pulumi-lang-nodejs=" repeatConditionNumberOfRepeats " pulumi-lang-dotnet=" RepeatConditionNumberOfRepeats " pulumi-lang-go=" repeatConditionNumberOfRepeats " pulumi-lang-python=" repeat_condition_number_of_repeats " pulumi-lang-yaml=" repeatConditionNumberOfRepeats " pulumi-lang-java=" repeatConditionNumberOfRepeats " pulumi-lang-hcl=" repeat_condition_number_of_repeats "> repeatConditionNumberOfRepeats </span>parameters.. Value must be one of true or false
         :param pulumi.Input[_builtins.str] description: The description of the workflow
         :param pulumi.Input[_builtins.bool] locked: Restricts workflow edits to admins when turned on. Only admins can set this field.. Value must be one of true or false
         :param pulumi.Input[_builtins.str] name: The title of the workflow
@@ -120,316 +120,316 @@ class WorkflowActionItemArgs:
 
     @_builtins.property
     @pulumi.getter(name="causeIds")
-    def cause_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def cause_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "cause_ids")
 
     @cause_ids.setter
-    def cause_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def cause_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "cause_ids", value)
 
     @_builtins.property
     @pulumi.getter
-    def command(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def command(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Workflow command
         """
         return pulumi.get(self, "command")
 
     @command.setter
-    def command(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def command(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "command", value)
 
     @_builtins.property
     @pulumi.getter(name="commandFeedbackEnabled")
-    def command_feedback_enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def command_feedback_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         This will notify you back when the workflow is starting. Value must be one of true or false
         """
         return pulumi.get(self, "command_feedback_enabled")
 
     @command_feedback_enabled.setter
-    def command_feedback_enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def command_feedback_enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "command_feedback_enabled", value)
 
     @_builtins.property
     @pulumi.getter(name="continuouslyRepeat")
-    def continuously_repeat(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def continuously_repeat(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        When continuously repeat is true, repeat workflows aren't automatically stopped when conditions aren't met. This setting won't override your conditions set by<span pulumi-lang-nodejs=" repeatConditionDurationSinceFirstRun " pulumi-lang-dotnet=" RepeatConditionDurationSinceFirstRun " pulumi-lang-go=" repeatConditionDurationSinceFirstRun " pulumi-lang-python=" repeat_condition_duration_since_first_run " pulumi-lang-yaml=" repeatConditionDurationSinceFirstRun " pulumi-lang-java=" repeatConditionDurationSinceFirstRun "> repeat_condition_duration_since_first_run </span>and<span pulumi-lang-nodejs=" repeatConditionNumberOfRepeats " pulumi-lang-dotnet=" RepeatConditionNumberOfRepeats " pulumi-lang-go=" repeatConditionNumberOfRepeats " pulumi-lang-python=" repeat_condition_number_of_repeats " pulumi-lang-yaml=" repeatConditionNumberOfRepeats " pulumi-lang-java=" repeatConditionNumberOfRepeats "> repeat_condition_number_of_repeats </span>parameters.. Value must be one of true or false
+        When continuously repeat is true, repeat workflows aren't automatically stopped when conditions aren't met. This setting won't override your conditions set by<span pulumi-lang-nodejs=" repeatConditionDurationSinceFirstRun " pulumi-lang-dotnet=" RepeatConditionDurationSinceFirstRun " pulumi-lang-go=" repeatConditionDurationSinceFirstRun " pulumi-lang-python=" repeat_condition_duration_since_first_run " pulumi-lang-yaml=" repeatConditionDurationSinceFirstRun " pulumi-lang-java=" repeatConditionDurationSinceFirstRun " pulumi-lang-hcl=" repeat_condition_duration_since_first_run "> repeatConditionDurationSinceFirstRun </span>and<span pulumi-lang-nodejs=" repeatConditionNumberOfRepeats " pulumi-lang-dotnet=" RepeatConditionNumberOfRepeats " pulumi-lang-go=" repeatConditionNumberOfRepeats " pulumi-lang-python=" repeat_condition_number_of_repeats " pulumi-lang-yaml=" repeatConditionNumberOfRepeats " pulumi-lang-java=" repeatConditionNumberOfRepeats " pulumi-lang-hcl=" repeat_condition_number_of_repeats "> repeatConditionNumberOfRepeats </span>parameters.. Value must be one of true or false
         """
         return pulumi.get(self, "continuously_repeat")
 
     @continuously_repeat.setter
-    def continuously_repeat(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def continuously_repeat(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "continuously_repeat", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the workflow
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter
-    def enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         return pulumi.get(self, "enabled")
 
     @enabled.setter
-    def enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "enabled", value)
 
     @_builtins.property
     @pulumi.getter(name="environmentIds")
-    def environment_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def environment_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "environment_ids")
 
     @environment_ids.setter
-    def environment_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def environment_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "environment_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="functionalityIds")
-    def functionality_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def functionality_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "functionality_ids")
 
     @functionality_ids.setter
-    def functionality_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def functionality_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "functionality_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="groupIds")
-    def group_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def group_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "group_ids")
 
     @group_ids.setter
-    def group_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def group_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "group_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentRoleIds")
-    def incident_role_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def incident_role_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "incident_role_ids")
 
     @incident_role_ids.setter
-    def incident_role_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def incident_role_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "incident_role_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentTypeIds")
-    def incident_type_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def incident_type_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "incident_type_ids")
 
     @incident_type_ids.setter
-    def incident_type_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def incident_type_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "incident_type_ids", value)
 
     @_builtins.property
     @pulumi.getter
-    def locked(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def locked(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Restricts workflow edits to admins when turned on. Only admins can set this field.. Value must be one of true or false
         """
         return pulumi.get(self, "locked")
 
     @locked.setter
-    def locked(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def locked(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "locked", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The title of the workflow
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The order which the workflow should run with other workflows.
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter(name="repeatConditionDurationSinceFirstRun")
-    def repeat_condition_duration_since_first_run(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def repeat_condition_duration_since_first_run(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The workflow will stop repeating if its runtime since it's first workflow run exceeds the duration set in this field
         """
         return pulumi.get(self, "repeat_condition_duration_since_first_run")
 
     @repeat_condition_duration_since_first_run.setter
-    def repeat_condition_duration_since_first_run(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def repeat_condition_duration_since_first_run(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "repeat_condition_duration_since_first_run", value)
 
     @_builtins.property
     @pulumi.getter(name="repeatConditionNumberOfRepeats")
-    def repeat_condition_number_of_repeats(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def repeat_condition_number_of_repeats(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The workflow will stop repeating if the number of repeats exceeds the value set in this field
         """
         return pulumi.get(self, "repeat_condition_number_of_repeats")
 
     @repeat_condition_number_of_repeats.setter
-    def repeat_condition_number_of_repeats(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def repeat_condition_number_of_repeats(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "repeat_condition_number_of_repeats", value)
 
     @_builtins.property
     @pulumi.getter(name="repeatEveryDuration")
-    def repeat_every_duration(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def repeat_every_duration(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Repeat workflow every duration
         """
         return pulumi.get(self, "repeat_every_duration")
 
     @repeat_every_duration.setter
-    def repeat_every_duration(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def repeat_every_duration(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "repeat_every_duration", value)
 
     @_builtins.property
     @pulumi.getter(name="repeatOns")
-    def repeat_ons(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def repeat_ons(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Repeat on weekdays. Value must be one of `S`, `M`, `T`, `W`, `R`, `F`, `U`.
         """
         return pulumi.get(self, "repeat_ons")
 
     @repeat_ons.setter
-    def repeat_ons(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def repeat_ons(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "repeat_ons", value)
 
     @_builtins.property
     @pulumi.getter(name="serviceIds")
-    def service_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def service_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "service_ids")
 
     @service_ids.setter
-    def service_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def service_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "service_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="severityIds")
-    def severity_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def severity_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "severity_ids")
 
     @severity_ids.setter
-    def severity_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def severity_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "severity_ids", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The slug of the workflow
         """
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
     @_builtins.property
     @pulumi.getter(name="subStatusIds")
-    def sub_status_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def sub_status_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "sub_status_ids")
 
     @sub_status_ids.setter
-    def sub_status_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def sub_status_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "sub_status_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="triggerParams")
-    def trigger_params(self) -> Optional[pulumi.Input['WorkflowActionItemTriggerParamsArgs']]:
+    def trigger_params(self) -> pulumi.Input[Optional['WorkflowActionItemTriggerParamsArgs']]:
         return pulumi.get(self, "trigger_params")
 
     @trigger_params.setter
-    def trigger_params(self, value: Optional[pulumi.Input['WorkflowActionItemTriggerParamsArgs']]):
+    def trigger_params(self, value: pulumi.Input[Optional['WorkflowActionItemTriggerParamsArgs']]):
         pulumi.set(self, "trigger_params", value)
 
     @_builtins.property
     @pulumi.getter
-    def wait(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def wait(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Wait this duration before executing
         """
         return pulumi.get(self, "wait")
 
     @wait.setter
-    def wait(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def wait(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "wait", value)
 
     @_builtins.property
     @pulumi.getter(name="workflowActionItemId")
-    def workflow_action_item_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def workflow_action_item_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "workflow_action_item_id")
 
     @workflow_action_item_id.setter
-    def workflow_action_item_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def workflow_action_item_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "workflow_action_item_id", value)
 
     @_builtins.property
     @pulumi.getter(name="workflowGroupId")
-    def workflow_group_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def workflow_group_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The group this workflow belongs to.
         """
         return pulumi.get(self, "workflow_group_id")
 
     @workflow_group_id.setter
-    def workflow_group_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def workflow_group_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "workflow_group_id", value)
 
 
 @pulumi.input_type
 class _WorkflowActionItemState:
     def __init__(__self__, *,
-                 cause_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 command: Optional[pulumi.Input[_builtins.str]] = None,
-                 command_feedback_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 continuously_repeat: Optional[pulumi.Input[_builtins.bool]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 incident_role_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 locked: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 repeat_condition_duration_since_first_run: Optional[pulumi.Input[_builtins.str]] = None,
-                 repeat_condition_number_of_repeats: Optional[pulumi.Input[_builtins.float]] = None,
-                 repeat_every_duration: Optional[pulumi.Input[_builtins.str]] = None,
-                 repeat_ons: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 severity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 sub_status_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 trigger_params: Optional[pulumi.Input['WorkflowActionItemTriggerParamsArgs']] = None,
-                 wait: Optional[pulumi.Input[_builtins.str]] = None,
-                 workflow_action_item_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 workflow_group_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 cause_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 command: pulumi.Input[Optional[_builtins.str]] = None,
+                 command_feedback_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 continuously_repeat: pulumi.Input[Optional[_builtins.bool]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 environment_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 functionality_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 incident_role_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 incident_type_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 locked: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 repeat_condition_duration_since_first_run: pulumi.Input[Optional[_builtins.str]] = None,
+                 repeat_condition_number_of_repeats: pulumi.Input[Optional[_builtins.float]] = None,
+                 repeat_every_duration: pulumi.Input[Optional[_builtins.str]] = None,
+                 repeat_ons: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 severity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 sub_status_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 trigger_params: pulumi.Input[Optional['WorkflowActionItemTriggerParamsArgs']] = None,
+                 wait: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_action_item_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_group_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering WorkflowActionItem resources.
 
         :param pulumi.Input[_builtins.str] command: Workflow command
         :param pulumi.Input[_builtins.bool] command_feedback_enabled: This will notify you back when the workflow is starting. Value must be one of true or false
-        :param pulumi.Input[_builtins.bool] continuously_repeat: When continuously repeat is true, repeat workflows aren't automatically stopped when conditions aren't met. This setting won't override your conditions set by<span pulumi-lang-nodejs=" repeatConditionDurationSinceFirstRun " pulumi-lang-dotnet=" RepeatConditionDurationSinceFirstRun " pulumi-lang-go=" repeatConditionDurationSinceFirstRun " pulumi-lang-python=" repeat_condition_duration_since_first_run " pulumi-lang-yaml=" repeatConditionDurationSinceFirstRun " pulumi-lang-java=" repeatConditionDurationSinceFirstRun "> repeat_condition_duration_since_first_run </span>and<span pulumi-lang-nodejs=" repeatConditionNumberOfRepeats " pulumi-lang-dotnet=" RepeatConditionNumberOfRepeats " pulumi-lang-go=" repeatConditionNumberOfRepeats " pulumi-lang-python=" repeat_condition_number_of_repeats " pulumi-lang-yaml=" repeatConditionNumberOfRepeats " pulumi-lang-java=" repeatConditionNumberOfRepeats "> repeat_condition_number_of_repeats </span>parameters.. Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] continuously_repeat: When continuously repeat is true, repeat workflows aren't automatically stopped when conditions aren't met. This setting won't override your conditions set by<span pulumi-lang-nodejs=" repeatConditionDurationSinceFirstRun " pulumi-lang-dotnet=" RepeatConditionDurationSinceFirstRun " pulumi-lang-go=" repeatConditionDurationSinceFirstRun " pulumi-lang-python=" repeat_condition_duration_since_first_run " pulumi-lang-yaml=" repeatConditionDurationSinceFirstRun " pulumi-lang-java=" repeatConditionDurationSinceFirstRun " pulumi-lang-hcl=" repeat_condition_duration_since_first_run "> repeatConditionDurationSinceFirstRun </span>and<span pulumi-lang-nodejs=" repeatConditionNumberOfRepeats " pulumi-lang-dotnet=" RepeatConditionNumberOfRepeats " pulumi-lang-go=" repeatConditionNumberOfRepeats " pulumi-lang-python=" repeat_condition_number_of_repeats " pulumi-lang-yaml=" repeatConditionNumberOfRepeats " pulumi-lang-java=" repeatConditionNumberOfRepeats " pulumi-lang-hcl=" repeat_condition_number_of_repeats "> repeatConditionNumberOfRepeats </span>parameters.. Value must be one of true or false
         :param pulumi.Input[_builtins.str] description: The description of the workflow
         :param pulumi.Input[_builtins.bool] locked: Restricts workflow edits to admins when turned on. Only admins can set this field.. Value must be one of true or false
         :param pulumi.Input[_builtins.str] name: The title of the workflow
@@ -497,278 +497,278 @@ class _WorkflowActionItemState:
 
     @_builtins.property
     @pulumi.getter(name="causeIds")
-    def cause_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def cause_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "cause_ids")
 
     @cause_ids.setter
-    def cause_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def cause_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "cause_ids", value)
 
     @_builtins.property
     @pulumi.getter
-    def command(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def command(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Workflow command
         """
         return pulumi.get(self, "command")
 
     @command.setter
-    def command(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def command(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "command", value)
 
     @_builtins.property
     @pulumi.getter(name="commandFeedbackEnabled")
-    def command_feedback_enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def command_feedback_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         This will notify you back when the workflow is starting. Value must be one of true or false
         """
         return pulumi.get(self, "command_feedback_enabled")
 
     @command_feedback_enabled.setter
-    def command_feedback_enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def command_feedback_enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "command_feedback_enabled", value)
 
     @_builtins.property
     @pulumi.getter(name="continuouslyRepeat")
-    def continuously_repeat(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def continuously_repeat(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        When continuously repeat is true, repeat workflows aren't automatically stopped when conditions aren't met. This setting won't override your conditions set by<span pulumi-lang-nodejs=" repeatConditionDurationSinceFirstRun " pulumi-lang-dotnet=" RepeatConditionDurationSinceFirstRun " pulumi-lang-go=" repeatConditionDurationSinceFirstRun " pulumi-lang-python=" repeat_condition_duration_since_first_run " pulumi-lang-yaml=" repeatConditionDurationSinceFirstRun " pulumi-lang-java=" repeatConditionDurationSinceFirstRun "> repeat_condition_duration_since_first_run </span>and<span pulumi-lang-nodejs=" repeatConditionNumberOfRepeats " pulumi-lang-dotnet=" RepeatConditionNumberOfRepeats " pulumi-lang-go=" repeatConditionNumberOfRepeats " pulumi-lang-python=" repeat_condition_number_of_repeats " pulumi-lang-yaml=" repeatConditionNumberOfRepeats " pulumi-lang-java=" repeatConditionNumberOfRepeats "> repeat_condition_number_of_repeats </span>parameters.. Value must be one of true or false
+        When continuously repeat is true, repeat workflows aren't automatically stopped when conditions aren't met. This setting won't override your conditions set by<span pulumi-lang-nodejs=" repeatConditionDurationSinceFirstRun " pulumi-lang-dotnet=" RepeatConditionDurationSinceFirstRun " pulumi-lang-go=" repeatConditionDurationSinceFirstRun " pulumi-lang-python=" repeat_condition_duration_since_first_run " pulumi-lang-yaml=" repeatConditionDurationSinceFirstRun " pulumi-lang-java=" repeatConditionDurationSinceFirstRun " pulumi-lang-hcl=" repeat_condition_duration_since_first_run "> repeatConditionDurationSinceFirstRun </span>and<span pulumi-lang-nodejs=" repeatConditionNumberOfRepeats " pulumi-lang-dotnet=" RepeatConditionNumberOfRepeats " pulumi-lang-go=" repeatConditionNumberOfRepeats " pulumi-lang-python=" repeat_condition_number_of_repeats " pulumi-lang-yaml=" repeatConditionNumberOfRepeats " pulumi-lang-java=" repeatConditionNumberOfRepeats " pulumi-lang-hcl=" repeat_condition_number_of_repeats "> repeatConditionNumberOfRepeats </span>parameters.. Value must be one of true or false
         """
         return pulumi.get(self, "continuously_repeat")
 
     @continuously_repeat.setter
-    def continuously_repeat(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def continuously_repeat(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "continuously_repeat", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the workflow
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter
-    def enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         return pulumi.get(self, "enabled")
 
     @enabled.setter
-    def enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "enabled", value)
 
     @_builtins.property
     @pulumi.getter(name="environmentIds")
-    def environment_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def environment_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "environment_ids")
 
     @environment_ids.setter
-    def environment_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def environment_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "environment_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="functionalityIds")
-    def functionality_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def functionality_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "functionality_ids")
 
     @functionality_ids.setter
-    def functionality_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def functionality_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "functionality_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="groupIds")
-    def group_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def group_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "group_ids")
 
     @group_ids.setter
-    def group_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def group_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "group_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentRoleIds")
-    def incident_role_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def incident_role_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "incident_role_ids")
 
     @incident_role_ids.setter
-    def incident_role_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def incident_role_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "incident_role_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentTypeIds")
-    def incident_type_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def incident_type_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "incident_type_ids")
 
     @incident_type_ids.setter
-    def incident_type_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def incident_type_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "incident_type_ids", value)
 
     @_builtins.property
     @pulumi.getter
-    def locked(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def locked(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Restricts workflow edits to admins when turned on. Only admins can set this field.. Value must be one of true or false
         """
         return pulumi.get(self, "locked")
 
     @locked.setter
-    def locked(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def locked(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "locked", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The title of the workflow
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The order which the workflow should run with other workflows.
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter(name="repeatConditionDurationSinceFirstRun")
-    def repeat_condition_duration_since_first_run(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def repeat_condition_duration_since_first_run(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The workflow will stop repeating if its runtime since it's first workflow run exceeds the duration set in this field
         """
         return pulumi.get(self, "repeat_condition_duration_since_first_run")
 
     @repeat_condition_duration_since_first_run.setter
-    def repeat_condition_duration_since_first_run(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def repeat_condition_duration_since_first_run(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "repeat_condition_duration_since_first_run", value)
 
     @_builtins.property
     @pulumi.getter(name="repeatConditionNumberOfRepeats")
-    def repeat_condition_number_of_repeats(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def repeat_condition_number_of_repeats(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The workflow will stop repeating if the number of repeats exceeds the value set in this field
         """
         return pulumi.get(self, "repeat_condition_number_of_repeats")
 
     @repeat_condition_number_of_repeats.setter
-    def repeat_condition_number_of_repeats(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def repeat_condition_number_of_repeats(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "repeat_condition_number_of_repeats", value)
 
     @_builtins.property
     @pulumi.getter(name="repeatEveryDuration")
-    def repeat_every_duration(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def repeat_every_duration(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Repeat workflow every duration
         """
         return pulumi.get(self, "repeat_every_duration")
 
     @repeat_every_duration.setter
-    def repeat_every_duration(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def repeat_every_duration(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "repeat_every_duration", value)
 
     @_builtins.property
     @pulumi.getter(name="repeatOns")
-    def repeat_ons(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def repeat_ons(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Repeat on weekdays. Value must be one of `S`, `M`, `T`, `W`, `R`, `F`, `U`.
         """
         return pulumi.get(self, "repeat_ons")
 
     @repeat_ons.setter
-    def repeat_ons(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def repeat_ons(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "repeat_ons", value)
 
     @_builtins.property
     @pulumi.getter(name="serviceIds")
-    def service_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def service_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "service_ids")
 
     @service_ids.setter
-    def service_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def service_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "service_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="severityIds")
-    def severity_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def severity_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "severity_ids")
 
     @severity_ids.setter
-    def severity_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def severity_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "severity_ids", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The slug of the workflow
         """
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
     @_builtins.property
     @pulumi.getter(name="subStatusIds")
-    def sub_status_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def sub_status_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "sub_status_ids")
 
     @sub_status_ids.setter
-    def sub_status_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def sub_status_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "sub_status_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="triggerParams")
-    def trigger_params(self) -> Optional[pulumi.Input['WorkflowActionItemTriggerParamsArgs']]:
+    def trigger_params(self) -> pulumi.Input[Optional['WorkflowActionItemTriggerParamsArgs']]:
         return pulumi.get(self, "trigger_params")
 
     @trigger_params.setter
-    def trigger_params(self, value: Optional[pulumi.Input['WorkflowActionItemTriggerParamsArgs']]):
+    def trigger_params(self, value: pulumi.Input[Optional['WorkflowActionItemTriggerParamsArgs']]):
         pulumi.set(self, "trigger_params", value)
 
     @_builtins.property
     @pulumi.getter
-    def wait(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def wait(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Wait this duration before executing
         """
         return pulumi.get(self, "wait")
 
     @wait.setter
-    def wait(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def wait(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "wait", value)
 
     @_builtins.property
     @pulumi.getter(name="workflowActionItemId")
-    def workflow_action_item_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def workflow_action_item_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "workflow_action_item_id")
 
     @workflow_action_item_id.setter
-    def workflow_action_item_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def workflow_action_item_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "workflow_action_item_id", value)
 
     @_builtins.property
     @pulumi.getter(name="workflowGroupId")
-    def workflow_group_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def workflow_group_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The group this workflow belongs to.
         """
         return pulumi.get(self, "workflow_group_id")
 
     @workflow_group_id.setter
-    def workflow_group_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def workflow_group_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "workflow_group_id", value)
 
 
@@ -778,32 +778,32 @@ class WorkflowActionItem(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 cause_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 command: Optional[pulumi.Input[_builtins.str]] = None,
-                 command_feedback_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 continuously_repeat: Optional[pulumi.Input[_builtins.bool]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 incident_role_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 locked: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 repeat_condition_duration_since_first_run: Optional[pulumi.Input[_builtins.str]] = None,
-                 repeat_condition_number_of_repeats: Optional[pulumi.Input[_builtins.float]] = None,
-                 repeat_every_duration: Optional[pulumi.Input[_builtins.str]] = None,
-                 repeat_ons: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 severity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 sub_status_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 trigger_params: Optional[pulumi.Input[Union['WorkflowActionItemTriggerParamsArgs', 'WorkflowActionItemTriggerParamsArgsDict']]] = None,
-                 wait: Optional[pulumi.Input[_builtins.str]] = None,
-                 workflow_action_item_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 workflow_group_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 cause_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 command: pulumi.Input[Optional[_builtins.str]] = None,
+                 command_feedback_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 continuously_repeat: pulumi.Input[Optional[_builtins.bool]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 environment_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 functionality_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 incident_role_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 incident_type_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 locked: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 repeat_condition_duration_since_first_run: pulumi.Input[Optional[_builtins.str]] = None,
+                 repeat_condition_number_of_repeats: pulumi.Input[Optional[_builtins.float]] = None,
+                 repeat_every_duration: pulumi.Input[Optional[_builtins.str]] = None,
+                 repeat_ons: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 severity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 sub_status_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 trigger_params: pulumi.Input[Optional[Union['WorkflowActionItemTriggerParamsArgs', 'WorkflowActionItemTriggerParamsArgsDict']]] = None,
+                 wait: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_action_item_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_group_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a WorkflowActionItem resource with the given unique name, props, and options.
@@ -812,7 +812,7 @@ class WorkflowActionItem(pulumi.CustomResource):
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.str] command: Workflow command
         :param pulumi.Input[_builtins.bool] command_feedback_enabled: This will notify you back when the workflow is starting. Value must be one of true or false
-        :param pulumi.Input[_builtins.bool] continuously_repeat: When continuously repeat is true, repeat workflows aren't automatically stopped when conditions aren't met. This setting won't override your conditions set by<span pulumi-lang-nodejs=" repeatConditionDurationSinceFirstRun " pulumi-lang-dotnet=" RepeatConditionDurationSinceFirstRun " pulumi-lang-go=" repeatConditionDurationSinceFirstRun " pulumi-lang-python=" repeat_condition_duration_since_first_run " pulumi-lang-yaml=" repeatConditionDurationSinceFirstRun " pulumi-lang-java=" repeatConditionDurationSinceFirstRun "> repeat_condition_duration_since_first_run </span>and<span pulumi-lang-nodejs=" repeatConditionNumberOfRepeats " pulumi-lang-dotnet=" RepeatConditionNumberOfRepeats " pulumi-lang-go=" repeatConditionNumberOfRepeats " pulumi-lang-python=" repeat_condition_number_of_repeats " pulumi-lang-yaml=" repeatConditionNumberOfRepeats " pulumi-lang-java=" repeatConditionNumberOfRepeats "> repeat_condition_number_of_repeats </span>parameters.. Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] continuously_repeat: When continuously repeat is true, repeat workflows aren't automatically stopped when conditions aren't met. This setting won't override your conditions set by<span pulumi-lang-nodejs=" repeatConditionDurationSinceFirstRun " pulumi-lang-dotnet=" RepeatConditionDurationSinceFirstRun " pulumi-lang-go=" repeatConditionDurationSinceFirstRun " pulumi-lang-python=" repeat_condition_duration_since_first_run " pulumi-lang-yaml=" repeatConditionDurationSinceFirstRun " pulumi-lang-java=" repeatConditionDurationSinceFirstRun " pulumi-lang-hcl=" repeat_condition_duration_since_first_run "> repeatConditionDurationSinceFirstRun </span>and<span pulumi-lang-nodejs=" repeatConditionNumberOfRepeats " pulumi-lang-dotnet=" RepeatConditionNumberOfRepeats " pulumi-lang-go=" repeatConditionNumberOfRepeats " pulumi-lang-python=" repeat_condition_number_of_repeats " pulumi-lang-yaml=" repeatConditionNumberOfRepeats " pulumi-lang-java=" repeatConditionNumberOfRepeats " pulumi-lang-hcl=" repeat_condition_number_of_repeats "> repeatConditionNumberOfRepeats </span>parameters.. Value must be one of true or false
         :param pulumi.Input[_builtins.str] description: The description of the workflow
         :param pulumi.Input[_builtins.bool] locked: Restricts workflow edits to admins when turned on. Only admins can set this field.. Value must be one of true or false
         :param pulumi.Input[_builtins.str] name: The title of the workflow
@@ -849,32 +849,32 @@ class WorkflowActionItem(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 cause_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 command: Optional[pulumi.Input[_builtins.str]] = None,
-                 command_feedback_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 continuously_repeat: Optional[pulumi.Input[_builtins.bool]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 incident_role_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 locked: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 repeat_condition_duration_since_first_run: Optional[pulumi.Input[_builtins.str]] = None,
-                 repeat_condition_number_of_repeats: Optional[pulumi.Input[_builtins.float]] = None,
-                 repeat_every_duration: Optional[pulumi.Input[_builtins.str]] = None,
-                 repeat_ons: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 severity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 sub_status_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 trigger_params: Optional[pulumi.Input[Union['WorkflowActionItemTriggerParamsArgs', 'WorkflowActionItemTriggerParamsArgsDict']]] = None,
-                 wait: Optional[pulumi.Input[_builtins.str]] = None,
-                 workflow_action_item_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 workflow_group_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 cause_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 command: pulumi.Input[Optional[_builtins.str]] = None,
+                 command_feedback_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 continuously_repeat: pulumi.Input[Optional[_builtins.bool]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 environment_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 functionality_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 incident_role_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 incident_type_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 locked: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 repeat_condition_duration_since_first_run: pulumi.Input[Optional[_builtins.str]] = None,
+                 repeat_condition_number_of_repeats: pulumi.Input[Optional[_builtins.float]] = None,
+                 repeat_every_duration: pulumi.Input[Optional[_builtins.str]] = None,
+                 repeat_ons: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 severity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 sub_status_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 trigger_params: pulumi.Input[Optional[Union['WorkflowActionItemTriggerParamsArgs', 'WorkflowActionItemTriggerParamsArgsDict']]] = None,
+                 wait: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_action_item_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_group_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -921,32 +921,32 @@ class WorkflowActionItem(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            cause_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            command: Optional[pulumi.Input[_builtins.str]] = None,
-            command_feedback_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-            continuously_repeat: Optional[pulumi.Input[_builtins.bool]] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-            environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            incident_role_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            locked: Optional[pulumi.Input[_builtins.bool]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None,
-            repeat_condition_duration_since_first_run: Optional[pulumi.Input[_builtins.str]] = None,
-            repeat_condition_number_of_repeats: Optional[pulumi.Input[_builtins.float]] = None,
-            repeat_every_duration: Optional[pulumi.Input[_builtins.str]] = None,
-            repeat_ons: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            severity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            slug: Optional[pulumi.Input[_builtins.str]] = None,
-            sub_status_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            trigger_params: Optional[pulumi.Input[Union['WorkflowActionItemTriggerParamsArgs', 'WorkflowActionItemTriggerParamsArgsDict']]] = None,
-            wait: Optional[pulumi.Input[_builtins.str]] = None,
-            workflow_action_item_id: Optional[pulumi.Input[_builtins.str]] = None,
-            workflow_group_id: Optional[pulumi.Input[_builtins.str]] = None) -> 'WorkflowActionItem':
+            cause_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            command: pulumi.Input[Optional[_builtins.str]] = None,
+            command_feedback_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+            continuously_repeat: pulumi.Input[Optional[_builtins.bool]] = None,
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+            environment_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            functionality_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            incident_role_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            incident_type_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            locked: pulumi.Input[Optional[_builtins.bool]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None,
+            repeat_condition_duration_since_first_run: pulumi.Input[Optional[_builtins.str]] = None,
+            repeat_condition_number_of_repeats: pulumi.Input[Optional[_builtins.float]] = None,
+            repeat_every_duration: pulumi.Input[Optional[_builtins.str]] = None,
+            repeat_ons: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            severity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            slug: pulumi.Input[Optional[_builtins.str]] = None,
+            sub_status_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            trigger_params: pulumi.Input[Optional[Union['WorkflowActionItemTriggerParamsArgs', 'WorkflowActionItemTriggerParamsArgsDict']]] = None,
+            wait: pulumi.Input[Optional[_builtins.str]] = None,
+            workflow_action_item_id: pulumi.Input[Optional[_builtins.str]] = None,
+            workflow_group_id: pulumi.Input[Optional[_builtins.str]] = None) -> 'WorkflowActionItem':
         """
         Get an existing WorkflowActionItem resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -956,7 +956,7 @@ class WorkflowActionItem(pulumi.CustomResource):
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.str] command: Workflow command
         :param pulumi.Input[_builtins.bool] command_feedback_enabled: This will notify you back when the workflow is starting. Value must be one of true or false
-        :param pulumi.Input[_builtins.bool] continuously_repeat: When continuously repeat is true, repeat workflows aren't automatically stopped when conditions aren't met. This setting won't override your conditions set by<span pulumi-lang-nodejs=" repeatConditionDurationSinceFirstRun " pulumi-lang-dotnet=" RepeatConditionDurationSinceFirstRun " pulumi-lang-go=" repeatConditionDurationSinceFirstRun " pulumi-lang-python=" repeat_condition_duration_since_first_run " pulumi-lang-yaml=" repeatConditionDurationSinceFirstRun " pulumi-lang-java=" repeatConditionDurationSinceFirstRun "> repeat_condition_duration_since_first_run </span>and<span pulumi-lang-nodejs=" repeatConditionNumberOfRepeats " pulumi-lang-dotnet=" RepeatConditionNumberOfRepeats " pulumi-lang-go=" repeatConditionNumberOfRepeats " pulumi-lang-python=" repeat_condition_number_of_repeats " pulumi-lang-yaml=" repeatConditionNumberOfRepeats " pulumi-lang-java=" repeatConditionNumberOfRepeats "> repeat_condition_number_of_repeats </span>parameters.. Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] continuously_repeat: When continuously repeat is true, repeat workflows aren't automatically stopped when conditions aren't met. This setting won't override your conditions set by<span pulumi-lang-nodejs=" repeatConditionDurationSinceFirstRun " pulumi-lang-dotnet=" RepeatConditionDurationSinceFirstRun " pulumi-lang-go=" repeatConditionDurationSinceFirstRun " pulumi-lang-python=" repeat_condition_duration_since_first_run " pulumi-lang-yaml=" repeatConditionDurationSinceFirstRun " pulumi-lang-java=" repeatConditionDurationSinceFirstRun " pulumi-lang-hcl=" repeat_condition_duration_since_first_run "> repeatConditionDurationSinceFirstRun </span>and<span pulumi-lang-nodejs=" repeatConditionNumberOfRepeats " pulumi-lang-dotnet=" RepeatConditionNumberOfRepeats " pulumi-lang-go=" repeatConditionNumberOfRepeats " pulumi-lang-python=" repeat_condition_number_of_repeats " pulumi-lang-yaml=" repeatConditionNumberOfRepeats " pulumi-lang-java=" repeatConditionNumberOfRepeats " pulumi-lang-hcl=" repeat_condition_number_of_repeats "> repeatConditionNumberOfRepeats </span>parameters.. Value must be one of true or false
         :param pulumi.Input[_builtins.str] description: The description of the workflow
         :param pulumi.Input[_builtins.bool] locked: Restricts workflow edits to admins when turned on. Only admins can set this field.. Value must be one of true or false
         :param pulumi.Input[_builtins.str] name: The title of the workflow
@@ -1026,7 +1026,7 @@ class WorkflowActionItem(pulumi.CustomResource):
     @pulumi.getter(name="continuouslyRepeat")
     def continuously_repeat(self) -> pulumi.Output[_builtins.bool]:
         """
-        When continuously repeat is true, repeat workflows aren't automatically stopped when conditions aren't met. This setting won't override your conditions set by<span pulumi-lang-nodejs=" repeatConditionDurationSinceFirstRun " pulumi-lang-dotnet=" RepeatConditionDurationSinceFirstRun " pulumi-lang-go=" repeatConditionDurationSinceFirstRun " pulumi-lang-python=" repeat_condition_duration_since_first_run " pulumi-lang-yaml=" repeatConditionDurationSinceFirstRun " pulumi-lang-java=" repeatConditionDurationSinceFirstRun "> repeat_condition_duration_since_first_run </span>and<span pulumi-lang-nodejs=" repeatConditionNumberOfRepeats " pulumi-lang-dotnet=" RepeatConditionNumberOfRepeats " pulumi-lang-go=" repeatConditionNumberOfRepeats " pulumi-lang-python=" repeat_condition_number_of_repeats " pulumi-lang-yaml=" repeatConditionNumberOfRepeats " pulumi-lang-java=" repeatConditionNumberOfRepeats "> repeat_condition_number_of_repeats </span>parameters.. Value must be one of true or false
+        When continuously repeat is true, repeat workflows aren't automatically stopped when conditions aren't met. This setting won't override your conditions set by<span pulumi-lang-nodejs=" repeatConditionDurationSinceFirstRun " pulumi-lang-dotnet=" RepeatConditionDurationSinceFirstRun " pulumi-lang-go=" repeatConditionDurationSinceFirstRun " pulumi-lang-python=" repeat_condition_duration_since_first_run " pulumi-lang-yaml=" repeatConditionDurationSinceFirstRun " pulumi-lang-java=" repeatConditionDurationSinceFirstRun " pulumi-lang-hcl=" repeat_condition_duration_since_first_run "> repeatConditionDurationSinceFirstRun </span>and<span pulumi-lang-nodejs=" repeatConditionNumberOfRepeats " pulumi-lang-dotnet=" RepeatConditionNumberOfRepeats " pulumi-lang-go=" repeatConditionNumberOfRepeats " pulumi-lang-python=" repeat_condition_number_of_repeats " pulumi-lang-yaml=" repeatConditionNumberOfRepeats " pulumi-lang-java=" repeatConditionNumberOfRepeats " pulumi-lang-hcl=" repeat_condition_number_of_repeats "> repeatConditionNumberOfRepeats </span>parameters.. Value must be one of true or false
         """
         return pulumi.get(self, "continuously_repeat")
 
@@ -1172,3 +1172,4 @@ class WorkflowActionItem(pulumi.CustomResource):
         The group this workflow belongs to.
         """
         return pulumi.get(self, "workflow_group_id")
+

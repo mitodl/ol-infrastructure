@@ -20,16 +20,16 @@ __all__ = ['IncidentRoleTaskArgs', 'IncidentRoleTask']
 class IncidentRoleTaskArgs:
     def __init__(__self__, *,
                  task: pulumi.Input[_builtins.str],
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_role_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_role_task_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 priority: Optional[pulumi.Input[_builtins.str]] = None):
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_role_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_role_task_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 priority: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a IncidentRoleTask resource.
 
         :param pulumi.Input[_builtins.str] task: The task of the incident task
         :param pulumi.Input[_builtins.str] description: The description of incident task
-        :param pulumi.Input[_builtins.str] priority: The priority of the incident task. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        :param pulumi.Input[_builtins.str] priority: The priority of the incident task. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         """
         pulumi.set(__self__, "task", task)
         if description is not None:
@@ -55,60 +55,60 @@ class IncidentRoleTaskArgs:
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of incident task
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentRoleId")
-    def incident_role_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def incident_role_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "incident_role_id")
 
     @incident_role_id.setter
-    def incident_role_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def incident_role_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "incident_role_id", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentRoleTaskId")
-    def incident_role_task_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def incident_role_task_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "incident_role_task_id")
 
     @incident_role_task_id.setter
-    def incident_role_task_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def incident_role_task_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "incident_role_task_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def priority(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def priority(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The priority of the incident task. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        The priority of the incident task. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         """
         return pulumi.get(self, "priority")
 
     @priority.setter
-    def priority(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def priority(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "priority", value)
 
 
 @pulumi.input_type
 class _IncidentRoleTaskState:
     def __init__(__self__, *,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_role_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_role_task_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 priority: Optional[pulumi.Input[_builtins.str]] = None,
-                 task: Optional[pulumi.Input[_builtins.str]] = None):
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_role_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_role_task_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 priority: pulumi.Input[Optional[_builtins.str]] = None,
+                 task: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering IncidentRoleTask resources.
 
         :param pulumi.Input[_builtins.str] description: The description of incident task
-        :param pulumi.Input[_builtins.str] priority: The priority of the incident task. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        :param pulumi.Input[_builtins.str] priority: The priority of the incident task. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         :param pulumi.Input[_builtins.str] task: The task of the incident task
         """
         if description is not None:
@@ -124,56 +124,56 @@ class _IncidentRoleTaskState:
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of incident task
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentRoleId")
-    def incident_role_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def incident_role_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "incident_role_id")
 
     @incident_role_id.setter
-    def incident_role_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def incident_role_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "incident_role_id", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentRoleTaskId")
-    def incident_role_task_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def incident_role_task_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "incident_role_task_id")
 
     @incident_role_task_id.setter
-    def incident_role_task_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def incident_role_task_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "incident_role_task_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def priority(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def priority(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The priority of the incident task. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        The priority of the incident task. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         """
         return pulumi.get(self, "priority")
 
     @priority.setter
-    def priority(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def priority(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "priority", value)
 
     @_builtins.property
     @pulumi.getter
-    def task(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def task(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The task of the incident task
         """
         return pulumi.get(self, "task")
 
     @task.setter
-    def task(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def task(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "task", value)
 
 
@@ -183,11 +183,11 @@ class IncidentRoleTask(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_role_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_role_task_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 priority: Optional[pulumi.Input[_builtins.str]] = None,
-                 task: Optional[pulumi.Input[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_role_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_role_task_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 priority: pulumi.Input[Optional[_builtins.str]] = None,
+                 task: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a IncidentRoleTask resource with the given unique name, props, and options.
@@ -195,7 +195,7 @@ class IncidentRoleTask(pulumi.CustomResource):
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.str] description: The description of incident task
-        :param pulumi.Input[_builtins.str] priority: The priority of the incident task. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        :param pulumi.Input[_builtins.str] priority: The priority of the incident task. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         :param pulumi.Input[_builtins.str] task: The task of the incident task
         """
         ...
@@ -222,11 +222,11 @@ class IncidentRoleTask(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_role_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_role_task_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 priority: Optional[pulumi.Input[_builtins.str]] = None,
-                 task: Optional[pulumi.Input[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_role_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_role_task_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 priority: pulumi.Input[Optional[_builtins.str]] = None,
+                 task: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -254,11 +254,11 @@ class IncidentRoleTask(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            incident_role_id: Optional[pulumi.Input[_builtins.str]] = None,
-            incident_role_task_id: Optional[pulumi.Input[_builtins.str]] = None,
-            priority: Optional[pulumi.Input[_builtins.str]] = None,
-            task: Optional[pulumi.Input[_builtins.str]] = None) -> 'IncidentRoleTask':
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            incident_role_id: pulumi.Input[Optional[_builtins.str]] = None,
+            incident_role_task_id: pulumi.Input[Optional[_builtins.str]] = None,
+            priority: pulumi.Input[Optional[_builtins.str]] = None,
+            task: pulumi.Input[Optional[_builtins.str]] = None) -> 'IncidentRoleTask':
         """
         Get an existing IncidentRoleTask resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -267,7 +267,7 @@ class IncidentRoleTask(pulumi.CustomResource):
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.str] description: The description of incident task
-        :param pulumi.Input[_builtins.str] priority: The priority of the incident task. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        :param pulumi.Input[_builtins.str] priority: The priority of the incident task. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         :param pulumi.Input[_builtins.str] task: The task of the incident task
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
@@ -303,7 +303,7 @@ class IncidentRoleTask(pulumi.CustomResource):
     @pulumi.getter
     def priority(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        The priority of the incident task. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        The priority of the incident task. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         """
         return pulumi.get(self, "priority")
 
@@ -314,3 +314,4 @@ class IncidentRoleTask(pulumi.CustomResource):
         The task of the incident task
         """
         return pulumi.get(self, "task")
+

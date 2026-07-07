@@ -20,9 +20,9 @@ __all__ = ['ScheduleRotationUserArgs', 'ScheduleRotationUser']
 class ScheduleRotationUserArgs:
     def __init__(__self__, *,
                  user_id: pulumi.Input[_builtins.float],
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 schedule_rotation_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_rotation_user_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 schedule_rotation_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_rotation_user_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a ScheduleRotationUser resource.
 
@@ -51,42 +51,42 @@ class ScheduleRotationUserArgs:
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Position of the user inside rotation
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleRotationId")
-    def schedule_rotation_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def schedule_rotation_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "schedule_rotation_id")
 
     @schedule_rotation_id.setter
-    def schedule_rotation_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def schedule_rotation_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "schedule_rotation_id", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleRotationUserId")
-    def schedule_rotation_user_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def schedule_rotation_user_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "schedule_rotation_user_id")
 
     @schedule_rotation_user_id.setter
-    def schedule_rotation_user_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def schedule_rotation_user_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "schedule_rotation_user_id", value)
 
 
 @pulumi.input_type
 class _ScheduleRotationUserState:
     def __init__(__self__, *,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 schedule_rotation_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_rotation_user_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 user_id: Optional[pulumi.Input[_builtins.float]] = None):
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 schedule_rotation_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_rotation_user_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 user_id: pulumi.Input[Optional[_builtins.float]] = None):
         """
         Input properties used for looking up and filtering ScheduleRotationUser resources.
 
@@ -104,44 +104,44 @@ class _ScheduleRotationUserState:
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Position of the user inside rotation
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleRotationId")
-    def schedule_rotation_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def schedule_rotation_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "schedule_rotation_id")
 
     @schedule_rotation_id.setter
-    def schedule_rotation_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def schedule_rotation_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "schedule_rotation_id", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleRotationUserId")
-    def schedule_rotation_user_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def schedule_rotation_user_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "schedule_rotation_user_id")
 
     @schedule_rotation_user_id.setter
-    def schedule_rotation_user_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def schedule_rotation_user_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "schedule_rotation_user_id", value)
 
     @_builtins.property
     @pulumi.getter(name="userId")
-    def user_id(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def user_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Schedule rotation user
         """
         return pulumi.get(self, "user_id")
 
     @user_id.setter
-    def user_id(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def user_id(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "user_id", value)
 
 
@@ -151,10 +151,10 @@ class ScheduleRotationUser(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 schedule_rotation_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_rotation_user_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 user_id: Optional[pulumi.Input[_builtins.float]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 schedule_rotation_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_rotation_user_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 user_id: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         """
         Create a ScheduleRotationUser resource with the given unique name, props, and options.
@@ -188,10 +188,10 @@ class ScheduleRotationUser(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 schedule_rotation_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_rotation_user_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 user_id: Optional[pulumi.Input[_builtins.float]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 schedule_rotation_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_rotation_user_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 user_id: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -218,10 +218,10 @@ class ScheduleRotationUser(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None,
-            schedule_rotation_id: Optional[pulumi.Input[_builtins.str]] = None,
-            schedule_rotation_user_id: Optional[pulumi.Input[_builtins.str]] = None,
-            user_id: Optional[pulumi.Input[_builtins.float]] = None) -> 'ScheduleRotationUser':
+            position: pulumi.Input[Optional[_builtins.float]] = None,
+            schedule_rotation_id: pulumi.Input[Optional[_builtins.str]] = None,
+            schedule_rotation_user_id: pulumi.Input[Optional[_builtins.str]] = None,
+            user_id: pulumi.Input[Optional[_builtins.float]] = None) -> 'ScheduleRotationUser':
         """
         Get an existing ScheduleRotationUser resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -267,3 +267,4 @@ class ScheduleRotationUser(pulumi.CustomResource):
         Schedule rotation user
         """
         return pulumi.get(self, "user_id")
+

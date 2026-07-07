@@ -80,8 +80,8 @@ def get_alert_routing_rule(created_at: Optional[Mapping[str, _builtins.str]] = N
         created_at=pulumi.get(__ret__, 'created_at'),
         id=pulumi.get(__ret__, 'id'),
         name=pulumi.get(__ret__, 'name'))
-def get_alert_routing_rule_output(created_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
-                                  name: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_alert_routing_rule_output(created_at: pulumi.Input[Optional[Optional[Mapping[str, _builtins.str]]]] = None,
+                                  name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                                   opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetAlertRoutingRuleResult]:
     """
     Use this data source to access information about an existing resource.

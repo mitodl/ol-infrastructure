@@ -105,10 +105,10 @@ def get_incident_roles(enabled: Optional[_builtins.bool] = None,
         incident_roles=pulumi.get(__ret__, 'incident_roles'),
         name=pulumi.get(__ret__, 'name'),
         slug=pulumi.get(__ret__, 'slug'))
-def get_incident_roles_output(enabled: Optional[pulumi.Input[Optional[_builtins.bool]]] = None,
-                              id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                              name: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                              slug: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_incident_roles_output(enabled: pulumi.Input[Optional[Optional[_builtins.bool]]] = None,
+                              id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                              name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                              slug: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                               opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetIncidentRolesResult]:
     """
     Use this data source to access information about an existing resource.

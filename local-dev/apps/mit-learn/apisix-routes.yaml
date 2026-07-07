@@ -1,0 +1,243 @@
+---
+# APISIX shared plugin config for mit-learn routes.
+# Applies HTTP→HTTPS redirect, CORS, Referrer-Policy, and prometheus to all routes.
+apiVersion: apisix.apache.org/v2
+kind: ApisixPluginConfig
+metadata:
+  name: mitlearn-shared-plugins
+  namespace: mit-learn
+spec:
+  plugins:
+  - name: redirect
+    enable: true
+    config:
+      http_to_https: true
+  - name: cors
+    enable: true
+    config:
+      allow_origins: "https://learn.mit.dev"
+      allow_methods: "GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS"
+      allow_headers: "Authorization,Content-Type,X-CSRFToken,X-Requested-With"
+      expose_headers: "X-CSRFToken"
+      allow_credential: true
+      max_age: 3600
+  - name: response-rewrite
+    enable: true
+    config:
+      headers:
+        set:
+          Referrer-Policy: "origin"
+  - name: prometheus
+    enable: true
+---
+# TLS configuration for api.learn.mit.dev (served by APISIX).
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: mitlearn-tls
+  namespace: mit-learn
+spec:
+  ingressClassName: apache-apisix
+  hosts:
+  - api.learn.mit.dev
+  secret:
+    name: local-dev-tls
+    namespace: mit-learn
+---
+# ApisixRoute — no-prefix (direct paths without /learn/ prefix).
+#
+# Three sub-routes:
+#   passauth   : all paths (OIDC pass-through, no redirect on auth failure)
+#   logout-redirect : /logout/oidc/* (redirect to OIDC logout endpoint)
+#   reqauth    : /admin/login/*, /login, /login/* (require authentication)
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: mitlearn-route-no-prefix
+  namespace: mit-learn
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: passauth
+    priority: 0
+    match:
+      hosts:
+      - api.learn.mit.dev
+      paths:
+      - "/*"
+    backends:
+    - serviceName: mitlearn-webapp
+      servicePort: 8060
+    plugin_config_name: mitlearn-shared-plugins
+    plugins:
+    - name: openid-connect
+      enable: true
+      secretRef: ol-mitlearn-oidc  # pragma: allowlist secret
+      config:
+        discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
+        use_jwks: true
+        bearer_only: false
+        realm: olapps
+        introspection_endpoint_auth_method: client_secret_post
+        scope: "openid profile email ol-profile"
+        redirect_uri: "https://api.learn.mit.dev/login/ol-oidc/callback/"
+        logout_path: "/logout/oidc"
+        post_logout_redirect_uri: "https://api.learn.mit.dev/logout/"
+        unauth_action: pass
+        session:
+          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+        ssl_verify: false
+
+  - name: logout-redirect
+    priority: 10
+    match:
+      hosts:
+      - api.learn.mit.dev
+      paths:
+      - "/logout/oidc/*"
+    backends:
+    - serviceName: mitlearn-webapp
+      servicePort: 8060
+    plugin_config_name: mitlearn-shared-plugins
+    plugins:
+    - name: redirect
+      enable: true
+      config:
+        uri: "/logout/oidc"
+
+  - name: reqauth
+    priority: 10
+    match:
+      hosts:
+      - api.learn.mit.dev
+      paths:
+      - "/admin/login/*"
+      - "/login"
+      - "/login/*"
+    backends:
+    - serviceName: mitlearn-webapp
+      servicePort: 8060
+    plugin_config_name: mitlearn-shared-plugins
+    plugins:
+    - name: openid-connect
+      enable: true
+      secretRef: ol-mitlearn-oidc  # pragma: allowlist secret
+      config:
+        discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
+        use_jwks: true
+        bearer_only: false
+        realm: olapps
+        introspection_endpoint_auth_method: client_secret_post
+        scope: "openid profile email ol-profile"
+        redirect_uri: "https://api.learn.mit.dev/login/ol-oidc/callback/"
+        logout_path: "/logout/oidc"
+        post_logout_redirect_uri: "https://api.learn.mit.dev/logout/"
+        unauth_action: auth
+        session:
+          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+        ssl_verify: false
+---
+# ApisixRoute — /learn/ prefix (strips prefix before forwarding to backend).
+#
+# Three sub-routes:
+#   passauth        : /learn/* (pass, strip prefix)
+#   logout-redirect : /learn/logout/oidc/*
+#   reqauth         : /learn/admin/login/*, /learn/login, /learn/login/*
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: mitlearn-route-prefix
+  namespace: mit-learn
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: passauth
+    priority: 0
+    match:
+      hosts:
+      - api.learn.mit.dev
+      paths:
+      - "/learn/*"
+    backends:
+    - serviceName: mitlearn-webapp
+      servicePort: 8060
+    plugin_config_name: mitlearn-shared-plugins
+    plugins:
+    - name: proxy-rewrite
+      enable: true
+      config:
+        regex_uri:
+        - "/learn/(.*)"
+        - "/$1"
+    - name: openid-connect
+      enable: true
+      secretRef: ol-mitlearn-oidc  # pragma: allowlist secret
+      config:
+        discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
+        use_jwks: true
+        bearer_only: false
+        realm: olapps
+        introspection_endpoint_auth_method: client_secret_post
+        scope: "openid profile email ol-profile"
+        redirect_uri: "https://api.learn.mit.dev/learn/login/ol-oidc/callback/"
+        logout_path: "/learn/logout/oidc"
+        post_logout_redirect_uri: "https://api.learn.mit.dev/learn/logout/"
+        unauth_action: pass
+        session:
+          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+        ssl_verify: false
+
+  - name: logout-redirect
+    priority: 10
+    match:
+      hosts:
+      - api.learn.mit.dev
+      paths:
+      - "/learn/logout/oidc/*"
+    backends:
+    - serviceName: mitlearn-webapp
+      servicePort: 8060
+    plugin_config_name: mitlearn-shared-plugins
+    plugins:
+    - name: redirect
+      enable: true
+      config:
+        uri: "/logout/oidc"
+
+  - name: reqauth
+    priority: 10
+    match:
+      hosts:
+      - api.learn.mit.dev
+      paths:
+      - "/learn/admin/login/*"
+      - "/learn/login"
+      - "/learn/login/*"
+    backends:
+    - serviceName: mitlearn-webapp
+      servicePort: 8060
+    plugin_config_name: mitlearn-shared-plugins
+    plugins:
+    - name: proxy-rewrite
+      enable: true
+      config:
+        regex_uri:
+        - "/learn/(.*)"
+        - "/$1"
+    - name: openid-connect
+      enable: true
+      secretRef: ol-mitlearn-oidc  # pragma: allowlist secret
+      config:
+        discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
+        use_jwks: true
+        bearer_only: false
+        realm: olapps
+        introspection_endpoint_auth_method: client_secret_post
+        scope: "openid profile email ol-profile"
+        redirect_uri: "https://api.learn.mit.dev/learn/login/ol-oidc/callback/"
+        logout_path: "/learn/logout/oidc"
+        post_logout_redirect_uri: "https://api.learn.mit.dev/learn/logout/"
+        unauth_action: auth
+        session:
+          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+        ssl_verify: false

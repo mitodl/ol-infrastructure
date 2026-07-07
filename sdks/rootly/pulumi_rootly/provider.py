@@ -19,8 +19,8 @@ __all__ = ['ProviderArgs', 'Provider']
 @pulumi.input_type
 class ProviderArgs:
     def __init__(__self__, *,
-                 api_host: Optional[pulumi.Input[_builtins.str]] = None,
-                 api_token: Optional[pulumi.Input[_builtins.str]] = None):
+                 api_host: pulumi.Input[Optional[_builtins.str]] = None,
+                 api_token: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a Provider resource.
 
@@ -34,26 +34,26 @@ class ProviderArgs:
 
     @_builtins.property
     @pulumi.getter(name="apiHost")
-    def api_host(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def api_host(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Rootly API host. Defaults to https://api.rootly.com. Can also be sourced from the `ROOTLY_API_URL` environment variable.
         """
         return pulumi.get(self, "api_host")
 
     @api_host.setter
-    def api_host(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def api_host(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "api_host", value)
 
     @_builtins.property
     @pulumi.getter(name="apiToken")
-    def api_token(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def api_token(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Rootly API Token. Generate it from your account at https://rootly.com/account. It must be provided but can also be sourced from the `ROOTLY_API_TOKEN` environment variable.
         """
         return pulumi.get(self, "api_token")
 
     @api_token.setter
-    def api_token(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def api_token(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "api_token", value)
 
 
@@ -63,8 +63,8 @@ class Provider(pulumi.ProviderResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 api_host: Optional[pulumi.Input[_builtins.str]] = None,
-                 api_token: Optional[pulumi.Input[_builtins.str]] = None,
+                 api_host: pulumi.Input[Optional[_builtins.str]] = None,
+                 api_token: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         The provider type for the rootly package. By default, resources use package-wide configuration
@@ -106,8 +106,8 @@ class Provider(pulumi.ProviderResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 api_host: Optional[pulumi.Input[_builtins.str]] = None,
-                 api_token: Optional[pulumi.Input[_builtins.str]] = None,
+                 api_host: pulumi.Input[Optional[_builtins.str]] = None,
+                 api_token: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -163,3 +163,4 @@ class Provider(pulumi.ProviderResource):
         __args__ = dict()
         __args__['__self__'] = __self__
         return pulumi.runtime.call('pulumi:providers:rootly/terraformConfig', __args__, res=__self__, typ=Provider.TerraformConfigResult, package_ref=_utilities.get_package())
+

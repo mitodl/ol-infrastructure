@@ -68,7 +68,7 @@ def get_retrospective_configuration(kind: Optional[_builtins.str] = None,
     return AwaitableGetRetrospectiveConfigurationResult(
         id=pulumi.get(__ret__, 'id'),
         kind=pulumi.get(__ret__, 'kind'))
-def get_retrospective_configuration_output(kind: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_retrospective_configuration_output(kind: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                                            opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetRetrospectiveConfigurationResult]:
     """
     Use this data source to access information about an existing resource.

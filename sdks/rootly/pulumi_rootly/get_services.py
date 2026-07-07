@@ -129,12 +129,12 @@ def get_services(backstage_id: Optional[_builtins.str] = None,
         pagerduty_id=pulumi.get(__ret__, 'pagerduty_id'),
         services=pulumi.get(__ret__, 'services'),
         slug=pulumi.get(__ret__, 'slug'))
-def get_services_output(backstage_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                        id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                        name: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                        opsgenie_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                        pagerduty_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                        slug: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_services_output(backstage_id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                        id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                        name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                        opsgenie_id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                        pagerduty_id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                        slug: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                         opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetServicesResult]:
     """
     Use this data source to access information about an existing resource.

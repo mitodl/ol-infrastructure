@@ -1,10 +1,10 @@
 [project]
   name = "pulumi_rootly"
   description = "A Pulumi provider dynamically bridged from rootly."
-  dependencies = ["parver>=0.2.1", "pulumi>=3.165.0,<4.0.0", "semver>=2.8.1", "typing-extensions>=4.11,<5; python_version < \"3.11\""]
+  dependencies = ["parver>=0.2.1", "pulumi>=3.231.0,<4.0.0", "semver>=2.8.1", "typing-extensions>=4.11,<5; python_version < \"3.11\""]
   readme = "README.md"
   requires-python = ">=3.9"
-  version = "5.13.0"
+  version = "5.16.1"
   [project.urls]
     Repository = "https://github.com/rootlyhq/terraform-provider-rootly"
 

@@ -1,0 +1,44 @@
+# odl-video-service Tiltfile
+# When the sibling odl-video-service repo is not checked out, Tilt uses the
+# prebuilt DockerHub image (mitodl/odl-video-service-app:latest) without
+# attempting a local build.
+
+load("../../tiltlib.star", "k8s_yaml_with_domain")
+
+workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
+APP_DIR = os.path.join(workspace_root, "odl-video-service")
+IMAGE = 'mitodl/odl-video-service-app'
+NAMESPACE = 'odl-video-service'
+DEPLOY_NAME = 'odlvideo-webapp'
+
+if os.path.exists(os.path.join(APP_DIR, '.git')):
+    docker_build(
+        IMAGE,
+        context=APP_DIR,
+        dockerfile=APP_DIR + '/Dockerfile',
+        live_update=[
+            sync(APP_DIR + '/odl_video', '/src/odl_video'),
+            run(
+                'cd /src && pip install -r requirements.txt',
+                trigger=[APP_DIR + '/requirements.txt'],
+            ),
+        ],
+    )
+
+k8s_yaml_with_domain([
+    'configmaps/app-env.yaml',
+    'configmaps/nginx.yaml',
+    'secrets.yaml',
+    'deployment.yaml',
+    'apisix-routes.yaml',
+])
+
+k8s_resource(
+    DEPLOY_NAME,
+    port_forwards=['8088:8088'],
+    labels=['odl-video-service'],
+    resource_deps=['local-infra-apps'],
+)
+
+k8s_resource('odlvideo-celery', labels=['odl-video-service'], resource_deps=['local-infra-apps'])
+k8s_resource('odlvideo-celery-beat', labels=['odl-video-service'], resource_deps=['local-infra-apps'])

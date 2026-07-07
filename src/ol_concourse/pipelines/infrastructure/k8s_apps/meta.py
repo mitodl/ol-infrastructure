@@ -43,6 +43,7 @@ def meta_job(app_name: str) -> Job:
                     ),
                     inputs=[Input(name=Identifier("k8s-app-pipeline-definitions"))],
                     outputs=[Output(name=Identifier("pipeline"))],
+                    params={"PYTHONPATH": "../k8s-app-pipeline-definitions/src"},
                     run=Command(
                         path="python",
                         dir="pipeline",
@@ -93,6 +94,7 @@ def meta_pipeline(app_names: list[str]) -> Pipeline:
                         ),
                         inputs=[Input(name=Identifier("k8s-app-pipeline-definitions"))],
                         outputs=[Output(name=Identifier("pipeline"))],
+                        params={"PYTHONPATH": "../k8s-app-pipeline-definitions/src"},
                         run=Command(
                             path="python",
                             dir="pipeline",

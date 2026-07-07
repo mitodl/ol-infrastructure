@@ -23,27 +23,27 @@ class ScheduleRotationArgs:
     def __init__(__self__, *,
                  schedule_id: pulumi.Input[_builtins.str],
                  schedule_rotationable_attributes: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]],
-                 active_all_week: Optional[pulumi.Input[_builtins.bool]] = None,
-                 active_days: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 active_time_attributes: Optional[pulumi.Input[Sequence[pulumi.Input['ScheduleRotationActiveTimeAttributeArgs']]]] = None,
-                 active_time_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 end_time: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 schedule_rotation_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_rotation_members: Optional[pulumi.Input[Sequence[pulumi.Input['ScheduleRotationScheduleRotationMemberArgs']]]] = None,
-                 schedule_rotationable_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 start_time: Optional[pulumi.Input[_builtins.str]] = None,
-                 time_zone: Optional[pulumi.Input[_builtins.str]] = None):
+                 active_all_week: pulumi.Input[Optional[_builtins.bool]] = None,
+                 active_days: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 active_time_attributes: pulumi.Input[Optional[Sequence[pulumi.Input['ScheduleRotationActiveTimeAttributeArgs']]]] = None,
+                 active_time_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 end_time: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 schedule_rotation_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_rotation_members: pulumi.Input[Optional[Sequence[pulumi.Input['ScheduleRotationScheduleRotationMemberArgs']]]] = None,
+                 schedule_rotationable_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 start_time: pulumi.Input[Optional[_builtins.str]] = None,
+                 time_zone: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a ScheduleRotation resource.
 
         :param pulumi.Input[_builtins.str] schedule_id: The ID of parent schedule
-        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] schedule_rotationable_attributes: handoff_time and/or<span pulumi-lang-nodejs=" handoffDay " pulumi-lang-dotnet=" HandoffDay " pulumi-lang-go=" handoffDay " pulumi-lang-python=" handoff_day " pulumi-lang-yaml=" handoffDay " pulumi-lang-java=" handoffDay "> handoff_day </span>may be required, depending on schedule_rotationable_type. Please see API docs for options based on schedule_rotationable_type: https://docs.rootly.com/api-reference/schedulerotations/creates-a-schedule-rotation#response-data-attributes-schedule-rotationable-attributes
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] schedule_rotationable_attributes: handoff_time and/or<span pulumi-lang-nodejs=" handoffDay " pulumi-lang-dotnet=" HandoffDay " pulumi-lang-go=" handoffDay " pulumi-lang-python=" handoff_day " pulumi-lang-yaml=" handoffDay " pulumi-lang-java=" handoffDay " pulumi-lang-hcl=" handoff_day "> handoffDay </span>may be required, depending on schedule_rotationable_type. Please see API docs for options based on schedule_rotationable_type: https://docs.rootly.com/api-reference/schedulerotations/creates-a-schedule-rotation#response-data-attributes-schedule-rotationable-attributes
         :param pulumi.Input[_builtins.bool] active_all_week: Schedule rotation active all week?. Value must be one of true or false
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] active_days: Value must be one of `S`, `M`, `T`, `W`, `R`, `F`, `U`.
         :param pulumi.Input[Sequence[pulumi.Input['ScheduleRotationActiveTimeAttributeArgs']]] active_time_attributes: Schedule rotation's active times
-        :param pulumi.Input[_builtins.str] active_time_type: Value must be one of <span pulumi-lang-nodejs="`allDay`" pulumi-lang-dotnet="`AllDay`" pulumi-lang-go="`allDay`" pulumi-lang-python="`all_day`" pulumi-lang-yaml="`allDay`" pulumi-lang-java="`allDay`">`all_day`</span>, <span pulumi-lang-nodejs="`sameTime`" pulumi-lang-dotnet="`SameTime`" pulumi-lang-go="`sameTime`" pulumi-lang-python="`same_time`" pulumi-lang-yaml="`sameTime`" pulumi-lang-java="`sameTime`">`same_time`</span>, or <span pulumi-lang-nodejs="`custom`" pulumi-lang-dotnet="`Custom`" pulumi-lang-go="`custom`" pulumi-lang-python="`custom`" pulumi-lang-yaml="`custom`" pulumi-lang-java="`custom`">`custom`</span>. The value chosen will override <span pulumi-lang-nodejs="`activeTimeAttributes`" pulumi-lang-dotnet="`ActiveTimeAttributes`" pulumi-lang-go="`activeTimeAttributes`" pulumi-lang-python="`active_time_attributes`" pulumi-lang-yaml="`activeTimeAttributes`" pulumi-lang-java="`activeTimeAttributes`">`active_time_attributes`</span> in any <span pulumi-lang-nodejs="`rootly.ScheduleRotationActiveDay`" pulumi-lang-dotnet="`rootly.ScheduleRotationActiveDay`" pulumi-lang-go="`ScheduleRotationActiveDay`" pulumi-lang-python="`ScheduleRotationActiveDay`" pulumi-lang-yaml="`rootly.ScheduleRotationActiveDay`" pulumi-lang-java="`rootly.ScheduleRotationActiveDay`">`rootly.ScheduleRotationActiveDay`</span> resources linked to this <span pulumi-lang-nodejs="`rootly.ScheduleRotation`" pulumi-lang-dotnet="`rootly.ScheduleRotation`" pulumi-lang-go="`ScheduleRotation`" pulumi-lang-python="`ScheduleRotation`" pulumi-lang-yaml="`rootly.ScheduleRotation`" pulumi-lang-java="`rootly.ScheduleRotation`">`rootly.ScheduleRotation`</span>.
+        :param pulumi.Input[_builtins.str] active_time_type: Value must be one of <span pulumi-lang-nodejs="`allDay`" pulumi-lang-dotnet="`AllDay`" pulumi-lang-go="`allDay`" pulumi-lang-python="`all_day`" pulumi-lang-yaml="`allDay`" pulumi-lang-java="`allDay`" pulumi-lang-hcl="`all_day`">`allDay`</span>, <span pulumi-lang-nodejs="`sameTime`" pulumi-lang-dotnet="`SameTime`" pulumi-lang-go="`sameTime`" pulumi-lang-python="`same_time`" pulumi-lang-yaml="`sameTime`" pulumi-lang-java="`sameTime`" pulumi-lang-hcl="`same_time`">`sameTime`</span>, or <span pulumi-lang-nodejs="`custom`" pulumi-lang-dotnet="`Custom`" pulumi-lang-go="`custom`" pulumi-lang-python="`custom`" pulumi-lang-yaml="`custom`" pulumi-lang-java="`custom`" pulumi-lang-hcl="`custom`">`custom`</span>. The value chosen will override <span pulumi-lang-nodejs="`activeTimeAttributes`" pulumi-lang-dotnet="`ActiveTimeAttributes`" pulumi-lang-go="`activeTimeAttributes`" pulumi-lang-python="`active_time_attributes`" pulumi-lang-yaml="`activeTimeAttributes`" pulumi-lang-java="`activeTimeAttributes`" pulumi-lang-hcl="`active_time_attributes`">`activeTimeAttributes`</span> in any <span pulumi-lang-nodejs="`rootly.ScheduleRotationActiveDay`" pulumi-lang-dotnet="`rootly.ScheduleRotationActiveDay`" pulumi-lang-go="`ScheduleRotationActiveDay`" pulumi-lang-python="`ScheduleRotationActiveDay`" pulumi-lang-yaml="`rootly.ScheduleRotationActiveDay`" pulumi-lang-java="`rootly.ScheduleRotationActiveDay`" pulumi-lang-hcl="`rootly_schedule_rotation_active_day`">`rootly.ScheduleRotationActiveDay`</span> resources linked to this <span pulumi-lang-nodejs="`rootly.ScheduleRotation`" pulumi-lang-dotnet="`rootly.ScheduleRotation`" pulumi-lang-go="`ScheduleRotation`" pulumi-lang-python="`ScheduleRotation`" pulumi-lang-yaml="`rootly.ScheduleRotation`" pulumi-lang-java="`rootly.ScheduleRotation`" pulumi-lang-hcl="`rootly_schedule_rotation`">`rootly.ScheduleRotation`</span>.
         :param pulumi.Input[_builtins.str] end_time: ISO8601 date and time when rotation ends. Shifts will only be created before this time.
         :param pulumi.Input[_builtins.str] name: The name of the schedule rotation
         :param pulumi.Input[_builtins.float] position: Position of the schedule rotation
@@ -95,7 +95,7 @@ class ScheduleRotationArgs:
     @pulumi.getter(name="scheduleRotationableAttributes")
     def schedule_rotationable_attributes(self) -> pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]:
         """
-        handoff_time and/or<span pulumi-lang-nodejs=" handoffDay " pulumi-lang-dotnet=" HandoffDay " pulumi-lang-go=" handoffDay " pulumi-lang-python=" handoff_day " pulumi-lang-yaml=" handoffDay " pulumi-lang-java=" handoffDay "> handoff_day </span>may be required, depending on schedule_rotationable_type. Please see API docs for options based on schedule_rotationable_type: https://docs.rootly.com/api-reference/schedulerotations/creates-a-schedule-rotation#response-data-attributes-schedule-rotationable-attributes
+        handoff_time and/or<span pulumi-lang-nodejs=" handoffDay " pulumi-lang-dotnet=" HandoffDay " pulumi-lang-go=" handoffDay " pulumi-lang-python=" handoff_day " pulumi-lang-yaml=" handoffDay " pulumi-lang-java=" handoffDay " pulumi-lang-hcl=" handoff_day "> handoffDay </span>may be required, depending on schedule_rotationable_type. Please see API docs for options based on schedule_rotationable_type: https://docs.rootly.com/api-reference/schedulerotations/creates-a-schedule-rotation#response-data-attributes-schedule-rotationable-attributes
         """
         return pulumi.get(self, "schedule_rotationable_attributes")
 
@@ -105,176 +105,176 @@ class ScheduleRotationArgs:
 
     @_builtins.property
     @pulumi.getter(name="activeAllWeek")
-    def active_all_week(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def active_all_week(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Schedule rotation active all week?. Value must be one of true or false
         """
         return pulumi.get(self, "active_all_week")
 
     @active_all_week.setter
-    def active_all_week(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def active_all_week(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "active_all_week", value)
 
     @_builtins.property
     @pulumi.getter(name="activeDays")
-    def active_days(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def active_days(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Value must be one of `S`, `M`, `T`, `W`, `R`, `F`, `U`.
         """
         return pulumi.get(self, "active_days")
 
     @active_days.setter
-    def active_days(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def active_days(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "active_days", value)
 
     @_builtins.property
     @pulumi.getter(name="activeTimeAttributes")
-    def active_time_attributes(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['ScheduleRotationActiveTimeAttributeArgs']]]]:
+    def active_time_attributes(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['ScheduleRotationActiveTimeAttributeArgs']]]]:
         """
         Schedule rotation's active times
         """
         return pulumi.get(self, "active_time_attributes")
 
     @active_time_attributes.setter
-    def active_time_attributes(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['ScheduleRotationActiveTimeAttributeArgs']]]]):
+    def active_time_attributes(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['ScheduleRotationActiveTimeAttributeArgs']]]]):
         pulumi.set(self, "active_time_attributes", value)
 
     @_builtins.property
     @pulumi.getter(name="activeTimeType")
-    def active_time_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def active_time_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`allDay`" pulumi-lang-dotnet="`AllDay`" pulumi-lang-go="`allDay`" pulumi-lang-python="`all_day`" pulumi-lang-yaml="`allDay`" pulumi-lang-java="`allDay`">`all_day`</span>, <span pulumi-lang-nodejs="`sameTime`" pulumi-lang-dotnet="`SameTime`" pulumi-lang-go="`sameTime`" pulumi-lang-python="`same_time`" pulumi-lang-yaml="`sameTime`" pulumi-lang-java="`sameTime`">`same_time`</span>, or <span pulumi-lang-nodejs="`custom`" pulumi-lang-dotnet="`Custom`" pulumi-lang-go="`custom`" pulumi-lang-python="`custom`" pulumi-lang-yaml="`custom`" pulumi-lang-java="`custom`">`custom`</span>. The value chosen will override <span pulumi-lang-nodejs="`activeTimeAttributes`" pulumi-lang-dotnet="`ActiveTimeAttributes`" pulumi-lang-go="`activeTimeAttributes`" pulumi-lang-python="`active_time_attributes`" pulumi-lang-yaml="`activeTimeAttributes`" pulumi-lang-java="`activeTimeAttributes`">`active_time_attributes`</span> in any <span pulumi-lang-nodejs="`rootly.ScheduleRotationActiveDay`" pulumi-lang-dotnet="`rootly.ScheduleRotationActiveDay`" pulumi-lang-go="`ScheduleRotationActiveDay`" pulumi-lang-python="`ScheduleRotationActiveDay`" pulumi-lang-yaml="`rootly.ScheduleRotationActiveDay`" pulumi-lang-java="`rootly.ScheduleRotationActiveDay`">`rootly.ScheduleRotationActiveDay`</span> resources linked to this <span pulumi-lang-nodejs="`rootly.ScheduleRotation`" pulumi-lang-dotnet="`rootly.ScheduleRotation`" pulumi-lang-go="`ScheduleRotation`" pulumi-lang-python="`ScheduleRotation`" pulumi-lang-yaml="`rootly.ScheduleRotation`" pulumi-lang-java="`rootly.ScheduleRotation`">`rootly.ScheduleRotation`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`allDay`" pulumi-lang-dotnet="`AllDay`" pulumi-lang-go="`allDay`" pulumi-lang-python="`all_day`" pulumi-lang-yaml="`allDay`" pulumi-lang-java="`allDay`" pulumi-lang-hcl="`all_day`">`allDay`</span>, <span pulumi-lang-nodejs="`sameTime`" pulumi-lang-dotnet="`SameTime`" pulumi-lang-go="`sameTime`" pulumi-lang-python="`same_time`" pulumi-lang-yaml="`sameTime`" pulumi-lang-java="`sameTime`" pulumi-lang-hcl="`same_time`">`sameTime`</span>, or <span pulumi-lang-nodejs="`custom`" pulumi-lang-dotnet="`Custom`" pulumi-lang-go="`custom`" pulumi-lang-python="`custom`" pulumi-lang-yaml="`custom`" pulumi-lang-java="`custom`" pulumi-lang-hcl="`custom`">`custom`</span>. The value chosen will override <span pulumi-lang-nodejs="`activeTimeAttributes`" pulumi-lang-dotnet="`ActiveTimeAttributes`" pulumi-lang-go="`activeTimeAttributes`" pulumi-lang-python="`active_time_attributes`" pulumi-lang-yaml="`activeTimeAttributes`" pulumi-lang-java="`activeTimeAttributes`" pulumi-lang-hcl="`active_time_attributes`">`activeTimeAttributes`</span> in any <span pulumi-lang-nodejs="`rootly.ScheduleRotationActiveDay`" pulumi-lang-dotnet="`rootly.ScheduleRotationActiveDay`" pulumi-lang-go="`ScheduleRotationActiveDay`" pulumi-lang-python="`ScheduleRotationActiveDay`" pulumi-lang-yaml="`rootly.ScheduleRotationActiveDay`" pulumi-lang-java="`rootly.ScheduleRotationActiveDay`" pulumi-lang-hcl="`rootly_schedule_rotation_active_day`">`rootly.ScheduleRotationActiveDay`</span> resources linked to this <span pulumi-lang-nodejs="`rootly.ScheduleRotation`" pulumi-lang-dotnet="`rootly.ScheduleRotation`" pulumi-lang-go="`ScheduleRotation`" pulumi-lang-python="`ScheduleRotation`" pulumi-lang-yaml="`rootly.ScheduleRotation`" pulumi-lang-java="`rootly.ScheduleRotation`" pulumi-lang-hcl="`rootly_schedule_rotation`">`rootly.ScheduleRotation`</span>.
         """
         return pulumi.get(self, "active_time_type")
 
     @active_time_type.setter
-    def active_time_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def active_time_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "active_time_type", value)
 
     @_builtins.property
     @pulumi.getter(name="endTime")
-    def end_time(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def end_time(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         ISO8601 date and time when rotation ends. Shifts will only be created before this time.
         """
         return pulumi.get(self, "end_time")
 
     @end_time.setter
-    def end_time(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def end_time(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "end_time", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the schedule rotation
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Position of the schedule rotation
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleRotationId")
-    def schedule_rotation_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def schedule_rotation_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "schedule_rotation_id")
 
     @schedule_rotation_id.setter
-    def schedule_rotation_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def schedule_rotation_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "schedule_rotation_id", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleRotationMembers")
-    def schedule_rotation_members(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['ScheduleRotationScheduleRotationMemberArgs']]]]:
+    def schedule_rotation_members(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['ScheduleRotationScheduleRotationMemberArgs']]]]:
         """
         Schedule rotation members. You can only add schedule rotation members if your account has schedule nesting feature enabled.
         """
         return pulumi.get(self, "schedule_rotation_members")
 
     @schedule_rotation_members.setter
-    def schedule_rotation_members(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['ScheduleRotationScheduleRotationMemberArgs']]]]):
+    def schedule_rotation_members(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['ScheduleRotationScheduleRotationMemberArgs']]]]):
         pulumi.set(self, "schedule_rotation_members", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleRotationableType")
-    def schedule_rotationable_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def schedule_rotationable_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Schedule rotation type. Value must be one of `ScheduleDailyRotation`, `ScheduleWeeklyRotation`, `ScheduleBiweeklyRotation`, `ScheduleMonthlyRotation`, `ScheduleCustomRotation`.
         """
         return pulumi.get(self, "schedule_rotationable_type")
 
     @schedule_rotationable_type.setter
-    def schedule_rotationable_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def schedule_rotationable_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "schedule_rotationable_type", value)
 
     @_builtins.property
     @pulumi.getter(name="startTime")
-    def start_time(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def start_time(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         ISO8601 date and time when rotation starts. Shifts will only be created after this time.
         """
         return pulumi.get(self, "start_time")
 
     @start_time.setter
-    def start_time(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def start_time(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "start_time", value)
 
     @_builtins.property
     @pulumi.getter(name="timeZone")
-    def time_zone(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def time_zone(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         A valid IANA time zone name.
         """
         return pulumi.get(self, "time_zone")
 
     @time_zone.setter
-    def time_zone(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def time_zone(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "time_zone", value)
 
 
 @pulumi.input_type
 class _ScheduleRotationState:
     def __init__(__self__, *,
-                 active_all_week: Optional[pulumi.Input[_builtins.bool]] = None,
-                 active_days: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 active_time_attributes: Optional[pulumi.Input[Sequence[pulumi.Input['ScheduleRotationActiveTimeAttributeArgs']]]] = None,
-                 active_time_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 end_time: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 schedule_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_rotation_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_rotation_members: Optional[pulumi.Input[Sequence[pulumi.Input['ScheduleRotationScheduleRotationMemberArgs']]]] = None,
-                 schedule_rotationable_attributes: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
-                 schedule_rotationable_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 start_time: Optional[pulumi.Input[_builtins.str]] = None,
-                 time_zone: Optional[pulumi.Input[_builtins.str]] = None):
+                 active_all_week: pulumi.Input[Optional[_builtins.bool]] = None,
+                 active_days: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 active_time_attributes: pulumi.Input[Optional[Sequence[pulumi.Input['ScheduleRotationActiveTimeAttributeArgs']]]] = None,
+                 active_time_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 end_time: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_rotation_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_rotation_members: pulumi.Input[Optional[Sequence[pulumi.Input['ScheduleRotationScheduleRotationMemberArgs']]]] = None,
+                 schedule_rotationable_attributes: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 schedule_rotationable_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 start_time: pulumi.Input[Optional[_builtins.str]] = None,
+                 time_zone: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering ScheduleRotation resources.
 
         :param pulumi.Input[_builtins.bool] active_all_week: Schedule rotation active all week?. Value must be one of true or false
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] active_days: Value must be one of `S`, `M`, `T`, `W`, `R`, `F`, `U`.
         :param pulumi.Input[Sequence[pulumi.Input['ScheduleRotationActiveTimeAttributeArgs']]] active_time_attributes: Schedule rotation's active times
-        :param pulumi.Input[_builtins.str] active_time_type: Value must be one of <span pulumi-lang-nodejs="`allDay`" pulumi-lang-dotnet="`AllDay`" pulumi-lang-go="`allDay`" pulumi-lang-python="`all_day`" pulumi-lang-yaml="`allDay`" pulumi-lang-java="`allDay`">`all_day`</span>, <span pulumi-lang-nodejs="`sameTime`" pulumi-lang-dotnet="`SameTime`" pulumi-lang-go="`sameTime`" pulumi-lang-python="`same_time`" pulumi-lang-yaml="`sameTime`" pulumi-lang-java="`sameTime`">`same_time`</span>, or <span pulumi-lang-nodejs="`custom`" pulumi-lang-dotnet="`Custom`" pulumi-lang-go="`custom`" pulumi-lang-python="`custom`" pulumi-lang-yaml="`custom`" pulumi-lang-java="`custom`">`custom`</span>. The value chosen will override <span pulumi-lang-nodejs="`activeTimeAttributes`" pulumi-lang-dotnet="`ActiveTimeAttributes`" pulumi-lang-go="`activeTimeAttributes`" pulumi-lang-python="`active_time_attributes`" pulumi-lang-yaml="`activeTimeAttributes`" pulumi-lang-java="`activeTimeAttributes`">`active_time_attributes`</span> in any <span pulumi-lang-nodejs="`rootly.ScheduleRotationActiveDay`" pulumi-lang-dotnet="`rootly.ScheduleRotationActiveDay`" pulumi-lang-go="`ScheduleRotationActiveDay`" pulumi-lang-python="`ScheduleRotationActiveDay`" pulumi-lang-yaml="`rootly.ScheduleRotationActiveDay`" pulumi-lang-java="`rootly.ScheduleRotationActiveDay`">`rootly.ScheduleRotationActiveDay`</span> resources linked to this <span pulumi-lang-nodejs="`rootly.ScheduleRotation`" pulumi-lang-dotnet="`rootly.ScheduleRotation`" pulumi-lang-go="`ScheduleRotation`" pulumi-lang-python="`ScheduleRotation`" pulumi-lang-yaml="`rootly.ScheduleRotation`" pulumi-lang-java="`rootly.ScheduleRotation`">`rootly.ScheduleRotation`</span>.
+        :param pulumi.Input[_builtins.str] active_time_type: Value must be one of <span pulumi-lang-nodejs="`allDay`" pulumi-lang-dotnet="`AllDay`" pulumi-lang-go="`allDay`" pulumi-lang-python="`all_day`" pulumi-lang-yaml="`allDay`" pulumi-lang-java="`allDay`" pulumi-lang-hcl="`all_day`">`allDay`</span>, <span pulumi-lang-nodejs="`sameTime`" pulumi-lang-dotnet="`SameTime`" pulumi-lang-go="`sameTime`" pulumi-lang-python="`same_time`" pulumi-lang-yaml="`sameTime`" pulumi-lang-java="`sameTime`" pulumi-lang-hcl="`same_time`">`sameTime`</span>, or <span pulumi-lang-nodejs="`custom`" pulumi-lang-dotnet="`Custom`" pulumi-lang-go="`custom`" pulumi-lang-python="`custom`" pulumi-lang-yaml="`custom`" pulumi-lang-java="`custom`" pulumi-lang-hcl="`custom`">`custom`</span>. The value chosen will override <span pulumi-lang-nodejs="`activeTimeAttributes`" pulumi-lang-dotnet="`ActiveTimeAttributes`" pulumi-lang-go="`activeTimeAttributes`" pulumi-lang-python="`active_time_attributes`" pulumi-lang-yaml="`activeTimeAttributes`" pulumi-lang-java="`activeTimeAttributes`" pulumi-lang-hcl="`active_time_attributes`">`activeTimeAttributes`</span> in any <span pulumi-lang-nodejs="`rootly.ScheduleRotationActiveDay`" pulumi-lang-dotnet="`rootly.ScheduleRotationActiveDay`" pulumi-lang-go="`ScheduleRotationActiveDay`" pulumi-lang-python="`ScheduleRotationActiveDay`" pulumi-lang-yaml="`rootly.ScheduleRotationActiveDay`" pulumi-lang-java="`rootly.ScheduleRotationActiveDay`" pulumi-lang-hcl="`rootly_schedule_rotation_active_day`">`rootly.ScheduleRotationActiveDay`</span> resources linked to this <span pulumi-lang-nodejs="`rootly.ScheduleRotation`" pulumi-lang-dotnet="`rootly.ScheduleRotation`" pulumi-lang-go="`ScheduleRotation`" pulumi-lang-python="`ScheduleRotation`" pulumi-lang-yaml="`rootly.ScheduleRotation`" pulumi-lang-java="`rootly.ScheduleRotation`" pulumi-lang-hcl="`rootly_schedule_rotation`">`rootly.ScheduleRotation`</span>.
         :param pulumi.Input[_builtins.str] end_time: ISO8601 date and time when rotation ends. Shifts will only be created before this time.
         :param pulumi.Input[_builtins.str] name: The name of the schedule rotation
         :param pulumi.Input[_builtins.float] position: Position of the schedule rotation
         :param pulumi.Input[_builtins.str] schedule_id: The ID of parent schedule
         :param pulumi.Input[Sequence[pulumi.Input['ScheduleRotationScheduleRotationMemberArgs']]] schedule_rotation_members: Schedule rotation members. You can only add schedule rotation members if your account has schedule nesting feature enabled.
-        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] schedule_rotationable_attributes: handoff_time and/or<span pulumi-lang-nodejs=" handoffDay " pulumi-lang-dotnet=" HandoffDay " pulumi-lang-go=" handoffDay " pulumi-lang-python=" handoff_day " pulumi-lang-yaml=" handoffDay " pulumi-lang-java=" handoffDay "> handoff_day </span>may be required, depending on schedule_rotationable_type. Please see API docs for options based on schedule_rotationable_type: https://docs.rootly.com/api-reference/schedulerotations/creates-a-schedule-rotation#response-data-attributes-schedule-rotationable-attributes
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] schedule_rotationable_attributes: handoff_time and/or<span pulumi-lang-nodejs=" handoffDay " pulumi-lang-dotnet=" HandoffDay " pulumi-lang-go=" handoffDay " pulumi-lang-python=" handoff_day " pulumi-lang-yaml=" handoffDay " pulumi-lang-java=" handoffDay " pulumi-lang-hcl=" handoff_day "> handoffDay </span>may be required, depending on schedule_rotationable_type. Please see API docs for options based on schedule_rotationable_type: https://docs.rootly.com/api-reference/schedulerotations/creates-a-schedule-rotation#response-data-attributes-schedule-rotationable-attributes
         :param pulumi.Input[_builtins.str] schedule_rotationable_type: Schedule rotation type. Value must be one of `ScheduleDailyRotation`, `ScheduleWeeklyRotation`, `ScheduleBiweeklyRotation`, `ScheduleMonthlyRotation`, `ScheduleCustomRotation`.
         :param pulumi.Input[_builtins.str] start_time: ISO8601 date and time when rotation starts. Shifts will only be created after this time.
         :param pulumi.Input[_builtins.str] time_zone: A valid IANA time zone name.
@@ -310,167 +310,167 @@ class _ScheduleRotationState:
 
     @_builtins.property
     @pulumi.getter(name="activeAllWeek")
-    def active_all_week(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def active_all_week(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Schedule rotation active all week?. Value must be one of true or false
         """
         return pulumi.get(self, "active_all_week")
 
     @active_all_week.setter
-    def active_all_week(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def active_all_week(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "active_all_week", value)
 
     @_builtins.property
     @pulumi.getter(name="activeDays")
-    def active_days(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def active_days(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Value must be one of `S`, `M`, `T`, `W`, `R`, `F`, `U`.
         """
         return pulumi.get(self, "active_days")
 
     @active_days.setter
-    def active_days(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def active_days(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "active_days", value)
 
     @_builtins.property
     @pulumi.getter(name="activeTimeAttributes")
-    def active_time_attributes(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['ScheduleRotationActiveTimeAttributeArgs']]]]:
+    def active_time_attributes(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['ScheduleRotationActiveTimeAttributeArgs']]]]:
         """
         Schedule rotation's active times
         """
         return pulumi.get(self, "active_time_attributes")
 
     @active_time_attributes.setter
-    def active_time_attributes(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['ScheduleRotationActiveTimeAttributeArgs']]]]):
+    def active_time_attributes(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['ScheduleRotationActiveTimeAttributeArgs']]]]):
         pulumi.set(self, "active_time_attributes", value)
 
     @_builtins.property
     @pulumi.getter(name="activeTimeType")
-    def active_time_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def active_time_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`allDay`" pulumi-lang-dotnet="`AllDay`" pulumi-lang-go="`allDay`" pulumi-lang-python="`all_day`" pulumi-lang-yaml="`allDay`" pulumi-lang-java="`allDay`">`all_day`</span>, <span pulumi-lang-nodejs="`sameTime`" pulumi-lang-dotnet="`SameTime`" pulumi-lang-go="`sameTime`" pulumi-lang-python="`same_time`" pulumi-lang-yaml="`sameTime`" pulumi-lang-java="`sameTime`">`same_time`</span>, or <span pulumi-lang-nodejs="`custom`" pulumi-lang-dotnet="`Custom`" pulumi-lang-go="`custom`" pulumi-lang-python="`custom`" pulumi-lang-yaml="`custom`" pulumi-lang-java="`custom`">`custom`</span>. The value chosen will override <span pulumi-lang-nodejs="`activeTimeAttributes`" pulumi-lang-dotnet="`ActiveTimeAttributes`" pulumi-lang-go="`activeTimeAttributes`" pulumi-lang-python="`active_time_attributes`" pulumi-lang-yaml="`activeTimeAttributes`" pulumi-lang-java="`activeTimeAttributes`">`active_time_attributes`</span> in any <span pulumi-lang-nodejs="`rootly.ScheduleRotationActiveDay`" pulumi-lang-dotnet="`rootly.ScheduleRotationActiveDay`" pulumi-lang-go="`ScheduleRotationActiveDay`" pulumi-lang-python="`ScheduleRotationActiveDay`" pulumi-lang-yaml="`rootly.ScheduleRotationActiveDay`" pulumi-lang-java="`rootly.ScheduleRotationActiveDay`">`rootly.ScheduleRotationActiveDay`</span> resources linked to this <span pulumi-lang-nodejs="`rootly.ScheduleRotation`" pulumi-lang-dotnet="`rootly.ScheduleRotation`" pulumi-lang-go="`ScheduleRotation`" pulumi-lang-python="`ScheduleRotation`" pulumi-lang-yaml="`rootly.ScheduleRotation`" pulumi-lang-java="`rootly.ScheduleRotation`">`rootly.ScheduleRotation`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`allDay`" pulumi-lang-dotnet="`AllDay`" pulumi-lang-go="`allDay`" pulumi-lang-python="`all_day`" pulumi-lang-yaml="`allDay`" pulumi-lang-java="`allDay`" pulumi-lang-hcl="`all_day`">`allDay`</span>, <span pulumi-lang-nodejs="`sameTime`" pulumi-lang-dotnet="`SameTime`" pulumi-lang-go="`sameTime`" pulumi-lang-python="`same_time`" pulumi-lang-yaml="`sameTime`" pulumi-lang-java="`sameTime`" pulumi-lang-hcl="`same_time`">`sameTime`</span>, or <span pulumi-lang-nodejs="`custom`" pulumi-lang-dotnet="`Custom`" pulumi-lang-go="`custom`" pulumi-lang-python="`custom`" pulumi-lang-yaml="`custom`" pulumi-lang-java="`custom`" pulumi-lang-hcl="`custom`">`custom`</span>. The value chosen will override <span pulumi-lang-nodejs="`activeTimeAttributes`" pulumi-lang-dotnet="`ActiveTimeAttributes`" pulumi-lang-go="`activeTimeAttributes`" pulumi-lang-python="`active_time_attributes`" pulumi-lang-yaml="`activeTimeAttributes`" pulumi-lang-java="`activeTimeAttributes`" pulumi-lang-hcl="`active_time_attributes`">`activeTimeAttributes`</span> in any <span pulumi-lang-nodejs="`rootly.ScheduleRotationActiveDay`" pulumi-lang-dotnet="`rootly.ScheduleRotationActiveDay`" pulumi-lang-go="`ScheduleRotationActiveDay`" pulumi-lang-python="`ScheduleRotationActiveDay`" pulumi-lang-yaml="`rootly.ScheduleRotationActiveDay`" pulumi-lang-java="`rootly.ScheduleRotationActiveDay`" pulumi-lang-hcl="`rootly_schedule_rotation_active_day`">`rootly.ScheduleRotationActiveDay`</span> resources linked to this <span pulumi-lang-nodejs="`rootly.ScheduleRotation`" pulumi-lang-dotnet="`rootly.ScheduleRotation`" pulumi-lang-go="`ScheduleRotation`" pulumi-lang-python="`ScheduleRotation`" pulumi-lang-yaml="`rootly.ScheduleRotation`" pulumi-lang-java="`rootly.ScheduleRotation`" pulumi-lang-hcl="`rootly_schedule_rotation`">`rootly.ScheduleRotation`</span>.
         """
         return pulumi.get(self, "active_time_type")
 
     @active_time_type.setter
-    def active_time_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def active_time_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "active_time_type", value)
 
     @_builtins.property
     @pulumi.getter(name="endTime")
-    def end_time(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def end_time(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         ISO8601 date and time when rotation ends. Shifts will only be created before this time.
         """
         return pulumi.get(self, "end_time")
 
     @end_time.setter
-    def end_time(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def end_time(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "end_time", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the schedule rotation
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Position of the schedule rotation
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleId")
-    def schedule_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def schedule_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The ID of parent schedule
         """
         return pulumi.get(self, "schedule_id")
 
     @schedule_id.setter
-    def schedule_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def schedule_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "schedule_id", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleRotationId")
-    def schedule_rotation_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def schedule_rotation_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "schedule_rotation_id")
 
     @schedule_rotation_id.setter
-    def schedule_rotation_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def schedule_rotation_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "schedule_rotation_id", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleRotationMembers")
-    def schedule_rotation_members(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['ScheduleRotationScheduleRotationMemberArgs']]]]:
+    def schedule_rotation_members(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['ScheduleRotationScheduleRotationMemberArgs']]]]:
         """
         Schedule rotation members. You can only add schedule rotation members if your account has schedule nesting feature enabled.
         """
         return pulumi.get(self, "schedule_rotation_members")
 
     @schedule_rotation_members.setter
-    def schedule_rotation_members(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['ScheduleRotationScheduleRotationMemberArgs']]]]):
+    def schedule_rotation_members(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['ScheduleRotationScheduleRotationMemberArgs']]]]):
         pulumi.set(self, "schedule_rotation_members", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleRotationableAttributes")
-    def schedule_rotationable_attributes(self) -> Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]]:
+    def schedule_rotationable_attributes(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
         """
-        handoff_time and/or<span pulumi-lang-nodejs=" handoffDay " pulumi-lang-dotnet=" HandoffDay " pulumi-lang-go=" handoffDay " pulumi-lang-python=" handoff_day " pulumi-lang-yaml=" handoffDay " pulumi-lang-java=" handoffDay "> handoff_day </span>may be required, depending on schedule_rotationable_type. Please see API docs for options based on schedule_rotationable_type: https://docs.rootly.com/api-reference/schedulerotations/creates-a-schedule-rotation#response-data-attributes-schedule-rotationable-attributes
+        handoff_time and/or<span pulumi-lang-nodejs=" handoffDay " pulumi-lang-dotnet=" HandoffDay " pulumi-lang-go=" handoffDay " pulumi-lang-python=" handoff_day " pulumi-lang-yaml=" handoffDay " pulumi-lang-java=" handoffDay " pulumi-lang-hcl=" handoff_day "> handoffDay </span>may be required, depending on schedule_rotationable_type. Please see API docs for options based on schedule_rotationable_type: https://docs.rootly.com/api-reference/schedulerotations/creates-a-schedule-rotation#response-data-attributes-schedule-rotationable-attributes
         """
         return pulumi.get(self, "schedule_rotationable_attributes")
 
     @schedule_rotationable_attributes.setter
-    def schedule_rotationable_attributes(self, value: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]]):
+    def schedule_rotationable_attributes(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "schedule_rotationable_attributes", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleRotationableType")
-    def schedule_rotationable_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def schedule_rotationable_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Schedule rotation type. Value must be one of `ScheduleDailyRotation`, `ScheduleWeeklyRotation`, `ScheduleBiweeklyRotation`, `ScheduleMonthlyRotation`, `ScheduleCustomRotation`.
         """
         return pulumi.get(self, "schedule_rotationable_type")
 
     @schedule_rotationable_type.setter
-    def schedule_rotationable_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def schedule_rotationable_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "schedule_rotationable_type", value)
 
     @_builtins.property
     @pulumi.getter(name="startTime")
-    def start_time(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def start_time(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         ISO8601 date and time when rotation starts. Shifts will only be created after this time.
         """
         return pulumi.get(self, "start_time")
 
     @start_time.setter
-    def start_time(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def start_time(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "start_time", value)
 
     @_builtins.property
     @pulumi.getter(name="timeZone")
-    def time_zone(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def time_zone(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         A valid IANA time zone name.
         """
         return pulumi.get(self, "time_zone")
 
     @time_zone.setter
-    def time_zone(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def time_zone(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "time_zone", value)
 
 
@@ -480,20 +480,20 @@ class ScheduleRotation(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 active_all_week: Optional[pulumi.Input[_builtins.bool]] = None,
-                 active_days: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 active_time_attributes: Optional[pulumi.Input[Sequence[pulumi.Input[Union['ScheduleRotationActiveTimeAttributeArgs', 'ScheduleRotationActiveTimeAttributeArgsDict']]]]] = None,
-                 active_time_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 end_time: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 schedule_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_rotation_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_rotation_members: Optional[pulumi.Input[Sequence[pulumi.Input[Union['ScheduleRotationScheduleRotationMemberArgs', 'ScheduleRotationScheduleRotationMemberArgsDict']]]]] = None,
-                 schedule_rotationable_attributes: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
-                 schedule_rotationable_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 start_time: Optional[pulumi.Input[_builtins.str]] = None,
-                 time_zone: Optional[pulumi.Input[_builtins.str]] = None,
+                 active_all_week: pulumi.Input[Optional[_builtins.bool]] = None,
+                 active_days: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 active_time_attributes: pulumi.Input[Optional[Sequence[pulumi.Input[Union['ScheduleRotationActiveTimeAttributeArgs', 'ScheduleRotationActiveTimeAttributeArgsDict']]]]] = None,
+                 active_time_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 end_time: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_rotation_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_rotation_members: pulumi.Input[Optional[Sequence[pulumi.Input[Union['ScheduleRotationScheduleRotationMemberArgs', 'ScheduleRotationScheduleRotationMemberArgsDict']]]]] = None,
+                 schedule_rotationable_attributes: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 schedule_rotationable_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 start_time: pulumi.Input[Optional[_builtins.str]] = None,
+                 time_zone: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a ScheduleRotation resource with the given unique name, props, and options.
@@ -503,13 +503,13 @@ class ScheduleRotation(pulumi.CustomResource):
         :param pulumi.Input[_builtins.bool] active_all_week: Schedule rotation active all week?. Value must be one of true or false
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] active_days: Value must be one of `S`, `M`, `T`, `W`, `R`, `F`, `U`.
         :param pulumi.Input[Sequence[pulumi.Input[Union['ScheduleRotationActiveTimeAttributeArgs', 'ScheduleRotationActiveTimeAttributeArgsDict']]]] active_time_attributes: Schedule rotation's active times
-        :param pulumi.Input[_builtins.str] active_time_type: Value must be one of <span pulumi-lang-nodejs="`allDay`" pulumi-lang-dotnet="`AllDay`" pulumi-lang-go="`allDay`" pulumi-lang-python="`all_day`" pulumi-lang-yaml="`allDay`" pulumi-lang-java="`allDay`">`all_day`</span>, <span pulumi-lang-nodejs="`sameTime`" pulumi-lang-dotnet="`SameTime`" pulumi-lang-go="`sameTime`" pulumi-lang-python="`same_time`" pulumi-lang-yaml="`sameTime`" pulumi-lang-java="`sameTime`">`same_time`</span>, or <span pulumi-lang-nodejs="`custom`" pulumi-lang-dotnet="`Custom`" pulumi-lang-go="`custom`" pulumi-lang-python="`custom`" pulumi-lang-yaml="`custom`" pulumi-lang-java="`custom`">`custom`</span>. The value chosen will override <span pulumi-lang-nodejs="`activeTimeAttributes`" pulumi-lang-dotnet="`ActiveTimeAttributes`" pulumi-lang-go="`activeTimeAttributes`" pulumi-lang-python="`active_time_attributes`" pulumi-lang-yaml="`activeTimeAttributes`" pulumi-lang-java="`activeTimeAttributes`">`active_time_attributes`</span> in any <span pulumi-lang-nodejs="`rootly.ScheduleRotationActiveDay`" pulumi-lang-dotnet="`rootly.ScheduleRotationActiveDay`" pulumi-lang-go="`ScheduleRotationActiveDay`" pulumi-lang-python="`ScheduleRotationActiveDay`" pulumi-lang-yaml="`rootly.ScheduleRotationActiveDay`" pulumi-lang-java="`rootly.ScheduleRotationActiveDay`">`rootly.ScheduleRotationActiveDay`</span> resources linked to this <span pulumi-lang-nodejs="`rootly.ScheduleRotation`" pulumi-lang-dotnet="`rootly.ScheduleRotation`" pulumi-lang-go="`ScheduleRotation`" pulumi-lang-python="`ScheduleRotation`" pulumi-lang-yaml="`rootly.ScheduleRotation`" pulumi-lang-java="`rootly.ScheduleRotation`">`rootly.ScheduleRotation`</span>.
+        :param pulumi.Input[_builtins.str] active_time_type: Value must be one of <span pulumi-lang-nodejs="`allDay`" pulumi-lang-dotnet="`AllDay`" pulumi-lang-go="`allDay`" pulumi-lang-python="`all_day`" pulumi-lang-yaml="`allDay`" pulumi-lang-java="`allDay`" pulumi-lang-hcl="`all_day`">`allDay`</span>, <span pulumi-lang-nodejs="`sameTime`" pulumi-lang-dotnet="`SameTime`" pulumi-lang-go="`sameTime`" pulumi-lang-python="`same_time`" pulumi-lang-yaml="`sameTime`" pulumi-lang-java="`sameTime`" pulumi-lang-hcl="`same_time`">`sameTime`</span>, or <span pulumi-lang-nodejs="`custom`" pulumi-lang-dotnet="`Custom`" pulumi-lang-go="`custom`" pulumi-lang-python="`custom`" pulumi-lang-yaml="`custom`" pulumi-lang-java="`custom`" pulumi-lang-hcl="`custom`">`custom`</span>. The value chosen will override <span pulumi-lang-nodejs="`activeTimeAttributes`" pulumi-lang-dotnet="`ActiveTimeAttributes`" pulumi-lang-go="`activeTimeAttributes`" pulumi-lang-python="`active_time_attributes`" pulumi-lang-yaml="`activeTimeAttributes`" pulumi-lang-java="`activeTimeAttributes`" pulumi-lang-hcl="`active_time_attributes`">`activeTimeAttributes`</span> in any <span pulumi-lang-nodejs="`rootly.ScheduleRotationActiveDay`" pulumi-lang-dotnet="`rootly.ScheduleRotationActiveDay`" pulumi-lang-go="`ScheduleRotationActiveDay`" pulumi-lang-python="`ScheduleRotationActiveDay`" pulumi-lang-yaml="`rootly.ScheduleRotationActiveDay`" pulumi-lang-java="`rootly.ScheduleRotationActiveDay`" pulumi-lang-hcl="`rootly_schedule_rotation_active_day`">`rootly.ScheduleRotationActiveDay`</span> resources linked to this <span pulumi-lang-nodejs="`rootly.ScheduleRotation`" pulumi-lang-dotnet="`rootly.ScheduleRotation`" pulumi-lang-go="`ScheduleRotation`" pulumi-lang-python="`ScheduleRotation`" pulumi-lang-yaml="`rootly.ScheduleRotation`" pulumi-lang-java="`rootly.ScheduleRotation`" pulumi-lang-hcl="`rootly_schedule_rotation`">`rootly.ScheduleRotation`</span>.
         :param pulumi.Input[_builtins.str] end_time: ISO8601 date and time when rotation ends. Shifts will only be created before this time.
         :param pulumi.Input[_builtins.str] name: The name of the schedule rotation
         :param pulumi.Input[_builtins.float] position: Position of the schedule rotation
         :param pulumi.Input[_builtins.str] schedule_id: The ID of parent schedule
         :param pulumi.Input[Sequence[pulumi.Input[Union['ScheduleRotationScheduleRotationMemberArgs', 'ScheduleRotationScheduleRotationMemberArgsDict']]]] schedule_rotation_members: Schedule rotation members. You can only add schedule rotation members if your account has schedule nesting feature enabled.
-        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] schedule_rotationable_attributes: handoff_time and/or<span pulumi-lang-nodejs=" handoffDay " pulumi-lang-dotnet=" HandoffDay " pulumi-lang-go=" handoffDay " pulumi-lang-python=" handoff_day " pulumi-lang-yaml=" handoffDay " pulumi-lang-java=" handoffDay "> handoff_day </span>may be required, depending on schedule_rotationable_type. Please see API docs for options based on schedule_rotationable_type: https://docs.rootly.com/api-reference/schedulerotations/creates-a-schedule-rotation#response-data-attributes-schedule-rotationable-attributes
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] schedule_rotationable_attributes: handoff_time and/or<span pulumi-lang-nodejs=" handoffDay " pulumi-lang-dotnet=" HandoffDay " pulumi-lang-go=" handoffDay " pulumi-lang-python=" handoff_day " pulumi-lang-yaml=" handoffDay " pulumi-lang-java=" handoffDay " pulumi-lang-hcl=" handoff_day "> handoffDay </span>may be required, depending on schedule_rotationable_type. Please see API docs for options based on schedule_rotationable_type: https://docs.rootly.com/api-reference/schedulerotations/creates-a-schedule-rotation#response-data-attributes-schedule-rotationable-attributes
         :param pulumi.Input[_builtins.str] schedule_rotationable_type: Schedule rotation type. Value must be one of `ScheduleDailyRotation`, `ScheduleWeeklyRotation`, `ScheduleBiweeklyRotation`, `ScheduleMonthlyRotation`, `ScheduleCustomRotation`.
         :param pulumi.Input[_builtins.str] start_time: ISO8601 date and time when rotation starts. Shifts will only be created after this time.
         :param pulumi.Input[_builtins.str] time_zone: A valid IANA time zone name.
@@ -538,20 +538,20 @@ class ScheduleRotation(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 active_all_week: Optional[pulumi.Input[_builtins.bool]] = None,
-                 active_days: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 active_time_attributes: Optional[pulumi.Input[Sequence[pulumi.Input[Union['ScheduleRotationActiveTimeAttributeArgs', 'ScheduleRotationActiveTimeAttributeArgsDict']]]]] = None,
-                 active_time_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 end_time: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 schedule_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_rotation_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_rotation_members: Optional[pulumi.Input[Sequence[pulumi.Input[Union['ScheduleRotationScheduleRotationMemberArgs', 'ScheduleRotationScheduleRotationMemberArgsDict']]]]] = None,
-                 schedule_rotationable_attributes: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
-                 schedule_rotationable_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 start_time: Optional[pulumi.Input[_builtins.str]] = None,
-                 time_zone: Optional[pulumi.Input[_builtins.str]] = None,
+                 active_all_week: pulumi.Input[Optional[_builtins.bool]] = None,
+                 active_days: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 active_time_attributes: pulumi.Input[Optional[Sequence[pulumi.Input[Union['ScheduleRotationActiveTimeAttributeArgs', 'ScheduleRotationActiveTimeAttributeArgsDict']]]]] = None,
+                 active_time_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 end_time: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_rotation_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_rotation_members: pulumi.Input[Optional[Sequence[pulumi.Input[Union['ScheduleRotationScheduleRotationMemberArgs', 'ScheduleRotationScheduleRotationMemberArgsDict']]]]] = None,
+                 schedule_rotationable_attributes: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 schedule_rotationable_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 start_time: pulumi.Input[Optional[_builtins.str]] = None,
+                 time_zone: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -590,20 +590,20 @@ class ScheduleRotation(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            active_all_week: Optional[pulumi.Input[_builtins.bool]] = None,
-            active_days: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            active_time_attributes: Optional[pulumi.Input[Sequence[pulumi.Input[Union['ScheduleRotationActiveTimeAttributeArgs', 'ScheduleRotationActiveTimeAttributeArgsDict']]]]] = None,
-            active_time_type: Optional[pulumi.Input[_builtins.str]] = None,
-            end_time: Optional[pulumi.Input[_builtins.str]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None,
-            schedule_id: Optional[pulumi.Input[_builtins.str]] = None,
-            schedule_rotation_id: Optional[pulumi.Input[_builtins.str]] = None,
-            schedule_rotation_members: Optional[pulumi.Input[Sequence[pulumi.Input[Union['ScheduleRotationScheduleRotationMemberArgs', 'ScheduleRotationScheduleRotationMemberArgsDict']]]]] = None,
-            schedule_rotationable_attributes: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
-            schedule_rotationable_type: Optional[pulumi.Input[_builtins.str]] = None,
-            start_time: Optional[pulumi.Input[_builtins.str]] = None,
-            time_zone: Optional[pulumi.Input[_builtins.str]] = None) -> 'ScheduleRotation':
+            active_all_week: pulumi.Input[Optional[_builtins.bool]] = None,
+            active_days: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            active_time_attributes: pulumi.Input[Optional[Sequence[pulumi.Input[Union['ScheduleRotationActiveTimeAttributeArgs', 'ScheduleRotationActiveTimeAttributeArgsDict']]]]] = None,
+            active_time_type: pulumi.Input[Optional[_builtins.str]] = None,
+            end_time: pulumi.Input[Optional[_builtins.str]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None,
+            schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+            schedule_rotation_id: pulumi.Input[Optional[_builtins.str]] = None,
+            schedule_rotation_members: pulumi.Input[Optional[Sequence[pulumi.Input[Union['ScheduleRotationScheduleRotationMemberArgs', 'ScheduleRotationScheduleRotationMemberArgsDict']]]]] = None,
+            schedule_rotationable_attributes: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+            schedule_rotationable_type: pulumi.Input[Optional[_builtins.str]] = None,
+            start_time: pulumi.Input[Optional[_builtins.str]] = None,
+            time_zone: pulumi.Input[Optional[_builtins.str]] = None) -> 'ScheduleRotation':
         """
         Get an existing ScheduleRotation resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -614,13 +614,13 @@ class ScheduleRotation(pulumi.CustomResource):
         :param pulumi.Input[_builtins.bool] active_all_week: Schedule rotation active all week?. Value must be one of true or false
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] active_days: Value must be one of `S`, `M`, `T`, `W`, `R`, `F`, `U`.
         :param pulumi.Input[Sequence[pulumi.Input[Union['ScheduleRotationActiveTimeAttributeArgs', 'ScheduleRotationActiveTimeAttributeArgsDict']]]] active_time_attributes: Schedule rotation's active times
-        :param pulumi.Input[_builtins.str] active_time_type: Value must be one of <span pulumi-lang-nodejs="`allDay`" pulumi-lang-dotnet="`AllDay`" pulumi-lang-go="`allDay`" pulumi-lang-python="`all_day`" pulumi-lang-yaml="`allDay`" pulumi-lang-java="`allDay`">`all_day`</span>, <span pulumi-lang-nodejs="`sameTime`" pulumi-lang-dotnet="`SameTime`" pulumi-lang-go="`sameTime`" pulumi-lang-python="`same_time`" pulumi-lang-yaml="`sameTime`" pulumi-lang-java="`sameTime`">`same_time`</span>, or <span pulumi-lang-nodejs="`custom`" pulumi-lang-dotnet="`Custom`" pulumi-lang-go="`custom`" pulumi-lang-python="`custom`" pulumi-lang-yaml="`custom`" pulumi-lang-java="`custom`">`custom`</span>. The value chosen will override <span pulumi-lang-nodejs="`activeTimeAttributes`" pulumi-lang-dotnet="`ActiveTimeAttributes`" pulumi-lang-go="`activeTimeAttributes`" pulumi-lang-python="`active_time_attributes`" pulumi-lang-yaml="`activeTimeAttributes`" pulumi-lang-java="`activeTimeAttributes`">`active_time_attributes`</span> in any <span pulumi-lang-nodejs="`rootly.ScheduleRotationActiveDay`" pulumi-lang-dotnet="`rootly.ScheduleRotationActiveDay`" pulumi-lang-go="`ScheduleRotationActiveDay`" pulumi-lang-python="`ScheduleRotationActiveDay`" pulumi-lang-yaml="`rootly.ScheduleRotationActiveDay`" pulumi-lang-java="`rootly.ScheduleRotationActiveDay`">`rootly.ScheduleRotationActiveDay`</span> resources linked to this <span pulumi-lang-nodejs="`rootly.ScheduleRotation`" pulumi-lang-dotnet="`rootly.ScheduleRotation`" pulumi-lang-go="`ScheduleRotation`" pulumi-lang-python="`ScheduleRotation`" pulumi-lang-yaml="`rootly.ScheduleRotation`" pulumi-lang-java="`rootly.ScheduleRotation`">`rootly.ScheduleRotation`</span>.
+        :param pulumi.Input[_builtins.str] active_time_type: Value must be one of <span pulumi-lang-nodejs="`allDay`" pulumi-lang-dotnet="`AllDay`" pulumi-lang-go="`allDay`" pulumi-lang-python="`all_day`" pulumi-lang-yaml="`allDay`" pulumi-lang-java="`allDay`" pulumi-lang-hcl="`all_day`">`allDay`</span>, <span pulumi-lang-nodejs="`sameTime`" pulumi-lang-dotnet="`SameTime`" pulumi-lang-go="`sameTime`" pulumi-lang-python="`same_time`" pulumi-lang-yaml="`sameTime`" pulumi-lang-java="`sameTime`" pulumi-lang-hcl="`same_time`">`sameTime`</span>, or <span pulumi-lang-nodejs="`custom`" pulumi-lang-dotnet="`Custom`" pulumi-lang-go="`custom`" pulumi-lang-python="`custom`" pulumi-lang-yaml="`custom`" pulumi-lang-java="`custom`" pulumi-lang-hcl="`custom`">`custom`</span>. The value chosen will override <span pulumi-lang-nodejs="`activeTimeAttributes`" pulumi-lang-dotnet="`ActiveTimeAttributes`" pulumi-lang-go="`activeTimeAttributes`" pulumi-lang-python="`active_time_attributes`" pulumi-lang-yaml="`activeTimeAttributes`" pulumi-lang-java="`activeTimeAttributes`" pulumi-lang-hcl="`active_time_attributes`">`activeTimeAttributes`</span> in any <span pulumi-lang-nodejs="`rootly.ScheduleRotationActiveDay`" pulumi-lang-dotnet="`rootly.ScheduleRotationActiveDay`" pulumi-lang-go="`ScheduleRotationActiveDay`" pulumi-lang-python="`ScheduleRotationActiveDay`" pulumi-lang-yaml="`rootly.ScheduleRotationActiveDay`" pulumi-lang-java="`rootly.ScheduleRotationActiveDay`" pulumi-lang-hcl="`rootly_schedule_rotation_active_day`">`rootly.ScheduleRotationActiveDay`</span> resources linked to this <span pulumi-lang-nodejs="`rootly.ScheduleRotation`" pulumi-lang-dotnet="`rootly.ScheduleRotation`" pulumi-lang-go="`ScheduleRotation`" pulumi-lang-python="`ScheduleRotation`" pulumi-lang-yaml="`rootly.ScheduleRotation`" pulumi-lang-java="`rootly.ScheduleRotation`" pulumi-lang-hcl="`rootly_schedule_rotation`">`rootly.ScheduleRotation`</span>.
         :param pulumi.Input[_builtins.str] end_time: ISO8601 date and time when rotation ends. Shifts will only be created before this time.
         :param pulumi.Input[_builtins.str] name: The name of the schedule rotation
         :param pulumi.Input[_builtins.float] position: Position of the schedule rotation
         :param pulumi.Input[_builtins.str] schedule_id: The ID of parent schedule
         :param pulumi.Input[Sequence[pulumi.Input[Union['ScheduleRotationScheduleRotationMemberArgs', 'ScheduleRotationScheduleRotationMemberArgsDict']]]] schedule_rotation_members: Schedule rotation members. You can only add schedule rotation members if your account has schedule nesting feature enabled.
-        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] schedule_rotationable_attributes: handoff_time and/or<span pulumi-lang-nodejs=" handoffDay " pulumi-lang-dotnet=" HandoffDay " pulumi-lang-go=" handoffDay " pulumi-lang-python=" handoff_day " pulumi-lang-yaml=" handoffDay " pulumi-lang-java=" handoffDay "> handoff_day </span>may be required, depending on schedule_rotationable_type. Please see API docs for options based on schedule_rotationable_type: https://docs.rootly.com/api-reference/schedulerotations/creates-a-schedule-rotation#response-data-attributes-schedule-rotationable-attributes
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] schedule_rotationable_attributes: handoff_time and/or<span pulumi-lang-nodejs=" handoffDay " pulumi-lang-dotnet=" HandoffDay " pulumi-lang-go=" handoffDay " pulumi-lang-python=" handoff_day " pulumi-lang-yaml=" handoffDay " pulumi-lang-java=" handoffDay " pulumi-lang-hcl=" handoff_day "> handoffDay </span>may be required, depending on schedule_rotationable_type. Please see API docs for options based on schedule_rotationable_type: https://docs.rootly.com/api-reference/schedulerotations/creates-a-schedule-rotation#response-data-attributes-schedule-rotationable-attributes
         :param pulumi.Input[_builtins.str] schedule_rotationable_type: Schedule rotation type. Value must be one of `ScheduleDailyRotation`, `ScheduleWeeklyRotation`, `ScheduleBiweeklyRotation`, `ScheduleMonthlyRotation`, `ScheduleCustomRotation`.
         :param pulumi.Input[_builtins.str] start_time: ISO8601 date and time when rotation starts. Shifts will only be created after this time.
         :param pulumi.Input[_builtins.str] time_zone: A valid IANA time zone name.
@@ -673,7 +673,7 @@ class ScheduleRotation(pulumi.CustomResource):
     @pulumi.getter(name="activeTimeType")
     def active_time_type(self) -> pulumi.Output[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`allDay`" pulumi-lang-dotnet="`AllDay`" pulumi-lang-go="`allDay`" pulumi-lang-python="`all_day`" pulumi-lang-yaml="`allDay`" pulumi-lang-java="`allDay`">`all_day`</span>, <span pulumi-lang-nodejs="`sameTime`" pulumi-lang-dotnet="`SameTime`" pulumi-lang-go="`sameTime`" pulumi-lang-python="`same_time`" pulumi-lang-yaml="`sameTime`" pulumi-lang-java="`sameTime`">`same_time`</span>, or <span pulumi-lang-nodejs="`custom`" pulumi-lang-dotnet="`Custom`" pulumi-lang-go="`custom`" pulumi-lang-python="`custom`" pulumi-lang-yaml="`custom`" pulumi-lang-java="`custom`">`custom`</span>. The value chosen will override <span pulumi-lang-nodejs="`activeTimeAttributes`" pulumi-lang-dotnet="`ActiveTimeAttributes`" pulumi-lang-go="`activeTimeAttributes`" pulumi-lang-python="`active_time_attributes`" pulumi-lang-yaml="`activeTimeAttributes`" pulumi-lang-java="`activeTimeAttributes`">`active_time_attributes`</span> in any <span pulumi-lang-nodejs="`rootly.ScheduleRotationActiveDay`" pulumi-lang-dotnet="`rootly.ScheduleRotationActiveDay`" pulumi-lang-go="`ScheduleRotationActiveDay`" pulumi-lang-python="`ScheduleRotationActiveDay`" pulumi-lang-yaml="`rootly.ScheduleRotationActiveDay`" pulumi-lang-java="`rootly.ScheduleRotationActiveDay`">`rootly.ScheduleRotationActiveDay`</span> resources linked to this <span pulumi-lang-nodejs="`rootly.ScheduleRotation`" pulumi-lang-dotnet="`rootly.ScheduleRotation`" pulumi-lang-go="`ScheduleRotation`" pulumi-lang-python="`ScheduleRotation`" pulumi-lang-yaml="`rootly.ScheduleRotation`" pulumi-lang-java="`rootly.ScheduleRotation`">`rootly.ScheduleRotation`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`allDay`" pulumi-lang-dotnet="`AllDay`" pulumi-lang-go="`allDay`" pulumi-lang-python="`all_day`" pulumi-lang-yaml="`allDay`" pulumi-lang-java="`allDay`" pulumi-lang-hcl="`all_day`">`allDay`</span>, <span pulumi-lang-nodejs="`sameTime`" pulumi-lang-dotnet="`SameTime`" pulumi-lang-go="`sameTime`" pulumi-lang-python="`same_time`" pulumi-lang-yaml="`sameTime`" pulumi-lang-java="`sameTime`" pulumi-lang-hcl="`same_time`">`sameTime`</span>, or <span pulumi-lang-nodejs="`custom`" pulumi-lang-dotnet="`Custom`" pulumi-lang-go="`custom`" pulumi-lang-python="`custom`" pulumi-lang-yaml="`custom`" pulumi-lang-java="`custom`" pulumi-lang-hcl="`custom`">`custom`</span>. The value chosen will override <span pulumi-lang-nodejs="`activeTimeAttributes`" pulumi-lang-dotnet="`ActiveTimeAttributes`" pulumi-lang-go="`activeTimeAttributes`" pulumi-lang-python="`active_time_attributes`" pulumi-lang-yaml="`activeTimeAttributes`" pulumi-lang-java="`activeTimeAttributes`" pulumi-lang-hcl="`active_time_attributes`">`activeTimeAttributes`</span> in any <span pulumi-lang-nodejs="`rootly.ScheduleRotationActiveDay`" pulumi-lang-dotnet="`rootly.ScheduleRotationActiveDay`" pulumi-lang-go="`ScheduleRotationActiveDay`" pulumi-lang-python="`ScheduleRotationActiveDay`" pulumi-lang-yaml="`rootly.ScheduleRotationActiveDay`" pulumi-lang-java="`rootly.ScheduleRotationActiveDay`" pulumi-lang-hcl="`rootly_schedule_rotation_active_day`">`rootly.ScheduleRotationActiveDay`</span> resources linked to this <span pulumi-lang-nodejs="`rootly.ScheduleRotation`" pulumi-lang-dotnet="`rootly.ScheduleRotation`" pulumi-lang-go="`ScheduleRotation`" pulumi-lang-python="`ScheduleRotation`" pulumi-lang-yaml="`rootly.ScheduleRotation`" pulumi-lang-java="`rootly.ScheduleRotation`" pulumi-lang-hcl="`rootly_schedule_rotation`">`rootly.ScheduleRotation`</span>.
         """
         return pulumi.get(self, "active_time_type")
 
@@ -726,7 +726,7 @@ class ScheduleRotation(pulumi.CustomResource):
     @pulumi.getter(name="scheduleRotationableAttributes")
     def schedule_rotationable_attributes(self) -> pulumi.Output[Mapping[str, _builtins.str]]:
         """
-        handoff_time and/or<span pulumi-lang-nodejs=" handoffDay " pulumi-lang-dotnet=" HandoffDay " pulumi-lang-go=" handoffDay " pulumi-lang-python=" handoff_day " pulumi-lang-yaml=" handoffDay " pulumi-lang-java=" handoffDay "> handoff_day </span>may be required, depending on schedule_rotationable_type. Please see API docs for options based on schedule_rotationable_type: https://docs.rootly.com/api-reference/schedulerotations/creates-a-schedule-rotation#response-data-attributes-schedule-rotationable-attributes
+        handoff_time and/or<span pulumi-lang-nodejs=" handoffDay " pulumi-lang-dotnet=" HandoffDay " pulumi-lang-go=" handoffDay " pulumi-lang-python=" handoff_day " pulumi-lang-yaml=" handoffDay " pulumi-lang-java=" handoffDay " pulumi-lang-hcl=" handoff_day "> handoffDay </span>may be required, depending on schedule_rotationable_type. Please see API docs for options based on schedule_rotationable_type: https://docs.rootly.com/api-reference/schedulerotations/creates-a-schedule-rotation#response-data-attributes-schedule-rotationable-attributes
         """
         return pulumi.get(self, "schedule_rotationable_attributes")
 
@@ -753,3 +753,4 @@ class ScheduleRotation(pulumi.CustomResource):
         A valid IANA time zone name.
         """
         return pulumi.get(self, "time_zone")
+

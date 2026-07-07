@@ -92,9 +92,9 @@ def get_form_field_option(color: Optional[_builtins.str] = None,
         form_field_id=pulumi.get(__ret__, 'form_field_id'),
         id=pulumi.get(__ret__, 'id'),
         value=pulumi.get(__ret__, 'value'))
-def get_form_field_option_output(color: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                                 form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-                                 value: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_form_field_option_output(color: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                                 form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+                                 value: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                                  opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetFormFieldOptionResult]:
     """
     Use this data source to access information about an existing resource.

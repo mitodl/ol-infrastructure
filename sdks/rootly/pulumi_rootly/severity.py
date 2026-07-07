@@ -21,16 +21,16 @@ __all__ = ['SeverityArgs', 'Severity']
 @pulumi.input_type
 class SeverityArgs:
     def __init__(__self__, *,
-                 color: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 notify_emails: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 severity: Optional[pulumi.Input[_builtins.str]] = None,
-                 severity_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 slack_aliases: Optional[pulumi.Input[Sequence[pulumi.Input['SeveritySlackAliasArgs']]]] = None,
-                 slack_channels: Optional[pulumi.Input[Sequence[pulumi.Input['SeveritySlackChannelArgs']]]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None):
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 notify_emails: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 severity: pulumi.Input[Optional[_builtins.str]] = None,
+                 severity_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input['SeveritySlackAliasArgs']]]] = None,
+                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input['SeveritySlackChannelArgs']]]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a Severity resource.
 
@@ -39,7 +39,7 @@ class SeverityArgs:
         :param pulumi.Input[_builtins.str] name: The name of the severity
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] notify_emails: Emails to attach to the severity
         :param pulumi.Input[_builtins.float] position: Position of the severity
-        :param pulumi.Input[_builtins.str] severity: The severity of the severity. Value must be one of <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        :param pulumi.Input[_builtins.str] severity: The severity of the severity. Value must be one of <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`" pulumi-lang-hcl="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         :param pulumi.Input[Sequence[pulumi.Input['SeveritySlackAliasArgs']]] slack_aliases: Slack Aliases associated with this severity
         :param pulumi.Input[Sequence[pulumi.Input['SeveritySlackChannelArgs']]] slack_channels: Slack Channels associated with this severity
         :param pulumi.Input[_builtins.str] slug: The slug of the severity
@@ -67,135 +67,135 @@ class SeverityArgs:
 
     @_builtins.property
     @pulumi.getter
-    def color(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def color(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The hex color of the severity
         """
         return pulumi.get(self, "color")
 
     @color.setter
-    def color(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def color(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "color", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the severity
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the severity
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="notifyEmails")
-    def notify_emails(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def notify_emails(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Emails to attach to the severity
         """
         return pulumi.get(self, "notify_emails")
 
     @notify_emails.setter
-    def notify_emails(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def notify_emails(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "notify_emails", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Position of the severity
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter
-    def severity(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def severity(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The severity of the severity. Value must be one of <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        The severity of the severity. Value must be one of <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`" pulumi-lang-hcl="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         """
         return pulumi.get(self, "severity")
 
     @severity.setter
-    def severity(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def severity(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "severity", value)
 
     @_builtins.property
     @pulumi.getter(name="severityId")
-    def severity_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def severity_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "severity_id")
 
     @severity_id.setter
-    def severity_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def severity_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "severity_id", value)
 
     @_builtins.property
     @pulumi.getter(name="slackAliases")
-    def slack_aliases(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['SeveritySlackAliasArgs']]]]:
+    def slack_aliases(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['SeveritySlackAliasArgs']]]]:
         """
         Slack Aliases associated with this severity
         """
         return pulumi.get(self, "slack_aliases")
 
     @slack_aliases.setter
-    def slack_aliases(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['SeveritySlackAliasArgs']]]]):
+    def slack_aliases(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['SeveritySlackAliasArgs']]]]):
         pulumi.set(self, "slack_aliases", value)
 
     @_builtins.property
     @pulumi.getter(name="slackChannels")
-    def slack_channels(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['SeveritySlackChannelArgs']]]]:
+    def slack_channels(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['SeveritySlackChannelArgs']]]]:
         """
         Slack Channels associated with this severity
         """
         return pulumi.get(self, "slack_channels")
 
     @slack_channels.setter
-    def slack_channels(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['SeveritySlackChannelArgs']]]]):
+    def slack_channels(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['SeveritySlackChannelArgs']]]]):
         pulumi.set(self, "slack_channels", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The slug of the severity
         """
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
 
 @pulumi.input_type
 class _SeverityState:
     def __init__(__self__, *,
-                 color: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 notify_emails: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 severity: Optional[pulumi.Input[_builtins.str]] = None,
-                 severity_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 slack_aliases: Optional[pulumi.Input[Sequence[pulumi.Input['SeveritySlackAliasArgs']]]] = None,
-                 slack_channels: Optional[pulumi.Input[Sequence[pulumi.Input['SeveritySlackChannelArgs']]]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None):
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 notify_emails: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 severity: pulumi.Input[Optional[_builtins.str]] = None,
+                 severity_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input['SeveritySlackAliasArgs']]]] = None,
+                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input['SeveritySlackChannelArgs']]]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering Severity resources.
 
@@ -204,7 +204,7 @@ class _SeverityState:
         :param pulumi.Input[_builtins.str] name: The name of the severity
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] notify_emails: Emails to attach to the severity
         :param pulumi.Input[_builtins.float] position: Position of the severity
-        :param pulumi.Input[_builtins.str] severity: The severity of the severity. Value must be one of <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        :param pulumi.Input[_builtins.str] severity: The severity of the severity. Value must be one of <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`" pulumi-lang-hcl="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         :param pulumi.Input[Sequence[pulumi.Input['SeveritySlackAliasArgs']]] slack_aliases: Slack Aliases associated with this severity
         :param pulumi.Input[Sequence[pulumi.Input['SeveritySlackChannelArgs']]] slack_channels: Slack Channels associated with this severity
         :param pulumi.Input[_builtins.str] slug: The slug of the severity
@@ -232,119 +232,119 @@ class _SeverityState:
 
     @_builtins.property
     @pulumi.getter
-    def color(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def color(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The hex color of the severity
         """
         return pulumi.get(self, "color")
 
     @color.setter
-    def color(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def color(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "color", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the severity
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the severity
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="notifyEmails")
-    def notify_emails(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def notify_emails(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Emails to attach to the severity
         """
         return pulumi.get(self, "notify_emails")
 
     @notify_emails.setter
-    def notify_emails(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def notify_emails(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "notify_emails", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Position of the severity
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter
-    def severity(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def severity(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The severity of the severity. Value must be one of <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        The severity of the severity. Value must be one of <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`" pulumi-lang-hcl="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         """
         return pulumi.get(self, "severity")
 
     @severity.setter
-    def severity(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def severity(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "severity", value)
 
     @_builtins.property
     @pulumi.getter(name="severityId")
-    def severity_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def severity_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "severity_id")
 
     @severity_id.setter
-    def severity_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def severity_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "severity_id", value)
 
     @_builtins.property
     @pulumi.getter(name="slackAliases")
-    def slack_aliases(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['SeveritySlackAliasArgs']]]]:
+    def slack_aliases(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['SeveritySlackAliasArgs']]]]:
         """
         Slack Aliases associated with this severity
         """
         return pulumi.get(self, "slack_aliases")
 
     @slack_aliases.setter
-    def slack_aliases(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['SeveritySlackAliasArgs']]]]):
+    def slack_aliases(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['SeveritySlackAliasArgs']]]]):
         pulumi.set(self, "slack_aliases", value)
 
     @_builtins.property
     @pulumi.getter(name="slackChannels")
-    def slack_channels(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['SeveritySlackChannelArgs']]]]:
+    def slack_channels(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['SeveritySlackChannelArgs']]]]:
         """
         Slack Channels associated with this severity
         """
         return pulumi.get(self, "slack_channels")
 
     @slack_channels.setter
-    def slack_channels(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['SeveritySlackChannelArgs']]]]):
+    def slack_channels(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['SeveritySlackChannelArgs']]]]):
         pulumi.set(self, "slack_channels", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The slug of the severity
         """
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
 
@@ -354,16 +354,16 @@ class Severity(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 color: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 notify_emails: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 severity: Optional[pulumi.Input[_builtins.str]] = None,
-                 severity_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 slack_aliases: Optional[pulumi.Input[Sequence[pulumi.Input[Union['SeveritySlackAliasArgs', 'SeveritySlackAliasArgsDict']]]]] = None,
-                 slack_channels: Optional[pulumi.Input[Sequence[pulumi.Input[Union['SeveritySlackChannelArgs', 'SeveritySlackChannelArgsDict']]]]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 notify_emails: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 severity: pulumi.Input[Optional[_builtins.str]] = None,
+                 severity_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input[Union['SeveritySlackAliasArgs', 'SeveritySlackAliasArgsDict']]]]] = None,
+                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input[Union['SeveritySlackChannelArgs', 'SeveritySlackChannelArgsDict']]]]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a Severity resource with the given unique name, props, and options.
@@ -375,7 +375,7 @@ class Severity(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] name: The name of the severity
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] notify_emails: Emails to attach to the severity
         :param pulumi.Input[_builtins.float] position: Position of the severity
-        :param pulumi.Input[_builtins.str] severity: The severity of the severity. Value must be one of <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        :param pulumi.Input[_builtins.str] severity: The severity of the severity. Value must be one of <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`" pulumi-lang-hcl="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         :param pulumi.Input[Sequence[pulumi.Input[Union['SeveritySlackAliasArgs', 'SeveritySlackAliasArgsDict']]]] slack_aliases: Slack Aliases associated with this severity
         :param pulumi.Input[Sequence[pulumi.Input[Union['SeveritySlackChannelArgs', 'SeveritySlackChannelArgsDict']]]] slack_channels: Slack Channels associated with this severity
         :param pulumi.Input[_builtins.str] slug: The slug of the severity
@@ -404,16 +404,16 @@ class Severity(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 color: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 notify_emails: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 severity: Optional[pulumi.Input[_builtins.str]] = None,
-                 severity_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 slack_aliases: Optional[pulumi.Input[Sequence[pulumi.Input[Union['SeveritySlackAliasArgs', 'SeveritySlackAliasArgsDict']]]]] = None,
-                 slack_channels: Optional[pulumi.Input[Sequence[pulumi.Input[Union['SeveritySlackChannelArgs', 'SeveritySlackChannelArgsDict']]]]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 notify_emails: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 severity: pulumi.Input[Optional[_builtins.str]] = None,
+                 severity_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input[Union['SeveritySlackAliasArgs', 'SeveritySlackAliasArgsDict']]]]] = None,
+                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input[Union['SeveritySlackChannelArgs', 'SeveritySlackChannelArgsDict']]]]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -444,16 +444,16 @@ class Severity(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            color: Optional[pulumi.Input[_builtins.str]] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            notify_emails: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None,
-            severity: Optional[pulumi.Input[_builtins.str]] = None,
-            severity_id: Optional[pulumi.Input[_builtins.str]] = None,
-            slack_aliases: Optional[pulumi.Input[Sequence[pulumi.Input[Union['SeveritySlackAliasArgs', 'SeveritySlackAliasArgsDict']]]]] = None,
-            slack_channels: Optional[pulumi.Input[Sequence[pulumi.Input[Union['SeveritySlackChannelArgs', 'SeveritySlackChannelArgsDict']]]]] = None,
-            slug: Optional[pulumi.Input[_builtins.str]] = None) -> 'Severity':
+            color: pulumi.Input[Optional[_builtins.str]] = None,
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            notify_emails: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None,
+            severity: pulumi.Input[Optional[_builtins.str]] = None,
+            severity_id: pulumi.Input[Optional[_builtins.str]] = None,
+            slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input[Union['SeveritySlackAliasArgs', 'SeveritySlackAliasArgsDict']]]]] = None,
+            slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input[Union['SeveritySlackChannelArgs', 'SeveritySlackChannelArgsDict']]]]] = None,
+            slug: pulumi.Input[Optional[_builtins.str]] = None) -> 'Severity':
         """
         Get an existing Severity resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -466,7 +466,7 @@ class Severity(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] name: The name of the severity
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] notify_emails: Emails to attach to the severity
         :param pulumi.Input[_builtins.float] position: Position of the severity
-        :param pulumi.Input[_builtins.str] severity: The severity of the severity. Value must be one of <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        :param pulumi.Input[_builtins.str] severity: The severity of the severity. Value must be one of <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`" pulumi-lang-hcl="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         :param pulumi.Input[Sequence[pulumi.Input[Union['SeveritySlackAliasArgs', 'SeveritySlackAliasArgsDict']]]] slack_aliases: Slack Aliases associated with this severity
         :param pulumi.Input[Sequence[pulumi.Input[Union['SeveritySlackChannelArgs', 'SeveritySlackChannelArgsDict']]]] slack_channels: Slack Channels associated with this severity
         :param pulumi.Input[_builtins.str] slug: The slug of the severity
@@ -531,7 +531,7 @@ class Severity(pulumi.CustomResource):
     @pulumi.getter
     def severity(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        The severity of the severity. Value must be one of <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        The severity of the severity. Value must be one of <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`" pulumi-lang-hcl="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         """
         return pulumi.get(self, "severity")
 
@@ -563,3 +563,4 @@ class Severity(pulumi.CustomResource):
         The slug of the severity
         """
         return pulumi.get(self, "slug")
+

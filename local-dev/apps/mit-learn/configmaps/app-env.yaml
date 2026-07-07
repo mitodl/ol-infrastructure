@@ -1,0 +1,142 @@
+---
+# Application environment ConfigMap for mit-learn.
+# Non-secret configuration only. Secret values live in mitlearn-secrets.
+#
+# Derived from:
+#   ol-infrastructure/src/ol_infrastructure/applications/mit_learn/__main__.py
+# with local-dev overrides (no S3, no AWS, dense-only Qdrant, Mailpit SMTP).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mitlearn-env
+  namespace: mit-learn
+data:
+  # ── Django settings ────────────────────────────────────────────────────────
+  ALLOWED_HOSTS: '["*"]'
+  DJANGO_SETTINGS_MODULE: "main.settings"
+  MITOL_ENVIRONMENT: "local"
+  MITOL_ADMIN_EMAIL: "admin@odl.local"
+  MITOL_SECURE_SSL_REDIRECT: "False"
+  MITOL_DB_DISABLE_SSL: "True"
+  MITOL_DB_CONN_MAX_AGE: "0"
+  MITOL_DEFAULT_SITE_KEY: "micromasters"
+  MITOL_FRONTPAGE_DIGEST_MAX_POSTS: "10"
+  USE_X_FORWARDED_HOST: "True"
+  USE_X_FORWARDED_PORT: "True"
+  SECURE_CROSS_ORIGIN_OPENER_POLICY: "None"
+  NODE_MODULES_CACHE: "False"
+  # Required — ImproperlyConfigured raised if unset.
+  MITOL_APP_BASE_URL: "https://learn.mit.dev"
+  MITOL_API_BASE_URL: "https://api.learn.mit.dev"
+  # Redirect target for first-time OIDC logins; defaults to a legacy open.odl.local host.
+  MITOL_NEW_USER_LOGIN_URL: "https://learn.mit.dev/onboarding"
+
+  # mkcert root CA — trusts the local wildcard TLS cert for inter-pod HTTPS
+  # (e.g. Django OIDC token exchange with Keycloak at sso.ol.mit.dev)
+  REQUESTS_CA_BUNDLE: "/etc/ssl/local-dev/rootCA.pem"
+  SSL_CERT_FILE: "/etc/ssl/local-dev/rootCA.pem"
+
+  # ── Domain / CORS / CSRF ───────────────────────────────────────────────────
+  CSRF_COOKIE_DOMAIN: ".mit.dev"
+  SESSION_COOKIE_DOMAIN: ".mit.dev"
+  MITOL_COOKIE_NAME: "mitlearn-auth"
+  MITOL_COOKIE_DOMAIN: ".mit.dev"
+  CSRF_TRUSTED_ORIGINS: '["https://learn.mit.dev","https://api.learn.mit.dev"]'
+  CORS_ALLOWED_ORIGINS: '["https://learn.mit.dev","https://api.learn.mit.dev","https://sso.ol.mit.dev"]'
+  MITOL_CORS_ORIGIN_WHITELIST: '["https://learn.mit.dev","https://api.learn.mit.dev"]'
+  CORS_ALLOWED_ORIGIN_REGEXES: "[]"
+  ALLOWED_REDIRECT_HOSTS: '["learn.mit.dev","api.learn.mit.dev"]'
+  MITOL_AXIOS_BASE_PATH: "https://learn.mit.dev"
+
+  # ── SSO / Keycloak ─────────────────────────────────────────────────────────
+  SOCIAL_AUTH_OL_OIDC_KEY: "ol-mitlearn-client"
+  KEYCLOAK_REALM_NAME: "olapps"
+  KEYCLOAK_BASE_URL: "https://sso.ol.mit.dev/"
+  OIDC_ENDPOINT: "https://sso.ol.mit.dev/realms/olapps"
+  SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT: "https://sso.ol.mit.dev/realms/olapps"
+  ACCESS_TOKEN_URL: "https://sso.ol.mit.dev/realms/olapps/protocol/openid-connect/token"
+  AUTHORIZATION_URL: "https://sso.ol.mit.dev/realms/olapps/protocol/openid-connect/auth"
+  USERINFO_URL: "https://sso.ol.mit.dev/realms/olapps/protocol/openid-connect/userinfo"
+
+  # ── Storage (local — no S3) ────────────────────────────────────────────────
+  MITOL_USE_S3: "False"
+  AWS_STORAGE_BUCKET_NAME: ""
+
+  # ── Email (Mailpit) ────────────────────────────────────────────────────────
+  MITOL_EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
+  MITOL_EMAIL_HOST: "mailpit.local-infra.svc.cluster.local"
+  MITOL_EMAIL_PORT: "1025"
+  MITOL_EMAIL_TLS: "False"
+  MITOL_FROM_EMAIL: "MIT Learn <noreply@mit.dev>"
+  MITOL_NOTIFICATION_EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
+  # Mailgun settings are required by settings.py even when using SMTP.
+  # Stub values prevent ImproperlyConfigured at startup; actual Mailgun
+  # is not used in local dev (Mailpit handles all outbound email).
+  MAILGUN_SENDER_DOMAIN: "ol.mit.dev"
+  MAILGUN_FROM_EMAIL: "MIT Learn <noreply@ol.mit.dev>"
+
+  # ── Database ───────────────────────────────────────────────────────────────
+  # DATABASE_URL is set in secrets (contains password).
+  # MITOL_DB_DISABLE_SSL is set above.
+
+  # ── Valkey / Celery ────────────────────────────────────────────────────────
+  # CELERY_BROKER_URL and REDISCACHE_URL are set in secrets.
+  CELERY_TASK_ALWAYS_EAGER: "False"
+  # Disable the Celery beat scheduler by default in local dev so backpopulate/
+  # news ETL and search reindex tasks run on demand (via the Tilt seed buttons),
+  # not automatically on a schedule. Set to "False" to re-enable scheduled
+  # background population.
+  CELERY_BEAT_DISABLED: "True"
+
+  # ── OpenSearch ─────────────────────────────────────────────────────────────
+  OPENSEARCH_INDEX: "mitlearn-local"
+  OPENSEARCH_URL: "http://opensearch-cluster-master.local-infra.svc.cluster.local:9200"
+  OPENSEARCH_DEFAULT_TIMEOUT: "30"
+  OPENSEARCH_INDEXING_CHUNK_SIZE: "75"
+
+  # ── Qdrant (local — use SparseHashEncoder which runs locally via sklearn) ──
+  QDRANT_HOST: "http://qdrant.local-infra.svc.cluster.local:6333"
+  QDRANT_HOST_V2: "http://qdrant.local-infra.svc.cluster.local:6333"
+  QDRANT_COLLECTION_NAME: "mitlearn-local"
+  QDRANT_DENSE_MODEL:
+  QDRANT_ENCODER: "vector_search.encoders.gensim.GensimEncoder"
+  # SparseHashEncoder uses sklearn locally — no Qdrant Cloud required.
+  QDRANT_SPARSE_ENCODER_V2: "vector_search.encoders.sparse_hash.SparseHashEncoder"
+  QDRANT_SPARSE_MODEL_V2: "sklearn/hashing_vectorizer_sparse_model"
+  QDRANT_ENABLE_INDEXING_PLUGIN_HOOKS: "True"
+
+  # ── LiteLLM ────────────────────────────────────────────────────────────────
+  LITELLM_PROXY_URL: "http://litellm.local-infra.svc.cluster.local:4000"
+  LITELLM_TOKEN_ENCODING_NAME: "cl100k_base"
+
+  # ── Tika (document parsing) ────────────────────────────────────────────────
+  TIKA_CLIENT_ONLY: "True"
+  TIKA_SERVER_ENDPOINT: "http://tika.local-infra.svc.cluster.local:9998"
+
+  # ── External catalog URLs (production values — used for ETL, OK to keep) ──
+  MICROMASTERS_CATALOG_API_URL: "https://micromasters.mit.edu/api/v0/catalog/"
+  MICROMASTERS_CMS_API_URL: "https://micromasters.mit.edu/api/v0/wagtail/"
+  OCW_BASE_URL: "https://ocw.mit.edu/"
+  OCW_CONTENT_BUCKET_NAME: "ocw-content-storage"
+  OCW_LIVE_BUCKET: "ocw-content-live-production"
+  OLL_BASE_URL: "https://openlearninglibrary.mit.edu/course/"
+  OLL_API_URL: "https://discovery.openlearninglibrary.mit.edu/api/v1/catalogs/1/courses/"
+  XPRO_CATALOG_API_URL: "https://xpro.mit.edu/api/programs/"
+  XPRO_COURSES_API_URL: "https://xpro.mit.edu/api/courses/"
+  PROLEARN_CATALOG_API_URL: "https://prolearn.mit.edu/graphql"
+  CSAIL_BASE_URL: "https://cap.csail.mit.edu/"
+  MITPE_BASE_URL: "https://professional.mit.edu/"
+  SEE_BASE_URL: "https://executive.mit.edu/"
+  EDX_API_URL: "https://api.edx.org/catalog/v1/catalogs/10/courses"
+  YOUTUBE_CONFIG_URL: "https://raw.githubusercontent.com/mitodl/open-video-data/mitopen/youtube/channels.yaml"
+
+  # ── Embedding config ───────────────────────────────────────────────────────
+  CONTENT_FILE_EMBEDDING_CHUNK_SIZE: "512"
+  CONTENT_FILE_EMBEDDING_CHUNK_OVERLAP: "51"
+  EMBEDDING_SCHEDULE_MINUTES: "120"
+  EMBEDDINGS_EXTERNAL_FETCH_USE_WEBDRIVER: "True"
+
+  # ── Misc ───────────────────────────────────────────────────────────────────
+  NEW_RELIC_LOG: "stdout"
+  POSTHOG_ENABLED: "False"
+  PORT: "8061"

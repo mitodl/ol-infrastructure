@@ -21,18 +21,18 @@ class FormFieldPlacementConditionArgs:
     def __init__(__self__, *,
                  form_field_id: pulumi.Input[_builtins.str],
                  values: pulumi.Input[Sequence[pulumi.Input[_builtins.str]]],
-                 comparison: Optional[pulumi.Input[_builtins.str]] = None,
-                 conditioned: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_placement_condition_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_placement_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None):
+                 comparison: pulumi.Input[Optional[_builtins.str]] = None,
+                 conditioned: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_placement_condition_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_placement_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None):
         """
         The set of arguments for constructing a FormFieldPlacementCondition resource.
 
         :param pulumi.Input[_builtins.str] form_field_id: The condition field.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] values: The values for comparison.
-        :param pulumi.Input[_builtins.str] comparison: The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`">`equal`</span>, <span pulumi-lang-nodejs="`notEqual`" pulumi-lang-dotnet="`NotEqual`" pulumi-lang-go="`notEqual`" pulumi-lang-python="`not_equal`" pulumi-lang-yaml="`notEqual`" pulumi-lang-java="`notEqual`">`not_equal`</span>, <span pulumi-lang-nodejs="`isSet`" pulumi-lang-dotnet="`IsSet`" pulumi-lang-go="`isSet`" pulumi-lang-python="`is_set`" pulumi-lang-yaml="`isSet`" pulumi-lang-java="`isSet`">`is_set`</span>, <span pulumi-lang-nodejs="`isNotSet`" pulumi-lang-dotnet="`IsNotSet`" pulumi-lang-go="`isNotSet`" pulumi-lang-python="`is_not_set`" pulumi-lang-yaml="`isNotSet`" pulumi-lang-java="`isNotSet`">`is_not_set`</span>.
-        :param pulumi.Input[_builtins.str] conditioned: The resource or attribute the condition applies.. Value must be one of <span pulumi-lang-nodejs="`placement`" pulumi-lang-dotnet="`Placement`" pulumi-lang-go="`placement`" pulumi-lang-python="`placement`" pulumi-lang-yaml="`placement`" pulumi-lang-java="`placement`">`placement`</span>, <span pulumi-lang-nodejs="`required`" pulumi-lang-dotnet="`Required`" pulumi-lang-go="`required`" pulumi-lang-python="`required`" pulumi-lang-yaml="`required`" pulumi-lang-java="`required`">`required`</span>.
+        :param pulumi.Input[_builtins.str] comparison: The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`" pulumi-lang-hcl="`equal`">`equal`</span>, <span pulumi-lang-nodejs="`notEqual`" pulumi-lang-dotnet="`NotEqual`" pulumi-lang-go="`notEqual`" pulumi-lang-python="`not_equal`" pulumi-lang-yaml="`notEqual`" pulumi-lang-java="`notEqual`" pulumi-lang-hcl="`not_equal`">`notEqual`</span>, <span pulumi-lang-nodejs="`isSet`" pulumi-lang-dotnet="`IsSet`" pulumi-lang-go="`isSet`" pulumi-lang-python="`is_set`" pulumi-lang-yaml="`isSet`" pulumi-lang-java="`isSet`" pulumi-lang-hcl="`is_set`">`isSet`</span>, <span pulumi-lang-nodejs="`isNotSet`" pulumi-lang-dotnet="`IsNotSet`" pulumi-lang-go="`isNotSet`" pulumi-lang-python="`is_not_set`" pulumi-lang-yaml="`isNotSet`" pulumi-lang-java="`isNotSet`" pulumi-lang-hcl="`is_not_set`">`isNotSet`</span>.
+        :param pulumi.Input[_builtins.str] conditioned: The resource or attribute the condition applies.. Value must be one of <span pulumi-lang-nodejs="`placement`" pulumi-lang-dotnet="`Placement`" pulumi-lang-go="`placement`" pulumi-lang-python="`placement`" pulumi-lang-yaml="`placement`" pulumi-lang-java="`placement`" pulumi-lang-hcl="`placement`">`placement`</span>, <span pulumi-lang-nodejs="`required`" pulumi-lang-dotnet="`Required`" pulumi-lang-go="`required`" pulumi-lang-python="`required`" pulumi-lang-yaml="`required`" pulumi-lang-java="`required`" pulumi-lang-hcl="`required`">`required`</span>.
         :param pulumi.Input[_builtins.str] form_field_placement_id: The form field placement this condition applies.
         :param pulumi.Input[_builtins.float] position: The condition position.
         """
@@ -75,77 +75,77 @@ class FormFieldPlacementConditionArgs:
 
     @_builtins.property
     @pulumi.getter
-    def comparison(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def comparison(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`">`equal`</span>, <span pulumi-lang-nodejs="`notEqual`" pulumi-lang-dotnet="`NotEqual`" pulumi-lang-go="`notEqual`" pulumi-lang-python="`not_equal`" pulumi-lang-yaml="`notEqual`" pulumi-lang-java="`notEqual`">`not_equal`</span>, <span pulumi-lang-nodejs="`isSet`" pulumi-lang-dotnet="`IsSet`" pulumi-lang-go="`isSet`" pulumi-lang-python="`is_set`" pulumi-lang-yaml="`isSet`" pulumi-lang-java="`isSet`">`is_set`</span>, <span pulumi-lang-nodejs="`isNotSet`" pulumi-lang-dotnet="`IsNotSet`" pulumi-lang-go="`isNotSet`" pulumi-lang-python="`is_not_set`" pulumi-lang-yaml="`isNotSet`" pulumi-lang-java="`isNotSet`">`is_not_set`</span>.
+        The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`" pulumi-lang-hcl="`equal`">`equal`</span>, <span pulumi-lang-nodejs="`notEqual`" pulumi-lang-dotnet="`NotEqual`" pulumi-lang-go="`notEqual`" pulumi-lang-python="`not_equal`" pulumi-lang-yaml="`notEqual`" pulumi-lang-java="`notEqual`" pulumi-lang-hcl="`not_equal`">`notEqual`</span>, <span pulumi-lang-nodejs="`isSet`" pulumi-lang-dotnet="`IsSet`" pulumi-lang-go="`isSet`" pulumi-lang-python="`is_set`" pulumi-lang-yaml="`isSet`" pulumi-lang-java="`isSet`" pulumi-lang-hcl="`is_set`">`isSet`</span>, <span pulumi-lang-nodejs="`isNotSet`" pulumi-lang-dotnet="`IsNotSet`" pulumi-lang-go="`isNotSet`" pulumi-lang-python="`is_not_set`" pulumi-lang-yaml="`isNotSet`" pulumi-lang-java="`isNotSet`" pulumi-lang-hcl="`is_not_set`">`isNotSet`</span>.
         """
         return pulumi.get(self, "comparison")
 
     @comparison.setter
-    def comparison(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def comparison(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "comparison", value)
 
     @_builtins.property
     @pulumi.getter
-    def conditioned(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def conditioned(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The resource or attribute the condition applies.. Value must be one of <span pulumi-lang-nodejs="`placement`" pulumi-lang-dotnet="`Placement`" pulumi-lang-go="`placement`" pulumi-lang-python="`placement`" pulumi-lang-yaml="`placement`" pulumi-lang-java="`placement`">`placement`</span>, <span pulumi-lang-nodejs="`required`" pulumi-lang-dotnet="`Required`" pulumi-lang-go="`required`" pulumi-lang-python="`required`" pulumi-lang-yaml="`required`" pulumi-lang-java="`required`">`required`</span>.
+        The resource or attribute the condition applies.. Value must be one of <span pulumi-lang-nodejs="`placement`" pulumi-lang-dotnet="`Placement`" pulumi-lang-go="`placement`" pulumi-lang-python="`placement`" pulumi-lang-yaml="`placement`" pulumi-lang-java="`placement`" pulumi-lang-hcl="`placement`">`placement`</span>, <span pulumi-lang-nodejs="`required`" pulumi-lang-dotnet="`Required`" pulumi-lang-go="`required`" pulumi-lang-python="`required`" pulumi-lang-yaml="`required`" pulumi-lang-java="`required`" pulumi-lang-hcl="`required`">`required`</span>.
         """
         return pulumi.get(self, "conditioned")
 
     @conditioned.setter
-    def conditioned(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def conditioned(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "conditioned", value)
 
     @_builtins.property
     @pulumi.getter(name="formFieldPlacementConditionId")
-    def form_field_placement_condition_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def form_field_placement_condition_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "form_field_placement_condition_id")
 
     @form_field_placement_condition_id.setter
-    def form_field_placement_condition_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def form_field_placement_condition_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form_field_placement_condition_id", value)
 
     @_builtins.property
     @pulumi.getter(name="formFieldPlacementId")
-    def form_field_placement_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def form_field_placement_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The form field placement this condition applies.
         """
         return pulumi.get(self, "form_field_placement_id")
 
     @form_field_placement_id.setter
-    def form_field_placement_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def form_field_placement_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form_field_placement_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The condition position.
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
 
 @pulumi.input_type
 class _FormFieldPlacementConditionState:
     def __init__(__self__, *,
-                 comparison: Optional[pulumi.Input[_builtins.str]] = None,
-                 conditioned: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_placement_condition_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_placement_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 values: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None):
+                 comparison: pulumi.Input[Optional[_builtins.str]] = None,
+                 conditioned: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_placement_condition_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_placement_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 values: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None):
         """
         Input properties used for looking up and filtering FormFieldPlacementCondition resources.
 
-        :param pulumi.Input[_builtins.str] comparison: The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`">`equal`</span>, <span pulumi-lang-nodejs="`notEqual`" pulumi-lang-dotnet="`NotEqual`" pulumi-lang-go="`notEqual`" pulumi-lang-python="`not_equal`" pulumi-lang-yaml="`notEqual`" pulumi-lang-java="`notEqual`">`not_equal`</span>, <span pulumi-lang-nodejs="`isSet`" pulumi-lang-dotnet="`IsSet`" pulumi-lang-go="`isSet`" pulumi-lang-python="`is_set`" pulumi-lang-yaml="`isSet`" pulumi-lang-java="`isSet`">`is_set`</span>, <span pulumi-lang-nodejs="`isNotSet`" pulumi-lang-dotnet="`IsNotSet`" pulumi-lang-go="`isNotSet`" pulumi-lang-python="`is_not_set`" pulumi-lang-yaml="`isNotSet`" pulumi-lang-java="`isNotSet`">`is_not_set`</span>.
-        :param pulumi.Input[_builtins.str] conditioned: The resource or attribute the condition applies.. Value must be one of <span pulumi-lang-nodejs="`placement`" pulumi-lang-dotnet="`Placement`" pulumi-lang-go="`placement`" pulumi-lang-python="`placement`" pulumi-lang-yaml="`placement`" pulumi-lang-java="`placement`">`placement`</span>, <span pulumi-lang-nodejs="`required`" pulumi-lang-dotnet="`Required`" pulumi-lang-go="`required`" pulumi-lang-python="`required`" pulumi-lang-yaml="`required`" pulumi-lang-java="`required`">`required`</span>.
+        :param pulumi.Input[_builtins.str] comparison: The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`" pulumi-lang-hcl="`equal`">`equal`</span>, <span pulumi-lang-nodejs="`notEqual`" pulumi-lang-dotnet="`NotEqual`" pulumi-lang-go="`notEqual`" pulumi-lang-python="`not_equal`" pulumi-lang-yaml="`notEqual`" pulumi-lang-java="`notEqual`" pulumi-lang-hcl="`not_equal`">`notEqual`</span>, <span pulumi-lang-nodejs="`isSet`" pulumi-lang-dotnet="`IsSet`" pulumi-lang-go="`isSet`" pulumi-lang-python="`is_set`" pulumi-lang-yaml="`isSet`" pulumi-lang-java="`isSet`" pulumi-lang-hcl="`is_set`">`isSet`</span>, <span pulumi-lang-nodejs="`isNotSet`" pulumi-lang-dotnet="`IsNotSet`" pulumi-lang-go="`isNotSet`" pulumi-lang-python="`is_not_set`" pulumi-lang-yaml="`isNotSet`" pulumi-lang-java="`isNotSet`" pulumi-lang-hcl="`is_not_set`">`isNotSet`</span>.
+        :param pulumi.Input[_builtins.str] conditioned: The resource or attribute the condition applies.. Value must be one of <span pulumi-lang-nodejs="`placement`" pulumi-lang-dotnet="`Placement`" pulumi-lang-go="`placement`" pulumi-lang-python="`placement`" pulumi-lang-yaml="`placement`" pulumi-lang-java="`placement`" pulumi-lang-hcl="`placement`">`placement`</span>, <span pulumi-lang-nodejs="`required`" pulumi-lang-dotnet="`Required`" pulumi-lang-go="`required`" pulumi-lang-python="`required`" pulumi-lang-yaml="`required`" pulumi-lang-java="`required`" pulumi-lang-hcl="`required`">`required`</span>.
         :param pulumi.Input[_builtins.str] form_field_id: The condition field.
         :param pulumi.Input[_builtins.str] form_field_placement_id: The form field placement this condition applies.
         :param pulumi.Input[_builtins.float] position: The condition position.
@@ -168,83 +168,83 @@ class _FormFieldPlacementConditionState:
 
     @_builtins.property
     @pulumi.getter
-    def comparison(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def comparison(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`">`equal`</span>, <span pulumi-lang-nodejs="`notEqual`" pulumi-lang-dotnet="`NotEqual`" pulumi-lang-go="`notEqual`" pulumi-lang-python="`not_equal`" pulumi-lang-yaml="`notEqual`" pulumi-lang-java="`notEqual`">`not_equal`</span>, <span pulumi-lang-nodejs="`isSet`" pulumi-lang-dotnet="`IsSet`" pulumi-lang-go="`isSet`" pulumi-lang-python="`is_set`" pulumi-lang-yaml="`isSet`" pulumi-lang-java="`isSet`">`is_set`</span>, <span pulumi-lang-nodejs="`isNotSet`" pulumi-lang-dotnet="`IsNotSet`" pulumi-lang-go="`isNotSet`" pulumi-lang-python="`is_not_set`" pulumi-lang-yaml="`isNotSet`" pulumi-lang-java="`isNotSet`">`is_not_set`</span>.
+        The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`" pulumi-lang-hcl="`equal`">`equal`</span>, <span pulumi-lang-nodejs="`notEqual`" pulumi-lang-dotnet="`NotEqual`" pulumi-lang-go="`notEqual`" pulumi-lang-python="`not_equal`" pulumi-lang-yaml="`notEqual`" pulumi-lang-java="`notEqual`" pulumi-lang-hcl="`not_equal`">`notEqual`</span>, <span pulumi-lang-nodejs="`isSet`" pulumi-lang-dotnet="`IsSet`" pulumi-lang-go="`isSet`" pulumi-lang-python="`is_set`" pulumi-lang-yaml="`isSet`" pulumi-lang-java="`isSet`" pulumi-lang-hcl="`is_set`">`isSet`</span>, <span pulumi-lang-nodejs="`isNotSet`" pulumi-lang-dotnet="`IsNotSet`" pulumi-lang-go="`isNotSet`" pulumi-lang-python="`is_not_set`" pulumi-lang-yaml="`isNotSet`" pulumi-lang-java="`isNotSet`" pulumi-lang-hcl="`is_not_set`">`isNotSet`</span>.
         """
         return pulumi.get(self, "comparison")
 
     @comparison.setter
-    def comparison(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def comparison(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "comparison", value)
 
     @_builtins.property
     @pulumi.getter
-    def conditioned(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def conditioned(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The resource or attribute the condition applies.. Value must be one of <span pulumi-lang-nodejs="`placement`" pulumi-lang-dotnet="`Placement`" pulumi-lang-go="`placement`" pulumi-lang-python="`placement`" pulumi-lang-yaml="`placement`" pulumi-lang-java="`placement`">`placement`</span>, <span pulumi-lang-nodejs="`required`" pulumi-lang-dotnet="`Required`" pulumi-lang-go="`required`" pulumi-lang-python="`required`" pulumi-lang-yaml="`required`" pulumi-lang-java="`required`">`required`</span>.
+        The resource or attribute the condition applies.. Value must be one of <span pulumi-lang-nodejs="`placement`" pulumi-lang-dotnet="`Placement`" pulumi-lang-go="`placement`" pulumi-lang-python="`placement`" pulumi-lang-yaml="`placement`" pulumi-lang-java="`placement`" pulumi-lang-hcl="`placement`">`placement`</span>, <span pulumi-lang-nodejs="`required`" pulumi-lang-dotnet="`Required`" pulumi-lang-go="`required`" pulumi-lang-python="`required`" pulumi-lang-yaml="`required`" pulumi-lang-java="`required`" pulumi-lang-hcl="`required`">`required`</span>.
         """
         return pulumi.get(self, "conditioned")
 
     @conditioned.setter
-    def conditioned(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def conditioned(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "conditioned", value)
 
     @_builtins.property
     @pulumi.getter(name="formFieldId")
-    def form_field_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def form_field_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The condition field.
         """
         return pulumi.get(self, "form_field_id")
 
     @form_field_id.setter
-    def form_field_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def form_field_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form_field_id", value)
 
     @_builtins.property
     @pulumi.getter(name="formFieldPlacementConditionId")
-    def form_field_placement_condition_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def form_field_placement_condition_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "form_field_placement_condition_id")
 
     @form_field_placement_condition_id.setter
-    def form_field_placement_condition_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def form_field_placement_condition_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form_field_placement_condition_id", value)
 
     @_builtins.property
     @pulumi.getter(name="formFieldPlacementId")
-    def form_field_placement_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def form_field_placement_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The form field placement this condition applies.
         """
         return pulumi.get(self, "form_field_placement_id")
 
     @form_field_placement_id.setter
-    def form_field_placement_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def form_field_placement_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form_field_placement_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The condition position.
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter
-    def values(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def values(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         The values for comparison.
         """
         return pulumi.get(self, "values")
 
     @values.setter
-    def values(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def values(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "values", value)
 
 
@@ -254,21 +254,21 @@ class FormFieldPlacementCondition(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 comparison: Optional[pulumi.Input[_builtins.str]] = None,
-                 conditioned: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_placement_condition_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_placement_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 values: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 comparison: pulumi.Input[Optional[_builtins.str]] = None,
+                 conditioned: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_placement_condition_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_placement_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 values: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  __props__=None):
         """
         Create a FormFieldPlacementCondition resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] comparison: The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`">`equal`</span>, <span pulumi-lang-nodejs="`notEqual`" pulumi-lang-dotnet="`NotEqual`" pulumi-lang-go="`notEqual`" pulumi-lang-python="`not_equal`" pulumi-lang-yaml="`notEqual`" pulumi-lang-java="`notEqual`">`not_equal`</span>, <span pulumi-lang-nodejs="`isSet`" pulumi-lang-dotnet="`IsSet`" pulumi-lang-go="`isSet`" pulumi-lang-python="`is_set`" pulumi-lang-yaml="`isSet`" pulumi-lang-java="`isSet`">`is_set`</span>, <span pulumi-lang-nodejs="`isNotSet`" pulumi-lang-dotnet="`IsNotSet`" pulumi-lang-go="`isNotSet`" pulumi-lang-python="`is_not_set`" pulumi-lang-yaml="`isNotSet`" pulumi-lang-java="`isNotSet`">`is_not_set`</span>.
-        :param pulumi.Input[_builtins.str] conditioned: The resource or attribute the condition applies.. Value must be one of <span pulumi-lang-nodejs="`placement`" pulumi-lang-dotnet="`Placement`" pulumi-lang-go="`placement`" pulumi-lang-python="`placement`" pulumi-lang-yaml="`placement`" pulumi-lang-java="`placement`">`placement`</span>, <span pulumi-lang-nodejs="`required`" pulumi-lang-dotnet="`Required`" pulumi-lang-go="`required`" pulumi-lang-python="`required`" pulumi-lang-yaml="`required`" pulumi-lang-java="`required`">`required`</span>.
+        :param pulumi.Input[_builtins.str] comparison: The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`" pulumi-lang-hcl="`equal`">`equal`</span>, <span pulumi-lang-nodejs="`notEqual`" pulumi-lang-dotnet="`NotEqual`" pulumi-lang-go="`notEqual`" pulumi-lang-python="`not_equal`" pulumi-lang-yaml="`notEqual`" pulumi-lang-java="`notEqual`" pulumi-lang-hcl="`not_equal`">`notEqual`</span>, <span pulumi-lang-nodejs="`isSet`" pulumi-lang-dotnet="`IsSet`" pulumi-lang-go="`isSet`" pulumi-lang-python="`is_set`" pulumi-lang-yaml="`isSet`" pulumi-lang-java="`isSet`" pulumi-lang-hcl="`is_set`">`isSet`</span>, <span pulumi-lang-nodejs="`isNotSet`" pulumi-lang-dotnet="`IsNotSet`" pulumi-lang-go="`isNotSet`" pulumi-lang-python="`is_not_set`" pulumi-lang-yaml="`isNotSet`" pulumi-lang-java="`isNotSet`" pulumi-lang-hcl="`is_not_set`">`isNotSet`</span>.
+        :param pulumi.Input[_builtins.str] conditioned: The resource or attribute the condition applies.. Value must be one of <span pulumi-lang-nodejs="`placement`" pulumi-lang-dotnet="`Placement`" pulumi-lang-go="`placement`" pulumi-lang-python="`placement`" pulumi-lang-yaml="`placement`" pulumi-lang-java="`placement`" pulumi-lang-hcl="`placement`">`placement`</span>, <span pulumi-lang-nodejs="`required`" pulumi-lang-dotnet="`Required`" pulumi-lang-go="`required`" pulumi-lang-python="`required`" pulumi-lang-yaml="`required`" pulumi-lang-java="`required`" pulumi-lang-hcl="`required`">`required`</span>.
         :param pulumi.Input[_builtins.str] form_field_id: The condition field.
         :param pulumi.Input[_builtins.str] form_field_placement_id: The form field placement this condition applies.
         :param pulumi.Input[_builtins.float] position: The condition position.
@@ -298,13 +298,13 @@ class FormFieldPlacementCondition(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 comparison: Optional[pulumi.Input[_builtins.str]] = None,
-                 conditioned: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_placement_condition_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_placement_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 values: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 comparison: pulumi.Input[Optional[_builtins.str]] = None,
+                 conditioned: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_placement_condition_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_placement_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 values: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -336,13 +336,13 @@ class FormFieldPlacementCondition(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            comparison: Optional[pulumi.Input[_builtins.str]] = None,
-            conditioned: Optional[pulumi.Input[_builtins.str]] = None,
-            form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-            form_field_placement_condition_id: Optional[pulumi.Input[_builtins.str]] = None,
-            form_field_placement_id: Optional[pulumi.Input[_builtins.str]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None,
-            values: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None) -> 'FormFieldPlacementCondition':
+            comparison: pulumi.Input[Optional[_builtins.str]] = None,
+            conditioned: pulumi.Input[Optional[_builtins.str]] = None,
+            form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+            form_field_placement_condition_id: pulumi.Input[Optional[_builtins.str]] = None,
+            form_field_placement_id: pulumi.Input[Optional[_builtins.str]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None,
+            values: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None) -> 'FormFieldPlacementCondition':
         """
         Get an existing FormFieldPlacementCondition resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -350,8 +350,8 @@ class FormFieldPlacementCondition(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] comparison: The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`">`equal`</span>, <span pulumi-lang-nodejs="`notEqual`" pulumi-lang-dotnet="`NotEqual`" pulumi-lang-go="`notEqual`" pulumi-lang-python="`not_equal`" pulumi-lang-yaml="`notEqual`" pulumi-lang-java="`notEqual`">`not_equal`</span>, <span pulumi-lang-nodejs="`isSet`" pulumi-lang-dotnet="`IsSet`" pulumi-lang-go="`isSet`" pulumi-lang-python="`is_set`" pulumi-lang-yaml="`isSet`" pulumi-lang-java="`isSet`">`is_set`</span>, <span pulumi-lang-nodejs="`isNotSet`" pulumi-lang-dotnet="`IsNotSet`" pulumi-lang-go="`isNotSet`" pulumi-lang-python="`is_not_set`" pulumi-lang-yaml="`isNotSet`" pulumi-lang-java="`isNotSet`">`is_not_set`</span>.
-        :param pulumi.Input[_builtins.str] conditioned: The resource or attribute the condition applies.. Value must be one of <span pulumi-lang-nodejs="`placement`" pulumi-lang-dotnet="`Placement`" pulumi-lang-go="`placement`" pulumi-lang-python="`placement`" pulumi-lang-yaml="`placement`" pulumi-lang-java="`placement`">`placement`</span>, <span pulumi-lang-nodejs="`required`" pulumi-lang-dotnet="`Required`" pulumi-lang-go="`required`" pulumi-lang-python="`required`" pulumi-lang-yaml="`required`" pulumi-lang-java="`required`">`required`</span>.
+        :param pulumi.Input[_builtins.str] comparison: The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`" pulumi-lang-hcl="`equal`">`equal`</span>, <span pulumi-lang-nodejs="`notEqual`" pulumi-lang-dotnet="`NotEqual`" pulumi-lang-go="`notEqual`" pulumi-lang-python="`not_equal`" pulumi-lang-yaml="`notEqual`" pulumi-lang-java="`notEqual`" pulumi-lang-hcl="`not_equal`">`notEqual`</span>, <span pulumi-lang-nodejs="`isSet`" pulumi-lang-dotnet="`IsSet`" pulumi-lang-go="`isSet`" pulumi-lang-python="`is_set`" pulumi-lang-yaml="`isSet`" pulumi-lang-java="`isSet`" pulumi-lang-hcl="`is_set`">`isSet`</span>, <span pulumi-lang-nodejs="`isNotSet`" pulumi-lang-dotnet="`IsNotSet`" pulumi-lang-go="`isNotSet`" pulumi-lang-python="`is_not_set`" pulumi-lang-yaml="`isNotSet`" pulumi-lang-java="`isNotSet`" pulumi-lang-hcl="`is_not_set`">`isNotSet`</span>.
+        :param pulumi.Input[_builtins.str] conditioned: The resource or attribute the condition applies.. Value must be one of <span pulumi-lang-nodejs="`placement`" pulumi-lang-dotnet="`Placement`" pulumi-lang-go="`placement`" pulumi-lang-python="`placement`" pulumi-lang-yaml="`placement`" pulumi-lang-java="`placement`" pulumi-lang-hcl="`placement`">`placement`</span>, <span pulumi-lang-nodejs="`required`" pulumi-lang-dotnet="`Required`" pulumi-lang-go="`required`" pulumi-lang-python="`required`" pulumi-lang-yaml="`required`" pulumi-lang-java="`required`" pulumi-lang-hcl="`required`">`required`</span>.
         :param pulumi.Input[_builtins.str] form_field_id: The condition field.
         :param pulumi.Input[_builtins.str] form_field_placement_id: The form field placement this condition applies.
         :param pulumi.Input[_builtins.float] position: The condition position.
@@ -374,7 +374,7 @@ class FormFieldPlacementCondition(pulumi.CustomResource):
     @pulumi.getter
     def comparison(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`">`equal`</span>, <span pulumi-lang-nodejs="`notEqual`" pulumi-lang-dotnet="`NotEqual`" pulumi-lang-go="`notEqual`" pulumi-lang-python="`not_equal`" pulumi-lang-yaml="`notEqual`" pulumi-lang-java="`notEqual`">`not_equal`</span>, <span pulumi-lang-nodejs="`isSet`" pulumi-lang-dotnet="`IsSet`" pulumi-lang-go="`isSet`" pulumi-lang-python="`is_set`" pulumi-lang-yaml="`isSet`" pulumi-lang-java="`isSet`">`is_set`</span>, <span pulumi-lang-nodejs="`isNotSet`" pulumi-lang-dotnet="`IsNotSet`" pulumi-lang-go="`isNotSet`" pulumi-lang-python="`is_not_set`" pulumi-lang-yaml="`isNotSet`" pulumi-lang-java="`isNotSet`">`is_not_set`</span>.
+        The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`" pulumi-lang-hcl="`equal`">`equal`</span>, <span pulumi-lang-nodejs="`notEqual`" pulumi-lang-dotnet="`NotEqual`" pulumi-lang-go="`notEqual`" pulumi-lang-python="`not_equal`" pulumi-lang-yaml="`notEqual`" pulumi-lang-java="`notEqual`" pulumi-lang-hcl="`not_equal`">`notEqual`</span>, <span pulumi-lang-nodejs="`isSet`" pulumi-lang-dotnet="`IsSet`" pulumi-lang-go="`isSet`" pulumi-lang-python="`is_set`" pulumi-lang-yaml="`isSet`" pulumi-lang-java="`isSet`" pulumi-lang-hcl="`is_set`">`isSet`</span>, <span pulumi-lang-nodejs="`isNotSet`" pulumi-lang-dotnet="`IsNotSet`" pulumi-lang-go="`isNotSet`" pulumi-lang-python="`is_not_set`" pulumi-lang-yaml="`isNotSet`" pulumi-lang-java="`isNotSet`" pulumi-lang-hcl="`is_not_set`">`isNotSet`</span>.
         """
         return pulumi.get(self, "comparison")
 
@@ -382,7 +382,7 @@ class FormFieldPlacementCondition(pulumi.CustomResource):
     @pulumi.getter
     def conditioned(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        The resource or attribute the condition applies.. Value must be one of <span pulumi-lang-nodejs="`placement`" pulumi-lang-dotnet="`Placement`" pulumi-lang-go="`placement`" pulumi-lang-python="`placement`" pulumi-lang-yaml="`placement`" pulumi-lang-java="`placement`">`placement`</span>, <span pulumi-lang-nodejs="`required`" pulumi-lang-dotnet="`Required`" pulumi-lang-go="`required`" pulumi-lang-python="`required`" pulumi-lang-yaml="`required`" pulumi-lang-java="`required`">`required`</span>.
+        The resource or attribute the condition applies.. Value must be one of <span pulumi-lang-nodejs="`placement`" pulumi-lang-dotnet="`Placement`" pulumi-lang-go="`placement`" pulumi-lang-python="`placement`" pulumi-lang-yaml="`placement`" pulumi-lang-java="`placement`" pulumi-lang-hcl="`placement`">`placement`</span>, <span pulumi-lang-nodejs="`required`" pulumi-lang-dotnet="`Required`" pulumi-lang-go="`required`" pulumi-lang-python="`required`" pulumi-lang-yaml="`required`" pulumi-lang-java="`required`" pulumi-lang-hcl="`required`">`required`</span>.
         """
         return pulumi.get(self, "conditioned")
 
@@ -422,3 +422,4 @@ class FormFieldPlacementCondition(pulumi.CustomResource):
         The values for comparison.
         """
         return pulumi.get(self, "values")
+

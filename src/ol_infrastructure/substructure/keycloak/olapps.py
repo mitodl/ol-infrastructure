@@ -323,7 +323,6 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
             "acr",
             "email",
             "profile",
-            "role_list",
             "roles",
             "web-origins",
             "ol-profile",
@@ -390,7 +389,6 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 "acr",
                 "email",
                 "profile",
-                "role_list",
                 "roles",
                 "web-origins",
                 "ol-profile",
@@ -993,18 +991,18 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 org_saml_metadata_xml=Path(__file__)
                 .parent.joinpath("files/olapps/ucv_metadata.xml")
                 .read_text(),
-                principal_type="ATTRIBUTE",
-                principal_attribute="Email",
+                # Google Workspace SAML reliably provides NameID as email.
+                # Use SUBJECT to avoid login failures when custom attributes
+                # like "Email" are not included in the assertion.
+                principal_type="SUBJECT",
                 name_id_format=NameIdFormat.email,
                 keycloak_url=keycloak_url,
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
-                attribute_map={
-                    "email": "Email",
-                    "firstName": "Given Name",
-                    "lastName": "Surname",
-                    "fullName": "Display Name",
+                # UCV currently releases only user.mail in the assertion.
+                attribute_name_map={
+                    "email": "user.mail",
                 },
             ),
             org=OrgConfig(

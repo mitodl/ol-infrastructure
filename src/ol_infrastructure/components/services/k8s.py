@@ -101,7 +101,7 @@ class OLApplicationK8sCeleryBeatConfig(BaseModel):
         default={"cpu": "100m", "memory": "512Mi"}
     )
     resource_limits: dict[str, str] = Field(default={"memory": "512Mi"})
-    scheduler: str = "redbeat.RedBeatScheduler"
+    scheduler: str = "celery.beat.PersistentScheduler"
 
 
 class GranianConfig(BaseModel):
@@ -1659,11 +1659,7 @@ class OLApplicationK8s(ComponentResource):
                                             else []
                                         ),
                                         *(
-                                            [
-                                                "-B",  # beat scheduler - only on one worker to avoid multiple competing schedulers
-                                                "--scheduler",
-                                                "redbeat.RedBeatScheduler",
-                                            ]
+                                            ["-B"]
                                             if celery_worker_config.run_beat
                                             else []
                                         ),

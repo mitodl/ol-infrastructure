@@ -23,11 +23,11 @@ class WorkflowTaskArchiveSlackChannelsArgs:
     def __init__(__self__, *,
                  task_params: pulumi.Input['WorkflowTaskArchiveSlackChannelsTaskParamsArgs'],
                  workflow_id: pulumi.Input[_builtins.str],
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 skip_on_failure: Optional[pulumi.Input[_builtins.bool]] = None,
-                 workflow_task_archive_slack_channels_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 skip_on_failure: pulumi.Input[Optional[_builtins.bool]] = None,
+                 workflow_task_archive_slack_channels_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a WorkflowTaskArchiveSlackChannels resource.
 
@@ -77,72 +77,72 @@ class WorkflowTaskArchiveSlackChannelsArgs:
 
     @_builtins.property
     @pulumi.getter
-    def enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Enable/disable this workflow task
         """
         return pulumi.get(self, "enabled")
 
     @enabled.setter
-    def enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "enabled", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Name of the workflow task
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The position of the workflow task (1 being top of list)
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter(name="skipOnFailure")
-    def skip_on_failure(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def skip_on_failure(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Skip workflow task if any failures
         """
         return pulumi.get(self, "skip_on_failure")
 
     @skip_on_failure.setter
-    def skip_on_failure(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def skip_on_failure(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "skip_on_failure", value)
 
     @_builtins.property
     @pulumi.getter(name="workflowTaskArchiveSlackChannelsId")
-    def workflow_task_archive_slack_channels_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def workflow_task_archive_slack_channels_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "workflow_task_archive_slack_channels_id")
 
     @workflow_task_archive_slack_channels_id.setter
-    def workflow_task_archive_slack_channels_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def workflow_task_archive_slack_channels_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "workflow_task_archive_slack_channels_id", value)
 
 
 @pulumi.input_type
 class _WorkflowTaskArchiveSlackChannelsState:
     def __init__(__self__, *,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 skip_on_failure: Optional[pulumi.Input[_builtins.bool]] = None,
-                 task_params: Optional[pulumi.Input['WorkflowTaskArchiveSlackChannelsTaskParamsArgs']] = None,
-                 workflow_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 workflow_task_archive_slack_channels_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 skip_on_failure: pulumi.Input[Optional[_builtins.bool]] = None,
+                 task_params: pulumi.Input[Optional['WorkflowTaskArchiveSlackChannelsTaskParamsArgs']] = None,
+                 workflow_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_task_archive_slack_channels_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering WorkflowTaskArchiveSlackChannels resources.
 
@@ -170,83 +170,83 @@ class _WorkflowTaskArchiveSlackChannelsState:
 
     @_builtins.property
     @pulumi.getter
-    def enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Enable/disable this workflow task
         """
         return pulumi.get(self, "enabled")
 
     @enabled.setter
-    def enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "enabled", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Name of the workflow task
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The position of the workflow task (1 being top of list)
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter(name="skipOnFailure")
-    def skip_on_failure(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def skip_on_failure(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Skip workflow task if any failures
         """
         return pulumi.get(self, "skip_on_failure")
 
     @skip_on_failure.setter
-    def skip_on_failure(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def skip_on_failure(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "skip_on_failure", value)
 
     @_builtins.property
     @pulumi.getter(name="taskParams")
-    def task_params(self) -> Optional[pulumi.Input['WorkflowTaskArchiveSlackChannelsTaskParamsArgs']]:
+    def task_params(self) -> pulumi.Input[Optional['WorkflowTaskArchiveSlackChannelsTaskParamsArgs']]:
         """
         The parameters for this workflow task.
         """
         return pulumi.get(self, "task_params")
 
     @task_params.setter
-    def task_params(self, value: Optional[pulumi.Input['WorkflowTaskArchiveSlackChannelsTaskParamsArgs']]):
+    def task_params(self, value: pulumi.Input[Optional['WorkflowTaskArchiveSlackChannelsTaskParamsArgs']]):
         pulumi.set(self, "task_params", value)
 
     @_builtins.property
     @pulumi.getter(name="workflowId")
-    def workflow_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def workflow_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The ID of the parent workflow
         """
         return pulumi.get(self, "workflow_id")
 
     @workflow_id.setter
-    def workflow_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def workflow_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "workflow_id", value)
 
     @_builtins.property
     @pulumi.getter(name="workflowTaskArchiveSlackChannelsId")
-    def workflow_task_archive_slack_channels_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def workflow_task_archive_slack_channels_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "workflow_task_archive_slack_channels_id")
 
     @workflow_task_archive_slack_channels_id.setter
-    def workflow_task_archive_slack_channels_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def workflow_task_archive_slack_channels_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "workflow_task_archive_slack_channels_id", value)
 
 
@@ -256,13 +256,13 @@ class WorkflowTaskArchiveSlackChannels(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 skip_on_failure: Optional[pulumi.Input[_builtins.bool]] = None,
-                 task_params: Optional[pulumi.Input[Union['WorkflowTaskArchiveSlackChannelsTaskParamsArgs', 'WorkflowTaskArchiveSlackChannelsTaskParamsArgsDict']]] = None,
-                 workflow_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 workflow_task_archive_slack_channels_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 skip_on_failure: pulumi.Input[Optional[_builtins.bool]] = None,
+                 task_params: pulumi.Input[Optional[Union['WorkflowTaskArchiveSlackChannelsTaskParamsArgs', 'WorkflowTaskArchiveSlackChannelsTaskParamsArgsDict']]] = None,
+                 workflow_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_task_archive_slack_channels_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a WorkflowTaskArchiveSlackChannels resource with the given unique name, props, and options.
@@ -300,13 +300,13 @@ class WorkflowTaskArchiveSlackChannels(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 skip_on_failure: Optional[pulumi.Input[_builtins.bool]] = None,
-                 task_params: Optional[pulumi.Input[Union['WorkflowTaskArchiveSlackChannelsTaskParamsArgs', 'WorkflowTaskArchiveSlackChannelsTaskParamsArgsDict']]] = None,
-                 workflow_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 workflow_task_archive_slack_channels_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 skip_on_failure: pulumi.Input[Optional[_builtins.bool]] = None,
+                 task_params: pulumi.Input[Optional[Union['WorkflowTaskArchiveSlackChannelsTaskParamsArgs', 'WorkflowTaskArchiveSlackChannelsTaskParamsArgsDict']]] = None,
+                 workflow_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_task_archive_slack_channels_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -338,13 +338,13 @@ class WorkflowTaskArchiveSlackChannels(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None,
-            skip_on_failure: Optional[pulumi.Input[_builtins.bool]] = None,
-            task_params: Optional[pulumi.Input[Union['WorkflowTaskArchiveSlackChannelsTaskParamsArgs', 'WorkflowTaskArchiveSlackChannelsTaskParamsArgsDict']]] = None,
-            workflow_id: Optional[pulumi.Input[_builtins.str]] = None,
-            workflow_task_archive_slack_channels_id: Optional[pulumi.Input[_builtins.str]] = None) -> 'WorkflowTaskArchiveSlackChannels':
+            enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None,
+            skip_on_failure: pulumi.Input[Optional[_builtins.bool]] = None,
+            task_params: pulumi.Input[Optional[Union['WorkflowTaskArchiveSlackChannelsTaskParamsArgs', 'WorkflowTaskArchiveSlackChannelsTaskParamsArgsDict']]] = None,
+            workflow_id: pulumi.Input[Optional[_builtins.str]] = None,
+            workflow_task_archive_slack_channels_id: pulumi.Input[Optional[_builtins.str]] = None) -> 'WorkflowTaskArchiveSlackChannels':
         """
         Get an existing WorkflowTaskArchiveSlackChannels resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -424,3 +424,4 @@ class WorkflowTaskArchiveSlackChannels(pulumi.CustomResource):
     @pulumi.getter(name="workflowTaskArchiveSlackChannelsId")
     def workflow_task_archive_slack_channels_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_task_archive_slack_channels_id")
+

@@ -19,20 +19,20 @@ __all__ = ['CatalogPropertyArgs', 'CatalogProperty']
 @pulumi.input_type
 class CatalogPropertyArgs:
     def __init__(__self__, *,
-                 catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 catalog_property_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 catalog_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 kind_catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 multiple: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 required: Optional[pulumi.Input[_builtins.bool]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None):
+                 catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 catalog_property_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 catalog_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 kind_catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 multiple: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 required: pulumi.Input[Optional[_builtins.bool]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a CatalogProperty resource.
 
-        :param pulumi.Input[_builtins.str] catalog_type: The type of catalog the property belongs to.. Value must be one of <span pulumi-lang-nodejs="`catalog`" pulumi-lang-dotnet="`Catalog`" pulumi-lang-go="`catalog`" pulumi-lang-python="`catalog`" pulumi-lang-yaml="`catalog`" pulumi-lang-java="`catalog`">`catalog`</span>, <span pulumi-lang-nodejs="`cause`" pulumi-lang-dotnet="`Cause`" pulumi-lang-go="`cause`" pulumi-lang-python="`cause`" pulumi-lang-yaml="`cause`" pulumi-lang-java="`cause`">`cause`</span>, <span pulumi-lang-nodejs="`environment`" pulumi-lang-dotnet="`Environment`" pulumi-lang-go="`environment`" pulumi-lang-python="`environment`" pulumi-lang-yaml="`environment`" pulumi-lang-java="`environment`">`environment`</span>, <span pulumi-lang-nodejs="`functionality`" pulumi-lang-dotnet="`Functionality`" pulumi-lang-go="`functionality`" pulumi-lang-python="`functionality`" pulumi-lang-yaml="`functionality`" pulumi-lang-java="`functionality`">`functionality`</span>, <span pulumi-lang-nodejs="`incidentType`" pulumi-lang-dotnet="`IncidentType`" pulumi-lang-go="`incidentType`" pulumi-lang-python="`incident_type`" pulumi-lang-yaml="`incidentType`" pulumi-lang-java="`incidentType`">`incident_type`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`">`service`</span>, <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`">`team`</span>.
-        :param pulumi.Input[_builtins.str] kind: Value must be one of <span pulumi-lang-nodejs="`text`" pulumi-lang-dotnet="`Text`" pulumi-lang-go="`text`" pulumi-lang-python="`text`" pulumi-lang-yaml="`text`" pulumi-lang-java="`text`">`text`</span>, <span pulumi-lang-nodejs="`reference`" pulumi-lang-dotnet="`Reference`" pulumi-lang-go="`reference`" pulumi-lang-python="`reference`" pulumi-lang-yaml="`reference`" pulumi-lang-java="`reference`">`reference`</span>.
+        :param pulumi.Input[_builtins.str] catalog_type: The type of catalog the property belongs to.. Value must be one of <span pulumi-lang-nodejs="`catalog`" pulumi-lang-dotnet="`Catalog`" pulumi-lang-go="`catalog`" pulumi-lang-python="`catalog`" pulumi-lang-yaml="`catalog`" pulumi-lang-java="`catalog`" pulumi-lang-hcl="`catalog`">`catalog`</span>, <span pulumi-lang-nodejs="`cause`" pulumi-lang-dotnet="`Cause`" pulumi-lang-go="`cause`" pulumi-lang-python="`cause`" pulumi-lang-yaml="`cause`" pulumi-lang-java="`cause`" pulumi-lang-hcl="`cause`">`cause`</span>, <span pulumi-lang-nodejs="`environment`" pulumi-lang-dotnet="`Environment`" pulumi-lang-go="`environment`" pulumi-lang-python="`environment`" pulumi-lang-yaml="`environment`" pulumi-lang-java="`environment`" pulumi-lang-hcl="`environment`">`environment`</span>, <span pulumi-lang-nodejs="`functionality`" pulumi-lang-dotnet="`Functionality`" pulumi-lang-go="`functionality`" pulumi-lang-python="`functionality`" pulumi-lang-yaml="`functionality`" pulumi-lang-java="`functionality`" pulumi-lang-hcl="`functionality`">`functionality`</span>, <span pulumi-lang-nodejs="`incidentType`" pulumi-lang-dotnet="`IncidentType`" pulumi-lang-go="`incidentType`" pulumi-lang-python="`incident_type`" pulumi-lang-yaml="`incidentType`" pulumi-lang-java="`incidentType`" pulumi-lang-hcl="`incident_type`">`incidentType`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`" pulumi-lang-hcl="`service`">`service`</span>, <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`" pulumi-lang-hcl="`team`">`team`</span>.
+        :param pulumi.Input[_builtins.str] kind: Value must be one of <span pulumi-lang-nodejs="`text`" pulumi-lang-dotnet="`Text`" pulumi-lang-go="`text`" pulumi-lang-python="`text`" pulumi-lang-yaml="`text`" pulumi-lang-java="`text`" pulumi-lang-hcl="`text`">`text`</span>, <span pulumi-lang-nodejs="`reference`" pulumi-lang-dotnet="`Reference`" pulumi-lang-go="`reference`" pulumi-lang-python="`reference`" pulumi-lang-yaml="`reference`" pulumi-lang-java="`reference`" pulumi-lang-hcl="`reference`">`reference`</span>.
         :param pulumi.Input[_builtins.str] kind_catalog_id: Restricts values to items of specified catalog.
         :param pulumi.Input[_builtins.bool] multiple: Whether the attribute accepts multiple values.. Value must be one of true or false
         :param pulumi.Input[_builtins.bool] required: Whether the property is required.. Value must be one of true or false
@@ -58,118 +58,118 @@ class CatalogPropertyArgs:
 
     @_builtins.property
     @pulumi.getter(name="catalogId")
-    def catalog_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def catalog_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "catalog_id")
 
     @catalog_id.setter
-    def catalog_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def catalog_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "catalog_id", value)
 
     @_builtins.property
     @pulumi.getter(name="catalogPropertyId")
-    def catalog_property_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def catalog_property_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "catalog_property_id")
 
     @catalog_property_id.setter
-    def catalog_property_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def catalog_property_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "catalog_property_id", value)
 
     @_builtins.property
     @pulumi.getter(name="catalogType")
-    def catalog_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def catalog_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The type of catalog the property belongs to.. Value must be one of <span pulumi-lang-nodejs="`catalog`" pulumi-lang-dotnet="`Catalog`" pulumi-lang-go="`catalog`" pulumi-lang-python="`catalog`" pulumi-lang-yaml="`catalog`" pulumi-lang-java="`catalog`">`catalog`</span>, <span pulumi-lang-nodejs="`cause`" pulumi-lang-dotnet="`Cause`" pulumi-lang-go="`cause`" pulumi-lang-python="`cause`" pulumi-lang-yaml="`cause`" pulumi-lang-java="`cause`">`cause`</span>, <span pulumi-lang-nodejs="`environment`" pulumi-lang-dotnet="`Environment`" pulumi-lang-go="`environment`" pulumi-lang-python="`environment`" pulumi-lang-yaml="`environment`" pulumi-lang-java="`environment`">`environment`</span>, <span pulumi-lang-nodejs="`functionality`" pulumi-lang-dotnet="`Functionality`" pulumi-lang-go="`functionality`" pulumi-lang-python="`functionality`" pulumi-lang-yaml="`functionality`" pulumi-lang-java="`functionality`">`functionality`</span>, <span pulumi-lang-nodejs="`incidentType`" pulumi-lang-dotnet="`IncidentType`" pulumi-lang-go="`incidentType`" pulumi-lang-python="`incident_type`" pulumi-lang-yaml="`incidentType`" pulumi-lang-java="`incidentType`">`incident_type`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`">`service`</span>, <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`">`team`</span>.
+        The type of catalog the property belongs to.. Value must be one of <span pulumi-lang-nodejs="`catalog`" pulumi-lang-dotnet="`Catalog`" pulumi-lang-go="`catalog`" pulumi-lang-python="`catalog`" pulumi-lang-yaml="`catalog`" pulumi-lang-java="`catalog`" pulumi-lang-hcl="`catalog`">`catalog`</span>, <span pulumi-lang-nodejs="`cause`" pulumi-lang-dotnet="`Cause`" pulumi-lang-go="`cause`" pulumi-lang-python="`cause`" pulumi-lang-yaml="`cause`" pulumi-lang-java="`cause`" pulumi-lang-hcl="`cause`">`cause`</span>, <span pulumi-lang-nodejs="`environment`" pulumi-lang-dotnet="`Environment`" pulumi-lang-go="`environment`" pulumi-lang-python="`environment`" pulumi-lang-yaml="`environment`" pulumi-lang-java="`environment`" pulumi-lang-hcl="`environment`">`environment`</span>, <span pulumi-lang-nodejs="`functionality`" pulumi-lang-dotnet="`Functionality`" pulumi-lang-go="`functionality`" pulumi-lang-python="`functionality`" pulumi-lang-yaml="`functionality`" pulumi-lang-java="`functionality`" pulumi-lang-hcl="`functionality`">`functionality`</span>, <span pulumi-lang-nodejs="`incidentType`" pulumi-lang-dotnet="`IncidentType`" pulumi-lang-go="`incidentType`" pulumi-lang-python="`incident_type`" pulumi-lang-yaml="`incidentType`" pulumi-lang-java="`incidentType`" pulumi-lang-hcl="`incident_type`">`incidentType`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`" pulumi-lang-hcl="`service`">`service`</span>, <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`" pulumi-lang-hcl="`team`">`team`</span>.
         """
         return pulumi.get(self, "catalog_type")
 
     @catalog_type.setter
-    def catalog_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def catalog_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "catalog_type", value)
 
     @_builtins.property
     @pulumi.getter
-    def kind(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def kind(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`text`" pulumi-lang-dotnet="`Text`" pulumi-lang-go="`text`" pulumi-lang-python="`text`" pulumi-lang-yaml="`text`" pulumi-lang-java="`text`">`text`</span>, <span pulumi-lang-nodejs="`reference`" pulumi-lang-dotnet="`Reference`" pulumi-lang-go="`reference`" pulumi-lang-python="`reference`" pulumi-lang-yaml="`reference`" pulumi-lang-java="`reference`">`reference`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`text`" pulumi-lang-dotnet="`Text`" pulumi-lang-go="`text`" pulumi-lang-python="`text`" pulumi-lang-yaml="`text`" pulumi-lang-java="`text`" pulumi-lang-hcl="`text`">`text`</span>, <span pulumi-lang-nodejs="`reference`" pulumi-lang-dotnet="`Reference`" pulumi-lang-go="`reference`" pulumi-lang-python="`reference`" pulumi-lang-yaml="`reference`" pulumi-lang-java="`reference`" pulumi-lang-hcl="`reference`">`reference`</span>.
         """
         return pulumi.get(self, "kind")
 
     @kind.setter
-    def kind(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def kind(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "kind", value)
 
     @_builtins.property
     @pulumi.getter(name="kindCatalogId")
-    def kind_catalog_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def kind_catalog_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Restricts values to items of specified catalog.
         """
         return pulumi.get(self, "kind_catalog_id")
 
     @kind_catalog_id.setter
-    def kind_catalog_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def kind_catalog_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "kind_catalog_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def multiple(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def multiple(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Whether the attribute accepts multiple values.. Value must be one of true or false
         """
         return pulumi.get(self, "multiple")
 
     @multiple.setter
-    def multiple(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def multiple(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "multiple", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def required(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def required(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Whether the property is required.. Value must be one of true or false
         """
         return pulumi.get(self, "required")
 
     @required.setter
-    def required(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def required(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "required", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
 
 @pulumi.input_type
 class _CatalogPropertyState:
     def __init__(__self__, *,
-                 catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 catalog_property_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 catalog_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 kind_catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 multiple: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 required: Optional[pulumi.Input[_builtins.bool]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None):
+                 catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 catalog_property_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 catalog_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 kind_catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 multiple: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 required: pulumi.Input[Optional[_builtins.bool]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering CatalogProperty resources.
 
-        :param pulumi.Input[_builtins.str] catalog_type: The type of catalog the property belongs to.. Value must be one of <span pulumi-lang-nodejs="`catalog`" pulumi-lang-dotnet="`Catalog`" pulumi-lang-go="`catalog`" pulumi-lang-python="`catalog`" pulumi-lang-yaml="`catalog`" pulumi-lang-java="`catalog`">`catalog`</span>, <span pulumi-lang-nodejs="`cause`" pulumi-lang-dotnet="`Cause`" pulumi-lang-go="`cause`" pulumi-lang-python="`cause`" pulumi-lang-yaml="`cause`" pulumi-lang-java="`cause`">`cause`</span>, <span pulumi-lang-nodejs="`environment`" pulumi-lang-dotnet="`Environment`" pulumi-lang-go="`environment`" pulumi-lang-python="`environment`" pulumi-lang-yaml="`environment`" pulumi-lang-java="`environment`">`environment`</span>, <span pulumi-lang-nodejs="`functionality`" pulumi-lang-dotnet="`Functionality`" pulumi-lang-go="`functionality`" pulumi-lang-python="`functionality`" pulumi-lang-yaml="`functionality`" pulumi-lang-java="`functionality`">`functionality`</span>, <span pulumi-lang-nodejs="`incidentType`" pulumi-lang-dotnet="`IncidentType`" pulumi-lang-go="`incidentType`" pulumi-lang-python="`incident_type`" pulumi-lang-yaml="`incidentType`" pulumi-lang-java="`incidentType`">`incident_type`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`">`service`</span>, <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`">`team`</span>.
-        :param pulumi.Input[_builtins.str] kind: Value must be one of <span pulumi-lang-nodejs="`text`" pulumi-lang-dotnet="`Text`" pulumi-lang-go="`text`" pulumi-lang-python="`text`" pulumi-lang-yaml="`text`" pulumi-lang-java="`text`">`text`</span>, <span pulumi-lang-nodejs="`reference`" pulumi-lang-dotnet="`Reference`" pulumi-lang-go="`reference`" pulumi-lang-python="`reference`" pulumi-lang-yaml="`reference`" pulumi-lang-java="`reference`">`reference`</span>.
+        :param pulumi.Input[_builtins.str] catalog_type: The type of catalog the property belongs to.. Value must be one of <span pulumi-lang-nodejs="`catalog`" pulumi-lang-dotnet="`Catalog`" pulumi-lang-go="`catalog`" pulumi-lang-python="`catalog`" pulumi-lang-yaml="`catalog`" pulumi-lang-java="`catalog`" pulumi-lang-hcl="`catalog`">`catalog`</span>, <span pulumi-lang-nodejs="`cause`" pulumi-lang-dotnet="`Cause`" pulumi-lang-go="`cause`" pulumi-lang-python="`cause`" pulumi-lang-yaml="`cause`" pulumi-lang-java="`cause`" pulumi-lang-hcl="`cause`">`cause`</span>, <span pulumi-lang-nodejs="`environment`" pulumi-lang-dotnet="`Environment`" pulumi-lang-go="`environment`" pulumi-lang-python="`environment`" pulumi-lang-yaml="`environment`" pulumi-lang-java="`environment`" pulumi-lang-hcl="`environment`">`environment`</span>, <span pulumi-lang-nodejs="`functionality`" pulumi-lang-dotnet="`Functionality`" pulumi-lang-go="`functionality`" pulumi-lang-python="`functionality`" pulumi-lang-yaml="`functionality`" pulumi-lang-java="`functionality`" pulumi-lang-hcl="`functionality`">`functionality`</span>, <span pulumi-lang-nodejs="`incidentType`" pulumi-lang-dotnet="`IncidentType`" pulumi-lang-go="`incidentType`" pulumi-lang-python="`incident_type`" pulumi-lang-yaml="`incidentType`" pulumi-lang-java="`incidentType`" pulumi-lang-hcl="`incident_type`">`incidentType`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`" pulumi-lang-hcl="`service`">`service`</span>, <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`" pulumi-lang-hcl="`team`">`team`</span>.
+        :param pulumi.Input[_builtins.str] kind: Value must be one of <span pulumi-lang-nodejs="`text`" pulumi-lang-dotnet="`Text`" pulumi-lang-go="`text`" pulumi-lang-python="`text`" pulumi-lang-yaml="`text`" pulumi-lang-java="`text`" pulumi-lang-hcl="`text`">`text`</span>, <span pulumi-lang-nodejs="`reference`" pulumi-lang-dotnet="`Reference`" pulumi-lang-go="`reference`" pulumi-lang-python="`reference`" pulumi-lang-yaml="`reference`" pulumi-lang-java="`reference`" pulumi-lang-hcl="`reference`">`reference`</span>.
         :param pulumi.Input[_builtins.str] kind_catalog_id: Restricts values to items of specified catalog.
         :param pulumi.Input[_builtins.bool] multiple: Whether the attribute accepts multiple values.. Value must be one of true or false
         :param pulumi.Input[_builtins.bool] required: Whether the property is required.. Value must be one of true or false
@@ -195,98 +195,98 @@ class _CatalogPropertyState:
 
     @_builtins.property
     @pulumi.getter(name="catalogId")
-    def catalog_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def catalog_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "catalog_id")
 
     @catalog_id.setter
-    def catalog_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def catalog_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "catalog_id", value)
 
     @_builtins.property
     @pulumi.getter(name="catalogPropertyId")
-    def catalog_property_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def catalog_property_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "catalog_property_id")
 
     @catalog_property_id.setter
-    def catalog_property_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def catalog_property_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "catalog_property_id", value)
 
     @_builtins.property
     @pulumi.getter(name="catalogType")
-    def catalog_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def catalog_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The type of catalog the property belongs to.. Value must be one of <span pulumi-lang-nodejs="`catalog`" pulumi-lang-dotnet="`Catalog`" pulumi-lang-go="`catalog`" pulumi-lang-python="`catalog`" pulumi-lang-yaml="`catalog`" pulumi-lang-java="`catalog`">`catalog`</span>, <span pulumi-lang-nodejs="`cause`" pulumi-lang-dotnet="`Cause`" pulumi-lang-go="`cause`" pulumi-lang-python="`cause`" pulumi-lang-yaml="`cause`" pulumi-lang-java="`cause`">`cause`</span>, <span pulumi-lang-nodejs="`environment`" pulumi-lang-dotnet="`Environment`" pulumi-lang-go="`environment`" pulumi-lang-python="`environment`" pulumi-lang-yaml="`environment`" pulumi-lang-java="`environment`">`environment`</span>, <span pulumi-lang-nodejs="`functionality`" pulumi-lang-dotnet="`Functionality`" pulumi-lang-go="`functionality`" pulumi-lang-python="`functionality`" pulumi-lang-yaml="`functionality`" pulumi-lang-java="`functionality`">`functionality`</span>, <span pulumi-lang-nodejs="`incidentType`" pulumi-lang-dotnet="`IncidentType`" pulumi-lang-go="`incidentType`" pulumi-lang-python="`incident_type`" pulumi-lang-yaml="`incidentType`" pulumi-lang-java="`incidentType`">`incident_type`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`">`service`</span>, <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`">`team`</span>.
+        The type of catalog the property belongs to.. Value must be one of <span pulumi-lang-nodejs="`catalog`" pulumi-lang-dotnet="`Catalog`" pulumi-lang-go="`catalog`" pulumi-lang-python="`catalog`" pulumi-lang-yaml="`catalog`" pulumi-lang-java="`catalog`" pulumi-lang-hcl="`catalog`">`catalog`</span>, <span pulumi-lang-nodejs="`cause`" pulumi-lang-dotnet="`Cause`" pulumi-lang-go="`cause`" pulumi-lang-python="`cause`" pulumi-lang-yaml="`cause`" pulumi-lang-java="`cause`" pulumi-lang-hcl="`cause`">`cause`</span>, <span pulumi-lang-nodejs="`environment`" pulumi-lang-dotnet="`Environment`" pulumi-lang-go="`environment`" pulumi-lang-python="`environment`" pulumi-lang-yaml="`environment`" pulumi-lang-java="`environment`" pulumi-lang-hcl="`environment`">`environment`</span>, <span pulumi-lang-nodejs="`functionality`" pulumi-lang-dotnet="`Functionality`" pulumi-lang-go="`functionality`" pulumi-lang-python="`functionality`" pulumi-lang-yaml="`functionality`" pulumi-lang-java="`functionality`" pulumi-lang-hcl="`functionality`">`functionality`</span>, <span pulumi-lang-nodejs="`incidentType`" pulumi-lang-dotnet="`IncidentType`" pulumi-lang-go="`incidentType`" pulumi-lang-python="`incident_type`" pulumi-lang-yaml="`incidentType`" pulumi-lang-java="`incidentType`" pulumi-lang-hcl="`incident_type`">`incidentType`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`" pulumi-lang-hcl="`service`">`service`</span>, <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`" pulumi-lang-hcl="`team`">`team`</span>.
         """
         return pulumi.get(self, "catalog_type")
 
     @catalog_type.setter
-    def catalog_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def catalog_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "catalog_type", value)
 
     @_builtins.property
     @pulumi.getter
-    def kind(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def kind(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`text`" pulumi-lang-dotnet="`Text`" pulumi-lang-go="`text`" pulumi-lang-python="`text`" pulumi-lang-yaml="`text`" pulumi-lang-java="`text`">`text`</span>, <span pulumi-lang-nodejs="`reference`" pulumi-lang-dotnet="`Reference`" pulumi-lang-go="`reference`" pulumi-lang-python="`reference`" pulumi-lang-yaml="`reference`" pulumi-lang-java="`reference`">`reference`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`text`" pulumi-lang-dotnet="`Text`" pulumi-lang-go="`text`" pulumi-lang-python="`text`" pulumi-lang-yaml="`text`" pulumi-lang-java="`text`" pulumi-lang-hcl="`text`">`text`</span>, <span pulumi-lang-nodejs="`reference`" pulumi-lang-dotnet="`Reference`" pulumi-lang-go="`reference`" pulumi-lang-python="`reference`" pulumi-lang-yaml="`reference`" pulumi-lang-java="`reference`" pulumi-lang-hcl="`reference`">`reference`</span>.
         """
         return pulumi.get(self, "kind")
 
     @kind.setter
-    def kind(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def kind(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "kind", value)
 
     @_builtins.property
     @pulumi.getter(name="kindCatalogId")
-    def kind_catalog_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def kind_catalog_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Restricts values to items of specified catalog.
         """
         return pulumi.get(self, "kind_catalog_id")
 
     @kind_catalog_id.setter
-    def kind_catalog_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def kind_catalog_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "kind_catalog_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def multiple(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def multiple(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Whether the attribute accepts multiple values.. Value must be one of true or false
         """
         return pulumi.get(self, "multiple")
 
     @multiple.setter
-    def multiple(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def multiple(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "multiple", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def required(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def required(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Whether the property is required.. Value must be one of true or false
         """
         return pulumi.get(self, "required")
 
     @required.setter
-    def required(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def required(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "required", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
 
@@ -296,23 +296,23 @@ class CatalogProperty(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 catalog_property_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 catalog_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 kind_catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 multiple: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 required: Optional[pulumi.Input[_builtins.bool]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
+                 catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 catalog_property_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 catalog_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 kind_catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 multiple: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 required: pulumi.Input[Optional[_builtins.bool]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a CatalogProperty resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] catalog_type: The type of catalog the property belongs to.. Value must be one of <span pulumi-lang-nodejs="`catalog`" pulumi-lang-dotnet="`Catalog`" pulumi-lang-go="`catalog`" pulumi-lang-python="`catalog`" pulumi-lang-yaml="`catalog`" pulumi-lang-java="`catalog`">`catalog`</span>, <span pulumi-lang-nodejs="`cause`" pulumi-lang-dotnet="`Cause`" pulumi-lang-go="`cause`" pulumi-lang-python="`cause`" pulumi-lang-yaml="`cause`" pulumi-lang-java="`cause`">`cause`</span>, <span pulumi-lang-nodejs="`environment`" pulumi-lang-dotnet="`Environment`" pulumi-lang-go="`environment`" pulumi-lang-python="`environment`" pulumi-lang-yaml="`environment`" pulumi-lang-java="`environment`">`environment`</span>, <span pulumi-lang-nodejs="`functionality`" pulumi-lang-dotnet="`Functionality`" pulumi-lang-go="`functionality`" pulumi-lang-python="`functionality`" pulumi-lang-yaml="`functionality`" pulumi-lang-java="`functionality`">`functionality`</span>, <span pulumi-lang-nodejs="`incidentType`" pulumi-lang-dotnet="`IncidentType`" pulumi-lang-go="`incidentType`" pulumi-lang-python="`incident_type`" pulumi-lang-yaml="`incidentType`" pulumi-lang-java="`incidentType`">`incident_type`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`">`service`</span>, <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`">`team`</span>.
-        :param pulumi.Input[_builtins.str] kind: Value must be one of <span pulumi-lang-nodejs="`text`" pulumi-lang-dotnet="`Text`" pulumi-lang-go="`text`" pulumi-lang-python="`text`" pulumi-lang-yaml="`text`" pulumi-lang-java="`text`">`text`</span>, <span pulumi-lang-nodejs="`reference`" pulumi-lang-dotnet="`Reference`" pulumi-lang-go="`reference`" pulumi-lang-python="`reference`" pulumi-lang-yaml="`reference`" pulumi-lang-java="`reference`">`reference`</span>.
+        :param pulumi.Input[_builtins.str] catalog_type: The type of catalog the property belongs to.. Value must be one of <span pulumi-lang-nodejs="`catalog`" pulumi-lang-dotnet="`Catalog`" pulumi-lang-go="`catalog`" pulumi-lang-python="`catalog`" pulumi-lang-yaml="`catalog`" pulumi-lang-java="`catalog`" pulumi-lang-hcl="`catalog`">`catalog`</span>, <span pulumi-lang-nodejs="`cause`" pulumi-lang-dotnet="`Cause`" pulumi-lang-go="`cause`" pulumi-lang-python="`cause`" pulumi-lang-yaml="`cause`" pulumi-lang-java="`cause`" pulumi-lang-hcl="`cause`">`cause`</span>, <span pulumi-lang-nodejs="`environment`" pulumi-lang-dotnet="`Environment`" pulumi-lang-go="`environment`" pulumi-lang-python="`environment`" pulumi-lang-yaml="`environment`" pulumi-lang-java="`environment`" pulumi-lang-hcl="`environment`">`environment`</span>, <span pulumi-lang-nodejs="`functionality`" pulumi-lang-dotnet="`Functionality`" pulumi-lang-go="`functionality`" pulumi-lang-python="`functionality`" pulumi-lang-yaml="`functionality`" pulumi-lang-java="`functionality`" pulumi-lang-hcl="`functionality`">`functionality`</span>, <span pulumi-lang-nodejs="`incidentType`" pulumi-lang-dotnet="`IncidentType`" pulumi-lang-go="`incidentType`" pulumi-lang-python="`incident_type`" pulumi-lang-yaml="`incidentType`" pulumi-lang-java="`incidentType`" pulumi-lang-hcl="`incident_type`">`incidentType`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`" pulumi-lang-hcl="`service`">`service`</span>, <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`" pulumi-lang-hcl="`team`">`team`</span>.
+        :param pulumi.Input[_builtins.str] kind: Value must be one of <span pulumi-lang-nodejs="`text`" pulumi-lang-dotnet="`Text`" pulumi-lang-go="`text`" pulumi-lang-python="`text`" pulumi-lang-yaml="`text`" pulumi-lang-java="`text`" pulumi-lang-hcl="`text`">`text`</span>, <span pulumi-lang-nodejs="`reference`" pulumi-lang-dotnet="`Reference`" pulumi-lang-go="`reference`" pulumi-lang-python="`reference`" pulumi-lang-yaml="`reference`" pulumi-lang-java="`reference`" pulumi-lang-hcl="`reference`">`reference`</span>.
         :param pulumi.Input[_builtins.str] kind_catalog_id: Restricts values to items of specified catalog.
         :param pulumi.Input[_builtins.bool] multiple: Whether the attribute accepts multiple values.. Value must be one of true or false
         :param pulumi.Input[_builtins.bool] required: Whether the property is required.. Value must be one of true or false
@@ -341,15 +341,15 @@ class CatalogProperty(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 catalog_property_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 catalog_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 kind_catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 multiple: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 required: Optional[pulumi.Input[_builtins.bool]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
+                 catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 catalog_property_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 catalog_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 kind_catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 multiple: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 required: pulumi.Input[Optional[_builtins.bool]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -379,15 +379,15 @@ class CatalogProperty(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
-            catalog_property_id: Optional[pulumi.Input[_builtins.str]] = None,
-            catalog_type: Optional[pulumi.Input[_builtins.str]] = None,
-            kind: Optional[pulumi.Input[_builtins.str]] = None,
-            kind_catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
-            multiple: Optional[pulumi.Input[_builtins.bool]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            required: Optional[pulumi.Input[_builtins.bool]] = None,
-            slug: Optional[pulumi.Input[_builtins.str]] = None) -> 'CatalogProperty':
+            catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
+            catalog_property_id: pulumi.Input[Optional[_builtins.str]] = None,
+            catalog_type: pulumi.Input[Optional[_builtins.str]] = None,
+            kind: pulumi.Input[Optional[_builtins.str]] = None,
+            kind_catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
+            multiple: pulumi.Input[Optional[_builtins.bool]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            required: pulumi.Input[Optional[_builtins.bool]] = None,
+            slug: pulumi.Input[Optional[_builtins.str]] = None) -> 'CatalogProperty':
         """
         Get an existing CatalogProperty resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -395,8 +395,8 @@ class CatalogProperty(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] catalog_type: The type of catalog the property belongs to.. Value must be one of <span pulumi-lang-nodejs="`catalog`" pulumi-lang-dotnet="`Catalog`" pulumi-lang-go="`catalog`" pulumi-lang-python="`catalog`" pulumi-lang-yaml="`catalog`" pulumi-lang-java="`catalog`">`catalog`</span>, <span pulumi-lang-nodejs="`cause`" pulumi-lang-dotnet="`Cause`" pulumi-lang-go="`cause`" pulumi-lang-python="`cause`" pulumi-lang-yaml="`cause`" pulumi-lang-java="`cause`">`cause`</span>, <span pulumi-lang-nodejs="`environment`" pulumi-lang-dotnet="`Environment`" pulumi-lang-go="`environment`" pulumi-lang-python="`environment`" pulumi-lang-yaml="`environment`" pulumi-lang-java="`environment`">`environment`</span>, <span pulumi-lang-nodejs="`functionality`" pulumi-lang-dotnet="`Functionality`" pulumi-lang-go="`functionality`" pulumi-lang-python="`functionality`" pulumi-lang-yaml="`functionality`" pulumi-lang-java="`functionality`">`functionality`</span>, <span pulumi-lang-nodejs="`incidentType`" pulumi-lang-dotnet="`IncidentType`" pulumi-lang-go="`incidentType`" pulumi-lang-python="`incident_type`" pulumi-lang-yaml="`incidentType`" pulumi-lang-java="`incidentType`">`incident_type`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`">`service`</span>, <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`">`team`</span>.
-        :param pulumi.Input[_builtins.str] kind: Value must be one of <span pulumi-lang-nodejs="`text`" pulumi-lang-dotnet="`Text`" pulumi-lang-go="`text`" pulumi-lang-python="`text`" pulumi-lang-yaml="`text`" pulumi-lang-java="`text`">`text`</span>, <span pulumi-lang-nodejs="`reference`" pulumi-lang-dotnet="`Reference`" pulumi-lang-go="`reference`" pulumi-lang-python="`reference`" pulumi-lang-yaml="`reference`" pulumi-lang-java="`reference`">`reference`</span>.
+        :param pulumi.Input[_builtins.str] catalog_type: The type of catalog the property belongs to.. Value must be one of <span pulumi-lang-nodejs="`catalog`" pulumi-lang-dotnet="`Catalog`" pulumi-lang-go="`catalog`" pulumi-lang-python="`catalog`" pulumi-lang-yaml="`catalog`" pulumi-lang-java="`catalog`" pulumi-lang-hcl="`catalog`">`catalog`</span>, <span pulumi-lang-nodejs="`cause`" pulumi-lang-dotnet="`Cause`" pulumi-lang-go="`cause`" pulumi-lang-python="`cause`" pulumi-lang-yaml="`cause`" pulumi-lang-java="`cause`" pulumi-lang-hcl="`cause`">`cause`</span>, <span pulumi-lang-nodejs="`environment`" pulumi-lang-dotnet="`Environment`" pulumi-lang-go="`environment`" pulumi-lang-python="`environment`" pulumi-lang-yaml="`environment`" pulumi-lang-java="`environment`" pulumi-lang-hcl="`environment`">`environment`</span>, <span pulumi-lang-nodejs="`functionality`" pulumi-lang-dotnet="`Functionality`" pulumi-lang-go="`functionality`" pulumi-lang-python="`functionality`" pulumi-lang-yaml="`functionality`" pulumi-lang-java="`functionality`" pulumi-lang-hcl="`functionality`">`functionality`</span>, <span pulumi-lang-nodejs="`incidentType`" pulumi-lang-dotnet="`IncidentType`" pulumi-lang-go="`incidentType`" pulumi-lang-python="`incident_type`" pulumi-lang-yaml="`incidentType`" pulumi-lang-java="`incidentType`" pulumi-lang-hcl="`incident_type`">`incidentType`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`" pulumi-lang-hcl="`service`">`service`</span>, <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`" pulumi-lang-hcl="`team`">`team`</span>.
+        :param pulumi.Input[_builtins.str] kind: Value must be one of <span pulumi-lang-nodejs="`text`" pulumi-lang-dotnet="`Text`" pulumi-lang-go="`text`" pulumi-lang-python="`text`" pulumi-lang-yaml="`text`" pulumi-lang-java="`text`" pulumi-lang-hcl="`text`">`text`</span>, <span pulumi-lang-nodejs="`reference`" pulumi-lang-dotnet="`Reference`" pulumi-lang-go="`reference`" pulumi-lang-python="`reference`" pulumi-lang-yaml="`reference`" pulumi-lang-java="`reference`" pulumi-lang-hcl="`reference`">`reference`</span>.
         :param pulumi.Input[_builtins.str] kind_catalog_id: Restricts values to items of specified catalog.
         :param pulumi.Input[_builtins.bool] multiple: Whether the attribute accepts multiple values.. Value must be one of true or false
         :param pulumi.Input[_builtins.bool] required: Whether the property is required.. Value must be one of true or false
@@ -430,7 +430,7 @@ class CatalogProperty(pulumi.CustomResource):
     @pulumi.getter(name="catalogType")
     def catalog_type(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        The type of catalog the property belongs to.. Value must be one of <span pulumi-lang-nodejs="`catalog`" pulumi-lang-dotnet="`Catalog`" pulumi-lang-go="`catalog`" pulumi-lang-python="`catalog`" pulumi-lang-yaml="`catalog`" pulumi-lang-java="`catalog`">`catalog`</span>, <span pulumi-lang-nodejs="`cause`" pulumi-lang-dotnet="`Cause`" pulumi-lang-go="`cause`" pulumi-lang-python="`cause`" pulumi-lang-yaml="`cause`" pulumi-lang-java="`cause`">`cause`</span>, <span pulumi-lang-nodejs="`environment`" pulumi-lang-dotnet="`Environment`" pulumi-lang-go="`environment`" pulumi-lang-python="`environment`" pulumi-lang-yaml="`environment`" pulumi-lang-java="`environment`">`environment`</span>, <span pulumi-lang-nodejs="`functionality`" pulumi-lang-dotnet="`Functionality`" pulumi-lang-go="`functionality`" pulumi-lang-python="`functionality`" pulumi-lang-yaml="`functionality`" pulumi-lang-java="`functionality`">`functionality`</span>, <span pulumi-lang-nodejs="`incidentType`" pulumi-lang-dotnet="`IncidentType`" pulumi-lang-go="`incidentType`" pulumi-lang-python="`incident_type`" pulumi-lang-yaml="`incidentType`" pulumi-lang-java="`incidentType`">`incident_type`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`">`service`</span>, <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`">`team`</span>.
+        The type of catalog the property belongs to.. Value must be one of <span pulumi-lang-nodejs="`catalog`" pulumi-lang-dotnet="`Catalog`" pulumi-lang-go="`catalog`" pulumi-lang-python="`catalog`" pulumi-lang-yaml="`catalog`" pulumi-lang-java="`catalog`" pulumi-lang-hcl="`catalog`">`catalog`</span>, <span pulumi-lang-nodejs="`cause`" pulumi-lang-dotnet="`Cause`" pulumi-lang-go="`cause`" pulumi-lang-python="`cause`" pulumi-lang-yaml="`cause`" pulumi-lang-java="`cause`" pulumi-lang-hcl="`cause`">`cause`</span>, <span pulumi-lang-nodejs="`environment`" pulumi-lang-dotnet="`Environment`" pulumi-lang-go="`environment`" pulumi-lang-python="`environment`" pulumi-lang-yaml="`environment`" pulumi-lang-java="`environment`" pulumi-lang-hcl="`environment`">`environment`</span>, <span pulumi-lang-nodejs="`functionality`" pulumi-lang-dotnet="`Functionality`" pulumi-lang-go="`functionality`" pulumi-lang-python="`functionality`" pulumi-lang-yaml="`functionality`" pulumi-lang-java="`functionality`" pulumi-lang-hcl="`functionality`">`functionality`</span>, <span pulumi-lang-nodejs="`incidentType`" pulumi-lang-dotnet="`IncidentType`" pulumi-lang-go="`incidentType`" pulumi-lang-python="`incident_type`" pulumi-lang-yaml="`incidentType`" pulumi-lang-java="`incidentType`" pulumi-lang-hcl="`incident_type`">`incidentType`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`" pulumi-lang-hcl="`service`">`service`</span>, <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`" pulumi-lang-hcl="`team`">`team`</span>.
         """
         return pulumi.get(self, "catalog_type")
 
@@ -438,7 +438,7 @@ class CatalogProperty(pulumi.CustomResource):
     @pulumi.getter
     def kind(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`text`" pulumi-lang-dotnet="`Text`" pulumi-lang-go="`text`" pulumi-lang-python="`text`" pulumi-lang-yaml="`text`" pulumi-lang-java="`text`">`text`</span>, <span pulumi-lang-nodejs="`reference`" pulumi-lang-dotnet="`Reference`" pulumi-lang-go="`reference`" pulumi-lang-python="`reference`" pulumi-lang-yaml="`reference`" pulumi-lang-java="`reference`">`reference`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`text`" pulumi-lang-dotnet="`Text`" pulumi-lang-go="`text`" pulumi-lang-python="`text`" pulumi-lang-yaml="`text`" pulumi-lang-java="`text`" pulumi-lang-hcl="`text`">`text`</span>, <span pulumi-lang-nodejs="`reference`" pulumi-lang-dotnet="`Reference`" pulumi-lang-go="`reference`" pulumi-lang-python="`reference`" pulumi-lang-yaml="`reference`" pulumi-lang-java="`reference`" pulumi-lang-hcl="`reference`">`reference`</span>.
         """
         return pulumi.get(self, "kind")
 
@@ -475,3 +475,4 @@ class CatalogProperty(pulumi.CustomResource):
     @pulumi.getter
     def slug(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "slug")
+

@@ -116,11 +116,11 @@ def get_communications_template(communication_type: Optional[_builtins.str] = No
         id=pulumi.get(__ret__, 'id'),
         name=pulumi.get(__ret__, 'name'),
         slug=pulumi.get(__ret__, 'slug'))
-def get_communications_template_output(communication_type: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                                       communication_type_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                                       created_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
-                                       name: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                                       slug: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_communications_template_output(communication_type: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                                       communication_type_id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                                       created_at: pulumi.Input[Optional[Optional[Mapping[str, _builtins.str]]]] = None,
+                                       name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                                       slug: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                                        opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetCommunicationsTemplateResult]:
     """
     Use this data source to access information about an existing resource.

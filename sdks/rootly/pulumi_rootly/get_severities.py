@@ -93,9 +93,9 @@ def get_severities(id: Optional[_builtins.str] = None,
         name=pulumi.get(__ret__, 'name'),
         severities=pulumi.get(__ret__, 'severities'),
         slug=pulumi.get(__ret__, 'slug'))
-def get_severities_output(id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                          name: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                          slug: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_severities_output(id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                          name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                          slug: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                           opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetSeveritiesResult]:
     """
     Use this data source to access information about an existing resource.

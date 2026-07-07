@@ -19,12 +19,12 @@ __all__ = ['SecretArgs', 'Secret']
 @pulumi.input_type
 class SecretArgs:
     def __init__(__self__, *,
-                 hashicorp_vault_mount: Optional[pulumi.Input[_builtins.str]] = None,
-                 hashicorp_vault_path: Optional[pulumi.Input[_builtins.str]] = None,
-                 hashicorp_vault_version: Optional[pulumi.Input[_builtins.float]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 secret: Optional[pulumi.Input[_builtins.str]] = None,
-                 secret_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 hashicorp_vault_mount: pulumi.Input[Optional[_builtins.str]] = None,
+                 hashicorp_vault_path: pulumi.Input[Optional[_builtins.str]] = None,
+                 hashicorp_vault_version: pulumi.Input[Optional[_builtins.float]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a Secret resource.
 
@@ -49,83 +49,83 @@ class SecretArgs:
 
     @_builtins.property
     @pulumi.getter(name="hashicorpVaultMount")
-    def hashicorp_vault_mount(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def hashicorp_vault_mount(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The HashiCorp Vault secret mount path
         """
         return pulumi.get(self, "hashicorp_vault_mount")
 
     @hashicorp_vault_mount.setter
-    def hashicorp_vault_mount(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def hashicorp_vault_mount(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "hashicorp_vault_mount", value)
 
     @_builtins.property
     @pulumi.getter(name="hashicorpVaultPath")
-    def hashicorp_vault_path(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def hashicorp_vault_path(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The HashiCorp Vault secret path
         """
         return pulumi.get(self, "hashicorp_vault_path")
 
     @hashicorp_vault_path.setter
-    def hashicorp_vault_path(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def hashicorp_vault_path(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "hashicorp_vault_path", value)
 
     @_builtins.property
     @pulumi.getter(name="hashicorpVaultVersion")
-    def hashicorp_vault_version(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def hashicorp_vault_version(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The HashiCorp Vault secret version
         """
         return pulumi.get(self, "hashicorp_vault_version")
 
     @hashicorp_vault_version.setter
-    def hashicorp_vault_version(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def hashicorp_vault_version(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "hashicorp_vault_version", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the secret
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def secret(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def secret(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The redacted secret
         """
         return pulumi.get(self, "secret")
 
     @secret.setter
-    def secret(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def secret(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "secret", value)
 
     @_builtins.property
     @pulumi.getter(name="secretId")
-    def secret_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def secret_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "secret_id")
 
     @secret_id.setter
-    def secret_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def secret_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "secret_id", value)
 
 
 @pulumi.input_type
 class _SecretState:
     def __init__(__self__, *,
-                 hashicorp_vault_mount: Optional[pulumi.Input[_builtins.str]] = None,
-                 hashicorp_vault_path: Optional[pulumi.Input[_builtins.str]] = None,
-                 hashicorp_vault_version: Optional[pulumi.Input[_builtins.float]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 secret: Optional[pulumi.Input[_builtins.str]] = None,
-                 secret_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 hashicorp_vault_mount: pulumi.Input[Optional[_builtins.str]] = None,
+                 hashicorp_vault_path: pulumi.Input[Optional[_builtins.str]] = None,
+                 hashicorp_vault_version: pulumi.Input[Optional[_builtins.float]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering Secret resources.
 
@@ -150,71 +150,71 @@ class _SecretState:
 
     @_builtins.property
     @pulumi.getter(name="hashicorpVaultMount")
-    def hashicorp_vault_mount(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def hashicorp_vault_mount(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The HashiCorp Vault secret mount path
         """
         return pulumi.get(self, "hashicorp_vault_mount")
 
     @hashicorp_vault_mount.setter
-    def hashicorp_vault_mount(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def hashicorp_vault_mount(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "hashicorp_vault_mount", value)
 
     @_builtins.property
     @pulumi.getter(name="hashicorpVaultPath")
-    def hashicorp_vault_path(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def hashicorp_vault_path(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The HashiCorp Vault secret path
         """
         return pulumi.get(self, "hashicorp_vault_path")
 
     @hashicorp_vault_path.setter
-    def hashicorp_vault_path(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def hashicorp_vault_path(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "hashicorp_vault_path", value)
 
     @_builtins.property
     @pulumi.getter(name="hashicorpVaultVersion")
-    def hashicorp_vault_version(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def hashicorp_vault_version(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The HashiCorp Vault secret version
         """
         return pulumi.get(self, "hashicorp_vault_version")
 
     @hashicorp_vault_version.setter
-    def hashicorp_vault_version(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def hashicorp_vault_version(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "hashicorp_vault_version", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the secret
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def secret(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def secret(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The redacted secret
         """
         return pulumi.get(self, "secret")
 
     @secret.setter
-    def secret(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def secret(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "secret", value)
 
     @_builtins.property
     @pulumi.getter(name="secretId")
-    def secret_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def secret_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "secret_id")
 
     @secret_id.setter
-    def secret_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def secret_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "secret_id", value)
 
 
@@ -224,12 +224,12 @@ class Secret(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 hashicorp_vault_mount: Optional[pulumi.Input[_builtins.str]] = None,
-                 hashicorp_vault_path: Optional[pulumi.Input[_builtins.str]] = None,
-                 hashicorp_vault_version: Optional[pulumi.Input[_builtins.float]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 secret: Optional[pulumi.Input[_builtins.str]] = None,
-                 secret_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 hashicorp_vault_mount: pulumi.Input[Optional[_builtins.str]] = None,
+                 hashicorp_vault_path: pulumi.Input[Optional[_builtins.str]] = None,
+                 hashicorp_vault_version: pulumi.Input[Optional[_builtins.float]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a Secret resource with the given unique name, props, and options.
@@ -266,12 +266,12 @@ class Secret(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 hashicorp_vault_mount: Optional[pulumi.Input[_builtins.str]] = None,
-                 hashicorp_vault_path: Optional[pulumi.Input[_builtins.str]] = None,
-                 hashicorp_vault_version: Optional[pulumi.Input[_builtins.float]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 secret: Optional[pulumi.Input[_builtins.str]] = None,
-                 secret_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 hashicorp_vault_mount: pulumi.Input[Optional[_builtins.str]] = None,
+                 hashicorp_vault_path: pulumi.Input[Optional[_builtins.str]] = None,
+                 hashicorp_vault_version: pulumi.Input[Optional[_builtins.float]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -298,12 +298,12 @@ class Secret(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            hashicorp_vault_mount: Optional[pulumi.Input[_builtins.str]] = None,
-            hashicorp_vault_path: Optional[pulumi.Input[_builtins.str]] = None,
-            hashicorp_vault_version: Optional[pulumi.Input[_builtins.float]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            secret: Optional[pulumi.Input[_builtins.str]] = None,
-            secret_id: Optional[pulumi.Input[_builtins.str]] = None) -> 'Secret':
+            hashicorp_vault_mount: pulumi.Input[Optional[_builtins.str]] = None,
+            hashicorp_vault_path: pulumi.Input[Optional[_builtins.str]] = None,
+            hashicorp_vault_version: pulumi.Input[Optional[_builtins.float]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            secret: pulumi.Input[Optional[_builtins.str]] = None,
+            secret_id: pulumi.Input[Optional[_builtins.str]] = None) -> 'Secret':
         """
         Get an existing Secret resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -373,3 +373,4 @@ class Secret(pulumi.CustomResource):
     @pulumi.getter(name="secretId")
     def secret_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "secret_id")
+

@@ -92,9 +92,9 @@ def get_workflow_task(name: Optional[_builtins.str] = None,
         name=pulumi.get(__ret__, 'name'),
         slug=pulumi.get(__ret__, 'slug'),
         workflow_id=pulumi.get(__ret__, 'workflow_id'))
-def get_workflow_task_output(name: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                             slug: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                             workflow_id: Optional[pulumi.Input[_builtins.str]] = None,
+def get_workflow_task_output(name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                             slug: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                             workflow_id: pulumi.Input[Optional[_builtins.str]] = None,
                              opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetWorkflowTaskResult]:
     """
     Use this data source to access information about an existing resource.

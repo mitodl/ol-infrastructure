@@ -256,7 +256,7 @@ keycloak_database_security_group = ec2.SecurityGroup(
                 data_vpc["security_groups"]["integrator"],
             ],
             # TODO: @Ardiea 20250521 Why are we opening the entire VPC?  # noqa: FIX002, TD002, E501
-            cidr_blocks=[target_vpc["cidr"]],
+            cidr_blocks=[target_vpc["cidr"], data_vpc["cidr"]],
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
@@ -508,6 +508,15 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
             {
                 "name": "spi-realm-restapi-extension-scim-admin-url-check",
                 "value": "no-context-path",
+            },
+            {
+                # Allows admin-cli (password grant) to authenticate against
+                # the scim-for-keycloak admin backend REST API. The plugin
+                # only accepts security-admin-console (browser UI) tokens by
+                # default; enabling this lets scripted admin operations use
+                # admin-cli credentials without a browser session.
+                "name": "spi-realm-restapi-extension-scim-accept-admin-cli-login",
+                "value": "true",
             },
             {
                 "name": "spi-sticky-session-encoder-infinispan-should-attach-route",

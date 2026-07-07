@@ -1,0 +1,9 @@
+---
+name: ol-local-dev-core
+runtime: python
+description: >
+  Core infrastructure for the MIT Learn local development environment.
+  Provisions operators, foundational services, and Keycloak instance.
+  Uses the local k3d cluster with a file-based state backend.
+backend:
+  url: file://../.pulumi

@@ -116,11 +116,11 @@ def get_authorization(authorizable_id: Optional[_builtins.str] = None,
         grantee_id=pulumi.get(__ret__, 'grantee_id'),
         grantee_type=pulumi.get(__ret__, 'grantee_type'),
         id=pulumi.get(__ret__, 'id'))
-def get_authorization_output(authorizable_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                             authorizable_type: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                             created_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
-                             grantee_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                             grantee_type: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_authorization_output(authorizable_id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                             authorizable_type: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                             created_at: pulumi.Input[Optional[Optional[Mapping[str, _builtins.str]]]] = None,
+                             grantee_id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                             grantee_type: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                              opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetAuthorizationResult]:
     """
     Use this data source to access information about an existing resource.

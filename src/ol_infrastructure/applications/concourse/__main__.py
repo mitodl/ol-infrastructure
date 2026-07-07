@@ -13,6 +13,7 @@ import textwrap
 from functools import partial
 from pathlib import Path
 from string import Template
+from typing import Any
 
 import pulumi_vault as vault
 import yaml
@@ -117,7 +118,7 @@ grafana_credentials = read_yaml_secrets(
 def build_worker_user_data(
     concourse_team: str, concourse_tags: list[str], consul_dc: str
 ) -> str:
-    yaml_contents = {
+    yaml_contents: dict[str, Any] = {
         "write_files": [
             {
                 "path": "/etc/consul.d/02-autojoin.json",
@@ -170,6 +171,25 @@ def build_worker_user_data(
                 "owner": "root:root",
             }
         )
+    # Worker identity defaults to the EC2-hostname-derived name (ip-A-B-C-D),
+    # and private IPs get recycled across ASG replacements in these subnets,
+    # so a fresh instance can inherit a prior (now-deleted) worker's identity
+    # before the stalled-worker reaper catches up, producing FK-constraint GC
+    # errors against the old worker's orphaned volume/container rows. Pin the
+    # name to the instance ID instead, which is never reused.
+    yaml_contents["runcmd"] = [
+        (
+            "TOKEN=$(curl -s -X PUT http://169.254.169.254/latest/api/token "
+            "-H 'X-aws-ec2-metadata-token-ttl-seconds: 60' "
+            "--connect-timeout 2 --max-time 5); "
+            'INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" '
+            "--connect-timeout 2 --max-time 5 "
+            "http://169.254.169.254/latest/meta-data/instance-id); "
+            'if [ -n "$INSTANCE_ID" ]; then '
+            'echo "CONCOURSE_NAME=${INSTANCE_ID}" > /etc/default/concourse-name; '
+            "fi"
+        )
+    ]
     return base64.b64encode(
         "#cloud-config\n{}".format(
             yaml.dump(
@@ -219,6 +239,9 @@ for iam_policy in iam_policy_names or []:
         policy=lint_iam_policy(
             policy_module.policy_definition,
             parliament_config={
+                "CREDENTIALS_EXPOSURE": {
+                    "ignore_locations": [{"actions": ["ecr:getauthorizationtoken"]}]
+                },
                 "PERMISSIONS_MANAGEMENT_ACTIONS": {
                     "ignore_locations": [{"actions": ["ec2:modifysnapshotattributte"]}]
                 },
@@ -758,14 +781,14 @@ for worker_def in concourse_config.get_object("workers") or []:
     )
     ol_worker_target_group_config = OLTargetGroupConfig(
         vpc_id=ops_vpc_id,
-        health_check_interval=60,
+        health_check_interval=30,
         health_check_healthy_threshold=2,
         health_check_matcher="200",
         health_check_path="/",
         health_check_port=str(CONCOURSE_WORKER_HEALTHCHECK_PORT),
         health_check_protocol="HTTP",
         health_check_timeout=20,
-        health_check_unhealthy_threshold=5,
+        health_check_unhealthy_threshold=3,
         tags=aws_config.merged_tags({"Name": worker_name_tag}, worker_def["aws_tags"]),
     )
 

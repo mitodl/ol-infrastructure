@@ -20,10 +20,10 @@ __all__ = ['PlaybookTaskArgs', 'PlaybookTask']
 class PlaybookTaskArgs:
     def __init__(__self__, *,
                  task: pulumi.Input[_builtins.str],
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 playbook_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 playbook_task_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None):
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 playbook_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 playbook_task_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None):
         """
         The set of arguments for constructing a PlaybookTask resource.
 
@@ -55,55 +55,55 @@ class PlaybookTaskArgs:
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of task
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="playbookId")
-    def playbook_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def playbook_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "playbook_id")
 
     @playbook_id.setter
-    def playbook_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def playbook_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "playbook_id", value)
 
     @_builtins.property
     @pulumi.getter(name="playbookTaskId")
-    def playbook_task_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def playbook_task_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "playbook_task_id")
 
     @playbook_task_id.setter
-    def playbook_task_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def playbook_task_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "playbook_task_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The position of the task
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
 
 @pulumi.input_type
 class _PlaybookTaskState:
     def __init__(__self__, *,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 playbook_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 playbook_task_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 task: Optional[pulumi.Input[_builtins.str]] = None):
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 playbook_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 playbook_task_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 task: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering PlaybookTask resources.
 
@@ -124,56 +124,56 @@ class _PlaybookTaskState:
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of task
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="playbookId")
-    def playbook_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def playbook_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "playbook_id")
 
     @playbook_id.setter
-    def playbook_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def playbook_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "playbook_id", value)
 
     @_builtins.property
     @pulumi.getter(name="playbookTaskId")
-    def playbook_task_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def playbook_task_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "playbook_task_id")
 
     @playbook_task_id.setter
-    def playbook_task_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def playbook_task_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "playbook_task_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The position of the task
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter
-    def task(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def task(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The task of the task
         """
         return pulumi.get(self, "task")
 
     @task.setter
-    def task(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def task(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "task", value)
 
 
@@ -183,11 +183,11 @@ class PlaybookTask(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 playbook_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 playbook_task_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 task: Optional[pulumi.Input[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 playbook_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 playbook_task_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 task: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a PlaybookTask resource with the given unique name, props, and options.
@@ -222,11 +222,11 @@ class PlaybookTask(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 playbook_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 playbook_task_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 task: Optional[pulumi.Input[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 playbook_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 playbook_task_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 task: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -254,11 +254,11 @@ class PlaybookTask(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            playbook_id: Optional[pulumi.Input[_builtins.str]] = None,
-            playbook_task_id: Optional[pulumi.Input[_builtins.str]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None,
-            task: Optional[pulumi.Input[_builtins.str]] = None) -> 'PlaybookTask':
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            playbook_id: pulumi.Input[Optional[_builtins.str]] = None,
+            playbook_task_id: pulumi.Input[Optional[_builtins.str]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None,
+            task: pulumi.Input[Optional[_builtins.str]] = None) -> 'PlaybookTask':
         """
         Get an existing PlaybookTask resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -314,3 +314,4 @@ class PlaybookTask(pulumi.CustomResource):
         The task of the task
         """
         return pulumi.get(self, "task")
+

@@ -1,0 +1,51 @@
+# openedx integration Tiltfile for ol-infrastructure local dev.
+#
+# Deploys edx-platform (LMS/CMS), codejail, edx-notes-api, and compiled MFEs
+# into the openedx namespace, sharing ol-infrastructure's Valkey and OpenSearch.
+# MySQL and MongoDB are deployed here since ol-infrastructure doesn't include them.
+#
+# Prerequisites:
+#   - MITOL_WORKSPACE_ROOT must be set (or lehrer must be at <workspace_root>/lehrer)
+#   - lehrer repo must be checked out alongside ol-infrastructure
+
+workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/../../..")
+lehrer_dir = os.path.join(workspace_root, "lehrer")
+
+if not os.path.exists(os.path.join(lehrer_dir, ".git")):
+    print("WARNING: lehrer repo not found at " + lehrer_dir + " — skipping openedx deployment.")
+    print("  Set MITOL_WORKSPACE_ROOT to the directory containing the lehrer repo.")
+else:
+    load(os.path.join(lehrer_dir, "local-dev/lehrer-core.star"), "setup")
+
+    local_dev = os.path.join(lehrer_dir, "local-dev")
+
+    # Apply integration-specific configmaps (Valkey, ol-infra OpenSearch, public URLs).
+    k8s_yaml(config.main_dir + "/configmaps/lms-config.yaml")
+    k8s_yaml(config.main_dir + "/configmaps/cms-config.yaml")
+
+    setup({
+        "deploy_config":   os.path.join(lehrer_dir, "deployments/mit-ol"),
+        "registry":        "localhost:5001",
+        "registry_k8s":    "k3d-registry.localhost:5001",
+        "redis_host":      "valkey-primary.local-infra.svc.cluster.local",
+        "opensearch_host": "opensearch-master.local-infra.svc.cluster.local",
+        "namespace":       "openedx",
+        "manage_infra":    False,
+        "mysql_managed":   True,
+        "mongo_managed":   True,
+        "ingress":         "apisix",
+        "mfe_hot_reload":  False,
+        "notes_repo":      "https://github.com/openedx/edx-notes-api",
+        "helm_override_dir": config.main_dir + "/helm",
+        "local_dev_dir":   local_dev,
+        "lms_base_url":    "https://lms.mit.dev",
+        "cms_base_url":    "https://studio.mit.dev",
+        "notes_public_url": "https://notes.mit.dev",
+        "apply_platform_configmaps": False,
+        "release_name":    "master",
+        "deploy_name":     "mitxonline",
+        "settings_ns":     "mitol",
+    })
+
+    # APISIX routes for lms/studio/notes/mfe on the ol-infra cluster
+    k8s_yaml(config.main_dir + "/apisix-routes.yaml")

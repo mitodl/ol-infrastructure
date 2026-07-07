@@ -85,7 +85,7 @@ config:
   edxapp:worker_disk_size: "50"
   edxapp:worker_instance_type: "m7a.xlarge"
   edxapp:enable_xqueue: "true"
-  edxapp:xqueue_domain: unused-placeholder
+  edxapp:xqueue_domain: xqueue.mitx.odl.mit.edu
   mongodb:atlas_project_id: 61b728704656cb4747e589a0
   redis:instance_type: cache.r7g.2xlarge
   vault:address: https://vault-production.odl.mit.edu
@@ -144,3 +144,7 @@ config:
   meilisearch:memory_limit: "1Gi"
   typesense:deploy: "true"
   typesense:enabled: "false"
+  edxapp:site_project:
+    deployment: mitx
+    mfe_apps:
+    - instructor-dashboard

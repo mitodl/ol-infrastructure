@@ -23,9 +23,9 @@ class OnCallShadowArgs:
                  shadow_user_id: pulumi.Input[_builtins.float],
                  shadowable_id: pulumi.Input[_builtins.str],
                  starts_at: pulumi.Input[_builtins.str],
-                 on_call_shadow_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 shadowable_type: Optional[pulumi.Input[_builtins.str]] = None):
+                 on_call_shadow_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 shadowable_type: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a OnCallShadow resource.
 
@@ -97,48 +97,48 @@ class OnCallShadowArgs:
 
     @_builtins.property
     @pulumi.getter(name="onCallShadowId")
-    def on_call_shadow_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def on_call_shadow_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "on_call_shadow_id")
 
     @on_call_shadow_id.setter
-    def on_call_shadow_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def on_call_shadow_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "on_call_shadow_id", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleId")
-    def schedule_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def schedule_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         ID of schedule the shadow shift belongs to
         """
         return pulumi.get(self, "schedule_id")
 
     @schedule_id.setter
-    def schedule_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def schedule_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "schedule_id", value)
 
     @_builtins.property
     @pulumi.getter(name="shadowableType")
-    def shadowable_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def shadowable_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Value must be one of `User`, `Schedule`.
         """
         return pulumi.get(self, "shadowable_type")
 
     @shadowable_type.setter
-    def shadowable_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def shadowable_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "shadowable_type", value)
 
 
 @pulumi.input_type
 class _OnCallShadowState:
     def __init__(__self__, *,
-                 ends_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 on_call_shadow_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 shadow_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 shadowable_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 shadowable_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 starts_at: Optional[pulumi.Input[_builtins.str]] = None):
+                 ends_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 on_call_shadow_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 shadow_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 shadowable_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 shadowable_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 starts_at: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering OnCallShadow resources.
 
@@ -166,83 +166,83 @@ class _OnCallShadowState:
 
     @_builtins.property
     @pulumi.getter(name="endsAt")
-    def ends_at(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def ends_at(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         End datetime for shadow shift
         """
         return pulumi.get(self, "ends_at")
 
     @ends_at.setter
-    def ends_at(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def ends_at(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "ends_at", value)
 
     @_builtins.property
     @pulumi.getter(name="onCallShadowId")
-    def on_call_shadow_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def on_call_shadow_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "on_call_shadow_id")
 
     @on_call_shadow_id.setter
-    def on_call_shadow_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def on_call_shadow_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "on_call_shadow_id", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleId")
-    def schedule_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def schedule_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         ID of schedule the shadow shift belongs to
         """
         return pulumi.get(self, "schedule_id")
 
     @schedule_id.setter
-    def schedule_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def schedule_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "schedule_id", value)
 
     @_builtins.property
     @pulumi.getter(name="shadowUserId")
-    def shadow_user_id(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def shadow_user_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Which user the shadow shift belongs to.
         """
         return pulumi.get(self, "shadow_user_id")
 
     @shadow_user_id.setter
-    def shadow_user_id(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def shadow_user_id(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "shadow_user_id", value)
 
     @_builtins.property
     @pulumi.getter(name="shadowableId")
-    def shadowable_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def shadowable_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         ID of schedule or user the shadow user is shadowing
         """
         return pulumi.get(self, "shadowable_id")
 
     @shadowable_id.setter
-    def shadowable_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def shadowable_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "shadowable_id", value)
 
     @_builtins.property
     @pulumi.getter(name="shadowableType")
-    def shadowable_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def shadowable_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Value must be one of `User`, `Schedule`.
         """
         return pulumi.get(self, "shadowable_type")
 
     @shadowable_type.setter
-    def shadowable_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def shadowable_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "shadowable_type", value)
 
     @_builtins.property
     @pulumi.getter(name="startsAt")
-    def starts_at(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def starts_at(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Start datetime of shadow shift
         """
         return pulumi.get(self, "starts_at")
 
     @starts_at.setter
-    def starts_at(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def starts_at(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "starts_at", value)
 
 
@@ -252,13 +252,13 @@ class OnCallShadow(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 ends_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 on_call_shadow_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 shadow_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 shadowable_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 shadowable_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 starts_at: Optional[pulumi.Input[_builtins.str]] = None,
+                 ends_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 on_call_shadow_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 shadow_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 shadowable_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 shadowable_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 starts_at: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a OnCallShadow resource with the given unique name, props, and options.
@@ -296,13 +296,13 @@ class OnCallShadow(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 ends_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 on_call_shadow_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 shadow_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 shadowable_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 shadowable_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 starts_at: Optional[pulumi.Input[_builtins.str]] = None,
+                 ends_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 on_call_shadow_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 shadow_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 shadowable_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 shadowable_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 starts_at: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -338,13 +338,13 @@ class OnCallShadow(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            ends_at: Optional[pulumi.Input[_builtins.str]] = None,
-            on_call_shadow_id: Optional[pulumi.Input[_builtins.str]] = None,
-            schedule_id: Optional[pulumi.Input[_builtins.str]] = None,
-            shadow_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-            shadowable_id: Optional[pulumi.Input[_builtins.str]] = None,
-            shadowable_type: Optional[pulumi.Input[_builtins.str]] = None,
-            starts_at: Optional[pulumi.Input[_builtins.str]] = None) -> 'OnCallShadow':
+            ends_at: pulumi.Input[Optional[_builtins.str]] = None,
+            on_call_shadow_id: pulumi.Input[Optional[_builtins.str]] = None,
+            schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+            shadow_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+            shadowable_id: pulumi.Input[Optional[_builtins.str]] = None,
+            shadowable_type: pulumi.Input[Optional[_builtins.str]] = None,
+            starts_at: pulumi.Input[Optional[_builtins.str]] = None) -> 'OnCallShadow':
         """
         Get an existing OnCallShadow resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -424,3 +424,4 @@ class OnCallShadow(pulumi.CustomResource):
         Start datetime of shadow shift
         """
         return pulumi.get(self, "starts_at")
+

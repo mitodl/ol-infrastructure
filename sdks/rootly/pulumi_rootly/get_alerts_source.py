@@ -92,9 +92,9 @@ def get_alerts_source(name: Optional[_builtins.str] = None,
         name=pulumi.get(__ret__, 'name'),
         source_type=pulumi.get(__ret__, 'source_type'),
         status=pulumi.get(__ret__, 'status'))
-def get_alerts_source_output(name: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                             source_type: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                             status: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_alerts_source_output(name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                             source_type: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                             status: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                              opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetAlertsSourceResult]:
     """
     Use this data source to access information about an existing resource.

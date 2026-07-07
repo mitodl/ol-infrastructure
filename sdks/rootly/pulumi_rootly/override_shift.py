@@ -22,9 +22,9 @@ class OverrideShiftArgs:
                  ends_at: pulumi.Input[_builtins.str],
                  starts_at: pulumi.Input[_builtins.str],
                  user_id: pulumi.Input[_builtins.float],
-                 override_shift_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 rotation_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 override_shift_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 rotation_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a OverrideShift resource.
 
@@ -82,47 +82,47 @@ class OverrideShiftArgs:
 
     @_builtins.property
     @pulumi.getter(name="overrideShiftId")
-    def override_shift_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def override_shift_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "override_shift_id")
 
     @override_shift_id.setter
-    def override_shift_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def override_shift_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "override_shift_id", value)
 
     @_builtins.property
     @pulumi.getter(name="rotationId")
-    def rotation_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def rotation_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         ID of rotation
         """
         return pulumi.get(self, "rotation_id")
 
     @rotation_id.setter
-    def rotation_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def rotation_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "rotation_id", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleId")
-    def schedule_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def schedule_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         ID of schedule
         """
         return pulumi.get(self, "schedule_id")
 
     @schedule_id.setter
-    def schedule_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def schedule_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "schedule_id", value)
 
 
 @pulumi.input_type
 class _OverrideShiftState:
     def __init__(__self__, *,
-                 ends_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 override_shift_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 rotation_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 starts_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 user_id: Optional[pulumi.Input[_builtins.float]] = None):
+                 ends_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 override_shift_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 rotation_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 starts_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 user_id: pulumi.Input[Optional[_builtins.float]] = None):
         """
         Input properties used for looking up and filtering OverrideShift resources.
 
@@ -147,71 +147,71 @@ class _OverrideShiftState:
 
     @_builtins.property
     @pulumi.getter(name="endsAt")
-    def ends_at(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def ends_at(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         End datetime of shift
         """
         return pulumi.get(self, "ends_at")
 
     @ends_at.setter
-    def ends_at(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def ends_at(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "ends_at", value)
 
     @_builtins.property
     @pulumi.getter(name="overrideShiftId")
-    def override_shift_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def override_shift_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "override_shift_id")
 
     @override_shift_id.setter
-    def override_shift_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def override_shift_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "override_shift_id", value)
 
     @_builtins.property
     @pulumi.getter(name="rotationId")
-    def rotation_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def rotation_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         ID of rotation
         """
         return pulumi.get(self, "rotation_id")
 
     @rotation_id.setter
-    def rotation_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def rotation_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "rotation_id", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleId")
-    def schedule_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def schedule_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         ID of schedule
         """
         return pulumi.get(self, "schedule_id")
 
     @schedule_id.setter
-    def schedule_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def schedule_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "schedule_id", value)
 
     @_builtins.property
     @pulumi.getter(name="startsAt")
-    def starts_at(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def starts_at(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Start datetime of shift
         """
         return pulumi.get(self, "starts_at")
 
     @starts_at.setter
-    def starts_at(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def starts_at(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "starts_at", value)
 
     @_builtins.property
     @pulumi.getter(name="userId")
-    def user_id(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def user_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Override shift user
         """
         return pulumi.get(self, "user_id")
 
     @user_id.setter
-    def user_id(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def user_id(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "user_id", value)
 
 
@@ -221,12 +221,12 @@ class OverrideShift(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 ends_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 override_shift_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 rotation_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 starts_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 user_id: Optional[pulumi.Input[_builtins.float]] = None,
+                 ends_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 override_shift_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 rotation_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 starts_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 user_id: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         """
         Create a OverrideShift resource with the given unique name, props, and options.
@@ -263,12 +263,12 @@ class OverrideShift(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 ends_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 override_shift_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 rotation_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 schedule_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 starts_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 user_id: Optional[pulumi.Input[_builtins.float]] = None,
+                 ends_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 override_shift_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 rotation_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 starts_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 user_id: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -301,12 +301,12 @@ class OverrideShift(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            ends_at: Optional[pulumi.Input[_builtins.str]] = None,
-            override_shift_id: Optional[pulumi.Input[_builtins.str]] = None,
-            rotation_id: Optional[pulumi.Input[_builtins.str]] = None,
-            schedule_id: Optional[pulumi.Input[_builtins.str]] = None,
-            starts_at: Optional[pulumi.Input[_builtins.str]] = None,
-            user_id: Optional[pulumi.Input[_builtins.float]] = None) -> 'OverrideShift':
+            ends_at: pulumi.Input[Optional[_builtins.str]] = None,
+            override_shift_id: pulumi.Input[Optional[_builtins.str]] = None,
+            rotation_id: pulumi.Input[Optional[_builtins.str]] = None,
+            schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+            starts_at: pulumi.Input[Optional[_builtins.str]] = None,
+            user_id: pulumi.Input[Optional[_builtins.float]] = None) -> 'OverrideShift':
         """
         Get an existing OverrideShift resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -376,3 +376,4 @@ class OverrideShift(pulumi.CustomResource):
         Override shift user
         """
         return pulumi.get(self, "user_id")
+

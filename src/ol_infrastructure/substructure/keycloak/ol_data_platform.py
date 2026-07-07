@@ -7,7 +7,7 @@ import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 
-def create_ol_data_platform_realm(  # noqa: C901, PLR0913, PLR0915
+def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     env_name: str,
@@ -500,6 +500,7 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0913, PLR0915
     for resource_name, role in [
         ("ol-starrocks-service-account-view-realm", "view-realm"),
         ("ol-starrocks-service-account-view-users", "view-users"),
+        ("ol-starrocks-service-account-view-clients", "view-clients"),
     ]:
         keycloak.openid.ClientServiceAccountRole(
             resource_name,
@@ -546,6 +547,159 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0913, PLR0915
             ],
             opts=resource_options,
         )
+
+    if "ol_researcher" in ol_data_platform_starrocks_client_role_refs:
+        keycloak.Role(
+            "ol-starrocks-researcher-composite",
+            realm_id=ol_data_platform_realm.id,
+            name="ol-starrocks-researcher",
+            description=(
+                "StarRocks researcher with read-only access to analytics"
+                " and research data"
+            ),
+            composite_roles=[
+                ol_data_platform_starrocks_client_role_refs["ol_researcher"].id
+            ],
+            opts=resource_options,
+        )
+
+    if "ol_instructor" in ol_data_platform_starrocks_client_role_refs:
+        keycloak.Role(
+            "ol-starrocks-instructor-composite",
+            realm_id=ol_data_platform_realm.id,
+            name="ol-starrocks-instructor",
+            description=(
+                "StarRocks instructor with read-only access to gold-tier course data"
+            ),
+            composite_roles=[
+                ol_data_platform_starrocks_client_role_refs["ol_instructor"].id
+            ],
+            opts=resource_options,
+        )
+
+    if "ol_business_analyst" in ol_data_platform_starrocks_client_role_refs:
+        keycloak.Role(
+            "ol-starrocks-business-analyst-composite",
+            realm_id=ol_data_platform_realm.id,
+            name="ol-starrocks-business-analyst",
+            description=(
+                "StarRocks business analyst with read-only access to"
+                " operational and gold-tier data"
+            ),
+            composite_roles=[
+                ol_data_platform_starrocks_client_role_refs["ol_business_analyst"].id
+            ],
+            opts=resource_options,
+        )
+
+    # Emit StarRocks client roles as a role_keys claim in the JWT so that
+    # external tooling and future StarRocks group-provider integration can
+    # read the user's StarRocks role without parsing resource_access.<client>.
+    keycloak.openid.UserClientRoleProtocolMapper(
+        "ol-data-platform-starrocks-role-keys-mapper",
+        claim_name="role_keys",
+        realm_id=ol_data_platform_realm.id,
+        add_to_access_token=True,
+        add_to_id_token=True,
+        add_to_userinfo=True,
+        claim_value_type="String",
+        client_id=ol_data_platform_starrocks_client.id,
+        client_id_for_role_mappings="ol-starrocks-client",
+        multivalued=True,
+        name="starrocks-role-keys",
+        opts=resource_options,
+    )
+
+    # NOTE: the shared "ol_roles" scope is intentionally NOT included here. That
+    # scope carries a role_keys mapper for ol-superset-client roles; combining it
+    # with the StarRocks role_keys mapper above (which maps ol-starrocks-client
+    # roles to the same claim) would put two mappers on the same role_keys claim
+    # for this client, and Keycloak would emit only one of them.  The dedicated
+    # starrocks-role-keys mapper is a direct client mapper, so it applies without
+    # needing the ol_roles scope.
+    keycloak.openid.ClientDefaultScopes(
+        "ol-data-platform-starrocks-client-default-scopes",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_starrocks_client.id,
+        default_scopes=[
+            "acr",
+            "basic",
+            "email",
+            "profile",
+            "roles",
+            "web-origins",
+        ],
+        opts=resource_options,
+    )
+
+    # StarRocks 4.x rejects '@' in usernames.  Expose the Kerberos short username
+    # stored in the "saml_uid" user attribute (populated by the Touchstone SAML
+    # uid mapper above) as the "starrocks_username" JWT claim so that the
+    # StarRocks security integration principal_field can reference it.
+    keycloak.openid.UserAttributeProtocolMapper(
+        "ol-data-platform-starrocks-client-username-mapper",
+        name="starrocks-username",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_starrocks_client.id,
+        user_attribute="saml_uid",
+        claim_name="starrocks_username",
+        claim_value_type="String",
+        add_to_id_token=True,
+        add_to_access_token=True,
+        add_to_userinfo=True,
+        opts=resource_options,
+    )
+
+    # Public client for CLI / developer PKCE flows (no client secret required).
+    # Used by the starrocks-auth helper script to obtain access tokens for
+    # interactive dbt runs and direct mysql connections without exposing the
+    # confidential client secret outside of Vault.
+    ol_data_platform_starrocks_cli_client = keycloak.openid.Client(
+        "ol-data-platform-starrocks-cli-client",
+        name="ol-data-platform-starrocks-cli-client",
+        realm_id=ol_data_platform_realm.id,
+        client_id="ol-starrocks-cli",
+        enabled=True,
+        access_type="PUBLIC",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        direct_access_grants_enabled=False,
+        service_accounts_enabled=False,
+        valid_redirect_uris=[
+            "http://localhost:18080/callback",
+            "http://localhost:*/callback",
+            "http://127.0.0.1:18080/callback",
+        ],
+        web_origins=["+"],
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    keycloak.openid.ClientDefaultScopes(
+        "ol-data-platform-starrocks-cli-client-default-scopes",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_starrocks_cli_client.id,
+        default_scopes=[
+            "acr",
+            "basic",
+            "email",
+            "profile",
+            "roles",
+            "web-origins",
+        ],
+        opts=resource_options,
+    )
+    keycloak.openid.UserAttributeProtocolMapper(
+        "ol-data-platform-starrocks-cli-client-username-mapper",
+        name="starrocks-username",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_starrocks_cli_client.id,
+        user_attribute="saml_uid",
+        claim_name="starrocks_username",
+        claim_value_type="String",
+        add_to_id_token=True,
+        add_to_access_token=True,
+        add_to_userinfo=True,
+        opts=resource_options,
+    )
     # STARROCKS [END] # noqa: ERA001
 
     # MARIMO [START] # noqa: ERA001
@@ -599,7 +753,6 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0913, PLR0915
             "basic",
             "email",
             "ol_roles",
-            "openid",
             "profile",
             "roles",
             "web-origins",
@@ -862,6 +1015,22 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0913, PLR0915
         attribute_name="displayName",
         identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
         user_attribute="fullName",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
+    )
+    # MIT Touchstone sends the Kerberos short username (e.g. "tmacey") in the
+    # SAML "uid" attribute.  Store it as the "saml_uid" Keycloak user attribute
+    # so that protocol mappers on StarRocks clients can expose it as the
+    # "starrocks_username" claim (StarRocks 4.x rejects "@" in usernames).
+    keycloak.AttributeImporterIdentityProviderMapper(
+        "ol-data-platform-touchstone-saml-uid-attribute",
+        name="ol-data-platform-touchstone-saml-uid-attribute",
+        realm=ol_data_platform_realm.id,
+        attribute_name="uid",
+        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
+        user_attribute="saml_uid",
         extra_config={
             "syncMode": "INHERIT",
         },

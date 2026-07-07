@@ -23,20 +23,20 @@ class AlertRoutingRuleArgs:
     def __init__(__self__, *,
                  alerts_source_id: pulumi.Input[_builtins.str],
                  destination: pulumi.Input['AlertRoutingRuleDestinationArgs'],
-                 alert_routing_rule_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 condition_groups: Optional[pulumi.Input[Sequence[pulumi.Input['AlertRoutingRuleConditionGroupArgs']]]] = None,
-                 condition_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 conditions: Optional[pulumi.Input[Sequence[pulumi.Input['AlertRoutingRuleConditionArgs']]]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None):
+                 alert_routing_rule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 condition_groups: pulumi.Input[Optional[Sequence[pulumi.Input['AlertRoutingRuleConditionGroupArgs']]]] = None,
+                 condition_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 conditions: pulumi.Input[Optional[Sequence[pulumi.Input['AlertRoutingRuleConditionArgs']]]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None):
         """
         The set of arguments for constructing a AlertRoutingRule resource.
 
         :param pulumi.Input[_builtins.str] alerts_source_id: The ID of the alerts source
         :param pulumi.Input['AlertRoutingRuleDestinationArgs'] destination: The destinations for the alert routing rule
         :param pulumi.Input[Sequence[pulumi.Input['AlertRoutingRuleConditionGroupArgs']]] condition_groups: The condition groups for the alert routing rule
-        :param pulumi.Input[_builtins.str] condition_type: The type of condition for the alert routing rule. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`">`all`</span>, <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`">`any`</span>.
+        :param pulumi.Input[_builtins.str] condition_type: The type of condition for the alert routing rule. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`" pulumi-lang-hcl="`all`">`all`</span>, <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`" pulumi-lang-hcl="`any`">`any`</span>.
         :param pulumi.Input[Sequence[pulumi.Input['AlertRoutingRuleConditionArgs']]] conditions: The conditions for the alert routing rule
         :param pulumi.Input[_builtins.str] name: The name of the alert routing rule
         :param pulumi.Input[_builtins.float] position: The position of the alert routing rule for ordering evaluation
@@ -84,101 +84,101 @@ class AlertRoutingRuleArgs:
 
     @_builtins.property
     @pulumi.getter(name="alertRoutingRuleId")
-    def alert_routing_rule_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alert_routing_rule_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "alert_routing_rule_id")
 
     @alert_routing_rule_id.setter
-    def alert_routing_rule_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alert_routing_rule_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alert_routing_rule_id", value)
 
     @_builtins.property
     @pulumi.getter(name="conditionGroups")
-    def condition_groups(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['AlertRoutingRuleConditionGroupArgs']]]]:
+    def condition_groups(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['AlertRoutingRuleConditionGroupArgs']]]]:
         """
         The condition groups for the alert routing rule
         """
         return pulumi.get(self, "condition_groups")
 
     @condition_groups.setter
-    def condition_groups(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['AlertRoutingRuleConditionGroupArgs']]]]):
+    def condition_groups(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['AlertRoutingRuleConditionGroupArgs']]]]):
         pulumi.set(self, "condition_groups", value)
 
     @_builtins.property
     @pulumi.getter(name="conditionType")
-    def condition_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def condition_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The type of condition for the alert routing rule. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`">`all`</span>, <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`">`any`</span>.
+        The type of condition for the alert routing rule. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`" pulumi-lang-hcl="`all`">`all`</span>, <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`" pulumi-lang-hcl="`any`">`any`</span>.
         """
         return pulumi.get(self, "condition_type")
 
     @condition_type.setter
-    def condition_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def condition_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "condition_type", value)
 
     @_builtins.property
     @pulumi.getter
-    def conditions(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['AlertRoutingRuleConditionArgs']]]]:
+    def conditions(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['AlertRoutingRuleConditionArgs']]]]:
         """
         The conditions for the alert routing rule
         """
         return pulumi.get(self, "conditions")
 
     @conditions.setter
-    def conditions(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['AlertRoutingRuleConditionArgs']]]]):
+    def conditions(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['AlertRoutingRuleConditionArgs']]]]):
         pulumi.set(self, "conditions", value)
 
     @_builtins.property
     @pulumi.getter
-    def enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         return pulumi.get(self, "enabled")
 
     @enabled.setter
-    def enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "enabled", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the alert routing rule
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The position of the alert routing rule for ordering evaluation
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
 
 @pulumi.input_type
 class _AlertRoutingRuleState:
     def __init__(__self__, *,
-                 alert_routing_rule_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 alerts_source_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 condition_groups: Optional[pulumi.Input[Sequence[pulumi.Input['AlertRoutingRuleConditionGroupArgs']]]] = None,
-                 condition_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 conditions: Optional[pulumi.Input[Sequence[pulumi.Input['AlertRoutingRuleConditionArgs']]]] = None,
-                 destination: Optional[pulumi.Input['AlertRoutingRuleDestinationArgs']] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None):
+                 alert_routing_rule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 alerts_source_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 condition_groups: pulumi.Input[Optional[Sequence[pulumi.Input['AlertRoutingRuleConditionGroupArgs']]]] = None,
+                 condition_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 conditions: pulumi.Input[Optional[Sequence[pulumi.Input['AlertRoutingRuleConditionArgs']]]] = None,
+                 destination: pulumi.Input[Optional['AlertRoutingRuleDestinationArgs']] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None):
         """
         Input properties used for looking up and filtering AlertRoutingRule resources.
 
         :param pulumi.Input[_builtins.str] alerts_source_id: The ID of the alerts source
         :param pulumi.Input[Sequence[pulumi.Input['AlertRoutingRuleConditionGroupArgs']]] condition_groups: The condition groups for the alert routing rule
-        :param pulumi.Input[_builtins.str] condition_type: The type of condition for the alert routing rule. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`">`all`</span>, <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`">`any`</span>.
+        :param pulumi.Input[_builtins.str] condition_type: The type of condition for the alert routing rule. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`" pulumi-lang-hcl="`all`">`all`</span>, <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`" pulumi-lang-hcl="`any`">`any`</span>.
         :param pulumi.Input[Sequence[pulumi.Input['AlertRoutingRuleConditionArgs']]] conditions: The conditions for the alert routing rule
         :param pulumi.Input['AlertRoutingRuleDestinationArgs'] destination: The destinations for the alert routing rule
         :param pulumi.Input[_builtins.str] name: The name of the alert routing rule
@@ -205,104 +205,104 @@ class _AlertRoutingRuleState:
 
     @_builtins.property
     @pulumi.getter(name="alertRoutingRuleId")
-    def alert_routing_rule_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alert_routing_rule_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "alert_routing_rule_id")
 
     @alert_routing_rule_id.setter
-    def alert_routing_rule_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alert_routing_rule_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alert_routing_rule_id", value)
 
     @_builtins.property
     @pulumi.getter(name="alertsSourceId")
-    def alerts_source_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alerts_source_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The ID of the alerts source
         """
         return pulumi.get(self, "alerts_source_id")
 
     @alerts_source_id.setter
-    def alerts_source_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alerts_source_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alerts_source_id", value)
 
     @_builtins.property
     @pulumi.getter(name="conditionGroups")
-    def condition_groups(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['AlertRoutingRuleConditionGroupArgs']]]]:
+    def condition_groups(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['AlertRoutingRuleConditionGroupArgs']]]]:
         """
         The condition groups for the alert routing rule
         """
         return pulumi.get(self, "condition_groups")
 
     @condition_groups.setter
-    def condition_groups(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['AlertRoutingRuleConditionGroupArgs']]]]):
+    def condition_groups(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['AlertRoutingRuleConditionGroupArgs']]]]):
         pulumi.set(self, "condition_groups", value)
 
     @_builtins.property
     @pulumi.getter(name="conditionType")
-    def condition_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def condition_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The type of condition for the alert routing rule. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`">`all`</span>, <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`">`any`</span>.
+        The type of condition for the alert routing rule. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`" pulumi-lang-hcl="`all`">`all`</span>, <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`" pulumi-lang-hcl="`any`">`any`</span>.
         """
         return pulumi.get(self, "condition_type")
 
     @condition_type.setter
-    def condition_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def condition_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "condition_type", value)
 
     @_builtins.property
     @pulumi.getter
-    def conditions(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['AlertRoutingRuleConditionArgs']]]]:
+    def conditions(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['AlertRoutingRuleConditionArgs']]]]:
         """
         The conditions for the alert routing rule
         """
         return pulumi.get(self, "conditions")
 
     @conditions.setter
-    def conditions(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['AlertRoutingRuleConditionArgs']]]]):
+    def conditions(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['AlertRoutingRuleConditionArgs']]]]):
         pulumi.set(self, "conditions", value)
 
     @_builtins.property
     @pulumi.getter
-    def destination(self) -> Optional[pulumi.Input['AlertRoutingRuleDestinationArgs']]:
+    def destination(self) -> pulumi.Input[Optional['AlertRoutingRuleDestinationArgs']]:
         """
         The destinations for the alert routing rule
         """
         return pulumi.get(self, "destination")
 
     @destination.setter
-    def destination(self, value: Optional[pulumi.Input['AlertRoutingRuleDestinationArgs']]):
+    def destination(self, value: pulumi.Input[Optional['AlertRoutingRuleDestinationArgs']]):
         pulumi.set(self, "destination", value)
 
     @_builtins.property
     @pulumi.getter
-    def enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         return pulumi.get(self, "enabled")
 
     @enabled.setter
-    def enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "enabled", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the alert routing rule
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The position of the alert routing rule for ordering evaluation
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
 
@@ -312,15 +312,15 @@ class AlertRoutingRule(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 alert_routing_rule_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 alerts_source_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 condition_groups: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertRoutingRuleConditionGroupArgs', 'AlertRoutingRuleConditionGroupArgsDict']]]]] = None,
-                 condition_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 conditions: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertRoutingRuleConditionArgs', 'AlertRoutingRuleConditionArgsDict']]]]] = None,
-                 destination: Optional[pulumi.Input[Union['AlertRoutingRuleDestinationArgs', 'AlertRoutingRuleDestinationArgsDict']]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
+                 alert_routing_rule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 alerts_source_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 condition_groups: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertRoutingRuleConditionGroupArgs', 'AlertRoutingRuleConditionGroupArgsDict']]]]] = None,
+                 condition_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 conditions: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertRoutingRuleConditionArgs', 'AlertRoutingRuleConditionArgsDict']]]]] = None,
+                 destination: pulumi.Input[Optional[Union['AlertRoutingRuleDestinationArgs', 'AlertRoutingRuleDestinationArgsDict']]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         """
         Create a AlertRoutingRule resource with the given unique name, props, and options.
@@ -329,7 +329,7 @@ class AlertRoutingRule(pulumi.CustomResource):
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.str] alerts_source_id: The ID of the alerts source
         :param pulumi.Input[Sequence[pulumi.Input[Union['AlertRoutingRuleConditionGroupArgs', 'AlertRoutingRuleConditionGroupArgsDict']]]] condition_groups: The condition groups for the alert routing rule
-        :param pulumi.Input[_builtins.str] condition_type: The type of condition for the alert routing rule. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`">`all`</span>, <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`">`any`</span>.
+        :param pulumi.Input[_builtins.str] condition_type: The type of condition for the alert routing rule. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`" pulumi-lang-hcl="`all`">`all`</span>, <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`" pulumi-lang-hcl="`any`">`any`</span>.
         :param pulumi.Input[Sequence[pulumi.Input[Union['AlertRoutingRuleConditionArgs', 'AlertRoutingRuleConditionArgsDict']]]] conditions: The conditions for the alert routing rule
         :param pulumi.Input[Union['AlertRoutingRuleDestinationArgs', 'AlertRoutingRuleDestinationArgsDict']] destination: The destinations for the alert routing rule
         :param pulumi.Input[_builtins.str] name: The name of the alert routing rule
@@ -359,15 +359,15 @@ class AlertRoutingRule(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 alert_routing_rule_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 alerts_source_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 condition_groups: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertRoutingRuleConditionGroupArgs', 'AlertRoutingRuleConditionGroupArgsDict']]]]] = None,
-                 condition_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 conditions: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertRoutingRuleConditionArgs', 'AlertRoutingRuleConditionArgsDict']]]]] = None,
-                 destination: Optional[pulumi.Input[Union['AlertRoutingRuleDestinationArgs', 'AlertRoutingRuleDestinationArgsDict']]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
+                 alert_routing_rule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 alerts_source_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 condition_groups: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertRoutingRuleConditionGroupArgs', 'AlertRoutingRuleConditionGroupArgsDict']]]]] = None,
+                 condition_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 conditions: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertRoutingRuleConditionArgs', 'AlertRoutingRuleConditionArgsDict']]]]] = None,
+                 destination: pulumi.Input[Optional[Union['AlertRoutingRuleDestinationArgs', 'AlertRoutingRuleDestinationArgsDict']]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -401,15 +401,15 @@ class AlertRoutingRule(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            alert_routing_rule_id: Optional[pulumi.Input[_builtins.str]] = None,
-            alerts_source_id: Optional[pulumi.Input[_builtins.str]] = None,
-            condition_groups: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertRoutingRuleConditionGroupArgs', 'AlertRoutingRuleConditionGroupArgsDict']]]]] = None,
-            condition_type: Optional[pulumi.Input[_builtins.str]] = None,
-            conditions: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertRoutingRuleConditionArgs', 'AlertRoutingRuleConditionArgsDict']]]]] = None,
-            destination: Optional[pulumi.Input[Union['AlertRoutingRuleDestinationArgs', 'AlertRoutingRuleDestinationArgsDict']]] = None,
-            enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None) -> 'AlertRoutingRule':
+            alert_routing_rule_id: pulumi.Input[Optional[_builtins.str]] = None,
+            alerts_source_id: pulumi.Input[Optional[_builtins.str]] = None,
+            condition_groups: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertRoutingRuleConditionGroupArgs', 'AlertRoutingRuleConditionGroupArgsDict']]]]] = None,
+            condition_type: pulumi.Input[Optional[_builtins.str]] = None,
+            conditions: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertRoutingRuleConditionArgs', 'AlertRoutingRuleConditionArgsDict']]]]] = None,
+            destination: pulumi.Input[Optional[Union['AlertRoutingRuleDestinationArgs', 'AlertRoutingRuleDestinationArgsDict']]] = None,
+            enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None) -> 'AlertRoutingRule':
         """
         Get an existing AlertRoutingRule resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -419,7 +419,7 @@ class AlertRoutingRule(pulumi.CustomResource):
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.str] alerts_source_id: The ID of the alerts source
         :param pulumi.Input[Sequence[pulumi.Input[Union['AlertRoutingRuleConditionGroupArgs', 'AlertRoutingRuleConditionGroupArgsDict']]]] condition_groups: The condition groups for the alert routing rule
-        :param pulumi.Input[_builtins.str] condition_type: The type of condition for the alert routing rule. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`">`all`</span>, <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`">`any`</span>.
+        :param pulumi.Input[_builtins.str] condition_type: The type of condition for the alert routing rule. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`" pulumi-lang-hcl="`all`">`all`</span>, <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`" pulumi-lang-hcl="`any`">`any`</span>.
         :param pulumi.Input[Sequence[pulumi.Input[Union['AlertRoutingRuleConditionArgs', 'AlertRoutingRuleConditionArgsDict']]]] conditions: The conditions for the alert routing rule
         :param pulumi.Input[Union['AlertRoutingRuleDestinationArgs', 'AlertRoutingRuleDestinationArgsDict']] destination: The destinations for the alert routing rule
         :param pulumi.Input[_builtins.str] name: The name of the alert routing rule
@@ -465,7 +465,7 @@ class AlertRoutingRule(pulumi.CustomResource):
     @pulumi.getter(name="conditionType")
     def condition_type(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        The type of condition for the alert routing rule. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`">`all`</span>, <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`">`any`</span>.
+        The type of condition for the alert routing rule. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`" pulumi-lang-hcl="`all`">`all`</span>, <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`" pulumi-lang-hcl="`any`">`any`</span>.
         """
         return pulumi.get(self, "condition_type")
 
@@ -505,3 +505,4 @@ class AlertRoutingRule(pulumi.CustomResource):
         The position of the alert routing rule for ordering evaluation
         """
         return pulumi.get(self, "position")
+

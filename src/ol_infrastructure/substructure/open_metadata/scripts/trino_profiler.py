@@ -30,9 +30,10 @@ config = {
                 "schemaFilterPattern": {
                     "includes": [r"^ol_warehouse_production_.*$"],
                 },
-                "profileSampleType": "PERCENTAGE",
-                "profileSample": 10.0,
-                "computeMetrics": True,
+                "profileSampleConfig": {
+                    "profileSampleType": "PERCENTAGE",
+                    "profileSample": 10.0,
+                },
                 "computeTableMetrics": True,
                 "computeColumnMetrics": True,
                 # Trino has no system-table metrics implementation in OM

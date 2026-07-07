@@ -80,8 +80,8 @@ def get_user(created_at: Optional[Mapping[str, _builtins.str]] = None,
         created_at=pulumi.get(__ret__, 'created_at'),
         email=pulumi.get(__ret__, 'email'),
         id=pulumi.get(__ret__, 'id'))
-def get_user_output(created_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
-                    email: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_user_output(created_at: pulumi.Input[Optional[Optional[Mapping[str, _builtins.str]]]] = None,
+                    email: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                     opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetUserResult]:
     """
     Use this data source to access information about an existing resource.

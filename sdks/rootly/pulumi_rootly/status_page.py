@@ -20,44 +20,44 @@ __all__ = ['StatusPageArgs', 'StatusPage']
 class StatusPageArgs:
     def __init__(__self__, *,
                  title: pulumi.Input[_builtins.str],
-                 allow_search_engine_index: Optional[pulumi.Input[_builtins.bool]] = None,
-                 authentication_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 authentication_method: Optional[pulumi.Input[_builtins.str]] = None,
-                 authentication_password: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 external_domain_names: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 failure_message: Optional[pulumi.Input[_builtins.str]] = None,
-                 footer_color: Optional[pulumi.Input[_builtins.str]] = None,
-                 functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 ga_tracking_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 header_color: Optional[pulumi.Input[_builtins.str]] = None,
-                 public: Optional[pulumi.Input[_builtins.bool]] = None,
-                 public_description: Optional[pulumi.Input[_builtins.str]] = None,
-                 public_title: Optional[pulumi.Input[_builtins.str]] = None,
-                 saml_idp_cert: Optional[pulumi.Input[_builtins.str]] = None,
-                 saml_idp_cert_fingerprint: Optional[pulumi.Input[_builtins.str]] = None,
-                 saml_idp_slo_service_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 saml_idp_sso_service_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 saml_name_identifier_format: Optional[pulumi.Input[_builtins.str]] = None,
-                 section_orders: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 show_uptime: Optional[pulumi.Input[_builtins.bool]] = None,
-                 show_uptime_last_days: Optional[pulumi.Input[_builtins.float]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 status_page_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 success_message: Optional[pulumi.Input[_builtins.str]] = None,
-                 time_zone: Optional[pulumi.Input[_builtins.str]] = None,
-                 website_privacy_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 website_support_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 website_url: Optional[pulumi.Input[_builtins.str]] = None):
+                 allow_search_engine_index: pulumi.Input[Optional[_builtins.bool]] = None,
+                 authentication_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 authentication_method: pulumi.Input[Optional[_builtins.str]] = None,
+                 authentication_password: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 external_domain_names: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 failure_message: pulumi.Input[Optional[_builtins.str]] = None,
+                 footer_color: pulumi.Input[Optional[_builtins.str]] = None,
+                 functionality_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 ga_tracking_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 header_color: pulumi.Input[Optional[_builtins.str]] = None,
+                 public: pulumi.Input[Optional[_builtins.bool]] = None,
+                 public_description: pulumi.Input[Optional[_builtins.str]] = None,
+                 public_title: pulumi.Input[Optional[_builtins.str]] = None,
+                 saml_idp_cert: pulumi.Input[Optional[_builtins.str]] = None,
+                 saml_idp_cert_fingerprint: pulumi.Input[Optional[_builtins.str]] = None,
+                 saml_idp_slo_service_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 saml_idp_sso_service_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 saml_name_identifier_format: pulumi.Input[Optional[_builtins.str]] = None,
+                 section_orders: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 show_uptime: pulumi.Input[Optional[_builtins.bool]] = None,
+                 show_uptime_last_days: pulumi.Input[Optional[_builtins.float]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 status_page_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 success_message: pulumi.Input[Optional[_builtins.str]] = None,
+                 time_zone: pulumi.Input[Optional[_builtins.str]] = None,
+                 website_privacy_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 website_support_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 website_url: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a StatusPage resource.
 
         :param pulumi.Input[_builtins.str] title: The title of the status page
         :param pulumi.Input[_builtins.bool] allow_search_engine_index: Allow search engines to include your public status page in search results. Value must be one of true or false
-        :param pulumi.Input[_builtins.bool] authentication_enabled: Enable authentication (deprecated - use<span pulumi-lang-nodejs=" authenticationMethod " pulumi-lang-dotnet=" AuthenticationMethod " pulumi-lang-go=" authenticationMethod " pulumi-lang-python=" authentication_method " pulumi-lang-yaml=" authenticationMethod " pulumi-lang-java=" authenticationMethod "> authentication_method </span>instead). Value must be one of true or false
-        :param pulumi.Input[_builtins.str] authentication_method: Authentication method. Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`">`none`</span>, <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`">`password`</span>, <span pulumi-lang-nodejs="`saml`" pulumi-lang-dotnet="`Saml`" pulumi-lang-go="`saml`" pulumi-lang-python="`saml`" pulumi-lang-yaml="`saml`" pulumi-lang-java="`saml`">`saml`</span>.
+        :param pulumi.Input[_builtins.bool] authentication_enabled: Enable authentication (deprecated - use<span pulumi-lang-nodejs=" authenticationMethod " pulumi-lang-dotnet=" AuthenticationMethod " pulumi-lang-go=" authenticationMethod " pulumi-lang-python=" authentication_method " pulumi-lang-yaml=" authenticationMethod " pulumi-lang-java=" authenticationMethod " pulumi-lang-hcl=" authentication_method "> authenticationMethod </span>instead). Value must be one of true or false
+        :param pulumi.Input[_builtins.str] authentication_method: Authentication method. Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`" pulumi-lang-hcl="`none`">`none`</span>, <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span>, <span pulumi-lang-nodejs="`saml`" pulumi-lang-dotnet="`Saml`" pulumi-lang-go="`saml`" pulumi-lang-python="`saml`" pulumi-lang-yaml="`saml`" pulumi-lang-java="`saml`" pulumi-lang-hcl="`saml`">`saml`</span>.
         :param pulumi.Input[_builtins.str] authentication_password: Authentication password
         :param pulumi.Input[_builtins.str] description: The description of the status page
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] external_domain_names: External domain names attached to the status page
@@ -74,10 +74,10 @@ class StatusPageArgs:
         :param pulumi.Input[_builtins.str] saml_idp_slo_service_url: SAML IdP SLO service URL
         :param pulumi.Input[_builtins.str] saml_idp_sso_service_url: SAML IdP SSO service URL
         :param pulumi.Input[_builtins.str] saml_name_identifier_format: SAML name identifier format. Value must be one of `urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress`, `urn:oasis:names:tc:SAML:2.0:nameid-format:persistent`, `urn:oasis:names:tc:SAML:2.0:nameid-format:transient`, `urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified`.
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] section_orders: Order of sections on the status page. Value must be a list of <span pulumi-lang-nodejs="`maintenance`" pulumi-lang-dotnet="`Maintenance`" pulumi-lang-go="`maintenance`" pulumi-lang-python="`maintenance`" pulumi-lang-yaml="`maintenance`" pulumi-lang-java="`maintenance`">`maintenance`</span>, <span pulumi-lang-nodejs="`systemStatus`" pulumi-lang-dotnet="`SystemStatus`" pulumi-lang-go="`systemStatus`" pulumi-lang-python="`system_status`" pulumi-lang-yaml="`systemStatus`" pulumi-lang-java="`systemStatus`">`system_status`</span>, <span pulumi-lang-nodejs="`incidents`" pulumi-lang-dotnet="`Incidents`" pulumi-lang-go="`incidents`" pulumi-lang-python="`incidents`" pulumi-lang-yaml="`incidents`" pulumi-lang-java="`incidents`">`incidents`</span>.
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] section_orders: Order of sections on the status page. Value must be a list of <span pulumi-lang-nodejs="`maintenance`" pulumi-lang-dotnet="`Maintenance`" pulumi-lang-go="`maintenance`" pulumi-lang-python="`maintenance`" pulumi-lang-yaml="`maintenance`" pulumi-lang-java="`maintenance`" pulumi-lang-hcl="`maintenance`">`maintenance`</span>, <span pulumi-lang-nodejs="`systemStatus`" pulumi-lang-dotnet="`SystemStatus`" pulumi-lang-go="`systemStatus`" pulumi-lang-python="`system_status`" pulumi-lang-yaml="`systemStatus`" pulumi-lang-java="`systemStatus`" pulumi-lang-hcl="`system_status`">`systemStatus`</span>, <span pulumi-lang-nodejs="`incidents`" pulumi-lang-dotnet="`Incidents`" pulumi-lang-go="`incidents`" pulumi-lang-python="`incidents`" pulumi-lang-yaml="`incidents`" pulumi-lang-java="`incidents`" pulumi-lang-hcl="`incidents`">`incidents`</span>.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] service_ids: Services attached to the status page
         :param pulumi.Input[_builtins.bool] show_uptime: Show uptime. Value must be one of true or false
-        :param pulumi.Input[_builtins.float] show_uptime_last_days: Show uptime over x days. Value must be one of <span pulumi-lang-nodejs="`30`" pulumi-lang-dotnet="`30`" pulumi-lang-go="`30`" pulumi-lang-python="`30`" pulumi-lang-yaml="`30`" pulumi-lang-java="`30`">`30`</span>, <span pulumi-lang-nodejs="`60`" pulumi-lang-dotnet="`60`" pulumi-lang-go="`60`" pulumi-lang-python="`60`" pulumi-lang-yaml="`60`" pulumi-lang-java="`60`">`60`</span>, <span pulumi-lang-nodejs="`90`" pulumi-lang-dotnet="`90`" pulumi-lang-go="`90`" pulumi-lang-python="`90`" pulumi-lang-yaml="`90`" pulumi-lang-java="`90`">`90`</span>.
+        :param pulumi.Input[_builtins.float] show_uptime_last_days: Show uptime over x days. Value must be one of <span pulumi-lang-nodejs="`30`" pulumi-lang-dotnet="`30`" pulumi-lang-go="`30`" pulumi-lang-python="`30`" pulumi-lang-yaml="`30`" pulumi-lang-java="`30`" pulumi-lang-hcl="`30`">`30`</span>, <span pulumi-lang-nodejs="`60`" pulumi-lang-dotnet="`60`" pulumi-lang-go="`60`" pulumi-lang-python="`60`" pulumi-lang-yaml="`60`" pulumi-lang-java="`60`" pulumi-lang-hcl="`60`">`60`</span>, <span pulumi-lang-nodejs="`90`" pulumi-lang-dotnet="`90`" pulumi-lang-go="`90`" pulumi-lang-python="`90`" pulumi-lang-yaml="`90`" pulumi-lang-java="`90`" pulumi-lang-hcl="`90`">`90`</span>.
         :param pulumi.Input[_builtins.str] slug: The slug of the status page
         :param pulumi.Input[_builtins.str] success_message: Message showing when all components are operational
         :param pulumi.Input[_builtins.str] time_zone: A valid IANA time zone name.
@@ -163,413 +163,413 @@ class StatusPageArgs:
 
     @_builtins.property
     @pulumi.getter(name="allowSearchEngineIndex")
-    def allow_search_engine_index(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def allow_search_engine_index(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Allow search engines to include your public status page in search results. Value must be one of true or false
         """
         return pulumi.get(self, "allow_search_engine_index")
 
     @allow_search_engine_index.setter
-    def allow_search_engine_index(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def allow_search_engine_index(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "allow_search_engine_index", value)
 
     @_builtins.property
     @pulumi.getter(name="authenticationEnabled")
-    def authentication_enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def authentication_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Enable authentication (deprecated - use<span pulumi-lang-nodejs=" authenticationMethod " pulumi-lang-dotnet=" AuthenticationMethod " pulumi-lang-go=" authenticationMethod " pulumi-lang-python=" authentication_method " pulumi-lang-yaml=" authenticationMethod " pulumi-lang-java=" authenticationMethod "> authentication_method </span>instead). Value must be one of true or false
+        Enable authentication (deprecated - use<span pulumi-lang-nodejs=" authenticationMethod " pulumi-lang-dotnet=" AuthenticationMethod " pulumi-lang-go=" authenticationMethod " pulumi-lang-python=" authentication_method " pulumi-lang-yaml=" authenticationMethod " pulumi-lang-java=" authenticationMethod " pulumi-lang-hcl=" authentication_method "> authenticationMethod </span>instead). Value must be one of true or false
         """
         return pulumi.get(self, "authentication_enabled")
 
     @authentication_enabled.setter
-    def authentication_enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def authentication_enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "authentication_enabled", value)
 
     @_builtins.property
     @pulumi.getter(name="authenticationMethod")
-    def authentication_method(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def authentication_method(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Authentication method. Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`">`none`</span>, <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`">`password`</span>, <span pulumi-lang-nodejs="`saml`" pulumi-lang-dotnet="`Saml`" pulumi-lang-go="`saml`" pulumi-lang-python="`saml`" pulumi-lang-yaml="`saml`" pulumi-lang-java="`saml`">`saml`</span>.
+        Authentication method. Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`" pulumi-lang-hcl="`none`">`none`</span>, <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span>, <span pulumi-lang-nodejs="`saml`" pulumi-lang-dotnet="`Saml`" pulumi-lang-go="`saml`" pulumi-lang-python="`saml`" pulumi-lang-yaml="`saml`" pulumi-lang-java="`saml`" pulumi-lang-hcl="`saml`">`saml`</span>.
         """
         return pulumi.get(self, "authentication_method")
 
     @authentication_method.setter
-    def authentication_method(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def authentication_method(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "authentication_method", value)
 
     @_builtins.property
     @pulumi.getter(name="authenticationPassword")
-    def authentication_password(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def authentication_password(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Authentication password
         """
         return pulumi.get(self, "authentication_password")
 
     @authentication_password.setter
-    def authentication_password(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def authentication_password(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "authentication_password", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the status page
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter
-    def enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         return pulumi.get(self, "enabled")
 
     @enabled.setter
-    def enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "enabled", value)
 
     @_builtins.property
     @pulumi.getter(name="externalDomainNames")
-    def external_domain_names(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def external_domain_names(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         External domain names attached to the status page
         """
         return pulumi.get(self, "external_domain_names")
 
     @external_domain_names.setter
-    def external_domain_names(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def external_domain_names(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "external_domain_names", value)
 
     @_builtins.property
     @pulumi.getter(name="failureMessage")
-    def failure_message(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def failure_message(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Message showing when at least one component is not operational
         """
         return pulumi.get(self, "failure_message")
 
     @failure_message.setter
-    def failure_message(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def failure_message(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "failure_message", value)
 
     @_builtins.property
     @pulumi.getter(name="footerColor")
-    def footer_color(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def footer_color(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The color of the footer. Eg. "#1F2F41"
         """
         return pulumi.get(self, "footer_color")
 
     @footer_color.setter
-    def footer_color(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def footer_color(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "footer_color", value)
 
     @_builtins.property
     @pulumi.getter(name="functionalityIds")
-    def functionality_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def functionality_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Functionalities attached to the status page
         """
         return pulumi.get(self, "functionality_ids")
 
     @functionality_ids.setter
-    def functionality_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def functionality_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "functionality_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="gaTrackingId")
-    def ga_tracking_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def ga_tracking_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Google Analytics tracking ID
         """
         return pulumi.get(self, "ga_tracking_id")
 
     @ga_tracking_id.setter
-    def ga_tracking_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def ga_tracking_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "ga_tracking_id", value)
 
     @_builtins.property
     @pulumi.getter(name="headerColor")
-    def header_color(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def header_color(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The color of the header. Eg. "#0061F2"
         """
         return pulumi.get(self, "header_color")
 
     @header_color.setter
-    def header_color(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def header_color(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "header_color", value)
 
     @_builtins.property
     @pulumi.getter
-    def public(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def public(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Make the status page accessible to the public. Value must be one of true or false
         """
         return pulumi.get(self, "public")
 
     @public.setter
-    def public(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def public(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "public", value)
 
     @_builtins.property
     @pulumi.getter(name="publicDescription")
-    def public_description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def public_description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The public description of the status page
         """
         return pulumi.get(self, "public_description")
 
     @public_description.setter
-    def public_description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def public_description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "public_description", value)
 
     @_builtins.property
     @pulumi.getter(name="publicTitle")
-    def public_title(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def public_title(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The public title of the status page
         """
         return pulumi.get(self, "public_title")
 
     @public_title.setter
-    def public_title(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def public_title(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "public_title", value)
 
     @_builtins.property
     @pulumi.getter(name="samlIdpCert")
-    def saml_idp_cert(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def saml_idp_cert(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         SAML IdP certificate
         """
         return pulumi.get(self, "saml_idp_cert")
 
     @saml_idp_cert.setter
-    def saml_idp_cert(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def saml_idp_cert(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "saml_idp_cert", value)
 
     @_builtins.property
     @pulumi.getter(name="samlIdpCertFingerprint")
-    def saml_idp_cert_fingerprint(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def saml_idp_cert_fingerprint(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         SAML IdP certificate fingerprint
         """
         return pulumi.get(self, "saml_idp_cert_fingerprint")
 
     @saml_idp_cert_fingerprint.setter
-    def saml_idp_cert_fingerprint(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def saml_idp_cert_fingerprint(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "saml_idp_cert_fingerprint", value)
 
     @_builtins.property
     @pulumi.getter(name="samlIdpSloServiceUrl")
-    def saml_idp_slo_service_url(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def saml_idp_slo_service_url(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         SAML IdP SLO service URL
         """
         return pulumi.get(self, "saml_idp_slo_service_url")
 
     @saml_idp_slo_service_url.setter
-    def saml_idp_slo_service_url(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def saml_idp_slo_service_url(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "saml_idp_slo_service_url", value)
 
     @_builtins.property
     @pulumi.getter(name="samlIdpSsoServiceUrl")
-    def saml_idp_sso_service_url(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def saml_idp_sso_service_url(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         SAML IdP SSO service URL
         """
         return pulumi.get(self, "saml_idp_sso_service_url")
 
     @saml_idp_sso_service_url.setter
-    def saml_idp_sso_service_url(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def saml_idp_sso_service_url(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "saml_idp_sso_service_url", value)
 
     @_builtins.property
     @pulumi.getter(name="samlNameIdentifierFormat")
-    def saml_name_identifier_format(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def saml_name_identifier_format(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         SAML name identifier format. Value must be one of `urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress`, `urn:oasis:names:tc:SAML:2.0:nameid-format:persistent`, `urn:oasis:names:tc:SAML:2.0:nameid-format:transient`, `urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified`.
         """
         return pulumi.get(self, "saml_name_identifier_format")
 
     @saml_name_identifier_format.setter
-    def saml_name_identifier_format(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def saml_name_identifier_format(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "saml_name_identifier_format", value)
 
     @_builtins.property
     @pulumi.getter(name="sectionOrders")
-    def section_orders(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def section_orders(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
-        Order of sections on the status page. Value must be a list of <span pulumi-lang-nodejs="`maintenance`" pulumi-lang-dotnet="`Maintenance`" pulumi-lang-go="`maintenance`" pulumi-lang-python="`maintenance`" pulumi-lang-yaml="`maintenance`" pulumi-lang-java="`maintenance`">`maintenance`</span>, <span pulumi-lang-nodejs="`systemStatus`" pulumi-lang-dotnet="`SystemStatus`" pulumi-lang-go="`systemStatus`" pulumi-lang-python="`system_status`" pulumi-lang-yaml="`systemStatus`" pulumi-lang-java="`systemStatus`">`system_status`</span>, <span pulumi-lang-nodejs="`incidents`" pulumi-lang-dotnet="`Incidents`" pulumi-lang-go="`incidents`" pulumi-lang-python="`incidents`" pulumi-lang-yaml="`incidents`" pulumi-lang-java="`incidents`">`incidents`</span>.
+        Order of sections on the status page. Value must be a list of <span pulumi-lang-nodejs="`maintenance`" pulumi-lang-dotnet="`Maintenance`" pulumi-lang-go="`maintenance`" pulumi-lang-python="`maintenance`" pulumi-lang-yaml="`maintenance`" pulumi-lang-java="`maintenance`" pulumi-lang-hcl="`maintenance`">`maintenance`</span>, <span pulumi-lang-nodejs="`systemStatus`" pulumi-lang-dotnet="`SystemStatus`" pulumi-lang-go="`systemStatus`" pulumi-lang-python="`system_status`" pulumi-lang-yaml="`systemStatus`" pulumi-lang-java="`systemStatus`" pulumi-lang-hcl="`system_status`">`systemStatus`</span>, <span pulumi-lang-nodejs="`incidents`" pulumi-lang-dotnet="`Incidents`" pulumi-lang-go="`incidents`" pulumi-lang-python="`incidents`" pulumi-lang-yaml="`incidents`" pulumi-lang-java="`incidents`" pulumi-lang-hcl="`incidents`">`incidents`</span>.
         """
         return pulumi.get(self, "section_orders")
 
     @section_orders.setter
-    def section_orders(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def section_orders(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "section_orders", value)
 
     @_builtins.property
     @pulumi.getter(name="serviceIds")
-    def service_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def service_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Services attached to the status page
         """
         return pulumi.get(self, "service_ids")
 
     @service_ids.setter
-    def service_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def service_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "service_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="showUptime")
-    def show_uptime(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def show_uptime(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Show uptime. Value must be one of true or false
         """
         return pulumi.get(self, "show_uptime")
 
     @show_uptime.setter
-    def show_uptime(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def show_uptime(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "show_uptime", value)
 
     @_builtins.property
     @pulumi.getter(name="showUptimeLastDays")
-    def show_uptime_last_days(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def show_uptime_last_days(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Show uptime over x days. Value must be one of <span pulumi-lang-nodejs="`30`" pulumi-lang-dotnet="`30`" pulumi-lang-go="`30`" pulumi-lang-python="`30`" pulumi-lang-yaml="`30`" pulumi-lang-java="`30`">`30`</span>, <span pulumi-lang-nodejs="`60`" pulumi-lang-dotnet="`60`" pulumi-lang-go="`60`" pulumi-lang-python="`60`" pulumi-lang-yaml="`60`" pulumi-lang-java="`60`">`60`</span>, <span pulumi-lang-nodejs="`90`" pulumi-lang-dotnet="`90`" pulumi-lang-go="`90`" pulumi-lang-python="`90`" pulumi-lang-yaml="`90`" pulumi-lang-java="`90`">`90`</span>.
+        Show uptime over x days. Value must be one of <span pulumi-lang-nodejs="`30`" pulumi-lang-dotnet="`30`" pulumi-lang-go="`30`" pulumi-lang-python="`30`" pulumi-lang-yaml="`30`" pulumi-lang-java="`30`" pulumi-lang-hcl="`30`">`30`</span>, <span pulumi-lang-nodejs="`60`" pulumi-lang-dotnet="`60`" pulumi-lang-go="`60`" pulumi-lang-python="`60`" pulumi-lang-yaml="`60`" pulumi-lang-java="`60`" pulumi-lang-hcl="`60`">`60`</span>, <span pulumi-lang-nodejs="`90`" pulumi-lang-dotnet="`90`" pulumi-lang-go="`90`" pulumi-lang-python="`90`" pulumi-lang-yaml="`90`" pulumi-lang-java="`90`" pulumi-lang-hcl="`90`">`90`</span>.
         """
         return pulumi.get(self, "show_uptime_last_days")
 
     @show_uptime_last_days.setter
-    def show_uptime_last_days(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def show_uptime_last_days(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "show_uptime_last_days", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The slug of the status page
         """
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
     @_builtins.property
     @pulumi.getter(name="statusPageId")
-    def status_page_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def status_page_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "status_page_id")
 
     @status_page_id.setter
-    def status_page_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def status_page_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "status_page_id", value)
 
     @_builtins.property
     @pulumi.getter(name="successMessage")
-    def success_message(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def success_message(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Message showing when all components are operational
         """
         return pulumi.get(self, "success_message")
 
     @success_message.setter
-    def success_message(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def success_message(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "success_message", value)
 
     @_builtins.property
     @pulumi.getter(name="timeZone")
-    def time_zone(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def time_zone(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         A valid IANA time zone name.
         """
         return pulumi.get(self, "time_zone")
 
     @time_zone.setter
-    def time_zone(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def time_zone(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "time_zone", value)
 
     @_builtins.property
     @pulumi.getter(name="websitePrivacyUrl")
-    def website_privacy_url(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def website_privacy_url(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Website Privacy URL
         """
         return pulumi.get(self, "website_privacy_url")
 
     @website_privacy_url.setter
-    def website_privacy_url(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def website_privacy_url(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "website_privacy_url", value)
 
     @_builtins.property
     @pulumi.getter(name="websiteSupportUrl")
-    def website_support_url(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def website_support_url(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Website Support URL
         """
         return pulumi.get(self, "website_support_url")
 
     @website_support_url.setter
-    def website_support_url(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def website_support_url(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "website_support_url", value)
 
     @_builtins.property
     @pulumi.getter(name="websiteUrl")
-    def website_url(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def website_url(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Website URL
         """
         return pulumi.get(self, "website_url")
 
     @website_url.setter
-    def website_url(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def website_url(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "website_url", value)
 
 
 @pulumi.input_type
 class _StatusPageState:
     def __init__(__self__, *,
-                 allow_search_engine_index: Optional[pulumi.Input[_builtins.bool]] = None,
-                 authentication_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 authentication_method: Optional[pulumi.Input[_builtins.str]] = None,
-                 authentication_password: Optional[pulumi.Input[_builtins.str]] = None,
-                 cname_records: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 external_domain_names: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 failure_message: Optional[pulumi.Input[_builtins.str]] = None,
-                 footer_color: Optional[pulumi.Input[_builtins.str]] = None,
-                 functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 ga_tracking_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 header_color: Optional[pulumi.Input[_builtins.str]] = None,
-                 public: Optional[pulumi.Input[_builtins.bool]] = None,
-                 public_description: Optional[pulumi.Input[_builtins.str]] = None,
-                 public_title: Optional[pulumi.Input[_builtins.str]] = None,
-                 saml_idp_cert: Optional[pulumi.Input[_builtins.str]] = None,
-                 saml_idp_cert_fingerprint: Optional[pulumi.Input[_builtins.str]] = None,
-                 saml_idp_slo_service_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 saml_idp_sso_service_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 saml_name_identifier_format: Optional[pulumi.Input[_builtins.str]] = None,
-                 section_orders: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 show_uptime: Optional[pulumi.Input[_builtins.bool]] = None,
-                 show_uptime_last_days: Optional[pulumi.Input[_builtins.float]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 status_page_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 success_message: Optional[pulumi.Input[_builtins.str]] = None,
-                 time_zone: Optional[pulumi.Input[_builtins.str]] = None,
-                 title: Optional[pulumi.Input[_builtins.str]] = None,
-                 website_privacy_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 website_support_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 website_url: Optional[pulumi.Input[_builtins.str]] = None):
+                 allow_search_engine_index: pulumi.Input[Optional[_builtins.bool]] = None,
+                 authentication_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 authentication_method: pulumi.Input[Optional[_builtins.str]] = None,
+                 authentication_password: pulumi.Input[Optional[_builtins.str]] = None,
+                 cname_records: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 external_domain_names: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 failure_message: pulumi.Input[Optional[_builtins.str]] = None,
+                 footer_color: pulumi.Input[Optional[_builtins.str]] = None,
+                 functionality_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 ga_tracking_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 header_color: pulumi.Input[Optional[_builtins.str]] = None,
+                 public: pulumi.Input[Optional[_builtins.bool]] = None,
+                 public_description: pulumi.Input[Optional[_builtins.str]] = None,
+                 public_title: pulumi.Input[Optional[_builtins.str]] = None,
+                 saml_idp_cert: pulumi.Input[Optional[_builtins.str]] = None,
+                 saml_idp_cert_fingerprint: pulumi.Input[Optional[_builtins.str]] = None,
+                 saml_idp_slo_service_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 saml_idp_sso_service_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 saml_name_identifier_format: pulumi.Input[Optional[_builtins.str]] = None,
+                 section_orders: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 show_uptime: pulumi.Input[Optional[_builtins.bool]] = None,
+                 show_uptime_last_days: pulumi.Input[Optional[_builtins.float]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 status_page_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 success_message: pulumi.Input[Optional[_builtins.str]] = None,
+                 time_zone: pulumi.Input[Optional[_builtins.str]] = None,
+                 title: pulumi.Input[Optional[_builtins.str]] = None,
+                 website_privacy_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 website_support_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 website_url: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering StatusPage resources.
 
         :param pulumi.Input[_builtins.bool] allow_search_engine_index: Allow search engines to include your public status page in search results. Value must be one of true or false
-        :param pulumi.Input[_builtins.bool] authentication_enabled: Enable authentication (deprecated - use<span pulumi-lang-nodejs=" authenticationMethod " pulumi-lang-dotnet=" AuthenticationMethod " pulumi-lang-go=" authenticationMethod " pulumi-lang-python=" authentication_method " pulumi-lang-yaml=" authenticationMethod " pulumi-lang-java=" authenticationMethod "> authentication_method </span>instead). Value must be one of true or false
-        :param pulumi.Input[_builtins.str] authentication_method: Authentication method. Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`">`none`</span>, <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`">`password`</span>, <span pulumi-lang-nodejs="`saml`" pulumi-lang-dotnet="`Saml`" pulumi-lang-go="`saml`" pulumi-lang-python="`saml`" pulumi-lang-yaml="`saml`" pulumi-lang-java="`saml`">`saml`</span>.
+        :param pulumi.Input[_builtins.bool] authentication_enabled: Enable authentication (deprecated - use<span pulumi-lang-nodejs=" authenticationMethod " pulumi-lang-dotnet=" AuthenticationMethod " pulumi-lang-go=" authenticationMethod " pulumi-lang-python=" authentication_method " pulumi-lang-yaml=" authenticationMethod " pulumi-lang-java=" authenticationMethod " pulumi-lang-hcl=" authentication_method "> authenticationMethod </span>instead). Value must be one of true or false
+        :param pulumi.Input[_builtins.str] authentication_method: Authentication method. Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`" pulumi-lang-hcl="`none`">`none`</span>, <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span>, <span pulumi-lang-nodejs="`saml`" pulumi-lang-dotnet="`Saml`" pulumi-lang-go="`saml`" pulumi-lang-python="`saml`" pulumi-lang-yaml="`saml`" pulumi-lang-java="`saml`" pulumi-lang-hcl="`saml`">`saml`</span>.
         :param pulumi.Input[_builtins.str] authentication_password: Authentication password
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] cname_records: CNAME records mapping external domain names to their DNS target values. Populated asynchronously after setting external_domain_names.
         :param pulumi.Input[_builtins.str] description: The description of the status page
@@ -587,10 +587,10 @@ class _StatusPageState:
         :param pulumi.Input[_builtins.str] saml_idp_slo_service_url: SAML IdP SLO service URL
         :param pulumi.Input[_builtins.str] saml_idp_sso_service_url: SAML IdP SSO service URL
         :param pulumi.Input[_builtins.str] saml_name_identifier_format: SAML name identifier format. Value must be one of `urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress`, `urn:oasis:names:tc:SAML:2.0:nameid-format:persistent`, `urn:oasis:names:tc:SAML:2.0:nameid-format:transient`, `urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified`.
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] section_orders: Order of sections on the status page. Value must be a list of <span pulumi-lang-nodejs="`maintenance`" pulumi-lang-dotnet="`Maintenance`" pulumi-lang-go="`maintenance`" pulumi-lang-python="`maintenance`" pulumi-lang-yaml="`maintenance`" pulumi-lang-java="`maintenance`">`maintenance`</span>, <span pulumi-lang-nodejs="`systemStatus`" pulumi-lang-dotnet="`SystemStatus`" pulumi-lang-go="`systemStatus`" pulumi-lang-python="`system_status`" pulumi-lang-yaml="`systemStatus`" pulumi-lang-java="`systemStatus`">`system_status`</span>, <span pulumi-lang-nodejs="`incidents`" pulumi-lang-dotnet="`Incidents`" pulumi-lang-go="`incidents`" pulumi-lang-python="`incidents`" pulumi-lang-yaml="`incidents`" pulumi-lang-java="`incidents`">`incidents`</span>.
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] section_orders: Order of sections on the status page. Value must be a list of <span pulumi-lang-nodejs="`maintenance`" pulumi-lang-dotnet="`Maintenance`" pulumi-lang-go="`maintenance`" pulumi-lang-python="`maintenance`" pulumi-lang-yaml="`maintenance`" pulumi-lang-java="`maintenance`" pulumi-lang-hcl="`maintenance`">`maintenance`</span>, <span pulumi-lang-nodejs="`systemStatus`" pulumi-lang-dotnet="`SystemStatus`" pulumi-lang-go="`systemStatus`" pulumi-lang-python="`system_status`" pulumi-lang-yaml="`systemStatus`" pulumi-lang-java="`systemStatus`" pulumi-lang-hcl="`system_status`">`systemStatus`</span>, <span pulumi-lang-nodejs="`incidents`" pulumi-lang-dotnet="`Incidents`" pulumi-lang-go="`incidents`" pulumi-lang-python="`incidents`" pulumi-lang-yaml="`incidents`" pulumi-lang-java="`incidents`" pulumi-lang-hcl="`incidents`">`incidents`</span>.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] service_ids: Services attached to the status page
         :param pulumi.Input[_builtins.bool] show_uptime: Show uptime. Value must be one of true or false
-        :param pulumi.Input[_builtins.float] show_uptime_last_days: Show uptime over x days. Value must be one of <span pulumi-lang-nodejs="`30`" pulumi-lang-dotnet="`30`" pulumi-lang-go="`30`" pulumi-lang-python="`30`" pulumi-lang-yaml="`30`" pulumi-lang-java="`30`">`30`</span>, <span pulumi-lang-nodejs="`60`" pulumi-lang-dotnet="`60`" pulumi-lang-go="`60`" pulumi-lang-python="`60`" pulumi-lang-yaml="`60`" pulumi-lang-java="`60`">`60`</span>, <span pulumi-lang-nodejs="`90`" pulumi-lang-dotnet="`90`" pulumi-lang-go="`90`" pulumi-lang-python="`90`" pulumi-lang-yaml="`90`" pulumi-lang-java="`90`">`90`</span>.
+        :param pulumi.Input[_builtins.float] show_uptime_last_days: Show uptime over x days. Value must be one of <span pulumi-lang-nodejs="`30`" pulumi-lang-dotnet="`30`" pulumi-lang-go="`30`" pulumi-lang-python="`30`" pulumi-lang-yaml="`30`" pulumi-lang-java="`30`" pulumi-lang-hcl="`30`">`30`</span>, <span pulumi-lang-nodejs="`60`" pulumi-lang-dotnet="`60`" pulumi-lang-go="`60`" pulumi-lang-python="`60`" pulumi-lang-yaml="`60`" pulumi-lang-java="`60`" pulumi-lang-hcl="`60`">`60`</span>, <span pulumi-lang-nodejs="`90`" pulumi-lang-dotnet="`90`" pulumi-lang-go="`90`" pulumi-lang-python="`90`" pulumi-lang-yaml="`90`" pulumi-lang-java="`90`" pulumi-lang-hcl="`90`">`90`</span>.
         :param pulumi.Input[_builtins.str] slug: The slug of the status page
         :param pulumi.Input[_builtins.str] success_message: Message showing when all components are operational
         :param pulumi.Input[_builtins.str] time_zone: A valid IANA time zone name.
@@ -668,392 +668,392 @@ class _StatusPageState:
 
     @_builtins.property
     @pulumi.getter(name="allowSearchEngineIndex")
-    def allow_search_engine_index(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def allow_search_engine_index(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Allow search engines to include your public status page in search results. Value must be one of true or false
         """
         return pulumi.get(self, "allow_search_engine_index")
 
     @allow_search_engine_index.setter
-    def allow_search_engine_index(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def allow_search_engine_index(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "allow_search_engine_index", value)
 
     @_builtins.property
     @pulumi.getter(name="authenticationEnabled")
-    def authentication_enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def authentication_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Enable authentication (deprecated - use<span pulumi-lang-nodejs=" authenticationMethod " pulumi-lang-dotnet=" AuthenticationMethod " pulumi-lang-go=" authenticationMethod " pulumi-lang-python=" authentication_method " pulumi-lang-yaml=" authenticationMethod " pulumi-lang-java=" authenticationMethod "> authentication_method </span>instead). Value must be one of true or false
+        Enable authentication (deprecated - use<span pulumi-lang-nodejs=" authenticationMethod " pulumi-lang-dotnet=" AuthenticationMethod " pulumi-lang-go=" authenticationMethod " pulumi-lang-python=" authentication_method " pulumi-lang-yaml=" authenticationMethod " pulumi-lang-java=" authenticationMethod " pulumi-lang-hcl=" authentication_method "> authenticationMethod </span>instead). Value must be one of true or false
         """
         return pulumi.get(self, "authentication_enabled")
 
     @authentication_enabled.setter
-    def authentication_enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def authentication_enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "authentication_enabled", value)
 
     @_builtins.property
     @pulumi.getter(name="authenticationMethod")
-    def authentication_method(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def authentication_method(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Authentication method. Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`">`none`</span>, <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`">`password`</span>, <span pulumi-lang-nodejs="`saml`" pulumi-lang-dotnet="`Saml`" pulumi-lang-go="`saml`" pulumi-lang-python="`saml`" pulumi-lang-yaml="`saml`" pulumi-lang-java="`saml`">`saml`</span>.
+        Authentication method. Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`" pulumi-lang-hcl="`none`">`none`</span>, <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span>, <span pulumi-lang-nodejs="`saml`" pulumi-lang-dotnet="`Saml`" pulumi-lang-go="`saml`" pulumi-lang-python="`saml`" pulumi-lang-yaml="`saml`" pulumi-lang-java="`saml`" pulumi-lang-hcl="`saml`">`saml`</span>.
         """
         return pulumi.get(self, "authentication_method")
 
     @authentication_method.setter
-    def authentication_method(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def authentication_method(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "authentication_method", value)
 
     @_builtins.property
     @pulumi.getter(name="authenticationPassword")
-    def authentication_password(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def authentication_password(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Authentication password
         """
         return pulumi.get(self, "authentication_password")
 
     @authentication_password.setter
-    def authentication_password(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def authentication_password(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "authentication_password", value)
 
     @_builtins.property
     @pulumi.getter(name="cnameRecords")
-    def cname_records(self) -> Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]]:
+    def cname_records(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
         """
         CNAME records mapping external domain names to their DNS target values. Populated asynchronously after setting external_domain_names.
         """
         return pulumi.get(self, "cname_records")
 
     @cname_records.setter
-    def cname_records(self, value: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]]):
+    def cname_records(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "cname_records", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the status page
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter
-    def enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         return pulumi.get(self, "enabled")
 
     @enabled.setter
-    def enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "enabled", value)
 
     @_builtins.property
     @pulumi.getter(name="externalDomainNames")
-    def external_domain_names(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def external_domain_names(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         External domain names attached to the status page
         """
         return pulumi.get(self, "external_domain_names")
 
     @external_domain_names.setter
-    def external_domain_names(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def external_domain_names(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "external_domain_names", value)
 
     @_builtins.property
     @pulumi.getter(name="failureMessage")
-    def failure_message(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def failure_message(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Message showing when at least one component is not operational
         """
         return pulumi.get(self, "failure_message")
 
     @failure_message.setter
-    def failure_message(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def failure_message(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "failure_message", value)
 
     @_builtins.property
     @pulumi.getter(name="footerColor")
-    def footer_color(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def footer_color(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The color of the footer. Eg. "#1F2F41"
         """
         return pulumi.get(self, "footer_color")
 
     @footer_color.setter
-    def footer_color(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def footer_color(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "footer_color", value)
 
     @_builtins.property
     @pulumi.getter(name="functionalityIds")
-    def functionality_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def functionality_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Functionalities attached to the status page
         """
         return pulumi.get(self, "functionality_ids")
 
     @functionality_ids.setter
-    def functionality_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def functionality_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "functionality_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="gaTrackingId")
-    def ga_tracking_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def ga_tracking_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Google Analytics tracking ID
         """
         return pulumi.get(self, "ga_tracking_id")
 
     @ga_tracking_id.setter
-    def ga_tracking_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def ga_tracking_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "ga_tracking_id", value)
 
     @_builtins.property
     @pulumi.getter(name="headerColor")
-    def header_color(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def header_color(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The color of the header. Eg. "#0061F2"
         """
         return pulumi.get(self, "header_color")
 
     @header_color.setter
-    def header_color(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def header_color(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "header_color", value)
 
     @_builtins.property
     @pulumi.getter
-    def public(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def public(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Make the status page accessible to the public. Value must be one of true or false
         """
         return pulumi.get(self, "public")
 
     @public.setter
-    def public(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def public(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "public", value)
 
     @_builtins.property
     @pulumi.getter(name="publicDescription")
-    def public_description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def public_description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The public description of the status page
         """
         return pulumi.get(self, "public_description")
 
     @public_description.setter
-    def public_description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def public_description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "public_description", value)
 
     @_builtins.property
     @pulumi.getter(name="publicTitle")
-    def public_title(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def public_title(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The public title of the status page
         """
         return pulumi.get(self, "public_title")
 
     @public_title.setter
-    def public_title(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def public_title(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "public_title", value)
 
     @_builtins.property
     @pulumi.getter(name="samlIdpCert")
-    def saml_idp_cert(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def saml_idp_cert(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         SAML IdP certificate
         """
         return pulumi.get(self, "saml_idp_cert")
 
     @saml_idp_cert.setter
-    def saml_idp_cert(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def saml_idp_cert(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "saml_idp_cert", value)
 
     @_builtins.property
     @pulumi.getter(name="samlIdpCertFingerprint")
-    def saml_idp_cert_fingerprint(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def saml_idp_cert_fingerprint(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         SAML IdP certificate fingerprint
         """
         return pulumi.get(self, "saml_idp_cert_fingerprint")
 
     @saml_idp_cert_fingerprint.setter
-    def saml_idp_cert_fingerprint(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def saml_idp_cert_fingerprint(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "saml_idp_cert_fingerprint", value)
 
     @_builtins.property
     @pulumi.getter(name="samlIdpSloServiceUrl")
-    def saml_idp_slo_service_url(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def saml_idp_slo_service_url(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         SAML IdP SLO service URL
         """
         return pulumi.get(self, "saml_idp_slo_service_url")
 
     @saml_idp_slo_service_url.setter
-    def saml_idp_slo_service_url(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def saml_idp_slo_service_url(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "saml_idp_slo_service_url", value)
 
     @_builtins.property
     @pulumi.getter(name="samlIdpSsoServiceUrl")
-    def saml_idp_sso_service_url(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def saml_idp_sso_service_url(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         SAML IdP SSO service URL
         """
         return pulumi.get(self, "saml_idp_sso_service_url")
 
     @saml_idp_sso_service_url.setter
-    def saml_idp_sso_service_url(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def saml_idp_sso_service_url(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "saml_idp_sso_service_url", value)
 
     @_builtins.property
     @pulumi.getter(name="samlNameIdentifierFormat")
-    def saml_name_identifier_format(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def saml_name_identifier_format(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         SAML name identifier format. Value must be one of `urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress`, `urn:oasis:names:tc:SAML:2.0:nameid-format:persistent`, `urn:oasis:names:tc:SAML:2.0:nameid-format:transient`, `urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified`.
         """
         return pulumi.get(self, "saml_name_identifier_format")
 
     @saml_name_identifier_format.setter
-    def saml_name_identifier_format(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def saml_name_identifier_format(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "saml_name_identifier_format", value)
 
     @_builtins.property
     @pulumi.getter(name="sectionOrders")
-    def section_orders(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def section_orders(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
-        Order of sections on the status page. Value must be a list of <span pulumi-lang-nodejs="`maintenance`" pulumi-lang-dotnet="`Maintenance`" pulumi-lang-go="`maintenance`" pulumi-lang-python="`maintenance`" pulumi-lang-yaml="`maintenance`" pulumi-lang-java="`maintenance`">`maintenance`</span>, <span pulumi-lang-nodejs="`systemStatus`" pulumi-lang-dotnet="`SystemStatus`" pulumi-lang-go="`systemStatus`" pulumi-lang-python="`system_status`" pulumi-lang-yaml="`systemStatus`" pulumi-lang-java="`systemStatus`">`system_status`</span>, <span pulumi-lang-nodejs="`incidents`" pulumi-lang-dotnet="`Incidents`" pulumi-lang-go="`incidents`" pulumi-lang-python="`incidents`" pulumi-lang-yaml="`incidents`" pulumi-lang-java="`incidents`">`incidents`</span>.
+        Order of sections on the status page. Value must be a list of <span pulumi-lang-nodejs="`maintenance`" pulumi-lang-dotnet="`Maintenance`" pulumi-lang-go="`maintenance`" pulumi-lang-python="`maintenance`" pulumi-lang-yaml="`maintenance`" pulumi-lang-java="`maintenance`" pulumi-lang-hcl="`maintenance`">`maintenance`</span>, <span pulumi-lang-nodejs="`systemStatus`" pulumi-lang-dotnet="`SystemStatus`" pulumi-lang-go="`systemStatus`" pulumi-lang-python="`system_status`" pulumi-lang-yaml="`systemStatus`" pulumi-lang-java="`systemStatus`" pulumi-lang-hcl="`system_status`">`systemStatus`</span>, <span pulumi-lang-nodejs="`incidents`" pulumi-lang-dotnet="`Incidents`" pulumi-lang-go="`incidents`" pulumi-lang-python="`incidents`" pulumi-lang-yaml="`incidents`" pulumi-lang-java="`incidents`" pulumi-lang-hcl="`incidents`">`incidents`</span>.
         """
         return pulumi.get(self, "section_orders")
 
     @section_orders.setter
-    def section_orders(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def section_orders(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "section_orders", value)
 
     @_builtins.property
     @pulumi.getter(name="serviceIds")
-    def service_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def service_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Services attached to the status page
         """
         return pulumi.get(self, "service_ids")
 
     @service_ids.setter
-    def service_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def service_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "service_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="showUptime")
-    def show_uptime(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def show_uptime(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Show uptime. Value must be one of true or false
         """
         return pulumi.get(self, "show_uptime")
 
     @show_uptime.setter
-    def show_uptime(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def show_uptime(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "show_uptime", value)
 
     @_builtins.property
     @pulumi.getter(name="showUptimeLastDays")
-    def show_uptime_last_days(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def show_uptime_last_days(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Show uptime over x days. Value must be one of <span pulumi-lang-nodejs="`30`" pulumi-lang-dotnet="`30`" pulumi-lang-go="`30`" pulumi-lang-python="`30`" pulumi-lang-yaml="`30`" pulumi-lang-java="`30`">`30`</span>, <span pulumi-lang-nodejs="`60`" pulumi-lang-dotnet="`60`" pulumi-lang-go="`60`" pulumi-lang-python="`60`" pulumi-lang-yaml="`60`" pulumi-lang-java="`60`">`60`</span>, <span pulumi-lang-nodejs="`90`" pulumi-lang-dotnet="`90`" pulumi-lang-go="`90`" pulumi-lang-python="`90`" pulumi-lang-yaml="`90`" pulumi-lang-java="`90`">`90`</span>.
+        Show uptime over x days. Value must be one of <span pulumi-lang-nodejs="`30`" pulumi-lang-dotnet="`30`" pulumi-lang-go="`30`" pulumi-lang-python="`30`" pulumi-lang-yaml="`30`" pulumi-lang-java="`30`" pulumi-lang-hcl="`30`">`30`</span>, <span pulumi-lang-nodejs="`60`" pulumi-lang-dotnet="`60`" pulumi-lang-go="`60`" pulumi-lang-python="`60`" pulumi-lang-yaml="`60`" pulumi-lang-java="`60`" pulumi-lang-hcl="`60`">`60`</span>, <span pulumi-lang-nodejs="`90`" pulumi-lang-dotnet="`90`" pulumi-lang-go="`90`" pulumi-lang-python="`90`" pulumi-lang-yaml="`90`" pulumi-lang-java="`90`" pulumi-lang-hcl="`90`">`90`</span>.
         """
         return pulumi.get(self, "show_uptime_last_days")
 
     @show_uptime_last_days.setter
-    def show_uptime_last_days(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def show_uptime_last_days(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "show_uptime_last_days", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The slug of the status page
         """
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
     @_builtins.property
     @pulumi.getter(name="statusPageId")
-    def status_page_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def status_page_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "status_page_id")
 
     @status_page_id.setter
-    def status_page_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def status_page_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "status_page_id", value)
 
     @_builtins.property
     @pulumi.getter(name="successMessage")
-    def success_message(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def success_message(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Message showing when all components are operational
         """
         return pulumi.get(self, "success_message")
 
     @success_message.setter
-    def success_message(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def success_message(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "success_message", value)
 
     @_builtins.property
     @pulumi.getter(name="timeZone")
-    def time_zone(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def time_zone(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         A valid IANA time zone name.
         """
         return pulumi.get(self, "time_zone")
 
     @time_zone.setter
-    def time_zone(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def time_zone(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "time_zone", value)
 
     @_builtins.property
     @pulumi.getter
-    def title(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def title(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The title of the status page
         """
         return pulumi.get(self, "title")
 
     @title.setter
-    def title(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def title(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "title", value)
 
     @_builtins.property
     @pulumi.getter(name="websitePrivacyUrl")
-    def website_privacy_url(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def website_privacy_url(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Website Privacy URL
         """
         return pulumi.get(self, "website_privacy_url")
 
     @website_privacy_url.setter
-    def website_privacy_url(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def website_privacy_url(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "website_privacy_url", value)
 
     @_builtins.property
     @pulumi.getter(name="websiteSupportUrl")
-    def website_support_url(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def website_support_url(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Website Support URL
         """
         return pulumi.get(self, "website_support_url")
 
     @website_support_url.setter
-    def website_support_url(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def website_support_url(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "website_support_url", value)
 
     @_builtins.property
     @pulumi.getter(name="websiteUrl")
-    def website_url(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def website_url(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Website URL
         """
         return pulumi.get(self, "website_url")
 
     @website_url.setter
-    def website_url(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def website_url(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "website_url", value)
 
 
@@ -1063,38 +1063,38 @@ class StatusPage(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 allow_search_engine_index: Optional[pulumi.Input[_builtins.bool]] = None,
-                 authentication_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 authentication_method: Optional[pulumi.Input[_builtins.str]] = None,
-                 authentication_password: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 external_domain_names: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 failure_message: Optional[pulumi.Input[_builtins.str]] = None,
-                 footer_color: Optional[pulumi.Input[_builtins.str]] = None,
-                 functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 ga_tracking_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 header_color: Optional[pulumi.Input[_builtins.str]] = None,
-                 public: Optional[pulumi.Input[_builtins.bool]] = None,
-                 public_description: Optional[pulumi.Input[_builtins.str]] = None,
-                 public_title: Optional[pulumi.Input[_builtins.str]] = None,
-                 saml_idp_cert: Optional[pulumi.Input[_builtins.str]] = None,
-                 saml_idp_cert_fingerprint: Optional[pulumi.Input[_builtins.str]] = None,
-                 saml_idp_slo_service_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 saml_idp_sso_service_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 saml_name_identifier_format: Optional[pulumi.Input[_builtins.str]] = None,
-                 section_orders: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 show_uptime: Optional[pulumi.Input[_builtins.bool]] = None,
-                 show_uptime_last_days: Optional[pulumi.Input[_builtins.float]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 status_page_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 success_message: Optional[pulumi.Input[_builtins.str]] = None,
-                 time_zone: Optional[pulumi.Input[_builtins.str]] = None,
-                 title: Optional[pulumi.Input[_builtins.str]] = None,
-                 website_privacy_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 website_support_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 website_url: Optional[pulumi.Input[_builtins.str]] = None,
+                 allow_search_engine_index: pulumi.Input[Optional[_builtins.bool]] = None,
+                 authentication_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 authentication_method: pulumi.Input[Optional[_builtins.str]] = None,
+                 authentication_password: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 external_domain_names: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 failure_message: pulumi.Input[Optional[_builtins.str]] = None,
+                 footer_color: pulumi.Input[Optional[_builtins.str]] = None,
+                 functionality_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 ga_tracking_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 header_color: pulumi.Input[Optional[_builtins.str]] = None,
+                 public: pulumi.Input[Optional[_builtins.bool]] = None,
+                 public_description: pulumi.Input[Optional[_builtins.str]] = None,
+                 public_title: pulumi.Input[Optional[_builtins.str]] = None,
+                 saml_idp_cert: pulumi.Input[Optional[_builtins.str]] = None,
+                 saml_idp_cert_fingerprint: pulumi.Input[Optional[_builtins.str]] = None,
+                 saml_idp_slo_service_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 saml_idp_sso_service_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 saml_name_identifier_format: pulumi.Input[Optional[_builtins.str]] = None,
+                 section_orders: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 show_uptime: pulumi.Input[Optional[_builtins.bool]] = None,
+                 show_uptime_last_days: pulumi.Input[Optional[_builtins.float]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 status_page_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 success_message: pulumi.Input[Optional[_builtins.str]] = None,
+                 time_zone: pulumi.Input[Optional[_builtins.str]] = None,
+                 title: pulumi.Input[Optional[_builtins.str]] = None,
+                 website_privacy_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 website_support_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 website_url: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a StatusPage resource with the given unique name, props, and options.
@@ -1102,8 +1102,8 @@ class StatusPage(pulumi.CustomResource):
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.bool] allow_search_engine_index: Allow search engines to include your public status page in search results. Value must be one of true or false
-        :param pulumi.Input[_builtins.bool] authentication_enabled: Enable authentication (deprecated - use<span pulumi-lang-nodejs=" authenticationMethod " pulumi-lang-dotnet=" AuthenticationMethod " pulumi-lang-go=" authenticationMethod " pulumi-lang-python=" authentication_method " pulumi-lang-yaml=" authenticationMethod " pulumi-lang-java=" authenticationMethod "> authentication_method </span>instead). Value must be one of true or false
-        :param pulumi.Input[_builtins.str] authentication_method: Authentication method. Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`">`none`</span>, <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`">`password`</span>, <span pulumi-lang-nodejs="`saml`" pulumi-lang-dotnet="`Saml`" pulumi-lang-go="`saml`" pulumi-lang-python="`saml`" pulumi-lang-yaml="`saml`" pulumi-lang-java="`saml`">`saml`</span>.
+        :param pulumi.Input[_builtins.bool] authentication_enabled: Enable authentication (deprecated - use<span pulumi-lang-nodejs=" authenticationMethod " pulumi-lang-dotnet=" AuthenticationMethod " pulumi-lang-go=" authenticationMethod " pulumi-lang-python=" authentication_method " pulumi-lang-yaml=" authenticationMethod " pulumi-lang-java=" authenticationMethod " pulumi-lang-hcl=" authentication_method "> authenticationMethod </span>instead). Value must be one of true or false
+        :param pulumi.Input[_builtins.str] authentication_method: Authentication method. Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`" pulumi-lang-hcl="`none`">`none`</span>, <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span>, <span pulumi-lang-nodejs="`saml`" pulumi-lang-dotnet="`Saml`" pulumi-lang-go="`saml`" pulumi-lang-python="`saml`" pulumi-lang-yaml="`saml`" pulumi-lang-java="`saml`" pulumi-lang-hcl="`saml`">`saml`</span>.
         :param pulumi.Input[_builtins.str] authentication_password: Authentication password
         :param pulumi.Input[_builtins.str] description: The description of the status page
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] external_domain_names: External domain names attached to the status page
@@ -1120,10 +1120,10 @@ class StatusPage(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] saml_idp_slo_service_url: SAML IdP SLO service URL
         :param pulumi.Input[_builtins.str] saml_idp_sso_service_url: SAML IdP SSO service URL
         :param pulumi.Input[_builtins.str] saml_name_identifier_format: SAML name identifier format. Value must be one of `urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress`, `urn:oasis:names:tc:SAML:2.0:nameid-format:persistent`, `urn:oasis:names:tc:SAML:2.0:nameid-format:transient`, `urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified`.
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] section_orders: Order of sections on the status page. Value must be a list of <span pulumi-lang-nodejs="`maintenance`" pulumi-lang-dotnet="`Maintenance`" pulumi-lang-go="`maintenance`" pulumi-lang-python="`maintenance`" pulumi-lang-yaml="`maintenance`" pulumi-lang-java="`maintenance`">`maintenance`</span>, <span pulumi-lang-nodejs="`systemStatus`" pulumi-lang-dotnet="`SystemStatus`" pulumi-lang-go="`systemStatus`" pulumi-lang-python="`system_status`" pulumi-lang-yaml="`systemStatus`" pulumi-lang-java="`systemStatus`">`system_status`</span>, <span pulumi-lang-nodejs="`incidents`" pulumi-lang-dotnet="`Incidents`" pulumi-lang-go="`incidents`" pulumi-lang-python="`incidents`" pulumi-lang-yaml="`incidents`" pulumi-lang-java="`incidents`">`incidents`</span>.
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] section_orders: Order of sections on the status page. Value must be a list of <span pulumi-lang-nodejs="`maintenance`" pulumi-lang-dotnet="`Maintenance`" pulumi-lang-go="`maintenance`" pulumi-lang-python="`maintenance`" pulumi-lang-yaml="`maintenance`" pulumi-lang-java="`maintenance`" pulumi-lang-hcl="`maintenance`">`maintenance`</span>, <span pulumi-lang-nodejs="`systemStatus`" pulumi-lang-dotnet="`SystemStatus`" pulumi-lang-go="`systemStatus`" pulumi-lang-python="`system_status`" pulumi-lang-yaml="`systemStatus`" pulumi-lang-java="`systemStatus`" pulumi-lang-hcl="`system_status`">`systemStatus`</span>, <span pulumi-lang-nodejs="`incidents`" pulumi-lang-dotnet="`Incidents`" pulumi-lang-go="`incidents`" pulumi-lang-python="`incidents`" pulumi-lang-yaml="`incidents`" pulumi-lang-java="`incidents`" pulumi-lang-hcl="`incidents`">`incidents`</span>.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] service_ids: Services attached to the status page
         :param pulumi.Input[_builtins.bool] show_uptime: Show uptime. Value must be one of true or false
-        :param pulumi.Input[_builtins.float] show_uptime_last_days: Show uptime over x days. Value must be one of <span pulumi-lang-nodejs="`30`" pulumi-lang-dotnet="`30`" pulumi-lang-go="`30`" pulumi-lang-python="`30`" pulumi-lang-yaml="`30`" pulumi-lang-java="`30`">`30`</span>, <span pulumi-lang-nodejs="`60`" pulumi-lang-dotnet="`60`" pulumi-lang-go="`60`" pulumi-lang-python="`60`" pulumi-lang-yaml="`60`" pulumi-lang-java="`60`">`60`</span>, <span pulumi-lang-nodejs="`90`" pulumi-lang-dotnet="`90`" pulumi-lang-go="`90`" pulumi-lang-python="`90`" pulumi-lang-yaml="`90`" pulumi-lang-java="`90`">`90`</span>.
+        :param pulumi.Input[_builtins.float] show_uptime_last_days: Show uptime over x days. Value must be one of <span pulumi-lang-nodejs="`30`" pulumi-lang-dotnet="`30`" pulumi-lang-go="`30`" pulumi-lang-python="`30`" pulumi-lang-yaml="`30`" pulumi-lang-java="`30`" pulumi-lang-hcl="`30`">`30`</span>, <span pulumi-lang-nodejs="`60`" pulumi-lang-dotnet="`60`" pulumi-lang-go="`60`" pulumi-lang-python="`60`" pulumi-lang-yaml="`60`" pulumi-lang-java="`60`" pulumi-lang-hcl="`60`">`60`</span>, <span pulumi-lang-nodejs="`90`" pulumi-lang-dotnet="`90`" pulumi-lang-go="`90`" pulumi-lang-python="`90`" pulumi-lang-yaml="`90`" pulumi-lang-java="`90`" pulumi-lang-hcl="`90`">`90`</span>.
         :param pulumi.Input[_builtins.str] slug: The slug of the status page
         :param pulumi.Input[_builtins.str] success_message: Message showing when all components are operational
         :param pulumi.Input[_builtins.str] time_zone: A valid IANA time zone name.
@@ -1156,38 +1156,38 @@ class StatusPage(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 allow_search_engine_index: Optional[pulumi.Input[_builtins.bool]] = None,
-                 authentication_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 authentication_method: Optional[pulumi.Input[_builtins.str]] = None,
-                 authentication_password: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 external_domain_names: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 failure_message: Optional[pulumi.Input[_builtins.str]] = None,
-                 footer_color: Optional[pulumi.Input[_builtins.str]] = None,
-                 functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 ga_tracking_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 header_color: Optional[pulumi.Input[_builtins.str]] = None,
-                 public: Optional[pulumi.Input[_builtins.bool]] = None,
-                 public_description: Optional[pulumi.Input[_builtins.str]] = None,
-                 public_title: Optional[pulumi.Input[_builtins.str]] = None,
-                 saml_idp_cert: Optional[pulumi.Input[_builtins.str]] = None,
-                 saml_idp_cert_fingerprint: Optional[pulumi.Input[_builtins.str]] = None,
-                 saml_idp_slo_service_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 saml_idp_sso_service_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 saml_name_identifier_format: Optional[pulumi.Input[_builtins.str]] = None,
-                 section_orders: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 show_uptime: Optional[pulumi.Input[_builtins.bool]] = None,
-                 show_uptime_last_days: Optional[pulumi.Input[_builtins.float]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 status_page_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 success_message: Optional[pulumi.Input[_builtins.str]] = None,
-                 time_zone: Optional[pulumi.Input[_builtins.str]] = None,
-                 title: Optional[pulumi.Input[_builtins.str]] = None,
-                 website_privacy_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 website_support_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 website_url: Optional[pulumi.Input[_builtins.str]] = None,
+                 allow_search_engine_index: pulumi.Input[Optional[_builtins.bool]] = None,
+                 authentication_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 authentication_method: pulumi.Input[Optional[_builtins.str]] = None,
+                 authentication_password: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 external_domain_names: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 failure_message: pulumi.Input[Optional[_builtins.str]] = None,
+                 footer_color: pulumi.Input[Optional[_builtins.str]] = None,
+                 functionality_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 ga_tracking_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 header_color: pulumi.Input[Optional[_builtins.str]] = None,
+                 public: pulumi.Input[Optional[_builtins.bool]] = None,
+                 public_description: pulumi.Input[Optional[_builtins.str]] = None,
+                 public_title: pulumi.Input[Optional[_builtins.str]] = None,
+                 saml_idp_cert: pulumi.Input[Optional[_builtins.str]] = None,
+                 saml_idp_cert_fingerprint: pulumi.Input[Optional[_builtins.str]] = None,
+                 saml_idp_slo_service_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 saml_idp_sso_service_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 saml_name_identifier_format: pulumi.Input[Optional[_builtins.str]] = None,
+                 section_orders: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 show_uptime: pulumi.Input[Optional[_builtins.bool]] = None,
+                 show_uptime_last_days: pulumi.Input[Optional[_builtins.float]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 status_page_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 success_message: pulumi.Input[Optional[_builtins.str]] = None,
+                 time_zone: pulumi.Input[Optional[_builtins.str]] = None,
+                 title: pulumi.Input[Optional[_builtins.str]] = None,
+                 website_privacy_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 website_support_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 website_url: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -1243,39 +1243,39 @@ class StatusPage(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            allow_search_engine_index: Optional[pulumi.Input[_builtins.bool]] = None,
-            authentication_enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-            authentication_method: Optional[pulumi.Input[_builtins.str]] = None,
-            authentication_password: Optional[pulumi.Input[_builtins.str]] = None,
-            cname_records: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-            external_domain_names: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            failure_message: Optional[pulumi.Input[_builtins.str]] = None,
-            footer_color: Optional[pulumi.Input[_builtins.str]] = None,
-            functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            ga_tracking_id: Optional[pulumi.Input[_builtins.str]] = None,
-            header_color: Optional[pulumi.Input[_builtins.str]] = None,
-            public: Optional[pulumi.Input[_builtins.bool]] = None,
-            public_description: Optional[pulumi.Input[_builtins.str]] = None,
-            public_title: Optional[pulumi.Input[_builtins.str]] = None,
-            saml_idp_cert: Optional[pulumi.Input[_builtins.str]] = None,
-            saml_idp_cert_fingerprint: Optional[pulumi.Input[_builtins.str]] = None,
-            saml_idp_slo_service_url: Optional[pulumi.Input[_builtins.str]] = None,
-            saml_idp_sso_service_url: Optional[pulumi.Input[_builtins.str]] = None,
-            saml_name_identifier_format: Optional[pulumi.Input[_builtins.str]] = None,
-            section_orders: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            show_uptime: Optional[pulumi.Input[_builtins.bool]] = None,
-            show_uptime_last_days: Optional[pulumi.Input[_builtins.float]] = None,
-            slug: Optional[pulumi.Input[_builtins.str]] = None,
-            status_page_id: Optional[pulumi.Input[_builtins.str]] = None,
-            success_message: Optional[pulumi.Input[_builtins.str]] = None,
-            time_zone: Optional[pulumi.Input[_builtins.str]] = None,
-            title: Optional[pulumi.Input[_builtins.str]] = None,
-            website_privacy_url: Optional[pulumi.Input[_builtins.str]] = None,
-            website_support_url: Optional[pulumi.Input[_builtins.str]] = None,
-            website_url: Optional[pulumi.Input[_builtins.str]] = None) -> 'StatusPage':
+            allow_search_engine_index: pulumi.Input[Optional[_builtins.bool]] = None,
+            authentication_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+            authentication_method: pulumi.Input[Optional[_builtins.str]] = None,
+            authentication_password: pulumi.Input[Optional[_builtins.str]] = None,
+            cname_records: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+            external_domain_names: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            failure_message: pulumi.Input[Optional[_builtins.str]] = None,
+            footer_color: pulumi.Input[Optional[_builtins.str]] = None,
+            functionality_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            ga_tracking_id: pulumi.Input[Optional[_builtins.str]] = None,
+            header_color: pulumi.Input[Optional[_builtins.str]] = None,
+            public: pulumi.Input[Optional[_builtins.bool]] = None,
+            public_description: pulumi.Input[Optional[_builtins.str]] = None,
+            public_title: pulumi.Input[Optional[_builtins.str]] = None,
+            saml_idp_cert: pulumi.Input[Optional[_builtins.str]] = None,
+            saml_idp_cert_fingerprint: pulumi.Input[Optional[_builtins.str]] = None,
+            saml_idp_slo_service_url: pulumi.Input[Optional[_builtins.str]] = None,
+            saml_idp_sso_service_url: pulumi.Input[Optional[_builtins.str]] = None,
+            saml_name_identifier_format: pulumi.Input[Optional[_builtins.str]] = None,
+            section_orders: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            show_uptime: pulumi.Input[Optional[_builtins.bool]] = None,
+            show_uptime_last_days: pulumi.Input[Optional[_builtins.float]] = None,
+            slug: pulumi.Input[Optional[_builtins.str]] = None,
+            status_page_id: pulumi.Input[Optional[_builtins.str]] = None,
+            success_message: pulumi.Input[Optional[_builtins.str]] = None,
+            time_zone: pulumi.Input[Optional[_builtins.str]] = None,
+            title: pulumi.Input[Optional[_builtins.str]] = None,
+            website_privacy_url: pulumi.Input[Optional[_builtins.str]] = None,
+            website_support_url: pulumi.Input[Optional[_builtins.str]] = None,
+            website_url: pulumi.Input[Optional[_builtins.str]] = None) -> 'StatusPage':
         """
         Get an existing StatusPage resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -1284,8 +1284,8 @@ class StatusPage(pulumi.CustomResource):
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.bool] allow_search_engine_index: Allow search engines to include your public status page in search results. Value must be one of true or false
-        :param pulumi.Input[_builtins.bool] authentication_enabled: Enable authentication (deprecated - use<span pulumi-lang-nodejs=" authenticationMethod " pulumi-lang-dotnet=" AuthenticationMethod " pulumi-lang-go=" authenticationMethod " pulumi-lang-python=" authentication_method " pulumi-lang-yaml=" authenticationMethod " pulumi-lang-java=" authenticationMethod "> authentication_method </span>instead). Value must be one of true or false
-        :param pulumi.Input[_builtins.str] authentication_method: Authentication method. Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`">`none`</span>, <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`">`password`</span>, <span pulumi-lang-nodejs="`saml`" pulumi-lang-dotnet="`Saml`" pulumi-lang-go="`saml`" pulumi-lang-python="`saml`" pulumi-lang-yaml="`saml`" pulumi-lang-java="`saml`">`saml`</span>.
+        :param pulumi.Input[_builtins.bool] authentication_enabled: Enable authentication (deprecated - use<span pulumi-lang-nodejs=" authenticationMethod " pulumi-lang-dotnet=" AuthenticationMethod " pulumi-lang-go=" authenticationMethod " pulumi-lang-python=" authentication_method " pulumi-lang-yaml=" authenticationMethod " pulumi-lang-java=" authenticationMethod " pulumi-lang-hcl=" authentication_method "> authenticationMethod </span>instead). Value must be one of true or false
+        :param pulumi.Input[_builtins.str] authentication_method: Authentication method. Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`" pulumi-lang-hcl="`none`">`none`</span>, <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span>, <span pulumi-lang-nodejs="`saml`" pulumi-lang-dotnet="`Saml`" pulumi-lang-go="`saml`" pulumi-lang-python="`saml`" pulumi-lang-yaml="`saml`" pulumi-lang-java="`saml`" pulumi-lang-hcl="`saml`">`saml`</span>.
         :param pulumi.Input[_builtins.str] authentication_password: Authentication password
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] cname_records: CNAME records mapping external domain names to their DNS target values. Populated asynchronously after setting external_domain_names.
         :param pulumi.Input[_builtins.str] description: The description of the status page
@@ -1303,10 +1303,10 @@ class StatusPage(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] saml_idp_slo_service_url: SAML IdP SLO service URL
         :param pulumi.Input[_builtins.str] saml_idp_sso_service_url: SAML IdP SSO service URL
         :param pulumi.Input[_builtins.str] saml_name_identifier_format: SAML name identifier format. Value must be one of `urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress`, `urn:oasis:names:tc:SAML:2.0:nameid-format:persistent`, `urn:oasis:names:tc:SAML:2.0:nameid-format:transient`, `urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified`.
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] section_orders: Order of sections on the status page. Value must be a list of <span pulumi-lang-nodejs="`maintenance`" pulumi-lang-dotnet="`Maintenance`" pulumi-lang-go="`maintenance`" pulumi-lang-python="`maintenance`" pulumi-lang-yaml="`maintenance`" pulumi-lang-java="`maintenance`">`maintenance`</span>, <span pulumi-lang-nodejs="`systemStatus`" pulumi-lang-dotnet="`SystemStatus`" pulumi-lang-go="`systemStatus`" pulumi-lang-python="`system_status`" pulumi-lang-yaml="`systemStatus`" pulumi-lang-java="`systemStatus`">`system_status`</span>, <span pulumi-lang-nodejs="`incidents`" pulumi-lang-dotnet="`Incidents`" pulumi-lang-go="`incidents`" pulumi-lang-python="`incidents`" pulumi-lang-yaml="`incidents`" pulumi-lang-java="`incidents`">`incidents`</span>.
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] section_orders: Order of sections on the status page. Value must be a list of <span pulumi-lang-nodejs="`maintenance`" pulumi-lang-dotnet="`Maintenance`" pulumi-lang-go="`maintenance`" pulumi-lang-python="`maintenance`" pulumi-lang-yaml="`maintenance`" pulumi-lang-java="`maintenance`" pulumi-lang-hcl="`maintenance`">`maintenance`</span>, <span pulumi-lang-nodejs="`systemStatus`" pulumi-lang-dotnet="`SystemStatus`" pulumi-lang-go="`systemStatus`" pulumi-lang-python="`system_status`" pulumi-lang-yaml="`systemStatus`" pulumi-lang-java="`systemStatus`" pulumi-lang-hcl="`system_status`">`systemStatus`</span>, <span pulumi-lang-nodejs="`incidents`" pulumi-lang-dotnet="`Incidents`" pulumi-lang-go="`incidents`" pulumi-lang-python="`incidents`" pulumi-lang-yaml="`incidents`" pulumi-lang-java="`incidents`" pulumi-lang-hcl="`incidents`">`incidents`</span>.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] service_ids: Services attached to the status page
         :param pulumi.Input[_builtins.bool] show_uptime: Show uptime. Value must be one of true or false
-        :param pulumi.Input[_builtins.float] show_uptime_last_days: Show uptime over x days. Value must be one of <span pulumi-lang-nodejs="`30`" pulumi-lang-dotnet="`30`" pulumi-lang-go="`30`" pulumi-lang-python="`30`" pulumi-lang-yaml="`30`" pulumi-lang-java="`30`">`30`</span>, <span pulumi-lang-nodejs="`60`" pulumi-lang-dotnet="`60`" pulumi-lang-go="`60`" pulumi-lang-python="`60`" pulumi-lang-yaml="`60`" pulumi-lang-java="`60`">`60`</span>, <span pulumi-lang-nodejs="`90`" pulumi-lang-dotnet="`90`" pulumi-lang-go="`90`" pulumi-lang-python="`90`" pulumi-lang-yaml="`90`" pulumi-lang-java="`90`">`90`</span>.
+        :param pulumi.Input[_builtins.float] show_uptime_last_days: Show uptime over x days. Value must be one of <span pulumi-lang-nodejs="`30`" pulumi-lang-dotnet="`30`" pulumi-lang-go="`30`" pulumi-lang-python="`30`" pulumi-lang-yaml="`30`" pulumi-lang-java="`30`" pulumi-lang-hcl="`30`">`30`</span>, <span pulumi-lang-nodejs="`60`" pulumi-lang-dotnet="`60`" pulumi-lang-go="`60`" pulumi-lang-python="`60`" pulumi-lang-yaml="`60`" pulumi-lang-java="`60`" pulumi-lang-hcl="`60`">`60`</span>, <span pulumi-lang-nodejs="`90`" pulumi-lang-dotnet="`90`" pulumi-lang-go="`90`" pulumi-lang-python="`90`" pulumi-lang-yaml="`90`" pulumi-lang-java="`90`" pulumi-lang-hcl="`90`">`90`</span>.
         :param pulumi.Input[_builtins.str] slug: The slug of the status page
         :param pulumi.Input[_builtins.str] success_message: Message showing when all components are operational
         :param pulumi.Input[_builtins.str] time_zone: A valid IANA time zone name.
@@ -1366,7 +1366,7 @@ class StatusPage(pulumi.CustomResource):
     @pulumi.getter(name="authenticationEnabled")
     def authentication_enabled(self) -> pulumi.Output[_builtins.bool]:
         """
-        Enable authentication (deprecated - use<span pulumi-lang-nodejs=" authenticationMethod " pulumi-lang-dotnet=" AuthenticationMethod " pulumi-lang-go=" authenticationMethod " pulumi-lang-python=" authentication_method " pulumi-lang-yaml=" authenticationMethod " pulumi-lang-java=" authenticationMethod "> authentication_method </span>instead). Value must be one of true or false
+        Enable authentication (deprecated - use<span pulumi-lang-nodejs=" authenticationMethod " pulumi-lang-dotnet=" AuthenticationMethod " pulumi-lang-go=" authenticationMethod " pulumi-lang-python=" authentication_method " pulumi-lang-yaml=" authenticationMethod " pulumi-lang-java=" authenticationMethod " pulumi-lang-hcl=" authentication_method "> authenticationMethod </span>instead). Value must be one of true or false
         """
         return pulumi.get(self, "authentication_enabled")
 
@@ -1374,7 +1374,7 @@ class StatusPage(pulumi.CustomResource):
     @pulumi.getter(name="authenticationMethod")
     def authentication_method(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Authentication method. Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`">`none`</span>, <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`">`password`</span>, <span pulumi-lang-nodejs="`saml`" pulumi-lang-dotnet="`Saml`" pulumi-lang-go="`saml`" pulumi-lang-python="`saml`" pulumi-lang-yaml="`saml`" pulumi-lang-java="`saml`">`saml`</span>.
+        Authentication method. Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`" pulumi-lang-hcl="`none`">`none`</span>, <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span>, <span pulumi-lang-nodejs="`saml`" pulumi-lang-dotnet="`Saml`" pulumi-lang-go="`saml`" pulumi-lang-python="`saml`" pulumi-lang-yaml="`saml`" pulumi-lang-java="`saml`" pulumi-lang-hcl="`saml`">`saml`</span>.
         """
         return pulumi.get(self, "authentication_method")
 
@@ -1523,7 +1523,7 @@ class StatusPage(pulumi.CustomResource):
     @pulumi.getter(name="sectionOrders")
     def section_orders(self) -> pulumi.Output[Sequence[_builtins.str]]:
         """
-        Order of sections on the status page. Value must be a list of <span pulumi-lang-nodejs="`maintenance`" pulumi-lang-dotnet="`Maintenance`" pulumi-lang-go="`maintenance`" pulumi-lang-python="`maintenance`" pulumi-lang-yaml="`maintenance`" pulumi-lang-java="`maintenance`">`maintenance`</span>, <span pulumi-lang-nodejs="`systemStatus`" pulumi-lang-dotnet="`SystemStatus`" pulumi-lang-go="`systemStatus`" pulumi-lang-python="`system_status`" pulumi-lang-yaml="`systemStatus`" pulumi-lang-java="`systemStatus`">`system_status`</span>, <span pulumi-lang-nodejs="`incidents`" pulumi-lang-dotnet="`Incidents`" pulumi-lang-go="`incidents`" pulumi-lang-python="`incidents`" pulumi-lang-yaml="`incidents`" pulumi-lang-java="`incidents`">`incidents`</span>.
+        Order of sections on the status page. Value must be a list of <span pulumi-lang-nodejs="`maintenance`" pulumi-lang-dotnet="`Maintenance`" pulumi-lang-go="`maintenance`" pulumi-lang-python="`maintenance`" pulumi-lang-yaml="`maintenance`" pulumi-lang-java="`maintenance`" pulumi-lang-hcl="`maintenance`">`maintenance`</span>, <span pulumi-lang-nodejs="`systemStatus`" pulumi-lang-dotnet="`SystemStatus`" pulumi-lang-go="`systemStatus`" pulumi-lang-python="`system_status`" pulumi-lang-yaml="`systemStatus`" pulumi-lang-java="`systemStatus`" pulumi-lang-hcl="`system_status`">`systemStatus`</span>, <span pulumi-lang-nodejs="`incidents`" pulumi-lang-dotnet="`Incidents`" pulumi-lang-go="`incidents`" pulumi-lang-python="`incidents`" pulumi-lang-yaml="`incidents`" pulumi-lang-java="`incidents`" pulumi-lang-hcl="`incidents`">`incidents`</span>.
         """
         return pulumi.get(self, "section_orders")
 
@@ -1547,7 +1547,7 @@ class StatusPage(pulumi.CustomResource):
     @pulumi.getter(name="showUptimeLastDays")
     def show_uptime_last_days(self) -> pulumi.Output[_builtins.float]:
         """
-        Show uptime over x days. Value must be one of <span pulumi-lang-nodejs="`30`" pulumi-lang-dotnet="`30`" pulumi-lang-go="`30`" pulumi-lang-python="`30`" pulumi-lang-yaml="`30`" pulumi-lang-java="`30`">`30`</span>, <span pulumi-lang-nodejs="`60`" pulumi-lang-dotnet="`60`" pulumi-lang-go="`60`" pulumi-lang-python="`60`" pulumi-lang-yaml="`60`" pulumi-lang-java="`60`">`60`</span>, <span pulumi-lang-nodejs="`90`" pulumi-lang-dotnet="`90`" pulumi-lang-go="`90`" pulumi-lang-python="`90`" pulumi-lang-yaml="`90`" pulumi-lang-java="`90`">`90`</span>.
+        Show uptime over x days. Value must be one of <span pulumi-lang-nodejs="`30`" pulumi-lang-dotnet="`30`" pulumi-lang-go="`30`" pulumi-lang-python="`30`" pulumi-lang-yaml="`30`" pulumi-lang-java="`30`" pulumi-lang-hcl="`30`">`30`</span>, <span pulumi-lang-nodejs="`60`" pulumi-lang-dotnet="`60`" pulumi-lang-go="`60`" pulumi-lang-python="`60`" pulumi-lang-yaml="`60`" pulumi-lang-java="`60`" pulumi-lang-hcl="`60`">`60`</span>, <span pulumi-lang-nodejs="`90`" pulumi-lang-dotnet="`90`" pulumi-lang-go="`90`" pulumi-lang-python="`90`" pulumi-lang-yaml="`90`" pulumi-lang-java="`90`" pulumi-lang-hcl="`90`">`90`</span>.
         """
         return pulumi.get(self, "show_uptime_last_days")
 
@@ -1611,3 +1611,4 @@ class StatusPage(pulumi.CustomResource):
         Website URL
         """
         return pulumi.get(self, "website_url")
+

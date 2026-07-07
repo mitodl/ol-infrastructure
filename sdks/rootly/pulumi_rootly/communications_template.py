@@ -22,19 +22,19 @@ __all__ = ['CommunicationsTemplateArgs', 'CommunicationsTemplate']
 class CommunicationsTemplateArgs:
     def __init__(__self__, *,
                  communication_type_id: pulumi.Input[_builtins.str],
-                 communication_template_stages: Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsTemplateCommunicationTemplateStageArgs']]]] = None,
-                 communication_type: Optional[pulumi.Input['CommunicationsTemplateCommunicationTypeArgs']] = None,
-                 communications_template_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None):
+                 communication_template_stages: pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsTemplateCommunicationTemplateStageArgs']]]] = None,
+                 communication_type: pulumi.Input[Optional['CommunicationsTemplateCommunicationTypeArgs']] = None,
+                 communications_template_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a CommunicationsTemplate resource.
 
         :param pulumi.Input[_builtins.str] communication_type_id: The communication type ID
         :param pulumi.Input[Sequence[pulumi.Input['CommunicationsTemplateCommunicationTemplateStageArgs']]] communication_template_stages: Communication template stages
-        :param pulumi.Input['CommunicationsTemplateCommunicationTypeArgs'] communication_type: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param pulumi.Input['CommunicationsTemplateCommunicationTypeArgs'] communication_type: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param pulumi.Input[_builtins.str] description: The description of the communications template
         :param pulumi.Input[_builtins.str] name: The name of the communications template
         :param pulumi.Input[_builtins.float] position: Position of the communications template
@@ -70,102 +70,102 @@ class CommunicationsTemplateArgs:
 
     @_builtins.property
     @pulumi.getter(name="communicationTemplateStages")
-    def communication_template_stages(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsTemplateCommunicationTemplateStageArgs']]]]:
+    def communication_template_stages(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsTemplateCommunicationTemplateStageArgs']]]]:
         """
         Communication template stages
         """
         return pulumi.get(self, "communication_template_stages")
 
     @communication_template_stages.setter
-    def communication_template_stages(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsTemplateCommunicationTemplateStageArgs']]]]):
+    def communication_template_stages(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsTemplateCommunicationTemplateStageArgs']]]]):
         pulumi.set(self, "communication_template_stages", value)
 
     @_builtins.property
     @pulumi.getter(name="communicationType")
-    def communication_type(self) -> Optional[pulumi.Input['CommunicationsTemplateCommunicationTypeArgs']]:
+    def communication_type(self) -> pulumi.Input[Optional['CommunicationsTemplateCommunicationTypeArgs']]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "communication_type")
 
     @communication_type.setter
-    def communication_type(self, value: Optional[pulumi.Input['CommunicationsTemplateCommunicationTypeArgs']]):
+    def communication_type(self, value: pulumi.Input[Optional['CommunicationsTemplateCommunicationTypeArgs']]):
         pulumi.set(self, "communication_type", value)
 
     @_builtins.property
     @pulumi.getter(name="communicationsTemplateId")
-    def communications_template_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def communications_template_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "communications_template_id")
 
     @communications_template_id.setter
-    def communications_template_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def communications_template_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "communications_template_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the communications template
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the communications template
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Position of the communications template
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The slug of the communications template
         """
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
 
 @pulumi.input_type
 class _CommunicationsTemplateState:
     def __init__(__self__, *,
-                 communication_template_stages: Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsTemplateCommunicationTemplateStageArgs']]]] = None,
-                 communication_type: Optional[pulumi.Input['CommunicationsTemplateCommunicationTypeArgs']] = None,
-                 communication_type_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 communications_template_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None):
+                 communication_template_stages: pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsTemplateCommunicationTemplateStageArgs']]]] = None,
+                 communication_type: pulumi.Input[Optional['CommunicationsTemplateCommunicationTypeArgs']] = None,
+                 communication_type_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 communications_template_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering CommunicationsTemplate resources.
 
         :param pulumi.Input[Sequence[pulumi.Input['CommunicationsTemplateCommunicationTemplateStageArgs']]] communication_template_stages: Communication template stages
-        :param pulumi.Input['CommunicationsTemplateCommunicationTypeArgs'] communication_type: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param pulumi.Input['CommunicationsTemplateCommunicationTypeArgs'] communication_type: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param pulumi.Input[_builtins.str] communication_type_id: The communication type ID
         :param pulumi.Input[_builtins.str] description: The description of the communications template
         :param pulumi.Input[_builtins.str] name: The name of the communications template
@@ -191,95 +191,95 @@ class _CommunicationsTemplateState:
 
     @_builtins.property
     @pulumi.getter(name="communicationTemplateStages")
-    def communication_template_stages(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsTemplateCommunicationTemplateStageArgs']]]]:
+    def communication_template_stages(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsTemplateCommunicationTemplateStageArgs']]]]:
         """
         Communication template stages
         """
         return pulumi.get(self, "communication_template_stages")
 
     @communication_template_stages.setter
-    def communication_template_stages(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['CommunicationsTemplateCommunicationTemplateStageArgs']]]]):
+    def communication_template_stages(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['CommunicationsTemplateCommunicationTemplateStageArgs']]]]):
         pulumi.set(self, "communication_template_stages", value)
 
     @_builtins.property
     @pulumi.getter(name="communicationType")
-    def communication_type(self) -> Optional[pulumi.Input['CommunicationsTemplateCommunicationTypeArgs']]:
+    def communication_type(self) -> pulumi.Input[Optional['CommunicationsTemplateCommunicationTypeArgs']]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "communication_type")
 
     @communication_type.setter
-    def communication_type(self, value: Optional[pulumi.Input['CommunicationsTemplateCommunicationTypeArgs']]):
+    def communication_type(self, value: pulumi.Input[Optional['CommunicationsTemplateCommunicationTypeArgs']]):
         pulumi.set(self, "communication_type", value)
 
     @_builtins.property
     @pulumi.getter(name="communicationTypeId")
-    def communication_type_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def communication_type_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The communication type ID
         """
         return pulumi.get(self, "communication_type_id")
 
     @communication_type_id.setter
-    def communication_type_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def communication_type_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "communication_type_id", value)
 
     @_builtins.property
     @pulumi.getter(name="communicationsTemplateId")
-    def communications_template_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def communications_template_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "communications_template_id")
 
     @communications_template_id.setter
-    def communications_template_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def communications_template_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "communications_template_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the communications template
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the communications template
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Position of the communications template
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The slug of the communications template
         """
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
 
@@ -289,14 +289,14 @@ class CommunicationsTemplate(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 communication_template_stages: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CommunicationsTemplateCommunicationTemplateStageArgs', 'CommunicationsTemplateCommunicationTemplateStageArgsDict']]]]] = None,
-                 communication_type: Optional[pulumi.Input[Union['CommunicationsTemplateCommunicationTypeArgs', 'CommunicationsTemplateCommunicationTypeArgsDict']]] = None,
-                 communication_type_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 communications_template_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
+                 communication_template_stages: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CommunicationsTemplateCommunicationTemplateStageArgs', 'CommunicationsTemplateCommunicationTemplateStageArgsDict']]]]] = None,
+                 communication_type: pulumi.Input[Optional[Union['CommunicationsTemplateCommunicationTypeArgs', 'CommunicationsTemplateCommunicationTypeArgsDict']]] = None,
+                 communication_type_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 communications_template_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a CommunicationsTemplate resource with the given unique name, props, and options.
@@ -304,7 +304,7 @@ class CommunicationsTemplate(pulumi.CustomResource):
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[Sequence[pulumi.Input[Union['CommunicationsTemplateCommunicationTemplateStageArgs', 'CommunicationsTemplateCommunicationTemplateStageArgsDict']]]] communication_template_stages: Communication template stages
-        :param pulumi.Input[Union['CommunicationsTemplateCommunicationTypeArgs', 'CommunicationsTemplateCommunicationTypeArgsDict']] communication_type: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param pulumi.Input[Union['CommunicationsTemplateCommunicationTypeArgs', 'CommunicationsTemplateCommunicationTypeArgsDict']] communication_type: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param pulumi.Input[_builtins.str] communication_type_id: The communication type ID
         :param pulumi.Input[_builtins.str] description: The description of the communications template
         :param pulumi.Input[_builtins.str] name: The name of the communications template
@@ -335,14 +335,14 @@ class CommunicationsTemplate(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 communication_template_stages: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CommunicationsTemplateCommunicationTemplateStageArgs', 'CommunicationsTemplateCommunicationTemplateStageArgsDict']]]]] = None,
-                 communication_type: Optional[pulumi.Input[Union['CommunicationsTemplateCommunicationTypeArgs', 'CommunicationsTemplateCommunicationTypeArgsDict']]] = None,
-                 communication_type_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 communications_template_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
+                 communication_template_stages: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CommunicationsTemplateCommunicationTemplateStageArgs', 'CommunicationsTemplateCommunicationTemplateStageArgsDict']]]]] = None,
+                 communication_type: pulumi.Input[Optional[Union['CommunicationsTemplateCommunicationTypeArgs', 'CommunicationsTemplateCommunicationTypeArgsDict']]] = None,
+                 communication_type_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 communications_template_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -373,14 +373,14 @@ class CommunicationsTemplate(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            communication_template_stages: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CommunicationsTemplateCommunicationTemplateStageArgs', 'CommunicationsTemplateCommunicationTemplateStageArgsDict']]]]] = None,
-            communication_type: Optional[pulumi.Input[Union['CommunicationsTemplateCommunicationTypeArgs', 'CommunicationsTemplateCommunicationTypeArgsDict']]] = None,
-            communication_type_id: Optional[pulumi.Input[_builtins.str]] = None,
-            communications_template_id: Optional[pulumi.Input[_builtins.str]] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None,
-            slug: Optional[pulumi.Input[_builtins.str]] = None) -> 'CommunicationsTemplate':
+            communication_template_stages: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CommunicationsTemplateCommunicationTemplateStageArgs', 'CommunicationsTemplateCommunicationTemplateStageArgsDict']]]]] = None,
+            communication_type: pulumi.Input[Optional[Union['CommunicationsTemplateCommunicationTypeArgs', 'CommunicationsTemplateCommunicationTypeArgsDict']]] = None,
+            communication_type_id: pulumi.Input[Optional[_builtins.str]] = None,
+            communications_template_id: pulumi.Input[Optional[_builtins.str]] = None,
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None,
+            slug: pulumi.Input[Optional[_builtins.str]] = None) -> 'CommunicationsTemplate':
         """
         Get an existing CommunicationsTemplate resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -389,7 +389,7 @@ class CommunicationsTemplate(pulumi.CustomResource):
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[Sequence[pulumi.Input[Union['CommunicationsTemplateCommunicationTemplateStageArgs', 'CommunicationsTemplateCommunicationTemplateStageArgsDict']]]] communication_template_stages: Communication template stages
-        :param pulumi.Input[Union['CommunicationsTemplateCommunicationTypeArgs', 'CommunicationsTemplateCommunicationTypeArgsDict']] communication_type: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param pulumi.Input[Union['CommunicationsTemplateCommunicationTypeArgs', 'CommunicationsTemplateCommunicationTypeArgsDict']] communication_type: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param pulumi.Input[_builtins.str] communication_type_id: The communication type ID
         :param pulumi.Input[_builtins.str] description: The description of the communications template
         :param pulumi.Input[_builtins.str] name: The name of the communications template
@@ -422,7 +422,7 @@ class CommunicationsTemplate(pulumi.CustomResource):
     @pulumi.getter(name="communicationType")
     def communication_type(self) -> pulumi.Output[Optional['outputs.CommunicationsTemplateCommunicationType']]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "communication_type")
 
@@ -470,3 +470,4 @@ class CommunicationsTemplate(pulumi.CustomResource):
         The slug of the communications template
         """
         return pulumi.get(self, "slug")
+

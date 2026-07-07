@@ -80,8 +80,8 @@ def get_form_set_condition(form_field_id: Optional[_builtins.str] = None,
         form_field_id=pulumi.get(__ret__, 'form_field_id'),
         form_set_id=pulumi.get(__ret__, 'form_set_id'),
         id=pulumi.get(__ret__, 'id'))
-def get_form_set_condition_output(form_field_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                                  form_set_id: Optional[pulumi.Input[_builtins.str]] = None,
+def get_form_set_condition_output(form_field_id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                                  form_set_id: pulumi.Input[Optional[_builtins.str]] = None,
                                   opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetFormSetConditionResult]:
     """
     Use this data source to access information about an existing resource.

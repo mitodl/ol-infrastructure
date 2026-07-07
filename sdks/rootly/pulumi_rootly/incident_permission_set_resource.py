@@ -20,15 +20,15 @@ __all__ = ['IncidentPermissionSetResourceArgs', 'IncidentPermissionSetResource']
 class IncidentPermissionSetResourceArgs:
     def __init__(__self__, *,
                  incident_permission_set_id: pulumi.Input[_builtins.str],
-                 incident_permission_set_resource_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 private: Optional[pulumi.Input[_builtins.bool]] = None,
-                 resource_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 resource_type: Optional[pulumi.Input[_builtins.str]] = None):
+                 incident_permission_set_resource_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 private: pulumi.Input[Optional[_builtins.bool]] = None,
+                 resource_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 resource_type: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a IncidentPermissionSetResource resource.
 
-        :param pulumi.Input[_builtins.str] kind: Value must be one of <span pulumi-lang-nodejs="`severities`" pulumi-lang-dotnet="`Severities`" pulumi-lang-go="`severities`" pulumi-lang-python="`severities`" pulumi-lang-yaml="`severities`" pulumi-lang-java="`severities`">`severities`</span>, <span pulumi-lang-nodejs="`incidentTypes`" pulumi-lang-dotnet="`IncidentTypes`" pulumi-lang-go="`incidentTypes`" pulumi-lang-python="`incident_types`" pulumi-lang-yaml="`incidentTypes`" pulumi-lang-java="`incidentTypes`">`incident_types`</span>, <span pulumi-lang-nodejs="`statuses`" pulumi-lang-dotnet="`Statuses`" pulumi-lang-go="`statuses`" pulumi-lang-python="`statuses`" pulumi-lang-yaml="`statuses`" pulumi-lang-java="`statuses`">`statuses`</span>, <span pulumi-lang-nodejs="`subStatuses`" pulumi-lang-dotnet="`SubStatuses`" pulumi-lang-go="`subStatuses`" pulumi-lang-python="`sub_statuses`" pulumi-lang-yaml="`subStatuses`" pulumi-lang-java="`subStatuses`">`sub_statuses`</span>.
+        :param pulumi.Input[_builtins.str] kind: Value must be one of <span pulumi-lang-nodejs="`severities`" pulumi-lang-dotnet="`Severities`" pulumi-lang-go="`severities`" pulumi-lang-python="`severities`" pulumi-lang-yaml="`severities`" pulumi-lang-java="`severities`" pulumi-lang-hcl="`severities`">`severities`</span>, <span pulumi-lang-nodejs="`incidentTypes`" pulumi-lang-dotnet="`IncidentTypes`" pulumi-lang-go="`incidentTypes`" pulumi-lang-python="`incident_types`" pulumi-lang-yaml="`incidentTypes`" pulumi-lang-java="`incidentTypes`" pulumi-lang-hcl="`incident_types`">`incidentTypes`</span>, <span pulumi-lang-nodejs="`statuses`" pulumi-lang-dotnet="`Statuses`" pulumi-lang-go="`statuses`" pulumi-lang-python="`statuses`" pulumi-lang-yaml="`statuses`" pulumi-lang-java="`statuses`" pulumi-lang-hcl="`statuses`">`statuses`</span>, <span pulumi-lang-nodejs="`subStatuses`" pulumi-lang-dotnet="`SubStatuses`" pulumi-lang-go="`subStatuses`" pulumi-lang-python="`sub_statuses`" pulumi-lang-yaml="`subStatuses`" pulumi-lang-java="`subStatuses`" pulumi-lang-hcl="`sub_statuses`">`subStatuses`</span>.
         :param pulumi.Input[_builtins.bool] private: Value must be one of true or false
         """
         pulumi.set(__self__, "incident_permission_set_id", incident_permission_set_id)
@@ -54,69 +54,69 @@ class IncidentPermissionSetResourceArgs:
 
     @_builtins.property
     @pulumi.getter(name="incidentPermissionSetResourceId")
-    def incident_permission_set_resource_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def incident_permission_set_resource_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "incident_permission_set_resource_id")
 
     @incident_permission_set_resource_id.setter
-    def incident_permission_set_resource_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def incident_permission_set_resource_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "incident_permission_set_resource_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def kind(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def kind(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`severities`" pulumi-lang-dotnet="`Severities`" pulumi-lang-go="`severities`" pulumi-lang-python="`severities`" pulumi-lang-yaml="`severities`" pulumi-lang-java="`severities`">`severities`</span>, <span pulumi-lang-nodejs="`incidentTypes`" pulumi-lang-dotnet="`IncidentTypes`" pulumi-lang-go="`incidentTypes`" pulumi-lang-python="`incident_types`" pulumi-lang-yaml="`incidentTypes`" pulumi-lang-java="`incidentTypes`">`incident_types`</span>, <span pulumi-lang-nodejs="`statuses`" pulumi-lang-dotnet="`Statuses`" pulumi-lang-go="`statuses`" pulumi-lang-python="`statuses`" pulumi-lang-yaml="`statuses`" pulumi-lang-java="`statuses`">`statuses`</span>, <span pulumi-lang-nodejs="`subStatuses`" pulumi-lang-dotnet="`SubStatuses`" pulumi-lang-go="`subStatuses`" pulumi-lang-python="`sub_statuses`" pulumi-lang-yaml="`subStatuses`" pulumi-lang-java="`subStatuses`">`sub_statuses`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`severities`" pulumi-lang-dotnet="`Severities`" pulumi-lang-go="`severities`" pulumi-lang-python="`severities`" pulumi-lang-yaml="`severities`" pulumi-lang-java="`severities`" pulumi-lang-hcl="`severities`">`severities`</span>, <span pulumi-lang-nodejs="`incidentTypes`" pulumi-lang-dotnet="`IncidentTypes`" pulumi-lang-go="`incidentTypes`" pulumi-lang-python="`incident_types`" pulumi-lang-yaml="`incidentTypes`" pulumi-lang-java="`incidentTypes`" pulumi-lang-hcl="`incident_types`">`incidentTypes`</span>, <span pulumi-lang-nodejs="`statuses`" pulumi-lang-dotnet="`Statuses`" pulumi-lang-go="`statuses`" pulumi-lang-python="`statuses`" pulumi-lang-yaml="`statuses`" pulumi-lang-java="`statuses`" pulumi-lang-hcl="`statuses`">`statuses`</span>, <span pulumi-lang-nodejs="`subStatuses`" pulumi-lang-dotnet="`SubStatuses`" pulumi-lang-go="`subStatuses`" pulumi-lang-python="`sub_statuses`" pulumi-lang-yaml="`subStatuses`" pulumi-lang-java="`subStatuses`" pulumi-lang-hcl="`sub_statuses`">`subStatuses`</span>.
         """
         return pulumi.get(self, "kind")
 
     @kind.setter
-    def kind(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def kind(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "kind", value)
 
     @_builtins.property
     @pulumi.getter
-    def private(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def private(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Value must be one of true or false
         """
         return pulumi.get(self, "private")
 
     @private.setter
-    def private(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def private(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "private", value)
 
     @_builtins.property
     @pulumi.getter(name="resourceId")
-    def resource_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def resource_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "resource_id")
 
     @resource_id.setter
-    def resource_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def resource_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "resource_id", value)
 
     @_builtins.property
     @pulumi.getter(name="resourceType")
-    def resource_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def resource_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "resource_type")
 
     @resource_type.setter
-    def resource_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def resource_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "resource_type", value)
 
 
 @pulumi.input_type
 class _IncidentPermissionSetResourceState:
     def __init__(__self__, *,
-                 incident_permission_set_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_permission_set_resource_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 private: Optional[pulumi.Input[_builtins.bool]] = None,
-                 resource_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 resource_type: Optional[pulumi.Input[_builtins.str]] = None):
+                 incident_permission_set_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_permission_set_resource_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 private: pulumi.Input[Optional[_builtins.bool]] = None,
+                 resource_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 resource_type: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering IncidentPermissionSetResource resources.
 
-        :param pulumi.Input[_builtins.str] kind: Value must be one of <span pulumi-lang-nodejs="`severities`" pulumi-lang-dotnet="`Severities`" pulumi-lang-go="`severities`" pulumi-lang-python="`severities`" pulumi-lang-yaml="`severities`" pulumi-lang-java="`severities`">`severities`</span>, <span pulumi-lang-nodejs="`incidentTypes`" pulumi-lang-dotnet="`IncidentTypes`" pulumi-lang-go="`incidentTypes`" pulumi-lang-python="`incident_types`" pulumi-lang-yaml="`incidentTypes`" pulumi-lang-java="`incidentTypes`">`incident_types`</span>, <span pulumi-lang-nodejs="`statuses`" pulumi-lang-dotnet="`Statuses`" pulumi-lang-go="`statuses`" pulumi-lang-python="`statuses`" pulumi-lang-yaml="`statuses`" pulumi-lang-java="`statuses`">`statuses`</span>, <span pulumi-lang-nodejs="`subStatuses`" pulumi-lang-dotnet="`SubStatuses`" pulumi-lang-go="`subStatuses`" pulumi-lang-python="`sub_statuses`" pulumi-lang-yaml="`subStatuses`" pulumi-lang-java="`subStatuses`">`sub_statuses`</span>.
+        :param pulumi.Input[_builtins.str] kind: Value must be one of <span pulumi-lang-nodejs="`severities`" pulumi-lang-dotnet="`Severities`" pulumi-lang-go="`severities`" pulumi-lang-python="`severities`" pulumi-lang-yaml="`severities`" pulumi-lang-java="`severities`" pulumi-lang-hcl="`severities`">`severities`</span>, <span pulumi-lang-nodejs="`incidentTypes`" pulumi-lang-dotnet="`IncidentTypes`" pulumi-lang-go="`incidentTypes`" pulumi-lang-python="`incident_types`" pulumi-lang-yaml="`incidentTypes`" pulumi-lang-java="`incidentTypes`" pulumi-lang-hcl="`incident_types`">`incidentTypes`</span>, <span pulumi-lang-nodejs="`statuses`" pulumi-lang-dotnet="`Statuses`" pulumi-lang-go="`statuses`" pulumi-lang-python="`statuses`" pulumi-lang-yaml="`statuses`" pulumi-lang-java="`statuses`" pulumi-lang-hcl="`statuses`">`statuses`</span>, <span pulumi-lang-nodejs="`subStatuses`" pulumi-lang-dotnet="`SubStatuses`" pulumi-lang-go="`subStatuses`" pulumi-lang-python="`sub_statuses`" pulumi-lang-yaml="`subStatuses`" pulumi-lang-java="`subStatuses`" pulumi-lang-hcl="`sub_statuses`">`subStatuses`</span>.
         :param pulumi.Input[_builtins.bool] private: Value must be one of true or false
         """
         if incident_permission_set_id is not None:
@@ -134,62 +134,62 @@ class _IncidentPermissionSetResourceState:
 
     @_builtins.property
     @pulumi.getter(name="incidentPermissionSetId")
-    def incident_permission_set_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def incident_permission_set_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "incident_permission_set_id")
 
     @incident_permission_set_id.setter
-    def incident_permission_set_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def incident_permission_set_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "incident_permission_set_id", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentPermissionSetResourceId")
-    def incident_permission_set_resource_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def incident_permission_set_resource_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "incident_permission_set_resource_id")
 
     @incident_permission_set_resource_id.setter
-    def incident_permission_set_resource_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def incident_permission_set_resource_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "incident_permission_set_resource_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def kind(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def kind(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`severities`" pulumi-lang-dotnet="`Severities`" pulumi-lang-go="`severities`" pulumi-lang-python="`severities`" pulumi-lang-yaml="`severities`" pulumi-lang-java="`severities`">`severities`</span>, <span pulumi-lang-nodejs="`incidentTypes`" pulumi-lang-dotnet="`IncidentTypes`" pulumi-lang-go="`incidentTypes`" pulumi-lang-python="`incident_types`" pulumi-lang-yaml="`incidentTypes`" pulumi-lang-java="`incidentTypes`">`incident_types`</span>, <span pulumi-lang-nodejs="`statuses`" pulumi-lang-dotnet="`Statuses`" pulumi-lang-go="`statuses`" pulumi-lang-python="`statuses`" pulumi-lang-yaml="`statuses`" pulumi-lang-java="`statuses`">`statuses`</span>, <span pulumi-lang-nodejs="`subStatuses`" pulumi-lang-dotnet="`SubStatuses`" pulumi-lang-go="`subStatuses`" pulumi-lang-python="`sub_statuses`" pulumi-lang-yaml="`subStatuses`" pulumi-lang-java="`subStatuses`">`sub_statuses`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`severities`" pulumi-lang-dotnet="`Severities`" pulumi-lang-go="`severities`" pulumi-lang-python="`severities`" pulumi-lang-yaml="`severities`" pulumi-lang-java="`severities`" pulumi-lang-hcl="`severities`">`severities`</span>, <span pulumi-lang-nodejs="`incidentTypes`" pulumi-lang-dotnet="`IncidentTypes`" pulumi-lang-go="`incidentTypes`" pulumi-lang-python="`incident_types`" pulumi-lang-yaml="`incidentTypes`" pulumi-lang-java="`incidentTypes`" pulumi-lang-hcl="`incident_types`">`incidentTypes`</span>, <span pulumi-lang-nodejs="`statuses`" pulumi-lang-dotnet="`Statuses`" pulumi-lang-go="`statuses`" pulumi-lang-python="`statuses`" pulumi-lang-yaml="`statuses`" pulumi-lang-java="`statuses`" pulumi-lang-hcl="`statuses`">`statuses`</span>, <span pulumi-lang-nodejs="`subStatuses`" pulumi-lang-dotnet="`SubStatuses`" pulumi-lang-go="`subStatuses`" pulumi-lang-python="`sub_statuses`" pulumi-lang-yaml="`subStatuses`" pulumi-lang-java="`subStatuses`" pulumi-lang-hcl="`sub_statuses`">`subStatuses`</span>.
         """
         return pulumi.get(self, "kind")
 
     @kind.setter
-    def kind(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def kind(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "kind", value)
 
     @_builtins.property
     @pulumi.getter
-    def private(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def private(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Value must be one of true or false
         """
         return pulumi.get(self, "private")
 
     @private.setter
-    def private(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def private(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "private", value)
 
     @_builtins.property
     @pulumi.getter(name="resourceId")
-    def resource_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def resource_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "resource_id")
 
     @resource_id.setter
-    def resource_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def resource_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "resource_id", value)
 
     @_builtins.property
     @pulumi.getter(name="resourceType")
-    def resource_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def resource_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "resource_type")
 
     @resource_type.setter
-    def resource_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def resource_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "resource_type", value)
 
 
@@ -199,19 +199,19 @@ class IncidentPermissionSetResource(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 incident_permission_set_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_permission_set_resource_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 private: Optional[pulumi.Input[_builtins.bool]] = None,
-                 resource_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 resource_type: Optional[pulumi.Input[_builtins.str]] = None,
+                 incident_permission_set_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_permission_set_resource_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 private: pulumi.Input[Optional[_builtins.bool]] = None,
+                 resource_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 resource_type: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a IncidentPermissionSetResource resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] kind: Value must be one of <span pulumi-lang-nodejs="`severities`" pulumi-lang-dotnet="`Severities`" pulumi-lang-go="`severities`" pulumi-lang-python="`severities`" pulumi-lang-yaml="`severities`" pulumi-lang-java="`severities`">`severities`</span>, <span pulumi-lang-nodejs="`incidentTypes`" pulumi-lang-dotnet="`IncidentTypes`" pulumi-lang-go="`incidentTypes`" pulumi-lang-python="`incident_types`" pulumi-lang-yaml="`incidentTypes`" pulumi-lang-java="`incidentTypes`">`incident_types`</span>, <span pulumi-lang-nodejs="`statuses`" pulumi-lang-dotnet="`Statuses`" pulumi-lang-go="`statuses`" pulumi-lang-python="`statuses`" pulumi-lang-yaml="`statuses`" pulumi-lang-java="`statuses`">`statuses`</span>, <span pulumi-lang-nodejs="`subStatuses`" pulumi-lang-dotnet="`SubStatuses`" pulumi-lang-go="`subStatuses`" pulumi-lang-python="`sub_statuses`" pulumi-lang-yaml="`subStatuses`" pulumi-lang-java="`subStatuses`">`sub_statuses`</span>.
+        :param pulumi.Input[_builtins.str] kind: Value must be one of <span pulumi-lang-nodejs="`severities`" pulumi-lang-dotnet="`Severities`" pulumi-lang-go="`severities`" pulumi-lang-python="`severities`" pulumi-lang-yaml="`severities`" pulumi-lang-java="`severities`" pulumi-lang-hcl="`severities`">`severities`</span>, <span pulumi-lang-nodejs="`incidentTypes`" pulumi-lang-dotnet="`IncidentTypes`" pulumi-lang-go="`incidentTypes`" pulumi-lang-python="`incident_types`" pulumi-lang-yaml="`incidentTypes`" pulumi-lang-java="`incidentTypes`" pulumi-lang-hcl="`incident_types`">`incidentTypes`</span>, <span pulumi-lang-nodejs="`statuses`" pulumi-lang-dotnet="`Statuses`" pulumi-lang-go="`statuses`" pulumi-lang-python="`statuses`" pulumi-lang-yaml="`statuses`" pulumi-lang-java="`statuses`" pulumi-lang-hcl="`statuses`">`statuses`</span>, <span pulumi-lang-nodejs="`subStatuses`" pulumi-lang-dotnet="`SubStatuses`" pulumi-lang-go="`subStatuses`" pulumi-lang-python="`sub_statuses`" pulumi-lang-yaml="`subStatuses`" pulumi-lang-java="`subStatuses`" pulumi-lang-hcl="`sub_statuses`">`subStatuses`</span>.
         :param pulumi.Input[_builtins.bool] private: Value must be one of true or false
         """
         ...
@@ -238,12 +238,12 @@ class IncidentPermissionSetResource(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 incident_permission_set_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_permission_set_resource_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 private: Optional[pulumi.Input[_builtins.bool]] = None,
-                 resource_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 resource_type: Optional[pulumi.Input[_builtins.str]] = None,
+                 incident_permission_set_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_permission_set_resource_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 private: pulumi.Input[Optional[_builtins.bool]] = None,
+                 resource_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 resource_type: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -272,12 +272,12 @@ class IncidentPermissionSetResource(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            incident_permission_set_id: Optional[pulumi.Input[_builtins.str]] = None,
-            incident_permission_set_resource_id: Optional[pulumi.Input[_builtins.str]] = None,
-            kind: Optional[pulumi.Input[_builtins.str]] = None,
-            private: Optional[pulumi.Input[_builtins.bool]] = None,
-            resource_id: Optional[pulumi.Input[_builtins.str]] = None,
-            resource_type: Optional[pulumi.Input[_builtins.str]] = None) -> 'IncidentPermissionSetResource':
+            incident_permission_set_id: pulumi.Input[Optional[_builtins.str]] = None,
+            incident_permission_set_resource_id: pulumi.Input[Optional[_builtins.str]] = None,
+            kind: pulumi.Input[Optional[_builtins.str]] = None,
+            private: pulumi.Input[Optional[_builtins.bool]] = None,
+            resource_id: pulumi.Input[Optional[_builtins.str]] = None,
+            resource_type: pulumi.Input[Optional[_builtins.str]] = None) -> 'IncidentPermissionSetResource':
         """
         Get an existing IncidentPermissionSetResource resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -285,7 +285,7 @@ class IncidentPermissionSetResource(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] kind: Value must be one of <span pulumi-lang-nodejs="`severities`" pulumi-lang-dotnet="`Severities`" pulumi-lang-go="`severities`" pulumi-lang-python="`severities`" pulumi-lang-yaml="`severities`" pulumi-lang-java="`severities`">`severities`</span>, <span pulumi-lang-nodejs="`incidentTypes`" pulumi-lang-dotnet="`IncidentTypes`" pulumi-lang-go="`incidentTypes`" pulumi-lang-python="`incident_types`" pulumi-lang-yaml="`incidentTypes`" pulumi-lang-java="`incidentTypes`">`incident_types`</span>, <span pulumi-lang-nodejs="`statuses`" pulumi-lang-dotnet="`Statuses`" pulumi-lang-go="`statuses`" pulumi-lang-python="`statuses`" pulumi-lang-yaml="`statuses`" pulumi-lang-java="`statuses`">`statuses`</span>, <span pulumi-lang-nodejs="`subStatuses`" pulumi-lang-dotnet="`SubStatuses`" pulumi-lang-go="`subStatuses`" pulumi-lang-python="`sub_statuses`" pulumi-lang-yaml="`subStatuses`" pulumi-lang-java="`subStatuses`">`sub_statuses`</span>.
+        :param pulumi.Input[_builtins.str] kind: Value must be one of <span pulumi-lang-nodejs="`severities`" pulumi-lang-dotnet="`Severities`" pulumi-lang-go="`severities`" pulumi-lang-python="`severities`" pulumi-lang-yaml="`severities`" pulumi-lang-java="`severities`" pulumi-lang-hcl="`severities`">`severities`</span>, <span pulumi-lang-nodejs="`incidentTypes`" pulumi-lang-dotnet="`IncidentTypes`" pulumi-lang-go="`incidentTypes`" pulumi-lang-python="`incident_types`" pulumi-lang-yaml="`incidentTypes`" pulumi-lang-java="`incidentTypes`" pulumi-lang-hcl="`incident_types`">`incidentTypes`</span>, <span pulumi-lang-nodejs="`statuses`" pulumi-lang-dotnet="`Statuses`" pulumi-lang-go="`statuses`" pulumi-lang-python="`statuses`" pulumi-lang-yaml="`statuses`" pulumi-lang-java="`statuses`" pulumi-lang-hcl="`statuses`">`statuses`</span>, <span pulumi-lang-nodejs="`subStatuses`" pulumi-lang-dotnet="`SubStatuses`" pulumi-lang-go="`subStatuses`" pulumi-lang-python="`sub_statuses`" pulumi-lang-yaml="`subStatuses`" pulumi-lang-java="`subStatuses`" pulumi-lang-hcl="`sub_statuses`">`subStatuses`</span>.
         :param pulumi.Input[_builtins.bool] private: Value must be one of true or false
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
@@ -314,7 +314,7 @@ class IncidentPermissionSetResource(pulumi.CustomResource):
     @pulumi.getter
     def kind(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`severities`" pulumi-lang-dotnet="`Severities`" pulumi-lang-go="`severities`" pulumi-lang-python="`severities`" pulumi-lang-yaml="`severities`" pulumi-lang-java="`severities`">`severities`</span>, <span pulumi-lang-nodejs="`incidentTypes`" pulumi-lang-dotnet="`IncidentTypes`" pulumi-lang-go="`incidentTypes`" pulumi-lang-python="`incident_types`" pulumi-lang-yaml="`incidentTypes`" pulumi-lang-java="`incidentTypes`">`incident_types`</span>, <span pulumi-lang-nodejs="`statuses`" pulumi-lang-dotnet="`Statuses`" pulumi-lang-go="`statuses`" pulumi-lang-python="`statuses`" pulumi-lang-yaml="`statuses`" pulumi-lang-java="`statuses`">`statuses`</span>, <span pulumi-lang-nodejs="`subStatuses`" pulumi-lang-dotnet="`SubStatuses`" pulumi-lang-go="`subStatuses`" pulumi-lang-python="`sub_statuses`" pulumi-lang-yaml="`subStatuses`" pulumi-lang-java="`subStatuses`">`sub_statuses`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`severities`" pulumi-lang-dotnet="`Severities`" pulumi-lang-go="`severities`" pulumi-lang-python="`severities`" pulumi-lang-yaml="`severities`" pulumi-lang-java="`severities`" pulumi-lang-hcl="`severities`">`severities`</span>, <span pulumi-lang-nodejs="`incidentTypes`" pulumi-lang-dotnet="`IncidentTypes`" pulumi-lang-go="`incidentTypes`" pulumi-lang-python="`incident_types`" pulumi-lang-yaml="`incidentTypes`" pulumi-lang-java="`incidentTypes`" pulumi-lang-hcl="`incident_types`">`incidentTypes`</span>, <span pulumi-lang-nodejs="`statuses`" pulumi-lang-dotnet="`Statuses`" pulumi-lang-go="`statuses`" pulumi-lang-python="`statuses`" pulumi-lang-yaml="`statuses`" pulumi-lang-java="`statuses`" pulumi-lang-hcl="`statuses`">`statuses`</span>, <span pulumi-lang-nodejs="`subStatuses`" pulumi-lang-dotnet="`SubStatuses`" pulumi-lang-go="`subStatuses`" pulumi-lang-python="`sub_statuses`" pulumi-lang-yaml="`subStatuses`" pulumi-lang-java="`subStatuses`" pulumi-lang-hcl="`sub_statuses`">`subStatuses`</span>.
         """
         return pulumi.get(self, "kind")
 
@@ -335,3 +335,4 @@ class IncidentPermissionSetResource(pulumi.CustomResource):
     @pulumi.getter(name="resourceType")
     def resource_type(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "resource_type")
+

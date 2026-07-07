@@ -80,8 +80,8 @@ def get_form_field_placement(form: Optional[_builtins.str] = None,
         form=pulumi.get(__ret__, 'form'),
         form_field_id=pulumi.get(__ret__, 'form_field_id'),
         id=pulumi.get(__ret__, 'id'))
-def get_form_field_placement_output(form: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                                    form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
+def get_form_field_placement_output(form: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                                    form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
                                     opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetFormFieldPlacementResult]:
     """
     Use this data source to access information about an existing resource.

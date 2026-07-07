@@ -325,7 +325,7 @@ def get_plugin_download_url():
 	return None
 
 def get_version():
-    return "5.13.0"
+    return "5.16.1"
 
 _package_lock = asyncio.Lock()
 _package_ref = ...
@@ -339,12 +339,12 @@ async def get_package():
 					parameterization = resource_pb2.Parameterization(
 						name="rootly",
 						version=get_version(),
-						value=base64.b64decode("eyJyZW1vdGUiOnsidXJsIjoicmVnaXN0cnkub3BlbnRvZnUub3JnL3Jvb3RseWhxL3Jvb3RseSIsInZlcnNpb24iOiI1LjEzLjAifX0="),
+						value=base64.b64decode("eyJyZW1vdGUiOnsidXJsIjoicmVnaXN0cnkub3BlbnRvZnUub3JnL3Jvb3RseWhxL3Jvb3RseSIsInZlcnNpb24iOiI1LjE2LjEifX0="),
 					)
 					registerPackageResponse = monitor.RegisterPackage(
 						resource_pb2.RegisterPackageRequest(
 							name="terraform-provider",
-							version="1.1.1",
+							version="1.1.4",
 							download_url=get_plugin_download_url(),
 							parameterization=parameterization,
 						))
@@ -354,3 +354,4 @@ async def get_package():
 	if _package_ref is None or _package_ref is ...:
 		raise Exception("The Pulumi CLI does not support parameterization. Please update the Pulumi CLI.")
 	return _package_ref
+	

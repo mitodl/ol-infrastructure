@@ -55,7 +55,7 @@ config:
     "--authenticated"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["teams.enable_teams_app", "--create", "--superusers", "--staff"]
-  - ["instructor.legacy_instructor_dashboard", "--create", "--everyone"]
+  - ["instructor.legacy_instructor_dashboard", "--deactivate"]
   edxapp:use_extracted_html_block: "false"
   edxapp:business_unit: mitxonline
   edxapp:db_password:
@@ -79,11 +79,11 @@ config:
   edxapp:elb_healthcheck_interval: "30"
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
-    communications: communications
+    admin_console: admin-console
     authoring: authoring
+    communications: communications
     discussions: discuss
     gradebook: gradebook
-    instructor: instructor
     learning: learn
     ora_grading: ora-grading
   edxapp:github_org_api_url: https://github.mit.edu/api/v3/orgs/mitxonline-rc
@@ -159,3 +159,7 @@ config:
   typesense:enabled: "true"
   typesense:course_search_enabled: "true"
   typesense:forum_search_enabled: "false"
+  edxapp:site_project:
+    deployment: mitxonline
+    mfe_apps:
+    - instructor-dashboard

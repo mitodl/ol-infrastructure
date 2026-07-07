@@ -21,15 +21,15 @@ __all__ = ['CatalogChecklistTemplateArgs', 'CatalogChecklistTemplate']
 @pulumi.input_type
 class CatalogChecklistTemplateArgs:
     def __init__(__self__, *,
-                 catalog_checklist_template_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 catalog_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 fields: Optional[pulumi.Input[Sequence[pulumi.Input['CatalogChecklistTemplateFieldArgs']]]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 owners: Optional[pulumi.Input[Sequence[pulumi.Input['CatalogChecklistTemplateOwnerArgs']]]] = None,
-                 scope_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 scope_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None):
+                 catalog_checklist_template_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 catalog_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 fields: pulumi.Input[Optional[Sequence[pulumi.Input['CatalogChecklistTemplateFieldArgs']]]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 owners: pulumi.Input[Optional[Sequence[pulumi.Input['CatalogChecklistTemplateOwnerArgs']]]] = None,
+                 scope_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 scope_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a CatalogChecklistTemplate resource.
 
@@ -63,122 +63,122 @@ class CatalogChecklistTemplateArgs:
 
     @_builtins.property
     @pulumi.getter(name="catalogChecklistTemplateId")
-    def catalog_checklist_template_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def catalog_checklist_template_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "catalog_checklist_template_id")
 
     @catalog_checklist_template_id.setter
-    def catalog_checklist_template_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def catalog_checklist_template_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "catalog_checklist_template_id", value)
 
     @_builtins.property
     @pulumi.getter(name="catalogType")
-    def catalog_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def catalog_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The catalog type. Value must be one of `Service`, `Functionality`, `Environment`, `Group`, `Cause`, `IncidentType`, `Catalog`.
         """
         return pulumi.get(self, "catalog_type")
 
     @catalog_type.setter
-    def catalog_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def catalog_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "catalog_type", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the checklist template
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter
-    def fields(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['CatalogChecklistTemplateFieldArgs']]]]:
+    def fields(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['CatalogChecklistTemplateFieldArgs']]]]:
         """
         Template fields in position order
         """
         return pulumi.get(self, "fields")
 
     @fields.setter
-    def fields(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['CatalogChecklistTemplateFieldArgs']]]]):
+    def fields(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['CatalogChecklistTemplateFieldArgs']]]]):
         pulumi.set(self, "fields", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the checklist template
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def owners(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['CatalogChecklistTemplateOwnerArgs']]]]:
+    def owners(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['CatalogChecklistTemplateOwnerArgs']]]]:
         """
         Template owners
         """
         return pulumi.get(self, "owners")
 
     @owners.setter
-    def owners(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['CatalogChecklistTemplateOwnerArgs']]]]):
+    def owners(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['CatalogChecklistTemplateOwnerArgs']]]]):
         pulumi.set(self, "owners", value)
 
     @_builtins.property
     @pulumi.getter(name="scopeId")
-    def scope_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def scope_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The scope ID
         """
         return pulumi.get(self, "scope_id")
 
     @scope_id.setter
-    def scope_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def scope_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "scope_id", value)
 
     @_builtins.property
     @pulumi.getter(name="scopeType")
-    def scope_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def scope_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The scope type. Value must be one of `Team`, `Catalog`.
         """
         return pulumi.get(self, "scope_type")
 
     @scope_type.setter
-    def scope_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def scope_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "scope_type", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The slug of the checklist template
         """
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
 
 @pulumi.input_type
 class _CatalogChecklistTemplateState:
     def __init__(__self__, *,
-                 catalog_checklist_template_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 catalog_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 fields: Optional[pulumi.Input[Sequence[pulumi.Input['CatalogChecklistTemplateFieldArgs']]]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 owners: Optional[pulumi.Input[Sequence[pulumi.Input['CatalogChecklistTemplateOwnerArgs']]]] = None,
-                 scope_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 scope_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None):
+                 catalog_checklist_template_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 catalog_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 fields: pulumi.Input[Optional[Sequence[pulumi.Input['CatalogChecklistTemplateFieldArgs']]]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 owners: pulumi.Input[Optional[Sequence[pulumi.Input['CatalogChecklistTemplateOwnerArgs']]]] = None,
+                 scope_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 scope_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering CatalogChecklistTemplate resources.
 
@@ -212,107 +212,107 @@ class _CatalogChecklistTemplateState:
 
     @_builtins.property
     @pulumi.getter(name="catalogChecklistTemplateId")
-    def catalog_checklist_template_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def catalog_checklist_template_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "catalog_checklist_template_id")
 
     @catalog_checklist_template_id.setter
-    def catalog_checklist_template_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def catalog_checklist_template_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "catalog_checklist_template_id", value)
 
     @_builtins.property
     @pulumi.getter(name="catalogType")
-    def catalog_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def catalog_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The catalog type. Value must be one of `Service`, `Functionality`, `Environment`, `Group`, `Cause`, `IncidentType`, `Catalog`.
         """
         return pulumi.get(self, "catalog_type")
 
     @catalog_type.setter
-    def catalog_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def catalog_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "catalog_type", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the checklist template
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter
-    def fields(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['CatalogChecklistTemplateFieldArgs']]]]:
+    def fields(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['CatalogChecklistTemplateFieldArgs']]]]:
         """
         Template fields in position order
         """
         return pulumi.get(self, "fields")
 
     @fields.setter
-    def fields(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['CatalogChecklistTemplateFieldArgs']]]]):
+    def fields(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['CatalogChecklistTemplateFieldArgs']]]]):
         pulumi.set(self, "fields", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the checklist template
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def owners(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['CatalogChecklistTemplateOwnerArgs']]]]:
+    def owners(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['CatalogChecklistTemplateOwnerArgs']]]]:
         """
         Template owners
         """
         return pulumi.get(self, "owners")
 
     @owners.setter
-    def owners(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['CatalogChecklistTemplateOwnerArgs']]]]):
+    def owners(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['CatalogChecklistTemplateOwnerArgs']]]]):
         pulumi.set(self, "owners", value)
 
     @_builtins.property
     @pulumi.getter(name="scopeId")
-    def scope_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def scope_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The scope ID
         """
         return pulumi.get(self, "scope_id")
 
     @scope_id.setter
-    def scope_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def scope_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "scope_id", value)
 
     @_builtins.property
     @pulumi.getter(name="scopeType")
-    def scope_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def scope_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The scope type. Value must be one of `Team`, `Catalog`.
         """
         return pulumi.get(self, "scope_type")
 
     @scope_type.setter
-    def scope_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def scope_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "scope_type", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The slug of the checklist template
         """
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
 
@@ -322,15 +322,15 @@ class CatalogChecklistTemplate(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 catalog_checklist_template_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 catalog_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 fields: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CatalogChecklistTemplateFieldArgs', 'CatalogChecklistTemplateFieldArgsDict']]]]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 owners: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CatalogChecklistTemplateOwnerArgs', 'CatalogChecklistTemplateOwnerArgsDict']]]]] = None,
-                 scope_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 scope_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
+                 catalog_checklist_template_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 catalog_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 fields: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CatalogChecklistTemplateFieldArgs', 'CatalogChecklistTemplateFieldArgsDict']]]]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 owners: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CatalogChecklistTemplateOwnerArgs', 'CatalogChecklistTemplateOwnerArgsDict']]]]] = None,
+                 scope_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 scope_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a CatalogChecklistTemplate resource with the given unique name, props, and options.
@@ -370,15 +370,15 @@ class CatalogChecklistTemplate(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 catalog_checklist_template_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 catalog_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 fields: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CatalogChecklistTemplateFieldArgs', 'CatalogChecklistTemplateFieldArgsDict']]]]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 owners: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CatalogChecklistTemplateOwnerArgs', 'CatalogChecklistTemplateOwnerArgsDict']]]]] = None,
-                 scope_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 scope_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
+                 catalog_checklist_template_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 catalog_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 fields: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CatalogChecklistTemplateFieldArgs', 'CatalogChecklistTemplateFieldArgsDict']]]]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 owners: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CatalogChecklistTemplateOwnerArgs', 'CatalogChecklistTemplateOwnerArgsDict']]]]] = None,
+                 scope_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 scope_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -408,15 +408,15 @@ class CatalogChecklistTemplate(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            catalog_checklist_template_id: Optional[pulumi.Input[_builtins.str]] = None,
-            catalog_type: Optional[pulumi.Input[_builtins.str]] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            fields: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CatalogChecklistTemplateFieldArgs', 'CatalogChecklistTemplateFieldArgsDict']]]]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            owners: Optional[pulumi.Input[Sequence[pulumi.Input[Union['CatalogChecklistTemplateOwnerArgs', 'CatalogChecklistTemplateOwnerArgsDict']]]]] = None,
-            scope_id: Optional[pulumi.Input[_builtins.str]] = None,
-            scope_type: Optional[pulumi.Input[_builtins.str]] = None,
-            slug: Optional[pulumi.Input[_builtins.str]] = None) -> 'CatalogChecklistTemplate':
+            catalog_checklist_template_id: pulumi.Input[Optional[_builtins.str]] = None,
+            catalog_type: pulumi.Input[Optional[_builtins.str]] = None,
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            fields: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CatalogChecklistTemplateFieldArgs', 'CatalogChecklistTemplateFieldArgsDict']]]]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            owners: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CatalogChecklistTemplateOwnerArgs', 'CatalogChecklistTemplateOwnerArgsDict']]]]] = None,
+            scope_id: pulumi.Input[Optional[_builtins.str]] = None,
+            scope_type: pulumi.Input[Optional[_builtins.str]] = None,
+            slug: pulumi.Input[Optional[_builtins.str]] = None) -> 'CatalogChecklistTemplate':
         """
         Get an existing CatalogChecklistTemplate resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -516,3 +516,4 @@ class CatalogChecklistTemplate(pulumi.CustomResource):
         The slug of the checklist template
         """
         return pulumi.get(self, "slug")
+

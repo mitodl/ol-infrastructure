@@ -40,7 +40,7 @@ config:
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["studio.library_authoring_mfe", "--deactivate"]
   - ["legacy_studio.certificates", "--create", "--everyone"]
-  - ["instructor.legacy_instructor_dashboard", "--create", "--everyone"]
+  - ["instructor.legacy_instructor_dashboard", "--deactivate"]
   edxapp:business_unit: residential-staging
   edxapp:canvas_base_url: https://mit.test.instructure.com
   edxapp:db_password:
@@ -57,6 +57,7 @@ config:
   edxapp:elb_healthcheck_interval: "30"
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
+    admin_console: admin-console
     authoring: authoring
     communications: communications
     discussions: discuss
@@ -130,3 +131,7 @@ config:
   typesense:enabled: "true"
   typesense:course_search_enabled: "true"
   typesense:forum_search_enabled: "false"
+  edxapp:site_project:
+    deployment: mitx
+    mfe_apps:
+    - instructor-dashboard

@@ -19,29 +19,47 @@ __all__ = ['ScheduleArgs', 'Schedule']
 @pulumi.input_type
 class ScheduleArgs:
     def __init__(__self__, *,
-                 all_time_coverage: Optional[pulumi.Input[_builtins.bool]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 owner_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 owner_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 schedule_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 slack_channel: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
-                 slack_user_group: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None):
+                 all_time_coverage: pulumi.Input[Optional[_builtins.bool]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 include_shadows_in_slack_notifications: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 owner_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 owner_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 shift_report_day_of_week: pulumi.Input[Optional[_builtins.str]] = None,
+                 shift_report_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 shift_report_time_of_day: pulumi.Input[Optional[_builtins.str]] = None,
+                 shift_report_time_zone: pulumi.Input[Optional[_builtins.str]] = None,
+                 shift_start_notifications_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 shift_update_notifications_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 slack_channel: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 slack_user_group: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 sync_linear_enabled: pulumi.Input[Optional[_builtins.bool]] = None):
         """
         The set of arguments for constructing a Schedule resource.
 
         :param pulumi.Input[_builtins.bool] all_time_coverage: 24/7 coverage of the schedule. Value must be one of true or false
         :param pulumi.Input[_builtins.str] description: The description of the schedule
+        :param pulumi.Input[_builtins.bool] include_shadows_in_slack_notifications: Whether shadow users are included in Slack notifications and user group syncing. Value must be one of true or false
         :param pulumi.Input[_builtins.str] name: The name of the schedule
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] owner_group_ids: The owning teams for this schedules.
         :param pulumi.Input[_builtins.float] owner_user_id: ID of user assigned as owner of the schedule. Defaults to the API token's user if not specified.
-        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack channel of the schedule
-        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_user_group: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack group of the schedule
+        :param pulumi.Input[_builtins.str] shift_report_day_of_week: Day of week the weekly shift summary is sent. Value must be one of <span pulumi-lang-nodejs="`monday`" pulumi-lang-dotnet="`Monday`" pulumi-lang-go="`monday`" pulumi-lang-python="`monday`" pulumi-lang-yaml="`monday`" pulumi-lang-java="`monday`" pulumi-lang-hcl="`monday`">`monday`</span>, <span pulumi-lang-nodejs="`tuesday`" pulumi-lang-dotnet="`Tuesday`" pulumi-lang-go="`tuesday`" pulumi-lang-python="`tuesday`" pulumi-lang-yaml="`tuesday`" pulumi-lang-java="`tuesday`" pulumi-lang-hcl="`tuesday`">`tuesday`</span>, <span pulumi-lang-nodejs="`wednesday`" pulumi-lang-dotnet="`Wednesday`" pulumi-lang-go="`wednesday`" pulumi-lang-python="`wednesday`" pulumi-lang-yaml="`wednesday`" pulumi-lang-java="`wednesday`" pulumi-lang-hcl="`wednesday`">`wednesday`</span>, <span pulumi-lang-nodejs="`thursday`" pulumi-lang-dotnet="`Thursday`" pulumi-lang-go="`thursday`" pulumi-lang-python="`thursday`" pulumi-lang-yaml="`thursday`" pulumi-lang-java="`thursday`" pulumi-lang-hcl="`thursday`">`thursday`</span>, <span pulumi-lang-nodejs="`friday`" pulumi-lang-dotnet="`Friday`" pulumi-lang-go="`friday`" pulumi-lang-python="`friday`" pulumi-lang-yaml="`friday`" pulumi-lang-java="`friday`" pulumi-lang-hcl="`friday`">`friday`</span>, <span pulumi-lang-nodejs="`saturday`" pulumi-lang-dotnet="`Saturday`" pulumi-lang-go="`saturday`" pulumi-lang-python="`saturday`" pulumi-lang-yaml="`saturday`" pulumi-lang-java="`saturday`" pulumi-lang-hcl="`saturday`">`saturday`</span>, <span pulumi-lang-nodejs="`sunday`" pulumi-lang-dotnet="`Sunday`" pulumi-lang-go="`sunday`" pulumi-lang-python="`sunday`" pulumi-lang-yaml="`sunday`" pulumi-lang-java="`sunday`" pulumi-lang-hcl="`sunday`">`sunday`</span>.
+        :param pulumi.Input[_builtins.bool] shift_report_enabled: Whether the weekly shift summary report is sent. Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        :param pulumi.Input[_builtins.str] shift_report_time_of_day: Time of day the weekly shift summary is sent, in `HH:MM` 24-hour format.
+        :param pulumi.Input[_builtins.str] shift_report_time_zone: IANA time zone used for the weekly shift summary (e.g. `Australia/Sydney`).
+        :param pulumi.Input[_builtins.bool] shift_start_notifications_enabled: Whether to send a Slack message every time a new shift begins. Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] shift_update_notifications_enabled: Whether to send a Slack message whenever a shift is updated (overrides, removed users, rotation changes, etc.). Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Synced slack channel of the schedule
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_user_group: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Synced slack group of the schedule
+        :param pulumi.Input[_builtins.bool] sync_linear_enabled: Whether the schedule is synced with Linear. Value must be one of true or false
         """
         if all_time_coverage is not None:
             pulumi.set(__self__, "all_time_coverage", all_time_coverage)
         if description is not None:
             pulumi.set(__self__, "description", description)
+        if include_shadows_in_slack_notifications is not None:
+            pulumi.set(__self__, "include_shadows_in_slack_notifications", include_shadows_in_slack_notifications)
         if name is not None:
             pulumi.set(__self__, "name", name)
         if owner_group_ids is not None:
@@ -50,131 +68,259 @@ class ScheduleArgs:
             pulumi.set(__self__, "owner_user_id", owner_user_id)
         if schedule_id is not None:
             pulumi.set(__self__, "schedule_id", schedule_id)
+        if shift_report_day_of_week is not None:
+            pulumi.set(__self__, "shift_report_day_of_week", shift_report_day_of_week)
+        if shift_report_enabled is not None:
+            pulumi.set(__self__, "shift_report_enabled", shift_report_enabled)
+        if shift_report_time_of_day is not None:
+            pulumi.set(__self__, "shift_report_time_of_day", shift_report_time_of_day)
+        if shift_report_time_zone is not None:
+            pulumi.set(__self__, "shift_report_time_zone", shift_report_time_zone)
+        if shift_start_notifications_enabled is not None:
+            pulumi.set(__self__, "shift_start_notifications_enabled", shift_start_notifications_enabled)
+        if shift_update_notifications_enabled is not None:
+            pulumi.set(__self__, "shift_update_notifications_enabled", shift_update_notifications_enabled)
         if slack_channel is not None:
             pulumi.set(__self__, "slack_channel", slack_channel)
         if slack_user_group is not None:
             pulumi.set(__self__, "slack_user_group", slack_user_group)
+        if sync_linear_enabled is not None:
+            pulumi.set(__self__, "sync_linear_enabled", sync_linear_enabled)
 
     @_builtins.property
     @pulumi.getter(name="allTimeCoverage")
-    def all_time_coverage(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def all_time_coverage(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         24/7 coverage of the schedule. Value must be one of true or false
         """
         return pulumi.get(self, "all_time_coverage")
 
     @all_time_coverage.setter
-    def all_time_coverage(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def all_time_coverage(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "all_time_coverage", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the schedule
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
+    @pulumi.getter(name="includeShadowsInSlackNotifications")
+    def include_shadows_in_slack_notifications(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Whether shadow users are included in Slack notifications and user group syncing. Value must be one of true or false
+        """
+        return pulumi.get(self, "include_shadows_in_slack_notifications")
+
+    @include_shadows_in_slack_notifications.setter
+    def include_shadows_in_slack_notifications(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "include_shadows_in_slack_notifications", value)
+
+    @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the schedule
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="ownerGroupIds")
-    def owner_group_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def owner_group_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         The owning teams for this schedules.
         """
         return pulumi.get(self, "owner_group_ids")
 
     @owner_group_ids.setter
-    def owner_group_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def owner_group_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "owner_group_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="ownerUserId")
-    def owner_user_id(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def owner_user_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         ID of user assigned as owner of the schedule. Defaults to the API token's user if not specified.
         """
         return pulumi.get(self, "owner_user_id")
 
     @owner_user_id.setter
-    def owner_user_id(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def owner_user_id(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "owner_user_id", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleId")
-    def schedule_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def schedule_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "schedule_id")
 
     @schedule_id.setter
-    def schedule_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def schedule_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "schedule_id", value)
 
     @_builtins.property
-    @pulumi.getter(name="slackChannel")
-    def slack_channel(self) -> Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]]:
+    @pulumi.getter(name="shiftReportDayOfWeek")
+    def shift_report_day_of_week(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack channel of the schedule
+        Day of week the weekly shift summary is sent. Value must be one of <span pulumi-lang-nodejs="`monday`" pulumi-lang-dotnet="`Monday`" pulumi-lang-go="`monday`" pulumi-lang-python="`monday`" pulumi-lang-yaml="`monday`" pulumi-lang-java="`monday`" pulumi-lang-hcl="`monday`">`monday`</span>, <span pulumi-lang-nodejs="`tuesday`" pulumi-lang-dotnet="`Tuesday`" pulumi-lang-go="`tuesday`" pulumi-lang-python="`tuesday`" pulumi-lang-yaml="`tuesday`" pulumi-lang-java="`tuesday`" pulumi-lang-hcl="`tuesday`">`tuesday`</span>, <span pulumi-lang-nodejs="`wednesday`" pulumi-lang-dotnet="`Wednesday`" pulumi-lang-go="`wednesday`" pulumi-lang-python="`wednesday`" pulumi-lang-yaml="`wednesday`" pulumi-lang-java="`wednesday`" pulumi-lang-hcl="`wednesday`">`wednesday`</span>, <span pulumi-lang-nodejs="`thursday`" pulumi-lang-dotnet="`Thursday`" pulumi-lang-go="`thursday`" pulumi-lang-python="`thursday`" pulumi-lang-yaml="`thursday`" pulumi-lang-java="`thursday`" pulumi-lang-hcl="`thursday`">`thursday`</span>, <span pulumi-lang-nodejs="`friday`" pulumi-lang-dotnet="`Friday`" pulumi-lang-go="`friday`" pulumi-lang-python="`friday`" pulumi-lang-yaml="`friday`" pulumi-lang-java="`friday`" pulumi-lang-hcl="`friday`">`friday`</span>, <span pulumi-lang-nodejs="`saturday`" pulumi-lang-dotnet="`Saturday`" pulumi-lang-go="`saturday`" pulumi-lang-python="`saturday`" pulumi-lang-yaml="`saturday`" pulumi-lang-java="`saturday`" pulumi-lang-hcl="`saturday`">`saturday`</span>, <span pulumi-lang-nodejs="`sunday`" pulumi-lang-dotnet="`Sunday`" pulumi-lang-go="`sunday`" pulumi-lang-python="`sunday`" pulumi-lang-yaml="`sunday`" pulumi-lang-java="`sunday`" pulumi-lang-hcl="`sunday`">`sunday`</span>.
+        """
+        return pulumi.get(self, "shift_report_day_of_week")
+
+    @shift_report_day_of_week.setter
+    def shift_report_day_of_week(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "shift_report_day_of_week", value)
+
+    @_builtins.property
+    @pulumi.getter(name="shiftReportEnabled")
+    def shift_report_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Whether the weekly shift summary report is sent. Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        """
+        return pulumi.get(self, "shift_report_enabled")
+
+    @shift_report_enabled.setter
+    def shift_report_enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "shift_report_enabled", value)
+
+    @_builtins.property
+    @pulumi.getter(name="shiftReportTimeOfDay")
+    def shift_report_time_of_day(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Time of day the weekly shift summary is sent, in `HH:MM` 24-hour format.
+        """
+        return pulumi.get(self, "shift_report_time_of_day")
+
+    @shift_report_time_of_day.setter
+    def shift_report_time_of_day(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "shift_report_time_of_day", value)
+
+    @_builtins.property
+    @pulumi.getter(name="shiftReportTimeZone")
+    def shift_report_time_zone(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        IANA time zone used for the weekly shift summary (e.g. `Australia/Sydney`).
+        """
+        return pulumi.get(self, "shift_report_time_zone")
+
+    @shift_report_time_zone.setter
+    def shift_report_time_zone(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "shift_report_time_zone", value)
+
+    @_builtins.property
+    @pulumi.getter(name="shiftStartNotificationsEnabled")
+    def shift_start_notifications_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Whether to send a Slack message every time a new shift begins. Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        """
+        return pulumi.get(self, "shift_start_notifications_enabled")
+
+    @shift_start_notifications_enabled.setter
+    def shift_start_notifications_enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "shift_start_notifications_enabled", value)
+
+    @_builtins.property
+    @pulumi.getter(name="shiftUpdateNotificationsEnabled")
+    def shift_update_notifications_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Whether to send a Slack message whenever a shift is updated (overrides, removed users, rotation changes, etc.). Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        """
+        return pulumi.get(self, "shift_update_notifications_enabled")
+
+    @shift_update_notifications_enabled.setter
+    def shift_update_notifications_enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "shift_update_notifications_enabled", value)
+
+    @_builtins.property
+    @pulumi.getter(name="slackChannel")
+    def slack_channel(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Synced slack channel of the schedule
         """
         return pulumi.get(self, "slack_channel")
 
     @slack_channel.setter
-    def slack_channel(self, value: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]]):
+    def slack_channel(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "slack_channel", value)
 
     @_builtins.property
     @pulumi.getter(name="slackUserGroup")
-    def slack_user_group(self) -> Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]]:
+    def slack_user_group(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack group of the schedule
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Synced slack group of the schedule
         """
         return pulumi.get(self, "slack_user_group")
 
     @slack_user_group.setter
-    def slack_user_group(self, value: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]]):
+    def slack_user_group(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "slack_user_group", value)
+
+    @_builtins.property
+    @pulumi.getter(name="syncLinearEnabled")
+    def sync_linear_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Whether the schedule is synced with Linear. Value must be one of true or false
+        """
+        return pulumi.get(self, "sync_linear_enabled")
+
+    @sync_linear_enabled.setter
+    def sync_linear_enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "sync_linear_enabled", value)
 
 
 @pulumi.input_type
 class _ScheduleState:
     def __init__(__self__, *,
-                 all_time_coverage: Optional[pulumi.Input[_builtins.bool]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 owner_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 owner_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 schedule_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 slack_channel: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
-                 slack_user_group: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None):
+                 all_time_coverage: pulumi.Input[Optional[_builtins.bool]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 include_shadows_in_slack_notifications: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 owner_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 owner_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 shift_report_day_of_week: pulumi.Input[Optional[_builtins.str]] = None,
+                 shift_report_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 shift_report_time_of_day: pulumi.Input[Optional[_builtins.str]] = None,
+                 shift_report_time_zone: pulumi.Input[Optional[_builtins.str]] = None,
+                 shift_start_notifications_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 shift_update_notifications_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 slack_channel: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 slack_user_group: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 sync_linear_enabled: pulumi.Input[Optional[_builtins.bool]] = None):
         """
         Input properties used for looking up and filtering Schedule resources.
 
         :param pulumi.Input[_builtins.bool] all_time_coverage: 24/7 coverage of the schedule. Value must be one of true or false
         :param pulumi.Input[_builtins.str] description: The description of the schedule
+        :param pulumi.Input[_builtins.bool] include_shadows_in_slack_notifications: Whether shadow users are included in Slack notifications and user group syncing. Value must be one of true or false
         :param pulumi.Input[_builtins.str] name: The name of the schedule
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] owner_group_ids: The owning teams for this schedules.
         :param pulumi.Input[_builtins.float] owner_user_id: ID of user assigned as owner of the schedule. Defaults to the API token's user if not specified.
-        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack channel of the schedule
-        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_user_group: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack group of the schedule
+        :param pulumi.Input[_builtins.str] shift_report_day_of_week: Day of week the weekly shift summary is sent. Value must be one of <span pulumi-lang-nodejs="`monday`" pulumi-lang-dotnet="`Monday`" pulumi-lang-go="`monday`" pulumi-lang-python="`monday`" pulumi-lang-yaml="`monday`" pulumi-lang-java="`monday`" pulumi-lang-hcl="`monday`">`monday`</span>, <span pulumi-lang-nodejs="`tuesday`" pulumi-lang-dotnet="`Tuesday`" pulumi-lang-go="`tuesday`" pulumi-lang-python="`tuesday`" pulumi-lang-yaml="`tuesday`" pulumi-lang-java="`tuesday`" pulumi-lang-hcl="`tuesday`">`tuesday`</span>, <span pulumi-lang-nodejs="`wednesday`" pulumi-lang-dotnet="`Wednesday`" pulumi-lang-go="`wednesday`" pulumi-lang-python="`wednesday`" pulumi-lang-yaml="`wednesday`" pulumi-lang-java="`wednesday`" pulumi-lang-hcl="`wednesday`">`wednesday`</span>, <span pulumi-lang-nodejs="`thursday`" pulumi-lang-dotnet="`Thursday`" pulumi-lang-go="`thursday`" pulumi-lang-python="`thursday`" pulumi-lang-yaml="`thursday`" pulumi-lang-java="`thursday`" pulumi-lang-hcl="`thursday`">`thursday`</span>, <span pulumi-lang-nodejs="`friday`" pulumi-lang-dotnet="`Friday`" pulumi-lang-go="`friday`" pulumi-lang-python="`friday`" pulumi-lang-yaml="`friday`" pulumi-lang-java="`friday`" pulumi-lang-hcl="`friday`">`friday`</span>, <span pulumi-lang-nodejs="`saturday`" pulumi-lang-dotnet="`Saturday`" pulumi-lang-go="`saturday`" pulumi-lang-python="`saturday`" pulumi-lang-yaml="`saturday`" pulumi-lang-java="`saturday`" pulumi-lang-hcl="`saturday`">`saturday`</span>, <span pulumi-lang-nodejs="`sunday`" pulumi-lang-dotnet="`Sunday`" pulumi-lang-go="`sunday`" pulumi-lang-python="`sunday`" pulumi-lang-yaml="`sunday`" pulumi-lang-java="`sunday`" pulumi-lang-hcl="`sunday`">`sunday`</span>.
+        :param pulumi.Input[_builtins.bool] shift_report_enabled: Whether the weekly shift summary report is sent. Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        :param pulumi.Input[_builtins.str] shift_report_time_of_day: Time of day the weekly shift summary is sent, in `HH:MM` 24-hour format.
+        :param pulumi.Input[_builtins.str] shift_report_time_zone: IANA time zone used for the weekly shift summary (e.g. `Australia/Sydney`).
+        :param pulumi.Input[_builtins.bool] shift_start_notifications_enabled: Whether to send a Slack message every time a new shift begins. Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] shift_update_notifications_enabled: Whether to send a Slack message whenever a shift is updated (overrides, removed users, rotation changes, etc.). Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Synced slack channel of the schedule
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_user_group: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Synced slack group of the schedule
+        :param pulumi.Input[_builtins.bool] sync_linear_enabled: Whether the schedule is synced with Linear. Value must be one of true or false
         """
         if all_time_coverage is not None:
             pulumi.set(__self__, "all_time_coverage", all_time_coverage)
         if description is not None:
             pulumi.set(__self__, "description", description)
+        if include_shadows_in_slack_notifications is not None:
+            pulumi.set(__self__, "include_shadows_in_slack_notifications", include_shadows_in_slack_notifications)
         if name is not None:
             pulumi.set(__self__, "name", name)
         if owner_group_ids is not None:
@@ -183,103 +329,213 @@ class _ScheduleState:
             pulumi.set(__self__, "owner_user_id", owner_user_id)
         if schedule_id is not None:
             pulumi.set(__self__, "schedule_id", schedule_id)
+        if shift_report_day_of_week is not None:
+            pulumi.set(__self__, "shift_report_day_of_week", shift_report_day_of_week)
+        if shift_report_enabled is not None:
+            pulumi.set(__self__, "shift_report_enabled", shift_report_enabled)
+        if shift_report_time_of_day is not None:
+            pulumi.set(__self__, "shift_report_time_of_day", shift_report_time_of_day)
+        if shift_report_time_zone is not None:
+            pulumi.set(__self__, "shift_report_time_zone", shift_report_time_zone)
+        if shift_start_notifications_enabled is not None:
+            pulumi.set(__self__, "shift_start_notifications_enabled", shift_start_notifications_enabled)
+        if shift_update_notifications_enabled is not None:
+            pulumi.set(__self__, "shift_update_notifications_enabled", shift_update_notifications_enabled)
         if slack_channel is not None:
             pulumi.set(__self__, "slack_channel", slack_channel)
         if slack_user_group is not None:
             pulumi.set(__self__, "slack_user_group", slack_user_group)
+        if sync_linear_enabled is not None:
+            pulumi.set(__self__, "sync_linear_enabled", sync_linear_enabled)
 
     @_builtins.property
     @pulumi.getter(name="allTimeCoverage")
-    def all_time_coverage(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def all_time_coverage(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         24/7 coverage of the schedule. Value must be one of true or false
         """
         return pulumi.get(self, "all_time_coverage")
 
     @all_time_coverage.setter
-    def all_time_coverage(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def all_time_coverage(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "all_time_coverage", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the schedule
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
+    @pulumi.getter(name="includeShadowsInSlackNotifications")
+    def include_shadows_in_slack_notifications(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Whether shadow users are included in Slack notifications and user group syncing. Value must be one of true or false
+        """
+        return pulumi.get(self, "include_shadows_in_slack_notifications")
+
+    @include_shadows_in_slack_notifications.setter
+    def include_shadows_in_slack_notifications(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "include_shadows_in_slack_notifications", value)
+
+    @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the schedule
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="ownerGroupIds")
-    def owner_group_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def owner_group_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         The owning teams for this schedules.
         """
         return pulumi.get(self, "owner_group_ids")
 
     @owner_group_ids.setter
-    def owner_group_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def owner_group_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "owner_group_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="ownerUserId")
-    def owner_user_id(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def owner_user_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         ID of user assigned as owner of the schedule. Defaults to the API token's user if not specified.
         """
         return pulumi.get(self, "owner_user_id")
 
     @owner_user_id.setter
-    def owner_user_id(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def owner_user_id(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "owner_user_id", value)
 
     @_builtins.property
     @pulumi.getter(name="scheduleId")
-    def schedule_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def schedule_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "schedule_id")
 
     @schedule_id.setter
-    def schedule_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def schedule_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "schedule_id", value)
 
     @_builtins.property
-    @pulumi.getter(name="slackChannel")
-    def slack_channel(self) -> Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]]:
+    @pulumi.getter(name="shiftReportDayOfWeek")
+    def shift_report_day_of_week(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack channel of the schedule
+        Day of week the weekly shift summary is sent. Value must be one of <span pulumi-lang-nodejs="`monday`" pulumi-lang-dotnet="`Monday`" pulumi-lang-go="`monday`" pulumi-lang-python="`monday`" pulumi-lang-yaml="`monday`" pulumi-lang-java="`monday`" pulumi-lang-hcl="`monday`">`monday`</span>, <span pulumi-lang-nodejs="`tuesday`" pulumi-lang-dotnet="`Tuesday`" pulumi-lang-go="`tuesday`" pulumi-lang-python="`tuesday`" pulumi-lang-yaml="`tuesday`" pulumi-lang-java="`tuesday`" pulumi-lang-hcl="`tuesday`">`tuesday`</span>, <span pulumi-lang-nodejs="`wednesday`" pulumi-lang-dotnet="`Wednesday`" pulumi-lang-go="`wednesday`" pulumi-lang-python="`wednesday`" pulumi-lang-yaml="`wednesday`" pulumi-lang-java="`wednesday`" pulumi-lang-hcl="`wednesday`">`wednesday`</span>, <span pulumi-lang-nodejs="`thursday`" pulumi-lang-dotnet="`Thursday`" pulumi-lang-go="`thursday`" pulumi-lang-python="`thursday`" pulumi-lang-yaml="`thursday`" pulumi-lang-java="`thursday`" pulumi-lang-hcl="`thursday`">`thursday`</span>, <span pulumi-lang-nodejs="`friday`" pulumi-lang-dotnet="`Friday`" pulumi-lang-go="`friday`" pulumi-lang-python="`friday`" pulumi-lang-yaml="`friday`" pulumi-lang-java="`friday`" pulumi-lang-hcl="`friday`">`friday`</span>, <span pulumi-lang-nodejs="`saturday`" pulumi-lang-dotnet="`Saturday`" pulumi-lang-go="`saturday`" pulumi-lang-python="`saturday`" pulumi-lang-yaml="`saturday`" pulumi-lang-java="`saturday`" pulumi-lang-hcl="`saturday`">`saturday`</span>, <span pulumi-lang-nodejs="`sunday`" pulumi-lang-dotnet="`Sunday`" pulumi-lang-go="`sunday`" pulumi-lang-python="`sunday`" pulumi-lang-yaml="`sunday`" pulumi-lang-java="`sunday`" pulumi-lang-hcl="`sunday`">`sunday`</span>.
+        """
+        return pulumi.get(self, "shift_report_day_of_week")
+
+    @shift_report_day_of_week.setter
+    def shift_report_day_of_week(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "shift_report_day_of_week", value)
+
+    @_builtins.property
+    @pulumi.getter(name="shiftReportEnabled")
+    def shift_report_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Whether the weekly shift summary report is sent. Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        """
+        return pulumi.get(self, "shift_report_enabled")
+
+    @shift_report_enabled.setter
+    def shift_report_enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "shift_report_enabled", value)
+
+    @_builtins.property
+    @pulumi.getter(name="shiftReportTimeOfDay")
+    def shift_report_time_of_day(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Time of day the weekly shift summary is sent, in `HH:MM` 24-hour format.
+        """
+        return pulumi.get(self, "shift_report_time_of_day")
+
+    @shift_report_time_of_day.setter
+    def shift_report_time_of_day(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "shift_report_time_of_day", value)
+
+    @_builtins.property
+    @pulumi.getter(name="shiftReportTimeZone")
+    def shift_report_time_zone(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        IANA time zone used for the weekly shift summary (e.g. `Australia/Sydney`).
+        """
+        return pulumi.get(self, "shift_report_time_zone")
+
+    @shift_report_time_zone.setter
+    def shift_report_time_zone(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "shift_report_time_zone", value)
+
+    @_builtins.property
+    @pulumi.getter(name="shiftStartNotificationsEnabled")
+    def shift_start_notifications_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Whether to send a Slack message every time a new shift begins. Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        """
+        return pulumi.get(self, "shift_start_notifications_enabled")
+
+    @shift_start_notifications_enabled.setter
+    def shift_start_notifications_enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "shift_start_notifications_enabled", value)
+
+    @_builtins.property
+    @pulumi.getter(name="shiftUpdateNotificationsEnabled")
+    def shift_update_notifications_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Whether to send a Slack message whenever a shift is updated (overrides, removed users, rotation changes, etc.). Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        """
+        return pulumi.get(self, "shift_update_notifications_enabled")
+
+    @shift_update_notifications_enabled.setter
+    def shift_update_notifications_enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "shift_update_notifications_enabled", value)
+
+    @_builtins.property
+    @pulumi.getter(name="slackChannel")
+    def slack_channel(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Synced slack channel of the schedule
         """
         return pulumi.get(self, "slack_channel")
 
     @slack_channel.setter
-    def slack_channel(self, value: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]]):
+    def slack_channel(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "slack_channel", value)
 
     @_builtins.property
     @pulumi.getter(name="slackUserGroup")
-    def slack_user_group(self) -> Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]]:
+    def slack_user_group(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack group of the schedule
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Synced slack group of the schedule
         """
         return pulumi.get(self, "slack_user_group")
 
     @slack_user_group.setter
-    def slack_user_group(self, value: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]]):
+    def slack_user_group(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "slack_user_group", value)
+
+    @_builtins.property
+    @pulumi.getter(name="syncLinearEnabled")
+    def sync_linear_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Whether the schedule is synced with Linear. Value must be one of true or false
+        """
+        return pulumi.get(self, "sync_linear_enabled")
+
+    @sync_linear_enabled.setter
+    def sync_linear_enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "sync_linear_enabled", value)
 
 
 @pulumi.type_token("rootly:index/schedule:Schedule")
@@ -288,14 +544,22 @@ class Schedule(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 all_time_coverage: Optional[pulumi.Input[_builtins.bool]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 owner_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 owner_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 schedule_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 slack_channel: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
-                 slack_user_group: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 all_time_coverage: pulumi.Input[Optional[_builtins.bool]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 include_shadows_in_slack_notifications: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 owner_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 owner_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 shift_report_day_of_week: pulumi.Input[Optional[_builtins.str]] = None,
+                 shift_report_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 shift_report_time_of_day: pulumi.Input[Optional[_builtins.str]] = None,
+                 shift_report_time_zone: pulumi.Input[Optional[_builtins.str]] = None,
+                 shift_start_notifications_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 shift_update_notifications_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 slack_channel: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 slack_user_group: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 sync_linear_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
                  __props__=None):
         """
         Create a Schedule resource with the given unique name, props, and options.
@@ -304,11 +568,19 @@ class Schedule(pulumi.CustomResource):
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.bool] all_time_coverage: 24/7 coverage of the schedule. Value must be one of true or false
         :param pulumi.Input[_builtins.str] description: The description of the schedule
+        :param pulumi.Input[_builtins.bool] include_shadows_in_slack_notifications: Whether shadow users are included in Slack notifications and user group syncing. Value must be one of true or false
         :param pulumi.Input[_builtins.str] name: The name of the schedule
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] owner_group_ids: The owning teams for this schedules.
         :param pulumi.Input[_builtins.float] owner_user_id: ID of user assigned as owner of the schedule. Defaults to the API token's user if not specified.
-        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack channel of the schedule
-        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_user_group: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack group of the schedule
+        :param pulumi.Input[_builtins.str] shift_report_day_of_week: Day of week the weekly shift summary is sent. Value must be one of <span pulumi-lang-nodejs="`monday`" pulumi-lang-dotnet="`Monday`" pulumi-lang-go="`monday`" pulumi-lang-python="`monday`" pulumi-lang-yaml="`monday`" pulumi-lang-java="`monday`" pulumi-lang-hcl="`monday`">`monday`</span>, <span pulumi-lang-nodejs="`tuesday`" pulumi-lang-dotnet="`Tuesday`" pulumi-lang-go="`tuesday`" pulumi-lang-python="`tuesday`" pulumi-lang-yaml="`tuesday`" pulumi-lang-java="`tuesday`" pulumi-lang-hcl="`tuesday`">`tuesday`</span>, <span pulumi-lang-nodejs="`wednesday`" pulumi-lang-dotnet="`Wednesday`" pulumi-lang-go="`wednesday`" pulumi-lang-python="`wednesday`" pulumi-lang-yaml="`wednesday`" pulumi-lang-java="`wednesday`" pulumi-lang-hcl="`wednesday`">`wednesday`</span>, <span pulumi-lang-nodejs="`thursday`" pulumi-lang-dotnet="`Thursday`" pulumi-lang-go="`thursday`" pulumi-lang-python="`thursday`" pulumi-lang-yaml="`thursday`" pulumi-lang-java="`thursday`" pulumi-lang-hcl="`thursday`">`thursday`</span>, <span pulumi-lang-nodejs="`friday`" pulumi-lang-dotnet="`Friday`" pulumi-lang-go="`friday`" pulumi-lang-python="`friday`" pulumi-lang-yaml="`friday`" pulumi-lang-java="`friday`" pulumi-lang-hcl="`friday`">`friday`</span>, <span pulumi-lang-nodejs="`saturday`" pulumi-lang-dotnet="`Saturday`" pulumi-lang-go="`saturday`" pulumi-lang-python="`saturday`" pulumi-lang-yaml="`saturday`" pulumi-lang-java="`saturday`" pulumi-lang-hcl="`saturday`">`saturday`</span>, <span pulumi-lang-nodejs="`sunday`" pulumi-lang-dotnet="`Sunday`" pulumi-lang-go="`sunday`" pulumi-lang-python="`sunday`" pulumi-lang-yaml="`sunday`" pulumi-lang-java="`sunday`" pulumi-lang-hcl="`sunday`">`sunday`</span>.
+        :param pulumi.Input[_builtins.bool] shift_report_enabled: Whether the weekly shift summary report is sent. Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        :param pulumi.Input[_builtins.str] shift_report_time_of_day: Time of day the weekly shift summary is sent, in `HH:MM` 24-hour format.
+        :param pulumi.Input[_builtins.str] shift_report_time_zone: IANA time zone used for the weekly shift summary (e.g. `Australia/Sydney`).
+        :param pulumi.Input[_builtins.bool] shift_start_notifications_enabled: Whether to send a Slack message every time a new shift begins. Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] shift_update_notifications_enabled: Whether to send a Slack message whenever a shift is updated (overrides, removed users, rotation changes, etc.). Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Synced slack channel of the schedule
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_user_group: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Synced slack group of the schedule
+        :param pulumi.Input[_builtins.bool] sync_linear_enabled: Whether the schedule is synced with Linear. Value must be one of true or false
         """
         ...
     @overload
@@ -334,14 +606,22 @@ class Schedule(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 all_time_coverage: Optional[pulumi.Input[_builtins.bool]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 owner_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 owner_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 schedule_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 slack_channel: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
-                 slack_user_group: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 all_time_coverage: pulumi.Input[Optional[_builtins.bool]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 include_shadows_in_slack_notifications: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 owner_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 owner_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 shift_report_day_of_week: pulumi.Input[Optional[_builtins.str]] = None,
+                 shift_report_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 shift_report_time_of_day: pulumi.Input[Optional[_builtins.str]] = None,
+                 shift_report_time_zone: pulumi.Input[Optional[_builtins.str]] = None,
+                 shift_start_notifications_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 shift_update_notifications_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 slack_channel: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 slack_user_group: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 sync_linear_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -353,12 +633,20 @@ class Schedule(pulumi.CustomResource):
 
             __props__.__dict__["all_time_coverage"] = all_time_coverage
             __props__.__dict__["description"] = description
+            __props__.__dict__["include_shadows_in_slack_notifications"] = include_shadows_in_slack_notifications
             __props__.__dict__["name"] = name
             __props__.__dict__["owner_group_ids"] = owner_group_ids
             __props__.__dict__["owner_user_id"] = owner_user_id
             __props__.__dict__["schedule_id"] = schedule_id
+            __props__.__dict__["shift_report_day_of_week"] = shift_report_day_of_week
+            __props__.__dict__["shift_report_enabled"] = shift_report_enabled
+            __props__.__dict__["shift_report_time_of_day"] = shift_report_time_of_day
+            __props__.__dict__["shift_report_time_zone"] = shift_report_time_zone
+            __props__.__dict__["shift_start_notifications_enabled"] = shift_start_notifications_enabled
+            __props__.__dict__["shift_update_notifications_enabled"] = shift_update_notifications_enabled
             __props__.__dict__["slack_channel"] = slack_channel
             __props__.__dict__["slack_user_group"] = slack_user_group
+            __props__.__dict__["sync_linear_enabled"] = sync_linear_enabled
         super(Schedule, __self__).__init__(
             'rootly:index/schedule:Schedule',
             resource_name,
@@ -370,14 +658,22 @@ class Schedule(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            all_time_coverage: Optional[pulumi.Input[_builtins.bool]] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            owner_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            owner_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-            schedule_id: Optional[pulumi.Input[_builtins.str]] = None,
-            slack_channel: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
-            slack_user_group: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None) -> 'Schedule':
+            all_time_coverage: pulumi.Input[Optional[_builtins.bool]] = None,
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            include_shadows_in_slack_notifications: pulumi.Input[Optional[_builtins.bool]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            owner_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            owner_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+            schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+            shift_report_day_of_week: pulumi.Input[Optional[_builtins.str]] = None,
+            shift_report_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+            shift_report_time_of_day: pulumi.Input[Optional[_builtins.str]] = None,
+            shift_report_time_zone: pulumi.Input[Optional[_builtins.str]] = None,
+            shift_start_notifications_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+            shift_update_notifications_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+            slack_channel: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+            slack_user_group: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+            sync_linear_enabled: pulumi.Input[Optional[_builtins.bool]] = None) -> 'Schedule':
         """
         Get an existing Schedule resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -387,11 +683,19 @@ class Schedule(pulumi.CustomResource):
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.bool] all_time_coverage: 24/7 coverage of the schedule. Value must be one of true or false
         :param pulumi.Input[_builtins.str] description: The description of the schedule
+        :param pulumi.Input[_builtins.bool] include_shadows_in_slack_notifications: Whether shadow users are included in Slack notifications and user group syncing. Value must be one of true or false
         :param pulumi.Input[_builtins.str] name: The name of the schedule
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] owner_group_ids: The owning teams for this schedules.
         :param pulumi.Input[_builtins.float] owner_user_id: ID of user assigned as owner of the schedule. Defaults to the API token's user if not specified.
-        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack channel of the schedule
-        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_user_group: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack group of the schedule
+        :param pulumi.Input[_builtins.str] shift_report_day_of_week: Day of week the weekly shift summary is sent. Value must be one of <span pulumi-lang-nodejs="`monday`" pulumi-lang-dotnet="`Monday`" pulumi-lang-go="`monday`" pulumi-lang-python="`monday`" pulumi-lang-yaml="`monday`" pulumi-lang-java="`monday`" pulumi-lang-hcl="`monday`">`monday`</span>, <span pulumi-lang-nodejs="`tuesday`" pulumi-lang-dotnet="`Tuesday`" pulumi-lang-go="`tuesday`" pulumi-lang-python="`tuesday`" pulumi-lang-yaml="`tuesday`" pulumi-lang-java="`tuesday`" pulumi-lang-hcl="`tuesday`">`tuesday`</span>, <span pulumi-lang-nodejs="`wednesday`" pulumi-lang-dotnet="`Wednesday`" pulumi-lang-go="`wednesday`" pulumi-lang-python="`wednesday`" pulumi-lang-yaml="`wednesday`" pulumi-lang-java="`wednesday`" pulumi-lang-hcl="`wednesday`">`wednesday`</span>, <span pulumi-lang-nodejs="`thursday`" pulumi-lang-dotnet="`Thursday`" pulumi-lang-go="`thursday`" pulumi-lang-python="`thursday`" pulumi-lang-yaml="`thursday`" pulumi-lang-java="`thursday`" pulumi-lang-hcl="`thursday`">`thursday`</span>, <span pulumi-lang-nodejs="`friday`" pulumi-lang-dotnet="`Friday`" pulumi-lang-go="`friday`" pulumi-lang-python="`friday`" pulumi-lang-yaml="`friday`" pulumi-lang-java="`friday`" pulumi-lang-hcl="`friday`">`friday`</span>, <span pulumi-lang-nodejs="`saturday`" pulumi-lang-dotnet="`Saturday`" pulumi-lang-go="`saturday`" pulumi-lang-python="`saturday`" pulumi-lang-yaml="`saturday`" pulumi-lang-java="`saturday`" pulumi-lang-hcl="`saturday`">`saturday`</span>, <span pulumi-lang-nodejs="`sunday`" pulumi-lang-dotnet="`Sunday`" pulumi-lang-go="`sunday`" pulumi-lang-python="`sunday`" pulumi-lang-yaml="`sunday`" pulumi-lang-java="`sunday`" pulumi-lang-hcl="`sunday`">`sunday`</span>.
+        :param pulumi.Input[_builtins.bool] shift_report_enabled: Whether the weekly shift summary report is sent. Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        :param pulumi.Input[_builtins.str] shift_report_time_of_day: Time of day the weekly shift summary is sent, in `HH:MM` 24-hour format.
+        :param pulumi.Input[_builtins.str] shift_report_time_zone: IANA time zone used for the weekly shift summary (e.g. `Australia/Sydney`).
+        :param pulumi.Input[_builtins.bool] shift_start_notifications_enabled: Whether to send a Slack message every time a new shift begins. Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] shift_update_notifications_enabled: Whether to send a Slack message whenever a shift is updated (overrides, removed users, rotation changes, etc.). Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Synced slack channel of the schedule
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] slack_user_group: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Synced slack group of the schedule
+        :param pulumi.Input[_builtins.bool] sync_linear_enabled: Whether the schedule is synced with Linear. Value must be one of true or false
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
@@ -399,12 +703,20 @@ class Schedule(pulumi.CustomResource):
 
         __props__.__dict__["all_time_coverage"] = all_time_coverage
         __props__.__dict__["description"] = description
+        __props__.__dict__["include_shadows_in_slack_notifications"] = include_shadows_in_slack_notifications
         __props__.__dict__["name"] = name
         __props__.__dict__["owner_group_ids"] = owner_group_ids
         __props__.__dict__["owner_user_id"] = owner_user_id
         __props__.__dict__["schedule_id"] = schedule_id
+        __props__.__dict__["shift_report_day_of_week"] = shift_report_day_of_week
+        __props__.__dict__["shift_report_enabled"] = shift_report_enabled
+        __props__.__dict__["shift_report_time_of_day"] = shift_report_time_of_day
+        __props__.__dict__["shift_report_time_zone"] = shift_report_time_zone
+        __props__.__dict__["shift_start_notifications_enabled"] = shift_start_notifications_enabled
+        __props__.__dict__["shift_update_notifications_enabled"] = shift_update_notifications_enabled
         __props__.__dict__["slack_channel"] = slack_channel
         __props__.__dict__["slack_user_group"] = slack_user_group
+        __props__.__dict__["sync_linear_enabled"] = sync_linear_enabled
         return Schedule(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
@@ -422,6 +734,14 @@ class Schedule(pulumi.CustomResource):
         The description of the schedule
         """
         return pulumi.get(self, "description")
+
+    @_builtins.property
+    @pulumi.getter(name="includeShadowsInSlackNotifications")
+    def include_shadows_in_slack_notifications(self) -> pulumi.Output[_builtins.bool]:
+        """
+        Whether shadow users are included in Slack notifications and user group syncing. Value must be one of true or false
+        """
+        return pulumi.get(self, "include_shadows_in_slack_notifications")
 
     @_builtins.property
     @pulumi.getter
@@ -453,10 +773,58 @@ class Schedule(pulumi.CustomResource):
         return pulumi.get(self, "schedule_id")
 
     @_builtins.property
+    @pulumi.getter(name="shiftReportDayOfWeek")
+    def shift_report_day_of_week(self) -> pulumi.Output[_builtins.str]:
+        """
+        Day of week the weekly shift summary is sent. Value must be one of <span pulumi-lang-nodejs="`monday`" pulumi-lang-dotnet="`Monday`" pulumi-lang-go="`monday`" pulumi-lang-python="`monday`" pulumi-lang-yaml="`monday`" pulumi-lang-java="`monday`" pulumi-lang-hcl="`monday`">`monday`</span>, <span pulumi-lang-nodejs="`tuesday`" pulumi-lang-dotnet="`Tuesday`" pulumi-lang-go="`tuesday`" pulumi-lang-python="`tuesday`" pulumi-lang-yaml="`tuesday`" pulumi-lang-java="`tuesday`" pulumi-lang-hcl="`tuesday`">`tuesday`</span>, <span pulumi-lang-nodejs="`wednesday`" pulumi-lang-dotnet="`Wednesday`" pulumi-lang-go="`wednesday`" pulumi-lang-python="`wednesday`" pulumi-lang-yaml="`wednesday`" pulumi-lang-java="`wednesday`" pulumi-lang-hcl="`wednesday`">`wednesday`</span>, <span pulumi-lang-nodejs="`thursday`" pulumi-lang-dotnet="`Thursday`" pulumi-lang-go="`thursday`" pulumi-lang-python="`thursday`" pulumi-lang-yaml="`thursday`" pulumi-lang-java="`thursday`" pulumi-lang-hcl="`thursday`">`thursday`</span>, <span pulumi-lang-nodejs="`friday`" pulumi-lang-dotnet="`Friday`" pulumi-lang-go="`friday`" pulumi-lang-python="`friday`" pulumi-lang-yaml="`friday`" pulumi-lang-java="`friday`" pulumi-lang-hcl="`friday`">`friday`</span>, <span pulumi-lang-nodejs="`saturday`" pulumi-lang-dotnet="`Saturday`" pulumi-lang-go="`saturday`" pulumi-lang-python="`saturday`" pulumi-lang-yaml="`saturday`" pulumi-lang-java="`saturday`" pulumi-lang-hcl="`saturday`">`saturday`</span>, <span pulumi-lang-nodejs="`sunday`" pulumi-lang-dotnet="`Sunday`" pulumi-lang-go="`sunday`" pulumi-lang-python="`sunday`" pulumi-lang-yaml="`sunday`" pulumi-lang-java="`sunday`" pulumi-lang-hcl="`sunday`">`sunday`</span>.
+        """
+        return pulumi.get(self, "shift_report_day_of_week")
+
+    @_builtins.property
+    @pulumi.getter(name="shiftReportEnabled")
+    def shift_report_enabled(self) -> pulumi.Output[_builtins.bool]:
+        """
+        Whether the weekly shift summary report is sent. Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        """
+        return pulumi.get(self, "shift_report_enabled")
+
+    @_builtins.property
+    @pulumi.getter(name="shiftReportTimeOfDay")
+    def shift_report_time_of_day(self) -> pulumi.Output[_builtins.str]:
+        """
+        Time of day the weekly shift summary is sent, in `HH:MM` 24-hour format.
+        """
+        return pulumi.get(self, "shift_report_time_of_day")
+
+    @_builtins.property
+    @pulumi.getter(name="shiftReportTimeZone")
+    def shift_report_time_zone(self) -> pulumi.Output[_builtins.str]:
+        """
+        IANA time zone used for the weekly shift summary (e.g. `Australia/Sydney`).
+        """
+        return pulumi.get(self, "shift_report_time_zone")
+
+    @_builtins.property
+    @pulumi.getter(name="shiftStartNotificationsEnabled")
+    def shift_start_notifications_enabled(self) -> pulumi.Output[_builtins.bool]:
+        """
+        Whether to send a Slack message every time a new shift begins. Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        """
+        return pulumi.get(self, "shift_start_notifications_enabled")
+
+    @_builtins.property
+    @pulumi.getter(name="shiftUpdateNotificationsEnabled")
+    def shift_update_notifications_enabled(self) -> pulumi.Output[_builtins.bool]:
+        """
+        Whether to send a Slack message whenever a shift is updated (overrides, removed users, rotation changes, etc.). Requires <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span> to be set. Value must be one of true or false
+        """
+        return pulumi.get(self, "shift_update_notifications_enabled")
+
+    @_builtins.property
     @pulumi.getter(name="slackChannel")
     def slack_channel(self) -> pulumi.Output[Optional[Mapping[str, _builtins.str]]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack channel of the schedule
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Synced slack channel of the schedule
         """
         return pulumi.get(self, "slack_channel")
 
@@ -464,6 +832,15 @@ class Schedule(pulumi.CustomResource):
     @pulumi.getter(name="slackUserGroup")
     def slack_user_group(self) -> pulumi.Output[Optional[Mapping[str, _builtins.str]]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Synced slack group of the schedule
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Synced slack group of the schedule
         """
         return pulumi.get(self, "slack_user_group")
+
+    @_builtins.property
+    @pulumi.getter(name="syncLinearEnabled")
+    def sync_linear_enabled(self) -> pulumi.Output[_builtins.bool]:
+        """
+        Whether the schedule is synced with Linear. Value must be one of true or false
+        """
+        return pulumi.get(self, "sync_linear_enabled")
+

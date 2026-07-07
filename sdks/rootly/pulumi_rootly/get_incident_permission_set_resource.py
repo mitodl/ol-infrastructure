@@ -92,9 +92,9 @@ def get_incident_permission_set_resource(created_at: Optional[Mapping[str, _buil
         id=pulumi.get(__ret__, 'id'),
         incident_permission_set_id=pulumi.get(__ret__, 'incident_permission_set_id'),
         kind=pulumi.get(__ret__, 'kind'))
-def get_incident_permission_set_resource_output(created_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
-                                                incident_permission_set_id: Optional[pulumi.Input[_builtins.str]] = None,
-                                                kind: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_incident_permission_set_resource_output(created_at: pulumi.Input[Optional[Optional[Mapping[str, _builtins.str]]]] = None,
+                                                incident_permission_set_id: pulumi.Input[Optional[_builtins.str]] = None,
+                                                kind: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                                                 opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetIncidentPermissionSetResourceResult]:
     """
     Use this data source to access information about an existing resource.

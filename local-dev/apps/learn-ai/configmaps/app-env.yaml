@@ -1,0 +1,54 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: learn-ai-env
+  namespace: learn-ai
+data:
+  DJANGO_SETTINGS_MODULE: "main.settings"
+  MITOL_APP_BASE_URL: "https://ai.learn.mit.dev"
+  MITOL_DB_DISABLE_SSL: "True"
+  MITOL_USE_S3: "False"
+  DEBUG: "True"
+  ALLOWED_HOSTS: "*"
+  USE_X_FORWARDED_HOST: "True"
+  USE_X_FORWARDED_PORT: "True"
+
+  # mkcert root CA — trusts the local wildcard TLS cert for inter-pod HTTPS
+  REQUESTS_CA_BUNDLE: "/etc/ssl/local-dev/rootCA.pem"
+  SSL_CERT_FILE: "/etc/ssl/local-dev/rootCA.pem"
+
+  # Keycloak/OIDC
+  KEYCLOAK_BASE_URL: "https://sso.ol.mit.dev"
+  KEYCLOAK_REALM_NAME: "olapps"
+
+  # Valkey (cluster-local)
+  REDIS_URL: "redis://valkey.local-infra.svc.cluster.local:6379/0"
+  REDIS_DOMAIN: "redis://valkey.local-infra.svc.cluster.local:6379/0"
+  CELERY_BROKER_URL: "redis://valkey.local-infra.svc.cluster.local:6379/1"
+  CELERY_RESULT_BACKEND: "redis://valkey.local-infra.svc.cluster.local:6379/1"
+
+  # AI proxy (local LiteLLM in local-infra)
+  AI_PROXY_URL: "http://litellm.local-infra.svc.cluster.local:4000"
+  AI_PROXY_CLASS: "LiteLLMProxy"
+
+  # mit-learn API (for AI to call back)
+  MIT_LEARN_API_PROXY_BASE_URL: "http://mitlearn-webapp.mit-learn.svc.cluster.local:8060/api/"
+
+  # Email (Mailpit) — settings reads MITOL_EMAIL_* prefix
+  MITOL_EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
+  MITOL_EMAIL_HOST: "mailpit.local-infra.svc.cluster.local"
+  MITOL_EMAIL_PORT: "1025"
+  MITOL_EMAIL_TLS: "False"
+  # Mailgun settings are required unconditionally by settings.py even when
+  # using SMTP. Stub values — Mailpit handles all email in local dev.
+  MAILGUN_SENDER_DOMAIN: "ol.mit.dev"
+  MAILGUN_FROM_EMAIL: "MIT Learn AI <noreply@ol.mit.dev>"
+  MAILGUN_KEY: "local-dev-mailgun-stub"
+
+  # Cookie configuration
+  MITOL_COOKIE_NAME: "learn-ai-auth"
+  MITOL_COOKIE_DOMAIN: ".mit.dev"
+
+  # Feature flags
+  FEATURE_LEARN_AI_ENABLED: "True"

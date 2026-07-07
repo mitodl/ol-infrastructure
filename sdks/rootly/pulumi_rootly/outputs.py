@@ -397,11 +397,11 @@ class AlertGroupCondition(dict):
                  values: Optional[Sequence['outputs.AlertGroupConditionValue']] = None):
         """
         :param Sequence[_builtins.str] alert_urgency_ids: The Alert Urgency IDs to check in the condition. Only need to be set when the property field type is 'attribute', the property field name is 'alert_urgency' and the property field condition type is 'is_one_of' or 'is_not_one_of'
-        :param _builtins.str conditionable_id: The ID of the conditionable. If<span pulumi-lang-nodejs=" conditionableType " pulumi-lang-dotnet=" ConditionableType " pulumi-lang-go=" conditionableType " pulumi-lang-python=" conditionable_type " pulumi-lang-yaml=" conditionableType " pulumi-lang-java=" conditionableType "> conditionable_type </span>is AlertField, this is the ID of the alert field.
+        :param _builtins.str conditionable_id: The ID of the conditionable. If<span pulumi-lang-nodejs=" conditionableType " pulumi-lang-dotnet=" ConditionableType " pulumi-lang-go=" conditionableType " pulumi-lang-python=" conditionable_type " pulumi-lang-yaml=" conditionableType " pulumi-lang-java=" conditionableType " pulumi-lang-hcl=" conditionable_type "> conditionableType </span>is AlertField, this is the ID of the alert field.
         :param _builtins.str conditionable_type: The type of the conditionable. Value must be one of `AlertField`.
-        :param _builtins.str property_field_condition_type: The condition type of the property field. Value must be one of <span pulumi-lang-nodejs="`isOneOf`" pulumi-lang-dotnet="`IsOneOf`" pulumi-lang-go="`isOneOf`" pulumi-lang-python="`is_one_of`" pulumi-lang-yaml="`isOneOf`" pulumi-lang-java="`isOneOf`">`is_one_of`</span>, <span pulumi-lang-nodejs="`isNotOneOf`" pulumi-lang-dotnet="`IsNotOneOf`" pulumi-lang-go="`isNotOneOf`" pulumi-lang-python="`is_not_one_of`" pulumi-lang-yaml="`isNotOneOf`" pulumi-lang-java="`isNotOneOf`">`is_not_one_of`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`">`does_not_contain`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`">`starts_with`</span>, <span pulumi-lang-nodejs="`endsWith`" pulumi-lang-dotnet="`EndsWith`" pulumi-lang-go="`endsWith`" pulumi-lang-python="`ends_with`" pulumi-lang-yaml="`endsWith`" pulumi-lang-java="`endsWith`">`ends_with`</span>, <span pulumi-lang-nodejs="`matchesRegex`" pulumi-lang-dotnet="`MatchesRegex`" pulumi-lang-go="`matchesRegex`" pulumi-lang-python="`matches_regex`" pulumi-lang-yaml="`matchesRegex`" pulumi-lang-java="`matchesRegex`">`matches_regex`</span>, <span pulumi-lang-nodejs="`isEmpty`" pulumi-lang-dotnet="`IsEmpty`" pulumi-lang-go="`isEmpty`" pulumi-lang-python="`is_empty`" pulumi-lang-yaml="`isEmpty`" pulumi-lang-java="`isEmpty`">`is_empty`</span>, <span pulumi-lang-nodejs="`matchesExistingAlert`" pulumi-lang-dotnet="`MatchesExistingAlert`" pulumi-lang-go="`matchesExistingAlert`" pulumi-lang-python="`matches_existing_alert`" pulumi-lang-yaml="`matchesExistingAlert`" pulumi-lang-java="`matchesExistingAlert`">`matches_existing_alert`</span>.
+        :param _builtins.str property_field_condition_type: The condition type of the property field. Value must be one of <span pulumi-lang-nodejs="`isOneOf`" pulumi-lang-dotnet="`IsOneOf`" pulumi-lang-go="`isOneOf`" pulumi-lang-python="`is_one_of`" pulumi-lang-yaml="`isOneOf`" pulumi-lang-java="`isOneOf`" pulumi-lang-hcl="`is_one_of`">`isOneOf`</span>, <span pulumi-lang-nodejs="`isNotOneOf`" pulumi-lang-dotnet="`IsNotOneOf`" pulumi-lang-go="`isNotOneOf`" pulumi-lang-python="`is_not_one_of`" pulumi-lang-yaml="`isNotOneOf`" pulumi-lang-java="`isNotOneOf`" pulumi-lang-hcl="`is_not_one_of`">`isNotOneOf`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`" pulumi-lang-hcl="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`" pulumi-lang-hcl="`does_not_contain`">`doesNotContain`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`" pulumi-lang-hcl="`starts_with`">`startsWith`</span>, <span pulumi-lang-nodejs="`endsWith`" pulumi-lang-dotnet="`EndsWith`" pulumi-lang-go="`endsWith`" pulumi-lang-python="`ends_with`" pulumi-lang-yaml="`endsWith`" pulumi-lang-java="`endsWith`" pulumi-lang-hcl="`ends_with`">`endsWith`</span>, <span pulumi-lang-nodejs="`matchesRegex`" pulumi-lang-dotnet="`MatchesRegex`" pulumi-lang-go="`matchesRegex`" pulumi-lang-python="`matches_regex`" pulumi-lang-yaml="`matchesRegex`" pulumi-lang-java="`matchesRegex`" pulumi-lang-hcl="`matches_regex`">`matchesRegex`</span>, <span pulumi-lang-nodejs="`isEmpty`" pulumi-lang-dotnet="`IsEmpty`" pulumi-lang-go="`isEmpty`" pulumi-lang-python="`is_empty`" pulumi-lang-yaml="`isEmpty`" pulumi-lang-java="`isEmpty`" pulumi-lang-hcl="`is_empty`">`isEmpty`</span>, <span pulumi-lang-nodejs="`matchesExistingAlert`" pulumi-lang-dotnet="`MatchesExistingAlert`" pulumi-lang-go="`matchesExistingAlert`" pulumi-lang-python="`matches_existing_alert`" pulumi-lang-yaml="`matchesExistingAlert`" pulumi-lang-java="`matchesExistingAlert`" pulumi-lang-hcl="`matches_existing_alert`">`matchesExistingAlert`</span>.
         :param _builtins.str property_field_name: The name of the property field. If the property field type is selected as 'attribute', then the allowed property field names are 'summary' (for Title), 'description', 'alert_urgency' and 'external_url' (for Alert Source URL). If the property field type is selected as 'payload', then the property field name should be supplied in JSON Path syntax.
-        :param _builtins.str property_field_type: The type of the property field. Value must be one of <span pulumi-lang-nodejs="`attribute`" pulumi-lang-dotnet="`Attribute`" pulumi-lang-go="`attribute`" pulumi-lang-python="`attribute`" pulumi-lang-yaml="`attribute`" pulumi-lang-java="`attribute`">`attribute`</span>, <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>, <span pulumi-lang-nodejs="`alertField`" pulumi-lang-dotnet="`AlertField`" pulumi-lang-go="`alertField`" pulumi-lang-python="`alert_field`" pulumi-lang-yaml="`alertField`" pulumi-lang-java="`alertField`">`alert_field`</span>.
+        :param _builtins.str property_field_type: The type of the property field. Value must be one of <span pulumi-lang-nodejs="`attribute`" pulumi-lang-dotnet="`Attribute`" pulumi-lang-go="`attribute`" pulumi-lang-python="`attribute`" pulumi-lang-yaml="`attribute`" pulumi-lang-java="`attribute`" pulumi-lang-hcl="`attribute`">`attribute`</span>, <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>, <span pulumi-lang-nodejs="`alertField`" pulumi-lang-dotnet="`AlertField`" pulumi-lang-go="`alertField`" pulumi-lang-python="`alert_field`" pulumi-lang-yaml="`alertField`" pulumi-lang-java="`alertField`" pulumi-lang-hcl="`alert_field`">`alertField`</span>.
         :param _builtins.str property_field_value: The value of the property field. Can be null if the property field condition type is 'is_one_of' or 'is_not_one_of'
         :param Sequence[_builtins.str] property_field_values: The values of the property field. Used if the property field condition type is 'is_one_of' or 'is_not_one_of' except for when property field name is 'alert_urgency'
         """
@@ -436,7 +436,7 @@ class AlertGroupCondition(dict):
     @pulumi.getter(name="conditionableId")
     def conditionable_id(self) -> Optional[_builtins.str]:
         """
-        The ID of the conditionable. If<span pulumi-lang-nodejs=" conditionableType " pulumi-lang-dotnet=" ConditionableType " pulumi-lang-go=" conditionableType " pulumi-lang-python=" conditionable_type " pulumi-lang-yaml=" conditionableType " pulumi-lang-java=" conditionableType "> conditionable_type </span>is AlertField, this is the ID of the alert field.
+        The ID of the conditionable. If<span pulumi-lang-nodejs=" conditionableType " pulumi-lang-dotnet=" ConditionableType " pulumi-lang-go=" conditionableType " pulumi-lang-python=" conditionable_type " pulumi-lang-yaml=" conditionableType " pulumi-lang-java=" conditionableType " pulumi-lang-hcl=" conditionable_type "> conditionableType </span>is AlertField, this is the ID of the alert field.
         """
         return pulumi.get(self, "conditionable_id")
 
@@ -452,7 +452,7 @@ class AlertGroupCondition(dict):
     @pulumi.getter(name="propertyFieldConditionType")
     def property_field_condition_type(self) -> Optional[_builtins.str]:
         """
-        The condition type of the property field. Value must be one of <span pulumi-lang-nodejs="`isOneOf`" pulumi-lang-dotnet="`IsOneOf`" pulumi-lang-go="`isOneOf`" pulumi-lang-python="`is_one_of`" pulumi-lang-yaml="`isOneOf`" pulumi-lang-java="`isOneOf`">`is_one_of`</span>, <span pulumi-lang-nodejs="`isNotOneOf`" pulumi-lang-dotnet="`IsNotOneOf`" pulumi-lang-go="`isNotOneOf`" pulumi-lang-python="`is_not_one_of`" pulumi-lang-yaml="`isNotOneOf`" pulumi-lang-java="`isNotOneOf`">`is_not_one_of`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`">`does_not_contain`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`">`starts_with`</span>, <span pulumi-lang-nodejs="`endsWith`" pulumi-lang-dotnet="`EndsWith`" pulumi-lang-go="`endsWith`" pulumi-lang-python="`ends_with`" pulumi-lang-yaml="`endsWith`" pulumi-lang-java="`endsWith`">`ends_with`</span>, <span pulumi-lang-nodejs="`matchesRegex`" pulumi-lang-dotnet="`MatchesRegex`" pulumi-lang-go="`matchesRegex`" pulumi-lang-python="`matches_regex`" pulumi-lang-yaml="`matchesRegex`" pulumi-lang-java="`matchesRegex`">`matches_regex`</span>, <span pulumi-lang-nodejs="`isEmpty`" pulumi-lang-dotnet="`IsEmpty`" pulumi-lang-go="`isEmpty`" pulumi-lang-python="`is_empty`" pulumi-lang-yaml="`isEmpty`" pulumi-lang-java="`isEmpty`">`is_empty`</span>, <span pulumi-lang-nodejs="`matchesExistingAlert`" pulumi-lang-dotnet="`MatchesExistingAlert`" pulumi-lang-go="`matchesExistingAlert`" pulumi-lang-python="`matches_existing_alert`" pulumi-lang-yaml="`matchesExistingAlert`" pulumi-lang-java="`matchesExistingAlert`">`matches_existing_alert`</span>.
+        The condition type of the property field. Value must be one of <span pulumi-lang-nodejs="`isOneOf`" pulumi-lang-dotnet="`IsOneOf`" pulumi-lang-go="`isOneOf`" pulumi-lang-python="`is_one_of`" pulumi-lang-yaml="`isOneOf`" pulumi-lang-java="`isOneOf`" pulumi-lang-hcl="`is_one_of`">`isOneOf`</span>, <span pulumi-lang-nodejs="`isNotOneOf`" pulumi-lang-dotnet="`IsNotOneOf`" pulumi-lang-go="`isNotOneOf`" pulumi-lang-python="`is_not_one_of`" pulumi-lang-yaml="`isNotOneOf`" pulumi-lang-java="`isNotOneOf`" pulumi-lang-hcl="`is_not_one_of`">`isNotOneOf`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`" pulumi-lang-hcl="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`" pulumi-lang-hcl="`does_not_contain`">`doesNotContain`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`" pulumi-lang-hcl="`starts_with`">`startsWith`</span>, <span pulumi-lang-nodejs="`endsWith`" pulumi-lang-dotnet="`EndsWith`" pulumi-lang-go="`endsWith`" pulumi-lang-python="`ends_with`" pulumi-lang-yaml="`endsWith`" pulumi-lang-java="`endsWith`" pulumi-lang-hcl="`ends_with`">`endsWith`</span>, <span pulumi-lang-nodejs="`matchesRegex`" pulumi-lang-dotnet="`MatchesRegex`" pulumi-lang-go="`matchesRegex`" pulumi-lang-python="`matches_regex`" pulumi-lang-yaml="`matchesRegex`" pulumi-lang-java="`matchesRegex`" pulumi-lang-hcl="`matches_regex`">`matchesRegex`</span>, <span pulumi-lang-nodejs="`isEmpty`" pulumi-lang-dotnet="`IsEmpty`" pulumi-lang-go="`isEmpty`" pulumi-lang-python="`is_empty`" pulumi-lang-yaml="`isEmpty`" pulumi-lang-java="`isEmpty`" pulumi-lang-hcl="`is_empty`">`isEmpty`</span>, <span pulumi-lang-nodejs="`matchesExistingAlert`" pulumi-lang-dotnet="`MatchesExistingAlert`" pulumi-lang-go="`matchesExistingAlert`" pulumi-lang-python="`matches_existing_alert`" pulumi-lang-yaml="`matchesExistingAlert`" pulumi-lang-java="`matchesExistingAlert`" pulumi-lang-hcl="`matches_existing_alert`">`matchesExistingAlert`</span>.
         """
         return pulumi.get(self, "property_field_condition_type")
 
@@ -468,7 +468,7 @@ class AlertGroupCondition(dict):
     @pulumi.getter(name="propertyFieldType")
     def property_field_type(self) -> Optional[_builtins.str]:
         """
-        The type of the property field. Value must be one of <span pulumi-lang-nodejs="`attribute`" pulumi-lang-dotnet="`Attribute`" pulumi-lang-go="`attribute`" pulumi-lang-python="`attribute`" pulumi-lang-yaml="`attribute`" pulumi-lang-java="`attribute`">`attribute`</span>, <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>, <span pulumi-lang-nodejs="`alertField`" pulumi-lang-dotnet="`AlertField`" pulumi-lang-go="`alertField`" pulumi-lang-python="`alert_field`" pulumi-lang-yaml="`alertField`" pulumi-lang-java="`alertField`">`alert_field`</span>.
+        The type of the property field. Value must be one of <span pulumi-lang-nodejs="`attribute`" pulumi-lang-dotnet="`Attribute`" pulumi-lang-go="`attribute`" pulumi-lang-python="`attribute`" pulumi-lang-yaml="`attribute`" pulumi-lang-java="`attribute`" pulumi-lang-hcl="`attribute`">`attribute`</span>, <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>, <span pulumi-lang-nodejs="`alertField`" pulumi-lang-dotnet="`AlertField`" pulumi-lang-go="`alertField`" pulumi-lang-python="`alert_field`" pulumi-lang-yaml="`alertField`" pulumi-lang-java="`alertField`" pulumi-lang-hcl="`alert_field`">`alertField`</span>.
         """
         return pulumi.get(self, "property_field_type")
 
@@ -622,8 +622,8 @@ class AlertRouteRule(dict):
                  name: Optional[_builtins.str] = None,
                  position: Optional[_builtins.float] = None):
         """
-        :param Sequence['AlertRouteRuleConditionGroupArgs'] condition_groups: Must be specified if <span pulumi-lang-nodejs="`fallbackRule`" pulumi-lang-dotnet="`FallbackRule`" pulumi-lang-go="`fallbackRule`" pulumi-lang-python="`fallback_rule`" pulumi-lang-yaml="`fallbackRule`" pulumi-lang-java="`fallbackRule`">`fallback_rule`</span> is <span pulumi-lang-nodejs="`false`" pulumi-lang-dotnet="`False`" pulumi-lang-go="`false`" pulumi-lang-python="`false`" pulumi-lang-yaml="`false`" pulumi-lang-java="`false`">`false`</span>.
-        :param _builtins.bool fallback_rule: Whether this is a fallback rule. Must be <span pulumi-lang-nodejs="`true`" pulumi-lang-dotnet="`True`" pulumi-lang-go="`true`" pulumi-lang-python="`true`" pulumi-lang-yaml="`true`" pulumi-lang-java="`true`">`true`</span> if <span pulumi-lang-nodejs="`conditionGroups`" pulumi-lang-dotnet="`ConditionGroups`" pulumi-lang-go="`conditionGroups`" pulumi-lang-python="`condition_groups`" pulumi-lang-yaml="`conditionGroups`" pulumi-lang-java="`conditionGroups`">`condition_groups`</span> is not specified.
+        :param Sequence['AlertRouteRuleConditionGroupArgs'] condition_groups: Must be specified if <span pulumi-lang-nodejs="`fallbackRule`" pulumi-lang-dotnet="`FallbackRule`" pulumi-lang-go="`fallbackRule`" pulumi-lang-python="`fallback_rule`" pulumi-lang-yaml="`fallbackRule`" pulumi-lang-java="`fallbackRule`" pulumi-lang-hcl="`fallback_rule`">`fallbackRule`</span> is <span pulumi-lang-nodejs="`false`" pulumi-lang-dotnet="`False`" pulumi-lang-go="`false`" pulumi-lang-python="`false`" pulumi-lang-yaml="`false`" pulumi-lang-java="`false`" pulumi-lang-hcl="`false`">`false`</span>.
+        :param _builtins.bool fallback_rule: Whether this is a fallback rule. Must be <span pulumi-lang-nodejs="`true`" pulumi-lang-dotnet="`True`" pulumi-lang-go="`true`" pulumi-lang-python="`true`" pulumi-lang-yaml="`true`" pulumi-lang-java="`true`" pulumi-lang-hcl="`true`">`true`</span> if <span pulumi-lang-nodejs="`conditionGroups`" pulumi-lang-dotnet="`ConditionGroups`" pulumi-lang-go="`conditionGroups`" pulumi-lang-python="`condition_groups`" pulumi-lang-yaml="`conditionGroups`" pulumi-lang-java="`conditionGroups`" pulumi-lang-hcl="`condition_groups`">`conditionGroups`</span> is not specified.
         :param _builtins.str name: The name of the alert routing rule
         :param _builtins.float position: The position of the alert routing rule for ordering evaluation
         """
@@ -642,7 +642,7 @@ class AlertRouteRule(dict):
     @pulumi.getter(name="conditionGroups")
     def condition_groups(self) -> Optional[Sequence['outputs.AlertRouteRuleConditionGroup']]:
         """
-        Must be specified if <span pulumi-lang-nodejs="`fallbackRule`" pulumi-lang-dotnet="`FallbackRule`" pulumi-lang-go="`fallbackRule`" pulumi-lang-python="`fallback_rule`" pulumi-lang-yaml="`fallbackRule`" pulumi-lang-java="`fallbackRule`">`fallback_rule`</span> is <span pulumi-lang-nodejs="`false`" pulumi-lang-dotnet="`False`" pulumi-lang-go="`false`" pulumi-lang-python="`false`" pulumi-lang-yaml="`false`" pulumi-lang-java="`false`">`false`</span>.
+        Must be specified if <span pulumi-lang-nodejs="`fallbackRule`" pulumi-lang-dotnet="`FallbackRule`" pulumi-lang-go="`fallbackRule`" pulumi-lang-python="`fallback_rule`" pulumi-lang-yaml="`fallbackRule`" pulumi-lang-java="`fallbackRule`" pulumi-lang-hcl="`fallback_rule`">`fallbackRule`</span> is <span pulumi-lang-nodejs="`false`" pulumi-lang-dotnet="`False`" pulumi-lang-go="`false`" pulumi-lang-python="`false`" pulumi-lang-yaml="`false`" pulumi-lang-java="`false`" pulumi-lang-hcl="`false`">`false`</span>.
         """
         return pulumi.get(self, "condition_groups")
 
@@ -655,7 +655,7 @@ class AlertRouteRule(dict):
     @pulumi.getter(name="fallbackRule")
     def fallback_rule(self) -> Optional[_builtins.bool]:
         """
-        Whether this is a fallback rule. Must be <span pulumi-lang-nodejs="`true`" pulumi-lang-dotnet="`True`" pulumi-lang-go="`true`" pulumi-lang-python="`true`" pulumi-lang-yaml="`true`" pulumi-lang-java="`true`">`true`</span> if <span pulumi-lang-nodejs="`conditionGroups`" pulumi-lang-dotnet="`ConditionGroups`" pulumi-lang-go="`conditionGroups`" pulumi-lang-python="`condition_groups`" pulumi-lang-yaml="`conditionGroups`" pulumi-lang-java="`conditionGroups`">`condition_groups`</span> is not specified.
+        Whether this is a fallback rule. Must be <span pulumi-lang-nodejs="`true`" pulumi-lang-dotnet="`True`" pulumi-lang-go="`true`" pulumi-lang-python="`true`" pulumi-lang-yaml="`true`" pulumi-lang-java="`true`" pulumi-lang-hcl="`true`">`true`</span> if <span pulumi-lang-nodejs="`conditionGroups`" pulumi-lang-dotnet="`ConditionGroups`" pulumi-lang-go="`conditionGroups`" pulumi-lang-python="`condition_groups`" pulumi-lang-yaml="`conditionGroups`" pulumi-lang-java="`conditionGroups`" pulumi-lang-hcl="`condition_groups`">`conditionGroups`</span> is not specified.
         """
         return pulumi.get(self, "fallback_rule")
 
@@ -749,9 +749,9 @@ class AlertRouteRuleConditionGroupCondition(dict):
         :param Sequence[_builtins.str] alert_urgency_ids: The Alert Urgency IDs to check in the condition
         :param _builtins.str conditionable_id: The ID of the conditionable
         :param _builtins.str conditionable_type: The type of the conditionable. Value must be one of `AlertField`.
-        :param _builtins.str property_field_condition_type: Value must be one of <span pulumi-lang-nodejs="`isOneOf`" pulumi-lang-dotnet="`IsOneOf`" pulumi-lang-go="`isOneOf`" pulumi-lang-python="`is_one_of`" pulumi-lang-yaml="`isOneOf`" pulumi-lang-java="`isOneOf`">`is_one_of`</span>, <span pulumi-lang-nodejs="`isNotOneOf`" pulumi-lang-dotnet="`IsNotOneOf`" pulumi-lang-go="`isNotOneOf`" pulumi-lang-python="`is_not_one_of`" pulumi-lang-yaml="`isNotOneOf`" pulumi-lang-java="`isNotOneOf`">`is_not_one_of`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`">`does_not_contain`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`">`starts_with`</span>, <span pulumi-lang-nodejs="`endsWith`" pulumi-lang-dotnet="`EndsWith`" pulumi-lang-go="`endsWith`" pulumi-lang-python="`ends_with`" pulumi-lang-yaml="`endsWith`" pulumi-lang-java="`endsWith`">`ends_with`</span>, <span pulumi-lang-nodejs="`matchesRegex`" pulumi-lang-dotnet="`MatchesRegex`" pulumi-lang-go="`matchesRegex`" pulumi-lang-python="`matches_regex`" pulumi-lang-yaml="`matchesRegex`" pulumi-lang-java="`matchesRegex`">`matches_regex`</span>, <span pulumi-lang-nodejs="`isEmpty`" pulumi-lang-dotnet="`IsEmpty`" pulumi-lang-go="`isEmpty`" pulumi-lang-python="`is_empty`" pulumi-lang-yaml="`isEmpty`" pulumi-lang-java="`isEmpty`">`is_empty`</span>.
+        :param _builtins.str property_field_condition_type: Value must be one of <span pulumi-lang-nodejs="`isOneOf`" pulumi-lang-dotnet="`IsOneOf`" pulumi-lang-go="`isOneOf`" pulumi-lang-python="`is_one_of`" pulumi-lang-yaml="`isOneOf`" pulumi-lang-java="`isOneOf`" pulumi-lang-hcl="`is_one_of`">`isOneOf`</span>, <span pulumi-lang-nodejs="`isNotOneOf`" pulumi-lang-dotnet="`IsNotOneOf`" pulumi-lang-go="`isNotOneOf`" pulumi-lang-python="`is_not_one_of`" pulumi-lang-yaml="`isNotOneOf`" pulumi-lang-java="`isNotOneOf`" pulumi-lang-hcl="`is_not_one_of`">`isNotOneOf`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`" pulumi-lang-hcl="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`" pulumi-lang-hcl="`does_not_contain`">`doesNotContain`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`" pulumi-lang-hcl="`starts_with`">`startsWith`</span>, <span pulumi-lang-nodejs="`endsWith`" pulumi-lang-dotnet="`EndsWith`" pulumi-lang-go="`endsWith`" pulumi-lang-python="`ends_with`" pulumi-lang-yaml="`endsWith`" pulumi-lang-java="`endsWith`" pulumi-lang-hcl="`ends_with`">`endsWith`</span>, <span pulumi-lang-nodejs="`matchesRegex`" pulumi-lang-dotnet="`MatchesRegex`" pulumi-lang-go="`matchesRegex`" pulumi-lang-python="`matches_regex`" pulumi-lang-yaml="`matchesRegex`" pulumi-lang-java="`matchesRegex`" pulumi-lang-hcl="`matches_regex`">`matchesRegex`</span>, <span pulumi-lang-nodejs="`isEmpty`" pulumi-lang-dotnet="`IsEmpty`" pulumi-lang-go="`isEmpty`" pulumi-lang-python="`is_empty`" pulumi-lang-yaml="`isEmpty`" pulumi-lang-java="`isEmpty`" pulumi-lang-hcl="`is_empty`">`isEmpty`</span>.
         :param _builtins.str property_field_name: The name of the property field
-        :param _builtins.str property_field_type: Value must be one of <span pulumi-lang-nodejs="`attribute`" pulumi-lang-dotnet="`Attribute`" pulumi-lang-go="`attribute`" pulumi-lang-python="`attribute`" pulumi-lang-yaml="`attribute`" pulumi-lang-java="`attribute`">`attribute`</span>, <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>, <span pulumi-lang-nodejs="`alertField`" pulumi-lang-dotnet="`AlertField`" pulumi-lang-go="`alertField`" pulumi-lang-python="`alert_field`" pulumi-lang-yaml="`alertField`" pulumi-lang-java="`alertField`">`alert_field`</span>.
+        :param _builtins.str property_field_type: Value must be one of <span pulumi-lang-nodejs="`attribute`" pulumi-lang-dotnet="`Attribute`" pulumi-lang-go="`attribute`" pulumi-lang-python="`attribute`" pulumi-lang-yaml="`attribute`" pulumi-lang-java="`attribute`" pulumi-lang-hcl="`attribute`">`attribute`</span>, <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>, <span pulumi-lang-nodejs="`alertField`" pulumi-lang-dotnet="`AlertField`" pulumi-lang-go="`alertField`" pulumi-lang-python="`alert_field`" pulumi-lang-yaml="`alertField`" pulumi-lang-java="`alertField`" pulumi-lang-hcl="`alert_field`">`alertField`</span>.
         :param _builtins.str property_field_value: The value of the property field
         """
         if alert_urgency_ids is not None:
@@ -799,7 +799,7 @@ class AlertRouteRuleConditionGroupCondition(dict):
     @pulumi.getter(name="propertyFieldConditionType")
     def property_field_condition_type(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`isOneOf`" pulumi-lang-dotnet="`IsOneOf`" pulumi-lang-go="`isOneOf`" pulumi-lang-python="`is_one_of`" pulumi-lang-yaml="`isOneOf`" pulumi-lang-java="`isOneOf`">`is_one_of`</span>, <span pulumi-lang-nodejs="`isNotOneOf`" pulumi-lang-dotnet="`IsNotOneOf`" pulumi-lang-go="`isNotOneOf`" pulumi-lang-python="`is_not_one_of`" pulumi-lang-yaml="`isNotOneOf`" pulumi-lang-java="`isNotOneOf`">`is_not_one_of`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`">`does_not_contain`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`">`starts_with`</span>, <span pulumi-lang-nodejs="`endsWith`" pulumi-lang-dotnet="`EndsWith`" pulumi-lang-go="`endsWith`" pulumi-lang-python="`ends_with`" pulumi-lang-yaml="`endsWith`" pulumi-lang-java="`endsWith`">`ends_with`</span>, <span pulumi-lang-nodejs="`matchesRegex`" pulumi-lang-dotnet="`MatchesRegex`" pulumi-lang-go="`matchesRegex`" pulumi-lang-python="`matches_regex`" pulumi-lang-yaml="`matchesRegex`" pulumi-lang-java="`matchesRegex`">`matches_regex`</span>, <span pulumi-lang-nodejs="`isEmpty`" pulumi-lang-dotnet="`IsEmpty`" pulumi-lang-go="`isEmpty`" pulumi-lang-python="`is_empty`" pulumi-lang-yaml="`isEmpty`" pulumi-lang-java="`isEmpty`">`is_empty`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`isOneOf`" pulumi-lang-dotnet="`IsOneOf`" pulumi-lang-go="`isOneOf`" pulumi-lang-python="`is_one_of`" pulumi-lang-yaml="`isOneOf`" pulumi-lang-java="`isOneOf`" pulumi-lang-hcl="`is_one_of`">`isOneOf`</span>, <span pulumi-lang-nodejs="`isNotOneOf`" pulumi-lang-dotnet="`IsNotOneOf`" pulumi-lang-go="`isNotOneOf`" pulumi-lang-python="`is_not_one_of`" pulumi-lang-yaml="`isNotOneOf`" pulumi-lang-java="`isNotOneOf`" pulumi-lang-hcl="`is_not_one_of`">`isNotOneOf`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`" pulumi-lang-hcl="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`" pulumi-lang-hcl="`does_not_contain`">`doesNotContain`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`" pulumi-lang-hcl="`starts_with`">`startsWith`</span>, <span pulumi-lang-nodejs="`endsWith`" pulumi-lang-dotnet="`EndsWith`" pulumi-lang-go="`endsWith`" pulumi-lang-python="`ends_with`" pulumi-lang-yaml="`endsWith`" pulumi-lang-java="`endsWith`" pulumi-lang-hcl="`ends_with`">`endsWith`</span>, <span pulumi-lang-nodejs="`matchesRegex`" pulumi-lang-dotnet="`MatchesRegex`" pulumi-lang-go="`matchesRegex`" pulumi-lang-python="`matches_regex`" pulumi-lang-yaml="`matchesRegex`" pulumi-lang-java="`matchesRegex`" pulumi-lang-hcl="`matches_regex`">`matchesRegex`</span>, <span pulumi-lang-nodejs="`isEmpty`" pulumi-lang-dotnet="`IsEmpty`" pulumi-lang-go="`isEmpty`" pulumi-lang-python="`is_empty`" pulumi-lang-yaml="`isEmpty`" pulumi-lang-java="`isEmpty`" pulumi-lang-hcl="`is_empty`">`isEmpty`</span>.
         """
         return pulumi.get(self, "property_field_condition_type")
 
@@ -815,7 +815,7 @@ class AlertRouteRuleConditionGroupCondition(dict):
     @pulumi.getter(name="propertyFieldType")
     def property_field_type(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`attribute`" pulumi-lang-dotnet="`Attribute`" pulumi-lang-go="`attribute`" pulumi-lang-python="`attribute`" pulumi-lang-yaml="`attribute`" pulumi-lang-java="`attribute`">`attribute`</span>, <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>, <span pulumi-lang-nodejs="`alertField`" pulumi-lang-dotnet="`AlertField`" pulumi-lang-go="`alertField`" pulumi-lang-python="`alert_field`" pulumi-lang-yaml="`alertField`" pulumi-lang-java="`alertField`">`alert_field`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`attribute`" pulumi-lang-dotnet="`Attribute`" pulumi-lang-go="`attribute`" pulumi-lang-python="`attribute`" pulumi-lang-yaml="`attribute`" pulumi-lang-java="`attribute`" pulumi-lang-hcl="`attribute`">`attribute`</span>, <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>, <span pulumi-lang-nodejs="`alertField`" pulumi-lang-dotnet="`AlertField`" pulumi-lang-go="`alertField`" pulumi-lang-python="`alert_field`" pulumi-lang-yaml="`alertField`" pulumi-lang-java="`alertField`" pulumi-lang-hcl="`alert_field`">`alertField`</span>.
         """
         return pulumi.get(self, "property_field_type")
 
@@ -859,7 +859,7 @@ class AlertRouteRuleDestination(dict):
                  target_type: Optional[_builtins.str] = None):
         """
         :param _builtins.str target_id: The ID of the target
-        :param _builtins.str target_type: The type of the target. Value must be one of `Service`, `Group`, `EscalationPolicy`.
+        :param _builtins.str target_type: The type of the target. Value must be one of `Service`, `Group`, `Functionality`, `EscalationPolicy`.
         """
         if target_id is not None:
             pulumi.set(__self__, "target_id", target_id)
@@ -878,7 +878,7 @@ class AlertRouteRuleDestination(dict):
     @pulumi.getter(name="targetType")
     def target_type(self) -> Optional[_builtins.str]:
         """
-        The type of the target. Value must be one of `Service`, `Group`, `EscalationPolicy`.
+        The type of the target. Value must be one of `Service`, `Group`, `Functionality`, `EscalationPolicy`.
         """
         return pulumi.get(self, "target_type")
 
@@ -917,9 +917,9 @@ class AlertRoutingRuleCondition(dict):
                  property_field_value: Optional[_builtins.str] = None,
                  property_field_values: Optional[Sequence[_builtins.str]] = None):
         """
-        :param _builtins.str property_field_condition_type: The condition type of the property field. Value must be one of <span pulumi-lang-nodejs="`isOneOf`" pulumi-lang-dotnet="`IsOneOf`" pulumi-lang-go="`isOneOf`" pulumi-lang-python="`is_one_of`" pulumi-lang-yaml="`isOneOf`" pulumi-lang-java="`isOneOf`">`is_one_of`</span>, <span pulumi-lang-nodejs="`isNotOneOf`" pulumi-lang-dotnet="`IsNotOneOf`" pulumi-lang-go="`isNotOneOf`" pulumi-lang-python="`is_not_one_of`" pulumi-lang-yaml="`isNotOneOf`" pulumi-lang-java="`isNotOneOf`">`is_not_one_of`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`">`does_not_contain`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`">`starts_with`</span>, <span pulumi-lang-nodejs="`endsWith`" pulumi-lang-dotnet="`EndsWith`" pulumi-lang-go="`endsWith`" pulumi-lang-python="`ends_with`" pulumi-lang-yaml="`endsWith`" pulumi-lang-java="`endsWith`">`ends_with`</span>, <span pulumi-lang-nodejs="`matchesRegex`" pulumi-lang-dotnet="`MatchesRegex`" pulumi-lang-go="`matchesRegex`" pulumi-lang-python="`matches_regex`" pulumi-lang-yaml="`matchesRegex`" pulumi-lang-java="`matchesRegex`">`matches_regex`</span>, <span pulumi-lang-nodejs="`isEmpty`" pulumi-lang-dotnet="`IsEmpty`" pulumi-lang-go="`isEmpty`" pulumi-lang-python="`is_empty`" pulumi-lang-yaml="`isEmpty`" pulumi-lang-java="`isEmpty`">`is_empty`</span>.
+        :param _builtins.str property_field_condition_type: The condition type of the property field. Value must be one of <span pulumi-lang-nodejs="`isOneOf`" pulumi-lang-dotnet="`IsOneOf`" pulumi-lang-go="`isOneOf`" pulumi-lang-python="`is_one_of`" pulumi-lang-yaml="`isOneOf`" pulumi-lang-java="`isOneOf`" pulumi-lang-hcl="`is_one_of`">`isOneOf`</span>, <span pulumi-lang-nodejs="`isNotOneOf`" pulumi-lang-dotnet="`IsNotOneOf`" pulumi-lang-go="`isNotOneOf`" pulumi-lang-python="`is_not_one_of`" pulumi-lang-yaml="`isNotOneOf`" pulumi-lang-java="`isNotOneOf`" pulumi-lang-hcl="`is_not_one_of`">`isNotOneOf`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`" pulumi-lang-hcl="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`" pulumi-lang-hcl="`does_not_contain`">`doesNotContain`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`" pulumi-lang-hcl="`starts_with`">`startsWith`</span>, <span pulumi-lang-nodejs="`endsWith`" pulumi-lang-dotnet="`EndsWith`" pulumi-lang-go="`endsWith`" pulumi-lang-python="`ends_with`" pulumi-lang-yaml="`endsWith`" pulumi-lang-java="`endsWith`" pulumi-lang-hcl="`ends_with`">`endsWith`</span>, <span pulumi-lang-nodejs="`matchesRegex`" pulumi-lang-dotnet="`MatchesRegex`" pulumi-lang-go="`matchesRegex`" pulumi-lang-python="`matches_regex`" pulumi-lang-yaml="`matchesRegex`" pulumi-lang-java="`matchesRegex`" pulumi-lang-hcl="`matches_regex`">`matchesRegex`</span>, <span pulumi-lang-nodejs="`isEmpty`" pulumi-lang-dotnet="`IsEmpty`" pulumi-lang-go="`isEmpty`" pulumi-lang-python="`is_empty`" pulumi-lang-yaml="`isEmpty`" pulumi-lang-java="`isEmpty`" pulumi-lang-hcl="`is_empty`">`isEmpty`</span>.
         :param _builtins.str property_field_name: The name of the property field. If the property field type is selected as 'attribute', then the allowed property field names are 'summary' (for Title), 'description', 'alert_urgency' and 'external_url' (for Alert Source URL). If the property field type is selected as 'payload', then the property field name should be supplied in JSON Path syntax.
-        :param _builtins.str property_field_type: The type of the property field. Value must be one of <span pulumi-lang-nodejs="`attribute`" pulumi-lang-dotnet="`Attribute`" pulumi-lang-go="`attribute`" pulumi-lang-python="`attribute`" pulumi-lang-yaml="`attribute`" pulumi-lang-java="`attribute`">`attribute`</span>, <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>.
+        :param _builtins.str property_field_type: The type of the property field. Value must be one of <span pulumi-lang-nodejs="`attribute`" pulumi-lang-dotnet="`Attribute`" pulumi-lang-go="`attribute`" pulumi-lang-python="`attribute`" pulumi-lang-yaml="`attribute`" pulumi-lang-java="`attribute`" pulumi-lang-hcl="`attribute`">`attribute`</span>, <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>.
         :param _builtins.str property_field_value: The value of the property field. Can be null if the property field condition type is 'is_one_of' or 'is_not_one_of'
         :param Sequence[_builtins.str] property_field_values: The values of the property field. Used if the property field condition type is 'is_one_of' or 'is_not_one_of' except for when property field name is 'alert_urgency'
         """
@@ -938,7 +938,7 @@ class AlertRoutingRuleCondition(dict):
     @pulumi.getter(name="propertyFieldConditionType")
     def property_field_condition_type(self) -> Optional[_builtins.str]:
         """
-        The condition type of the property field. Value must be one of <span pulumi-lang-nodejs="`isOneOf`" pulumi-lang-dotnet="`IsOneOf`" pulumi-lang-go="`isOneOf`" pulumi-lang-python="`is_one_of`" pulumi-lang-yaml="`isOneOf`" pulumi-lang-java="`isOneOf`">`is_one_of`</span>, <span pulumi-lang-nodejs="`isNotOneOf`" pulumi-lang-dotnet="`IsNotOneOf`" pulumi-lang-go="`isNotOneOf`" pulumi-lang-python="`is_not_one_of`" pulumi-lang-yaml="`isNotOneOf`" pulumi-lang-java="`isNotOneOf`">`is_not_one_of`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`">`does_not_contain`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`">`starts_with`</span>, <span pulumi-lang-nodejs="`endsWith`" pulumi-lang-dotnet="`EndsWith`" pulumi-lang-go="`endsWith`" pulumi-lang-python="`ends_with`" pulumi-lang-yaml="`endsWith`" pulumi-lang-java="`endsWith`">`ends_with`</span>, <span pulumi-lang-nodejs="`matchesRegex`" pulumi-lang-dotnet="`MatchesRegex`" pulumi-lang-go="`matchesRegex`" pulumi-lang-python="`matches_regex`" pulumi-lang-yaml="`matchesRegex`" pulumi-lang-java="`matchesRegex`">`matches_regex`</span>, <span pulumi-lang-nodejs="`isEmpty`" pulumi-lang-dotnet="`IsEmpty`" pulumi-lang-go="`isEmpty`" pulumi-lang-python="`is_empty`" pulumi-lang-yaml="`isEmpty`" pulumi-lang-java="`isEmpty`">`is_empty`</span>.
+        The condition type of the property field. Value must be one of <span pulumi-lang-nodejs="`isOneOf`" pulumi-lang-dotnet="`IsOneOf`" pulumi-lang-go="`isOneOf`" pulumi-lang-python="`is_one_of`" pulumi-lang-yaml="`isOneOf`" pulumi-lang-java="`isOneOf`" pulumi-lang-hcl="`is_one_of`">`isOneOf`</span>, <span pulumi-lang-nodejs="`isNotOneOf`" pulumi-lang-dotnet="`IsNotOneOf`" pulumi-lang-go="`isNotOneOf`" pulumi-lang-python="`is_not_one_of`" pulumi-lang-yaml="`isNotOneOf`" pulumi-lang-java="`isNotOneOf`" pulumi-lang-hcl="`is_not_one_of`">`isNotOneOf`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`" pulumi-lang-hcl="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`" pulumi-lang-hcl="`does_not_contain`">`doesNotContain`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`" pulumi-lang-hcl="`starts_with`">`startsWith`</span>, <span pulumi-lang-nodejs="`endsWith`" pulumi-lang-dotnet="`EndsWith`" pulumi-lang-go="`endsWith`" pulumi-lang-python="`ends_with`" pulumi-lang-yaml="`endsWith`" pulumi-lang-java="`endsWith`" pulumi-lang-hcl="`ends_with`">`endsWith`</span>, <span pulumi-lang-nodejs="`matchesRegex`" pulumi-lang-dotnet="`MatchesRegex`" pulumi-lang-go="`matchesRegex`" pulumi-lang-python="`matches_regex`" pulumi-lang-yaml="`matchesRegex`" pulumi-lang-java="`matchesRegex`" pulumi-lang-hcl="`matches_regex`">`matchesRegex`</span>, <span pulumi-lang-nodejs="`isEmpty`" pulumi-lang-dotnet="`IsEmpty`" pulumi-lang-go="`isEmpty`" pulumi-lang-python="`is_empty`" pulumi-lang-yaml="`isEmpty`" pulumi-lang-java="`isEmpty`" pulumi-lang-hcl="`is_empty`">`isEmpty`</span>.
         """
         return pulumi.get(self, "property_field_condition_type")
 
@@ -954,7 +954,7 @@ class AlertRoutingRuleCondition(dict):
     @pulumi.getter(name="propertyFieldType")
     def property_field_type(self) -> Optional[_builtins.str]:
         """
-        The type of the property field. Value must be one of <span pulumi-lang-nodejs="`attribute`" pulumi-lang-dotnet="`Attribute`" pulumi-lang-go="`attribute`" pulumi-lang-python="`attribute`" pulumi-lang-yaml="`attribute`" pulumi-lang-java="`attribute`">`attribute`</span>, <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>.
+        The type of the property field. Value must be one of <span pulumi-lang-nodejs="`attribute`" pulumi-lang-dotnet="`Attribute`" pulumi-lang-go="`attribute`" pulumi-lang-python="`attribute`" pulumi-lang-yaml="`attribute`" pulumi-lang-java="`attribute`" pulumi-lang-hcl="`attribute`">`attribute`</span>, <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>.
         """
         return pulumi.get(self, "property_field_type")
 
@@ -1112,9 +1112,9 @@ class AlertRoutingRuleConditionGroupCondition(dict):
         :param _builtins.str conditionable_type: The type of the conditionable object
         :param _builtins.str created_at: Date of creation
         :param _builtins.str id: Unique ID of the condition
-        :param _builtins.str property_field_condition_type: The condition type of the property field. Value must be one of <span pulumi-lang-nodejs="`isOneOf`" pulumi-lang-dotnet="`IsOneOf`" pulumi-lang-go="`isOneOf`" pulumi-lang-python="`is_one_of`" pulumi-lang-yaml="`isOneOf`" pulumi-lang-java="`isOneOf`">`is_one_of`</span>, <span pulumi-lang-nodejs="`isNotOneOf`" pulumi-lang-dotnet="`IsNotOneOf`" pulumi-lang-go="`isNotOneOf`" pulumi-lang-python="`is_not_one_of`" pulumi-lang-yaml="`isNotOneOf`" pulumi-lang-java="`isNotOneOf`">`is_not_one_of`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`">`does_not_contain`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`">`starts_with`</span>, <span pulumi-lang-nodejs="`endsWith`" pulumi-lang-dotnet="`EndsWith`" pulumi-lang-go="`endsWith`" pulumi-lang-python="`ends_with`" pulumi-lang-yaml="`endsWith`" pulumi-lang-java="`endsWith`">`ends_with`</span>, <span pulumi-lang-nodejs="`matchesRegex`" pulumi-lang-dotnet="`MatchesRegex`" pulumi-lang-go="`matchesRegex`" pulumi-lang-python="`matches_regex`" pulumi-lang-yaml="`matchesRegex`" pulumi-lang-java="`matchesRegex`">`matches_regex`</span>, <span pulumi-lang-nodejs="`isEmpty`" pulumi-lang-dotnet="`IsEmpty`" pulumi-lang-go="`isEmpty`" pulumi-lang-python="`is_empty`" pulumi-lang-yaml="`isEmpty`" pulumi-lang-java="`isEmpty`">`is_empty`</span>.
+        :param _builtins.str property_field_condition_type: The condition type of the property field. Value must be one of <span pulumi-lang-nodejs="`isOneOf`" pulumi-lang-dotnet="`IsOneOf`" pulumi-lang-go="`isOneOf`" pulumi-lang-python="`is_one_of`" pulumi-lang-yaml="`isOneOf`" pulumi-lang-java="`isOneOf`" pulumi-lang-hcl="`is_one_of`">`isOneOf`</span>, <span pulumi-lang-nodejs="`isNotOneOf`" pulumi-lang-dotnet="`IsNotOneOf`" pulumi-lang-go="`isNotOneOf`" pulumi-lang-python="`is_not_one_of`" pulumi-lang-yaml="`isNotOneOf`" pulumi-lang-java="`isNotOneOf`" pulumi-lang-hcl="`is_not_one_of`">`isNotOneOf`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`" pulumi-lang-hcl="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`" pulumi-lang-hcl="`does_not_contain`">`doesNotContain`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`" pulumi-lang-hcl="`starts_with`">`startsWith`</span>, <span pulumi-lang-nodejs="`endsWith`" pulumi-lang-dotnet="`EndsWith`" pulumi-lang-go="`endsWith`" pulumi-lang-python="`ends_with`" pulumi-lang-yaml="`endsWith`" pulumi-lang-java="`endsWith`" pulumi-lang-hcl="`ends_with`">`endsWith`</span>, <span pulumi-lang-nodejs="`matchesRegex`" pulumi-lang-dotnet="`MatchesRegex`" pulumi-lang-go="`matchesRegex`" pulumi-lang-python="`matches_regex`" pulumi-lang-yaml="`matchesRegex`" pulumi-lang-java="`matchesRegex`" pulumi-lang-hcl="`matches_regex`">`matchesRegex`</span>, <span pulumi-lang-nodejs="`isEmpty`" pulumi-lang-dotnet="`IsEmpty`" pulumi-lang-go="`isEmpty`" pulumi-lang-python="`is_empty`" pulumi-lang-yaml="`isEmpty`" pulumi-lang-java="`isEmpty`" pulumi-lang-hcl="`is_empty`">`isEmpty`</span>.
         :param _builtins.str property_field_name: The name of the property field
-        :param _builtins.str property_field_type: The type of the property field. Value must be one of <span pulumi-lang-nodejs="`attribute`" pulumi-lang-dotnet="`Attribute`" pulumi-lang-go="`attribute`" pulumi-lang-python="`attribute`" pulumi-lang-yaml="`attribute`" pulumi-lang-java="`attribute`">`attribute`</span>, <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>.
+        :param _builtins.str property_field_type: The type of the property field. Value must be one of <span pulumi-lang-nodejs="`attribute`" pulumi-lang-dotnet="`Attribute`" pulumi-lang-go="`attribute`" pulumi-lang-python="`attribute`" pulumi-lang-yaml="`attribute`" pulumi-lang-java="`attribute`" pulumi-lang-hcl="`attribute`">`attribute`</span>, <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>.
         :param _builtins.str property_field_value: The value of the property field
         :param Sequence[_builtins.str] property_field_values: The values of the property field
         :param _builtins.str updated_at: Date of last update
@@ -1176,7 +1176,7 @@ class AlertRoutingRuleConditionGroupCondition(dict):
     @pulumi.getter(name="propertyFieldConditionType")
     def property_field_condition_type(self) -> Optional[_builtins.str]:
         """
-        The condition type of the property field. Value must be one of <span pulumi-lang-nodejs="`isOneOf`" pulumi-lang-dotnet="`IsOneOf`" pulumi-lang-go="`isOneOf`" pulumi-lang-python="`is_one_of`" pulumi-lang-yaml="`isOneOf`" pulumi-lang-java="`isOneOf`">`is_one_of`</span>, <span pulumi-lang-nodejs="`isNotOneOf`" pulumi-lang-dotnet="`IsNotOneOf`" pulumi-lang-go="`isNotOneOf`" pulumi-lang-python="`is_not_one_of`" pulumi-lang-yaml="`isNotOneOf`" pulumi-lang-java="`isNotOneOf`">`is_not_one_of`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`">`does_not_contain`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`">`starts_with`</span>, <span pulumi-lang-nodejs="`endsWith`" pulumi-lang-dotnet="`EndsWith`" pulumi-lang-go="`endsWith`" pulumi-lang-python="`ends_with`" pulumi-lang-yaml="`endsWith`" pulumi-lang-java="`endsWith`">`ends_with`</span>, <span pulumi-lang-nodejs="`matchesRegex`" pulumi-lang-dotnet="`MatchesRegex`" pulumi-lang-go="`matchesRegex`" pulumi-lang-python="`matches_regex`" pulumi-lang-yaml="`matchesRegex`" pulumi-lang-java="`matchesRegex`">`matches_regex`</span>, <span pulumi-lang-nodejs="`isEmpty`" pulumi-lang-dotnet="`IsEmpty`" pulumi-lang-go="`isEmpty`" pulumi-lang-python="`is_empty`" pulumi-lang-yaml="`isEmpty`" pulumi-lang-java="`isEmpty`">`is_empty`</span>.
+        The condition type of the property field. Value must be one of <span pulumi-lang-nodejs="`isOneOf`" pulumi-lang-dotnet="`IsOneOf`" pulumi-lang-go="`isOneOf`" pulumi-lang-python="`is_one_of`" pulumi-lang-yaml="`isOneOf`" pulumi-lang-java="`isOneOf`" pulumi-lang-hcl="`is_one_of`">`isOneOf`</span>, <span pulumi-lang-nodejs="`isNotOneOf`" pulumi-lang-dotnet="`IsNotOneOf`" pulumi-lang-go="`isNotOneOf`" pulumi-lang-python="`is_not_one_of`" pulumi-lang-yaml="`isNotOneOf`" pulumi-lang-java="`isNotOneOf`" pulumi-lang-hcl="`is_not_one_of`">`isNotOneOf`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`" pulumi-lang-hcl="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`" pulumi-lang-hcl="`does_not_contain`">`doesNotContain`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`" pulumi-lang-hcl="`starts_with`">`startsWith`</span>, <span pulumi-lang-nodejs="`endsWith`" pulumi-lang-dotnet="`EndsWith`" pulumi-lang-go="`endsWith`" pulumi-lang-python="`ends_with`" pulumi-lang-yaml="`endsWith`" pulumi-lang-java="`endsWith`" pulumi-lang-hcl="`ends_with`">`endsWith`</span>, <span pulumi-lang-nodejs="`matchesRegex`" pulumi-lang-dotnet="`MatchesRegex`" pulumi-lang-go="`matchesRegex`" pulumi-lang-python="`matches_regex`" pulumi-lang-yaml="`matchesRegex`" pulumi-lang-java="`matchesRegex`" pulumi-lang-hcl="`matches_regex`">`matchesRegex`</span>, <span pulumi-lang-nodejs="`isEmpty`" pulumi-lang-dotnet="`IsEmpty`" pulumi-lang-go="`isEmpty`" pulumi-lang-python="`is_empty`" pulumi-lang-yaml="`isEmpty`" pulumi-lang-java="`isEmpty`" pulumi-lang-hcl="`is_empty`">`isEmpty`</span>.
         """
         return pulumi.get(self, "property_field_condition_type")
 
@@ -1192,7 +1192,7 @@ class AlertRoutingRuleConditionGroupCondition(dict):
     @pulumi.getter(name="propertyFieldType")
     def property_field_type(self) -> Optional[_builtins.str]:
         """
-        The type of the property field. Value must be one of <span pulumi-lang-nodejs="`attribute`" pulumi-lang-dotnet="`Attribute`" pulumi-lang-go="`attribute`" pulumi-lang-python="`attribute`" pulumi-lang-yaml="`attribute`" pulumi-lang-java="`attribute`">`attribute`</span>, <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>.
+        The type of the property field. Value must be one of <span pulumi-lang-nodejs="`attribute`" pulumi-lang-dotnet="`Attribute`" pulumi-lang-go="`attribute`" pulumi-lang-python="`attribute`" pulumi-lang-yaml="`attribute`" pulumi-lang-java="`attribute`" pulumi-lang-hcl="`attribute`">`attribute`</span>, <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>.
         """
         return pulumi.get(self, "property_field_type")
 
@@ -1355,11 +1355,11 @@ class AlertsSourceAlertSourceUrgencyRulesAttribute(dict):
                  value: Optional[_builtins.str] = None):
         """
         :param _builtins.str alert_urgency_id: The ID of the alert urgency
-        :param _builtins.str conditionable_id: The ID of the conditionable. If<span pulumi-lang-nodejs=" conditionableType " pulumi-lang-dotnet=" ConditionableType " pulumi-lang-go=" conditionableType " pulumi-lang-python=" conditionable_type " pulumi-lang-yaml=" conditionableType " pulumi-lang-java=" conditionableType "> conditionable_type </span>is AlertField, this is the ID of the alert field.
+        :param _builtins.str conditionable_id: The ID of the conditionable. If<span pulumi-lang-nodejs=" conditionableType " pulumi-lang-dotnet=" ConditionableType " pulumi-lang-go=" conditionableType " pulumi-lang-python=" conditionable_type " pulumi-lang-yaml=" conditionableType " pulumi-lang-java=" conditionableType " pulumi-lang-hcl=" conditionable_type "> conditionableType </span>is AlertField, this is the ID of the alert field.
         :param _builtins.str conditionable_type: The type of the conditionable. Value must be one of `AlertField or (empty string)`.
         :param _builtins.str json_path: JSON path expression to extract a specific value from the alert's payload for evaluation
-        :param _builtins.str kind: The kind of the conditionable. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>, <span pulumi-lang-nodejs="`alertField`" pulumi-lang-dotnet="`AlertField`" pulumi-lang-go="`alertField`" pulumi-lang-python="`alert_field`" pulumi-lang-yaml="`alertField`" pulumi-lang-java="`alertField`">`alert_field`</span>.
-        :param _builtins.str operator: Comparison operator used to evaluate the extracted value against the specified condition. Value must be one of <span pulumi-lang-nodejs="`is`" pulumi-lang-dotnet="`Is`" pulumi-lang-go="`is`" pulumi-lang-python="`is`" pulumi-lang-yaml="`is`" pulumi-lang-java="`is`">`is`</span>, <span pulumi-lang-nodejs="`isNot`" pulumi-lang-dotnet="`IsNot`" pulumi-lang-go="`isNot`" pulumi-lang-python="`is_not`" pulumi-lang-yaml="`isNot`" pulumi-lang-java="`isNot`">`is_not`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`">`does_not_contain`</span>.
+        :param _builtins.str kind: The kind of the conditionable. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>, <span pulumi-lang-nodejs="`alertField`" pulumi-lang-dotnet="`AlertField`" pulumi-lang-go="`alertField`" pulumi-lang-python="`alert_field`" pulumi-lang-yaml="`alertField`" pulumi-lang-java="`alertField`" pulumi-lang-hcl="`alert_field`">`alertField`</span>.
+        :param _builtins.str operator: Comparison operator used to evaluate the extracted value against the specified condition. Value must be one of <span pulumi-lang-nodejs="`is`" pulumi-lang-dotnet="`Is`" pulumi-lang-go="`is`" pulumi-lang-python="`is`" pulumi-lang-yaml="`is`" pulumi-lang-java="`is`" pulumi-lang-hcl="`is`">`is`</span>, <span pulumi-lang-nodejs="`isNot`" pulumi-lang-dotnet="`IsNot`" pulumi-lang-go="`isNot`" pulumi-lang-python="`is_not`" pulumi-lang-yaml="`isNot`" pulumi-lang-java="`isNot`" pulumi-lang-hcl="`is_not`">`isNot`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`" pulumi-lang-hcl="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`" pulumi-lang-hcl="`does_not_contain`">`doesNotContain`</span>.
         :param _builtins.str value: Value that the extracted payload data is compared to using the specified operator to determine a match
         """
         if alert_urgency_id is not None:
@@ -1389,7 +1389,7 @@ class AlertsSourceAlertSourceUrgencyRulesAttribute(dict):
     @pulumi.getter(name="conditionableId")
     def conditionable_id(self) -> Optional[_builtins.str]:
         """
-        The ID of the conditionable. If<span pulumi-lang-nodejs=" conditionableType " pulumi-lang-dotnet=" ConditionableType " pulumi-lang-go=" conditionableType " pulumi-lang-python=" conditionable_type " pulumi-lang-yaml=" conditionableType " pulumi-lang-java=" conditionableType "> conditionable_type </span>is AlertField, this is the ID of the alert field.
+        The ID of the conditionable. If<span pulumi-lang-nodejs=" conditionableType " pulumi-lang-dotnet=" ConditionableType " pulumi-lang-go=" conditionableType " pulumi-lang-python=" conditionable_type " pulumi-lang-yaml=" conditionableType " pulumi-lang-java=" conditionableType " pulumi-lang-hcl=" conditionable_type "> conditionableType </span>is AlertField, this is the ID of the alert field.
         """
         return pulumi.get(self, "conditionable_id")
 
@@ -1413,7 +1413,7 @@ class AlertsSourceAlertSourceUrgencyRulesAttribute(dict):
     @pulumi.getter
     def kind(self) -> Optional[_builtins.str]:
         """
-        The kind of the conditionable. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>, <span pulumi-lang-nodejs="`alertField`" pulumi-lang-dotnet="`AlertField`" pulumi-lang-go="`alertField`" pulumi-lang-python="`alert_field`" pulumi-lang-yaml="`alertField`" pulumi-lang-java="`alertField`">`alert_field`</span>.
+        The kind of the conditionable. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>, <span pulumi-lang-nodejs="`alertField`" pulumi-lang-dotnet="`AlertField`" pulumi-lang-go="`alertField`" pulumi-lang-python="`alert_field`" pulumi-lang-yaml="`alertField`" pulumi-lang-java="`alertField`" pulumi-lang-hcl="`alert_field`">`alertField`</span>.
         """
         return pulumi.get(self, "kind")
 
@@ -1421,7 +1421,7 @@ class AlertsSourceAlertSourceUrgencyRulesAttribute(dict):
     @pulumi.getter
     def operator(self) -> Optional[_builtins.str]:
         """
-        Comparison operator used to evaluate the extracted value against the specified condition. Value must be one of <span pulumi-lang-nodejs="`is`" pulumi-lang-dotnet="`Is`" pulumi-lang-go="`is`" pulumi-lang-python="`is`" pulumi-lang-yaml="`is`" pulumi-lang-java="`is`">`is`</span>, <span pulumi-lang-nodejs="`isNot`" pulumi-lang-dotnet="`IsNot`" pulumi-lang-go="`isNot`" pulumi-lang-python="`is_not`" pulumi-lang-yaml="`isNot`" pulumi-lang-java="`isNot`">`is_not`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`">`does_not_contain`</span>.
+        Comparison operator used to evaluate the extracted value against the specified condition. Value must be one of <span pulumi-lang-nodejs="`is`" pulumi-lang-dotnet="`Is`" pulumi-lang-go="`is`" pulumi-lang-python="`is`" pulumi-lang-yaml="`is`" pulumi-lang-java="`is`" pulumi-lang-hcl="`is`">`is`</span>, <span pulumi-lang-nodejs="`isNot`" pulumi-lang-dotnet="`IsNot`" pulumi-lang-go="`isNot`" pulumi-lang-python="`is_not`" pulumi-lang-yaml="`isNot`" pulumi-lang-java="`isNot`" pulumi-lang-hcl="`is_not`">`isNot`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`" pulumi-lang-hcl="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`" pulumi-lang-hcl="`does_not_contain`">`doesNotContain`</span>.
         """
         return pulumi.get(self, "operator")
 
@@ -1535,12 +1535,12 @@ class AlertsSourceResolutionRuleAttributes(dict):
                  identifier_reference_kind: Optional[_builtins.str] = None,
                  identifier_value_regex: Optional[_builtins.str] = None):
         """
-        :param _builtins.str condition_type: The type of condition to evaluate to apply auto resolution rule. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`">`all`</span>, <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`">`any`</span>.
+        :param _builtins.str condition_type: The type of condition to evaluate to apply auto resolution rule. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`" pulumi-lang-hcl="`all`">`all`</span>, <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`" pulumi-lang-hcl="`any`">`any`</span>.
         :param Sequence['AlertsSourceResolutionRuleAttributesConditionsAttributeArgs'] conditions_attributes: List of conditions to evaluate for auto resolution
         :param _builtins.str identifier_json_path: JSON path expression to extract unique alert identifier used to match triggered alerts with resolving alerts
-        :param _builtins.str identifier_matchable_id: The ID of the identifier matchable. If<span pulumi-lang-nodejs=" identifierMatchableType " pulumi-lang-dotnet=" IdentifierMatchableType " pulumi-lang-go=" identifierMatchableType " pulumi-lang-python=" identifier_matchable_type " pulumi-lang-yaml=" identifierMatchableType " pulumi-lang-java=" identifierMatchableType "> identifier_matchable_type </span>is AlertField, this is the ID of the alert field.
+        :param _builtins.str identifier_matchable_id: The ID of the identifier matchable. If<span pulumi-lang-nodejs=" identifierMatchableType " pulumi-lang-dotnet=" IdentifierMatchableType " pulumi-lang-go=" identifierMatchableType " pulumi-lang-python=" identifier_matchable_type " pulumi-lang-yaml=" identifierMatchableType " pulumi-lang-java=" identifierMatchableType " pulumi-lang-hcl=" identifier_matchable_type "> identifierMatchableType </span>is AlertField, this is the ID of the alert field.
         :param _builtins.str identifier_matchable_type: The type of the identifier matchable. Value must be one of `AlertField`.
-        :param _builtins.str identifier_reference_kind: The kind of the identifier reference. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>, <span pulumi-lang-nodejs="`alertField`" pulumi-lang-dotnet="`AlertField`" pulumi-lang-go="`alertField`" pulumi-lang-python="`alert_field`" pulumi-lang-yaml="`alertField`" pulumi-lang-java="`alertField`">`alert_field`</span>.
+        :param _builtins.str identifier_reference_kind: The kind of the identifier reference. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>, <span pulumi-lang-nodejs="`alertField`" pulumi-lang-dotnet="`AlertField`" pulumi-lang-go="`alertField`" pulumi-lang-python="`alert_field`" pulumi-lang-yaml="`alertField`" pulumi-lang-java="`alertField`" pulumi-lang-hcl="`alert_field`">`alertField`</span>.
         :param _builtins.str identifier_value_regex: Regex group to further specify the part of the string used as a unique identifier
         """
         if condition_type is not None:
@@ -1564,7 +1564,7 @@ class AlertsSourceResolutionRuleAttributes(dict):
     @pulumi.getter(name="conditionType")
     def condition_type(self) -> Optional[_builtins.str]:
         """
-        The type of condition to evaluate to apply auto resolution rule. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`">`all`</span>, <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`">`any`</span>.
+        The type of condition to evaluate to apply auto resolution rule. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`" pulumi-lang-hcl="`all`">`all`</span>, <span pulumi-lang-nodejs="`any`" pulumi-lang-dotnet="`Any`" pulumi-lang-go="`any`" pulumi-lang-python="`any`" pulumi-lang-yaml="`any`" pulumi-lang-java="`any`" pulumi-lang-hcl="`any`">`any`</span>.
         """
         return pulumi.get(self, "condition_type")
 
@@ -1593,7 +1593,7 @@ class AlertsSourceResolutionRuleAttributes(dict):
     @pulumi.getter(name="identifierMatchableId")
     def identifier_matchable_id(self) -> Optional[_builtins.str]:
         """
-        The ID of the identifier matchable. If<span pulumi-lang-nodejs=" identifierMatchableType " pulumi-lang-dotnet=" IdentifierMatchableType " pulumi-lang-go=" identifierMatchableType " pulumi-lang-python=" identifier_matchable_type " pulumi-lang-yaml=" identifierMatchableType " pulumi-lang-java=" identifierMatchableType "> identifier_matchable_type </span>is AlertField, this is the ID of the alert field.
+        The ID of the identifier matchable. If<span pulumi-lang-nodejs=" identifierMatchableType " pulumi-lang-dotnet=" IdentifierMatchableType " pulumi-lang-go=" identifierMatchableType " pulumi-lang-python=" identifier_matchable_type " pulumi-lang-yaml=" identifierMatchableType " pulumi-lang-java=" identifierMatchableType " pulumi-lang-hcl=" identifier_matchable_type "> identifierMatchableType </span>is AlertField, this is the ID of the alert field.
         """
         return pulumi.get(self, "identifier_matchable_id")
 
@@ -1609,7 +1609,7 @@ class AlertsSourceResolutionRuleAttributes(dict):
     @pulumi.getter(name="identifierReferenceKind")
     def identifier_reference_kind(self) -> Optional[_builtins.str]:
         """
-        The kind of the identifier reference. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>, <span pulumi-lang-nodejs="`alertField`" pulumi-lang-dotnet="`AlertField`" pulumi-lang-go="`alertField`" pulumi-lang-python="`alert_field`" pulumi-lang-yaml="`alertField`" pulumi-lang-java="`alertField`">`alert_field`</span>.
+        The kind of the identifier reference. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>, <span pulumi-lang-nodejs="`alertField`" pulumi-lang-dotnet="`AlertField`" pulumi-lang-go="`alertField`" pulumi-lang-python="`alert_field`" pulumi-lang-yaml="`alertField`" pulumi-lang-java="`alertField`" pulumi-lang-hcl="`alert_field`">`alertField`</span>.
         """
         return pulumi.get(self, "identifier_reference_kind")
 
@@ -1651,11 +1651,11 @@ class AlertsSourceResolutionRuleAttributesConditionsAttribute(dict):
                  operator: Optional[_builtins.str] = None,
                  value: Optional[_builtins.str] = None):
         """
-        :param _builtins.str conditionable_id: The ID of the conditionable. If<span pulumi-lang-nodejs=" conditionableType " pulumi-lang-dotnet=" ConditionableType " pulumi-lang-go=" conditionableType " pulumi-lang-python=" conditionable_type " pulumi-lang-yaml=" conditionableType " pulumi-lang-java=" conditionableType "> conditionable_type </span>is AlertField, this is the ID of the alert field.
+        :param _builtins.str conditionable_id: The ID of the conditionable. If<span pulumi-lang-nodejs=" conditionableType " pulumi-lang-dotnet=" ConditionableType " pulumi-lang-go=" conditionableType " pulumi-lang-python=" conditionable_type " pulumi-lang-yaml=" conditionableType " pulumi-lang-java=" conditionableType " pulumi-lang-hcl=" conditionable_type "> conditionableType </span>is AlertField, this is the ID of the alert field.
         :param _builtins.str conditionable_type: The type of the conditionable. Value must be one of `AlertField or (empty string)`.
         :param _builtins.str field: JSON path expression to extract a specific value from the alert's payload for evaluation
-        :param _builtins.str kind: The kind of the conditionable. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>, <span pulumi-lang-nodejs="`alertField`" pulumi-lang-dotnet="`AlertField`" pulumi-lang-go="`alertField`" pulumi-lang-python="`alert_field`" pulumi-lang-yaml="`alertField`" pulumi-lang-java="`alertField`">`alert_field`</span>.
-        :param _builtins.str operator: Comparison operator used to evaluate the extracted value against the specified condition. Value must be one of <span pulumi-lang-nodejs="`is`" pulumi-lang-dotnet="`Is`" pulumi-lang-go="`is`" pulumi-lang-python="`is`" pulumi-lang-yaml="`is`" pulumi-lang-java="`is`">`is`</span>, <span pulumi-lang-nodejs="`isNot`" pulumi-lang-dotnet="`IsNot`" pulumi-lang-go="`isNot`" pulumi-lang-python="`is_not`" pulumi-lang-yaml="`isNot`" pulumi-lang-java="`isNot`">`is_not`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`">`does_not_contain`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`">`starts_with`</span>, <span pulumi-lang-nodejs="`endsWith`" pulumi-lang-dotnet="`EndsWith`" pulumi-lang-go="`endsWith`" pulumi-lang-python="`ends_with`" pulumi-lang-yaml="`endsWith`" pulumi-lang-java="`endsWith`">`ends_with`</span>.
+        :param _builtins.str kind: The kind of the conditionable. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>, <span pulumi-lang-nodejs="`alertField`" pulumi-lang-dotnet="`AlertField`" pulumi-lang-go="`alertField`" pulumi-lang-python="`alert_field`" pulumi-lang-yaml="`alertField`" pulumi-lang-java="`alertField`" pulumi-lang-hcl="`alert_field`">`alertField`</span>.
+        :param _builtins.str operator: Comparison operator used to evaluate the extracted value against the specified condition. Value must be one of <span pulumi-lang-nodejs="`is`" pulumi-lang-dotnet="`Is`" pulumi-lang-go="`is`" pulumi-lang-python="`is`" pulumi-lang-yaml="`is`" pulumi-lang-java="`is`" pulumi-lang-hcl="`is`">`is`</span>, <span pulumi-lang-nodejs="`isNot`" pulumi-lang-dotnet="`IsNot`" pulumi-lang-go="`isNot`" pulumi-lang-python="`is_not`" pulumi-lang-yaml="`isNot`" pulumi-lang-java="`isNot`" pulumi-lang-hcl="`is_not`">`isNot`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`" pulumi-lang-hcl="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`" pulumi-lang-hcl="`does_not_contain`">`doesNotContain`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`" pulumi-lang-hcl="`starts_with`">`startsWith`</span>, <span pulumi-lang-nodejs="`endsWith`" pulumi-lang-dotnet="`EndsWith`" pulumi-lang-go="`endsWith`" pulumi-lang-python="`ends_with`" pulumi-lang-yaml="`endsWith`" pulumi-lang-java="`endsWith`" pulumi-lang-hcl="`ends_with`">`endsWith`</span>.
         :param _builtins.str value: Value that the extracted payload data is compared to using the specified operator to determine a match
         """
         if conditionable_id is not None:
@@ -1675,7 +1675,7 @@ class AlertsSourceResolutionRuleAttributesConditionsAttribute(dict):
     @pulumi.getter(name="conditionableId")
     def conditionable_id(self) -> Optional[_builtins.str]:
         """
-        The ID of the conditionable. If<span pulumi-lang-nodejs=" conditionableType " pulumi-lang-dotnet=" ConditionableType " pulumi-lang-go=" conditionableType " pulumi-lang-python=" conditionable_type " pulumi-lang-yaml=" conditionableType " pulumi-lang-java=" conditionableType "> conditionable_type </span>is AlertField, this is the ID of the alert field.
+        The ID of the conditionable. If<span pulumi-lang-nodejs=" conditionableType " pulumi-lang-dotnet=" ConditionableType " pulumi-lang-go=" conditionableType " pulumi-lang-python=" conditionable_type " pulumi-lang-yaml=" conditionableType " pulumi-lang-java=" conditionableType " pulumi-lang-hcl=" conditionable_type "> conditionableType </span>is AlertField, this is the ID of the alert field.
         """
         return pulumi.get(self, "conditionable_id")
 
@@ -1699,7 +1699,7 @@ class AlertsSourceResolutionRuleAttributesConditionsAttribute(dict):
     @pulumi.getter
     def kind(self) -> Optional[_builtins.str]:
         """
-        The kind of the conditionable. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>, <span pulumi-lang-nodejs="`alertField`" pulumi-lang-dotnet="`AlertField`" pulumi-lang-go="`alertField`" pulumi-lang-python="`alert_field`" pulumi-lang-yaml="`alertField`" pulumi-lang-java="`alertField`">`alert_field`</span>.
+        The kind of the conditionable. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>, <span pulumi-lang-nodejs="`alertField`" pulumi-lang-dotnet="`AlertField`" pulumi-lang-go="`alertField`" pulumi-lang-python="`alert_field`" pulumi-lang-yaml="`alertField`" pulumi-lang-java="`alertField`" pulumi-lang-hcl="`alert_field`">`alertField`</span>.
         """
         return pulumi.get(self, "kind")
 
@@ -1707,7 +1707,7 @@ class AlertsSourceResolutionRuleAttributesConditionsAttribute(dict):
     @pulumi.getter
     def operator(self) -> Optional[_builtins.str]:
         """
-        Comparison operator used to evaluate the extracted value against the specified condition. Value must be one of <span pulumi-lang-nodejs="`is`" pulumi-lang-dotnet="`Is`" pulumi-lang-go="`is`" pulumi-lang-python="`is`" pulumi-lang-yaml="`is`" pulumi-lang-java="`is`">`is`</span>, <span pulumi-lang-nodejs="`isNot`" pulumi-lang-dotnet="`IsNot`" pulumi-lang-go="`isNot`" pulumi-lang-python="`is_not`" pulumi-lang-yaml="`isNot`" pulumi-lang-java="`isNot`">`is_not`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`">`does_not_contain`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`">`starts_with`</span>, <span pulumi-lang-nodejs="`endsWith`" pulumi-lang-dotnet="`EndsWith`" pulumi-lang-go="`endsWith`" pulumi-lang-python="`ends_with`" pulumi-lang-yaml="`endsWith`" pulumi-lang-java="`endsWith`">`ends_with`</span>.
+        Comparison operator used to evaluate the extracted value against the specified condition. Value must be one of <span pulumi-lang-nodejs="`is`" pulumi-lang-dotnet="`Is`" pulumi-lang-go="`is`" pulumi-lang-python="`is`" pulumi-lang-yaml="`is`" pulumi-lang-java="`is`" pulumi-lang-hcl="`is`">`is`</span>, <span pulumi-lang-nodejs="`isNot`" pulumi-lang-dotnet="`IsNot`" pulumi-lang-go="`isNot`" pulumi-lang-python="`is_not`" pulumi-lang-yaml="`isNot`" pulumi-lang-java="`isNot`" pulumi-lang-hcl="`is_not`">`isNot`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`" pulumi-lang-hcl="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`" pulumi-lang-hcl="`does_not_contain`">`doesNotContain`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`" pulumi-lang-hcl="`starts_with`">`startsWith`</span>, <span pulumi-lang-nodejs="`endsWith`" pulumi-lang-dotnet="`EndsWith`" pulumi-lang-go="`endsWith`" pulumi-lang-python="`ends_with`" pulumi-lang-yaml="`endsWith`" pulumi-lang-java="`endsWith`" pulumi-lang-hcl="`ends_with`">`endsWith`</span>.
         """
         return pulumi.get(self, "operator")
 
@@ -1752,7 +1752,7 @@ class AlertsSourceSourceableAttributes(dict):
                  resolve_state: Optional[_builtins.str] = None):
         """
         :param _builtins.bool accept_threaded_emails: Set this to false to reject threaded emails. Value must be one of true or false
-        :param _builtins.bool auto_resolve: Set this to true to auto-resolve alerts based on<span pulumi-lang-nodejs=" fieldMappingsAttributes " pulumi-lang-dotnet=" FieldMappingsAttributes " pulumi-lang-go=" fieldMappingsAttributes " pulumi-lang-python=" field_mappings_attributes " pulumi-lang-yaml=" fieldMappingsAttributes " pulumi-lang-java=" fieldMappingsAttributes "> field_mappings_attributes </span>conditions. Value must be one of true or false
+        :param _builtins.bool auto_resolve: Set this to true to auto-resolve alerts based on<span pulumi-lang-nodejs=" fieldMappingsAttributes " pulumi-lang-dotnet=" FieldMappingsAttributes " pulumi-lang-go=" fieldMappingsAttributes " pulumi-lang-python=" field_mappings_attributes " pulumi-lang-yaml=" fieldMappingsAttributes " pulumi-lang-java=" fieldMappingsAttributes " pulumi-lang-hcl=" field_mappings_attributes "> fieldMappingsAttributes </span>conditions. Value must be one of true or false
         :param Sequence['AlertsSourceSourceableAttributesFieldMappingsAttributeArgs'] field_mappings_attributes: Specify rules to auto resolve alerts
         :param _builtins.str resolve_state: This value is matched with the value extracted from alerts payload using JSON path in field_mappings_attributes
         """
@@ -1777,7 +1777,7 @@ class AlertsSourceSourceableAttributes(dict):
     @pulumi.getter(name="autoResolve")
     def auto_resolve(self) -> Optional[_builtins.bool]:
         """
-        Set this to true to auto-resolve alerts based on<span pulumi-lang-nodejs=" fieldMappingsAttributes " pulumi-lang-dotnet=" FieldMappingsAttributes " pulumi-lang-go=" fieldMappingsAttributes " pulumi-lang-python=" field_mappings_attributes " pulumi-lang-yaml=" fieldMappingsAttributes " pulumi-lang-java=" fieldMappingsAttributes "> field_mappings_attributes </span>conditions. Value must be one of true or false
+        Set this to true to auto-resolve alerts based on<span pulumi-lang-nodejs=" fieldMappingsAttributes " pulumi-lang-dotnet=" FieldMappingsAttributes " pulumi-lang-go=" fieldMappingsAttributes " pulumi-lang-python=" field_mappings_attributes " pulumi-lang-yaml=" fieldMappingsAttributes " pulumi-lang-java=" fieldMappingsAttributes " pulumi-lang-hcl=" field_mappings_attributes "> fieldMappingsAttributes </span>conditions. Value must be one of true or false
         """
         return pulumi.get(self, "auto_resolve")
 
@@ -1821,7 +1821,7 @@ class AlertsSourceSourceableAttributesFieldMappingsAttribute(dict):
                  field: Optional[_builtins.str] = None,
                  json_path: Optional[_builtins.str] = None):
         """
-        :param _builtins.str field: Select the field on which the condition to be evaluated. Value must be one of <span pulumi-lang-nodejs="`externalId`" pulumi-lang-dotnet="`ExternalId`" pulumi-lang-go="`externalId`" pulumi-lang-python="`external_id`" pulumi-lang-yaml="`externalId`" pulumi-lang-java="`externalId`">`external_id`</span>, <span pulumi-lang-nodejs="`state`" pulumi-lang-dotnet="`State`" pulumi-lang-go="`state`" pulumi-lang-python="`state`" pulumi-lang-yaml="`state`" pulumi-lang-java="`state`">`state`</span>, <span pulumi-lang-nodejs="`alertTitle`" pulumi-lang-dotnet="`AlertTitle`" pulumi-lang-go="`alertTitle`" pulumi-lang-python="`alert_title`" pulumi-lang-yaml="`alertTitle`" pulumi-lang-java="`alertTitle`">`alert_title`</span>, <span pulumi-lang-nodejs="`alertExternalUrl`" pulumi-lang-dotnet="`AlertExternalUrl`" pulumi-lang-go="`alertExternalUrl`" pulumi-lang-python="`alert_external_url`" pulumi-lang-yaml="`alertExternalUrl`" pulumi-lang-java="`alertExternalUrl`">`alert_external_url`</span>, <span pulumi-lang-nodejs="`notificationTargetType`" pulumi-lang-dotnet="`NotificationTargetType`" pulumi-lang-go="`notificationTargetType`" pulumi-lang-python="`notification_target_type`" pulumi-lang-yaml="`notificationTargetType`" pulumi-lang-java="`notificationTargetType`">`notification_target_type`</span>, <span pulumi-lang-nodejs="`notificationTargetId`" pulumi-lang-dotnet="`NotificationTargetId`" pulumi-lang-go="`notificationTargetId`" pulumi-lang-python="`notification_target_id`" pulumi-lang-yaml="`notificationTargetId`" pulumi-lang-java="`notificationTargetId`">`notification_target_id`</span>.
+        :param _builtins.str field: Select the field on which the condition to be evaluated. Value must be one of <span pulumi-lang-nodejs="`externalId`" pulumi-lang-dotnet="`ExternalId`" pulumi-lang-go="`externalId`" pulumi-lang-python="`external_id`" pulumi-lang-yaml="`externalId`" pulumi-lang-java="`externalId`" pulumi-lang-hcl="`external_id`">`externalId`</span>, <span pulumi-lang-nodejs="`state`" pulumi-lang-dotnet="`State`" pulumi-lang-go="`state`" pulumi-lang-python="`state`" pulumi-lang-yaml="`state`" pulumi-lang-java="`state`" pulumi-lang-hcl="`state`">`state`</span>, <span pulumi-lang-nodejs="`alertTitle`" pulumi-lang-dotnet="`AlertTitle`" pulumi-lang-go="`alertTitle`" pulumi-lang-python="`alert_title`" pulumi-lang-yaml="`alertTitle`" pulumi-lang-java="`alertTitle`" pulumi-lang-hcl="`alert_title`">`alertTitle`</span>, <span pulumi-lang-nodejs="`alertExternalUrl`" pulumi-lang-dotnet="`AlertExternalUrl`" pulumi-lang-go="`alertExternalUrl`" pulumi-lang-python="`alert_external_url`" pulumi-lang-yaml="`alertExternalUrl`" pulumi-lang-java="`alertExternalUrl`" pulumi-lang-hcl="`alert_external_url`">`alertExternalUrl`</span>, <span pulumi-lang-nodejs="`notificationTargetType`" pulumi-lang-dotnet="`NotificationTargetType`" pulumi-lang-go="`notificationTargetType`" pulumi-lang-python="`notification_target_type`" pulumi-lang-yaml="`notificationTargetType`" pulumi-lang-java="`notificationTargetType`" pulumi-lang-hcl="`notification_target_type`">`notificationTargetType`</span>, <span pulumi-lang-nodejs="`notificationTargetId`" pulumi-lang-dotnet="`NotificationTargetId`" pulumi-lang-go="`notificationTargetId`" pulumi-lang-python="`notification_target_id`" pulumi-lang-yaml="`notificationTargetId`" pulumi-lang-java="`notificationTargetId`" pulumi-lang-hcl="`notification_target_id`">`notificationTargetId`</span>.
         :param _builtins.str json_path: JSON path expression to extract a specific value from the alert's payload for evaluation
         """
         if field is not None:
@@ -1833,7 +1833,7 @@ class AlertsSourceSourceableAttributesFieldMappingsAttribute(dict):
     @pulumi.getter
     def field(self) -> Optional[_builtins.str]:
         """
-        Select the field on which the condition to be evaluated. Value must be one of <span pulumi-lang-nodejs="`externalId`" pulumi-lang-dotnet="`ExternalId`" pulumi-lang-go="`externalId`" pulumi-lang-python="`external_id`" pulumi-lang-yaml="`externalId`" pulumi-lang-java="`externalId`">`external_id`</span>, <span pulumi-lang-nodejs="`state`" pulumi-lang-dotnet="`State`" pulumi-lang-go="`state`" pulumi-lang-python="`state`" pulumi-lang-yaml="`state`" pulumi-lang-java="`state`">`state`</span>, <span pulumi-lang-nodejs="`alertTitle`" pulumi-lang-dotnet="`AlertTitle`" pulumi-lang-go="`alertTitle`" pulumi-lang-python="`alert_title`" pulumi-lang-yaml="`alertTitle`" pulumi-lang-java="`alertTitle`">`alert_title`</span>, <span pulumi-lang-nodejs="`alertExternalUrl`" pulumi-lang-dotnet="`AlertExternalUrl`" pulumi-lang-go="`alertExternalUrl`" pulumi-lang-python="`alert_external_url`" pulumi-lang-yaml="`alertExternalUrl`" pulumi-lang-java="`alertExternalUrl`">`alert_external_url`</span>, <span pulumi-lang-nodejs="`notificationTargetType`" pulumi-lang-dotnet="`NotificationTargetType`" pulumi-lang-go="`notificationTargetType`" pulumi-lang-python="`notification_target_type`" pulumi-lang-yaml="`notificationTargetType`" pulumi-lang-java="`notificationTargetType`">`notification_target_type`</span>, <span pulumi-lang-nodejs="`notificationTargetId`" pulumi-lang-dotnet="`NotificationTargetId`" pulumi-lang-go="`notificationTargetId`" pulumi-lang-python="`notification_target_id`" pulumi-lang-yaml="`notificationTargetId`" pulumi-lang-java="`notificationTargetId`">`notification_target_id`</span>.
+        Select the field on which the condition to be evaluated. Value must be one of <span pulumi-lang-nodejs="`externalId`" pulumi-lang-dotnet="`ExternalId`" pulumi-lang-go="`externalId`" pulumi-lang-python="`external_id`" pulumi-lang-yaml="`externalId`" pulumi-lang-java="`externalId`" pulumi-lang-hcl="`external_id`">`externalId`</span>, <span pulumi-lang-nodejs="`state`" pulumi-lang-dotnet="`State`" pulumi-lang-go="`state`" pulumi-lang-python="`state`" pulumi-lang-yaml="`state`" pulumi-lang-java="`state`" pulumi-lang-hcl="`state`">`state`</span>, <span pulumi-lang-nodejs="`alertTitle`" pulumi-lang-dotnet="`AlertTitle`" pulumi-lang-go="`alertTitle`" pulumi-lang-python="`alert_title`" pulumi-lang-yaml="`alertTitle`" pulumi-lang-java="`alertTitle`" pulumi-lang-hcl="`alert_title`">`alertTitle`</span>, <span pulumi-lang-nodejs="`alertExternalUrl`" pulumi-lang-dotnet="`AlertExternalUrl`" pulumi-lang-go="`alertExternalUrl`" pulumi-lang-python="`alert_external_url`" pulumi-lang-yaml="`alertExternalUrl`" pulumi-lang-java="`alertExternalUrl`" pulumi-lang-hcl="`alert_external_url`">`alertExternalUrl`</span>, <span pulumi-lang-nodejs="`notificationTargetType`" pulumi-lang-dotnet="`NotificationTargetType`" pulumi-lang-go="`notificationTargetType`" pulumi-lang-python="`notification_target_type`" pulumi-lang-yaml="`notificationTargetType`" pulumi-lang-java="`notificationTargetType`" pulumi-lang-hcl="`notification_target_type`">`notificationTargetType`</span>, <span pulumi-lang-nodejs="`notificationTargetId`" pulumi-lang-dotnet="`NotificationTargetId`" pulumi-lang-go="`notificationTargetId`" pulumi-lang-python="`notification_target_id`" pulumi-lang-yaml="`notificationTargetId`" pulumi-lang-java="`notificationTargetId`" pulumi-lang-hcl="`notification_target_id`">`notificationTargetId`</span>.
         """
         return pulumi.get(self, "field")
 
@@ -1876,7 +1876,7 @@ class CatalogChecklistTemplateField(dict):
         """
         :param _builtins.str catalog_property_id: ID of the catalog property for custom fields
         :param _builtins.str field_key: Key identifying the field
-        :param _builtins.str field_source: Source of the field. Value must be one of <span pulumi-lang-nodejs="`builtin`" pulumi-lang-dotnet="`Builtin`" pulumi-lang-go="`builtin`" pulumi-lang-python="`builtin`" pulumi-lang-yaml="`builtin`" pulumi-lang-java="`builtin`">`builtin`</span>, <span pulumi-lang-nodejs="`custom`" pulumi-lang-dotnet="`Custom`" pulumi-lang-go="`custom`" pulumi-lang-python="`custom`" pulumi-lang-yaml="`custom`" pulumi-lang-java="`custom`">`custom`</span>.
+        :param _builtins.str field_source: Source of the field. Value must be one of <span pulumi-lang-nodejs="`builtin`" pulumi-lang-dotnet="`Builtin`" pulumi-lang-go="`builtin`" pulumi-lang-python="`builtin`" pulumi-lang-yaml="`builtin`" pulumi-lang-java="`builtin`" pulumi-lang-hcl="`builtin`">`builtin`</span>, <span pulumi-lang-nodejs="`custom`" pulumi-lang-dotnet="`Custom`" pulumi-lang-go="`custom`" pulumi-lang-python="`custom`" pulumi-lang-yaml="`custom`" pulumi-lang-java="`custom`" pulumi-lang-hcl="`custom`">`custom`</span>.
         """
         if catalog_property_id is not None:
             pulumi.set(__self__, "catalog_property_id", catalog_property_id)
@@ -1905,7 +1905,7 @@ class CatalogChecklistTemplateField(dict):
     @pulumi.getter(name="fieldSource")
     def field_source(self) -> Optional[_builtins.str]:
         """
-        Source of the field. Value must be one of <span pulumi-lang-nodejs="`builtin`" pulumi-lang-dotnet="`Builtin`" pulumi-lang-go="`builtin`" pulumi-lang-python="`builtin`" pulumi-lang-yaml="`builtin`" pulumi-lang-java="`builtin`">`builtin`</span>, <span pulumi-lang-nodejs="`custom`" pulumi-lang-dotnet="`Custom`" pulumi-lang-go="`custom`" pulumi-lang-python="`custom`" pulumi-lang-yaml="`custom`" pulumi-lang-java="`custom`">`custom`</span>.
+        Source of the field. Value must be one of <span pulumi-lang-nodejs="`builtin`" pulumi-lang-dotnet="`Builtin`" pulumi-lang-go="`builtin`" pulumi-lang-python="`builtin`" pulumi-lang-yaml="`builtin`" pulumi-lang-java="`builtin`" pulumi-lang-hcl="`builtin`">`builtin`</span>, <span pulumi-lang-nodejs="`custom`" pulumi-lang-dotnet="`Custom`" pulumi-lang-go="`custom`" pulumi-lang-python="`custom`" pulumi-lang-yaml="`custom`" pulumi-lang-java="`custom`" pulumi-lang-hcl="`custom`">`custom`</span>.
         """
         return pulumi.get(self, "field_source")
 
@@ -1917,7 +1917,7 @@ class CatalogChecklistTemplateOwner(dict):
                  type: Optional[_builtins.str] = None):
         """
         :param _builtins.str id: User ID for user owners, or field key for field owners
-        :param _builtins.str type: Type of owner. Value must be one of <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`">`field`</span>, <span pulumi-lang-nodejs="`user`" pulumi-lang-dotnet="`User`" pulumi-lang-go="`user`" pulumi-lang-python="`user`" pulumi-lang-yaml="`user`" pulumi-lang-java="`user`">`user`</span>.
+        :param _builtins.str type: Type of owner. Value must be one of <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`" pulumi-lang-hcl="`field`">`field`</span>, <span pulumi-lang-nodejs="`user`" pulumi-lang-dotnet="`User`" pulumi-lang-go="`user`" pulumi-lang-python="`user`" pulumi-lang-yaml="`user`" pulumi-lang-java="`user`" pulumi-lang-hcl="`user`">`user`</span>.
         """
         if id is not None:
             pulumi.set(__self__, "id", id)
@@ -1936,7 +1936,7 @@ class CatalogChecklistTemplateOwner(dict):
     @pulumi.getter
     def type(self) -> Optional[_builtins.str]:
         """
-        Type of owner. Value must be one of <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`">`field`</span>, <span pulumi-lang-nodejs="`user`" pulumi-lang-dotnet="`User`" pulumi-lang-go="`user`" pulumi-lang-python="`user`" pulumi-lang-yaml="`user`" pulumi-lang-java="`user`">`user`</span>.
+        Type of owner. Value must be one of <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`" pulumi-lang-hcl="`field`">`field`</span>, <span pulumi-lang-nodejs="`user`" pulumi-lang-dotnet="`User`" pulumi-lang-go="`user`" pulumi-lang-python="`user`" pulumi-lang-yaml="`user`" pulumi-lang-java="`user`" pulumi-lang-hcl="`user`">`user`</span>.
         """
         return pulumi.get(self, "type")
 
@@ -2137,7 +2137,7 @@ class CommunicationsGroupCommunicationGroupCondition(dict):
         :param _builtins.str condition: Condition
         :param _builtins.str id: ID of the condition
         :param Sequence['CommunicationsGroupCommunicationGroupConditionPropertyArgs'] properties: Properties
-        :param _builtins.str property_type: Property type. Value must be one of <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`">`service`</span>, <span pulumi-lang-nodejs="`severity`" pulumi-lang-dotnet="`Severity`" pulumi-lang-go="`severity`" pulumi-lang-python="`severity`" pulumi-lang-yaml="`severity`" pulumi-lang-java="`severity`">`severity`</span>, <span pulumi-lang-nodejs="`functionality`" pulumi-lang-dotnet="`Functionality`" pulumi-lang-go="`functionality`" pulumi-lang-python="`functionality`" pulumi-lang-yaml="`functionality`" pulumi-lang-java="`functionality`">`functionality`</span>, <span pulumi-lang-nodejs="`group`" pulumi-lang-dotnet="`Group`" pulumi-lang-go="`group`" pulumi-lang-python="`group`" pulumi-lang-yaml="`group`" pulumi-lang-java="`group`">`group`</span>, <span pulumi-lang-nodejs="`incidentType`" pulumi-lang-dotnet="`IncidentType`" pulumi-lang-go="`incidentType`" pulumi-lang-python="`incident_type`" pulumi-lang-yaml="`incidentType`" pulumi-lang-java="`incidentType`">`incident_type`</span>.
+        :param _builtins.str property_type: Property type. Value must be one of <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`" pulumi-lang-hcl="`service`">`service`</span>, <span pulumi-lang-nodejs="`severity`" pulumi-lang-dotnet="`Severity`" pulumi-lang-go="`severity`" pulumi-lang-python="`severity`" pulumi-lang-yaml="`severity`" pulumi-lang-java="`severity`" pulumi-lang-hcl="`severity`">`severity`</span>, <span pulumi-lang-nodejs="`functionality`" pulumi-lang-dotnet="`Functionality`" pulumi-lang-go="`functionality`" pulumi-lang-python="`functionality`" pulumi-lang-yaml="`functionality`" pulumi-lang-java="`functionality`" pulumi-lang-hcl="`functionality`">`functionality`</span>, <span pulumi-lang-nodejs="`group`" pulumi-lang-dotnet="`Group`" pulumi-lang-go="`group`" pulumi-lang-python="`group`" pulumi-lang-yaml="`group`" pulumi-lang-java="`group`" pulumi-lang-hcl="`group`">`group`</span>, <span pulumi-lang-nodejs="`incidentType`" pulumi-lang-dotnet="`IncidentType`" pulumi-lang-go="`incidentType`" pulumi-lang-python="`incident_type`" pulumi-lang-yaml="`incidentType`" pulumi-lang-java="`incidentType`" pulumi-lang-hcl="`incident_type`">`incidentType`</span>.
         """
         if condition is not None:
             pulumi.set(__self__, "condition", condition)
@@ -2176,7 +2176,7 @@ class CommunicationsGroupCommunicationGroupCondition(dict):
     @pulumi.getter(name="propertyType")
     def property_type(self) -> Optional[_builtins.str]:
         """
-        Property type. Value must be one of <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`">`service`</span>, <span pulumi-lang-nodejs="`severity`" pulumi-lang-dotnet="`Severity`" pulumi-lang-go="`severity`" pulumi-lang-python="`severity`" pulumi-lang-yaml="`severity`" pulumi-lang-java="`severity`">`severity`</span>, <span pulumi-lang-nodejs="`functionality`" pulumi-lang-dotnet="`Functionality`" pulumi-lang-go="`functionality`" pulumi-lang-python="`functionality`" pulumi-lang-yaml="`functionality`" pulumi-lang-java="`functionality`">`functionality`</span>, <span pulumi-lang-nodejs="`group`" pulumi-lang-dotnet="`Group`" pulumi-lang-go="`group`" pulumi-lang-python="`group`" pulumi-lang-yaml="`group`" pulumi-lang-java="`group`">`group`</span>, <span pulumi-lang-nodejs="`incidentType`" pulumi-lang-dotnet="`IncidentType`" pulumi-lang-go="`incidentType`" pulumi-lang-python="`incident_type`" pulumi-lang-yaml="`incidentType`" pulumi-lang-java="`incidentType`">`incident_type`</span>.
+        Property type. Value must be one of <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`" pulumi-lang-hcl="`service`">`service`</span>, <span pulumi-lang-nodejs="`severity`" pulumi-lang-dotnet="`Severity`" pulumi-lang-go="`severity`" pulumi-lang-python="`severity`" pulumi-lang-yaml="`severity`" pulumi-lang-java="`severity`" pulumi-lang-hcl="`severity`">`severity`</span>, <span pulumi-lang-nodejs="`functionality`" pulumi-lang-dotnet="`Functionality`" pulumi-lang-go="`functionality`" pulumi-lang-python="`functionality`" pulumi-lang-yaml="`functionality`" pulumi-lang-java="`functionality`" pulumi-lang-hcl="`functionality`">`functionality`</span>, <span pulumi-lang-nodejs="`group`" pulumi-lang-dotnet="`Group`" pulumi-lang-go="`group`" pulumi-lang-python="`group`" pulumi-lang-yaml="`group`" pulumi-lang-java="`group`" pulumi-lang-hcl="`group`">`group`</span>, <span pulumi-lang-nodejs="`incidentType`" pulumi-lang-dotnet="`IncidentType`" pulumi-lang-go="`incidentType`" pulumi-lang-python="`incident_type`" pulumi-lang-yaml="`incidentType`" pulumi-lang-java="`incidentType`" pulumi-lang-hcl="`incident_type`">`incidentType`</span>.
         """
         return pulumi.get(self, "property_type")
 
@@ -2413,7 +2413,7 @@ class DashboardPanelParams(dict):
                  legend: Optional['outputs.DashboardPanelParamsLegend'] = None,
                  table_fields: Optional[Sequence[_builtins.str]] = None):
         """
-        :param _builtins.str display: Value must be one of <span pulumi-lang-nodejs="`lineChart`" pulumi-lang-dotnet="`LineChart`" pulumi-lang-go="`lineChart`" pulumi-lang-python="`line_chart`" pulumi-lang-yaml="`lineChart`" pulumi-lang-java="`lineChart`">`line_chart`</span>, <span pulumi-lang-nodejs="`lineSteppedChart`" pulumi-lang-dotnet="`LineSteppedChart`" pulumi-lang-go="`lineSteppedChart`" pulumi-lang-python="`line_stepped_chart`" pulumi-lang-yaml="`lineSteppedChart`" pulumi-lang-java="`lineSteppedChart`">`line_stepped_chart`</span>, <span pulumi-lang-nodejs="`columnChart`" pulumi-lang-dotnet="`ColumnChart`" pulumi-lang-go="`columnChart`" pulumi-lang-python="`column_chart`" pulumi-lang-yaml="`columnChart`" pulumi-lang-java="`columnChart`">`column_chart`</span>, <span pulumi-lang-nodejs="`stackedColumnChart`" pulumi-lang-dotnet="`StackedColumnChart`" pulumi-lang-go="`stackedColumnChart`" pulumi-lang-python="`stacked_column_chart`" pulumi-lang-yaml="`stackedColumnChart`" pulumi-lang-java="`stackedColumnChart`">`stacked_column_chart`</span>, <span pulumi-lang-nodejs="`monitoringChart`" pulumi-lang-dotnet="`MonitoringChart`" pulumi-lang-go="`monitoringChart`" pulumi-lang-python="`monitoring_chart`" pulumi-lang-yaml="`monitoringChart`" pulumi-lang-java="`monitoringChart`">`monitoring_chart`</span>, <span pulumi-lang-nodejs="`pieChart`" pulumi-lang-dotnet="`PieChart`" pulumi-lang-go="`pieChart`" pulumi-lang-python="`pie_chart`" pulumi-lang-yaml="`pieChart`" pulumi-lang-java="`pieChart`">`pie_chart`</span>, <span pulumi-lang-nodejs="`table`" pulumi-lang-dotnet="`Table`" pulumi-lang-go="`table`" pulumi-lang-python="`table`" pulumi-lang-yaml="`table`" pulumi-lang-java="`table`">`table`</span>, <span pulumi-lang-nodejs="`aggregateValue`" pulumi-lang-dotnet="`AggregateValue`" pulumi-lang-go="`aggregateValue`" pulumi-lang-python="`aggregate_value`" pulumi-lang-yaml="`aggregateValue`" pulumi-lang-java="`aggregateValue`">`aggregate_value`</span>.
+        :param _builtins.str display: Value must be one of <span pulumi-lang-nodejs="`lineChart`" pulumi-lang-dotnet="`LineChart`" pulumi-lang-go="`lineChart`" pulumi-lang-python="`line_chart`" pulumi-lang-yaml="`lineChart`" pulumi-lang-java="`lineChart`" pulumi-lang-hcl="`line_chart`">`lineChart`</span>, <span pulumi-lang-nodejs="`lineSteppedChart`" pulumi-lang-dotnet="`LineSteppedChart`" pulumi-lang-go="`lineSteppedChart`" pulumi-lang-python="`line_stepped_chart`" pulumi-lang-yaml="`lineSteppedChart`" pulumi-lang-java="`lineSteppedChart`" pulumi-lang-hcl="`line_stepped_chart`">`lineSteppedChart`</span>, <span pulumi-lang-nodejs="`columnChart`" pulumi-lang-dotnet="`ColumnChart`" pulumi-lang-go="`columnChart`" pulumi-lang-python="`column_chart`" pulumi-lang-yaml="`columnChart`" pulumi-lang-java="`columnChart`" pulumi-lang-hcl="`column_chart`">`columnChart`</span>, <span pulumi-lang-nodejs="`stackedColumnChart`" pulumi-lang-dotnet="`StackedColumnChart`" pulumi-lang-go="`stackedColumnChart`" pulumi-lang-python="`stacked_column_chart`" pulumi-lang-yaml="`stackedColumnChart`" pulumi-lang-java="`stackedColumnChart`" pulumi-lang-hcl="`stacked_column_chart`">`stackedColumnChart`</span>, <span pulumi-lang-nodejs="`monitoringChart`" pulumi-lang-dotnet="`MonitoringChart`" pulumi-lang-go="`monitoringChart`" pulumi-lang-python="`monitoring_chart`" pulumi-lang-yaml="`monitoringChart`" pulumi-lang-java="`monitoringChart`" pulumi-lang-hcl="`monitoring_chart`">`monitoringChart`</span>, <span pulumi-lang-nodejs="`pieChart`" pulumi-lang-dotnet="`PieChart`" pulumi-lang-go="`pieChart`" pulumi-lang-python="`pie_chart`" pulumi-lang-yaml="`pieChart`" pulumi-lang-java="`pieChart`" pulumi-lang-hcl="`pie_chart`">`pieChart`</span>, <span pulumi-lang-nodejs="`table`" pulumi-lang-dotnet="`Table`" pulumi-lang-go="`table`" pulumi-lang-python="`table`" pulumi-lang-yaml="`table`" pulumi-lang-java="`table`" pulumi-lang-hcl="`table`">`table`</span>, <span pulumi-lang-nodejs="`aggregateValue`" pulumi-lang-dotnet="`AggregateValue`" pulumi-lang-go="`aggregateValue`" pulumi-lang-python="`aggregate_value`" pulumi-lang-yaml="`aggregateValue`" pulumi-lang-java="`aggregateValue`" pulumi-lang-hcl="`aggregate_value`">`aggregateValue`</span>.
         """
         if datalabels is not None:
             pulumi.set(__self__, "datalabels", datalabels)
@@ -2447,7 +2447,7 @@ class DashboardPanelParams(dict):
     @pulumi.getter
     def display(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`lineChart`" pulumi-lang-dotnet="`LineChart`" pulumi-lang-go="`lineChart`" pulumi-lang-python="`line_chart`" pulumi-lang-yaml="`lineChart`" pulumi-lang-java="`lineChart`">`line_chart`</span>, <span pulumi-lang-nodejs="`lineSteppedChart`" pulumi-lang-dotnet="`LineSteppedChart`" pulumi-lang-go="`lineSteppedChart`" pulumi-lang-python="`line_stepped_chart`" pulumi-lang-yaml="`lineSteppedChart`" pulumi-lang-java="`lineSteppedChart`">`line_stepped_chart`</span>, <span pulumi-lang-nodejs="`columnChart`" pulumi-lang-dotnet="`ColumnChart`" pulumi-lang-go="`columnChart`" pulumi-lang-python="`column_chart`" pulumi-lang-yaml="`columnChart`" pulumi-lang-java="`columnChart`">`column_chart`</span>, <span pulumi-lang-nodejs="`stackedColumnChart`" pulumi-lang-dotnet="`StackedColumnChart`" pulumi-lang-go="`stackedColumnChart`" pulumi-lang-python="`stacked_column_chart`" pulumi-lang-yaml="`stackedColumnChart`" pulumi-lang-java="`stackedColumnChart`">`stacked_column_chart`</span>, <span pulumi-lang-nodejs="`monitoringChart`" pulumi-lang-dotnet="`MonitoringChart`" pulumi-lang-go="`monitoringChart`" pulumi-lang-python="`monitoring_chart`" pulumi-lang-yaml="`monitoringChart`" pulumi-lang-java="`monitoringChart`">`monitoring_chart`</span>, <span pulumi-lang-nodejs="`pieChart`" pulumi-lang-dotnet="`PieChart`" pulumi-lang-go="`pieChart`" pulumi-lang-python="`pie_chart`" pulumi-lang-yaml="`pieChart`" pulumi-lang-java="`pieChart`">`pie_chart`</span>, <span pulumi-lang-nodejs="`table`" pulumi-lang-dotnet="`Table`" pulumi-lang-go="`table`" pulumi-lang-python="`table`" pulumi-lang-yaml="`table`" pulumi-lang-java="`table`">`table`</span>, <span pulumi-lang-nodejs="`aggregateValue`" pulumi-lang-dotnet="`AggregateValue`" pulumi-lang-go="`aggregateValue`" pulumi-lang-python="`aggregate_value`" pulumi-lang-yaml="`aggregateValue`" pulumi-lang-java="`aggregateValue`">`aggregate_value`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`lineChart`" pulumi-lang-dotnet="`LineChart`" pulumi-lang-go="`lineChart`" pulumi-lang-python="`line_chart`" pulumi-lang-yaml="`lineChart`" pulumi-lang-java="`lineChart`" pulumi-lang-hcl="`line_chart`">`lineChart`</span>, <span pulumi-lang-nodejs="`lineSteppedChart`" pulumi-lang-dotnet="`LineSteppedChart`" pulumi-lang-go="`lineSteppedChart`" pulumi-lang-python="`line_stepped_chart`" pulumi-lang-yaml="`lineSteppedChart`" pulumi-lang-java="`lineSteppedChart`" pulumi-lang-hcl="`line_stepped_chart`">`lineSteppedChart`</span>, <span pulumi-lang-nodejs="`columnChart`" pulumi-lang-dotnet="`ColumnChart`" pulumi-lang-go="`columnChart`" pulumi-lang-python="`column_chart`" pulumi-lang-yaml="`columnChart`" pulumi-lang-java="`columnChart`" pulumi-lang-hcl="`column_chart`">`columnChart`</span>, <span pulumi-lang-nodejs="`stackedColumnChart`" pulumi-lang-dotnet="`StackedColumnChart`" pulumi-lang-go="`stackedColumnChart`" pulumi-lang-python="`stacked_column_chart`" pulumi-lang-yaml="`stackedColumnChart`" pulumi-lang-java="`stackedColumnChart`" pulumi-lang-hcl="`stacked_column_chart`">`stackedColumnChart`</span>, <span pulumi-lang-nodejs="`monitoringChart`" pulumi-lang-dotnet="`MonitoringChart`" pulumi-lang-go="`monitoringChart`" pulumi-lang-python="`monitoring_chart`" pulumi-lang-yaml="`monitoringChart`" pulumi-lang-java="`monitoringChart`" pulumi-lang-hcl="`monitoring_chart`">`monitoringChart`</span>, <span pulumi-lang-nodejs="`pieChart`" pulumi-lang-dotnet="`PieChart`" pulumi-lang-go="`pieChart`" pulumi-lang-python="`pie_chart`" pulumi-lang-yaml="`pieChart`" pulumi-lang-java="`pieChart`" pulumi-lang-hcl="`pie_chart`">`pieChart`</span>, <span pulumi-lang-nodejs="`table`" pulumi-lang-dotnet="`Table`" pulumi-lang-go="`table`" pulumi-lang-python="`table`" pulumi-lang-yaml="`table`" pulumi-lang-java="`table`" pulumi-lang-hcl="`table`">`table`</span>, <span pulumi-lang-nodejs="`aggregateValue`" pulumi-lang-dotnet="`AggregateValue`" pulumi-lang-go="`aggregateValue`" pulumi-lang-python="`aggregate_value`" pulumi-lang-yaml="`aggregateValue`" pulumi-lang-java="`aggregateValue`" pulumi-lang-hcl="`aggregate_value`">`aggregateValue`</span>.
         """
         return pulumi.get(self, "display")
 
@@ -2501,7 +2501,7 @@ class DashboardPanelParamsDataset(dict):
                  group_by: Optional[_builtins.str] = None,
                  name: Optional[_builtins.str] = None):
         """
-        :param _builtins.str collection: Value must be one of <span pulumi-lang-nodejs="`alerts`" pulumi-lang-dotnet="`Alerts`" pulumi-lang-go="`alerts`" pulumi-lang-python="`alerts`" pulumi-lang-yaml="`alerts`" pulumi-lang-java="`alerts`">`alerts`</span>, <span pulumi-lang-nodejs="`incidents`" pulumi-lang-dotnet="`Incidents`" pulumi-lang-go="`incidents`" pulumi-lang-python="`incidents`" pulumi-lang-yaml="`incidents`" pulumi-lang-java="`incidents`">`incidents`</span>, <span pulumi-lang-nodejs="`incidentPostMortems`" pulumi-lang-dotnet="`IncidentPostMortems`" pulumi-lang-go="`incidentPostMortems`" pulumi-lang-python="`incident_post_mortems`" pulumi-lang-yaml="`incidentPostMortems`" pulumi-lang-java="`incidentPostMortems`">`incident_post_mortems`</span>, <span pulumi-lang-nodejs="`incidentActionItems`" pulumi-lang-dotnet="`IncidentActionItems`" pulumi-lang-go="`incidentActionItems`" pulumi-lang-python="`incident_action_items`" pulumi-lang-yaml="`incidentActionItems`" pulumi-lang-java="`incidentActionItems`">`incident_action_items`</span>, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`">`users`</span>.
+        :param _builtins.str collection: Value must be one of <span pulumi-lang-nodejs="`alerts`" pulumi-lang-dotnet="`Alerts`" pulumi-lang-go="`alerts`" pulumi-lang-python="`alerts`" pulumi-lang-yaml="`alerts`" pulumi-lang-java="`alerts`" pulumi-lang-hcl="`alerts`">`alerts`</span>, <span pulumi-lang-nodejs="`incidents`" pulumi-lang-dotnet="`Incidents`" pulumi-lang-go="`incidents`" pulumi-lang-python="`incidents`" pulumi-lang-yaml="`incidents`" pulumi-lang-java="`incidents`" pulumi-lang-hcl="`incidents`">`incidents`</span>, <span pulumi-lang-nodejs="`incidentPostMortems`" pulumi-lang-dotnet="`IncidentPostMortems`" pulumi-lang-go="`incidentPostMortems`" pulumi-lang-python="`incident_post_mortems`" pulumi-lang-yaml="`incidentPostMortems`" pulumi-lang-java="`incidentPostMortems`" pulumi-lang-hcl="`incident_post_mortems`">`incidentPostMortems`</span>, <span pulumi-lang-nodejs="`incidentActionItems`" pulumi-lang-dotnet="`IncidentActionItems`" pulumi-lang-go="`incidentActionItems`" pulumi-lang-python="`incident_action_items`" pulumi-lang-yaml="`incidentActionItems`" pulumi-lang-java="`incidentActionItems`" pulumi-lang-hcl="`incident_action_items`">`incidentActionItems`</span>, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`" pulumi-lang-hcl="`users`">`users`</span>.
         """
         if aggregate is not None:
             pulumi.set(__self__, "aggregate", aggregate)
@@ -2523,7 +2523,7 @@ class DashboardPanelParamsDataset(dict):
     @pulumi.getter
     def collection(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`alerts`" pulumi-lang-dotnet="`Alerts`" pulumi-lang-go="`alerts`" pulumi-lang-python="`alerts`" pulumi-lang-yaml="`alerts`" pulumi-lang-java="`alerts`">`alerts`</span>, <span pulumi-lang-nodejs="`incidents`" pulumi-lang-dotnet="`Incidents`" pulumi-lang-go="`incidents`" pulumi-lang-python="`incidents`" pulumi-lang-yaml="`incidents`" pulumi-lang-java="`incidents`">`incidents`</span>, <span pulumi-lang-nodejs="`incidentPostMortems`" pulumi-lang-dotnet="`IncidentPostMortems`" pulumi-lang-go="`incidentPostMortems`" pulumi-lang-python="`incident_post_mortems`" pulumi-lang-yaml="`incidentPostMortems`" pulumi-lang-java="`incidentPostMortems`">`incident_post_mortems`</span>, <span pulumi-lang-nodejs="`incidentActionItems`" pulumi-lang-dotnet="`IncidentActionItems`" pulumi-lang-go="`incidentActionItems`" pulumi-lang-python="`incident_action_items`" pulumi-lang-yaml="`incidentActionItems`" pulumi-lang-java="`incidentActionItems`">`incident_action_items`</span>, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`">`users`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`alerts`" pulumi-lang-dotnet="`Alerts`" pulumi-lang-go="`alerts`" pulumi-lang-python="`alerts`" pulumi-lang-yaml="`alerts`" pulumi-lang-java="`alerts`" pulumi-lang-hcl="`alerts`">`alerts`</span>, <span pulumi-lang-nodejs="`incidents`" pulumi-lang-dotnet="`Incidents`" pulumi-lang-go="`incidents`" pulumi-lang-python="`incidents`" pulumi-lang-yaml="`incidents`" pulumi-lang-java="`incidents`" pulumi-lang-hcl="`incidents`">`incidents`</span>, <span pulumi-lang-nodejs="`incidentPostMortems`" pulumi-lang-dotnet="`IncidentPostMortems`" pulumi-lang-go="`incidentPostMortems`" pulumi-lang-python="`incident_post_mortems`" pulumi-lang-yaml="`incidentPostMortems`" pulumi-lang-java="`incidentPostMortems`" pulumi-lang-hcl="`incident_post_mortems`">`incidentPostMortems`</span>, <span pulumi-lang-nodejs="`incidentActionItems`" pulumi-lang-dotnet="`IncidentActionItems`" pulumi-lang-go="`incidentActionItems`" pulumi-lang-python="`incident_action_items`" pulumi-lang-yaml="`incidentActionItems`" pulumi-lang-java="`incidentActionItems`" pulumi-lang-hcl="`incident_action_items`">`incidentActionItems`</span>, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`" pulumi-lang-hcl="`users`">`users`</span>.
         """
         return pulumi.get(self, "collection")
 
@@ -2551,7 +2551,7 @@ class DashboardPanelParamsDatasetAggregate(dict):
                  operation: Optional[_builtins.str] = None):
         """
         :param _builtins.bool cumulative: Value must be one of true or false
-        :param _builtins.str operation: Value must be one of <span pulumi-lang-nodejs="`count`" pulumi-lang-dotnet="`Count`" pulumi-lang-go="`count`" pulumi-lang-python="`count`" pulumi-lang-yaml="`count`" pulumi-lang-java="`count`">`count`</span>, <span pulumi-lang-nodejs="`sum`" pulumi-lang-dotnet="`Sum`" pulumi-lang-go="`sum`" pulumi-lang-python="`sum`" pulumi-lang-yaml="`sum`" pulumi-lang-java="`sum`">`sum`</span>, <span pulumi-lang-nodejs="`average`" pulumi-lang-dotnet="`Average`" pulumi-lang-go="`average`" pulumi-lang-python="`average`" pulumi-lang-yaml="`average`" pulumi-lang-java="`average`">`average`</span>.
+        :param _builtins.str operation: Value must be one of <span pulumi-lang-nodejs="`count`" pulumi-lang-dotnet="`Count`" pulumi-lang-go="`count`" pulumi-lang-python="`count`" pulumi-lang-yaml="`count`" pulumi-lang-java="`count`" pulumi-lang-hcl="`count`">`count`</span>, <span pulumi-lang-nodejs="`sum`" pulumi-lang-dotnet="`Sum`" pulumi-lang-go="`sum`" pulumi-lang-python="`sum`" pulumi-lang-yaml="`sum`" pulumi-lang-java="`sum`" pulumi-lang-hcl="`sum`">`sum`</span>, <span pulumi-lang-nodejs="`average`" pulumi-lang-dotnet="`Average`" pulumi-lang-go="`average`" pulumi-lang-python="`average`" pulumi-lang-yaml="`average`" pulumi-lang-java="`average`" pulumi-lang-hcl="`average`">`average`</span>.
         """
         if cumulative is not None:
             pulumi.set(__self__, "cumulative", cumulative)
@@ -2577,7 +2577,7 @@ class DashboardPanelParamsDatasetAggregate(dict):
     @pulumi.getter
     def operation(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`count`" pulumi-lang-dotnet="`Count`" pulumi-lang-go="`count`" pulumi-lang-python="`count`" pulumi-lang-yaml="`count`" pulumi-lang-java="`count`">`count`</span>, <span pulumi-lang-nodejs="`sum`" pulumi-lang-dotnet="`Sum`" pulumi-lang-go="`sum`" pulumi-lang-python="`sum`" pulumi-lang-yaml="`sum`" pulumi-lang-java="`sum`">`sum`</span>, <span pulumi-lang-nodejs="`average`" pulumi-lang-dotnet="`Average`" pulumi-lang-go="`average`" pulumi-lang-python="`average`" pulumi-lang-yaml="`average`" pulumi-lang-java="`average`">`average`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`count`" pulumi-lang-dotnet="`Count`" pulumi-lang-go="`count`" pulumi-lang-python="`count`" pulumi-lang-yaml="`count`" pulumi-lang-java="`count`" pulumi-lang-hcl="`count`">`count`</span>, <span pulumi-lang-nodejs="`sum`" pulumi-lang-dotnet="`Sum`" pulumi-lang-go="`sum`" pulumi-lang-python="`sum`" pulumi-lang-yaml="`sum`" pulumi-lang-java="`sum`" pulumi-lang-hcl="`sum`">`sum`</span>, <span pulumi-lang-nodejs="`average`" pulumi-lang-dotnet="`Average`" pulumi-lang-go="`average`" pulumi-lang-python="`average`" pulumi-lang-yaml="`average`" pulumi-lang-java="`average`" pulumi-lang-hcl="`average`">`average`</span>.
         """
         return pulumi.get(self, "operation")
 
@@ -2588,7 +2588,7 @@ class DashboardPanelParamsDatasetFilter(dict):
                  operation: Optional[_builtins.str] = None,
                  rules: Optional[Sequence['outputs.DashboardPanelParamsDatasetFilterRule']] = None):
         """
-        :param _builtins.str operation: Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`">`or`</span>.
+        :param _builtins.str operation: Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`" pulumi-lang-hcl="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`" pulumi-lang-hcl="`or`">`or`</span>.
         """
         if operation is not None:
             pulumi.set(__self__, "operation", operation)
@@ -2599,7 +2599,7 @@ class DashboardPanelParamsDatasetFilter(dict):
     @pulumi.getter
     def operation(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`">`or`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`" pulumi-lang-hcl="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`" pulumi-lang-hcl="`or`">`or`</span>.
         """
         return pulumi.get(self, "operation")
 
@@ -2617,8 +2617,8 @@ class DashboardPanelParamsDatasetFilterRule(dict):
                  operation: Optional[_builtins.str] = None,
                  value: Optional[_builtins.str] = None):
         """
-        :param _builtins.str condition: Value must be one of `=`, `!=`, `>=`, `<=`, <span pulumi-lang-nodejs="`exists`" pulumi-lang-dotnet="`Exists`" pulumi-lang-go="`exists`" pulumi-lang-python="`exists`" pulumi-lang-yaml="`exists`" pulumi-lang-java="`exists`">`exists`</span>, <span pulumi-lang-nodejs="`notExists`" pulumi-lang-dotnet="`NotExists`" pulumi-lang-go="`notExists`" pulumi-lang-python="`not_exists`" pulumi-lang-yaml="`notExists`" pulumi-lang-java="`notExists`">`not_exists`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`notContains`" pulumi-lang-dotnet="`NotContains`" pulumi-lang-go="`notContains`" pulumi-lang-python="`not_contains`" pulumi-lang-yaml="`notContains`" pulumi-lang-java="`notContains`">`not_contains`</span>, <span pulumi-lang-nodejs="`assigned`" pulumi-lang-dotnet="`Assigned`" pulumi-lang-go="`assigned`" pulumi-lang-python="`assigned`" pulumi-lang-yaml="`assigned`" pulumi-lang-java="`assigned`">`assigned`</span>, <span pulumi-lang-nodejs="`unassigned`" pulumi-lang-dotnet="`Unassigned`" pulumi-lang-go="`unassigned`" pulumi-lang-python="`unassigned`" pulumi-lang-yaml="`unassigned`" pulumi-lang-java="`unassigned`">`unassigned`</span>.
-        :param _builtins.str operation: Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`">`or`</span>.
+        :param _builtins.str condition: Value must be one of `=`, `!=`, `>=`, `<=`, <span pulumi-lang-nodejs="`exists`" pulumi-lang-dotnet="`Exists`" pulumi-lang-go="`exists`" pulumi-lang-python="`exists`" pulumi-lang-yaml="`exists`" pulumi-lang-java="`exists`" pulumi-lang-hcl="`exists`">`exists`</span>, <span pulumi-lang-nodejs="`notExists`" pulumi-lang-dotnet="`NotExists`" pulumi-lang-go="`notExists`" pulumi-lang-python="`not_exists`" pulumi-lang-yaml="`notExists`" pulumi-lang-java="`notExists`" pulumi-lang-hcl="`not_exists`">`notExists`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`" pulumi-lang-hcl="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`notContains`" pulumi-lang-dotnet="`NotContains`" pulumi-lang-go="`notContains`" pulumi-lang-python="`not_contains`" pulumi-lang-yaml="`notContains`" pulumi-lang-java="`notContains`" pulumi-lang-hcl="`not_contains`">`notContains`</span>, <span pulumi-lang-nodejs="`assigned`" pulumi-lang-dotnet="`Assigned`" pulumi-lang-go="`assigned`" pulumi-lang-python="`assigned`" pulumi-lang-yaml="`assigned`" pulumi-lang-java="`assigned`" pulumi-lang-hcl="`assigned`">`assigned`</span>, <span pulumi-lang-nodejs="`unassigned`" pulumi-lang-dotnet="`Unassigned`" pulumi-lang-go="`unassigned`" pulumi-lang-python="`unassigned`" pulumi-lang-yaml="`unassigned`" pulumi-lang-java="`unassigned`" pulumi-lang-hcl="`unassigned`">`unassigned`</span>.
+        :param _builtins.str operation: Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`" pulumi-lang-hcl="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`" pulumi-lang-hcl="`or`">`or`</span>.
         """
         if condition is not None:
             pulumi.set(__self__, "condition", condition)
@@ -2633,7 +2633,7 @@ class DashboardPanelParamsDatasetFilterRule(dict):
     @pulumi.getter
     def condition(self) -> Optional[_builtins.str]:
         """
-        Value must be one of `=`, `!=`, `>=`, `<=`, <span pulumi-lang-nodejs="`exists`" pulumi-lang-dotnet="`Exists`" pulumi-lang-go="`exists`" pulumi-lang-python="`exists`" pulumi-lang-yaml="`exists`" pulumi-lang-java="`exists`">`exists`</span>, <span pulumi-lang-nodejs="`notExists`" pulumi-lang-dotnet="`NotExists`" pulumi-lang-go="`notExists`" pulumi-lang-python="`not_exists`" pulumi-lang-yaml="`notExists`" pulumi-lang-java="`notExists`">`not_exists`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`notContains`" pulumi-lang-dotnet="`NotContains`" pulumi-lang-go="`notContains`" pulumi-lang-python="`not_contains`" pulumi-lang-yaml="`notContains`" pulumi-lang-java="`notContains`">`not_contains`</span>, <span pulumi-lang-nodejs="`assigned`" pulumi-lang-dotnet="`Assigned`" pulumi-lang-go="`assigned`" pulumi-lang-python="`assigned`" pulumi-lang-yaml="`assigned`" pulumi-lang-java="`assigned`">`assigned`</span>, <span pulumi-lang-nodejs="`unassigned`" pulumi-lang-dotnet="`Unassigned`" pulumi-lang-go="`unassigned`" pulumi-lang-python="`unassigned`" pulumi-lang-yaml="`unassigned`" pulumi-lang-java="`unassigned`">`unassigned`</span>.
+        Value must be one of `=`, `!=`, `>=`, `<=`, <span pulumi-lang-nodejs="`exists`" pulumi-lang-dotnet="`Exists`" pulumi-lang-go="`exists`" pulumi-lang-python="`exists`" pulumi-lang-yaml="`exists`" pulumi-lang-java="`exists`" pulumi-lang-hcl="`exists`">`exists`</span>, <span pulumi-lang-nodejs="`notExists`" pulumi-lang-dotnet="`NotExists`" pulumi-lang-go="`notExists`" pulumi-lang-python="`not_exists`" pulumi-lang-yaml="`notExists`" pulumi-lang-java="`notExists`" pulumi-lang-hcl="`not_exists`">`notExists`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`" pulumi-lang-hcl="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`notContains`" pulumi-lang-dotnet="`NotContains`" pulumi-lang-go="`notContains`" pulumi-lang-python="`not_contains`" pulumi-lang-yaml="`notContains`" pulumi-lang-java="`notContains`" pulumi-lang-hcl="`not_contains`">`notContains`</span>, <span pulumi-lang-nodejs="`assigned`" pulumi-lang-dotnet="`Assigned`" pulumi-lang-go="`assigned`" pulumi-lang-python="`assigned`" pulumi-lang-yaml="`assigned`" pulumi-lang-java="`assigned`" pulumi-lang-hcl="`assigned`">`assigned`</span>, <span pulumi-lang-nodejs="`unassigned`" pulumi-lang-dotnet="`Unassigned`" pulumi-lang-go="`unassigned`" pulumi-lang-python="`unassigned`" pulumi-lang-yaml="`unassigned`" pulumi-lang-java="`unassigned`" pulumi-lang-hcl="`unassigned`">`unassigned`</span>.
         """
         return pulumi.get(self, "condition")
 
@@ -2646,7 +2646,7 @@ class DashboardPanelParamsDatasetFilterRule(dict):
     @pulumi.getter
     def operation(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`">`or`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`" pulumi-lang-hcl="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`" pulumi-lang-hcl="`or`">`or`</span>.
         """
         return pulumi.get(self, "operation")
 
@@ -2661,7 +2661,7 @@ class DashboardPanelParamsLegend(dict):
     def __init__(__self__, *,
                  groups: Optional[_builtins.str] = None):
         """
-        :param _builtins.str groups: Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`">`all`</span>, <span pulumi-lang-nodejs="`charted`" pulumi-lang-dotnet="`Charted`" pulumi-lang-go="`charted`" pulumi-lang-python="`charted`" pulumi-lang-yaml="`charted`" pulumi-lang-java="`charted`">`charted`</span>.
+        :param _builtins.str groups: Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`" pulumi-lang-hcl="`all`">`all`</span>, <span pulumi-lang-nodejs="`charted`" pulumi-lang-dotnet="`Charted`" pulumi-lang-go="`charted`" pulumi-lang-python="`charted`" pulumi-lang-yaml="`charted`" pulumi-lang-java="`charted`" pulumi-lang-hcl="`charted`">`charted`</span>.
         """
         if groups is not None:
             pulumi.set(__self__, "groups", groups)
@@ -2670,7 +2670,7 @@ class DashboardPanelParamsLegend(dict):
     @pulumi.getter
     def groups(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`">`all`</span>, <span pulumi-lang-nodejs="`charted`" pulumi-lang-dotnet="`Charted`" pulumi-lang-go="`charted`" pulumi-lang-python="`charted`" pulumi-lang-yaml="`charted`" pulumi-lang-java="`charted`">`charted`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`" pulumi-lang-hcl="`all`">`all`</span>, <span pulumi-lang-nodejs="`charted`" pulumi-lang-dotnet="`Charted`" pulumi-lang-go="`charted`" pulumi-lang-python="`charted`" pulumi-lang-yaml="`charted`" pulumi-lang-java="`charted`" pulumi-lang-hcl="`charted`">`charted`</span>.
         """
         return pulumi.get(self, "groups")
 
@@ -2896,8 +2896,8 @@ class EscalationLevelNotificationTargetParam(dict):
                  type: Optional[_builtins.str] = None):
         """
         :param _builtins.str id: The ID of notification target
-        :param _builtins.str team_members: For targets with type=team, controls whether to notify admins, all team members, or escalate to team EP.. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`">`all`</span>, <span pulumi-lang-nodejs="`admins`" pulumi-lang-dotnet="`Admins`" pulumi-lang-go="`admins`" pulumi-lang-python="`admins`" pulumi-lang-yaml="`admins`" pulumi-lang-java="`admins`">`admins`</span>, <span pulumi-lang-nodejs="`escalate`" pulumi-lang-dotnet="`Escalate`" pulumi-lang-go="`escalate`" pulumi-lang-python="`escalate`" pulumi-lang-yaml="`escalate`" pulumi-lang-java="`escalate`">`escalate`</span>.
-        :param _builtins.str type: The type of the notification target. Value must be one of <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`">`team`</span>, <span pulumi-lang-nodejs="`user`" pulumi-lang-dotnet="`User`" pulumi-lang-go="`user`" pulumi-lang-python="`user`" pulumi-lang-yaml="`user`" pulumi-lang-java="`user`">`user`</span>, <span pulumi-lang-nodejs="`schedule`" pulumi-lang-dotnet="`Schedule`" pulumi-lang-go="`schedule`" pulumi-lang-python="`schedule`" pulumi-lang-yaml="`schedule`" pulumi-lang-java="`schedule`">`schedule`</span>, <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`">`slack_channel`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`">`service`</span>.
+        :param _builtins.str team_members: For targets with type=team, controls whether to notify admins, all team members, or escalate to team EP.. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`" pulumi-lang-hcl="`all`">`all`</span>, <span pulumi-lang-nodejs="`admins`" pulumi-lang-dotnet="`Admins`" pulumi-lang-go="`admins`" pulumi-lang-python="`admins`" pulumi-lang-yaml="`admins`" pulumi-lang-java="`admins`" pulumi-lang-hcl="`admins`">`admins`</span>, <span pulumi-lang-nodejs="`escalate`" pulumi-lang-dotnet="`Escalate`" pulumi-lang-go="`escalate`" pulumi-lang-python="`escalate`" pulumi-lang-yaml="`escalate`" pulumi-lang-java="`escalate`" pulumi-lang-hcl="`escalate`">`escalate`</span>.
+        :param _builtins.str type: The type of the notification target. Value must be one of <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`" pulumi-lang-hcl="`team`">`team`</span>, <span pulumi-lang-nodejs="`user`" pulumi-lang-dotnet="`User`" pulumi-lang-go="`user`" pulumi-lang-python="`user`" pulumi-lang-yaml="`user`" pulumi-lang-java="`user`" pulumi-lang-hcl="`user`">`user`</span>, <span pulumi-lang-nodejs="`schedule`" pulumi-lang-dotnet="`Schedule`" pulumi-lang-go="`schedule`" pulumi-lang-python="`schedule`" pulumi-lang-yaml="`schedule`" pulumi-lang-java="`schedule`" pulumi-lang-hcl="`schedule`">`schedule`</span>, <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`" pulumi-lang-hcl="`service`">`service`</span>.
         """
         if id is not None:
             pulumi.set(__self__, "id", id)
@@ -2918,7 +2918,7 @@ class EscalationLevelNotificationTargetParam(dict):
     @pulumi.getter(name="teamMembers")
     def team_members(self) -> Optional[_builtins.str]:
         """
-        For targets with type=team, controls whether to notify admins, all team members, or escalate to team EP.. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`">`all`</span>, <span pulumi-lang-nodejs="`admins`" pulumi-lang-dotnet="`Admins`" pulumi-lang-go="`admins`" pulumi-lang-python="`admins`" pulumi-lang-yaml="`admins`" pulumi-lang-java="`admins`">`admins`</span>, <span pulumi-lang-nodejs="`escalate`" pulumi-lang-dotnet="`Escalate`" pulumi-lang-go="`escalate`" pulumi-lang-python="`escalate`" pulumi-lang-yaml="`escalate`" pulumi-lang-java="`escalate`">`escalate`</span>.
+        For targets with type=team, controls whether to notify admins, all team members, or escalate to team EP.. Value must be one of <span pulumi-lang-nodejs="`all`" pulumi-lang-dotnet="`All`" pulumi-lang-go="`all`" pulumi-lang-python="`all`" pulumi-lang-yaml="`all`" pulumi-lang-java="`all`" pulumi-lang-hcl="`all`">`all`</span>, <span pulumi-lang-nodejs="`admins`" pulumi-lang-dotnet="`Admins`" pulumi-lang-go="`admins`" pulumi-lang-python="`admins`" pulumi-lang-yaml="`admins`" pulumi-lang-java="`admins`" pulumi-lang-hcl="`admins`">`admins`</span>, <span pulumi-lang-nodejs="`escalate`" pulumi-lang-dotnet="`Escalate`" pulumi-lang-go="`escalate`" pulumi-lang-python="`escalate`" pulumi-lang-yaml="`escalate`" pulumi-lang-java="`escalate`" pulumi-lang-hcl="`escalate`">`escalate`</span>.
         """
         return pulumi.get(self, "team_members")
 
@@ -2926,7 +2926,7 @@ class EscalationLevelNotificationTargetParam(dict):
     @pulumi.getter
     def type(self) -> Optional[_builtins.str]:
         """
-        The type of the notification target. Value must be one of <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`">`team`</span>, <span pulumi-lang-nodejs="`user`" pulumi-lang-dotnet="`User`" pulumi-lang-go="`user`" pulumi-lang-python="`user`" pulumi-lang-yaml="`user`" pulumi-lang-java="`user`">`user`</span>, <span pulumi-lang-nodejs="`schedule`" pulumi-lang-dotnet="`Schedule`" pulumi-lang-go="`schedule`" pulumi-lang-python="`schedule`" pulumi-lang-yaml="`schedule`" pulumi-lang-java="`schedule`">`schedule`</span>, <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`">`slack_channel`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`">`service`</span>.
+        The type of the notification target. Value must be one of <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`" pulumi-lang-hcl="`team`">`team`</span>, <span pulumi-lang-nodejs="`user`" pulumi-lang-dotnet="`User`" pulumi-lang-go="`user`" pulumi-lang-python="`user`" pulumi-lang-yaml="`user`" pulumi-lang-java="`user`" pulumi-lang-hcl="`user`">`user`</span>, <span pulumi-lang-nodejs="`schedule`" pulumi-lang-dotnet="`Schedule`" pulumi-lang-go="`schedule`" pulumi-lang-python="`schedule`" pulumi-lang-yaml="`schedule`" pulumi-lang-java="`schedule`" pulumi-lang-hcl="`schedule`">`schedule`</span>, <span pulumi-lang-nodejs="`slackChannel`" pulumi-lang-dotnet="`SlackChannel`" pulumi-lang-go="`slackChannel`" pulumi-lang-python="`slack_channel`" pulumi-lang-yaml="`slackChannel`" pulumi-lang-java="`slackChannel`" pulumi-lang-hcl="`slack_channel`">`slackChannel`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`" pulumi-lang-hcl="`service`">`service`</span>.
         """
         return pulumi.get(self, "type")
 
@@ -2980,17 +2980,17 @@ class EscalationPathRule(dict):
                  values: Optional[Sequence[_builtins.str]] = None,
                  within_working_hour: Optional[_builtins.bool] = None):
         """
-        :param _builtins.str fieldable_id: The ID of the alert field. Only used with <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`">`field`</span> rule type.
-        :param _builtins.str fieldable_type: The type of the fieldable. Only used with <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`">`field`</span> rule type. Value must be one of `AlertField`.
+        :param _builtins.str fieldable_id: The ID of the alert field. Only used with <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`" pulumi-lang-hcl="`field`">`field`</span> rule type.
+        :param _builtins.str fieldable_type: The type of the fieldable. Only used with <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`" pulumi-lang-hcl="`field`">`field`</span> rule type. Value must be one of `AlertField`.
         :param _builtins.str json_path: JSON path to extract value from payload
-        :param _builtins.str operator: How the value should be matched. For <span pulumi-lang-nodejs="`jsonPath`" pulumi-lang-dotnet="`JsonPath`" pulumi-lang-go="`jsonPath`" pulumi-lang-python="`json_path`" pulumi-lang-yaml="`jsonPath`" pulumi-lang-java="`jsonPath`">`json_path`</span> rule type: <span pulumi-lang-nodejs="`is`" pulumi-lang-dotnet="`Is`" pulumi-lang-go="`is`" pulumi-lang-python="`is`" pulumi-lang-yaml="`is`" pulumi-lang-java="`is`">`is`</span>, <span pulumi-lang-nodejs="`isNot`" pulumi-lang-dotnet="`IsNot`" pulumi-lang-go="`isNot`" pulumi-lang-python="`is_not`" pulumi-lang-yaml="`isNot`" pulumi-lang-java="`isNot`">`is_not`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`">`does_not_contain`</span>. For <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`">`field`</span> rule type: <span pulumi-lang-nodejs="`is`" pulumi-lang-dotnet="`Is`" pulumi-lang-go="`is`" pulumi-lang-python="`is`" pulumi-lang-yaml="`is`" pulumi-lang-java="`is`">`is`</span>, <span pulumi-lang-nodejs="`isNot`" pulumi-lang-dotnet="`IsNot`" pulumi-lang-go="`isNot`" pulumi-lang-python="`is_not`" pulumi-lang-yaml="`isNot`" pulumi-lang-java="`isNot`">`is_not`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`">`does_not_contain`</span>, <span pulumi-lang-nodejs="`isOneOf`" pulumi-lang-dotnet="`IsOneOf`" pulumi-lang-go="`isOneOf`" pulumi-lang-python="`is_one_of`" pulumi-lang-yaml="`isOneOf`" pulumi-lang-java="`isOneOf`">`is_one_of`</span>, <span pulumi-lang-nodejs="`isNotOneOf`" pulumi-lang-dotnet="`IsNotOneOf`" pulumi-lang-go="`isNotOneOf`" pulumi-lang-python="`is_not_one_of`" pulumi-lang-yaml="`isNotOneOf`" pulumi-lang-java="`isNotOneOf`">`is_not_one_of`</span>, <span pulumi-lang-nodejs="`isEmpty`" pulumi-lang-dotnet="`IsEmpty`" pulumi-lang-go="`isEmpty`" pulumi-lang-python="`is_empty`" pulumi-lang-yaml="`isEmpty`" pulumi-lang-java="`isEmpty`">`is_empty`</span>, <span pulumi-lang-nodejs="`isNotEmpty`" pulumi-lang-dotnet="`IsNotEmpty`" pulumi-lang-go="`isNotEmpty`" pulumi-lang-python="`is_not_empty`" pulumi-lang-yaml="`isNotEmpty`" pulumi-lang-java="`isNotEmpty`">`is_not_empty`</span>, <span pulumi-lang-nodejs="`containsKey`" pulumi-lang-dotnet="`ContainsKey`" pulumi-lang-go="`containsKey`" pulumi-lang-python="`contains_key`" pulumi-lang-yaml="`containsKey`" pulumi-lang-java="`containsKey`">`contains_key`</span>, <span pulumi-lang-nodejs="`doesNotContainKey`" pulumi-lang-dotnet="`DoesNotContainKey`" pulumi-lang-go="`doesNotContainKey`" pulumi-lang-python="`does_not_contain_key`" pulumi-lang-yaml="`doesNotContainKey`" pulumi-lang-java="`doesNotContainKey`">`does_not_contain_key`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`">`starts_with`</span>, <span pulumi-lang-nodejs="`doesNotStartWith`" pulumi-lang-dotnet="`DoesNotStartWith`" pulumi-lang-go="`doesNotStartWith`" pulumi-lang-python="`does_not_start_with`" pulumi-lang-yaml="`doesNotStartWith`" pulumi-lang-java="`doesNotStartWith`">`does_not_start_with`</span>, <span pulumi-lang-nodejs="`matches`" pulumi-lang-dotnet="`Matches`" pulumi-lang-go="`matches`" pulumi-lang-python="`matches`" pulumi-lang-yaml="`matches`" pulumi-lang-java="`matches`">`matches`</span>, <span pulumi-lang-nodejs="`doesNotMatch`" pulumi-lang-dotnet="`DoesNotMatch`" pulumi-lang-go="`doesNotMatch`" pulumi-lang-python="`does_not_match`" pulumi-lang-yaml="`doesNotMatch`" pulumi-lang-java="`doesNotMatch`">`does_not_match`</span>.
-        :param _builtins.str rule_type: The type of the escalation path rule. Value must be one of <span pulumi-lang-nodejs="`alertUrgency`" pulumi-lang-dotnet="`AlertUrgency`" pulumi-lang-go="`alertUrgency`" pulumi-lang-python="`alert_urgency`" pulumi-lang-yaml="`alertUrgency`" pulumi-lang-java="`alertUrgency`">`alert_urgency`</span>, <span pulumi-lang-nodejs="`workingHour`" pulumi-lang-dotnet="`WorkingHour`" pulumi-lang-go="`workingHour`" pulumi-lang-python="`working_hour`" pulumi-lang-yaml="`workingHour`" pulumi-lang-java="`workingHour`">`working_hour`</span>, <span pulumi-lang-nodejs="`jsonPath`" pulumi-lang-dotnet="`JsonPath`" pulumi-lang-go="`jsonPath`" pulumi-lang-python="`json_path`" pulumi-lang-yaml="`jsonPath`" pulumi-lang-java="`jsonPath`">`json_path`</span>, <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`">`field`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`">`service`</span>, <span pulumi-lang-nodejs="`deferralWindow`" pulumi-lang-dotnet="`DeferralWindow`" pulumi-lang-go="`deferralWindow`" pulumi-lang-python="`deferral_window`" pulumi-lang-yaml="`deferralWindow`" pulumi-lang-java="`deferralWindow`">`deferral_window`</span>.
-        :param Sequence[_builtins.str] service_ids: Service ids for which this escalation path should be used. Only used with <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`">`service`</span> rule type.
-        :param Sequence['EscalationPathRuleTimeBlockArgs'] time_blocks: Time windows during which alerts are deferred. Only used with <span pulumi-lang-nodejs="`deferralWindow`" pulumi-lang-dotnet="`DeferralWindow`" pulumi-lang-go="`deferralWindow`" pulumi-lang-python="`deferral_window`" pulumi-lang-yaml="`deferralWindow`" pulumi-lang-java="`deferralWindow`">`deferral_window`</span> rule type.
-        :param _builtins.str time_zone: Time zone for the deferral window (IANA format, e.g. `America/New_York`). Only used with <span pulumi-lang-nodejs="`deferralWindow`" pulumi-lang-dotnet="`DeferralWindow`" pulumi-lang-go="`deferralWindow`" pulumi-lang-python="`deferral_window`" pulumi-lang-yaml="`deferralWindow`" pulumi-lang-java="`deferralWindow`">`deferral_window`</span> rule type.
+        :param _builtins.str operator: How the value should be matched. For <span pulumi-lang-nodejs="`jsonPath`" pulumi-lang-dotnet="`JsonPath`" pulumi-lang-go="`jsonPath`" pulumi-lang-python="`json_path`" pulumi-lang-yaml="`jsonPath`" pulumi-lang-java="`jsonPath`" pulumi-lang-hcl="`json_path`">`jsonPath`</span> rule type: <span pulumi-lang-nodejs="`is`" pulumi-lang-dotnet="`Is`" pulumi-lang-go="`is`" pulumi-lang-python="`is`" pulumi-lang-yaml="`is`" pulumi-lang-java="`is`" pulumi-lang-hcl="`is`">`is`</span>, <span pulumi-lang-nodejs="`isNot`" pulumi-lang-dotnet="`IsNot`" pulumi-lang-go="`isNot`" pulumi-lang-python="`is_not`" pulumi-lang-yaml="`isNot`" pulumi-lang-java="`isNot`" pulumi-lang-hcl="`is_not`">`isNot`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`" pulumi-lang-hcl="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`" pulumi-lang-hcl="`does_not_contain`">`doesNotContain`</span>. For <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`" pulumi-lang-hcl="`field`">`field`</span> rule type: <span pulumi-lang-nodejs="`is`" pulumi-lang-dotnet="`Is`" pulumi-lang-go="`is`" pulumi-lang-python="`is`" pulumi-lang-yaml="`is`" pulumi-lang-java="`is`" pulumi-lang-hcl="`is`">`is`</span>, <span pulumi-lang-nodejs="`isNot`" pulumi-lang-dotnet="`IsNot`" pulumi-lang-go="`isNot`" pulumi-lang-python="`is_not`" pulumi-lang-yaml="`isNot`" pulumi-lang-java="`isNot`" pulumi-lang-hcl="`is_not`">`isNot`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`" pulumi-lang-hcl="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`" pulumi-lang-hcl="`does_not_contain`">`doesNotContain`</span>, <span pulumi-lang-nodejs="`isOneOf`" pulumi-lang-dotnet="`IsOneOf`" pulumi-lang-go="`isOneOf`" pulumi-lang-python="`is_one_of`" pulumi-lang-yaml="`isOneOf`" pulumi-lang-java="`isOneOf`" pulumi-lang-hcl="`is_one_of`">`isOneOf`</span>, <span pulumi-lang-nodejs="`isNotOneOf`" pulumi-lang-dotnet="`IsNotOneOf`" pulumi-lang-go="`isNotOneOf`" pulumi-lang-python="`is_not_one_of`" pulumi-lang-yaml="`isNotOneOf`" pulumi-lang-java="`isNotOneOf`" pulumi-lang-hcl="`is_not_one_of`">`isNotOneOf`</span>, <span pulumi-lang-nodejs="`isEmpty`" pulumi-lang-dotnet="`IsEmpty`" pulumi-lang-go="`isEmpty`" pulumi-lang-python="`is_empty`" pulumi-lang-yaml="`isEmpty`" pulumi-lang-java="`isEmpty`" pulumi-lang-hcl="`is_empty`">`isEmpty`</span>, <span pulumi-lang-nodejs="`isNotEmpty`" pulumi-lang-dotnet="`IsNotEmpty`" pulumi-lang-go="`isNotEmpty`" pulumi-lang-python="`is_not_empty`" pulumi-lang-yaml="`isNotEmpty`" pulumi-lang-java="`isNotEmpty`" pulumi-lang-hcl="`is_not_empty`">`isNotEmpty`</span>, <span pulumi-lang-nodejs="`containsKey`" pulumi-lang-dotnet="`ContainsKey`" pulumi-lang-go="`containsKey`" pulumi-lang-python="`contains_key`" pulumi-lang-yaml="`containsKey`" pulumi-lang-java="`containsKey`" pulumi-lang-hcl="`contains_key`">`containsKey`</span>, <span pulumi-lang-nodejs="`doesNotContainKey`" pulumi-lang-dotnet="`DoesNotContainKey`" pulumi-lang-go="`doesNotContainKey`" pulumi-lang-python="`does_not_contain_key`" pulumi-lang-yaml="`doesNotContainKey`" pulumi-lang-java="`doesNotContainKey`" pulumi-lang-hcl="`does_not_contain_key`">`doesNotContainKey`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`" pulumi-lang-hcl="`starts_with`">`startsWith`</span>, <span pulumi-lang-nodejs="`doesNotStartWith`" pulumi-lang-dotnet="`DoesNotStartWith`" pulumi-lang-go="`doesNotStartWith`" pulumi-lang-python="`does_not_start_with`" pulumi-lang-yaml="`doesNotStartWith`" pulumi-lang-java="`doesNotStartWith`" pulumi-lang-hcl="`does_not_start_with`">`doesNotStartWith`</span>, <span pulumi-lang-nodejs="`matches`" pulumi-lang-dotnet="`Matches`" pulumi-lang-go="`matches`" pulumi-lang-python="`matches`" pulumi-lang-yaml="`matches`" pulumi-lang-java="`matches`" pulumi-lang-hcl="`matches`">`matches`</span>, <span pulumi-lang-nodejs="`doesNotMatch`" pulumi-lang-dotnet="`DoesNotMatch`" pulumi-lang-go="`doesNotMatch`" pulumi-lang-python="`does_not_match`" pulumi-lang-yaml="`doesNotMatch`" pulumi-lang-java="`doesNotMatch`" pulumi-lang-hcl="`does_not_match`">`doesNotMatch`</span>.
+        :param _builtins.str rule_type: The type of the escalation path rule. Value must be one of <span pulumi-lang-nodejs="`alertUrgency`" pulumi-lang-dotnet="`AlertUrgency`" pulumi-lang-go="`alertUrgency`" pulumi-lang-python="`alert_urgency`" pulumi-lang-yaml="`alertUrgency`" pulumi-lang-java="`alertUrgency`" pulumi-lang-hcl="`alert_urgency`">`alertUrgency`</span>, <span pulumi-lang-nodejs="`workingHour`" pulumi-lang-dotnet="`WorkingHour`" pulumi-lang-go="`workingHour`" pulumi-lang-python="`working_hour`" pulumi-lang-yaml="`workingHour`" pulumi-lang-java="`workingHour`" pulumi-lang-hcl="`working_hour`">`workingHour`</span>, <span pulumi-lang-nodejs="`jsonPath`" pulumi-lang-dotnet="`JsonPath`" pulumi-lang-go="`jsonPath`" pulumi-lang-python="`json_path`" pulumi-lang-yaml="`jsonPath`" pulumi-lang-java="`jsonPath`" pulumi-lang-hcl="`json_path`">`jsonPath`</span>, <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`" pulumi-lang-hcl="`field`">`field`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`" pulumi-lang-hcl="`service`">`service`</span>, <span pulumi-lang-nodejs="`deferralWindow`" pulumi-lang-dotnet="`DeferralWindow`" pulumi-lang-go="`deferralWindow`" pulumi-lang-python="`deferral_window`" pulumi-lang-yaml="`deferralWindow`" pulumi-lang-java="`deferralWindow`" pulumi-lang-hcl="`deferral_window`">`deferralWindow`</span>.
+        :param Sequence[_builtins.str] service_ids: Service ids for which this escalation path should be used. Only used with <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`" pulumi-lang-hcl="`service`">`service`</span> rule type.
+        :param Sequence['EscalationPathRuleTimeBlockArgs'] time_blocks: Time windows during which alerts are deferred. Only used with <span pulumi-lang-nodejs="`deferralWindow`" pulumi-lang-dotnet="`DeferralWindow`" pulumi-lang-go="`deferralWindow`" pulumi-lang-python="`deferral_window`" pulumi-lang-yaml="`deferralWindow`" pulumi-lang-java="`deferralWindow`" pulumi-lang-hcl="`deferral_window`">`deferralWindow`</span> rule type.
+        :param _builtins.str time_zone: Time zone for the deferral window (IANA format, e.g. `America/New_York`). Only used with <span pulumi-lang-nodejs="`deferralWindow`" pulumi-lang-dotnet="`DeferralWindow`" pulumi-lang-go="`deferralWindow`" pulumi-lang-python="`deferral_window`" pulumi-lang-yaml="`deferralWindow`" pulumi-lang-java="`deferralWindow`" pulumi-lang-hcl="`deferral_window`">`deferralWindow`</span> rule type.
         :param Sequence[_builtins.str] urgency_ids: Alert urgency ids for which this escalation path should be used
         :param _builtins.str value: Value with which JSON path value should be matched
-        :param Sequence[_builtins.str] values: Values to match against. Only used with <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`">`field`</span> rule type.
+        :param Sequence[_builtins.str] values: Values to match against. Only used with <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`" pulumi-lang-hcl="`field`">`field`</span> rule type.
         :param _builtins.bool within_working_hour: Whether the escalation path should be used within working hours. Value must be one of true or false
         """
         if fieldable_id is not None:
@@ -3022,7 +3022,7 @@ class EscalationPathRule(dict):
     @pulumi.getter(name="fieldableId")
     def fieldable_id(self) -> Optional[_builtins.str]:
         """
-        The ID of the alert field. Only used with <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`">`field`</span> rule type.
+        The ID of the alert field. Only used with <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`" pulumi-lang-hcl="`field`">`field`</span> rule type.
         """
         return pulumi.get(self, "fieldable_id")
 
@@ -3030,7 +3030,7 @@ class EscalationPathRule(dict):
     @pulumi.getter(name="fieldableType")
     def fieldable_type(self) -> Optional[_builtins.str]:
         """
-        The type of the fieldable. Only used with <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`">`field`</span> rule type. Value must be one of `AlertField`.
+        The type of the fieldable. Only used with <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`" pulumi-lang-hcl="`field`">`field`</span> rule type. Value must be one of `AlertField`.
         """
         return pulumi.get(self, "fieldable_type")
 
@@ -3046,7 +3046,7 @@ class EscalationPathRule(dict):
     @pulumi.getter
     def operator(self) -> Optional[_builtins.str]:
         """
-        How the value should be matched. For <span pulumi-lang-nodejs="`jsonPath`" pulumi-lang-dotnet="`JsonPath`" pulumi-lang-go="`jsonPath`" pulumi-lang-python="`json_path`" pulumi-lang-yaml="`jsonPath`" pulumi-lang-java="`jsonPath`">`json_path`</span> rule type: <span pulumi-lang-nodejs="`is`" pulumi-lang-dotnet="`Is`" pulumi-lang-go="`is`" pulumi-lang-python="`is`" pulumi-lang-yaml="`is`" pulumi-lang-java="`is`">`is`</span>, <span pulumi-lang-nodejs="`isNot`" pulumi-lang-dotnet="`IsNot`" pulumi-lang-go="`isNot`" pulumi-lang-python="`is_not`" pulumi-lang-yaml="`isNot`" pulumi-lang-java="`isNot`">`is_not`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`">`does_not_contain`</span>. For <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`">`field`</span> rule type: <span pulumi-lang-nodejs="`is`" pulumi-lang-dotnet="`Is`" pulumi-lang-go="`is`" pulumi-lang-python="`is`" pulumi-lang-yaml="`is`" pulumi-lang-java="`is`">`is`</span>, <span pulumi-lang-nodejs="`isNot`" pulumi-lang-dotnet="`IsNot`" pulumi-lang-go="`isNot`" pulumi-lang-python="`is_not`" pulumi-lang-yaml="`isNot`" pulumi-lang-java="`isNot`">`is_not`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`">`does_not_contain`</span>, <span pulumi-lang-nodejs="`isOneOf`" pulumi-lang-dotnet="`IsOneOf`" pulumi-lang-go="`isOneOf`" pulumi-lang-python="`is_one_of`" pulumi-lang-yaml="`isOneOf`" pulumi-lang-java="`isOneOf`">`is_one_of`</span>, <span pulumi-lang-nodejs="`isNotOneOf`" pulumi-lang-dotnet="`IsNotOneOf`" pulumi-lang-go="`isNotOneOf`" pulumi-lang-python="`is_not_one_of`" pulumi-lang-yaml="`isNotOneOf`" pulumi-lang-java="`isNotOneOf`">`is_not_one_of`</span>, <span pulumi-lang-nodejs="`isEmpty`" pulumi-lang-dotnet="`IsEmpty`" pulumi-lang-go="`isEmpty`" pulumi-lang-python="`is_empty`" pulumi-lang-yaml="`isEmpty`" pulumi-lang-java="`isEmpty`">`is_empty`</span>, <span pulumi-lang-nodejs="`isNotEmpty`" pulumi-lang-dotnet="`IsNotEmpty`" pulumi-lang-go="`isNotEmpty`" pulumi-lang-python="`is_not_empty`" pulumi-lang-yaml="`isNotEmpty`" pulumi-lang-java="`isNotEmpty`">`is_not_empty`</span>, <span pulumi-lang-nodejs="`containsKey`" pulumi-lang-dotnet="`ContainsKey`" pulumi-lang-go="`containsKey`" pulumi-lang-python="`contains_key`" pulumi-lang-yaml="`containsKey`" pulumi-lang-java="`containsKey`">`contains_key`</span>, <span pulumi-lang-nodejs="`doesNotContainKey`" pulumi-lang-dotnet="`DoesNotContainKey`" pulumi-lang-go="`doesNotContainKey`" pulumi-lang-python="`does_not_contain_key`" pulumi-lang-yaml="`doesNotContainKey`" pulumi-lang-java="`doesNotContainKey`">`does_not_contain_key`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`">`starts_with`</span>, <span pulumi-lang-nodejs="`doesNotStartWith`" pulumi-lang-dotnet="`DoesNotStartWith`" pulumi-lang-go="`doesNotStartWith`" pulumi-lang-python="`does_not_start_with`" pulumi-lang-yaml="`doesNotStartWith`" pulumi-lang-java="`doesNotStartWith`">`does_not_start_with`</span>, <span pulumi-lang-nodejs="`matches`" pulumi-lang-dotnet="`Matches`" pulumi-lang-go="`matches`" pulumi-lang-python="`matches`" pulumi-lang-yaml="`matches`" pulumi-lang-java="`matches`">`matches`</span>, <span pulumi-lang-nodejs="`doesNotMatch`" pulumi-lang-dotnet="`DoesNotMatch`" pulumi-lang-go="`doesNotMatch`" pulumi-lang-python="`does_not_match`" pulumi-lang-yaml="`doesNotMatch`" pulumi-lang-java="`doesNotMatch`">`does_not_match`</span>.
+        How the value should be matched. For <span pulumi-lang-nodejs="`jsonPath`" pulumi-lang-dotnet="`JsonPath`" pulumi-lang-go="`jsonPath`" pulumi-lang-python="`json_path`" pulumi-lang-yaml="`jsonPath`" pulumi-lang-java="`jsonPath`" pulumi-lang-hcl="`json_path`">`jsonPath`</span> rule type: <span pulumi-lang-nodejs="`is`" pulumi-lang-dotnet="`Is`" pulumi-lang-go="`is`" pulumi-lang-python="`is`" pulumi-lang-yaml="`is`" pulumi-lang-java="`is`" pulumi-lang-hcl="`is`">`is`</span>, <span pulumi-lang-nodejs="`isNot`" pulumi-lang-dotnet="`IsNot`" pulumi-lang-go="`isNot`" pulumi-lang-python="`is_not`" pulumi-lang-yaml="`isNot`" pulumi-lang-java="`isNot`" pulumi-lang-hcl="`is_not`">`isNot`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`" pulumi-lang-hcl="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`" pulumi-lang-hcl="`does_not_contain`">`doesNotContain`</span>. For <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`" pulumi-lang-hcl="`field`">`field`</span> rule type: <span pulumi-lang-nodejs="`is`" pulumi-lang-dotnet="`Is`" pulumi-lang-go="`is`" pulumi-lang-python="`is`" pulumi-lang-yaml="`is`" pulumi-lang-java="`is`" pulumi-lang-hcl="`is`">`is`</span>, <span pulumi-lang-nodejs="`isNot`" pulumi-lang-dotnet="`IsNot`" pulumi-lang-go="`isNot`" pulumi-lang-python="`is_not`" pulumi-lang-yaml="`isNot`" pulumi-lang-java="`isNot`" pulumi-lang-hcl="`is_not`">`isNot`</span>, <span pulumi-lang-nodejs="`contains`" pulumi-lang-dotnet="`Contains`" pulumi-lang-go="`contains`" pulumi-lang-python="`contains`" pulumi-lang-yaml="`contains`" pulumi-lang-java="`contains`" pulumi-lang-hcl="`contains`">`contains`</span>, <span pulumi-lang-nodejs="`doesNotContain`" pulumi-lang-dotnet="`DoesNotContain`" pulumi-lang-go="`doesNotContain`" pulumi-lang-python="`does_not_contain`" pulumi-lang-yaml="`doesNotContain`" pulumi-lang-java="`doesNotContain`" pulumi-lang-hcl="`does_not_contain`">`doesNotContain`</span>, <span pulumi-lang-nodejs="`isOneOf`" pulumi-lang-dotnet="`IsOneOf`" pulumi-lang-go="`isOneOf`" pulumi-lang-python="`is_one_of`" pulumi-lang-yaml="`isOneOf`" pulumi-lang-java="`isOneOf`" pulumi-lang-hcl="`is_one_of`">`isOneOf`</span>, <span pulumi-lang-nodejs="`isNotOneOf`" pulumi-lang-dotnet="`IsNotOneOf`" pulumi-lang-go="`isNotOneOf`" pulumi-lang-python="`is_not_one_of`" pulumi-lang-yaml="`isNotOneOf`" pulumi-lang-java="`isNotOneOf`" pulumi-lang-hcl="`is_not_one_of`">`isNotOneOf`</span>, <span pulumi-lang-nodejs="`isEmpty`" pulumi-lang-dotnet="`IsEmpty`" pulumi-lang-go="`isEmpty`" pulumi-lang-python="`is_empty`" pulumi-lang-yaml="`isEmpty`" pulumi-lang-java="`isEmpty`" pulumi-lang-hcl="`is_empty`">`isEmpty`</span>, <span pulumi-lang-nodejs="`isNotEmpty`" pulumi-lang-dotnet="`IsNotEmpty`" pulumi-lang-go="`isNotEmpty`" pulumi-lang-python="`is_not_empty`" pulumi-lang-yaml="`isNotEmpty`" pulumi-lang-java="`isNotEmpty`" pulumi-lang-hcl="`is_not_empty`">`isNotEmpty`</span>, <span pulumi-lang-nodejs="`containsKey`" pulumi-lang-dotnet="`ContainsKey`" pulumi-lang-go="`containsKey`" pulumi-lang-python="`contains_key`" pulumi-lang-yaml="`containsKey`" pulumi-lang-java="`containsKey`" pulumi-lang-hcl="`contains_key`">`containsKey`</span>, <span pulumi-lang-nodejs="`doesNotContainKey`" pulumi-lang-dotnet="`DoesNotContainKey`" pulumi-lang-go="`doesNotContainKey`" pulumi-lang-python="`does_not_contain_key`" pulumi-lang-yaml="`doesNotContainKey`" pulumi-lang-java="`doesNotContainKey`" pulumi-lang-hcl="`does_not_contain_key`">`doesNotContainKey`</span>, <span pulumi-lang-nodejs="`startsWith`" pulumi-lang-dotnet="`StartsWith`" pulumi-lang-go="`startsWith`" pulumi-lang-python="`starts_with`" pulumi-lang-yaml="`startsWith`" pulumi-lang-java="`startsWith`" pulumi-lang-hcl="`starts_with`">`startsWith`</span>, <span pulumi-lang-nodejs="`doesNotStartWith`" pulumi-lang-dotnet="`DoesNotStartWith`" pulumi-lang-go="`doesNotStartWith`" pulumi-lang-python="`does_not_start_with`" pulumi-lang-yaml="`doesNotStartWith`" pulumi-lang-java="`doesNotStartWith`" pulumi-lang-hcl="`does_not_start_with`">`doesNotStartWith`</span>, <span pulumi-lang-nodejs="`matches`" pulumi-lang-dotnet="`Matches`" pulumi-lang-go="`matches`" pulumi-lang-python="`matches`" pulumi-lang-yaml="`matches`" pulumi-lang-java="`matches`" pulumi-lang-hcl="`matches`">`matches`</span>, <span pulumi-lang-nodejs="`doesNotMatch`" pulumi-lang-dotnet="`DoesNotMatch`" pulumi-lang-go="`doesNotMatch`" pulumi-lang-python="`does_not_match`" pulumi-lang-yaml="`doesNotMatch`" pulumi-lang-java="`doesNotMatch`" pulumi-lang-hcl="`does_not_match`">`doesNotMatch`</span>.
         """
         return pulumi.get(self, "operator")
 
@@ -3054,7 +3054,7 @@ class EscalationPathRule(dict):
     @pulumi.getter(name="ruleType")
     def rule_type(self) -> Optional[_builtins.str]:
         """
-        The type of the escalation path rule. Value must be one of <span pulumi-lang-nodejs="`alertUrgency`" pulumi-lang-dotnet="`AlertUrgency`" pulumi-lang-go="`alertUrgency`" pulumi-lang-python="`alert_urgency`" pulumi-lang-yaml="`alertUrgency`" pulumi-lang-java="`alertUrgency`">`alert_urgency`</span>, <span pulumi-lang-nodejs="`workingHour`" pulumi-lang-dotnet="`WorkingHour`" pulumi-lang-go="`workingHour`" pulumi-lang-python="`working_hour`" pulumi-lang-yaml="`workingHour`" pulumi-lang-java="`workingHour`">`working_hour`</span>, <span pulumi-lang-nodejs="`jsonPath`" pulumi-lang-dotnet="`JsonPath`" pulumi-lang-go="`jsonPath`" pulumi-lang-python="`json_path`" pulumi-lang-yaml="`jsonPath`" pulumi-lang-java="`jsonPath`">`json_path`</span>, <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`">`field`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`">`service`</span>, <span pulumi-lang-nodejs="`deferralWindow`" pulumi-lang-dotnet="`DeferralWindow`" pulumi-lang-go="`deferralWindow`" pulumi-lang-python="`deferral_window`" pulumi-lang-yaml="`deferralWindow`" pulumi-lang-java="`deferralWindow`">`deferral_window`</span>.
+        The type of the escalation path rule. Value must be one of <span pulumi-lang-nodejs="`alertUrgency`" pulumi-lang-dotnet="`AlertUrgency`" pulumi-lang-go="`alertUrgency`" pulumi-lang-python="`alert_urgency`" pulumi-lang-yaml="`alertUrgency`" pulumi-lang-java="`alertUrgency`" pulumi-lang-hcl="`alert_urgency`">`alertUrgency`</span>, <span pulumi-lang-nodejs="`workingHour`" pulumi-lang-dotnet="`WorkingHour`" pulumi-lang-go="`workingHour`" pulumi-lang-python="`working_hour`" pulumi-lang-yaml="`workingHour`" pulumi-lang-java="`workingHour`" pulumi-lang-hcl="`working_hour`">`workingHour`</span>, <span pulumi-lang-nodejs="`jsonPath`" pulumi-lang-dotnet="`JsonPath`" pulumi-lang-go="`jsonPath`" pulumi-lang-python="`json_path`" pulumi-lang-yaml="`jsonPath`" pulumi-lang-java="`jsonPath`" pulumi-lang-hcl="`json_path`">`jsonPath`</span>, <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`" pulumi-lang-hcl="`field`">`field`</span>, <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`" pulumi-lang-hcl="`service`">`service`</span>, <span pulumi-lang-nodejs="`deferralWindow`" pulumi-lang-dotnet="`DeferralWindow`" pulumi-lang-go="`deferralWindow`" pulumi-lang-python="`deferral_window`" pulumi-lang-yaml="`deferralWindow`" pulumi-lang-java="`deferralWindow`" pulumi-lang-hcl="`deferral_window`">`deferralWindow`</span>.
         """
         return pulumi.get(self, "rule_type")
 
@@ -3062,7 +3062,7 @@ class EscalationPathRule(dict):
     @pulumi.getter(name="serviceIds")
     def service_ids(self) -> Optional[Sequence[_builtins.str]]:
         """
-        Service ids for which this escalation path should be used. Only used with <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`">`service`</span> rule type.
+        Service ids for which this escalation path should be used. Only used with <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`" pulumi-lang-hcl="`service`">`service`</span> rule type.
         """
         return pulumi.get(self, "service_ids")
 
@@ -3070,7 +3070,7 @@ class EscalationPathRule(dict):
     @pulumi.getter(name="timeBlocks")
     def time_blocks(self) -> Optional[Sequence['outputs.EscalationPathRuleTimeBlock']]:
         """
-        Time windows during which alerts are deferred. Only used with <span pulumi-lang-nodejs="`deferralWindow`" pulumi-lang-dotnet="`DeferralWindow`" pulumi-lang-go="`deferralWindow`" pulumi-lang-python="`deferral_window`" pulumi-lang-yaml="`deferralWindow`" pulumi-lang-java="`deferralWindow`">`deferral_window`</span> rule type.
+        Time windows during which alerts are deferred. Only used with <span pulumi-lang-nodejs="`deferralWindow`" pulumi-lang-dotnet="`DeferralWindow`" pulumi-lang-go="`deferralWindow`" pulumi-lang-python="`deferral_window`" pulumi-lang-yaml="`deferralWindow`" pulumi-lang-java="`deferralWindow`" pulumi-lang-hcl="`deferral_window`">`deferralWindow`</span> rule type.
         """
         return pulumi.get(self, "time_blocks")
 
@@ -3078,7 +3078,7 @@ class EscalationPathRule(dict):
     @pulumi.getter(name="timeZone")
     def time_zone(self) -> Optional[_builtins.str]:
         """
-        Time zone for the deferral window (IANA format, e.g. `America/New_York`). Only used with <span pulumi-lang-nodejs="`deferralWindow`" pulumi-lang-dotnet="`DeferralWindow`" pulumi-lang-go="`deferralWindow`" pulumi-lang-python="`deferral_window`" pulumi-lang-yaml="`deferralWindow`" pulumi-lang-java="`deferralWindow`">`deferral_window`</span> rule type.
+        Time zone for the deferral window (IANA format, e.g. `America/New_York`). Only used with <span pulumi-lang-nodejs="`deferralWindow`" pulumi-lang-dotnet="`DeferralWindow`" pulumi-lang-go="`deferralWindow`" pulumi-lang-python="`deferral_window`" pulumi-lang-yaml="`deferralWindow`" pulumi-lang-java="`deferralWindow`" pulumi-lang-hcl="`deferral_window`">`deferralWindow`</span> rule type.
         """
         return pulumi.get(self, "time_zone")
 
@@ -3102,7 +3102,7 @@ class EscalationPathRule(dict):
     @pulumi.getter
     def values(self) -> Optional[Sequence[_builtins.str]]:
         """
-        Values to match against. Only used with <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`">`field`</span> rule type.
+        Values to match against. Only used with <span pulumi-lang-nodejs="`field`" pulumi-lang-dotnet="`Field`" pulumi-lang-go="`field`" pulumi-lang-python="`field`" pulumi-lang-yaml="`field`" pulumi-lang-java="`field`" pulumi-lang-hcl="`field`">`field`</span> rule type.
         """
         return pulumi.get(self, "values")
 
@@ -3306,9 +3306,9 @@ class EscalationPathTimeRestriction(dict):
                  start_day: Optional[_builtins.str] = None,
                  start_time: Optional[_builtins.str] = None):
         """
-        :param _builtins.str end_day: Value must be one of <span pulumi-lang-nodejs="`monday`" pulumi-lang-dotnet="`Monday`" pulumi-lang-go="`monday`" pulumi-lang-python="`monday`" pulumi-lang-yaml="`monday`" pulumi-lang-java="`monday`">`monday`</span>, <span pulumi-lang-nodejs="`tuesday`" pulumi-lang-dotnet="`Tuesday`" pulumi-lang-go="`tuesday`" pulumi-lang-python="`tuesday`" pulumi-lang-yaml="`tuesday`" pulumi-lang-java="`tuesday`">`tuesday`</span>, <span pulumi-lang-nodejs="`wednesday`" pulumi-lang-dotnet="`Wednesday`" pulumi-lang-go="`wednesday`" pulumi-lang-python="`wednesday`" pulumi-lang-yaml="`wednesday`" pulumi-lang-java="`wednesday`">`wednesday`</span>, <span pulumi-lang-nodejs="`thursday`" pulumi-lang-dotnet="`Thursday`" pulumi-lang-go="`thursday`" pulumi-lang-python="`thursday`" pulumi-lang-yaml="`thursday`" pulumi-lang-java="`thursday`">`thursday`</span>, <span pulumi-lang-nodejs="`friday`" pulumi-lang-dotnet="`Friday`" pulumi-lang-go="`friday`" pulumi-lang-python="`friday`" pulumi-lang-yaml="`friday`" pulumi-lang-java="`friday`">`friday`</span>, <span pulumi-lang-nodejs="`saturday`" pulumi-lang-dotnet="`Saturday`" pulumi-lang-go="`saturday`" pulumi-lang-python="`saturday`" pulumi-lang-yaml="`saturday`" pulumi-lang-java="`saturday`">`saturday`</span>, <span pulumi-lang-nodejs="`sunday`" pulumi-lang-dotnet="`Sunday`" pulumi-lang-go="`sunday`" pulumi-lang-python="`sunday`" pulumi-lang-yaml="`sunday`" pulumi-lang-java="`sunday`">`sunday`</span>.
+        :param _builtins.str end_day: Value must be one of <span pulumi-lang-nodejs="`monday`" pulumi-lang-dotnet="`Monday`" pulumi-lang-go="`monday`" pulumi-lang-python="`monday`" pulumi-lang-yaml="`monday`" pulumi-lang-java="`monday`" pulumi-lang-hcl="`monday`">`monday`</span>, <span pulumi-lang-nodejs="`tuesday`" pulumi-lang-dotnet="`Tuesday`" pulumi-lang-go="`tuesday`" pulumi-lang-python="`tuesday`" pulumi-lang-yaml="`tuesday`" pulumi-lang-java="`tuesday`" pulumi-lang-hcl="`tuesday`">`tuesday`</span>, <span pulumi-lang-nodejs="`wednesday`" pulumi-lang-dotnet="`Wednesday`" pulumi-lang-go="`wednesday`" pulumi-lang-python="`wednesday`" pulumi-lang-yaml="`wednesday`" pulumi-lang-java="`wednesday`" pulumi-lang-hcl="`wednesday`">`wednesday`</span>, <span pulumi-lang-nodejs="`thursday`" pulumi-lang-dotnet="`Thursday`" pulumi-lang-go="`thursday`" pulumi-lang-python="`thursday`" pulumi-lang-yaml="`thursday`" pulumi-lang-java="`thursday`" pulumi-lang-hcl="`thursday`">`thursday`</span>, <span pulumi-lang-nodejs="`friday`" pulumi-lang-dotnet="`Friday`" pulumi-lang-go="`friday`" pulumi-lang-python="`friday`" pulumi-lang-yaml="`friday`" pulumi-lang-java="`friday`" pulumi-lang-hcl="`friday`">`friday`</span>, <span pulumi-lang-nodejs="`saturday`" pulumi-lang-dotnet="`Saturday`" pulumi-lang-go="`saturday`" pulumi-lang-python="`saturday`" pulumi-lang-yaml="`saturday`" pulumi-lang-java="`saturday`" pulumi-lang-hcl="`saturday`">`saturday`</span>, <span pulumi-lang-nodejs="`sunday`" pulumi-lang-dotnet="`Sunday`" pulumi-lang-go="`sunday`" pulumi-lang-python="`sunday`" pulumi-lang-yaml="`sunday`" pulumi-lang-java="`sunday`" pulumi-lang-hcl="`sunday`">`sunday`</span>.
         :param _builtins.str end_time: Formatted as HH:MM
-        :param _builtins.str start_day: Value must be one of <span pulumi-lang-nodejs="`monday`" pulumi-lang-dotnet="`Monday`" pulumi-lang-go="`monday`" pulumi-lang-python="`monday`" pulumi-lang-yaml="`monday`" pulumi-lang-java="`monday`">`monday`</span>, <span pulumi-lang-nodejs="`tuesday`" pulumi-lang-dotnet="`Tuesday`" pulumi-lang-go="`tuesday`" pulumi-lang-python="`tuesday`" pulumi-lang-yaml="`tuesday`" pulumi-lang-java="`tuesday`">`tuesday`</span>, <span pulumi-lang-nodejs="`wednesday`" pulumi-lang-dotnet="`Wednesday`" pulumi-lang-go="`wednesday`" pulumi-lang-python="`wednesday`" pulumi-lang-yaml="`wednesday`" pulumi-lang-java="`wednesday`">`wednesday`</span>, <span pulumi-lang-nodejs="`thursday`" pulumi-lang-dotnet="`Thursday`" pulumi-lang-go="`thursday`" pulumi-lang-python="`thursday`" pulumi-lang-yaml="`thursday`" pulumi-lang-java="`thursday`">`thursday`</span>, <span pulumi-lang-nodejs="`friday`" pulumi-lang-dotnet="`Friday`" pulumi-lang-go="`friday`" pulumi-lang-python="`friday`" pulumi-lang-yaml="`friday`" pulumi-lang-java="`friday`">`friday`</span>, <span pulumi-lang-nodejs="`saturday`" pulumi-lang-dotnet="`Saturday`" pulumi-lang-go="`saturday`" pulumi-lang-python="`saturday`" pulumi-lang-yaml="`saturday`" pulumi-lang-java="`saturday`">`saturday`</span>, <span pulumi-lang-nodejs="`sunday`" pulumi-lang-dotnet="`Sunday`" pulumi-lang-go="`sunday`" pulumi-lang-python="`sunday`" pulumi-lang-yaml="`sunday`" pulumi-lang-java="`sunday`">`sunday`</span>.
+        :param _builtins.str start_day: Value must be one of <span pulumi-lang-nodejs="`monday`" pulumi-lang-dotnet="`Monday`" pulumi-lang-go="`monday`" pulumi-lang-python="`monday`" pulumi-lang-yaml="`monday`" pulumi-lang-java="`monday`" pulumi-lang-hcl="`monday`">`monday`</span>, <span pulumi-lang-nodejs="`tuesday`" pulumi-lang-dotnet="`Tuesday`" pulumi-lang-go="`tuesday`" pulumi-lang-python="`tuesday`" pulumi-lang-yaml="`tuesday`" pulumi-lang-java="`tuesday`" pulumi-lang-hcl="`tuesday`">`tuesday`</span>, <span pulumi-lang-nodejs="`wednesday`" pulumi-lang-dotnet="`Wednesday`" pulumi-lang-go="`wednesday`" pulumi-lang-python="`wednesday`" pulumi-lang-yaml="`wednesday`" pulumi-lang-java="`wednesday`" pulumi-lang-hcl="`wednesday`">`wednesday`</span>, <span pulumi-lang-nodejs="`thursday`" pulumi-lang-dotnet="`Thursday`" pulumi-lang-go="`thursday`" pulumi-lang-python="`thursday`" pulumi-lang-yaml="`thursday`" pulumi-lang-java="`thursday`" pulumi-lang-hcl="`thursday`">`thursday`</span>, <span pulumi-lang-nodejs="`friday`" pulumi-lang-dotnet="`Friday`" pulumi-lang-go="`friday`" pulumi-lang-python="`friday`" pulumi-lang-yaml="`friday`" pulumi-lang-java="`friday`" pulumi-lang-hcl="`friday`">`friday`</span>, <span pulumi-lang-nodejs="`saturday`" pulumi-lang-dotnet="`Saturday`" pulumi-lang-go="`saturday`" pulumi-lang-python="`saturday`" pulumi-lang-yaml="`saturday`" pulumi-lang-java="`saturday`" pulumi-lang-hcl="`saturday`">`saturday`</span>, <span pulumi-lang-nodejs="`sunday`" pulumi-lang-dotnet="`Sunday`" pulumi-lang-go="`sunday`" pulumi-lang-python="`sunday`" pulumi-lang-yaml="`sunday`" pulumi-lang-java="`sunday`" pulumi-lang-hcl="`sunday`">`sunday`</span>.
         :param _builtins.str start_time: Formatted as HH:MM
         """
         if end_day is not None:
@@ -3324,7 +3324,7 @@ class EscalationPathTimeRestriction(dict):
     @pulumi.getter(name="endDay")
     def end_day(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`monday`" pulumi-lang-dotnet="`Monday`" pulumi-lang-go="`monday`" pulumi-lang-python="`monday`" pulumi-lang-yaml="`monday`" pulumi-lang-java="`monday`">`monday`</span>, <span pulumi-lang-nodejs="`tuesday`" pulumi-lang-dotnet="`Tuesday`" pulumi-lang-go="`tuesday`" pulumi-lang-python="`tuesday`" pulumi-lang-yaml="`tuesday`" pulumi-lang-java="`tuesday`">`tuesday`</span>, <span pulumi-lang-nodejs="`wednesday`" pulumi-lang-dotnet="`Wednesday`" pulumi-lang-go="`wednesday`" pulumi-lang-python="`wednesday`" pulumi-lang-yaml="`wednesday`" pulumi-lang-java="`wednesday`">`wednesday`</span>, <span pulumi-lang-nodejs="`thursday`" pulumi-lang-dotnet="`Thursday`" pulumi-lang-go="`thursday`" pulumi-lang-python="`thursday`" pulumi-lang-yaml="`thursday`" pulumi-lang-java="`thursday`">`thursday`</span>, <span pulumi-lang-nodejs="`friday`" pulumi-lang-dotnet="`Friday`" pulumi-lang-go="`friday`" pulumi-lang-python="`friday`" pulumi-lang-yaml="`friday`" pulumi-lang-java="`friday`">`friday`</span>, <span pulumi-lang-nodejs="`saturday`" pulumi-lang-dotnet="`Saturday`" pulumi-lang-go="`saturday`" pulumi-lang-python="`saturday`" pulumi-lang-yaml="`saturday`" pulumi-lang-java="`saturday`">`saturday`</span>, <span pulumi-lang-nodejs="`sunday`" pulumi-lang-dotnet="`Sunday`" pulumi-lang-go="`sunday`" pulumi-lang-python="`sunday`" pulumi-lang-yaml="`sunday`" pulumi-lang-java="`sunday`">`sunday`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`monday`" pulumi-lang-dotnet="`Monday`" pulumi-lang-go="`monday`" pulumi-lang-python="`monday`" pulumi-lang-yaml="`monday`" pulumi-lang-java="`monday`" pulumi-lang-hcl="`monday`">`monday`</span>, <span pulumi-lang-nodejs="`tuesday`" pulumi-lang-dotnet="`Tuesday`" pulumi-lang-go="`tuesday`" pulumi-lang-python="`tuesday`" pulumi-lang-yaml="`tuesday`" pulumi-lang-java="`tuesday`" pulumi-lang-hcl="`tuesday`">`tuesday`</span>, <span pulumi-lang-nodejs="`wednesday`" pulumi-lang-dotnet="`Wednesday`" pulumi-lang-go="`wednesday`" pulumi-lang-python="`wednesday`" pulumi-lang-yaml="`wednesday`" pulumi-lang-java="`wednesday`" pulumi-lang-hcl="`wednesday`">`wednesday`</span>, <span pulumi-lang-nodejs="`thursday`" pulumi-lang-dotnet="`Thursday`" pulumi-lang-go="`thursday`" pulumi-lang-python="`thursday`" pulumi-lang-yaml="`thursday`" pulumi-lang-java="`thursday`" pulumi-lang-hcl="`thursday`">`thursday`</span>, <span pulumi-lang-nodejs="`friday`" pulumi-lang-dotnet="`Friday`" pulumi-lang-go="`friday`" pulumi-lang-python="`friday`" pulumi-lang-yaml="`friday`" pulumi-lang-java="`friday`" pulumi-lang-hcl="`friday`">`friday`</span>, <span pulumi-lang-nodejs="`saturday`" pulumi-lang-dotnet="`Saturday`" pulumi-lang-go="`saturday`" pulumi-lang-python="`saturday`" pulumi-lang-yaml="`saturday`" pulumi-lang-java="`saturday`" pulumi-lang-hcl="`saturday`">`saturday`</span>, <span pulumi-lang-nodejs="`sunday`" pulumi-lang-dotnet="`Sunday`" pulumi-lang-go="`sunday`" pulumi-lang-python="`sunday`" pulumi-lang-yaml="`sunday`" pulumi-lang-java="`sunday`" pulumi-lang-hcl="`sunday`">`sunday`</span>.
         """
         return pulumi.get(self, "end_day")
 
@@ -3340,7 +3340,7 @@ class EscalationPathTimeRestriction(dict):
     @pulumi.getter(name="startDay")
     def start_day(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`monday`" pulumi-lang-dotnet="`Monday`" pulumi-lang-go="`monday`" pulumi-lang-python="`monday`" pulumi-lang-yaml="`monday`" pulumi-lang-java="`monday`">`monday`</span>, <span pulumi-lang-nodejs="`tuesday`" pulumi-lang-dotnet="`Tuesday`" pulumi-lang-go="`tuesday`" pulumi-lang-python="`tuesday`" pulumi-lang-yaml="`tuesday`" pulumi-lang-java="`tuesday`">`tuesday`</span>, <span pulumi-lang-nodejs="`wednesday`" pulumi-lang-dotnet="`Wednesday`" pulumi-lang-go="`wednesday`" pulumi-lang-python="`wednesday`" pulumi-lang-yaml="`wednesday`" pulumi-lang-java="`wednesday`">`wednesday`</span>, <span pulumi-lang-nodejs="`thursday`" pulumi-lang-dotnet="`Thursday`" pulumi-lang-go="`thursday`" pulumi-lang-python="`thursday`" pulumi-lang-yaml="`thursday`" pulumi-lang-java="`thursday`">`thursday`</span>, <span pulumi-lang-nodejs="`friday`" pulumi-lang-dotnet="`Friday`" pulumi-lang-go="`friday`" pulumi-lang-python="`friday`" pulumi-lang-yaml="`friday`" pulumi-lang-java="`friday`">`friday`</span>, <span pulumi-lang-nodejs="`saturday`" pulumi-lang-dotnet="`Saturday`" pulumi-lang-go="`saturday`" pulumi-lang-python="`saturday`" pulumi-lang-yaml="`saturday`" pulumi-lang-java="`saturday`">`saturday`</span>, <span pulumi-lang-nodejs="`sunday`" pulumi-lang-dotnet="`Sunday`" pulumi-lang-go="`sunday`" pulumi-lang-python="`sunday`" pulumi-lang-yaml="`sunday`" pulumi-lang-java="`sunday`">`sunday`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`monday`" pulumi-lang-dotnet="`Monday`" pulumi-lang-go="`monday`" pulumi-lang-python="`monday`" pulumi-lang-yaml="`monday`" pulumi-lang-java="`monday`" pulumi-lang-hcl="`monday`">`monday`</span>, <span pulumi-lang-nodejs="`tuesday`" pulumi-lang-dotnet="`Tuesday`" pulumi-lang-go="`tuesday`" pulumi-lang-python="`tuesday`" pulumi-lang-yaml="`tuesday`" pulumi-lang-java="`tuesday`" pulumi-lang-hcl="`tuesday`">`tuesday`</span>, <span pulumi-lang-nodejs="`wednesday`" pulumi-lang-dotnet="`Wednesday`" pulumi-lang-go="`wednesday`" pulumi-lang-python="`wednesday`" pulumi-lang-yaml="`wednesday`" pulumi-lang-java="`wednesday`" pulumi-lang-hcl="`wednesday`">`wednesday`</span>, <span pulumi-lang-nodejs="`thursday`" pulumi-lang-dotnet="`Thursday`" pulumi-lang-go="`thursday`" pulumi-lang-python="`thursday`" pulumi-lang-yaml="`thursday`" pulumi-lang-java="`thursday`" pulumi-lang-hcl="`thursday`">`thursday`</span>, <span pulumi-lang-nodejs="`friday`" pulumi-lang-dotnet="`Friday`" pulumi-lang-go="`friday`" pulumi-lang-python="`friday`" pulumi-lang-yaml="`friday`" pulumi-lang-java="`friday`" pulumi-lang-hcl="`friday`">`friday`</span>, <span pulumi-lang-nodejs="`saturday`" pulumi-lang-dotnet="`Saturday`" pulumi-lang-go="`saturday`" pulumi-lang-python="`saturday`" pulumi-lang-yaml="`saturday`" pulumi-lang-java="`saturday`" pulumi-lang-hcl="`saturday`">`saturday`</span>, <span pulumi-lang-nodejs="`sunday`" pulumi-lang-dotnet="`Sunday`" pulumi-lang-go="`sunday`" pulumi-lang-python="`sunday`" pulumi-lang-yaml="`sunday`" pulumi-lang-java="`sunday`" pulumi-lang-hcl="`sunday`">`sunday`</span>.
         """
         return pulumi.get(self, "start_day")
 
@@ -3675,7 +3675,7 @@ class LiveCallRouterPagingTarget(dict):
         """
         :param _builtins.str alert_urgency_id: This is used in escalation paths to determine who to page
         :param _builtins.str id: The ID of paging target
-        :param _builtins.str type: The type of the paging target. Value must be one of <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`">`service`</span>, <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`">`team`</span>, <span pulumi-lang-nodejs="`escalationPolicy`" pulumi-lang-dotnet="`EscalationPolicy`" pulumi-lang-go="`escalationPolicy`" pulumi-lang-python="`escalation_policy`" pulumi-lang-yaml="`escalationPolicy`" pulumi-lang-java="`escalationPolicy`">`escalation_policy`</span>.
+        :param _builtins.str type: The type of the paging target. Value must be one of <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`" pulumi-lang-hcl="`service`">`service`</span>, <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`" pulumi-lang-hcl="`team`">`team`</span>, <span pulumi-lang-nodejs="`escalationPolicy`" pulumi-lang-dotnet="`EscalationPolicy`" pulumi-lang-go="`escalationPolicy`" pulumi-lang-python="`escalation_policy`" pulumi-lang-yaml="`escalationPolicy`" pulumi-lang-java="`escalationPolicy`" pulumi-lang-hcl="`escalation_policy`">`escalationPolicy`</span>.
         """
         if alert_urgency_id is not None:
             pulumi.set(__self__, "alert_urgency_id", alert_urgency_id)
@@ -3704,7 +3704,7 @@ class LiveCallRouterPagingTarget(dict):
     @pulumi.getter
     def type(self) -> Optional[_builtins.str]:
         """
-        The type of the paging target. Value must be one of <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`">`service`</span>, <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`">`team`</span>, <span pulumi-lang-nodejs="`escalationPolicy`" pulumi-lang-dotnet="`EscalationPolicy`" pulumi-lang-go="`escalationPolicy`" pulumi-lang-python="`escalation_policy`" pulumi-lang-yaml="`escalationPolicy`" pulumi-lang-java="`escalationPolicy`">`escalation_policy`</span>.
+        The type of the paging target. Value must be one of <span pulumi-lang-nodejs="`service`" pulumi-lang-dotnet="`Service`" pulumi-lang-go="`service`" pulumi-lang-python="`service`" pulumi-lang-yaml="`service`" pulumi-lang-java="`service`" pulumi-lang-hcl="`service`">`service`</span>, <span pulumi-lang-nodejs="`team`" pulumi-lang-dotnet="`Team`" pulumi-lang-go="`team`" pulumi-lang-python="`team`" pulumi-lang-yaml="`team`" pulumi-lang-java="`team`" pulumi-lang-hcl="`team`">`team`</span>, <span pulumi-lang-nodejs="`escalationPolicy`" pulumi-lang-dotnet="`EscalationPolicy`" pulumi-lang-go="`escalationPolicy`" pulumi-lang-python="`escalation_policy`" pulumi-lang-yaml="`escalationPolicy`" pulumi-lang-java="`escalationPolicy`" pulumi-lang-hcl="`escalation_policy`">`escalationPolicy`</span>.
         """
         return pulumi.get(self, "type")
 
@@ -4314,7 +4314,7 @@ class SlaNotificationConfiguration(dict):
         :param _builtins.str created_at: Date of creation
         :param _builtins.str id: Unique ID of the notification configuration
         :param _builtins.float offset_days: Number of days offset from the deadline
-        :param _builtins.str offset_type: When to send the notification relative to the deadline. Value must be one of <span pulumi-lang-nodejs="`beforeDue`" pulumi-lang-dotnet="`BeforeDue`" pulumi-lang-go="`beforeDue`" pulumi-lang-python="`before_due`" pulumi-lang-yaml="`beforeDue`" pulumi-lang-java="`beforeDue`">`before_due`</span>, <span pulumi-lang-nodejs="`whenDue`" pulumi-lang-dotnet="`WhenDue`" pulumi-lang-go="`whenDue`" pulumi-lang-python="`when_due`" pulumi-lang-yaml="`whenDue`" pulumi-lang-java="`whenDue`">`when_due`</span>, <span pulumi-lang-nodejs="`afterDue`" pulumi-lang-dotnet="`AfterDue`" pulumi-lang-go="`afterDue`" pulumi-lang-python="`after_due`" pulumi-lang-yaml="`afterDue`" pulumi-lang-java="`afterDue`">`after_due`</span>.
+        :param _builtins.str offset_type: When to send the notification relative to the deadline. Value must be one of <span pulumi-lang-nodejs="`beforeDue`" pulumi-lang-dotnet="`BeforeDue`" pulumi-lang-go="`beforeDue`" pulumi-lang-python="`before_due`" pulumi-lang-yaml="`beforeDue`" pulumi-lang-java="`beforeDue`" pulumi-lang-hcl="`before_due`">`beforeDue`</span>, <span pulumi-lang-nodejs="`whenDue`" pulumi-lang-dotnet="`WhenDue`" pulumi-lang-go="`whenDue`" pulumi-lang-python="`when_due`" pulumi-lang-yaml="`whenDue`" pulumi-lang-java="`whenDue`" pulumi-lang-hcl="`when_due`">`whenDue`</span>, <span pulumi-lang-nodejs="`afterDue`" pulumi-lang-dotnet="`AfterDue`" pulumi-lang-go="`afterDue`" pulumi-lang-python="`after_due`" pulumi-lang-yaml="`afterDue`" pulumi-lang-java="`afterDue`" pulumi-lang-hcl="`after_due`">`afterDue`</span>.
         :param _builtins.str updated_at: Date of last update
         """
         if created_at is not None:
@@ -4356,7 +4356,7 @@ class SlaNotificationConfiguration(dict):
     @pulumi.getter(name="offsetType")
     def offset_type(self) -> Optional[_builtins.str]:
         """
-        When to send the notification relative to the deadline. Value must be one of <span pulumi-lang-nodejs="`beforeDue`" pulumi-lang-dotnet="`BeforeDue`" pulumi-lang-go="`beforeDue`" pulumi-lang-python="`before_due`" pulumi-lang-yaml="`beforeDue`" pulumi-lang-java="`beforeDue`">`before_due`</span>, <span pulumi-lang-nodejs="`whenDue`" pulumi-lang-dotnet="`WhenDue`" pulumi-lang-go="`whenDue`" pulumi-lang-python="`when_due`" pulumi-lang-yaml="`whenDue`" pulumi-lang-java="`whenDue`">`when_due`</span>, <span pulumi-lang-nodejs="`afterDue`" pulumi-lang-dotnet="`AfterDue`" pulumi-lang-go="`afterDue`" pulumi-lang-python="`after_due`" pulumi-lang-yaml="`afterDue`" pulumi-lang-java="`afterDue`">`after_due`</span>.
+        When to send the notification relative to the deadline. Value must be one of <span pulumi-lang-nodejs="`beforeDue`" pulumi-lang-dotnet="`BeforeDue`" pulumi-lang-go="`beforeDue`" pulumi-lang-python="`before_due`" pulumi-lang-yaml="`beforeDue`" pulumi-lang-java="`beforeDue`" pulumi-lang-hcl="`before_due`">`beforeDue`</span>, <span pulumi-lang-nodejs="`whenDue`" pulumi-lang-dotnet="`WhenDue`" pulumi-lang-go="`whenDue`" pulumi-lang-python="`when_due`" pulumi-lang-yaml="`whenDue`" pulumi-lang-java="`whenDue`" pulumi-lang-hcl="`when_due`">`whenDue`</span>, <span pulumi-lang-nodejs="`afterDue`" pulumi-lang-dotnet="`AfterDue`" pulumi-lang-go="`afterDue`" pulumi-lang-python="`after_due`" pulumi-lang-yaml="`afterDue`" pulumi-lang-java="`afterDue`" pulumi-lang-hcl="`after_due`">`afterDue`</span>.
         """
         return pulumi.get(self, "offset_type")
 
@@ -4665,25 +4665,32 @@ class WorkflowActionItemTriggerParams(dict):
         :param _builtins.str incident_action_item_condition_kind: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_action_item_condition_priority: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_action_item_condition_status: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param Sequence[_builtins.str] incident_action_item_kinds: Value must be one of <span pulumi-lang-nodejs="`task`" pulumi-lang-dotnet="`Task`" pulumi-lang-go="`task`" pulumi-lang-python="`task`" pulumi-lang-yaml="`task`" pulumi-lang-java="`task`">`task`</span>, <span pulumi-lang-nodejs="`followUp`" pulumi-lang-dotnet="`FollowUp`" pulumi-lang-go="`followUp`" pulumi-lang-python="`follow_up`" pulumi-lang-yaml="`followUp`" pulumi-lang-java="`followUp`">`follow_up`</span>.
-        :param Sequence[_builtins.str] incident_action_item_priorities: Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
-        :param Sequence[_builtins.str] incident_action_item_statuses: Value must be one of <span pulumi-lang-nodejs="`open`" pulumi-lang-dotnet="`Open`" pulumi-lang-go="`open`" pulumi-lang-python="`open`" pulumi-lang-yaml="`open`" pulumi-lang-java="`open`">`open`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`done`" pulumi-lang-dotnet="`Done`" pulumi-lang-go="`done`" pulumi-lang-python="`done`" pulumi-lang-yaml="`done`" pulumi-lang-java="`done`">`done`</span>.
+        :param Sequence[_builtins.str] incident_action_item_kinds: Value must be one of <span pulumi-lang-nodejs="`task`" pulumi-lang-dotnet="`Task`" pulumi-lang-go="`task`" pulumi-lang-python="`task`" pulumi-lang-yaml="`task`" pulumi-lang-java="`task`" pulumi-lang-hcl="`task`">`task`</span>, <span pulumi-lang-nodejs="`followUp`" pulumi-lang-dotnet="`FollowUp`" pulumi-lang-go="`followUp`" pulumi-lang-python="`follow_up`" pulumi-lang-yaml="`followUp`" pulumi-lang-java="`followUp`" pulumi-lang-hcl="`follow_up`">`followUp`</span>.
+        :param Sequence[_builtins.str] incident_action_item_priorities: Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
+        :param Sequence[_builtins.str] incident_action_item_statuses: Value must be one of <span pulumi-lang-nodejs="`open`" pulumi-lang-dotnet="`Open`" pulumi-lang-go="`open`" pulumi-lang-python="`open`" pulumi-lang-yaml="`open`" pulumi-lang-java="`open`" pulumi-lang-hcl="`open`">`open`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`done`" pulumi-lang-dotnet="`Done`" pulumi-lang-go="`done`" pulumi-lang-python="`done`" pulumi-lang-yaml="`done`" pulumi-lang-java="`done`" pulumi-lang-hcl="`done`">`done`</span>.
         :param _builtins.str incident_condition: Value must be one of `ALL`, `ANY`, `NONE`.
+        :param _builtins.str incident_condition_acknowledged_at: Value must be one of `SET`, `UNSET`.
+        :param _builtins.str incident_condition_detected_at: Value must be one of `SET`, `UNSET`.
         :param _builtins.str incident_condition_environment: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_functionality: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_group: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_incident_roles: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_incident_type: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_kind: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_mitigated_at: Value must be one of `SET`, `UNSET`.
+        :param _builtins.str incident_condition_resolved_at: Value must be one of `SET`, `UNSET`.
         :param _builtins.str incident_condition_service: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_severity: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_started_at: Value must be one of `SET`, `UNSET`.
         :param _builtins.str incident_condition_status: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_sub_status: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_summary: Value must be one of `SET`, `UNSET`.
         :param _builtins.str incident_condition_visibility: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_conditional_inactivity: Value must be one of `IS`.
         :param _builtins.str incident_inactivity_duration: ex. 10 min, 1h, 3 days, 2 weeks
-        :param Sequence[_builtins.str] incident_kinds: Value must be one of <span pulumi-lang-nodejs="`test`" pulumi-lang-dotnet="`Test`" pulumi-lang-go="`test`" pulumi-lang-python="`test`" pulumi-lang-yaml="`test`" pulumi-lang-java="`test`">`test`</span>, <span pulumi-lang-nodejs="`testSub`" pulumi-lang-dotnet="`TestSub`" pulumi-lang-go="`testSub`" pulumi-lang-python="`test_sub`" pulumi-lang-yaml="`testSub`" pulumi-lang-java="`testSub`">`test_sub`</span>, <span pulumi-lang-nodejs="`example`" pulumi-lang-dotnet="`Example`" pulumi-lang-go="`example`" pulumi-lang-python="`example`" pulumi-lang-yaml="`example`" pulumi-lang-java="`example`">`example`</span>, <span pulumi-lang-nodejs="`exampleSub`" pulumi-lang-dotnet="`ExampleSub`" pulumi-lang-go="`exampleSub`" pulumi-lang-python="`example_sub`" pulumi-lang-yaml="`exampleSub`" pulumi-lang-java="`exampleSub`">`example_sub`</span>, <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`normalSub`" pulumi-lang-dotnet="`NormalSub`" pulumi-lang-go="`normalSub`" pulumi-lang-python="`normal_sub`" pulumi-lang-yaml="`normalSub`" pulumi-lang-java="`normalSub`">`normal_sub`</span>, <span pulumi-lang-nodejs="`backfilled`" pulumi-lang-dotnet="`Backfilled`" pulumi-lang-go="`backfilled`" pulumi-lang-python="`backfilled`" pulumi-lang-yaml="`backfilled`" pulumi-lang-java="`backfilled`">`backfilled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`scheduledSub`" pulumi-lang-dotnet="`ScheduledSub`" pulumi-lang-go="`scheduledSub`" pulumi-lang-python="`scheduled_sub`" pulumi-lang-yaml="`scheduledSub`" pulumi-lang-java="`scheduledSub`">`scheduled_sub`</span>.
-        :param Sequence[_builtins.str] incident_statuses: Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`">`in_triage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`">`started`</span>, <span pulumi-lang-nodejs="`detected`" pulumi-lang-dotnet="`Detected`" pulumi-lang-go="`detected`" pulumi-lang-python="`detected`" pulumi-lang-yaml="`detected`" pulumi-lang-java="`detected`">`detected`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`">`completed`</span>.
-        :param _builtins.str trigger_type: Value must be one of <span pulumi-lang-nodejs="`actionItem`" pulumi-lang-dotnet="`ActionItem`" pulumi-lang-go="`actionItem`" pulumi-lang-python="`action_item`" pulumi-lang-yaml="`actionItem`" pulumi-lang-java="`actionItem`">`action_item`</span>.
+        :param Sequence[_builtins.str] incident_kinds: Value must be one of <span pulumi-lang-nodejs="`test`" pulumi-lang-dotnet="`Test`" pulumi-lang-go="`test`" pulumi-lang-python="`test`" pulumi-lang-yaml="`test`" pulumi-lang-java="`test`" pulumi-lang-hcl="`test`">`test`</span>, <span pulumi-lang-nodejs="`testSub`" pulumi-lang-dotnet="`TestSub`" pulumi-lang-go="`testSub`" pulumi-lang-python="`test_sub`" pulumi-lang-yaml="`testSub`" pulumi-lang-java="`testSub`" pulumi-lang-hcl="`test_sub`">`testSub`</span>, <span pulumi-lang-nodejs="`example`" pulumi-lang-dotnet="`Example`" pulumi-lang-go="`example`" pulumi-lang-python="`example`" pulumi-lang-yaml="`example`" pulumi-lang-java="`example`" pulumi-lang-hcl="`example`">`example`</span>, <span pulumi-lang-nodejs="`exampleSub`" pulumi-lang-dotnet="`ExampleSub`" pulumi-lang-go="`exampleSub`" pulumi-lang-python="`example_sub`" pulumi-lang-yaml="`exampleSub`" pulumi-lang-java="`exampleSub`" pulumi-lang-hcl="`example_sub`">`exampleSub`</span>, <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`" pulumi-lang-hcl="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`normalSub`" pulumi-lang-dotnet="`NormalSub`" pulumi-lang-go="`normalSub`" pulumi-lang-python="`normal_sub`" pulumi-lang-yaml="`normalSub`" pulumi-lang-java="`normalSub`" pulumi-lang-hcl="`normal_sub`">`normalSub`</span>, <span pulumi-lang-nodejs="`backfilled`" pulumi-lang-dotnet="`Backfilled`" pulumi-lang-go="`backfilled`" pulumi-lang-python="`backfilled`" pulumi-lang-yaml="`backfilled`" pulumi-lang-java="`backfilled`" pulumi-lang-hcl="`backfilled`">`backfilled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`scheduledSub`" pulumi-lang-dotnet="`ScheduledSub`" pulumi-lang-go="`scheduledSub`" pulumi-lang-python="`scheduled_sub`" pulumi-lang-yaml="`scheduledSub`" pulumi-lang-java="`scheduledSub`" pulumi-lang-hcl="`scheduled_sub`">`scheduledSub`</span>.
+        :param Sequence[_builtins.str] incident_statuses: Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`" pulumi-lang-hcl="`in_triage`">`inTriage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`detected`" pulumi-lang-dotnet="`Detected`" pulumi-lang-go="`detected`" pulumi-lang-python="`detected`" pulumi-lang-yaml="`detected`" pulumi-lang-java="`detected`" pulumi-lang-hcl="`detected`">`detected`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`" pulumi-lang-hcl="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`" pulumi-lang-hcl="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`" pulumi-lang-hcl="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`" pulumi-lang-hcl="`completed`">`completed`</span>.
+        :param _builtins.str trigger_type: Value must be one of <span pulumi-lang-nodejs="`actionItem`" pulumi-lang-dotnet="`ActionItem`" pulumi-lang-go="`actionItem`" pulumi-lang-python="`action_item`" pulumi-lang-yaml="`actionItem`" pulumi-lang-java="`actionItem`" pulumi-lang-hcl="`action_item`">`actionItem`</span>.
         :param Sequence[_builtins.str] triggers: Actions that trigger the workflow. One of custom_fields.<slug>.updated, incident_updated, action_item_created, action_item_updated, assigned_user_updated, summary_updated, description_updated, status_updated, priority_updated, due_date_updated, teams_updated, slack_command
         """
         if incident_action_item_condition is not None:
@@ -4804,7 +4811,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentActionItemKinds")
     def incident_action_item_kinds(self) -> Optional[Sequence[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`task`" pulumi-lang-dotnet="`Task`" pulumi-lang-go="`task`" pulumi-lang-python="`task`" pulumi-lang-yaml="`task`" pulumi-lang-java="`task`">`task`</span>, <span pulumi-lang-nodejs="`followUp`" pulumi-lang-dotnet="`FollowUp`" pulumi-lang-go="`followUp`" pulumi-lang-python="`follow_up`" pulumi-lang-yaml="`followUp`" pulumi-lang-java="`followUp`">`follow_up`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`task`" pulumi-lang-dotnet="`Task`" pulumi-lang-go="`task`" pulumi-lang-python="`task`" pulumi-lang-yaml="`task`" pulumi-lang-java="`task`" pulumi-lang-hcl="`task`">`task`</span>, <span pulumi-lang-nodejs="`followUp`" pulumi-lang-dotnet="`FollowUp`" pulumi-lang-go="`followUp`" pulumi-lang-python="`follow_up`" pulumi-lang-yaml="`followUp`" pulumi-lang-java="`followUp`" pulumi-lang-hcl="`follow_up`">`followUp`</span>.
         """
         return pulumi.get(self, "incident_action_item_kinds")
 
@@ -4812,7 +4819,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentActionItemPriorities")
     def incident_action_item_priorities(self) -> Optional[Sequence[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         """
         return pulumi.get(self, "incident_action_item_priorities")
 
@@ -4820,7 +4827,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentActionItemStatuses")
     def incident_action_item_statuses(self) -> Optional[Sequence[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`open`" pulumi-lang-dotnet="`Open`" pulumi-lang-go="`open`" pulumi-lang-python="`open`" pulumi-lang-yaml="`open`" pulumi-lang-java="`open`">`open`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`done`" pulumi-lang-dotnet="`Done`" pulumi-lang-go="`done`" pulumi-lang-python="`done`" pulumi-lang-yaml="`done`" pulumi-lang-java="`done`">`done`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`open`" pulumi-lang-dotnet="`Open`" pulumi-lang-go="`open`" pulumi-lang-python="`open`" pulumi-lang-yaml="`open`" pulumi-lang-java="`open`" pulumi-lang-hcl="`open`">`open`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`done`" pulumi-lang-dotnet="`Done`" pulumi-lang-go="`done`" pulumi-lang-python="`done`" pulumi-lang-yaml="`done`" pulumi-lang-java="`done`" pulumi-lang-hcl="`done`">`done`</span>.
         """
         return pulumi.get(self, "incident_action_item_statuses")
 
@@ -4835,11 +4842,17 @@ class WorkflowActionItemTriggerParams(dict):
     @_builtins.property
     @pulumi.getter(name="incidentConditionAcknowledgedAt")
     def incident_condition_acknowledged_at(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `SET`, `UNSET`.
+        """
         return pulumi.get(self, "incident_condition_acknowledged_at")
 
     @_builtins.property
     @pulumi.getter(name="incidentConditionDetectedAt")
     def incident_condition_detected_at(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `SET`, `UNSET`.
+        """
         return pulumi.get(self, "incident_condition_detected_at")
 
     @_builtins.property
@@ -4893,11 +4906,17 @@ class WorkflowActionItemTriggerParams(dict):
     @_builtins.property
     @pulumi.getter(name="incidentConditionMitigatedAt")
     def incident_condition_mitigated_at(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `SET`, `UNSET`.
+        """
         return pulumi.get(self, "incident_condition_mitigated_at")
 
     @_builtins.property
     @pulumi.getter(name="incidentConditionResolvedAt")
     def incident_condition_resolved_at(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `SET`, `UNSET`.
+        """
         return pulumi.get(self, "incident_condition_resolved_at")
 
     @_builtins.property
@@ -4919,6 +4938,9 @@ class WorkflowActionItemTriggerParams(dict):
     @_builtins.property
     @pulumi.getter(name="incidentConditionStartedAt")
     def incident_condition_started_at(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `SET`, `UNSET`.
+        """
         return pulumi.get(self, "incident_condition_started_at")
 
     @_builtins.property
@@ -4940,6 +4962,9 @@ class WorkflowActionItemTriggerParams(dict):
     @_builtins.property
     @pulumi.getter(name="incidentConditionSummary")
     def incident_condition_summary(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `SET`, `UNSET`.
+        """
         return pulumi.get(self, "incident_condition_summary")
 
     @_builtins.property
@@ -4953,6 +4978,9 @@ class WorkflowActionItemTriggerParams(dict):
     @_builtins.property
     @pulumi.getter(name="incidentConditionalInactivity")
     def incident_conditional_inactivity(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `IS`.
+        """
         return pulumi.get(self, "incident_conditional_inactivity")
 
     @_builtins.property
@@ -4967,7 +4995,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentKinds")
     def incident_kinds(self) -> Optional[Sequence[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`test`" pulumi-lang-dotnet="`Test`" pulumi-lang-go="`test`" pulumi-lang-python="`test`" pulumi-lang-yaml="`test`" pulumi-lang-java="`test`">`test`</span>, <span pulumi-lang-nodejs="`testSub`" pulumi-lang-dotnet="`TestSub`" pulumi-lang-go="`testSub`" pulumi-lang-python="`test_sub`" pulumi-lang-yaml="`testSub`" pulumi-lang-java="`testSub`">`test_sub`</span>, <span pulumi-lang-nodejs="`example`" pulumi-lang-dotnet="`Example`" pulumi-lang-go="`example`" pulumi-lang-python="`example`" pulumi-lang-yaml="`example`" pulumi-lang-java="`example`">`example`</span>, <span pulumi-lang-nodejs="`exampleSub`" pulumi-lang-dotnet="`ExampleSub`" pulumi-lang-go="`exampleSub`" pulumi-lang-python="`example_sub`" pulumi-lang-yaml="`exampleSub`" pulumi-lang-java="`exampleSub`">`example_sub`</span>, <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`normalSub`" pulumi-lang-dotnet="`NormalSub`" pulumi-lang-go="`normalSub`" pulumi-lang-python="`normal_sub`" pulumi-lang-yaml="`normalSub`" pulumi-lang-java="`normalSub`">`normal_sub`</span>, <span pulumi-lang-nodejs="`backfilled`" pulumi-lang-dotnet="`Backfilled`" pulumi-lang-go="`backfilled`" pulumi-lang-python="`backfilled`" pulumi-lang-yaml="`backfilled`" pulumi-lang-java="`backfilled`">`backfilled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`scheduledSub`" pulumi-lang-dotnet="`ScheduledSub`" pulumi-lang-go="`scheduledSub`" pulumi-lang-python="`scheduled_sub`" pulumi-lang-yaml="`scheduledSub`" pulumi-lang-java="`scheduledSub`">`scheduled_sub`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`test`" pulumi-lang-dotnet="`Test`" pulumi-lang-go="`test`" pulumi-lang-python="`test`" pulumi-lang-yaml="`test`" pulumi-lang-java="`test`" pulumi-lang-hcl="`test`">`test`</span>, <span pulumi-lang-nodejs="`testSub`" pulumi-lang-dotnet="`TestSub`" pulumi-lang-go="`testSub`" pulumi-lang-python="`test_sub`" pulumi-lang-yaml="`testSub`" pulumi-lang-java="`testSub`" pulumi-lang-hcl="`test_sub`">`testSub`</span>, <span pulumi-lang-nodejs="`example`" pulumi-lang-dotnet="`Example`" pulumi-lang-go="`example`" pulumi-lang-python="`example`" pulumi-lang-yaml="`example`" pulumi-lang-java="`example`" pulumi-lang-hcl="`example`">`example`</span>, <span pulumi-lang-nodejs="`exampleSub`" pulumi-lang-dotnet="`ExampleSub`" pulumi-lang-go="`exampleSub`" pulumi-lang-python="`example_sub`" pulumi-lang-yaml="`exampleSub`" pulumi-lang-java="`exampleSub`" pulumi-lang-hcl="`example_sub`">`exampleSub`</span>, <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`" pulumi-lang-hcl="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`normalSub`" pulumi-lang-dotnet="`NormalSub`" pulumi-lang-go="`normalSub`" pulumi-lang-python="`normal_sub`" pulumi-lang-yaml="`normalSub`" pulumi-lang-java="`normalSub`" pulumi-lang-hcl="`normal_sub`">`normalSub`</span>, <span pulumi-lang-nodejs="`backfilled`" pulumi-lang-dotnet="`Backfilled`" pulumi-lang-go="`backfilled`" pulumi-lang-python="`backfilled`" pulumi-lang-yaml="`backfilled`" pulumi-lang-java="`backfilled`" pulumi-lang-hcl="`backfilled`">`backfilled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`scheduledSub`" pulumi-lang-dotnet="`ScheduledSub`" pulumi-lang-go="`scheduledSub`" pulumi-lang-python="`scheduled_sub`" pulumi-lang-yaml="`scheduledSub`" pulumi-lang-java="`scheduledSub`" pulumi-lang-hcl="`scheduled_sub`">`scheduledSub`</span>.
         """
         return pulumi.get(self, "incident_kinds")
 
@@ -4975,7 +5003,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="incidentStatuses")
     def incident_statuses(self) -> Optional[Sequence[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`">`in_triage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`">`started`</span>, <span pulumi-lang-nodejs="`detected`" pulumi-lang-dotnet="`Detected`" pulumi-lang-go="`detected`" pulumi-lang-python="`detected`" pulumi-lang-yaml="`detected`" pulumi-lang-java="`detected`">`detected`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`">`completed`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`" pulumi-lang-hcl="`in_triage`">`inTriage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`detected`" pulumi-lang-dotnet="`Detected`" pulumi-lang-go="`detected`" pulumi-lang-python="`detected`" pulumi-lang-yaml="`detected`" pulumi-lang-java="`detected`" pulumi-lang-hcl="`detected`">`detected`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`" pulumi-lang-hcl="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`" pulumi-lang-hcl="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`" pulumi-lang-hcl="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`" pulumi-lang-hcl="`completed`">`completed`</span>.
         """
         return pulumi.get(self, "incident_statuses")
 
@@ -4988,7 +5016,7 @@ class WorkflowActionItemTriggerParams(dict):
     @pulumi.getter(name="triggerType")
     def trigger_type(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`actionItem`" pulumi-lang-dotnet="`ActionItem`" pulumi-lang-go="`actionItem`" pulumi-lang-python="`action_item`" pulumi-lang-yaml="`actionItem`" pulumi-lang-java="`actionItem`">`action_item`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`actionItem`" pulumi-lang-dotnet="`ActionItem`" pulumi-lang-go="`actionItem`" pulumi-lang-python="`action_item`" pulumi-lang-yaml="`actionItem`" pulumi-lang-java="`actionItem`" pulumi-lang-hcl="`action_item`">`actionItem`</span>.
         """
         return pulumi.get(self, "trigger_type")
 
@@ -5089,8 +5117,8 @@ class WorkflowAlertTriggerParams(dict):
         :param _builtins.bool alert_condition_status_use_regexp: Value must be one of true or false
         :param _builtins.str alert_condition_urgency: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str alert_query_payload: You can use jsonpath syntax. eg: $.incident.teams[*]
-        :param _builtins.str trigger_type: Value must be one of <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`">`alert`</span>.
-        :param Sequence[_builtins.str] triggers: Actions that trigger the workflow. Value must be one of <span pulumi-lang-nodejs="`alertCreated`" pulumi-lang-dotnet="`AlertCreated`" pulumi-lang-go="`alertCreated`" pulumi-lang-python="`alert_created`" pulumi-lang-yaml="`alertCreated`" pulumi-lang-java="`alertCreated`">`alert_created`</span>, <span pulumi-lang-nodejs="`alertStatusUpdated`" pulumi-lang-dotnet="`AlertStatusUpdated`" pulumi-lang-go="`alertStatusUpdated`" pulumi-lang-python="`alert_status_updated`" pulumi-lang-yaml="`alertStatusUpdated`" pulumi-lang-java="`alertStatusUpdated`">`alert_status_updated`</span>.
+        :param _builtins.str trigger_type: Value must be one of <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`" pulumi-lang-hcl="`alert`">`alert`</span>.
+        :param Sequence[_builtins.str] triggers: Actions that trigger the workflow. Value must be one of <span pulumi-lang-nodejs="`alertCreated`" pulumi-lang-dotnet="`AlertCreated`" pulumi-lang-go="`alertCreated`" pulumi-lang-python="`alert_created`" pulumi-lang-yaml="`alertCreated`" pulumi-lang-java="`alertCreated`" pulumi-lang-hcl="`alert_created`">`alertCreated`</span>, <span pulumi-lang-nodejs="`alertStatusUpdated`" pulumi-lang-dotnet="`AlertStatusUpdated`" pulumi-lang-go="`alertStatusUpdated`" pulumi-lang-python="`alert_status_updated`" pulumi-lang-yaml="`alertStatusUpdated`" pulumi-lang-java="`alertStatusUpdated`" pulumi-lang-hcl="`alert_status_updated`">`alertStatusUpdated`</span>.
         """
         if alert_condition is not None:
             pulumi.set(__self__, "alert_condition", alert_condition)
@@ -5260,7 +5288,7 @@ class WorkflowAlertTriggerParams(dict):
     @pulumi.getter(name="triggerType")
     def trigger_type(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`">`alert`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`" pulumi-lang-hcl="`alert`">`alert`</span>.
         """
         return pulumi.get(self, "trigger_type")
 
@@ -5268,7 +5296,7 @@ class WorkflowAlertTriggerParams(dict):
     @pulumi.getter
     def triggers(self) -> Optional[Sequence[_builtins.str]]:
         """
-        Actions that trigger the workflow. Value must be one of <span pulumi-lang-nodejs="`alertCreated`" pulumi-lang-dotnet="`AlertCreated`" pulumi-lang-go="`alertCreated`" pulumi-lang-python="`alert_created`" pulumi-lang-yaml="`alertCreated`" pulumi-lang-java="`alertCreated`">`alert_created`</span>, <span pulumi-lang-nodejs="`alertStatusUpdated`" pulumi-lang-dotnet="`AlertStatusUpdated`" pulumi-lang-go="`alertStatusUpdated`" pulumi-lang-python="`alert_status_updated`" pulumi-lang-yaml="`alertStatusUpdated`" pulumi-lang-java="`alertStatusUpdated`">`alert_status_updated`</span>.
+        Actions that trigger the workflow. Value must be one of <span pulumi-lang-nodejs="`alertCreated`" pulumi-lang-dotnet="`AlertCreated`" pulumi-lang-go="`alertCreated`" pulumi-lang-python="`alert_created`" pulumi-lang-yaml="`alertCreated`" pulumi-lang-java="`alertCreated`" pulumi-lang-hcl="`alert_created`">`alertCreated`</span>, <span pulumi-lang-nodejs="`alertStatusUpdated`" pulumi-lang-dotnet="`AlertStatusUpdated`" pulumi-lang-go="`alertStatusUpdated`" pulumi-lang-python="`alert_status_updated`" pulumi-lang-yaml="`alertStatusUpdated`" pulumi-lang-java="`alertStatusUpdated`" pulumi-lang-hcl="`alert_status_updated`">`alertStatusUpdated`</span>.
         """
         return pulumi.get(self, "triggers")
 
@@ -5479,23 +5507,30 @@ class WorkflowIncidentTriggerParams(dict):
                  triggers: Optional[Sequence[_builtins.str]] = None):
         """
         :param _builtins.str incident_condition: Value must be one of `ALL`, `ANY`, `NONE`.
+        :param _builtins.str incident_condition_acknowledged_at: Value must be one of `SET`, `UNSET`.
         :param _builtins.str incident_condition_cause: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_detected_at: Value must be one of `SET`, `UNSET`.
         :param _builtins.str incident_condition_environment: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_functionality: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_group: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_incident_roles: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_incident_type: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_kind: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_mitigated_at: Value must be one of `SET`, `UNSET`.
+        :param _builtins.str incident_condition_resolved_at: Value must be one of `SET`, `UNSET`.
         :param _builtins.str incident_condition_service: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_severity: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_started_at: Value must be one of `SET`, `UNSET`.
         :param _builtins.str incident_condition_status: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_sub_status: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_summary: Value must be one of `SET`, `UNSET`.
         :param _builtins.str incident_condition_visibility: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_conditional_inactivity: Value must be one of `IS`.
         :param _builtins.str incident_inactivity_duration: ex. 10 min, 1h, 3 days, 2 weeks
-        :param Sequence[_builtins.str] incident_kinds: Value must be one of <span pulumi-lang-nodejs="`test`" pulumi-lang-dotnet="`Test`" pulumi-lang-go="`test`" pulumi-lang-python="`test`" pulumi-lang-yaml="`test`" pulumi-lang-java="`test`">`test`</span>, <span pulumi-lang-nodejs="`testSub`" pulumi-lang-dotnet="`TestSub`" pulumi-lang-go="`testSub`" pulumi-lang-python="`test_sub`" pulumi-lang-yaml="`testSub`" pulumi-lang-java="`testSub`">`test_sub`</span>, <span pulumi-lang-nodejs="`example`" pulumi-lang-dotnet="`Example`" pulumi-lang-go="`example`" pulumi-lang-python="`example`" pulumi-lang-yaml="`example`" pulumi-lang-java="`example`">`example`</span>, <span pulumi-lang-nodejs="`exampleSub`" pulumi-lang-dotnet="`ExampleSub`" pulumi-lang-go="`exampleSub`" pulumi-lang-python="`example_sub`" pulumi-lang-yaml="`exampleSub`" pulumi-lang-java="`exampleSub`">`example_sub`</span>, <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`normalSub`" pulumi-lang-dotnet="`NormalSub`" pulumi-lang-go="`normalSub`" pulumi-lang-python="`normal_sub`" pulumi-lang-yaml="`normalSub`" pulumi-lang-java="`normalSub`">`normal_sub`</span>, <span pulumi-lang-nodejs="`backfilled`" pulumi-lang-dotnet="`Backfilled`" pulumi-lang-go="`backfilled`" pulumi-lang-python="`backfilled`" pulumi-lang-yaml="`backfilled`" pulumi-lang-java="`backfilled`">`backfilled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`scheduledSub`" pulumi-lang-dotnet="`ScheduledSub`" pulumi-lang-go="`scheduledSub`" pulumi-lang-python="`scheduled_sub`" pulumi-lang-yaml="`scheduledSub`" pulumi-lang-java="`scheduledSub`">`scheduled_sub`</span>.
-        :param _builtins.str incident_post_mortem_condition_cause: [DEPRECATED] Use<span pulumi-lang-nodejs=" incidentConditionCause " pulumi-lang-dotnet=" IncidentConditionCause " pulumi-lang-go=" incidentConditionCause " pulumi-lang-python=" incident_condition_cause " pulumi-lang-yaml=" incidentConditionCause " pulumi-lang-java=" incidentConditionCause "> incident_condition_cause </span>instead. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param Sequence[_builtins.str] incident_statuses: Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`">`in_triage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`">`started`</span>, <span pulumi-lang-nodejs="`detected`" pulumi-lang-dotnet="`Detected`" pulumi-lang-go="`detected`" pulumi-lang-python="`detected`" pulumi-lang-yaml="`detected`" pulumi-lang-java="`detected`">`detected`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`">`completed`</span>.
-        :param _builtins.str trigger_type: Value must be one of <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`">`incident`</span>.
+        :param Sequence[_builtins.str] incident_kinds: Value must be one of <span pulumi-lang-nodejs="`test`" pulumi-lang-dotnet="`Test`" pulumi-lang-go="`test`" pulumi-lang-python="`test`" pulumi-lang-yaml="`test`" pulumi-lang-java="`test`" pulumi-lang-hcl="`test`">`test`</span>, <span pulumi-lang-nodejs="`testSub`" pulumi-lang-dotnet="`TestSub`" pulumi-lang-go="`testSub`" pulumi-lang-python="`test_sub`" pulumi-lang-yaml="`testSub`" pulumi-lang-java="`testSub`" pulumi-lang-hcl="`test_sub`">`testSub`</span>, <span pulumi-lang-nodejs="`example`" pulumi-lang-dotnet="`Example`" pulumi-lang-go="`example`" pulumi-lang-python="`example`" pulumi-lang-yaml="`example`" pulumi-lang-java="`example`" pulumi-lang-hcl="`example`">`example`</span>, <span pulumi-lang-nodejs="`exampleSub`" pulumi-lang-dotnet="`ExampleSub`" pulumi-lang-go="`exampleSub`" pulumi-lang-python="`example_sub`" pulumi-lang-yaml="`exampleSub`" pulumi-lang-java="`exampleSub`" pulumi-lang-hcl="`example_sub`">`exampleSub`</span>, <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`" pulumi-lang-hcl="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`normalSub`" pulumi-lang-dotnet="`NormalSub`" pulumi-lang-go="`normalSub`" pulumi-lang-python="`normal_sub`" pulumi-lang-yaml="`normalSub`" pulumi-lang-java="`normalSub`" pulumi-lang-hcl="`normal_sub`">`normalSub`</span>, <span pulumi-lang-nodejs="`backfilled`" pulumi-lang-dotnet="`Backfilled`" pulumi-lang-go="`backfilled`" pulumi-lang-python="`backfilled`" pulumi-lang-yaml="`backfilled`" pulumi-lang-java="`backfilled`" pulumi-lang-hcl="`backfilled`">`backfilled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`scheduledSub`" pulumi-lang-dotnet="`ScheduledSub`" pulumi-lang-go="`scheduledSub`" pulumi-lang-python="`scheduled_sub`" pulumi-lang-yaml="`scheduledSub`" pulumi-lang-java="`scheduledSub`" pulumi-lang-hcl="`scheduled_sub`">`scheduledSub`</span>.
+        :param _builtins.str incident_post_mortem_condition_cause: [DEPRECATED] Use<span pulumi-lang-nodejs=" incidentConditionCause " pulumi-lang-dotnet=" IncidentConditionCause " pulumi-lang-go=" incidentConditionCause " pulumi-lang-python=" incident_condition_cause " pulumi-lang-yaml=" incidentConditionCause " pulumi-lang-java=" incidentConditionCause " pulumi-lang-hcl=" incident_condition_cause "> incidentConditionCause </span>instead. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param Sequence[_builtins.str] incident_statuses: Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`" pulumi-lang-hcl="`in_triage`">`inTriage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`detected`" pulumi-lang-dotnet="`Detected`" pulumi-lang-go="`detected`" pulumi-lang-python="`detected`" pulumi-lang-yaml="`detected`" pulumi-lang-java="`detected`" pulumi-lang-hcl="`detected`">`detected`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`" pulumi-lang-hcl="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`" pulumi-lang-hcl="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`" pulumi-lang-hcl="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`" pulumi-lang-hcl="`completed`">`completed`</span>.
+        :param _builtins.str trigger_type: Value must be one of <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`" pulumi-lang-hcl="`incident`">`incident`</span>.
         :param Sequence[_builtins.str] triggers: Actions that trigger the workflow. One of custom_fields.<slug>.updated, incident_in_triage, incident_created, incident_started, incident_updated, title_updated, summary_updated, status_updated, severity_updated, environments_added, environments_removed, environments_updated, incident_types_added, incident_types_removed, incident_types_updated, services_added, services_removed, services_updated, visibility_updated, functionalities_added, functionalities_removed, functionalities_updated, teams_added, teams_removed, teams_updated, causes_added, causes_removed, causes_updated, timeline_updated, status_page_timeline_updated, role_assignments_updated, role_assignments_added, role_assignments_removed, slack_command, slack_channel_created, slack_channel_converted, microsoft_teams_channel_created, microsoft_teams_chat_created, subscribers_updated, subscribers_added, subscribers_removed, user_joined_slack_channel, user_left_slack_channel
         """
         if incident_condition is not None:
@@ -5564,6 +5599,9 @@ class WorkflowIncidentTriggerParams(dict):
     @_builtins.property
     @pulumi.getter(name="incidentConditionAcknowledgedAt")
     def incident_condition_acknowledged_at(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `SET`, `UNSET`.
+        """
         return pulumi.get(self, "incident_condition_acknowledged_at")
 
     @_builtins.property
@@ -5577,6 +5615,9 @@ class WorkflowIncidentTriggerParams(dict):
     @_builtins.property
     @pulumi.getter(name="incidentConditionDetectedAt")
     def incident_condition_detected_at(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `SET`, `UNSET`.
+        """
         return pulumi.get(self, "incident_condition_detected_at")
 
     @_builtins.property
@@ -5630,11 +5671,17 @@ class WorkflowIncidentTriggerParams(dict):
     @_builtins.property
     @pulumi.getter(name="incidentConditionMitigatedAt")
     def incident_condition_mitigated_at(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `SET`, `UNSET`.
+        """
         return pulumi.get(self, "incident_condition_mitigated_at")
 
     @_builtins.property
     @pulumi.getter(name="incidentConditionResolvedAt")
     def incident_condition_resolved_at(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `SET`, `UNSET`.
+        """
         return pulumi.get(self, "incident_condition_resolved_at")
 
     @_builtins.property
@@ -5656,6 +5703,9 @@ class WorkflowIncidentTriggerParams(dict):
     @_builtins.property
     @pulumi.getter(name="incidentConditionStartedAt")
     def incident_condition_started_at(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `SET`, `UNSET`.
+        """
         return pulumi.get(self, "incident_condition_started_at")
 
     @_builtins.property
@@ -5677,6 +5727,9 @@ class WorkflowIncidentTriggerParams(dict):
     @_builtins.property
     @pulumi.getter(name="incidentConditionSummary")
     def incident_condition_summary(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `SET`, `UNSET`.
+        """
         return pulumi.get(self, "incident_condition_summary")
 
     @_builtins.property
@@ -5690,6 +5743,9 @@ class WorkflowIncidentTriggerParams(dict):
     @_builtins.property
     @pulumi.getter(name="incidentConditionalInactivity")
     def incident_conditional_inactivity(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `IS`.
+        """
         return pulumi.get(self, "incident_conditional_inactivity")
 
     @_builtins.property
@@ -5704,7 +5760,7 @@ class WorkflowIncidentTriggerParams(dict):
     @pulumi.getter(name="incidentKinds")
     def incident_kinds(self) -> Optional[Sequence[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`test`" pulumi-lang-dotnet="`Test`" pulumi-lang-go="`test`" pulumi-lang-python="`test`" pulumi-lang-yaml="`test`" pulumi-lang-java="`test`">`test`</span>, <span pulumi-lang-nodejs="`testSub`" pulumi-lang-dotnet="`TestSub`" pulumi-lang-go="`testSub`" pulumi-lang-python="`test_sub`" pulumi-lang-yaml="`testSub`" pulumi-lang-java="`testSub`">`test_sub`</span>, <span pulumi-lang-nodejs="`example`" pulumi-lang-dotnet="`Example`" pulumi-lang-go="`example`" pulumi-lang-python="`example`" pulumi-lang-yaml="`example`" pulumi-lang-java="`example`">`example`</span>, <span pulumi-lang-nodejs="`exampleSub`" pulumi-lang-dotnet="`ExampleSub`" pulumi-lang-go="`exampleSub`" pulumi-lang-python="`example_sub`" pulumi-lang-yaml="`exampleSub`" pulumi-lang-java="`exampleSub`">`example_sub`</span>, <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`normalSub`" pulumi-lang-dotnet="`NormalSub`" pulumi-lang-go="`normalSub`" pulumi-lang-python="`normal_sub`" pulumi-lang-yaml="`normalSub`" pulumi-lang-java="`normalSub`">`normal_sub`</span>, <span pulumi-lang-nodejs="`backfilled`" pulumi-lang-dotnet="`Backfilled`" pulumi-lang-go="`backfilled`" pulumi-lang-python="`backfilled`" pulumi-lang-yaml="`backfilled`" pulumi-lang-java="`backfilled`">`backfilled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`scheduledSub`" pulumi-lang-dotnet="`ScheduledSub`" pulumi-lang-go="`scheduledSub`" pulumi-lang-python="`scheduled_sub`" pulumi-lang-yaml="`scheduledSub`" pulumi-lang-java="`scheduledSub`">`scheduled_sub`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`test`" pulumi-lang-dotnet="`Test`" pulumi-lang-go="`test`" pulumi-lang-python="`test`" pulumi-lang-yaml="`test`" pulumi-lang-java="`test`" pulumi-lang-hcl="`test`">`test`</span>, <span pulumi-lang-nodejs="`testSub`" pulumi-lang-dotnet="`TestSub`" pulumi-lang-go="`testSub`" pulumi-lang-python="`test_sub`" pulumi-lang-yaml="`testSub`" pulumi-lang-java="`testSub`" pulumi-lang-hcl="`test_sub`">`testSub`</span>, <span pulumi-lang-nodejs="`example`" pulumi-lang-dotnet="`Example`" pulumi-lang-go="`example`" pulumi-lang-python="`example`" pulumi-lang-yaml="`example`" pulumi-lang-java="`example`" pulumi-lang-hcl="`example`">`example`</span>, <span pulumi-lang-nodejs="`exampleSub`" pulumi-lang-dotnet="`ExampleSub`" pulumi-lang-go="`exampleSub`" pulumi-lang-python="`example_sub`" pulumi-lang-yaml="`exampleSub`" pulumi-lang-java="`exampleSub`" pulumi-lang-hcl="`example_sub`">`exampleSub`</span>, <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`" pulumi-lang-hcl="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`normalSub`" pulumi-lang-dotnet="`NormalSub`" pulumi-lang-go="`normalSub`" pulumi-lang-python="`normal_sub`" pulumi-lang-yaml="`normalSub`" pulumi-lang-java="`normalSub`" pulumi-lang-hcl="`normal_sub`">`normalSub`</span>, <span pulumi-lang-nodejs="`backfilled`" pulumi-lang-dotnet="`Backfilled`" pulumi-lang-go="`backfilled`" pulumi-lang-python="`backfilled`" pulumi-lang-yaml="`backfilled`" pulumi-lang-java="`backfilled`" pulumi-lang-hcl="`backfilled`">`backfilled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`scheduledSub`" pulumi-lang-dotnet="`ScheduledSub`" pulumi-lang-go="`scheduledSub`" pulumi-lang-python="`scheduled_sub`" pulumi-lang-yaml="`scheduledSub`" pulumi-lang-java="`scheduledSub`" pulumi-lang-hcl="`scheduled_sub`">`scheduledSub`</span>.
         """
         return pulumi.get(self, "incident_kinds")
 
@@ -5712,7 +5768,7 @@ class WorkflowIncidentTriggerParams(dict):
     @pulumi.getter(name="incidentPostMortemConditionCause")
     def incident_post_mortem_condition_cause(self) -> Optional[_builtins.str]:
         """
-        [DEPRECATED] Use<span pulumi-lang-nodejs=" incidentConditionCause " pulumi-lang-dotnet=" IncidentConditionCause " pulumi-lang-go=" incidentConditionCause " pulumi-lang-python=" incident_condition_cause " pulumi-lang-yaml=" incidentConditionCause " pulumi-lang-java=" incidentConditionCause "> incident_condition_cause </span>instead. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        [DEPRECATED] Use<span pulumi-lang-nodejs=" incidentConditionCause " pulumi-lang-dotnet=" IncidentConditionCause " pulumi-lang-go=" incidentConditionCause " pulumi-lang-python=" incident_condition_cause " pulumi-lang-yaml=" incidentConditionCause " pulumi-lang-java=" incidentConditionCause " pulumi-lang-hcl=" incident_condition_cause "> incidentConditionCause </span>instead. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_post_mortem_condition_cause")
 
@@ -5720,7 +5776,7 @@ class WorkflowIncidentTriggerParams(dict):
     @pulumi.getter(name="incidentStatuses")
     def incident_statuses(self) -> Optional[Sequence[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`">`in_triage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`">`started`</span>, <span pulumi-lang-nodejs="`detected`" pulumi-lang-dotnet="`Detected`" pulumi-lang-go="`detected`" pulumi-lang-python="`detected`" pulumi-lang-yaml="`detected`" pulumi-lang-java="`detected`">`detected`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`">`completed`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`" pulumi-lang-hcl="`in_triage`">`inTriage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`detected`" pulumi-lang-dotnet="`Detected`" pulumi-lang-go="`detected`" pulumi-lang-python="`detected`" pulumi-lang-yaml="`detected`" pulumi-lang-java="`detected`" pulumi-lang-hcl="`detected`">`detected`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`" pulumi-lang-hcl="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`" pulumi-lang-hcl="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`" pulumi-lang-hcl="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`" pulumi-lang-hcl="`completed`">`completed`</span>.
         """
         return pulumi.get(self, "incident_statuses")
 
@@ -5733,7 +5789,7 @@ class WorkflowIncidentTriggerParams(dict):
     @pulumi.getter(name="triggerType")
     def trigger_type(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`">`incident`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`" pulumi-lang-hcl="`incident`">`incident`</span>.
         """
         return pulumi.get(self, "trigger_type")
 
@@ -5854,26 +5910,33 @@ class WorkflowPostMortemTriggerParams(dict):
                  triggers: Optional[Sequence[_builtins.str]] = None):
         """
         :param _builtins.str incident_condition: Value must be one of `ALL`, `ANY`, `NONE`.
+        :param _builtins.str incident_condition_acknowledged_at: Value must be one of `SET`, `UNSET`.
         :param _builtins.str incident_condition_cause: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_detected_at: Value must be one of `SET`, `UNSET`.
         :param _builtins.str incident_condition_environment: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_functionality: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_group: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_incident_roles: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_incident_type: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_kind: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_mitigated_at: Value must be one of `SET`, `UNSET`.
+        :param _builtins.str incident_condition_resolved_at: Value must be one of `SET`, `UNSET`.
         :param _builtins.str incident_condition_service: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_severity: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_started_at: Value must be one of `SET`, `UNSET`.
         :param _builtins.str incident_condition_status: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_condition_sub_status: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_condition_summary: Value must be one of `SET`, `UNSET`.
         :param _builtins.str incident_condition_visibility: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_conditional_inactivity: Value must be one of `IS`.
         :param _builtins.str incident_inactivity_duration: ex. 10 min, 1h, 3 days, 2 weeks
-        :param Sequence[_builtins.str] incident_kinds: Value must be one of <span pulumi-lang-nodejs="`test`" pulumi-lang-dotnet="`Test`" pulumi-lang-go="`test`" pulumi-lang-python="`test`" pulumi-lang-yaml="`test`" pulumi-lang-java="`test`">`test`</span>, <span pulumi-lang-nodejs="`testSub`" pulumi-lang-dotnet="`TestSub`" pulumi-lang-go="`testSub`" pulumi-lang-python="`test_sub`" pulumi-lang-yaml="`testSub`" pulumi-lang-java="`testSub`">`test_sub`</span>, <span pulumi-lang-nodejs="`example`" pulumi-lang-dotnet="`Example`" pulumi-lang-go="`example`" pulumi-lang-python="`example`" pulumi-lang-yaml="`example`" pulumi-lang-java="`example`">`example`</span>, <span pulumi-lang-nodejs="`exampleSub`" pulumi-lang-dotnet="`ExampleSub`" pulumi-lang-go="`exampleSub`" pulumi-lang-python="`example_sub`" pulumi-lang-yaml="`exampleSub`" pulumi-lang-java="`exampleSub`">`example_sub`</span>, <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`normalSub`" pulumi-lang-dotnet="`NormalSub`" pulumi-lang-go="`normalSub`" pulumi-lang-python="`normal_sub`" pulumi-lang-yaml="`normalSub`" pulumi-lang-java="`normalSub`">`normal_sub`</span>, <span pulumi-lang-nodejs="`backfilled`" pulumi-lang-dotnet="`Backfilled`" pulumi-lang-go="`backfilled`" pulumi-lang-python="`backfilled`" pulumi-lang-yaml="`backfilled`" pulumi-lang-java="`backfilled`">`backfilled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`scheduledSub`" pulumi-lang-dotnet="`ScheduledSub`" pulumi-lang-go="`scheduledSub`" pulumi-lang-python="`scheduled_sub`" pulumi-lang-yaml="`scheduledSub`" pulumi-lang-java="`scheduledSub`">`scheduled_sub`</span>.
+        :param Sequence[_builtins.str] incident_kinds: Value must be one of <span pulumi-lang-nodejs="`test`" pulumi-lang-dotnet="`Test`" pulumi-lang-go="`test`" pulumi-lang-python="`test`" pulumi-lang-yaml="`test`" pulumi-lang-java="`test`" pulumi-lang-hcl="`test`">`test`</span>, <span pulumi-lang-nodejs="`testSub`" pulumi-lang-dotnet="`TestSub`" pulumi-lang-go="`testSub`" pulumi-lang-python="`test_sub`" pulumi-lang-yaml="`testSub`" pulumi-lang-java="`testSub`" pulumi-lang-hcl="`test_sub`">`testSub`</span>, <span pulumi-lang-nodejs="`example`" pulumi-lang-dotnet="`Example`" pulumi-lang-go="`example`" pulumi-lang-python="`example`" pulumi-lang-yaml="`example`" pulumi-lang-java="`example`" pulumi-lang-hcl="`example`">`example`</span>, <span pulumi-lang-nodejs="`exampleSub`" pulumi-lang-dotnet="`ExampleSub`" pulumi-lang-go="`exampleSub`" pulumi-lang-python="`example_sub`" pulumi-lang-yaml="`exampleSub`" pulumi-lang-java="`exampleSub`" pulumi-lang-hcl="`example_sub`">`exampleSub`</span>, <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`" pulumi-lang-hcl="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`normalSub`" pulumi-lang-dotnet="`NormalSub`" pulumi-lang-go="`normalSub`" pulumi-lang-python="`normal_sub`" pulumi-lang-yaml="`normalSub`" pulumi-lang-java="`normalSub`" pulumi-lang-hcl="`normal_sub`">`normalSub`</span>, <span pulumi-lang-nodejs="`backfilled`" pulumi-lang-dotnet="`Backfilled`" pulumi-lang-go="`backfilled`" pulumi-lang-python="`backfilled`" pulumi-lang-yaml="`backfilled`" pulumi-lang-java="`backfilled`" pulumi-lang-hcl="`backfilled`">`backfilled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`scheduledSub`" pulumi-lang-dotnet="`ScheduledSub`" pulumi-lang-go="`scheduledSub`" pulumi-lang-python="`scheduled_sub`" pulumi-lang-yaml="`scheduledSub`" pulumi-lang-java="`scheduledSub`" pulumi-lang-hcl="`scheduled_sub`">`scheduledSub`</span>.
         :param _builtins.str incident_post_mortem_condition: Value must be one of `ALL`, `ANY`, `NONE`.
-        :param _builtins.str incident_post_mortem_condition_cause: [DEPRECATED] Use<span pulumi-lang-nodejs=" incidentConditionCause " pulumi-lang-dotnet=" IncidentConditionCause " pulumi-lang-go=" incidentConditionCause " pulumi-lang-python=" incident_condition_cause " pulumi-lang-yaml=" incidentConditionCause " pulumi-lang-java=" incidentConditionCause "> incident_condition_cause </span>instead. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param _builtins.str incident_post_mortem_condition_cause: [DEPRECATED] Use<span pulumi-lang-nodejs=" incidentConditionCause " pulumi-lang-dotnet=" IncidentConditionCause " pulumi-lang-go=" incidentConditionCause " pulumi-lang-python=" incident_condition_cause " pulumi-lang-yaml=" incidentConditionCause " pulumi-lang-java=" incidentConditionCause " pulumi-lang-hcl=" incident_condition_cause "> incidentConditionCause </span>instead. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.str incident_post_mortem_condition_status: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
-        :param Sequence[_builtins.str] incident_post_mortem_statuses: Value must be one of <span pulumi-lang-nodejs="`draft`" pulumi-lang-dotnet="`Draft`" pulumi-lang-go="`draft`" pulumi-lang-python="`draft`" pulumi-lang-yaml="`draft`" pulumi-lang-java="`draft`">`draft`</span>, <span pulumi-lang-nodejs="`published`" pulumi-lang-dotnet="`Published`" pulumi-lang-go="`published`" pulumi-lang-python="`published`" pulumi-lang-yaml="`published`" pulumi-lang-java="`published`">`published`</span>.
-        :param Sequence[_builtins.str] incident_statuses: Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`">`in_triage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`">`started`</span>, <span pulumi-lang-nodejs="`detected`" pulumi-lang-dotnet="`Detected`" pulumi-lang-go="`detected`" pulumi-lang-python="`detected`" pulumi-lang-yaml="`detected`" pulumi-lang-java="`detected`">`detected`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`">`completed`</span>.
-        :param _builtins.str trigger_type: Value must be one of <span pulumi-lang-nodejs="`postMortem`" pulumi-lang-dotnet="`PostMortem`" pulumi-lang-go="`postMortem`" pulumi-lang-python="`post_mortem`" pulumi-lang-yaml="`postMortem`" pulumi-lang-java="`postMortem`">`post_mortem`</span>.
+        :param Sequence[_builtins.str] incident_post_mortem_statuses: Value must be one of <span pulumi-lang-nodejs="`draft`" pulumi-lang-dotnet="`Draft`" pulumi-lang-go="`draft`" pulumi-lang-python="`draft`" pulumi-lang-yaml="`draft`" pulumi-lang-java="`draft`" pulumi-lang-hcl="`draft`">`draft`</span>, <span pulumi-lang-nodejs="`published`" pulumi-lang-dotnet="`Published`" pulumi-lang-go="`published`" pulumi-lang-python="`published`" pulumi-lang-yaml="`published`" pulumi-lang-java="`published`" pulumi-lang-hcl="`published`">`published`</span>.
+        :param Sequence[_builtins.str] incident_statuses: Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`" pulumi-lang-hcl="`in_triage`">`inTriage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`detected`" pulumi-lang-dotnet="`Detected`" pulumi-lang-go="`detected`" pulumi-lang-python="`detected`" pulumi-lang-yaml="`detected`" pulumi-lang-java="`detected`" pulumi-lang-hcl="`detected`">`detected`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`" pulumi-lang-hcl="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`" pulumi-lang-hcl="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`" pulumi-lang-hcl="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`" pulumi-lang-hcl="`completed`">`completed`</span>.
+        :param _builtins.str trigger_type: Value must be one of <span pulumi-lang-nodejs="`postMortem`" pulumi-lang-dotnet="`PostMortem`" pulumi-lang-go="`postMortem`" pulumi-lang-python="`post_mortem`" pulumi-lang-yaml="`postMortem`" pulumi-lang-java="`postMortem`" pulumi-lang-hcl="`post_mortem`">`postMortem`</span>.
         :param Sequence[_builtins.str] triggers: Actions that trigger the workflow. One of custom_fields.<slug>.updated, post_mortem_created, post_mortem_updated, status_updated, slack_command
         """
         if incident_condition is not None:
@@ -5948,6 +6011,9 @@ class WorkflowPostMortemTriggerParams(dict):
     @_builtins.property
     @pulumi.getter(name="incidentConditionAcknowledgedAt")
     def incident_condition_acknowledged_at(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `SET`, `UNSET`.
+        """
         return pulumi.get(self, "incident_condition_acknowledged_at")
 
     @_builtins.property
@@ -5961,6 +6027,9 @@ class WorkflowPostMortemTriggerParams(dict):
     @_builtins.property
     @pulumi.getter(name="incidentConditionDetectedAt")
     def incident_condition_detected_at(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `SET`, `UNSET`.
+        """
         return pulumi.get(self, "incident_condition_detected_at")
 
     @_builtins.property
@@ -6014,11 +6083,17 @@ class WorkflowPostMortemTriggerParams(dict):
     @_builtins.property
     @pulumi.getter(name="incidentConditionMitigatedAt")
     def incident_condition_mitigated_at(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `SET`, `UNSET`.
+        """
         return pulumi.get(self, "incident_condition_mitigated_at")
 
     @_builtins.property
     @pulumi.getter(name="incidentConditionResolvedAt")
     def incident_condition_resolved_at(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `SET`, `UNSET`.
+        """
         return pulumi.get(self, "incident_condition_resolved_at")
 
     @_builtins.property
@@ -6040,6 +6115,9 @@ class WorkflowPostMortemTriggerParams(dict):
     @_builtins.property
     @pulumi.getter(name="incidentConditionStartedAt")
     def incident_condition_started_at(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `SET`, `UNSET`.
+        """
         return pulumi.get(self, "incident_condition_started_at")
 
     @_builtins.property
@@ -6061,6 +6139,9 @@ class WorkflowPostMortemTriggerParams(dict):
     @_builtins.property
     @pulumi.getter(name="incidentConditionSummary")
     def incident_condition_summary(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `SET`, `UNSET`.
+        """
         return pulumi.get(self, "incident_condition_summary")
 
     @_builtins.property
@@ -6074,6 +6155,9 @@ class WorkflowPostMortemTriggerParams(dict):
     @_builtins.property
     @pulumi.getter(name="incidentConditionalInactivity")
     def incident_conditional_inactivity(self) -> Optional[_builtins.str]:
+        """
+        Value must be one of `IS`.
+        """
         return pulumi.get(self, "incident_conditional_inactivity")
 
     @_builtins.property
@@ -6088,7 +6172,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="incidentKinds")
     def incident_kinds(self) -> Optional[Sequence[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`test`" pulumi-lang-dotnet="`Test`" pulumi-lang-go="`test`" pulumi-lang-python="`test`" pulumi-lang-yaml="`test`" pulumi-lang-java="`test`">`test`</span>, <span pulumi-lang-nodejs="`testSub`" pulumi-lang-dotnet="`TestSub`" pulumi-lang-go="`testSub`" pulumi-lang-python="`test_sub`" pulumi-lang-yaml="`testSub`" pulumi-lang-java="`testSub`">`test_sub`</span>, <span pulumi-lang-nodejs="`example`" pulumi-lang-dotnet="`Example`" pulumi-lang-go="`example`" pulumi-lang-python="`example`" pulumi-lang-yaml="`example`" pulumi-lang-java="`example`">`example`</span>, <span pulumi-lang-nodejs="`exampleSub`" pulumi-lang-dotnet="`ExampleSub`" pulumi-lang-go="`exampleSub`" pulumi-lang-python="`example_sub`" pulumi-lang-yaml="`exampleSub`" pulumi-lang-java="`exampleSub`">`example_sub`</span>, <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`normalSub`" pulumi-lang-dotnet="`NormalSub`" pulumi-lang-go="`normalSub`" pulumi-lang-python="`normal_sub`" pulumi-lang-yaml="`normalSub`" pulumi-lang-java="`normalSub`">`normal_sub`</span>, <span pulumi-lang-nodejs="`backfilled`" pulumi-lang-dotnet="`Backfilled`" pulumi-lang-go="`backfilled`" pulumi-lang-python="`backfilled`" pulumi-lang-yaml="`backfilled`" pulumi-lang-java="`backfilled`">`backfilled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`scheduledSub`" pulumi-lang-dotnet="`ScheduledSub`" pulumi-lang-go="`scheduledSub`" pulumi-lang-python="`scheduled_sub`" pulumi-lang-yaml="`scheduledSub`" pulumi-lang-java="`scheduledSub`">`scheduled_sub`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`test`" pulumi-lang-dotnet="`Test`" pulumi-lang-go="`test`" pulumi-lang-python="`test`" pulumi-lang-yaml="`test`" pulumi-lang-java="`test`" pulumi-lang-hcl="`test`">`test`</span>, <span pulumi-lang-nodejs="`testSub`" pulumi-lang-dotnet="`TestSub`" pulumi-lang-go="`testSub`" pulumi-lang-python="`test_sub`" pulumi-lang-yaml="`testSub`" pulumi-lang-java="`testSub`" pulumi-lang-hcl="`test_sub`">`testSub`</span>, <span pulumi-lang-nodejs="`example`" pulumi-lang-dotnet="`Example`" pulumi-lang-go="`example`" pulumi-lang-python="`example`" pulumi-lang-yaml="`example`" pulumi-lang-java="`example`" pulumi-lang-hcl="`example`">`example`</span>, <span pulumi-lang-nodejs="`exampleSub`" pulumi-lang-dotnet="`ExampleSub`" pulumi-lang-go="`exampleSub`" pulumi-lang-python="`example_sub`" pulumi-lang-yaml="`exampleSub`" pulumi-lang-java="`exampleSub`" pulumi-lang-hcl="`example_sub`">`exampleSub`</span>, <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`" pulumi-lang-hcl="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`normalSub`" pulumi-lang-dotnet="`NormalSub`" pulumi-lang-go="`normalSub`" pulumi-lang-python="`normal_sub`" pulumi-lang-yaml="`normalSub`" pulumi-lang-java="`normalSub`" pulumi-lang-hcl="`normal_sub`">`normalSub`</span>, <span pulumi-lang-nodejs="`backfilled`" pulumi-lang-dotnet="`Backfilled`" pulumi-lang-go="`backfilled`" pulumi-lang-python="`backfilled`" pulumi-lang-yaml="`backfilled`" pulumi-lang-java="`backfilled`" pulumi-lang-hcl="`backfilled`">`backfilled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`scheduledSub`" pulumi-lang-dotnet="`ScheduledSub`" pulumi-lang-go="`scheduledSub`" pulumi-lang-python="`scheduled_sub`" pulumi-lang-yaml="`scheduledSub`" pulumi-lang-java="`scheduledSub`" pulumi-lang-hcl="`scheduled_sub`">`scheduledSub`</span>.
         """
         return pulumi.get(self, "incident_kinds")
 
@@ -6104,7 +6188,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="incidentPostMortemConditionCause")
     def incident_post_mortem_condition_cause(self) -> Optional[_builtins.str]:
         """
-        [DEPRECATED] Use<span pulumi-lang-nodejs=" incidentConditionCause " pulumi-lang-dotnet=" IncidentConditionCause " pulumi-lang-go=" incidentConditionCause " pulumi-lang-python=" incident_condition_cause " pulumi-lang-yaml=" incidentConditionCause " pulumi-lang-java=" incidentConditionCause "> incident_condition_cause </span>instead. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        [DEPRECATED] Use<span pulumi-lang-nodejs=" incidentConditionCause " pulumi-lang-dotnet=" IncidentConditionCause " pulumi-lang-go=" incidentConditionCause " pulumi-lang-python=" incident_condition_cause " pulumi-lang-yaml=" incidentConditionCause " pulumi-lang-java=" incidentConditionCause " pulumi-lang-hcl=" incident_condition_cause "> incidentConditionCause </span>instead. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_post_mortem_condition_cause")
 
@@ -6120,7 +6204,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="incidentPostMortemStatuses")
     def incident_post_mortem_statuses(self) -> Optional[Sequence[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`draft`" pulumi-lang-dotnet="`Draft`" pulumi-lang-go="`draft`" pulumi-lang-python="`draft`" pulumi-lang-yaml="`draft`" pulumi-lang-java="`draft`">`draft`</span>, <span pulumi-lang-nodejs="`published`" pulumi-lang-dotnet="`Published`" pulumi-lang-go="`published`" pulumi-lang-python="`published`" pulumi-lang-yaml="`published`" pulumi-lang-java="`published`">`published`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`draft`" pulumi-lang-dotnet="`Draft`" pulumi-lang-go="`draft`" pulumi-lang-python="`draft`" pulumi-lang-yaml="`draft`" pulumi-lang-java="`draft`" pulumi-lang-hcl="`draft`">`draft`</span>, <span pulumi-lang-nodejs="`published`" pulumi-lang-dotnet="`Published`" pulumi-lang-go="`published`" pulumi-lang-python="`published`" pulumi-lang-yaml="`published`" pulumi-lang-java="`published`" pulumi-lang-hcl="`published`">`published`</span>.
         """
         return pulumi.get(self, "incident_post_mortem_statuses")
 
@@ -6128,7 +6212,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="incidentStatuses")
     def incident_statuses(self) -> Optional[Sequence[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`">`in_triage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`">`started`</span>, <span pulumi-lang-nodejs="`detected`" pulumi-lang-dotnet="`Detected`" pulumi-lang-go="`detected`" pulumi-lang-python="`detected`" pulumi-lang-yaml="`detected`" pulumi-lang-java="`detected`">`detected`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`">`completed`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`" pulumi-lang-hcl="`in_triage`">`inTriage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`detected`" pulumi-lang-dotnet="`Detected`" pulumi-lang-go="`detected`" pulumi-lang-python="`detected`" pulumi-lang-yaml="`detected`" pulumi-lang-java="`detected`" pulumi-lang-hcl="`detected`">`detected`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`" pulumi-lang-hcl="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`" pulumi-lang-hcl="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`" pulumi-lang-hcl="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`" pulumi-lang-hcl="`completed`">`completed`</span>.
         """
         return pulumi.get(self, "incident_statuses")
 
@@ -6141,7 +6225,7 @@ class WorkflowPostMortemTriggerParams(dict):
     @pulumi.getter(name="triggerType")
     def trigger_type(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`postMortem`" pulumi-lang-dotnet="`PostMortem`" pulumi-lang-go="`postMortem`" pulumi-lang-python="`post_mortem`" pulumi-lang-yaml="`postMortem`" pulumi-lang-java="`postMortem`">`post_mortem`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`postMortem`" pulumi-lang-dotnet="`PostMortem`" pulumi-lang-go="`postMortem`" pulumi-lang-python="`post_mortem`" pulumi-lang-yaml="`postMortem`" pulumi-lang-java="`postMortem`" pulumi-lang-hcl="`post_mortem`">`postMortem`</span>.
         """
         return pulumi.get(self, "trigger_type")
 
@@ -6218,8 +6302,8 @@ class WorkflowPulseTriggerParams(dict):
         :param _builtins.str pulse_condition_source: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param _builtins.bool pulse_condition_source_use_regexp: Value must be one of true or false
         :param _builtins.str pulse_query_payload: You can use jsonpath syntax. eg: $.incident.teams[*]
-        :param _builtins.str trigger_type: Value must be one of <span pulumi-lang-nodejs="`pulse`" pulumi-lang-dotnet="`Pulse`" pulumi-lang-go="`pulse`" pulumi-lang-python="`pulse`" pulumi-lang-yaml="`pulse`" pulumi-lang-java="`pulse`">`pulse`</span>.
-        :param Sequence[_builtins.str] triggers: Actions that trigger the workflow. Value must be one of <span pulumi-lang-nodejs="`pulseCreated`" pulumi-lang-dotnet="`PulseCreated`" pulumi-lang-go="`pulseCreated`" pulumi-lang-python="`pulse_created`" pulumi-lang-yaml="`pulseCreated`" pulumi-lang-java="`pulseCreated`">`pulse_created`</span>.
+        :param _builtins.str trigger_type: Value must be one of <span pulumi-lang-nodejs="`pulse`" pulumi-lang-dotnet="`Pulse`" pulumi-lang-go="`pulse`" pulumi-lang-python="`pulse`" pulumi-lang-yaml="`pulse`" pulumi-lang-java="`pulse`" pulumi-lang-hcl="`pulse`">`pulse`</span>.
+        :param Sequence[_builtins.str] triggers: Actions that trigger the workflow. Value must be one of <span pulumi-lang-nodejs="`pulseCreated`" pulumi-lang-dotnet="`PulseCreated`" pulumi-lang-go="`pulseCreated`" pulumi-lang-python="`pulse_created`" pulumi-lang-yaml="`pulseCreated`" pulumi-lang-java="`pulseCreated`" pulumi-lang-hcl="`pulse_created`">`pulseCreated`</span>.
         """
         if pulse_condition is not None:
             pulumi.set(__self__, "pulse_condition", pulse_condition)
@@ -6331,7 +6415,7 @@ class WorkflowPulseTriggerParams(dict):
     @pulumi.getter(name="triggerType")
     def trigger_type(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`pulse`" pulumi-lang-dotnet="`Pulse`" pulumi-lang-go="`pulse`" pulumi-lang-python="`pulse`" pulumi-lang-yaml="`pulse`" pulumi-lang-java="`pulse`">`pulse`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`pulse`" pulumi-lang-dotnet="`Pulse`" pulumi-lang-go="`pulse`" pulumi-lang-python="`pulse`" pulumi-lang-yaml="`pulse`" pulumi-lang-java="`pulse`" pulumi-lang-hcl="`pulse`">`pulse`</span>.
         """
         return pulumi.get(self, "trigger_type")
 
@@ -6339,7 +6423,7 @@ class WorkflowPulseTriggerParams(dict):
     @pulumi.getter
     def triggers(self) -> Optional[Sequence[_builtins.str]]:
         """
-        Actions that trigger the workflow. Value must be one of <span pulumi-lang-nodejs="`pulseCreated`" pulumi-lang-dotnet="`PulseCreated`" pulumi-lang-go="`pulseCreated`" pulumi-lang-python="`pulse_created`" pulumi-lang-yaml="`pulseCreated`" pulumi-lang-java="`pulseCreated`">`pulse_created`</span>.
+        Actions that trigger the workflow. Value must be one of <span pulumi-lang-nodejs="`pulseCreated`" pulumi-lang-dotnet="`PulseCreated`" pulumi-lang-go="`pulseCreated`" pulumi-lang-python="`pulse_created`" pulumi-lang-yaml="`pulseCreated`" pulumi-lang-java="`pulseCreated`" pulumi-lang-hcl="`pulse_created`">`pulseCreated`</span>.
         """
         return pulumi.get(self, "triggers")
 
@@ -6367,8 +6451,8 @@ class WorkflowSimpleTriggerParams(dict):
                  trigger_type: Optional[_builtins.str] = None,
                  triggers: Optional[Sequence[_builtins.str]] = None):
         """
-        :param _builtins.str trigger_type: Value must be one of <span pulumi-lang-nodejs="`simple`" pulumi-lang-dotnet="`Simple`" pulumi-lang-go="`simple`" pulumi-lang-python="`simple`" pulumi-lang-yaml="`simple`" pulumi-lang-java="`simple`">`simple`</span>.
-        :param Sequence[_builtins.str] triggers: Actions that trigger the workflow. Value must be one of <span pulumi-lang-nodejs="`slackCommand`" pulumi-lang-dotnet="`SlackCommand`" pulumi-lang-go="`slackCommand`" pulumi-lang-python="`slack_command`" pulumi-lang-yaml="`slackCommand`" pulumi-lang-java="`slackCommand`">`slack_command`</span>.
+        :param _builtins.str trigger_type: Value must be one of <span pulumi-lang-nodejs="`simple`" pulumi-lang-dotnet="`Simple`" pulumi-lang-go="`simple`" pulumi-lang-python="`simple`" pulumi-lang-yaml="`simple`" pulumi-lang-java="`simple`" pulumi-lang-hcl="`simple`">`simple`</span>.
+        :param Sequence[_builtins.str] triggers: Actions that trigger the workflow. Value must be one of <span pulumi-lang-nodejs="`slackCommand`" pulumi-lang-dotnet="`SlackCommand`" pulumi-lang-go="`slackCommand`" pulumi-lang-python="`slack_command`" pulumi-lang-yaml="`slackCommand`" pulumi-lang-java="`slackCommand`" pulumi-lang-hcl="`slack_command`">`slackCommand`</span>.
         """
         if trigger_type is not None:
             pulumi.set(__self__, "trigger_type", trigger_type)
@@ -6379,7 +6463,7 @@ class WorkflowSimpleTriggerParams(dict):
     @pulumi.getter(name="triggerType")
     def trigger_type(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`simple`" pulumi-lang-dotnet="`Simple`" pulumi-lang-go="`simple`" pulumi-lang-python="`simple`" pulumi-lang-yaml="`simple`" pulumi-lang-java="`simple`">`simple`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`simple`" pulumi-lang-dotnet="`Simple`" pulumi-lang-go="`simple`" pulumi-lang-python="`simple`" pulumi-lang-yaml="`simple`" pulumi-lang-java="`simple`" pulumi-lang-hcl="`simple`">`simple`</span>.
         """
         return pulumi.get(self, "trigger_type")
 
@@ -6387,7 +6471,7 @@ class WorkflowSimpleTriggerParams(dict):
     @pulumi.getter
     def triggers(self) -> Optional[Sequence[_builtins.str]]:
         """
-        Actions that trigger the workflow. Value must be one of <span pulumi-lang-nodejs="`slackCommand`" pulumi-lang-dotnet="`SlackCommand`" pulumi-lang-go="`slackCommand`" pulumi-lang-python="`slack_command`" pulumi-lang-yaml="`slackCommand`" pulumi-lang-java="`slackCommand`">`slack_command`</span>.
+        Actions that trigger the workflow. Value must be one of <span pulumi-lang-nodejs="`slackCommand`" pulumi-lang-dotnet="`SlackCommand`" pulumi-lang-go="`slackCommand`" pulumi-lang-python="`slack_command`" pulumi-lang-yaml="`slackCommand`" pulumi-lang-java="`slackCommand`" pulumi-lang-hcl="`slack_command`">`slackCommand`</span>.
         """
         return pulumi.get(self, "triggers")
 
@@ -6443,18 +6527,18 @@ class WorkflowTaskAddActionItemTaskParams(dict):
                  query_value: Optional[_builtins.str] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param _builtins.str priority: The action item priority. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
-        :param _builtins.str status: The action item status. Value must be one of <span pulumi-lang-nodejs="`open`" pulumi-lang-dotnet="`Open`" pulumi-lang-go="`open`" pulumi-lang-python="`open`" pulumi-lang-yaml="`open`" pulumi-lang-java="`open`">`open`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`done`" pulumi-lang-dotnet="`Done`" pulumi-lang-go="`done`" pulumi-lang-python="`done`" pulumi-lang-yaml="`done`" pulumi-lang-java="`done`">`done`</span>.
+        :param _builtins.str priority: The action item priority. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
+        :param _builtins.str status: The action item status. Value must be one of <span pulumi-lang-nodejs="`open`" pulumi-lang-dotnet="`Open`" pulumi-lang-go="`open`" pulumi-lang-python="`open`" pulumi-lang-yaml="`open`" pulumi-lang-java="`open`" pulumi-lang-hcl="`open`">`open`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`done`" pulumi-lang-dotnet="`Done`" pulumi-lang-go="`done`" pulumi-lang-python="`done`" pulumi-lang-yaml="`done`" pulumi-lang-java="`done`" pulumi-lang-hcl="`done`">`done`</span>.
         :param _builtins.str summary: The action item summary
-        :param Mapping[str, _builtins.str] assigned_to_user: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.  The user this action item is assigned to
-        :param _builtins.str assigned_to_user_id: [DEPRECATED] Use<span pulumi-lang-nodejs=" assignedToUser " pulumi-lang-dotnet=" AssignedToUser " pulumi-lang-go=" assignedToUser " pulumi-lang-python=" assigned_to_user " pulumi-lang-yaml=" assignedToUser " pulumi-lang-java=" assignedToUser "> assigned_to_user </span>attribute instead. The user id this action item is assigned to
-        :param _builtins.str attribute_to_query_by: Attribute of the Incident to match against. Value must be one of <span pulumi-lang-nodejs="`jiraIssueId`" pulumi-lang-dotnet="`JiraIssueId`" pulumi-lang-go="`jiraIssueId`" pulumi-lang-python="`jira_issue_id`" pulumi-lang-yaml="`jiraIssueId`" pulumi-lang-java="`jiraIssueId`">`jira_issue_id`</span>.
+        :param Mapping[str, _builtins.str] assigned_to_user: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.  The user this action item is assigned to
+        :param _builtins.str assigned_to_user_id: [DEPRECATED] Use<span pulumi-lang-nodejs=" assignedToUser " pulumi-lang-dotnet=" AssignedToUser " pulumi-lang-go=" assignedToUser " pulumi-lang-python=" assigned_to_user " pulumi-lang-yaml=" assignedToUser " pulumi-lang-java=" assignedToUser " pulumi-lang-hcl=" assigned_to_user "> assignedToUser </span>attribute instead. The user id this action item is assigned to
+        :param _builtins.str attribute_to_query_by: Attribute of the Incident to match against. Value must be one of <span pulumi-lang-nodejs="`jiraIssueId`" pulumi-lang-dotnet="`JiraIssueId`" pulumi-lang-go="`jiraIssueId`" pulumi-lang-python="`jira_issue_id`" pulumi-lang-yaml="`jiraIssueId`" pulumi-lang-java="`jiraIssueId`" pulumi-lang-hcl="`jira_issue_id`">`jiraIssueId`</span>.
         :param _builtins.str custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON
         :param _builtins.str description: The action item description
         :param _builtins.str incident_role_id: The role id this action item is associated with
         :param _builtins.str kind: The action item kind
         :param _builtins.bool post_to_incident_timeline: Value must be one of true or false
-        :param _builtins.str query_value: Value that<span pulumi-lang-nodejs=" attributeToQueryBy " pulumi-lang-dotnet=" AttributeToQueryBy " pulumi-lang-go=" attributeToQueryBy " pulumi-lang-python=" attribute_to_query_by " pulumi-lang-yaml=" attributeToQueryBy " pulumi-lang-java=" attributeToQueryBy "> attribute_to_query_by </span>to uses to match against
+        :param _builtins.str query_value: Value that<span pulumi-lang-nodejs=" attributeToQueryBy " pulumi-lang-dotnet=" AttributeToQueryBy " pulumi-lang-go=" attributeToQueryBy " pulumi-lang-python=" attribute_to_query_by " pulumi-lang-yaml=" attributeToQueryBy " pulumi-lang-java=" attributeToQueryBy " pulumi-lang-hcl=" attribute_to_query_by "> attributeToQueryBy </span>to uses to match against
         """
         pulumi.set(__self__, "priority", priority)
         pulumi.set(__self__, "status", status)
@@ -6486,7 +6570,7 @@ class WorkflowTaskAddActionItemTaskParams(dict):
     @pulumi.getter
     def priority(self) -> _builtins.str:
         """
-        The action item priority. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        The action item priority. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         """
         return pulumi.get(self, "priority")
 
@@ -6494,7 +6578,7 @@ class WorkflowTaskAddActionItemTaskParams(dict):
     @pulumi.getter
     def status(self) -> _builtins.str:
         """
-        The action item status. Value must be one of <span pulumi-lang-nodejs="`open`" pulumi-lang-dotnet="`Open`" pulumi-lang-go="`open`" pulumi-lang-python="`open`" pulumi-lang-yaml="`open`" pulumi-lang-java="`open`">`open`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`done`" pulumi-lang-dotnet="`Done`" pulumi-lang-go="`done`" pulumi-lang-python="`done`" pulumi-lang-yaml="`done`" pulumi-lang-java="`done`">`done`</span>.
+        The action item status. Value must be one of <span pulumi-lang-nodejs="`open`" pulumi-lang-dotnet="`Open`" pulumi-lang-go="`open`" pulumi-lang-python="`open`" pulumi-lang-yaml="`open`" pulumi-lang-java="`open`" pulumi-lang-hcl="`open`">`open`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`done`" pulumi-lang-dotnet="`Done`" pulumi-lang-go="`done`" pulumi-lang-python="`done`" pulumi-lang-yaml="`done`" pulumi-lang-java="`done`" pulumi-lang-hcl="`done`">`done`</span>.
         """
         return pulumi.get(self, "status")
 
@@ -6510,7 +6594,7 @@ class WorkflowTaskAddActionItemTaskParams(dict):
     @pulumi.getter(name="assignedToUser")
     def assigned_to_user(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.  The user this action item is assigned to
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.  The user this action item is assigned to
         """
         return pulumi.get(self, "assigned_to_user")
 
@@ -6518,7 +6602,7 @@ class WorkflowTaskAddActionItemTaskParams(dict):
     @pulumi.getter(name="assignedToUserId")
     def assigned_to_user_id(self) -> Optional[_builtins.str]:
         """
-        [DEPRECATED] Use<span pulumi-lang-nodejs=" assignedToUser " pulumi-lang-dotnet=" AssignedToUser " pulumi-lang-go=" assignedToUser " pulumi-lang-python=" assigned_to_user " pulumi-lang-yaml=" assignedToUser " pulumi-lang-java=" assignedToUser "> assigned_to_user </span>attribute instead. The user id this action item is assigned to
+        [DEPRECATED] Use<span pulumi-lang-nodejs=" assignedToUser " pulumi-lang-dotnet=" AssignedToUser " pulumi-lang-go=" assignedToUser " pulumi-lang-python=" assigned_to_user " pulumi-lang-yaml=" assignedToUser " pulumi-lang-java=" assignedToUser " pulumi-lang-hcl=" assigned_to_user "> assignedToUser </span>attribute instead. The user id this action item is assigned to
         """
         return pulumi.get(self, "assigned_to_user_id")
 
@@ -6526,7 +6610,7 @@ class WorkflowTaskAddActionItemTaskParams(dict):
     @pulumi.getter(name="attributeToQueryBy")
     def attribute_to_query_by(self) -> Optional[_builtins.str]:
         """
-        Attribute of the Incident to match against. Value must be one of <span pulumi-lang-nodejs="`jiraIssueId`" pulumi-lang-dotnet="`JiraIssueId`" pulumi-lang-go="`jiraIssueId`" pulumi-lang-python="`jira_issue_id`" pulumi-lang-yaml="`jiraIssueId`" pulumi-lang-java="`jiraIssueId`">`jira_issue_id`</span>.
+        Attribute of the Incident to match against. Value must be one of <span pulumi-lang-nodejs="`jiraIssueId`" pulumi-lang-dotnet="`JiraIssueId`" pulumi-lang-go="`jiraIssueId`" pulumi-lang-python="`jira_issue_id`" pulumi-lang-yaml="`jiraIssueId`" pulumi-lang-java="`jiraIssueId`" pulumi-lang-hcl="`jira_issue_id`">`jiraIssueId`</span>.
         """
         return pulumi.get(self, "attribute_to_query_by")
 
@@ -6579,7 +6663,7 @@ class WorkflowTaskAddActionItemTaskParams(dict):
     @pulumi.getter(name="queryValue")
     def query_value(self) -> Optional[_builtins.str]:
         """
-        Value that<span pulumi-lang-nodejs=" attributeToQueryBy " pulumi-lang-dotnet=" AttributeToQueryBy " pulumi-lang-go=" attributeToQueryBy " pulumi-lang-python=" attribute_to_query_by " pulumi-lang-yaml=" attributeToQueryBy " pulumi-lang-java=" attributeToQueryBy "> attribute_to_query_by </span>to uses to match against
+        Value that<span pulumi-lang-nodejs=" attributeToQueryBy " pulumi-lang-dotnet=" AttributeToQueryBy " pulumi-lang-go=" attributeToQueryBy " pulumi-lang-python=" attribute_to_query_by " pulumi-lang-yaml=" attributeToQueryBy " pulumi-lang-java=" attributeToQueryBy " pulumi-lang-hcl=" attribute_to_query_by "> attributeToQueryBy </span>to uses to match against
         """
         return pulumi.get(self, "query_value")
 
@@ -6633,7 +6717,7 @@ class WorkflowTaskAddMicrosoftTeamsChatTabTaskParams(dict):
                  title: _builtins.str,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] chat: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] chat: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str link: The tab link
         :param _builtins.str title: The tab title
         """
@@ -6647,7 +6731,7 @@ class WorkflowTaskAddMicrosoftTeamsChatTabTaskParams(dict):
     @pulumi.getter
     def chat(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "chat")
 
@@ -6702,8 +6786,8 @@ class WorkflowTaskAddMicrosoftTeamsTabTaskParams(dict):
                  task_type: Optional[_builtins.str] = None,
                  title: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] team: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] team: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str link: The tab link. Required if not a playbook tab
         :param _builtins.str playbook_id: The playbook id if tab is of an incident playbook
         :param _builtins.str title: The tab title. Required if not a playbook tab
@@ -6723,7 +6807,7 @@ class WorkflowTaskAddMicrosoftTeamsTabTaskParams(dict):
     @pulumi.getter
     def channel(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "channel")
 
@@ -6731,7 +6815,7 @@ class WorkflowTaskAddMicrosoftTeamsTabTaskParams(dict):
     @pulumi.getter
     def team(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "team")
 
@@ -6797,8 +6881,8 @@ class WorkflowTaskAddRoleTaskParams(dict):
                  task_type: Optional[_builtins.str] = None):
         """
         :param _builtins.str incident_role_id: The role id to add to the incident
-        :param Mapping[str, _builtins.str] assigned_to_user: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.  The user this role is assigned to
-        :param _builtins.str assigned_to_user_id: [DEPRECATED] Use<span pulumi-lang-nodejs=" assignedToUser " pulumi-lang-dotnet=" AssignedToUser " pulumi-lang-go=" assignedToUser " pulumi-lang-python=" assigned_to_user " pulumi-lang-yaml=" assignedToUser " pulumi-lang-java=" assignedToUser "> assigned_to_user </span>attribute instead. The user id this role is assigned to
+        :param Mapping[str, _builtins.str] assigned_to_user: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.  The user this role is assigned to
+        :param _builtins.str assigned_to_user_id: [DEPRECATED] Use<span pulumi-lang-nodejs=" assignedToUser " pulumi-lang-dotnet=" AssignedToUser " pulumi-lang-go=" assignedToUser " pulumi-lang-python=" assigned_to_user " pulumi-lang-yaml=" assignedToUser " pulumi-lang-java=" assignedToUser " pulumi-lang-hcl=" assigned_to_user "> assignedToUser </span>attribute instead. The user id this role is assigned to
         """
         pulumi.set(__self__, "incident_role_id", incident_role_id)
         if assigned_to_user is not None:
@@ -6820,7 +6904,7 @@ class WorkflowTaskAddRoleTaskParams(dict):
     @pulumi.getter(name="assignedToUser")
     def assigned_to_user(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.  The user this role is assigned to
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.  The user this role is assigned to
         """
         return pulumi.get(self, "assigned_to_user")
 
@@ -6828,7 +6912,7 @@ class WorkflowTaskAddRoleTaskParams(dict):
     @pulumi.getter(name="assignedToUserId")
     def assigned_to_user_id(self) -> Optional[_builtins.str]:
         """
-        [DEPRECATED] Use<span pulumi-lang-nodejs=" assignedToUser " pulumi-lang-dotnet=" AssignedToUser " pulumi-lang-go=" assignedToUser " pulumi-lang-python=" assigned_to_user " pulumi-lang-yaml=" assignedToUser " pulumi-lang-java=" assignedToUser "> assigned_to_user </span>attribute instead. The user id this role is assigned to
+        [DEPRECATED] Use<span pulumi-lang-nodejs=" assignedToUser " pulumi-lang-dotnet=" AssignedToUser " pulumi-lang-go=" assignedToUser " pulumi-lang-python=" assigned_to_user " pulumi-lang-yaml=" assignedToUser " pulumi-lang-java=" assignedToUser " pulumi-lang-hcl=" assigned_to_user "> assignedToUser </span>attribute instead. The user id this role is assigned to
         """
         return pulumi.get(self, "assigned_to_user_id")
 
@@ -6867,7 +6951,7 @@ class WorkflowTaskAddSlackBookmarkTaskParams(dict):
                  task_type: Optional[_builtins.str] = None,
                  title: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str emoji: The bookmark emoji
         :param _builtins.str link: The bookmark link. Required if not a playbook bookmark
         :param _builtins.str playbook_id: The playbook id if bookmark is of an incident playbook
@@ -6889,7 +6973,7 @@ class WorkflowTaskAddSlackBookmarkTaskParams(dict):
     @pulumi.getter
     def channel(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "channel")
 
@@ -7084,7 +7168,7 @@ class WorkflowTaskArchiveMicrosoftTeamsChannelsTaskParams(dict):
                  team: Mapping[str, _builtins.str],
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] team: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] team: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "channels", channels)
         pulumi.set(__self__, "team", team)
@@ -7100,7 +7184,7 @@ class WorkflowTaskArchiveMicrosoftTeamsChannelsTaskParams(dict):
     @pulumi.getter
     def team(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "team")
 
@@ -7313,7 +7397,7 @@ class WorkflowTaskAutoAssignRoleOpsgenieTaskParams(dict):
                  task_type: Optional[_builtins.str] = None):
         """
         :param _builtins.str incident_role_id: The role id
-        :param Mapping[str, _builtins.str] schedule: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] schedule: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "incident_role_id", incident_role_id)
         pulumi.set(__self__, "schedule", schedule)
@@ -7332,7 +7416,7 @@ class WorkflowTaskAutoAssignRoleOpsgenieTaskParams(dict):
     @pulumi.getter
     def schedule(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "schedule")
 
@@ -7373,9 +7457,9 @@ class WorkflowTaskAutoAssignRolePagerdutyTaskParams(dict):
                  task_type: Optional[_builtins.str] = None):
         """
         :param _builtins.str incident_role_id: The role id
-        :param Mapping[str, _builtins.str] escalation_policy: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] schedule: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] service: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] escalation_policy: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] schedule: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] service: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "incident_role_id", incident_role_id)
         if escalation_policy is not None:
@@ -7399,7 +7483,7 @@ class WorkflowTaskAutoAssignRolePagerdutyTaskParams(dict):
     @pulumi.getter(name="escalationPolicy")
     def escalation_policy(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "escalation_policy")
 
@@ -7407,7 +7491,7 @@ class WorkflowTaskAutoAssignRolePagerdutyTaskParams(dict):
     @pulumi.getter
     def schedule(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "schedule")
 
@@ -7415,7 +7499,7 @@ class WorkflowTaskAutoAssignRolePagerdutyTaskParams(dict):
     @pulumi.getter
     def service(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "service")
 
@@ -7466,11 +7550,11 @@ class WorkflowTaskAutoAssignRoleRootlyTaskParams(dict):
                  user_target: Optional[Mapping[str, _builtins.str]] = None):
         """
         :param _builtins.str incident_role_id: The role id
-        :param Mapping[str, _builtins.str] escalation_policy_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] group_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] schedule_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] service_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] user_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] escalation_policy_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] group_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] schedule_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] service_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] user_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "incident_role_id", incident_role_id)
         if escalation_policy_target is not None:
@@ -7498,7 +7582,7 @@ class WorkflowTaskAutoAssignRoleRootlyTaskParams(dict):
     @pulumi.getter(name="escalationPolicyTarget")
     def escalation_policy_target(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "escalation_policy_target")
 
@@ -7506,7 +7590,7 @@ class WorkflowTaskAutoAssignRoleRootlyTaskParams(dict):
     @pulumi.getter(name="groupTarget")
     def group_target(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "group_target")
 
@@ -7514,7 +7598,7 @@ class WorkflowTaskAutoAssignRoleRootlyTaskParams(dict):
     @pulumi.getter(name="scheduleTarget")
     def schedule_target(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "schedule_target")
 
@@ -7522,7 +7606,7 @@ class WorkflowTaskAutoAssignRoleRootlyTaskParams(dict):
     @pulumi.getter(name="serviceTarget")
     def service_target(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "service_target")
 
@@ -7535,7 +7619,7 @@ class WorkflowTaskAutoAssignRoleRootlyTaskParams(dict):
     @pulumi.getter(name="userTarget")
     def user_target(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "user_target")
 
@@ -7567,7 +7651,7 @@ class WorkflowTaskAutoAssignRoleVictorOpsTaskParams(dict):
                  task_type: Optional[_builtins.str] = None):
         """
         :param _builtins.str incident_role_id: The role id
-        :param Mapping[str, _builtins.str] team: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] team: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "incident_role_id", incident_role_id)
         pulumi.set(__self__, "team", team)
@@ -7586,7 +7670,7 @@ class WorkflowTaskAutoAssignRoleVictorOpsTaskParams(dict):
     @pulumi.getter
     def team(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "team")
 
@@ -7683,8 +7767,8 @@ class WorkflowTaskChangeSlackChannelPrivacyTaskParams(dict):
                  channel: Optional[Mapping[str, _builtins.str]] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param _builtins.str privacy: Value must be one of <span pulumi-lang-nodejs="`private`" pulumi-lang-dotnet="`Private`" pulumi-lang-go="`private`" pulumi-lang-python="`private`" pulumi-lang-yaml="`private`" pulumi-lang-java="`private`">`private`</span>, <span pulumi-lang-nodejs="`public`" pulumi-lang-dotnet="`Public`" pulumi-lang-go="`public`" pulumi-lang-python="`public`" pulumi-lang-yaml="`public`" pulumi-lang-java="`public`">`public`</span>.
-        :param Mapping[str, _builtins.str] channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param _builtins.str privacy: Value must be one of <span pulumi-lang-nodejs="`private`" pulumi-lang-dotnet="`Private`" pulumi-lang-go="`private`" pulumi-lang-python="`private`" pulumi-lang-yaml="`private`" pulumi-lang-java="`private`" pulumi-lang-hcl="`private`">`private`</span>, <span pulumi-lang-nodejs="`public`" pulumi-lang-dotnet="`Public`" pulumi-lang-go="`public`" pulumi-lang-python="`public`" pulumi-lang-yaml="`public`" pulumi-lang-java="`public`" pulumi-lang-hcl="`public`">`public`</span>.
+        :param Mapping[str, _builtins.str] channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "privacy", privacy)
         if channel is not None:
@@ -7696,7 +7780,7 @@ class WorkflowTaskChangeSlackChannelPrivacyTaskParams(dict):
     @pulumi.getter
     def privacy(self) -> _builtins.str:
         """
-        Value must be one of <span pulumi-lang-nodejs="`private`" pulumi-lang-dotnet="`Private`" pulumi-lang-go="`private`" pulumi-lang-python="`private`" pulumi-lang-yaml="`private`" pulumi-lang-java="`private`">`private`</span>, <span pulumi-lang-nodejs="`public`" pulumi-lang-dotnet="`Public`" pulumi-lang-go="`public`" pulumi-lang-python="`public`" pulumi-lang-yaml="`public`" pulumi-lang-java="`public`">`public`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`private`" pulumi-lang-dotnet="`Private`" pulumi-lang-go="`private`" pulumi-lang-python="`private`" pulumi-lang-yaml="`private`" pulumi-lang-java="`private`" pulumi-lang-hcl="`private`">`private`</span>, <span pulumi-lang-nodejs="`public`" pulumi-lang-dotnet="`Public`" pulumi-lang-go="`public`" pulumi-lang-python="`public`" pulumi-lang-yaml="`public`" pulumi-lang-java="`public`" pulumi-lang-hcl="`public`">`public`</span>.
         """
         return pulumi.get(self, "privacy")
 
@@ -7704,7 +7788,7 @@ class WorkflowTaskChangeSlackChannelPrivacyTaskParams(dict):
     @pulumi.getter
     def channel(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "channel")
 
@@ -7741,8 +7825,8 @@ class WorkflowTaskCreateAirtableTableRecordTaskParams(dict):
                  custom_fields_mapping: Optional[_builtins.str] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] base: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] table: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] base: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] table: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON
         """
         pulumi.set(__self__, "base", base)
@@ -7756,7 +7840,7 @@ class WorkflowTaskCreateAirtableTableRecordTaskParams(dict):
     @pulumi.getter
     def base(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "base")
 
@@ -7764,7 +7848,7 @@ class WorkflowTaskCreateAirtableTableRecordTaskParams(dict):
     @pulumi.getter
     def table(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "table")
 
@@ -7809,7 +7893,7 @@ class WorkflowTaskCreateAnthropicChatCompletionTaskParams(dict):
                  system_prompt: Optional[_builtins.str] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] model: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The Anthropic model. eg: claude-3-5-sonnet-20241022
+        :param Mapping[str, _builtins.str] model: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The Anthropic model. eg: claude-3-5-sonnet-20241022
         :param _builtins.str prompt: The prompt to send to Anthropic
         :param _builtins.str system_prompt: The system prompt to send to Anthropic (optional)
         """
@@ -7824,7 +7908,7 @@ class WorkflowTaskCreateAnthropicChatCompletionTaskParams(dict):
     @pulumi.getter
     def model(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The Anthropic model. eg: claude-3-5-sonnet-20241022
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The Anthropic model. eg: claude-3-5-sonnet-20241022
         """
         return pulumi.get(self, "model")
 
@@ -7893,12 +7977,12 @@ class WorkflowTaskCreateAsanaSubtaskTaskParams(dict):
                  notes: Optional[_builtins.str] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str parent_task_id: The parent task id
         :param _builtins.str title: The subtask title
         :param _builtins.str assign_user_email: The assigned user's email
         :param _builtins.str custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON
-        :param _builtins.str dependency_direction: Value must be one of <span pulumi-lang-nodejs="`blocking`" pulumi-lang-dotnet="`Blocking`" pulumi-lang-go="`blocking`" pulumi-lang-python="`blocking`" pulumi-lang-yaml="`blocking`" pulumi-lang-java="`blocking`">`blocking`</span>, <span pulumi-lang-nodejs="`blockedBy`" pulumi-lang-dotnet="`BlockedBy`" pulumi-lang-go="`blockedBy`" pulumi-lang-python="`blocked_by`" pulumi-lang-yaml="`blockedBy`" pulumi-lang-java="`blockedBy`">`blocked_by`</span>.
+        :param _builtins.str dependency_direction: Value must be one of <span pulumi-lang-nodejs="`blocking`" pulumi-lang-dotnet="`Blocking`" pulumi-lang-go="`blocking`" pulumi-lang-python="`blocking`" pulumi-lang-yaml="`blocking`" pulumi-lang-java="`blocking`" pulumi-lang-hcl="`blocking`">`blocking`</span>, <span pulumi-lang-nodejs="`blockedBy`" pulumi-lang-dotnet="`BlockedBy`" pulumi-lang-go="`blockedBy`" pulumi-lang-python="`blocked_by`" pulumi-lang-yaml="`blockedBy`" pulumi-lang-java="`blockedBy`" pulumi-lang-hcl="`blocked_by`">`blockedBy`</span>.
         :param Sequence[_builtins.str] dependent_task_ids: Dependent task ids. Supports liquid syntax
         :param _builtins.str due_date: The due date
         """
@@ -7924,7 +8008,7 @@ class WorkflowTaskCreateAsanaSubtaskTaskParams(dict):
     @pulumi.getter
     def completion(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "completion")
 
@@ -7964,7 +8048,7 @@ class WorkflowTaskCreateAsanaSubtaskTaskParams(dict):
     @pulumi.getter(name="dependencyDirection")
     def dependency_direction(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`blocking`" pulumi-lang-dotnet="`Blocking`" pulumi-lang-go="`blocking`" pulumi-lang-python="`blocking`" pulumi-lang-yaml="`blocking`" pulumi-lang-java="`blocking`">`blocking`</span>, <span pulumi-lang-nodejs="`blockedBy`" pulumi-lang-dotnet="`BlockedBy`" pulumi-lang-go="`blockedBy`" pulumi-lang-python="`blocked_by`" pulumi-lang-yaml="`blockedBy`" pulumi-lang-java="`blockedBy`">`blocked_by`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`blocking`" pulumi-lang-dotnet="`Blocking`" pulumi-lang-go="`blocking`" pulumi-lang-python="`blocking`" pulumi-lang-yaml="`blocking`" pulumi-lang-java="`blocking`" pulumi-lang-hcl="`blocking`">`blocking`</span>, <span pulumi-lang-nodejs="`blockedBy`" pulumi-lang-dotnet="`BlockedBy`" pulumi-lang-go="`blockedBy`" pulumi-lang-python="`blocked_by`" pulumi-lang-yaml="`blockedBy`" pulumi-lang-java="`blockedBy`" pulumi-lang-hcl="`blocked_by`">`blockedBy`</span>.
         """
         return pulumi.get(self, "dependency_direction")
 
@@ -8037,12 +8121,12 @@ class WorkflowTaskCreateAsanaTaskTaskParams(dict):
                  notes: Optional[_builtins.str] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str title: The task title
-        :param Mapping[str, _builtins.str] workspace: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] workspace: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str assign_user_email: The assigned user's email
         :param _builtins.str custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON
-        :param _builtins.str dependency_direction: Value must be one of <span pulumi-lang-nodejs="`blocking`" pulumi-lang-dotnet="`Blocking`" pulumi-lang-go="`blocking`" pulumi-lang-python="`blocking`" pulumi-lang-yaml="`blocking`" pulumi-lang-java="`blocking`">`blocking`</span>, <span pulumi-lang-nodejs="`blockedBy`" pulumi-lang-dotnet="`BlockedBy`" pulumi-lang-go="`blockedBy`" pulumi-lang-python="`blocked_by`" pulumi-lang-yaml="`blockedBy`" pulumi-lang-java="`blockedBy`">`blocked_by`</span>.
+        :param _builtins.str dependency_direction: Value must be one of <span pulumi-lang-nodejs="`blocking`" pulumi-lang-dotnet="`Blocking`" pulumi-lang-go="`blocking`" pulumi-lang-python="`blocking`" pulumi-lang-yaml="`blocking`" pulumi-lang-java="`blocking`" pulumi-lang-hcl="`blocking`">`blocking`</span>, <span pulumi-lang-nodejs="`blockedBy`" pulumi-lang-dotnet="`BlockedBy`" pulumi-lang-go="`blockedBy`" pulumi-lang-python="`blocked_by`" pulumi-lang-yaml="`blockedBy`" pulumi-lang-java="`blockedBy`" pulumi-lang-hcl="`blocked_by`">`blockedBy`</span>.
         :param Sequence[_builtins.str] dependent_task_ids: Dependent task ids. Supports liquid syntax
         :param _builtins.str due_date: The due date
         """
@@ -8069,7 +8153,7 @@ class WorkflowTaskCreateAsanaTaskTaskParams(dict):
     @pulumi.getter
     def completion(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "completion")
 
@@ -8090,7 +8174,7 @@ class WorkflowTaskCreateAsanaTaskTaskParams(dict):
     @pulumi.getter
     def workspace(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "workspace")
 
@@ -8114,7 +8198,7 @@ class WorkflowTaskCreateAsanaTaskTaskParams(dict):
     @pulumi.getter(name="dependencyDirection")
     def dependency_direction(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`blocking`" pulumi-lang-dotnet="`Blocking`" pulumi-lang-go="`blocking`" pulumi-lang-python="`blocking`" pulumi-lang-yaml="`blocking`" pulumi-lang-java="`blocking`">`blocking`</span>, <span pulumi-lang-nodejs="`blockedBy`" pulumi-lang-dotnet="`BlockedBy`" pulumi-lang-go="`blockedBy`" pulumi-lang-python="`blocked_by`" pulumi-lang-yaml="`blockedBy`" pulumi-lang-java="`blockedBy`">`blocked_by`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`blocking`" pulumi-lang-dotnet="`Blocking`" pulumi-lang-go="`blocking`" pulumi-lang-python="`blocking`" pulumi-lang-yaml="`blocking`" pulumi-lang-java="`blocking`" pulumi-lang-hcl="`blocking`">`blocking`</span>, <span pulumi-lang-nodejs="`blockedBy`" pulumi-lang-dotnet="`BlockedBy`" pulumi-lang-go="`blockedBy`" pulumi-lang-python="`blocked_by`" pulumi-lang-yaml="`blockedBy`" pulumi-lang-java="`blockedBy`" pulumi-lang-hcl="`blocked_by`">`blockedBy`</span>.
         """
         return pulumi.get(self, "dependency_direction")
 
@@ -8203,7 +8287,7 @@ class WorkflowTaskCreateClickupTaskTaskParams(dict):
         :param _builtins.str custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON
         :param _builtins.str description: The task description
         :param _builtins.str due_date: The due date
-        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         :param _builtins.str tags: The task tags
         :param _builtins.str task_payload: Additional ClickUp task attributes. Will be merged into whatever was specified in this tasks current parameters. Can contain liquid markup and need to be valid JSON
         """
@@ -8259,7 +8343,7 @@ class WorkflowTaskCreateClickupTaskTaskParams(dict):
     @pulumi.getter
     def priority(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         """
         return pulumi.get(self, "priority")
 
@@ -8323,12 +8407,12 @@ class WorkflowTaskCreateCodaPageTaskParams(dict):
         """
         :param _builtins.str title: The Coda page title
         :param _builtins.str content: The Coda page content
-        :param Mapping[str, _builtins.str] doc: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The Coda doc object with id and name
+        :param Mapping[str, _builtins.str] doc: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The Coda doc object with id and name
         :param _builtins.str folder_id: The Coda folder id
         :param _builtins.bool mark_post_mortem_as_published: Value must be one of true or false
         :param _builtins.str post_mortem_template_id: Retrospective template to use when creating page, if desired
         :param _builtins.str subtitle: The Coda page subtitle
-        :param Mapping[str, _builtins.str] template: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] template: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "title", title)
         if content is not None:
@@ -8368,7 +8452,7 @@ class WorkflowTaskCreateCodaPageTaskParams(dict):
     @pulumi.getter
     def doc(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The Coda doc object with id and name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The Coda doc object with id and name
         """
         return pulumi.get(self, "doc")
 
@@ -8413,7 +8497,7 @@ class WorkflowTaskCreateCodaPageTaskParams(dict):
     @pulumi.getter
     def template(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "template")
 
@@ -8452,14 +8536,14 @@ class WorkflowTaskCreateConfluencePageTaskParams(dict):
                  task_type: Optional[_builtins.str] = None,
                  template: Optional[Mapping[str, _builtins.str]] = None):
         """
-        :param Mapping[str, _builtins.str] space: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] space: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str title: The page title
-        :param Mapping[str, _builtins.str] ancestor: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] ancestor: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str content: The page content
-        :param Mapping[str, _builtins.str] integration: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Specify integration id if you have more than one Confluence instance
+        :param Mapping[str, _builtins.str] integration: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Specify integration id if you have more than one Confluence instance
         :param _builtins.bool mark_post_mortem_as_published: Value must be one of true or false
         :param _builtins.str post_mortem_template_id: The Retrospective template to use
-        :param Mapping[str, _builtins.str] template: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] template: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "space", space)
         pulumi.set(__self__, "title", title)
@@ -8482,7 +8566,7 @@ class WorkflowTaskCreateConfluencePageTaskParams(dict):
     @pulumi.getter
     def space(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "space")
 
@@ -8498,7 +8582,7 @@ class WorkflowTaskCreateConfluencePageTaskParams(dict):
     @pulumi.getter
     def ancestor(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "ancestor")
 
@@ -8514,7 +8598,7 @@ class WorkflowTaskCreateConfluencePageTaskParams(dict):
     @pulumi.getter
     def integration(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Specify integration id if you have more than one Confluence instance
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Specify integration id if you have more than one Confluence instance
         """
         return pulumi.get(self, "integration")
 
@@ -8543,7 +8627,7 @@ class WorkflowTaskCreateConfluencePageTaskParams(dict):
     @pulumi.getter
     def template(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "template")
 
@@ -8580,12 +8664,12 @@ class WorkflowTaskCreateDatadogNotebookTaskParams(dict):
                  task_type: Optional[_builtins.str] = None,
                  template: Optional[Mapping[str, _builtins.str]] = None):
         """
-        :param _builtins.str kind: The notebook kind. Value must be one of <span pulumi-lang-nodejs="`postmortem`" pulumi-lang-dotnet="`Postmortem`" pulumi-lang-go="`postmortem`" pulumi-lang-python="`postmortem`" pulumi-lang-yaml="`postmortem`" pulumi-lang-java="`postmortem`">`postmortem`</span>, <span pulumi-lang-nodejs="`runbook`" pulumi-lang-dotnet="`Runbook`" pulumi-lang-go="`runbook`" pulumi-lang-python="`runbook`" pulumi-lang-yaml="`runbook`" pulumi-lang-java="`runbook`">`runbook`</span>, <span pulumi-lang-nodejs="`investigation`" pulumi-lang-dotnet="`Investigation`" pulumi-lang-go="`investigation`" pulumi-lang-python="`investigation`" pulumi-lang-yaml="`investigation`" pulumi-lang-java="`investigation`">`investigation`</span>, <span pulumi-lang-nodejs="`documentation`" pulumi-lang-dotnet="`Documentation`" pulumi-lang-go="`documentation`" pulumi-lang-python="`documentation`" pulumi-lang-yaml="`documentation`" pulumi-lang-java="`documentation`">`documentation`</span>, <span pulumi-lang-nodejs="`report`" pulumi-lang-dotnet="`Report`" pulumi-lang-go="`report`" pulumi-lang-python="`report`" pulumi-lang-yaml="`report`" pulumi-lang-java="`report`">`report`</span>.
+        :param _builtins.str kind: The notebook kind. Value must be one of <span pulumi-lang-nodejs="`postmortem`" pulumi-lang-dotnet="`Postmortem`" pulumi-lang-go="`postmortem`" pulumi-lang-python="`postmortem`" pulumi-lang-yaml="`postmortem`" pulumi-lang-java="`postmortem`" pulumi-lang-hcl="`postmortem`">`postmortem`</span>, <span pulumi-lang-nodejs="`runbook`" pulumi-lang-dotnet="`Runbook`" pulumi-lang-go="`runbook`" pulumi-lang-python="`runbook`" pulumi-lang-yaml="`runbook`" pulumi-lang-java="`runbook`" pulumi-lang-hcl="`runbook`">`runbook`</span>, <span pulumi-lang-nodejs="`investigation`" pulumi-lang-dotnet="`Investigation`" pulumi-lang-go="`investigation`" pulumi-lang-python="`investigation`" pulumi-lang-yaml="`investigation`" pulumi-lang-java="`investigation`" pulumi-lang-hcl="`investigation`">`investigation`</span>, <span pulumi-lang-nodejs="`documentation`" pulumi-lang-dotnet="`Documentation`" pulumi-lang-go="`documentation`" pulumi-lang-python="`documentation`" pulumi-lang-yaml="`documentation`" pulumi-lang-java="`documentation`" pulumi-lang-hcl="`documentation`">`documentation`</span>, <span pulumi-lang-nodejs="`report`" pulumi-lang-dotnet="`Report`" pulumi-lang-go="`report`" pulumi-lang-python="`report`" pulumi-lang-yaml="`report`" pulumi-lang-java="`report`" pulumi-lang-hcl="`report`">`report`</span>.
         :param _builtins.str title: The notebook title
         :param _builtins.str content: The notebook content
         :param _builtins.bool mark_post_mortem_as_published: Value must be one of true or false
         :param _builtins.str post_mortem_template_id: Retrospective template to use when creating notebook, if desired
-        :param Mapping[str, _builtins.str] template: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] template: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "kind", kind)
         pulumi.set(__self__, "title", title)
@@ -8604,7 +8688,7 @@ class WorkflowTaskCreateDatadogNotebookTaskParams(dict):
     @pulumi.getter
     def kind(self) -> _builtins.str:
         """
-        The notebook kind. Value must be one of <span pulumi-lang-nodejs="`postmortem`" pulumi-lang-dotnet="`Postmortem`" pulumi-lang-go="`postmortem`" pulumi-lang-python="`postmortem`" pulumi-lang-yaml="`postmortem`" pulumi-lang-java="`postmortem`">`postmortem`</span>, <span pulumi-lang-nodejs="`runbook`" pulumi-lang-dotnet="`Runbook`" pulumi-lang-go="`runbook`" pulumi-lang-python="`runbook`" pulumi-lang-yaml="`runbook`" pulumi-lang-java="`runbook`">`runbook`</span>, <span pulumi-lang-nodejs="`investigation`" pulumi-lang-dotnet="`Investigation`" pulumi-lang-go="`investigation`" pulumi-lang-python="`investigation`" pulumi-lang-yaml="`investigation`" pulumi-lang-java="`investigation`">`investigation`</span>, <span pulumi-lang-nodejs="`documentation`" pulumi-lang-dotnet="`Documentation`" pulumi-lang-go="`documentation`" pulumi-lang-python="`documentation`" pulumi-lang-yaml="`documentation`" pulumi-lang-java="`documentation`">`documentation`</span>, <span pulumi-lang-nodejs="`report`" pulumi-lang-dotnet="`Report`" pulumi-lang-go="`report`" pulumi-lang-python="`report`" pulumi-lang-yaml="`report`" pulumi-lang-java="`report`">`report`</span>.
+        The notebook kind. Value must be one of <span pulumi-lang-nodejs="`postmortem`" pulumi-lang-dotnet="`Postmortem`" pulumi-lang-go="`postmortem`" pulumi-lang-python="`postmortem`" pulumi-lang-yaml="`postmortem`" pulumi-lang-java="`postmortem`" pulumi-lang-hcl="`postmortem`">`postmortem`</span>, <span pulumi-lang-nodejs="`runbook`" pulumi-lang-dotnet="`Runbook`" pulumi-lang-go="`runbook`" pulumi-lang-python="`runbook`" pulumi-lang-yaml="`runbook`" pulumi-lang-java="`runbook`" pulumi-lang-hcl="`runbook`">`runbook`</span>, <span pulumi-lang-nodejs="`investigation`" pulumi-lang-dotnet="`Investigation`" pulumi-lang-go="`investigation`" pulumi-lang-python="`investigation`" pulumi-lang-yaml="`investigation`" pulumi-lang-java="`investigation`" pulumi-lang-hcl="`investigation`">`investigation`</span>, <span pulumi-lang-nodejs="`documentation`" pulumi-lang-dotnet="`Documentation`" pulumi-lang-go="`documentation`" pulumi-lang-python="`documentation`" pulumi-lang-yaml="`documentation`" pulumi-lang-java="`documentation`" pulumi-lang-hcl="`documentation`">`documentation`</span>, <span pulumi-lang-nodejs="`report`" pulumi-lang-dotnet="`Report`" pulumi-lang-go="`report`" pulumi-lang-python="`report`" pulumi-lang-yaml="`report`" pulumi-lang-java="`report`" pulumi-lang-hcl="`report`">`report`</span>.
         """
         return pulumi.get(self, "kind")
 
@@ -8649,7 +8733,7 @@ class WorkflowTaskCreateDatadogNotebookTaskParams(dict):
     @pulumi.getter
     def template(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "template")
 
@@ -8691,8 +8775,8 @@ class WorkflowTaskCreateDropboxPaperPageTaskParams(dict):
         :param _builtins.str title: The page task title
         :param _builtins.str content: The page content
         :param _builtins.bool mark_post_mortem_as_published: Value must be one of true or false
-        :param Mapping[str, _builtins.str] namespace: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] parent_folder: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] namespace: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] parent_folder: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str post_mortem_template_id: Retrospective template to use when creating page task, if desired
         """
         pulumi.set(__self__, "title", title)
@@ -8737,7 +8821,7 @@ class WorkflowTaskCreateDropboxPaperPageTaskParams(dict):
     @pulumi.getter
     def namespace(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "namespace")
 
@@ -8745,7 +8829,7 @@ class WorkflowTaskCreateDropboxPaperPageTaskParams(dict):
     @pulumi.getter(name="parentFolder")
     def parent_folder(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "parent_folder")
 
@@ -8795,10 +8879,10 @@ class WorkflowTaskCreateGithubIssueTaskParams(dict):
                  parent_issue_number: Optional[_builtins.str] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] repository: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] repository: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str title: The issue title
         :param _builtins.str body: The issue body
-        :param Mapping[str, _builtins.str] issue_type: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The issue type
+        :param Mapping[str, _builtins.str] issue_type: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The issue type
         :param Sequence['WorkflowTaskCreateGithubIssueTaskParamsLabelArgs'] labels: The issue labels
         :param _builtins.str parent_issue_number: The parent issue number for sub-issue linking
         """
@@ -8819,7 +8903,7 @@ class WorkflowTaskCreateGithubIssueTaskParams(dict):
     @pulumi.getter
     def repository(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "repository")
 
@@ -8843,7 +8927,7 @@ class WorkflowTaskCreateGithubIssueTaskParams(dict):
     @pulumi.getter(name="issueType")
     def issue_type(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The issue type
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The issue type
         """
         return pulumi.get(self, "issue_type")
 
@@ -8920,11 +9004,11 @@ class WorkflowTaskCreateGitlabIssueTaskParams(dict):
                  labels: Optional[_builtins.str] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] repository: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] repository: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str title: The issue title
         :param _builtins.str description: The issue description
         :param _builtins.str due_date: The due date
-        :param _builtins.str issue_type: The issue type. Value must be one of <span pulumi-lang-nodejs="`issue`" pulumi-lang-dotnet="`Issue`" pulumi-lang-go="`issue`" pulumi-lang-python="`issue`" pulumi-lang-yaml="`issue`" pulumi-lang-java="`issue`">`issue`</span>, <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`">`incident`</span>, <span pulumi-lang-nodejs="`testCase`" pulumi-lang-dotnet="`TestCase`" pulumi-lang-go="`testCase`" pulumi-lang-python="`test_case`" pulumi-lang-yaml="`testCase`" pulumi-lang-java="`testCase`">`test_case`</span>, <span pulumi-lang-nodejs="`task`" pulumi-lang-dotnet="`Task`" pulumi-lang-go="`task`" pulumi-lang-python="`task`" pulumi-lang-yaml="`task`" pulumi-lang-java="`task`">`task`</span>.
+        :param _builtins.str issue_type: The issue type. Value must be one of <span pulumi-lang-nodejs="`issue`" pulumi-lang-dotnet="`Issue`" pulumi-lang-go="`issue`" pulumi-lang-python="`issue`" pulumi-lang-yaml="`issue`" pulumi-lang-java="`issue`" pulumi-lang-hcl="`issue`">`issue`</span>, <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`" pulumi-lang-hcl="`incident`">`incident`</span>, <span pulumi-lang-nodejs="`testCase`" pulumi-lang-dotnet="`TestCase`" pulumi-lang-go="`testCase`" pulumi-lang-python="`test_case`" pulumi-lang-yaml="`testCase`" pulumi-lang-java="`testCase`" pulumi-lang-hcl="`test_case`">`testCase`</span>, <span pulumi-lang-nodejs="`task`" pulumi-lang-dotnet="`Task`" pulumi-lang-go="`task`" pulumi-lang-python="`task`" pulumi-lang-yaml="`task`" pulumi-lang-java="`task`" pulumi-lang-hcl="`task`">`task`</span>.
         :param _builtins.str labels: The issue labels
         """
         pulumi.set(__self__, "repository", repository)
@@ -8944,7 +9028,7 @@ class WorkflowTaskCreateGitlabIssueTaskParams(dict):
     @pulumi.getter
     def repository(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "repository")
 
@@ -8976,7 +9060,7 @@ class WorkflowTaskCreateGitlabIssueTaskParams(dict):
     @pulumi.getter(name="issueType")
     def issue_type(self) -> Optional[_builtins.str]:
         """
-        The issue type. Value must be one of <span pulumi-lang-nodejs="`issue`" pulumi-lang-dotnet="`Issue`" pulumi-lang-go="`issue`" pulumi-lang-python="`issue`" pulumi-lang-yaml="`issue`" pulumi-lang-java="`issue`">`issue`</span>, <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`">`incident`</span>, <span pulumi-lang-nodejs="`testCase`" pulumi-lang-dotnet="`TestCase`" pulumi-lang-go="`testCase`" pulumi-lang-python="`test_case`" pulumi-lang-yaml="`testCase`" pulumi-lang-java="`testCase`">`test_case`</span>, <span pulumi-lang-nodejs="`task`" pulumi-lang-dotnet="`Task`" pulumi-lang-go="`task`" pulumi-lang-python="`task`" pulumi-lang-yaml="`task`" pulumi-lang-java="`task`">`task`</span>.
+        The issue type. Value must be one of <span pulumi-lang-nodejs="`issue`" pulumi-lang-dotnet="`Issue`" pulumi-lang-go="`issue`" pulumi-lang-python="`issue`" pulumi-lang-yaml="`issue`" pulumi-lang-java="`issue`" pulumi-lang-hcl="`issue`">`issue`</span>, <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`" pulumi-lang-hcl="`incident`">`incident`</span>, <span pulumi-lang-nodejs="`testCase`" pulumi-lang-dotnet="`TestCase`" pulumi-lang-go="`testCase`" pulumi-lang-python="`test_case`" pulumi-lang-yaml="`testCase`" pulumi-lang-java="`testCase`" pulumi-lang-hcl="`test_case`">`testCase`</span>, <span pulumi-lang-nodejs="`task`" pulumi-lang-dotnet="`Task`" pulumi-lang-go="`task`" pulumi-lang-python="`task`" pulumi-lang-yaml="`task`" pulumi-lang-java="`task`" pulumi-lang-hcl="`task`">`task`</span>.
         """
         return pulumi.get(self, "issue_type")
 
@@ -9030,7 +9114,7 @@ class WorkflowTaskCreateGoToMeetingTaskParams(dict):
                  task_type: Optional[_builtins.str] = None):
         """
         :param _builtins.str subject: The meeting subject
-        :param _builtins.str conference_call_info: Value must be one of <span pulumi-lang-nodejs="`ptsn`" pulumi-lang-dotnet="`Ptsn`" pulumi-lang-go="`ptsn`" pulumi-lang-python="`ptsn`" pulumi-lang-yaml="`ptsn`" pulumi-lang-java="`ptsn`">`ptsn`</span>, <span pulumi-lang-nodejs="`free`" pulumi-lang-dotnet="`Free`" pulumi-lang-go="`free`" pulumi-lang-python="`free`" pulumi-lang-yaml="`free`" pulumi-lang-java="`free`">`free`</span>, <span pulumi-lang-nodejs="`hyrid`" pulumi-lang-dotnet="`Hyrid`" pulumi-lang-go="`hyrid`" pulumi-lang-python="`hyrid`" pulumi-lang-yaml="`hyrid`" pulumi-lang-java="`hyrid`">`hyrid`</span>, <span pulumi-lang-nodejs="`voip`" pulumi-lang-dotnet="`Voip`" pulumi-lang-go="`voip`" pulumi-lang-python="`voip`" pulumi-lang-yaml="`voip`" pulumi-lang-java="`voip`">`voip`</span>.
+        :param _builtins.str conference_call_info: Value must be one of <span pulumi-lang-nodejs="`ptsn`" pulumi-lang-dotnet="`Ptsn`" pulumi-lang-go="`ptsn`" pulumi-lang-python="`ptsn`" pulumi-lang-yaml="`ptsn`" pulumi-lang-java="`ptsn`" pulumi-lang-hcl="`ptsn`">`ptsn`</span>, <span pulumi-lang-nodejs="`free`" pulumi-lang-dotnet="`Free`" pulumi-lang-go="`free`" pulumi-lang-python="`free`" pulumi-lang-yaml="`free`" pulumi-lang-java="`free`" pulumi-lang-hcl="`free`">`free`</span>, <span pulumi-lang-nodejs="`hyrid`" pulumi-lang-dotnet="`Hyrid`" pulumi-lang-go="`hyrid`" pulumi-lang-python="`hyrid`" pulumi-lang-yaml="`hyrid`" pulumi-lang-java="`hyrid`" pulumi-lang-hcl="`hyrid`">`hyrid`</span>, <span pulumi-lang-nodejs="`voip`" pulumi-lang-dotnet="`Voip`" pulumi-lang-go="`voip`" pulumi-lang-python="`voip`" pulumi-lang-yaml="`voip`" pulumi-lang-java="`voip`" pulumi-lang-hcl="`voip`">`voip`</span>.
         :param _builtins.bool password_required: Value must be one of true or false
         :param _builtins.bool post_to_incident_timeline: Value must be one of true or false
         """
@@ -9058,7 +9142,7 @@ class WorkflowTaskCreateGoToMeetingTaskParams(dict):
     @pulumi.getter(name="conferenceCallInfo")
     def conference_call_info(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`ptsn`" pulumi-lang-dotnet="`Ptsn`" pulumi-lang-go="`ptsn`" pulumi-lang-python="`ptsn`" pulumi-lang-yaml="`ptsn`" pulumi-lang-java="`ptsn`">`ptsn`</span>, <span pulumi-lang-nodejs="`free`" pulumi-lang-dotnet="`Free`" pulumi-lang-go="`free`" pulumi-lang-python="`free`" pulumi-lang-yaml="`free`" pulumi-lang-java="`free`">`free`</span>, <span pulumi-lang-nodejs="`hyrid`" pulumi-lang-dotnet="`Hyrid`" pulumi-lang-go="`hyrid`" pulumi-lang-python="`hyrid`" pulumi-lang-yaml="`hyrid`" pulumi-lang-java="`hyrid`">`hyrid`</span>, <span pulumi-lang-nodejs="`voip`" pulumi-lang-dotnet="`Voip`" pulumi-lang-go="`voip`" pulumi-lang-python="`voip`" pulumi-lang-yaml="`voip`" pulumi-lang-java="`voip`">`voip`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`ptsn`" pulumi-lang-dotnet="`Ptsn`" pulumi-lang-go="`ptsn`" pulumi-lang-python="`ptsn`" pulumi-lang-yaml="`ptsn`" pulumi-lang-java="`ptsn`" pulumi-lang-hcl="`ptsn`">`ptsn`</span>, <span pulumi-lang-nodejs="`free`" pulumi-lang-dotnet="`Free`" pulumi-lang-go="`free`" pulumi-lang-python="`free`" pulumi-lang-yaml="`free`" pulumi-lang-java="`free`" pulumi-lang-hcl="`free`">`free`</span>, <span pulumi-lang-nodejs="`hyrid`" pulumi-lang-dotnet="`Hyrid`" pulumi-lang-go="`hyrid`" pulumi-lang-python="`hyrid`" pulumi-lang-yaml="`hyrid`" pulumi-lang-java="`hyrid`" pulumi-lang-hcl="`hyrid`">`hyrid`</span>, <span pulumi-lang-nodejs="`voip`" pulumi-lang-dotnet="`Voip`" pulumi-lang-go="`voip`" pulumi-lang-python="`voip`" pulumi-lang-yaml="`voip`" pulumi-lang-java="`voip`" pulumi-lang-hcl="`voip`">`voip`</span>.
         """
         return pulumi.get(self, "conference_call_info")
 
@@ -9404,9 +9488,9 @@ class WorkflowTaskCreateGoogleDocsPageTaskParams(dict):
         """
         :param _builtins.str title: The page title
         :param _builtins.str content: The page content
-        :param Mapping[str, _builtins.str] drive: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] drive: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.bool mark_post_mortem_as_published: Value must be one of true or false
-        :param Mapping[str, _builtins.str] parent_folder: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] parent_folder: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str permissions: Page permissions JSON
         :param _builtins.str post_mortem_template_id: Retrospective template to use when creating page, if desired
         :param _builtins.str template_id: The Google Doc file ID to use as a template
@@ -9449,7 +9533,7 @@ class WorkflowTaskCreateGoogleDocsPageTaskParams(dict):
     @pulumi.getter
     def drive(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "drive")
 
@@ -9465,7 +9549,7 @@ class WorkflowTaskCreateGoogleDocsPageTaskParams(dict):
     @pulumi.getter(name="parentFolder")
     def parent_folder(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "parent_folder")
 
@@ -9610,7 +9694,7 @@ class WorkflowTaskCreateGoogleGeminiChatCompletionTaskParams(dict):
                  system_prompt: Optional[_builtins.str] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] model: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The Gemini model. eg: gemini-2.0-flash
+        :param Mapping[str, _builtins.str] model: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The Gemini model. eg: gemini-2.0-flash
         :param _builtins.str prompt: The prompt to send to Gemini
         :param _builtins.str system_prompt: The system prompt to send to Gemini (optional)
         """
@@ -9625,7 +9709,7 @@ class WorkflowTaskCreateGoogleGeminiChatCompletionTaskParams(dict):
     @pulumi.getter
     def model(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The Gemini model. eg: gemini-2.0-flash
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The Gemini model. eg: gemini-2.0-flash
         """
         return pulumi.get(self, "model")
 
@@ -9695,7 +9779,7 @@ class WorkflowTaskCreateGoogleMeetingTaskParams(dict):
         :param _builtins.str conference_solution_key: [DEPRECATED] Sets the video conference type attached to the meeting. Value must be one of `eventHangout`, `eventNamedHangout`, `hangoutsMeet`, `addOn`.
         :param _builtins.bool post_to_incident_timeline: Value must be one of true or false
         :param _builtins.bool record_meeting: Rootly AI will record the meeting and automatically generate a transcript and summary from your meeting. Value must be one of true or false
-        :param _builtins.str recording_mode: The video layout for the bot's recording (e.g. speaker_view, gallery_view, gallery_view_v2, audio_only). Value must be one of <span pulumi-lang-nodejs="`speakerView`" pulumi-lang-dotnet="`SpeakerView`" pulumi-lang-go="`speakerView`" pulumi-lang-python="`speaker_view`" pulumi-lang-yaml="`speakerView`" pulumi-lang-java="`speakerView`">`speaker_view`</span>, <span pulumi-lang-nodejs="`galleryView`" pulumi-lang-dotnet="`GalleryView`" pulumi-lang-go="`galleryView`" pulumi-lang-python="`gallery_view`" pulumi-lang-yaml="`galleryView`" pulumi-lang-java="`galleryView`">`gallery_view`</span>, <span pulumi-lang-nodejs="`galleryViewV2`" pulumi-lang-dotnet="`GalleryViewV2`" pulumi-lang-go="`galleryViewV2`" pulumi-lang-python="`gallery_view_v2`" pulumi-lang-yaml="`galleryViewV2`" pulumi-lang-java="`galleryViewV2`">`gallery_view_v2`</span>, <span pulumi-lang-nodejs="`audioOnly`" pulumi-lang-dotnet="`AudioOnly`" pulumi-lang-go="`audioOnly`" pulumi-lang-python="`audio_only`" pulumi-lang-yaml="`audioOnly`" pulumi-lang-java="`audioOnly`">`audio_only`</span>.
+        :param _builtins.str recording_mode: The video layout for the bot's recording (e.g. speaker_view, gallery_view, gallery_view_v2, audio_only). Value must be one of <span pulumi-lang-nodejs="`speakerView`" pulumi-lang-dotnet="`SpeakerView`" pulumi-lang-go="`speakerView`" pulumi-lang-python="`speaker_view`" pulumi-lang-yaml="`speakerView`" pulumi-lang-java="`speakerView`" pulumi-lang-hcl="`speaker_view`">`speakerView`</span>, <span pulumi-lang-nodejs="`galleryView`" pulumi-lang-dotnet="`GalleryView`" pulumi-lang-go="`galleryView`" pulumi-lang-python="`gallery_view`" pulumi-lang-yaml="`galleryView`" pulumi-lang-java="`galleryView`" pulumi-lang-hcl="`gallery_view`">`galleryView`</span>, <span pulumi-lang-nodejs="`galleryViewV2`" pulumi-lang-dotnet="`GalleryViewV2`" pulumi-lang-go="`galleryViewV2`" pulumi-lang-python="`gallery_view_v2`" pulumi-lang-yaml="`galleryViewV2`" pulumi-lang-java="`galleryViewV2`" pulumi-lang-hcl="`gallery_view_v2`">`galleryViewV2`</span>, <span pulumi-lang-nodejs="`audioOnly`" pulumi-lang-dotnet="`AudioOnly`" pulumi-lang-go="`audioOnly`" pulumi-lang-python="`audio_only`" pulumi-lang-yaml="`audioOnly`" pulumi-lang-java="`audioOnly`" pulumi-lang-hcl="`audio_only`">`audioOnly`</span>.
         """
         pulumi.set(__self__, "description", description)
         pulumi.set(__self__, "summary", summary)
@@ -9761,7 +9845,7 @@ class WorkflowTaskCreateGoogleMeetingTaskParams(dict):
     @pulumi.getter(name="recordingMode")
     def recording_mode(self) -> Optional[_builtins.str]:
         """
-        The video layout for the bot's recording (e.g. speaker_view, gallery_view, gallery_view_v2, audio_only). Value must be one of <span pulumi-lang-nodejs="`speakerView`" pulumi-lang-dotnet="`SpeakerView`" pulumi-lang-go="`speakerView`" pulumi-lang-python="`speaker_view`" pulumi-lang-yaml="`speakerView`" pulumi-lang-java="`speakerView`">`speaker_view`</span>, <span pulumi-lang-nodejs="`galleryView`" pulumi-lang-dotnet="`GalleryView`" pulumi-lang-go="`galleryView`" pulumi-lang-python="`gallery_view`" pulumi-lang-yaml="`galleryView`" pulumi-lang-java="`galleryView`">`gallery_view`</span>, <span pulumi-lang-nodejs="`galleryViewV2`" pulumi-lang-dotnet="`GalleryViewV2`" pulumi-lang-go="`galleryViewV2`" pulumi-lang-python="`gallery_view_v2`" pulumi-lang-yaml="`galleryViewV2`" pulumi-lang-java="`galleryViewV2`">`gallery_view_v2`</span>, <span pulumi-lang-nodejs="`audioOnly`" pulumi-lang-dotnet="`AudioOnly`" pulumi-lang-go="`audioOnly`" pulumi-lang-python="`audio_only`" pulumi-lang-yaml="`audioOnly`" pulumi-lang-java="`audioOnly`">`audio_only`</span>.
+        The video layout for the bot's recording (e.g. speaker_view, gallery_view, gallery_view_v2, audio_only). Value must be one of <span pulumi-lang-nodejs="`speakerView`" pulumi-lang-dotnet="`SpeakerView`" pulumi-lang-go="`speakerView`" pulumi-lang-python="`speaker_view`" pulumi-lang-yaml="`speakerView`" pulumi-lang-java="`speakerView`" pulumi-lang-hcl="`speaker_view`">`speakerView`</span>, <span pulumi-lang-nodejs="`galleryView`" pulumi-lang-dotnet="`GalleryView`" pulumi-lang-go="`galleryView`" pulumi-lang-python="`gallery_view`" pulumi-lang-yaml="`galleryView`" pulumi-lang-java="`galleryView`" pulumi-lang-hcl="`gallery_view`">`galleryView`</span>, <span pulumi-lang-nodejs="`galleryViewV2`" pulumi-lang-dotnet="`GalleryViewV2`" pulumi-lang-go="`galleryViewV2`" pulumi-lang-python="`gallery_view_v2`" pulumi-lang-yaml="`galleryViewV2`" pulumi-lang-java="`galleryViewV2`" pulumi-lang-hcl="`gallery_view_v2`">`galleryViewV2`</span>, <span pulumi-lang-nodejs="`audioOnly`" pulumi-lang-dotnet="`AudioOnly`" pulumi-lang-go="`audioOnly`" pulumi-lang-python="`audio_only`" pulumi-lang-yaml="`audioOnly`" pulumi-lang-java="`audioOnly`" pulumi-lang-hcl="`audio_only`">`audioOnly`</span>.
         """
         return pulumi.get(self, "recording_mode")
 
@@ -9820,7 +9904,7 @@ class WorkflowTaskCreateIncidentPostmortemTaskParams(dict):
         """
         :param _builtins.str incident_id: UUID of the incident that needs a retrospective
         :param _builtins.str title: The retrospective title
-        :param Mapping[str, _builtins.str] template: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Retrospective template to use
+        :param Mapping[str, _builtins.str] template: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Retrospective template to use
         """
         pulumi.set(__self__, "incident_id", incident_id)
         pulumi.set(__self__, "title", title)
@@ -9861,7 +9945,7 @@ class WorkflowTaskCreateIncidentPostmortemTaskParams(dict):
     @pulumi.getter
     def template(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Retrospective template to use
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Retrospective template to use
         """
         return pulumi.get(self, "template")
 
@@ -10068,18 +10152,18 @@ class WorkflowTaskCreateJiraIssueTaskParams(dict):
                  task_type: Optional[_builtins.str] = None,
                  update_payload: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] issue_type: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The issue type id and display name
+        :param Mapping[str, _builtins.str] issue_type: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The issue type id and display name
         :param _builtins.str project_key: The project key
         :param _builtins.str title: The issue title
         :param _builtins.str assign_user_email: The assigned user's email
         :param _builtins.str custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON
         :param _builtins.str description: The issue description
         :param _builtins.str due_date: The due date
-        :param Mapping[str, _builtins.str] integration: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Specify integration id if you have more than one Jira instance
+        :param Mapping[str, _builtins.str] integration: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Specify integration id if you have more than one Jira instance
         :param _builtins.str labels: The issue labels
-        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         :param _builtins.str reporter_user_email: The reporter user's email
-        :param Mapping[str, _builtins.str] status: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The status id and display name
+        :param Mapping[str, _builtins.str] status: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The status id and display name
         :param _builtins.str update_payload: Update payload. Can contain liquid markup and need to be valid JSON
         """
         pulumi.set(__self__, "issue_type", issue_type)
@@ -10112,7 +10196,7 @@ class WorkflowTaskCreateJiraIssueTaskParams(dict):
     @pulumi.getter(name="issueType")
     def issue_type(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The issue type id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The issue type id and display name
         """
         return pulumi.get(self, "issue_type")
 
@@ -10168,7 +10252,7 @@ class WorkflowTaskCreateJiraIssueTaskParams(dict):
     @pulumi.getter
     def integration(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Specify integration id if you have more than one Jira instance
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Specify integration id if you have more than one Jira instance
         """
         return pulumi.get(self, "integration")
 
@@ -10184,7 +10268,7 @@ class WorkflowTaskCreateJiraIssueTaskParams(dict):
     @pulumi.getter
     def priority(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         """
         return pulumi.get(self, "priority")
 
@@ -10200,7 +10284,7 @@ class WorkflowTaskCreateJiraIssueTaskParams(dict):
     @pulumi.getter
     def status(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The status id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The status id and display name
         """
         return pulumi.get(self, "status")
 
@@ -10272,17 +10356,17 @@ class WorkflowTaskCreateJiraSubtaskTaskParams(dict):
         """
         :param _builtins.str parent_issue_id: The parent issue
         :param _builtins.str project_key: The project key
-        :param Mapping[str, _builtins.str] subtask_issue_type: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The issue type id and display name
+        :param Mapping[str, _builtins.str] subtask_issue_type: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The issue type id and display name
         :param _builtins.str title: The issue title
         :param _builtins.str assign_user_email: The assigned user's email
         :param _builtins.str custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON
         :param _builtins.str description: The issue description
         :param _builtins.str due_date: The due date
-        :param Mapping[str, _builtins.str] integration: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Specify integration id if you have more than one Jira instance
+        :param Mapping[str, _builtins.str] integration: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Specify integration id if you have more than one Jira instance
         :param _builtins.str labels: The issue labels
-        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         :param _builtins.str reporter_user_email: The reporter user's email
-        :param Mapping[str, _builtins.str] status: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The status id and display name
+        :param Mapping[str, _builtins.str] status: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The status id and display name
         :param _builtins.str update_payload: Update payload. Can contain liquid markup and need to be valid JSON
         """
         pulumi.set(__self__, "parent_issue_id", parent_issue_id)
@@ -10332,7 +10416,7 @@ class WorkflowTaskCreateJiraSubtaskTaskParams(dict):
     @pulumi.getter(name="subtaskIssueType")
     def subtask_issue_type(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The issue type id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The issue type id and display name
         """
         return pulumi.get(self, "subtask_issue_type")
 
@@ -10380,7 +10464,7 @@ class WorkflowTaskCreateJiraSubtaskTaskParams(dict):
     @pulumi.getter
     def integration(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Specify integration id if you have more than one Jira instance
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Specify integration id if you have more than one Jira instance
         """
         return pulumi.get(self, "integration")
 
@@ -10396,7 +10480,7 @@ class WorkflowTaskCreateJiraSubtaskTaskParams(dict):
     @pulumi.getter
     def priority(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         """
         return pulumi.get(self, "priority")
 
@@ -10412,7 +10496,7 @@ class WorkflowTaskCreateJiraSubtaskTaskParams(dict):
     @pulumi.getter
     def status(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The status id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The status id and display name
         """
         return pulumi.get(self, "status")
 
@@ -10463,7 +10547,7 @@ class WorkflowTaskCreateJsmopsAlertTaskParams(dict):
         :param _builtins.str message: Message of the alert
         :param _builtins.str description: Description field of the alert that is generally used to provide a detailed information about the alert
         :param _builtins.str details: Details payload. Can contain liquid markup and need to be valid JSON
-        :param _builtins.str priority: Value must be one of `P3`, `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        :param _builtins.str priority: Value must be one of `P3`, `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         """
         pulumi.set(__self__, "message", message)
         if description is not None:
@@ -10516,7 +10600,7 @@ class WorkflowTaskCreateJsmopsAlertTaskParams(dict):
     @pulumi.getter
     def priority(self) -> Optional[_builtins.str]:
         """
-        Value must be one of `P3`, `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        Value must be one of `P3`, `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         """
         return pulumi.get(self, "priority")
 
@@ -10705,13 +10789,13 @@ class WorkflowTaskCreateLinearIssueTaskParams(dict):
                  project: Optional[Mapping[str, _builtins.str]] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] state: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The state id and display name
-        :param Mapping[str, _builtins.str] team: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The team id and display name
+        :param Mapping[str, _builtins.str] state: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The state id and display name
+        :param Mapping[str, _builtins.str] team: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The team id and display name
         :param _builtins.str title: The issue title
         :param _builtins.str assign_user_email: The assigned user's email
         :param _builtins.str description: The issue description
-        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
-        :param Mapping[str, _builtins.str] project: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The project id and display name
+        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
+        :param Mapping[str, _builtins.str] project: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The project id and display name
         """
         pulumi.set(__self__, "state", state)
         pulumi.set(__self__, "team", team)
@@ -10733,7 +10817,7 @@ class WorkflowTaskCreateLinearIssueTaskParams(dict):
     @pulumi.getter
     def state(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The state id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The state id and display name
         """
         return pulumi.get(self, "state")
 
@@ -10741,7 +10825,7 @@ class WorkflowTaskCreateLinearIssueTaskParams(dict):
     @pulumi.getter
     def team(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The team id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The team id and display name
         """
         return pulumi.get(self, "team")
 
@@ -10778,7 +10862,7 @@ class WorkflowTaskCreateLinearIssueTaskParams(dict):
     @pulumi.getter
     def priority(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         """
         return pulumi.get(self, "priority")
 
@@ -10786,7 +10870,7 @@ class WorkflowTaskCreateLinearIssueTaskParams(dict):
     @pulumi.getter
     def project(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The project id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The project id and display name
         """
         return pulumi.get(self, "project")
 
@@ -10849,11 +10933,11 @@ class WorkflowTaskCreateLinearSubtaskIssueTaskParams(dict):
                  task_type: Optional[_builtins.str] = None):
         """
         :param _builtins.str parent_issue_id: The parent issue
-        :param Mapping[str, _builtins.str] state: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The state id and display name
+        :param Mapping[str, _builtins.str] state: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The state id and display name
         :param _builtins.str title: The issue title
         :param _builtins.str assign_user_email: The assigned user's email
         :param _builtins.str description: The issue description
-        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         """
         pulumi.set(__self__, "parent_issue_id", parent_issue_id)
         pulumi.set(__self__, "state", state)
@@ -10881,7 +10965,7 @@ class WorkflowTaskCreateLinearSubtaskIssueTaskParams(dict):
     @pulumi.getter
     def state(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The state id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The state id and display name
         """
         return pulumi.get(self, "state")
 
@@ -10918,7 +11002,7 @@ class WorkflowTaskCreateLinearSubtaskIssueTaskParams(dict):
     @pulumi.getter
     def priority(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         """
         return pulumi.get(self, "priority")
 
@@ -10975,8 +11059,8 @@ class WorkflowTaskCreateMicrosoftTeamsChannelTaskParams(dict):
         """
         :param _builtins.str title: Microsoft Team channel title
         :param _builtins.str description: Microsoft Team channel description
-        :param _builtins.str private: Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`true`" pulumi-lang-dotnet="`True`" pulumi-lang-go="`true`" pulumi-lang-python="`true`" pulumi-lang-yaml="`true`" pulumi-lang-java="`true`">`true`</span>, <span pulumi-lang-nodejs="`false`" pulumi-lang-dotnet="`False`" pulumi-lang-go="`false`" pulumi-lang-python="`false`" pulumi-lang-yaml="`false`" pulumi-lang-java="`false`">`false`</span>.
-        :param Mapping[str, _builtins.str] team: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param _builtins.str private: Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`true`" pulumi-lang-dotnet="`True`" pulumi-lang-go="`true`" pulumi-lang-python="`true`" pulumi-lang-yaml="`true`" pulumi-lang-java="`true`" pulumi-lang-hcl="`true`">`true`</span>, <span pulumi-lang-nodejs="`false`" pulumi-lang-dotnet="`False`" pulumi-lang-go="`false`" pulumi-lang-python="`false`" pulumi-lang-yaml="`false`" pulumi-lang-java="`false`" pulumi-lang-hcl="`false`">`false`</span>.
+        :param Mapping[str, _builtins.str] team: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "title", title)
         if description is not None:
@@ -11008,7 +11092,7 @@ class WorkflowTaskCreateMicrosoftTeamsChannelTaskParams(dict):
     @pulumi.getter
     def private(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`true`" pulumi-lang-dotnet="`True`" pulumi-lang-go="`true`" pulumi-lang-python="`true`" pulumi-lang-yaml="`true`" pulumi-lang-java="`true`">`true`</span>, <span pulumi-lang-nodejs="`false`" pulumi-lang-dotnet="`False`" pulumi-lang-go="`false`" pulumi-lang-python="`false`" pulumi-lang-yaml="`false`" pulumi-lang-java="`false`">`false`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`true`" pulumi-lang-dotnet="`True`" pulumi-lang-go="`true`" pulumi-lang-python="`true`" pulumi-lang-yaml="`true`" pulumi-lang-java="`true`" pulumi-lang-hcl="`true`">`true`</span>, <span pulumi-lang-nodejs="`false`" pulumi-lang-dotnet="`False`" pulumi-lang-go="`false`" pulumi-lang-python="`false`" pulumi-lang-yaml="`false`" pulumi-lang-java="`false`" pulumi-lang-hcl="`false`">`false`</span>.
         """
         return pulumi.get(self, "private")
 
@@ -11021,7 +11105,7 @@ class WorkflowTaskCreateMicrosoftTeamsChannelTaskParams(dict):
     @pulumi.getter
     def team(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "team")
 
@@ -11054,7 +11138,7 @@ class WorkflowTaskCreateMicrosoftTeamsChatTaskParams(dict):
                  topic: Optional[_builtins.str] = None):
         """
         :param Sequence['WorkflowTaskCreateMicrosoftTeamsChatTaskParamsMemberArgs'] members: Array of members to include in the chat
-        :param _builtins.str chat_type: Type of chat to create. Value must be one of <span pulumi-lang-nodejs="`group`" pulumi-lang-dotnet="`Group`" pulumi-lang-go="`group`" pulumi-lang-python="`group`" pulumi-lang-yaml="`group`" pulumi-lang-java="`group`">`group`</span>, `oneOnOne`.
+        :param _builtins.str chat_type: Type of chat to create. Value must be one of <span pulumi-lang-nodejs="`group`" pulumi-lang-dotnet="`Group`" pulumi-lang-go="`group`" pulumi-lang-python="`group`" pulumi-lang-yaml="`group`" pulumi-lang-java="`group`" pulumi-lang-hcl="`group`">`group`</span>, `oneOnOne`.
         :param _builtins.str topic: Chat topic (only for group chats)
         """
         pulumi.set(__self__, "members", members)
@@ -11077,7 +11161,7 @@ class WorkflowTaskCreateMicrosoftTeamsChatTaskParams(dict):
     @pulumi.getter(name="chatType")
     def chat_type(self) -> Optional[_builtins.str]:
         """
-        Type of chat to create. Value must be one of <span pulumi-lang-nodejs="`group`" pulumi-lang-dotnet="`Group`" pulumi-lang-go="`group`" pulumi-lang-python="`group`" pulumi-lang-yaml="`group`" pulumi-lang-java="`group`">`group`</span>, `oneOnOne`.
+        Type of chat to create. Value must be one of <span pulumi-lang-nodejs="`group`" pulumi-lang-dotnet="`Group`" pulumi-lang-go="`group`" pulumi-lang-python="`group`" pulumi-lang-yaml="`group`" pulumi-lang-java="`group`" pulumi-lang-hcl="`group`">`group`</span>, `oneOnOne`.
         """
         return pulumi.get(self, "chat_type")
 
@@ -11154,7 +11238,7 @@ class WorkflowTaskCreateMicrosoftTeamsMeetingTaskParams(dict):
         :param _builtins.str subject: The meeting subject
         :param _builtins.bool post_to_incident_timeline: Value must be one of true or false
         :param _builtins.bool record_meeting: Rootly AI will record the meeting and automatically generate a transcript and summary from your meeting. Value must be one of true or false
-        :param _builtins.str recording_mode: The video layout for the bot's recording (e.g. speaker_view, gallery_view, gallery_view_v2, audio_only). Value must be one of <span pulumi-lang-nodejs="`speakerView`" pulumi-lang-dotnet="`SpeakerView`" pulumi-lang-go="`speakerView`" pulumi-lang-python="`speaker_view`" pulumi-lang-yaml="`speakerView`" pulumi-lang-java="`speakerView`">`speaker_view`</span>, <span pulumi-lang-nodejs="`galleryView`" pulumi-lang-dotnet="`GalleryView`" pulumi-lang-go="`galleryView`" pulumi-lang-python="`gallery_view`" pulumi-lang-yaml="`galleryView`" pulumi-lang-java="`galleryView`">`gallery_view`</span>, <span pulumi-lang-nodejs="`galleryViewV2`" pulumi-lang-dotnet="`GalleryViewV2`" pulumi-lang-go="`galleryViewV2`" pulumi-lang-python="`gallery_view_v2`" pulumi-lang-yaml="`galleryViewV2`" pulumi-lang-java="`galleryViewV2`">`gallery_view_v2`</span>, <span pulumi-lang-nodejs="`audioOnly`" pulumi-lang-dotnet="`AudioOnly`" pulumi-lang-go="`audioOnly`" pulumi-lang-python="`audio_only`" pulumi-lang-yaml="`audioOnly`" pulumi-lang-java="`audioOnly`">`audio_only`</span>.
+        :param _builtins.str recording_mode: The video layout for the bot's recording (e.g. speaker_view, gallery_view, gallery_view_v2, audio_only). Value must be one of <span pulumi-lang-nodejs="`speakerView`" pulumi-lang-dotnet="`SpeakerView`" pulumi-lang-go="`speakerView`" pulumi-lang-python="`speaker_view`" pulumi-lang-yaml="`speakerView`" pulumi-lang-java="`speakerView`" pulumi-lang-hcl="`speaker_view`">`speakerView`</span>, <span pulumi-lang-nodejs="`galleryView`" pulumi-lang-dotnet="`GalleryView`" pulumi-lang-go="`galleryView`" pulumi-lang-python="`gallery_view`" pulumi-lang-yaml="`galleryView`" pulumi-lang-java="`galleryView`" pulumi-lang-hcl="`gallery_view`">`galleryView`</span>, <span pulumi-lang-nodejs="`galleryViewV2`" pulumi-lang-dotnet="`GalleryViewV2`" pulumi-lang-go="`galleryViewV2`" pulumi-lang-python="`gallery_view_v2`" pulumi-lang-yaml="`galleryViewV2`" pulumi-lang-java="`galleryViewV2`" pulumi-lang-hcl="`gallery_view_v2`">`galleryViewV2`</span>, <span pulumi-lang-nodejs="`audioOnly`" pulumi-lang-dotnet="`AudioOnly`" pulumi-lang-go="`audioOnly`" pulumi-lang-python="`audio_only`" pulumi-lang-yaml="`audioOnly`" pulumi-lang-java="`audioOnly`" pulumi-lang-hcl="`audio_only`">`audioOnly`</span>.
         """
         pulumi.set(__self__, "name", name)
         pulumi.set(__self__, "subject", subject)
@@ -11210,7 +11294,7 @@ class WorkflowTaskCreateMicrosoftTeamsMeetingTaskParams(dict):
     @pulumi.getter(name="recordingMode")
     def recording_mode(self) -> Optional[_builtins.str]:
         """
-        The video layout for the bot's recording (e.g. speaker_view, gallery_view, gallery_view_v2, audio_only). Value must be one of <span pulumi-lang-nodejs="`speakerView`" pulumi-lang-dotnet="`SpeakerView`" pulumi-lang-go="`speakerView`" pulumi-lang-python="`speaker_view`" pulumi-lang-yaml="`speakerView`" pulumi-lang-java="`speakerView`">`speaker_view`</span>, <span pulumi-lang-nodejs="`galleryView`" pulumi-lang-dotnet="`GalleryView`" pulumi-lang-go="`galleryView`" pulumi-lang-python="`gallery_view`" pulumi-lang-yaml="`galleryView`" pulumi-lang-java="`galleryView`">`gallery_view`</span>, <span pulumi-lang-nodejs="`galleryViewV2`" pulumi-lang-dotnet="`GalleryViewV2`" pulumi-lang-go="`galleryViewV2`" pulumi-lang-python="`gallery_view_v2`" pulumi-lang-yaml="`galleryViewV2`" pulumi-lang-java="`galleryViewV2`">`gallery_view_v2`</span>, <span pulumi-lang-nodejs="`audioOnly`" pulumi-lang-dotnet="`AudioOnly`" pulumi-lang-go="`audioOnly`" pulumi-lang-python="`audio_only`" pulumi-lang-yaml="`audioOnly`" pulumi-lang-java="`audioOnly`">`audio_only`</span>.
+        The video layout for the bot's recording (e.g. speaker_view, gallery_view, gallery_view_v2, audio_only). Value must be one of <span pulumi-lang-nodejs="`speakerView`" pulumi-lang-dotnet="`SpeakerView`" pulumi-lang-go="`speakerView`" pulumi-lang-python="`speaker_view`" pulumi-lang-yaml="`speakerView`" pulumi-lang-java="`speakerView`" pulumi-lang-hcl="`speaker_view`">`speakerView`</span>, <span pulumi-lang-nodejs="`galleryView`" pulumi-lang-dotnet="`GalleryView`" pulumi-lang-go="`galleryView`" pulumi-lang-python="`gallery_view`" pulumi-lang-yaml="`galleryView`" pulumi-lang-java="`galleryView`" pulumi-lang-hcl="`gallery_view`">`galleryView`</span>, <span pulumi-lang-nodejs="`galleryViewV2`" pulumi-lang-dotnet="`GalleryViewV2`" pulumi-lang-go="`galleryViewV2`" pulumi-lang-python="`gallery_view_v2`" pulumi-lang-yaml="`galleryViewV2`" pulumi-lang-java="`galleryViewV2`" pulumi-lang-hcl="`gallery_view_v2`">`galleryViewV2`</span>, <span pulumi-lang-nodejs="`audioOnly`" pulumi-lang-dotnet="`AudioOnly`" pulumi-lang-go="`audioOnly`" pulumi-lang-python="`audio_only`" pulumi-lang-yaml="`audioOnly`" pulumi-lang-java="`audioOnly`" pulumi-lang-hcl="`audio_only`">`audioOnly`</span>.
         """
         return pulumi.get(self, "recording_mode")
 
@@ -11273,7 +11357,7 @@ class WorkflowTaskCreateMistralChatCompletionTaskParams(dict):
                  temperature: Optional[_builtins.float] = None,
                  top_p: Optional[_builtins.float] = None):
         """
-        :param Mapping[str, _builtins.str] model: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The Mistral model. eg: mistral-large-latest
+        :param Mapping[str, _builtins.str] model: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The Mistral model. eg: mistral-large-latest
         :param _builtins.str prompt: The prompt to send to Mistral
         :param _builtins.str max_tokens: Maximum number of tokens to generate
         :param _builtins.str system_prompt: The system prompt to send to Mistral (optional)
@@ -11297,7 +11381,7 @@ class WorkflowTaskCreateMistralChatCompletionTaskParams(dict):
     @pulumi.getter
     def model(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The Mistral model. eg: mistral-large-latest
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The Mistral model. eg: mistral-large-latest
         """
         return pulumi.get(self, "model")
 
@@ -11381,13 +11465,13 @@ class WorkflowTaskCreateMotionTaskTaskParams(dict):
                  task_type: Optional[_builtins.str] = None):
         """
         :param _builtins.str title: The task title
-        :param Mapping[str, _builtins.str] workspace: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] workspace: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str description: The task description
         :param _builtins.str due_date: The due date
         :param _builtins.str duration: The duration. Eg.  "NONE", "REMINDER", or a integer greater than 0.
-        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
-        :param Mapping[str, _builtins.str] project: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] status: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
+        :param Mapping[str, _builtins.str] project: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] status: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "title", title)
         pulumi.set(__self__, "workspace", workspace)
@@ -11420,7 +11504,7 @@ class WorkflowTaskCreateMotionTaskTaskParams(dict):
     @pulumi.getter
     def workspace(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "workspace")
 
@@ -11457,7 +11541,7 @@ class WorkflowTaskCreateMotionTaskTaskParams(dict):
     @pulumi.getter
     def priority(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         """
         return pulumi.get(self, "priority")
 
@@ -11465,7 +11549,7 @@ class WorkflowTaskCreateMotionTaskTaskParams(dict):
     @pulumi.getter
     def project(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "project")
 
@@ -11473,7 +11557,7 @@ class WorkflowTaskCreateMotionTaskTaskParams(dict):
     @pulumi.getter
     def status(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "status")
 
@@ -11522,7 +11606,7 @@ class WorkflowTaskCreateNotionPageTaskParams(dict):
                  show_timeline_as_table: Optional[_builtins.bool] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] parent_page: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The parent page id and display name
+        :param Mapping[str, _builtins.str] parent_page: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The parent page id and display name
         :param _builtins.str title: The Notion page title
         :param _builtins.str content: Custom page content with liquid templating support. When provided, only this content will be rendered (no default sections)
         :param _builtins.bool mark_post_mortem_as_published: Value must be one of true or false
@@ -11549,7 +11633,7 @@ class WorkflowTaskCreateNotionPageTaskParams(dict):
     @pulumi.getter(name="parentPage")
     def parent_page(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The parent page id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The parent page id and display name
         """
         return pulumi.get(self, "parent_page")
 
@@ -11647,11 +11731,11 @@ class WorkflowTaskCreateOpenaiChatCompletionTaskParams(dict):
                  temperature: Optional[_builtins.float] = None,
                  top_p: Optional[_builtins.float] = None):
         """
-        :param Mapping[str, _builtins.str] model: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The OpenAI model. eg: gpt-5-nano
+        :param Mapping[str, _builtins.str] model: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The OpenAI model. eg: gpt-5-nano
         :param _builtins.str prompt: The prompt to send to OpenAI
         :param _builtins.str max_tokens: Maximum number of tokens to generate in the response
-        :param _builtins.str reasoning_effort: Constrains effort on reasoning for GPT-5 and o-series models. Value must be one of <span pulumi-lang-nodejs="`minimal`" pulumi-lang-dotnet="`Minimal`" pulumi-lang-go="`minimal`" pulumi-lang-python="`minimal`" pulumi-lang-yaml="`minimal`" pulumi-lang-java="`minimal`">`minimal`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>.
-        :param _builtins.str reasoning_summary: Summary of the reasoning performed by the model for GPT-5 and o-series models. Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`concise`" pulumi-lang-dotnet="`Concise`" pulumi-lang-go="`concise`" pulumi-lang-python="`concise`" pulumi-lang-yaml="`concise`" pulumi-lang-java="`concise`">`concise`</span>, <span pulumi-lang-nodejs="`detailed`" pulumi-lang-dotnet="`Detailed`" pulumi-lang-go="`detailed`" pulumi-lang-python="`detailed`" pulumi-lang-yaml="`detailed`" pulumi-lang-java="`detailed`">`detailed`</span>.
+        :param _builtins.str reasoning_effort: Constrains effort on reasoning for GPT-5 and o-series models. Value must be one of <span pulumi-lang-nodejs="`minimal`" pulumi-lang-dotnet="`Minimal`" pulumi-lang-go="`minimal`" pulumi-lang-python="`minimal`" pulumi-lang-yaml="`minimal`" pulumi-lang-java="`minimal`" pulumi-lang-hcl="`minimal`">`minimal`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>.
+        :param _builtins.str reasoning_summary: Summary of the reasoning performed by the model for GPT-5 and o-series models. Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`concise`" pulumi-lang-dotnet="`Concise`" pulumi-lang-go="`concise`" pulumi-lang-python="`concise`" pulumi-lang-yaml="`concise`" pulumi-lang-java="`concise`" pulumi-lang-hcl="`concise`">`concise`</span>, <span pulumi-lang-nodejs="`detailed`" pulumi-lang-dotnet="`Detailed`" pulumi-lang-go="`detailed`" pulumi-lang-python="`detailed`" pulumi-lang-yaml="`detailed`" pulumi-lang-java="`detailed`" pulumi-lang-hcl="`detailed`">`detailed`</span>.
         :param _builtins.str system_prompt: The system prompt to send to OpenAI (optional)
         :param _builtins.float temperature: Controls randomness in the response. Higher values make output more random
         :param _builtins.float top_p: Controls diversity via nucleus sampling. Lower values make output more focused
@@ -11677,7 +11761,7 @@ class WorkflowTaskCreateOpenaiChatCompletionTaskParams(dict):
     @pulumi.getter
     def model(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The OpenAI model. eg: gpt-5-nano
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The OpenAI model. eg: gpt-5-nano
         """
         return pulumi.get(self, "model")
 
@@ -11701,7 +11785,7 @@ class WorkflowTaskCreateOpenaiChatCompletionTaskParams(dict):
     @pulumi.getter(name="reasoningEffort")
     def reasoning_effort(self) -> Optional[_builtins.str]:
         """
-        Constrains effort on reasoning for GPT-5 and o-series models. Value must be one of <span pulumi-lang-nodejs="`minimal`" pulumi-lang-dotnet="`Minimal`" pulumi-lang-go="`minimal`" pulumi-lang-python="`minimal`" pulumi-lang-yaml="`minimal`" pulumi-lang-java="`minimal`">`minimal`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>.
+        Constrains effort on reasoning for GPT-5 and o-series models. Value must be one of <span pulumi-lang-nodejs="`minimal`" pulumi-lang-dotnet="`Minimal`" pulumi-lang-go="`minimal`" pulumi-lang-python="`minimal`" pulumi-lang-yaml="`minimal`" pulumi-lang-java="`minimal`" pulumi-lang-hcl="`minimal`">`minimal`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>.
         """
         return pulumi.get(self, "reasoning_effort")
 
@@ -11709,7 +11793,7 @@ class WorkflowTaskCreateOpenaiChatCompletionTaskParams(dict):
     @pulumi.getter(name="reasoningSummary")
     def reasoning_summary(self) -> Optional[_builtins.str]:
         """
-        Summary of the reasoning performed by the model for GPT-5 and o-series models. Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`concise`" pulumi-lang-dotnet="`Concise`" pulumi-lang-go="`concise`" pulumi-lang-python="`concise`" pulumi-lang-yaml="`concise`" pulumi-lang-java="`concise`">`concise`</span>, <span pulumi-lang-nodejs="`detailed`" pulumi-lang-dotnet="`Detailed`" pulumi-lang-go="`detailed`" pulumi-lang-python="`detailed`" pulumi-lang-yaml="`detailed`" pulumi-lang-java="`detailed`">`detailed`</span>.
+        Summary of the reasoning performed by the model for GPT-5 and o-series models. Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`concise`" pulumi-lang-dotnet="`Concise`" pulumi-lang-go="`concise`" pulumi-lang-python="`concise`" pulumi-lang-yaml="`concise`" pulumi-lang-java="`concise`" pulumi-lang-hcl="`concise`">`concise`</span>, <span pulumi-lang-nodejs="`detailed`" pulumi-lang-dotnet="`Detailed`" pulumi-lang-go="`detailed`" pulumi-lang-python="`detailed`" pulumi-lang-yaml="`detailed`" pulumi-lang-java="`detailed`" pulumi-lang-hcl="`detailed`">`detailed`</span>.
         """
         return pulumi.get(self, "reasoning_summary")
 
@@ -11776,7 +11860,7 @@ class WorkflowTaskCreateOpsgenieAlertTaskParams(dict):
         :param _builtins.str message: Message of the alert
         :param _builtins.str description: Description field of the alert that is generally used to provide a detailed information about the alert
         :param _builtins.str details: Details payload. Can contain liquid markup and need to be valid JSON
-        :param _builtins.str priority: Value must be one of `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        :param _builtins.str priority: Value must be one of `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         """
         pulumi.set(__self__, "message", message)
         if description is not None:
@@ -11829,7 +11913,7 @@ class WorkflowTaskCreateOpsgenieAlertTaskParams(dict):
     @pulumi.getter
     def priority(self) -> Optional[_builtins.str]:
         """
-        Value must be one of `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        Value must be one of `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         """
         return pulumi.get(self, "priority")
 
@@ -11980,7 +12064,7 @@ class WorkflowTaskCreateOutlookEventTaskParams(dict):
                  task_type: Optional[_builtins.str] = None,
                  time_zone: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] calendar: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] calendar: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str days_until_meeting: The days until meeting
         :param _builtins.str description: The event description
         :param _builtins.str meeting_duration: Meeting duration in format like '1 hour', '30 minutes'
@@ -12017,7 +12101,7 @@ class WorkflowTaskCreateOutlookEventTaskParams(dict):
     @pulumi.getter
     def calendar(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "calendar")
 
@@ -12218,9 +12302,9 @@ class WorkflowTaskCreatePagertreeAlertTaskParams(dict):
         """
         :param _builtins.str description: Description of alert as text
         :param _builtins.bool incident: Setting to true makes an alert a Pagertree incident. Value must be one of true or false
-        :param _builtins.str severity: Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>, `SEV-1`, `SEV-2`, `SEV-3`, `SEV-4`.
+        :param _builtins.str severity: Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>, `SEV-1`, `SEV-2`, `SEV-3`, `SEV-4`.
         :param _builtins.str title: Title of alert as text
-        :param _builtins.str urgency: Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        :param _builtins.str urgency: Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`" pulumi-lang-hcl="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         """
         if description is not None:
             pulumi.set(__self__, "description", description)
@@ -12259,7 +12343,7 @@ class WorkflowTaskCreatePagertreeAlertTaskParams(dict):
     @pulumi.getter
     def severity(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>, `SEV-1`, `SEV-2`, `SEV-3`, `SEV-4`.
+        Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>, `SEV-1`, `SEV-2`, `SEV-3`, `SEV-4`.
         """
         return pulumi.get(self, "severity")
 
@@ -12285,7 +12369,7 @@ class WorkflowTaskCreatePagertreeAlertTaskParams(dict):
     @pulumi.getter
     def urgency(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`" pulumi-lang-hcl="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         """
         return pulumi.get(self, "urgency")
 
@@ -12474,10 +12558,10 @@ class WorkflowTaskCreateServiceNowIncidentTaskParams(dict):
                  task_type: Optional[_builtins.str] = None):
         """
         :param _builtins.str title: The incident title
-        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The completion id and display name
+        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The completion id and display name
         :param _builtins.str custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON
         :param _builtins.str description: The incident description
-        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         """
         pulumi.set(__self__, "title", title)
         if completion is not None:
@@ -12503,7 +12587,7 @@ class WorkflowTaskCreateServiceNowIncidentTaskParams(dict):
     @pulumi.getter
     def completion(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The completion id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The completion id and display name
         """
         return pulumi.get(self, "completion")
 
@@ -12527,7 +12611,7 @@ class WorkflowTaskCreateServiceNowIncidentTaskParams(dict):
     @pulumi.getter
     def priority(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         """
         return pulumi.get(self, "priority")
 
@@ -12575,12 +12659,12 @@ class WorkflowTaskCreateSharepointPageTaskParams(dict):
                  task_type: Optional[_builtins.str] = None,
                  template_id: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] drive: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] site: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] drive: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] site: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str title: The page title
         :param _builtins.str content: The page content
         :param _builtins.bool mark_post_mortem_as_published: Value must be one of true or false
-        :param Mapping[str, _builtins.str] parent_folder: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] parent_folder: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str post_mortem_template_id: Retrospective template to use when creating page, if desired
         :param _builtins.str template_id: The SharePoint file ID to use as a template
         """
@@ -12604,7 +12688,7 @@ class WorkflowTaskCreateSharepointPageTaskParams(dict):
     @pulumi.getter
     def drive(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "drive")
 
@@ -12612,7 +12696,7 @@ class WorkflowTaskCreateSharepointPageTaskParams(dict):
     @pulumi.getter
     def site(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "site")
 
@@ -12644,7 +12728,7 @@ class WorkflowTaskCreateSharepointPageTaskParams(dict):
     @pulumi.getter(name="parentFolder")
     def parent_folder(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "parent_folder")
 
@@ -12705,15 +12789,15 @@ class WorkflowTaskCreateShortcutStoryTaskParams(dict):
                  task_type: Optional[_builtins.str] = None,
                  workflow_state: Optional[Mapping[str, _builtins.str]] = None):
         """
-        :param Mapping[str, _builtins.str] archivation: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The archivation id and display name
-        :param _builtins.str kind: Value must be one of <span pulumi-lang-nodejs="`bug`" pulumi-lang-dotnet="`Bug`" pulumi-lang-go="`bug`" pulumi-lang-python="`bug`" pulumi-lang-yaml="`bug`" pulumi-lang-java="`bug`">`bug`</span>, <span pulumi-lang-nodejs="`chore`" pulumi-lang-dotnet="`Chore`" pulumi-lang-go="`chore`" pulumi-lang-python="`chore`" pulumi-lang-yaml="`chore`" pulumi-lang-java="`chore`">`chore`</span>, <span pulumi-lang-nodejs="`feature`" pulumi-lang-dotnet="`Feature`" pulumi-lang-go="`feature`" pulumi-lang-python="`feature`" pulumi-lang-yaml="`feature`" pulumi-lang-java="`feature`">`feature`</span>.
+        :param Mapping[str, _builtins.str] archivation: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The archivation id and display name
+        :param _builtins.str kind: Value must be one of <span pulumi-lang-nodejs="`bug`" pulumi-lang-dotnet="`Bug`" pulumi-lang-go="`bug`" pulumi-lang-python="`bug`" pulumi-lang-yaml="`bug`" pulumi-lang-java="`bug`" pulumi-lang-hcl="`bug`">`bug`</span>, <span pulumi-lang-nodejs="`chore`" pulumi-lang-dotnet="`Chore`" pulumi-lang-go="`chore`" pulumi-lang-python="`chore`" pulumi-lang-yaml="`chore`" pulumi-lang-java="`chore`" pulumi-lang-hcl="`chore`">`chore`</span>, <span pulumi-lang-nodejs="`feature`" pulumi-lang-dotnet="`Feature`" pulumi-lang-go="`feature`" pulumi-lang-python="`feature`" pulumi-lang-yaml="`feature`" pulumi-lang-java="`feature`" pulumi-lang-hcl="`feature`">`feature`</span>.
         :param _builtins.str title: The incident title
         :param _builtins.str description: The incident description
         :param _builtins.str due_date: The due date
-        :param Mapping[str, _builtins.str] group: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The group id and display name
+        :param Mapping[str, _builtins.str] group: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The group id and display name
         :param _builtins.str labels: The story labels
-        :param Mapping[str, _builtins.str] project: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The project id and display name
-        :param Mapping[str, _builtins.str] workflow_state: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The workflow state id workflow state name
+        :param Mapping[str, _builtins.str] project: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The project id and display name
+        :param Mapping[str, _builtins.str] workflow_state: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The workflow state id workflow state name
         """
         pulumi.set(__self__, "archivation", archivation)
         pulumi.set(__self__, "kind", kind)
@@ -12737,7 +12821,7 @@ class WorkflowTaskCreateShortcutStoryTaskParams(dict):
     @pulumi.getter
     def archivation(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The archivation id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The archivation id and display name
         """
         return pulumi.get(self, "archivation")
 
@@ -12745,7 +12829,7 @@ class WorkflowTaskCreateShortcutStoryTaskParams(dict):
     @pulumi.getter
     def kind(self) -> _builtins.str:
         """
-        Value must be one of <span pulumi-lang-nodejs="`bug`" pulumi-lang-dotnet="`Bug`" pulumi-lang-go="`bug`" pulumi-lang-python="`bug`" pulumi-lang-yaml="`bug`" pulumi-lang-java="`bug`">`bug`</span>, <span pulumi-lang-nodejs="`chore`" pulumi-lang-dotnet="`Chore`" pulumi-lang-go="`chore`" pulumi-lang-python="`chore`" pulumi-lang-yaml="`chore`" pulumi-lang-java="`chore`">`chore`</span>, <span pulumi-lang-nodejs="`feature`" pulumi-lang-dotnet="`Feature`" pulumi-lang-go="`feature`" pulumi-lang-python="`feature`" pulumi-lang-yaml="`feature`" pulumi-lang-java="`feature`">`feature`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`bug`" pulumi-lang-dotnet="`Bug`" pulumi-lang-go="`bug`" pulumi-lang-python="`bug`" pulumi-lang-yaml="`bug`" pulumi-lang-java="`bug`" pulumi-lang-hcl="`bug`">`bug`</span>, <span pulumi-lang-nodejs="`chore`" pulumi-lang-dotnet="`Chore`" pulumi-lang-go="`chore`" pulumi-lang-python="`chore`" pulumi-lang-yaml="`chore`" pulumi-lang-java="`chore`" pulumi-lang-hcl="`chore`">`chore`</span>, <span pulumi-lang-nodejs="`feature`" pulumi-lang-dotnet="`Feature`" pulumi-lang-go="`feature`" pulumi-lang-python="`feature`" pulumi-lang-yaml="`feature`" pulumi-lang-java="`feature`" pulumi-lang-hcl="`feature`">`feature`</span>.
         """
         return pulumi.get(self, "kind")
 
@@ -12777,7 +12861,7 @@ class WorkflowTaskCreateShortcutStoryTaskParams(dict):
     @pulumi.getter
     def group(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The group id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The group id and display name
         """
         return pulumi.get(self, "group")
 
@@ -12793,7 +12877,7 @@ class WorkflowTaskCreateShortcutStoryTaskParams(dict):
     @pulumi.getter
     def project(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The project id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The project id and display name
         """
         return pulumi.get(self, "project")
 
@@ -12806,7 +12890,7 @@ class WorkflowTaskCreateShortcutStoryTaskParams(dict):
     @pulumi.getter(name="workflowState")
     def workflow_state(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The workflow state id workflow state name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The workflow state id workflow state name
         """
         return pulumi.get(self, "workflow_state")
 
@@ -12838,7 +12922,7 @@ class WorkflowTaskCreateShortcutTaskTaskParams(dict):
                  parent_story_id: _builtins.str,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The completion id and display name
+        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The completion id and display name
         :param _builtins.str description: The task description
         :param _builtins.str parent_story_id: The parent story
         """
@@ -12852,7 +12936,7 @@ class WorkflowTaskCreateShortcutTaskTaskParams(dict):
     @pulumi.getter
     def completion(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The completion id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The completion id and display name
         """
         return pulumi.get(self, "completion")
 
@@ -12904,8 +12988,8 @@ class WorkflowTaskCreateSlackChannelTaskParams(dict):
                  task_type: Optional[_builtins.str] = None):
         """
         :param _builtins.str title: Slack channel title
-        :param Mapping[str, _builtins.str] workspace: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param _builtins.str private: Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`true`" pulumi-lang-dotnet="`True`" pulumi-lang-go="`true`" pulumi-lang-python="`true`" pulumi-lang-yaml="`true`" pulumi-lang-java="`true`">`true`</span>, <span pulumi-lang-nodejs="`false`" pulumi-lang-dotnet="`False`" pulumi-lang-go="`false`" pulumi-lang-python="`false`" pulumi-lang-yaml="`false`" pulumi-lang-java="`false`">`false`</span>.
+        :param Mapping[str, _builtins.str] workspace: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param _builtins.str private: Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`true`" pulumi-lang-dotnet="`True`" pulumi-lang-go="`true`" pulumi-lang-python="`true`" pulumi-lang-yaml="`true`" pulumi-lang-java="`true`" pulumi-lang-hcl="`true`">`true`</span>, <span pulumi-lang-nodejs="`false`" pulumi-lang-dotnet="`False`" pulumi-lang-go="`false`" pulumi-lang-python="`false`" pulumi-lang-yaml="`false`" pulumi-lang-java="`false`" pulumi-lang-hcl="`false`">`false`</span>.
         """
         pulumi.set(__self__, "title", title)
         pulumi.set(__self__, "workspace", workspace)
@@ -12926,7 +13010,7 @@ class WorkflowTaskCreateSlackChannelTaskParams(dict):
     @pulumi.getter
     def workspace(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "workspace")
 
@@ -12934,7 +13018,7 @@ class WorkflowTaskCreateSlackChannelTaskParams(dict):
     @pulumi.getter
     def private(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`true`" pulumi-lang-dotnet="`True`" pulumi-lang-go="`true`" pulumi-lang-python="`true`" pulumi-lang-yaml="`true`" pulumi-lang-java="`true`">`true`</span>, <span pulumi-lang-nodejs="`false`" pulumi-lang-dotnet="`False`" pulumi-lang-go="`false`" pulumi-lang-python="`false`" pulumi-lang-yaml="`false`" pulumi-lang-java="`false`">`false`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`true`" pulumi-lang-dotnet="`True`" pulumi-lang-go="`true`" pulumi-lang-python="`true`" pulumi-lang-yaml="`true`" pulumi-lang-java="`true`" pulumi-lang-hcl="`true`">`true`</span>, <span pulumi-lang-nodejs="`false`" pulumi-lang-dotnet="`False`" pulumi-lang-go="`false`" pulumi-lang-python="`false`" pulumi-lang-yaml="`false`" pulumi-lang-java="`false`" pulumi-lang-hcl="`false`">`false`</span>.
         """
         return pulumi.get(self, "private")
 
@@ -13030,10 +13114,10 @@ class WorkflowTaskCreateTrelloCardTaskParams(dict):
                  labels: Optional[Sequence['outputs.WorkflowTaskCreateTrelloCardTaskParamsLabel']] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] board: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The board id and display name
-        :param Mapping[str, _builtins.str] list: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The list id and display name
+        :param Mapping[str, _builtins.str] board: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The board id and display name
+        :param Mapping[str, _builtins.str] list: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The list id and display name
         :param _builtins.str title: The card title
-        :param Mapping[str, _builtins.str] archivation: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The archivation id and display name
+        :param Mapping[str, _builtins.str] archivation: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The archivation id and display name
         :param _builtins.str description: The card description
         :param _builtins.str due_date: The due date
         """
@@ -13055,7 +13139,7 @@ class WorkflowTaskCreateTrelloCardTaskParams(dict):
     @pulumi.getter
     def board(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The board id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The board id and display name
         """
         return pulumi.get(self, "board")
 
@@ -13063,7 +13147,7 @@ class WorkflowTaskCreateTrelloCardTaskParams(dict):
     @pulumi.getter
     def list(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The list id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The list id and display name
         """
         return pulumi.get(self, "list")
 
@@ -13079,7 +13163,7 @@ class WorkflowTaskCreateTrelloCardTaskParams(dict):
     @pulumi.getter
     def archivation(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The archivation id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The archivation id and display name
         """
         return pulumi.get(self, "archivation")
 
@@ -13159,7 +13243,7 @@ class WorkflowTaskCreateWatsonxChatCompletionTaskParams(dict):
                  system_prompt: Optional[_builtins.str] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] model: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The WatsonX model. eg: ibm/granite-3-b8b-instruct
+        :param Mapping[str, _builtins.str] model: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The WatsonX model. eg: ibm/granite-3-b8b-instruct
         :param _builtins.str prompt: The prompt to send to WatsonX
         :param _builtins.str system_prompt: The system prompt to send to WatsonX (optional)
         """
@@ -13175,7 +13259,7 @@ class WorkflowTaskCreateWatsonxChatCompletionTaskParams(dict):
     @pulumi.getter
     def model(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The WatsonX model. eg: ibm/granite-3-b8b-instruct
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The WatsonX model. eg: ibm/granite-3-b8b-instruct
         """
         return pulumi.get(self, "model")
 
@@ -13246,7 +13330,7 @@ class WorkflowTaskCreateWebexMeetingTaskParams(dict):
         :param _builtins.str password: The meeting password
         :param _builtins.bool post_to_incident_timeline: Value must be one of true or false
         :param _builtins.bool record_meeting: Rootly AI will record the meeting and automatically generate a transcript and summary from your meeting. Value must be one of true or false
-        :param _builtins.str recording_mode: The video layout for the bot's recording (e.g. speaker_view, gallery_view, gallery_view_v2, audio_only). Value must be one of <span pulumi-lang-nodejs="`speakerView`" pulumi-lang-dotnet="`SpeakerView`" pulumi-lang-go="`speakerView`" pulumi-lang-python="`speaker_view`" pulumi-lang-yaml="`speakerView`" pulumi-lang-java="`speakerView`">`speaker_view`</span>, <span pulumi-lang-nodejs="`galleryView`" pulumi-lang-dotnet="`GalleryView`" pulumi-lang-go="`galleryView`" pulumi-lang-python="`gallery_view`" pulumi-lang-yaml="`galleryView`" pulumi-lang-java="`galleryView`">`gallery_view`</span>, <span pulumi-lang-nodejs="`galleryViewV2`" pulumi-lang-dotnet="`GalleryViewV2`" pulumi-lang-go="`galleryViewV2`" pulumi-lang-python="`gallery_view_v2`" pulumi-lang-yaml="`galleryViewV2`" pulumi-lang-java="`galleryViewV2`">`gallery_view_v2`</span>, <span pulumi-lang-nodejs="`audioOnly`" pulumi-lang-dotnet="`AudioOnly`" pulumi-lang-go="`audioOnly`" pulumi-lang-python="`audio_only`" pulumi-lang-yaml="`audioOnly`" pulumi-lang-java="`audioOnly`">`audio_only`</span>.
+        :param _builtins.str recording_mode: The video layout for the bot's recording (e.g. speaker_view, gallery_view, gallery_view_v2, audio_only). Value must be one of <span pulumi-lang-nodejs="`speakerView`" pulumi-lang-dotnet="`SpeakerView`" pulumi-lang-go="`speakerView`" pulumi-lang-python="`speaker_view`" pulumi-lang-yaml="`speakerView`" pulumi-lang-java="`speakerView`" pulumi-lang-hcl="`speaker_view`">`speakerView`</span>, <span pulumi-lang-nodejs="`galleryView`" pulumi-lang-dotnet="`GalleryView`" pulumi-lang-go="`galleryView`" pulumi-lang-python="`gallery_view`" pulumi-lang-yaml="`galleryView`" pulumi-lang-java="`galleryView`" pulumi-lang-hcl="`gallery_view`">`galleryView`</span>, <span pulumi-lang-nodejs="`galleryViewV2`" pulumi-lang-dotnet="`GalleryViewV2`" pulumi-lang-go="`galleryViewV2`" pulumi-lang-python="`gallery_view_v2`" pulumi-lang-yaml="`galleryViewV2`" pulumi-lang-java="`galleryViewV2`" pulumi-lang-hcl="`gallery_view_v2`">`galleryViewV2`</span>, <span pulumi-lang-nodejs="`audioOnly`" pulumi-lang-dotnet="`AudioOnly`" pulumi-lang-go="`audioOnly`" pulumi-lang-python="`audio_only`" pulumi-lang-yaml="`audioOnly`" pulumi-lang-java="`audioOnly`" pulumi-lang-hcl="`audio_only`">`audioOnly`</span>.
         """
         pulumi.set(__self__, "topic", topic)
         if password is not None:
@@ -13303,7 +13387,7 @@ class WorkflowTaskCreateWebexMeetingTaskParams(dict):
     @pulumi.getter(name="recordingMode")
     def recording_mode(self) -> Optional[_builtins.str]:
         """
-        The video layout for the bot's recording (e.g. speaker_view, gallery_view, gallery_view_v2, audio_only). Value must be one of <span pulumi-lang-nodejs="`speakerView`" pulumi-lang-dotnet="`SpeakerView`" pulumi-lang-go="`speakerView`" pulumi-lang-python="`speaker_view`" pulumi-lang-yaml="`speakerView`" pulumi-lang-java="`speakerView`">`speaker_view`</span>, <span pulumi-lang-nodejs="`galleryView`" pulumi-lang-dotnet="`GalleryView`" pulumi-lang-go="`galleryView`" pulumi-lang-python="`gallery_view`" pulumi-lang-yaml="`galleryView`" pulumi-lang-java="`galleryView`">`gallery_view`</span>, <span pulumi-lang-nodejs="`galleryViewV2`" pulumi-lang-dotnet="`GalleryViewV2`" pulumi-lang-go="`galleryViewV2`" pulumi-lang-python="`gallery_view_v2`" pulumi-lang-yaml="`galleryViewV2`" pulumi-lang-java="`galleryViewV2`">`gallery_view_v2`</span>, <span pulumi-lang-nodejs="`audioOnly`" pulumi-lang-dotnet="`AudioOnly`" pulumi-lang-go="`audioOnly`" pulumi-lang-python="`audio_only`" pulumi-lang-yaml="`audioOnly`" pulumi-lang-java="`audioOnly`">`audio_only`</span>.
+        The video layout for the bot's recording (e.g. speaker_view, gallery_view, gallery_view_v2, audio_only). Value must be one of <span pulumi-lang-nodejs="`speakerView`" pulumi-lang-dotnet="`SpeakerView`" pulumi-lang-go="`speakerView`" pulumi-lang-python="`speaker_view`" pulumi-lang-yaml="`speakerView`" pulumi-lang-java="`speakerView`" pulumi-lang-hcl="`speaker_view`">`speakerView`</span>, <span pulumi-lang-nodejs="`galleryView`" pulumi-lang-dotnet="`GalleryView`" pulumi-lang-go="`galleryView`" pulumi-lang-python="`gallery_view`" pulumi-lang-yaml="`galleryView`" pulumi-lang-java="`galleryView`" pulumi-lang-hcl="`gallery_view`">`galleryView`</span>, <span pulumi-lang-nodejs="`galleryViewV2`" pulumi-lang-dotnet="`GalleryViewV2`" pulumi-lang-go="`galleryViewV2`" pulumi-lang-python="`gallery_view_v2`" pulumi-lang-yaml="`galleryViewV2`" pulumi-lang-java="`galleryViewV2`" pulumi-lang-hcl="`gallery_view_v2`">`galleryViewV2`</span>, <span pulumi-lang-nodejs="`audioOnly`" pulumi-lang-dotnet="`AudioOnly`" pulumi-lang-go="`audioOnly`" pulumi-lang-python="`audio_only`" pulumi-lang-yaml="`audioOnly`" pulumi-lang-java="`audioOnly`" pulumi-lang-hcl="`audio_only`">`audioOnly`</span>.
         """
         return pulumi.get(self, "recording_mode")
 
@@ -13437,12 +13521,12 @@ class WorkflowTaskCreateZendeskTicketTaskParams(dict):
                  task_type: Optional[_builtins.str] = None,
                  ticket_payload: Optional[_builtins.str] = None):
         """
-        :param _builtins.str kind: Value must be one of <span pulumi-lang-nodejs="`problem`" pulumi-lang-dotnet="`Problem`" pulumi-lang-go="`problem`" pulumi-lang-python="`problem`" pulumi-lang-yaml="`problem`" pulumi-lang-java="`problem`">`problem`</span>, <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`">`incident`</span>, <span pulumi-lang-nodejs="`question`" pulumi-lang-dotnet="`Question`" pulumi-lang-go="`question`" pulumi-lang-python="`question`" pulumi-lang-yaml="`question`" pulumi-lang-java="`question`">`question`</span>, <span pulumi-lang-nodejs="`task`" pulumi-lang-dotnet="`Task`" pulumi-lang-go="`task`" pulumi-lang-python="`task`" pulumi-lang-yaml="`task`" pulumi-lang-java="`task`">`task`</span>.
+        :param _builtins.str kind: Value must be one of <span pulumi-lang-nodejs="`problem`" pulumi-lang-dotnet="`Problem`" pulumi-lang-go="`problem`" pulumi-lang-python="`problem`" pulumi-lang-yaml="`problem`" pulumi-lang-java="`problem`" pulumi-lang-hcl="`problem`">`problem`</span>, <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`" pulumi-lang-hcl="`incident`">`incident`</span>, <span pulumi-lang-nodejs="`question`" pulumi-lang-dotnet="`Question`" pulumi-lang-go="`question`" pulumi-lang-python="`question`" pulumi-lang-yaml="`question`" pulumi-lang-java="`question`" pulumi-lang-hcl="`question`">`question`</span>, <span pulumi-lang-nodejs="`task`" pulumi-lang-dotnet="`Task`" pulumi-lang-go="`task`" pulumi-lang-python="`task`" pulumi-lang-yaml="`task`" pulumi-lang-java="`task`" pulumi-lang-hcl="`task`">`task`</span>.
         :param _builtins.str subject: The ticket subject
         :param _builtins.str comment: The ticket comment
-        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The completion id and display name
+        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The completion id and display name
         :param _builtins.str custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON
-        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         :param _builtins.str tags: The ticket tags
         :param _builtins.str ticket_payload: Additional Zendesk ticket attributes. Will be merged into whatever was specified in this tasks current parameters. Can contain liquid markup and need to be valid JSON
         """
@@ -13467,7 +13551,7 @@ class WorkflowTaskCreateZendeskTicketTaskParams(dict):
     @pulumi.getter
     def kind(self) -> _builtins.str:
         """
-        Value must be one of <span pulumi-lang-nodejs="`problem`" pulumi-lang-dotnet="`Problem`" pulumi-lang-go="`problem`" pulumi-lang-python="`problem`" pulumi-lang-yaml="`problem`" pulumi-lang-java="`problem`">`problem`</span>, <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`">`incident`</span>, <span pulumi-lang-nodejs="`question`" pulumi-lang-dotnet="`Question`" pulumi-lang-go="`question`" pulumi-lang-python="`question`" pulumi-lang-yaml="`question`" pulumi-lang-java="`question`">`question`</span>, <span pulumi-lang-nodejs="`task`" pulumi-lang-dotnet="`Task`" pulumi-lang-go="`task`" pulumi-lang-python="`task`" pulumi-lang-yaml="`task`" pulumi-lang-java="`task`">`task`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`problem`" pulumi-lang-dotnet="`Problem`" pulumi-lang-go="`problem`" pulumi-lang-python="`problem`" pulumi-lang-yaml="`problem`" pulumi-lang-java="`problem`" pulumi-lang-hcl="`problem`">`problem`</span>, <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`" pulumi-lang-hcl="`incident`">`incident`</span>, <span pulumi-lang-nodejs="`question`" pulumi-lang-dotnet="`Question`" pulumi-lang-go="`question`" pulumi-lang-python="`question`" pulumi-lang-yaml="`question`" pulumi-lang-java="`question`" pulumi-lang-hcl="`question`">`question`</span>, <span pulumi-lang-nodejs="`task`" pulumi-lang-dotnet="`Task`" pulumi-lang-go="`task`" pulumi-lang-python="`task`" pulumi-lang-yaml="`task`" pulumi-lang-java="`task`" pulumi-lang-hcl="`task`">`task`</span>.
         """
         return pulumi.get(self, "kind")
 
@@ -13491,7 +13575,7 @@ class WorkflowTaskCreateZendeskTicketTaskParams(dict):
     @pulumi.getter
     def completion(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The completion id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The completion id and display name
         """
         return pulumi.get(self, "completion")
 
@@ -13507,7 +13591,7 @@ class WorkflowTaskCreateZendeskTicketTaskParams(dict):
     @pulumi.getter
     def priority(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         """
         return pulumi.get(self, "priority")
 
@@ -13579,12 +13663,12 @@ class WorkflowTaskCreateZoomMeetingTaskParams(dict):
                  task_type: Optional[_builtins.str] = None):
         """
         :param _builtins.str topic: The meeting topic
-        :param _builtins.str auto_recording: Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`">`none`</span>, <span pulumi-lang-nodejs="`local`" pulumi-lang-dotnet="`Local`" pulumi-lang-go="`local`" pulumi-lang-python="`local`" pulumi-lang-yaml="`local`" pulumi-lang-java="`local`">`local`</span>, <span pulumi-lang-nodejs="`cloud`" pulumi-lang-dotnet="`Cloud`" pulumi-lang-go="`cloud`" pulumi-lang-python="`cloud`" pulumi-lang-yaml="`cloud`" pulumi-lang-java="`cloud`">`cloud`</span>.
+        :param _builtins.str auto_recording: Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`" pulumi-lang-hcl="`none`">`none`</span>, <span pulumi-lang-nodejs="`local`" pulumi-lang-dotnet="`Local`" pulumi-lang-go="`local`" pulumi-lang-python="`local`" pulumi-lang-yaml="`local`" pulumi-lang-java="`local`" pulumi-lang-hcl="`local`">`local`</span>, <span pulumi-lang-nodejs="`cloud`" pulumi-lang-dotnet="`Cloud`" pulumi-lang-go="`cloud`" pulumi-lang-python="`cloud`" pulumi-lang-yaml="`cloud`" pulumi-lang-java="`cloud`" pulumi-lang-hcl="`cloud`">`cloud`</span>.
         :param _builtins.str create_as_email: The email to use if creating as email
         :param _builtins.str password: The meeting password
         :param _builtins.bool post_to_incident_timeline: Value must be one of true or false
         :param _builtins.bool record_meeting: Rootly AI will record the meeting and automatically generate a transcript and summary from your meeting. Value must be one of true or false
-        :param _builtins.str recording_mode: The video layout for the bot's recording (e.g. speaker_view, gallery_view, gallery_view_v2, audio_only). Value must be one of <span pulumi-lang-nodejs="`speakerView`" pulumi-lang-dotnet="`SpeakerView`" pulumi-lang-go="`speakerView`" pulumi-lang-python="`speaker_view`" pulumi-lang-yaml="`speakerView`" pulumi-lang-java="`speakerView`">`speaker_view`</span>, <span pulumi-lang-nodejs="`galleryView`" pulumi-lang-dotnet="`GalleryView`" pulumi-lang-go="`galleryView`" pulumi-lang-python="`gallery_view`" pulumi-lang-yaml="`galleryView`" pulumi-lang-java="`galleryView`">`gallery_view`</span>, <span pulumi-lang-nodejs="`galleryViewV2`" pulumi-lang-dotnet="`GalleryViewV2`" pulumi-lang-go="`galleryViewV2`" pulumi-lang-python="`gallery_view_v2`" pulumi-lang-yaml="`galleryViewV2`" pulumi-lang-java="`galleryViewV2`">`gallery_view_v2`</span>, <span pulumi-lang-nodejs="`audioOnly`" pulumi-lang-dotnet="`AudioOnly`" pulumi-lang-go="`audioOnly`" pulumi-lang-python="`audio_only`" pulumi-lang-yaml="`audioOnly`" pulumi-lang-java="`audioOnly`">`audio_only`</span>.
+        :param _builtins.str recording_mode: The video layout for the bot's recording (e.g. speaker_view, gallery_view, gallery_view_v2, audio_only). Value must be one of <span pulumi-lang-nodejs="`speakerView`" pulumi-lang-dotnet="`SpeakerView`" pulumi-lang-go="`speakerView`" pulumi-lang-python="`speaker_view`" pulumi-lang-yaml="`speakerView`" pulumi-lang-java="`speakerView`" pulumi-lang-hcl="`speaker_view`">`speakerView`</span>, <span pulumi-lang-nodejs="`galleryView`" pulumi-lang-dotnet="`GalleryView`" pulumi-lang-go="`galleryView`" pulumi-lang-python="`gallery_view`" pulumi-lang-yaml="`galleryView`" pulumi-lang-java="`galleryView`" pulumi-lang-hcl="`gallery_view`">`galleryView`</span>, <span pulumi-lang-nodejs="`galleryViewV2`" pulumi-lang-dotnet="`GalleryViewV2`" pulumi-lang-go="`galleryViewV2`" pulumi-lang-python="`gallery_view_v2`" pulumi-lang-yaml="`galleryViewV2`" pulumi-lang-java="`galleryViewV2`" pulumi-lang-hcl="`gallery_view_v2`">`galleryViewV2`</span>, <span pulumi-lang-nodejs="`audioOnly`" pulumi-lang-dotnet="`AudioOnly`" pulumi-lang-go="`audioOnly`" pulumi-lang-python="`audio_only`" pulumi-lang-yaml="`audioOnly`" pulumi-lang-java="`audioOnly`" pulumi-lang-hcl="`audio_only`">`audioOnly`</span>.
         """
         pulumi.set(__self__, "topic", topic)
         if alternative_hosts is not None:
@@ -13623,7 +13707,7 @@ class WorkflowTaskCreateZoomMeetingTaskParams(dict):
     @pulumi.getter(name="autoRecording")
     def auto_recording(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`">`none`</span>, <span pulumi-lang-nodejs="`local`" pulumi-lang-dotnet="`Local`" pulumi-lang-go="`local`" pulumi-lang-python="`local`" pulumi-lang-yaml="`local`" pulumi-lang-java="`local`">`local`</span>, <span pulumi-lang-nodejs="`cloud`" pulumi-lang-dotnet="`Cloud`" pulumi-lang-go="`cloud`" pulumi-lang-python="`cloud`" pulumi-lang-yaml="`cloud`" pulumi-lang-java="`cloud`">`cloud`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`" pulumi-lang-hcl="`none`">`none`</span>, <span pulumi-lang-nodejs="`local`" pulumi-lang-dotnet="`Local`" pulumi-lang-go="`local`" pulumi-lang-python="`local`" pulumi-lang-yaml="`local`" pulumi-lang-java="`local`" pulumi-lang-hcl="`local`">`local`</span>, <span pulumi-lang-nodejs="`cloud`" pulumi-lang-dotnet="`Cloud`" pulumi-lang-go="`cloud`" pulumi-lang-python="`cloud`" pulumi-lang-yaml="`cloud`" pulumi-lang-java="`cloud`" pulumi-lang-hcl="`cloud`">`cloud`</span>.
         """
         return pulumi.get(self, "auto_recording")
 
@@ -13668,7 +13752,7 @@ class WorkflowTaskCreateZoomMeetingTaskParams(dict):
     @pulumi.getter(name="recordingMode")
     def recording_mode(self) -> Optional[_builtins.str]:
         """
-        The video layout for the bot's recording (e.g. speaker_view, gallery_view, gallery_view_v2, audio_only). Value must be one of <span pulumi-lang-nodejs="`speakerView`" pulumi-lang-dotnet="`SpeakerView`" pulumi-lang-go="`speakerView`" pulumi-lang-python="`speaker_view`" pulumi-lang-yaml="`speakerView`" pulumi-lang-java="`speakerView`">`speaker_view`</span>, <span pulumi-lang-nodejs="`galleryView`" pulumi-lang-dotnet="`GalleryView`" pulumi-lang-go="`galleryView`" pulumi-lang-python="`gallery_view`" pulumi-lang-yaml="`galleryView`" pulumi-lang-java="`galleryView`">`gallery_view`</span>, <span pulumi-lang-nodejs="`galleryViewV2`" pulumi-lang-dotnet="`GalleryViewV2`" pulumi-lang-go="`galleryViewV2`" pulumi-lang-python="`gallery_view_v2`" pulumi-lang-yaml="`galleryViewV2`" pulumi-lang-java="`galleryViewV2`">`gallery_view_v2`</span>, <span pulumi-lang-nodejs="`audioOnly`" pulumi-lang-dotnet="`AudioOnly`" pulumi-lang-go="`audioOnly`" pulumi-lang-python="`audio_only`" pulumi-lang-yaml="`audioOnly`" pulumi-lang-java="`audioOnly`">`audio_only`</span>.
+        The video layout for the bot's recording (e.g. speaker_view, gallery_view, gallery_view_v2, audio_only). Value must be one of <span pulumi-lang-nodejs="`speakerView`" pulumi-lang-dotnet="`SpeakerView`" pulumi-lang-go="`speakerView`" pulumi-lang-python="`speaker_view`" pulumi-lang-yaml="`speakerView`" pulumi-lang-java="`speakerView`" pulumi-lang-hcl="`speaker_view`">`speakerView`</span>, <span pulumi-lang-nodejs="`galleryView`" pulumi-lang-dotnet="`GalleryView`" pulumi-lang-go="`galleryView`" pulumi-lang-python="`gallery_view`" pulumi-lang-yaml="`galleryView`" pulumi-lang-java="`galleryView`" pulumi-lang-hcl="`gallery_view`">`galleryView`</span>, <span pulumi-lang-nodejs="`galleryViewV2`" pulumi-lang-dotnet="`GalleryViewV2`" pulumi-lang-go="`galleryViewV2`" pulumi-lang-python="`gallery_view_v2`" pulumi-lang-yaml="`galleryViewV2`" pulumi-lang-java="`galleryViewV2`" pulumi-lang-hcl="`gallery_view_v2`">`galleryViewV2`</span>, <span pulumi-lang-nodejs="`audioOnly`" pulumi-lang-dotnet="`AudioOnly`" pulumi-lang-go="`audioOnly`" pulumi-lang-python="`audio_only`" pulumi-lang-yaml="`audioOnly`" pulumi-lang-java="`audioOnly`" pulumi-lang-hcl="`audio_only`">`audioOnly`</span>.
         """
         return pulumi.get(self, "recording_mode")
 
@@ -13747,7 +13831,7 @@ class WorkflowTaskGetAlertsTaskParams(dict):
         """
         :param _builtins.str past_duration: How far back to fetch commits (in format '1 minute', '30 days', '3 months', etc.)
         :param _builtins.bool environments_impacted_by_incident: Value must be one of true or false
-        :param Mapping[str, _builtins.str] parent_message_thread_task: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. A hash where [id] is the task id of the parent task that sent a message, and [name] is the name of the parent task
+        :param Mapping[str, _builtins.str] parent_message_thread_task: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. A hash where [id] is the task id of the parent task that sent a message, and [name] is the name of the parent task
         :param _builtins.bool post_to_incident_timeline: Value must be one of true or false
         :param _builtins.bool services_impacted_by_incident: Value must be one of true or false
         """
@@ -13803,7 +13887,7 @@ class WorkflowTaskGetAlertsTaskParams(dict):
     @pulumi.getter(name="parentMessageThreadTask")
     def parent_message_thread_task(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. A hash where [id] is the task id of the parent task that sent a message, and [name] is the name of the parent task
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. A hash where [id] is the task id of the parent task that sent a message, and [name] is the name of the parent task
         """
         return pulumi.get(self, "parent_message_thread_task")
 
@@ -14180,7 +14264,7 @@ class WorkflowTaskGetPulsesTaskParams(dict):
         """
         :param _builtins.str past_duration: How far back to fetch commits (in format '1 minute', '30 days', '3 months', etc.)
         :param _builtins.bool environments_impacted_by_incident: Value must be one of true or false
-        :param Mapping[str, _builtins.str] parent_message_thread_task: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. A hash where [id] is the task id of the parent task that sent a message, and [name] is the name of the parent task
+        :param Mapping[str, _builtins.str] parent_message_thread_task: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. A hash where [id] is the task id of the parent task that sent a message, and [name] is the name of the parent task
         :param _builtins.bool post_to_incident_timeline: Value must be one of true or false
         :param _builtins.bool services_impacted_by_incident: Value must be one of true or false
         """
@@ -14238,7 +14322,7 @@ class WorkflowTaskGetPulsesTaskParams(dict):
     @pulumi.getter(name="parentMessageThreadTask")
     def parent_message_thread_task(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. A hash where [id] is the task id of the parent task that sent a message, and [name] is the name of the parent task
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. A hash where [id] is the task id of the parent task that sent a message, and [name] is the name of the parent task
         """
         return pulumi.get(self, "parent_message_thread_task")
 
@@ -14318,6 +14402,10 @@ class WorkflowTaskHttpClientTaskParams(dict):
             suggest = "post_to_incident_timeline"
         elif key == "postToSlackChannels":
             suggest = "post_to_slack_channels"
+        elif key == "retryCount":
+            suggest = "retry_count"
+        elif key == "retryWaitTime":
+            suggest = "retry_wait_time"
         elif key == "taskType":
             suggest = "task_type"
 
@@ -14343,6 +14431,8 @@ class WorkflowTaskHttpClientTaskParams(dict):
                  params: Optional[_builtins.str] = None,
                  post_to_incident_timeline: Optional[_builtins.bool] = None,
                  post_to_slack_channels: Optional[Sequence['outputs.WorkflowTaskHttpClientTaskParamsPostToSlackChannel']] = None,
+                 retry_count: Optional[_builtins.str] = None,
+                 retry_wait_time: Optional[_builtins.str] = None,
                  task_type: Optional[_builtins.str] = None):
         """
         :param _builtins.str succeed_on_status: HTTP status code expected. Can be a regular expression. Eg: 200, 200|203, 20[0-3]
@@ -14352,6 +14442,8 @@ class WorkflowTaskHttpClientTaskParams(dict):
         :param _builtins.str method: HTTP method. Value must be one of `GET`, `POST`, `PATCH`, `PUT`, `DELETE`, `OPTIONS`.
         :param _builtins.str params: JSON map of HTTP query parameters
         :param _builtins.bool post_to_incident_timeline: Value must be one of true or false
+        :param _builtins.str retry_count: Number of times to retry on HTTP 429 responses (0-4). 0 disables retry.
+        :param _builtins.str retry_wait_time: Seconds to wait before each retry (1-15). Retry-After header is honored when present and <= 90s, taking the larger of<span pulumi-lang-nodejs=" retryWaitTime " pulumi-lang-dotnet=" RetryWaitTime " pulumi-lang-go=" retryWaitTime " pulumi-lang-python=" retry_wait_time " pulumi-lang-yaml=" retryWaitTime " pulumi-lang-java=" retryWaitTime " pulumi-lang-hcl=" retry_wait_time "> retryWaitTime </span>and the header value.
         """
         pulumi.set(__self__, "succeed_on_status", succeed_on_status)
         pulumi.set(__self__, "url", url)
@@ -14371,6 +14463,10 @@ class WorkflowTaskHttpClientTaskParams(dict):
             pulumi.set(__self__, "post_to_incident_timeline", post_to_incident_timeline)
         if post_to_slack_channels is not None:
             pulumi.set(__self__, "post_to_slack_channels", post_to_slack_channels)
+        if retry_count is not None:
+            pulumi.set(__self__, "retry_count", retry_count)
+        if retry_wait_time is not None:
+            pulumi.set(__self__, "retry_wait_time", retry_wait_time)
         if task_type is not None:
             pulumi.set(__self__, "task_type", task_type)
 
@@ -14446,6 +14542,22 @@ class WorkflowTaskHttpClientTaskParams(dict):
         return pulumi.get(self, "post_to_slack_channels")
 
     @_builtins.property
+    @pulumi.getter(name="retryCount")
+    def retry_count(self) -> Optional[_builtins.str]:
+        """
+        Number of times to retry on HTTP 429 responses (0-4). 0 disables retry.
+        """
+        return pulumi.get(self, "retry_count")
+
+    @_builtins.property
+    @pulumi.getter(name="retryWaitTime")
+    def retry_wait_time(self) -> Optional[_builtins.str]:
+        """
+        Seconds to wait before each retry (1-15). Retry-After header is honored when present and <= 90s, taking the larger of<span pulumi-lang-nodejs=" retryWaitTime " pulumi-lang-dotnet=" RetryWaitTime " pulumi-lang-go=" retryWaitTime " pulumi-lang-python=" retry_wait_time " pulumi-lang-yaml=" retryWaitTime " pulumi-lang-java=" retryWaitTime " pulumi-lang-hcl=" retry_wait_time "> retryWaitTime </span>and the header value.
+        """
+        return pulumi.get(self, "retry_wait_time")
+
+    @_builtins.property
     @pulumi.getter(name="taskType")
     def task_type(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "task_type")
@@ -14495,9 +14607,9 @@ class WorkflowTaskInviteToMicrosoftTeamsChannelTaskParams(dict):
                  task_type: Optional[_builtins.str] = None,
                  team: Optional[Mapping[str, _builtins.str]] = None):
         """
-        :param Mapping[str, _builtins.str] channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str emails: Comma separated list of emails to invite
-        :param Mapping[str, _builtins.str] team: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] team: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "channel", channel)
         pulumi.set(__self__, "emails", emails)
@@ -14510,7 +14622,7 @@ class WorkflowTaskInviteToMicrosoftTeamsChannelTaskParams(dict):
     @pulumi.getter
     def channel(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "channel")
 
@@ -14531,7 +14643,7 @@ class WorkflowTaskInviteToMicrosoftTeamsChannelTaskParams(dict):
     @pulumi.getter
     def team(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "team")
 
@@ -14560,7 +14672,7 @@ class WorkflowTaskInviteToSlackChannelOpsgenieTaskParams(dict):
                  schedule: Mapping[str, _builtins.str],
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] schedule: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] schedule: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "channels", channels)
         pulumi.set(__self__, "schedule", schedule)
@@ -14576,7 +14688,7 @@ class WorkflowTaskInviteToSlackChannelOpsgenieTaskParams(dict):
     @pulumi.getter
     def schedule(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "schedule")
 
@@ -14633,9 +14745,9 @@ class WorkflowTaskInviteToSlackChannelPagerdutyTaskParams(dict):
                  service: Optional[Mapping[str, _builtins.str]] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] escalation_policy: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] schedule: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] service: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] escalation_policy: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] schedule: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] service: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "channels", channels)
         if escalation_policy is not None:
@@ -14656,7 +14768,7 @@ class WorkflowTaskInviteToSlackChannelPagerdutyTaskParams(dict):
     @pulumi.getter(name="escalationPolicy")
     def escalation_policy(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "escalation_policy")
 
@@ -14664,7 +14776,7 @@ class WorkflowTaskInviteToSlackChannelPagerdutyTaskParams(dict):
     @pulumi.getter
     def schedule(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "schedule")
 
@@ -14672,7 +14784,7 @@ class WorkflowTaskInviteToSlackChannelPagerdutyTaskParams(dict):
     @pulumi.getter
     def service(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "service")
 
@@ -14739,11 +14851,11 @@ class WorkflowTaskInviteToSlackChannelRootlyTaskParams(dict):
                  task_type: Optional[_builtins.str] = None,
                  user_target: Optional[Mapping[str, _builtins.str]] = None):
         """
-        :param Mapping[str, _builtins.str] escalation_policy_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] group_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] schedule_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] service_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] user_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] escalation_policy_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] group_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] schedule_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] service_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] user_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "channels", channels)
         if escalation_policy_target is not None:
@@ -14768,7 +14880,7 @@ class WorkflowTaskInviteToSlackChannelRootlyTaskParams(dict):
     @pulumi.getter(name="escalationPolicyTarget")
     def escalation_policy_target(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "escalation_policy_target")
 
@@ -14776,7 +14888,7 @@ class WorkflowTaskInviteToSlackChannelRootlyTaskParams(dict):
     @pulumi.getter(name="groupTarget")
     def group_target(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "group_target")
 
@@ -14784,7 +14896,7 @@ class WorkflowTaskInviteToSlackChannelRootlyTaskParams(dict):
     @pulumi.getter(name="scheduleTarget")
     def schedule_target(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "schedule_target")
 
@@ -14792,7 +14904,7 @@ class WorkflowTaskInviteToSlackChannelRootlyTaskParams(dict):
     @pulumi.getter(name="serviceTarget")
     def service_target(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "service_target")
 
@@ -14805,7 +14917,7 @@ class WorkflowTaskInviteToSlackChannelRootlyTaskParams(dict):
     @pulumi.getter(name="userTarget")
     def user_target(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "user_target")
 
@@ -14861,7 +14973,7 @@ class WorkflowTaskInviteToSlackChannelTaskParams(dict):
                  slack_users: Optional[Sequence['outputs.WorkflowTaskInviteToSlackChannelTaskParamsSlackUser']] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str slack_emails: Comma separated list of emails to invite to the channel
         """
         pulumi.set(__self__, "channel", channel)
@@ -14878,7 +14990,7 @@ class WorkflowTaskInviteToSlackChannelTaskParams(dict):
     @pulumi.getter
     def channel(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "channel")
 
@@ -14968,7 +15080,7 @@ class WorkflowTaskInviteToSlackChannelVictorOpsTaskParams(dict):
                  team: Mapping[str, _builtins.str],
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] team: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] team: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "channels", channels)
         pulumi.set(__self__, "team", team)
@@ -14984,7 +15096,7 @@ class WorkflowTaskInviteToSlackChannelVictorOpsTaskParams(dict):
     @pulumi.getter
     def team(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "team")
 
@@ -15043,7 +15155,7 @@ class WorkflowTaskPageJsmopsOnCallRespondersTaskParams(dict):
         """
         :param _builtins.str description: Description field of the incident that is generally used to provide a detailed information about the incident
         :param _builtins.str message: Message of the incident
-        :param _builtins.str priority: Value must be one of `P3`, `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        :param _builtins.str priority: Value must be one of `P3`, `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         :param _builtins.str title: Incident title.
         """
         if description is not None:
@@ -15081,7 +15193,7 @@ class WorkflowTaskPageJsmopsOnCallRespondersTaskParams(dict):
     @pulumi.getter
     def priority(self) -> Optional[_builtins.str]:
         """
-        Value must be one of `P3`, `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        Value must be one of `P3`, `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         """
         return pulumi.get(self, "priority")
 
@@ -15177,7 +15289,7 @@ class WorkflowTaskPageOpsgenieOnCallRespondersTaskParams(dict):
         """
         :param _builtins.str description: Description field of the incident that is generally used to provide a detailed information about the incident
         :param _builtins.str message: Message of the incident
-        :param _builtins.str priority: Value must be one of `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        :param _builtins.str priority: Value must be one of `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         :param _builtins.str title: Incident title.
         """
         if description is not None:
@@ -15215,7 +15327,7 @@ class WorkflowTaskPageOpsgenieOnCallRespondersTaskParams(dict):
     @pulumi.getter
     def priority(self) -> Optional[_builtins.str]:
         """
-        Value must be one of `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        Value must be one of `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         """
         return pulumi.get(self, "priority")
 
@@ -15315,11 +15427,11 @@ class WorkflowTaskPagePagerdutyOnCallRespondersTaskParams(dict):
                  urgency: Optional[_builtins.str] = None,
                  users: Optional[Sequence['outputs.WorkflowTaskPagePagerdutyOnCallRespondersTaskParamsUser']] = None):
         """
-        :param Mapping[str, _builtins.str] service: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] service: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.bool create_new_incident_on_conflict: Rootly only supports linking to a single PagerDuty incident. If this feature is disabled Rootly will add responders from any additional pages to the existing PagerDuty incident that is linked to the Rootly incident. If enabled, Rootly will create a new PagerDuty incident that is not linked to any Rootly incidents. Value must be one of true or false
         :param _builtins.str priority: PagerDuty incident priority, selecting auto will let Rootly auto map our incident severity
         :param _builtins.str title: Incident title.
-        :param _builtins.str urgency: Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        :param _builtins.str urgency: Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         """
         pulumi.set(__self__, "service", service)
         if create_new_incident_on_conflict is not None:
@@ -15343,7 +15455,7 @@ class WorkflowTaskPagePagerdutyOnCallRespondersTaskParams(dict):
     @pulumi.getter
     def service(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "service")
 
@@ -15390,7 +15502,7 @@ class WorkflowTaskPagePagerdutyOnCallRespondersTaskParams(dict):
     @pulumi.getter
     def urgency(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         """
         return pulumi.get(self, "urgency")
 
@@ -15486,11 +15598,11 @@ class WorkflowTaskPageRootlyOnCallRespondersTaskParams(dict):
         :param _builtins.str alert_urgency_id: Alert urgency ID
         :param _builtins.str summary: Alert title
         :param _builtins.str description: Alert description
-        :param Mapping[str, _builtins.str] escalation_policy_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] functionality_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] group_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] service_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] user_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] escalation_policy_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] functionality_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] group_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] service_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] user_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "alert_urgency_id", alert_urgency_id)
         pulumi.set(__self__, "summary", summary)
@@ -15544,7 +15656,7 @@ class WorkflowTaskPageRootlyOnCallRespondersTaskParams(dict):
     @pulumi.getter(name="escalationPolicyTarget")
     def escalation_policy_target(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "escalation_policy_target")
 
@@ -15552,7 +15664,7 @@ class WorkflowTaskPageRootlyOnCallRespondersTaskParams(dict):
     @pulumi.getter(name="functionalityTarget")
     def functionality_target(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "functionality_target")
 
@@ -15560,7 +15672,7 @@ class WorkflowTaskPageRootlyOnCallRespondersTaskParams(dict):
     @pulumi.getter(name="groupTarget")
     def group_target(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "group_target")
 
@@ -15568,7 +15680,7 @@ class WorkflowTaskPageRootlyOnCallRespondersTaskParams(dict):
     @pulumi.getter(name="serviceTarget")
     def service_target(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "service_target")
 
@@ -15581,7 +15693,7 @@ class WorkflowTaskPageRootlyOnCallRespondersTaskParams(dict):
     @pulumi.getter(name="userTarget")
     def user_target(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "user_target")
 
@@ -15772,13 +15884,13 @@ class WorkflowTaskPublishIncidentTaskParams(dict):
                  status_page_template: Optional[Mapping[str, _builtins.str]] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] incident: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param _builtins.str status: Value must be one of <span pulumi-lang-nodejs="`investigating`" pulumi-lang-dotnet="`Investigating`" pulumi-lang-go="`investigating`" pulumi-lang-python="`investigating`" pulumi-lang-yaml="`investigating`" pulumi-lang-java="`investigating`">`investigating`</span>, <span pulumi-lang-nodejs="`identified`" pulumi-lang-dotnet="`Identified`" pulumi-lang-go="`identified`" pulumi-lang-python="`identified`" pulumi-lang-yaml="`identified`" pulumi-lang-java="`identified`">`identified`</span>, <span pulumi-lang-nodejs="`monitoring`" pulumi-lang-dotnet="`Monitoring`" pulumi-lang-go="`monitoring`" pulumi-lang-python="`monitoring`" pulumi-lang-yaml="`monitoring`" pulumi-lang-java="`monitoring`">`monitoring`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`">`completed`</span>.
+        :param Mapping[str, _builtins.str] incident: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param _builtins.str status: Value must be one of <span pulumi-lang-nodejs="`investigating`" pulumi-lang-dotnet="`Investigating`" pulumi-lang-go="`investigating`" pulumi-lang-python="`investigating`" pulumi-lang-yaml="`investigating`" pulumi-lang-java="`investigating`" pulumi-lang-hcl="`investigating`">`investigating`</span>, <span pulumi-lang-nodejs="`identified`" pulumi-lang-dotnet="`Identified`" pulumi-lang-go="`identified`" pulumi-lang-python="`identified`" pulumi-lang-yaml="`identified`" pulumi-lang-java="`identified`" pulumi-lang-hcl="`identified`">`identified`</span>, <span pulumi-lang-nodejs="`monitoring`" pulumi-lang-dotnet="`Monitoring`" pulumi-lang-go="`monitoring`" pulumi-lang-python="`monitoring`" pulumi-lang-yaml="`monitoring`" pulumi-lang-java="`monitoring`" pulumi-lang-hcl="`monitoring`">`monitoring`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`" pulumi-lang-hcl="`completed`">`completed`</span>.
         :param _builtins.str event: Incident event description
         :param _builtins.str integration_payload: Additional API Payload you can pass to statuspage.io for example. Can contain liquid markup and need to be valid JSON
         :param _builtins.bool notify_subscribers: When true notifies subscribers of the status page by email/text. Value must be one of true or false
         :param _builtins.bool should_tweet: For Statuspage.io integrated pages auto publishes a tweet for your update. Value must be one of true or false
-        :param Mapping[str, _builtins.str] status_page_template: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] status_page_template: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "incident", incident)
         pulumi.set(__self__, "public_title", public_title)
@@ -15801,7 +15913,7 @@ class WorkflowTaskPublishIncidentTaskParams(dict):
     @pulumi.getter
     def incident(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "incident")
 
@@ -15814,7 +15926,7 @@ class WorkflowTaskPublishIncidentTaskParams(dict):
     @pulumi.getter
     def status(self) -> _builtins.str:
         """
-        Value must be one of <span pulumi-lang-nodejs="`investigating`" pulumi-lang-dotnet="`Investigating`" pulumi-lang-go="`investigating`" pulumi-lang-python="`investigating`" pulumi-lang-yaml="`investigating`" pulumi-lang-java="`investigating`">`investigating`</span>, <span pulumi-lang-nodejs="`identified`" pulumi-lang-dotnet="`Identified`" pulumi-lang-go="`identified`" pulumi-lang-python="`identified`" pulumi-lang-yaml="`identified`" pulumi-lang-java="`identified`">`identified`</span>, <span pulumi-lang-nodejs="`monitoring`" pulumi-lang-dotnet="`Monitoring`" pulumi-lang-go="`monitoring`" pulumi-lang-python="`monitoring`" pulumi-lang-yaml="`monitoring`" pulumi-lang-java="`monitoring`">`monitoring`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`">`completed`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`investigating`" pulumi-lang-dotnet="`Investigating`" pulumi-lang-go="`investigating`" pulumi-lang-python="`investigating`" pulumi-lang-yaml="`investigating`" pulumi-lang-java="`investigating`" pulumi-lang-hcl="`investigating`">`investigating`</span>, <span pulumi-lang-nodejs="`identified`" pulumi-lang-dotnet="`Identified`" pulumi-lang-go="`identified`" pulumi-lang-python="`identified`" pulumi-lang-yaml="`identified`" pulumi-lang-java="`identified`" pulumi-lang-hcl="`identified`">`identified`</span>, <span pulumi-lang-nodejs="`monitoring`" pulumi-lang-dotnet="`Monitoring`" pulumi-lang-go="`monitoring`" pulumi-lang-python="`monitoring`" pulumi-lang-yaml="`monitoring`" pulumi-lang-java="`monitoring`" pulumi-lang-hcl="`monitoring`">`monitoring`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`" pulumi-lang-hcl="`completed`">`completed`</span>.
         """
         return pulumi.get(self, "status")
 
@@ -15859,7 +15971,7 @@ class WorkflowTaskPublishIncidentTaskParams(dict):
     @pulumi.getter(name="statusPageTemplate")
     def status_page_template(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "status_page_template")
 
@@ -16007,7 +16119,7 @@ class WorkflowTaskRemoveGoogleDocsPermissionsTaskParams(dict):
                  value: _builtins.str,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param _builtins.str attribute_to_query_by: Value must be one of <span pulumi-lang-nodejs="`type`" pulumi-lang-dotnet="`Type`" pulumi-lang-go="`type`" pulumi-lang-python="`type`" pulumi-lang-yaml="`type`" pulumi-lang-java="`type`">`type`</span>, <span pulumi-lang-nodejs="`role`" pulumi-lang-dotnet="`Role`" pulumi-lang-go="`role`" pulumi-lang-python="`role`" pulumi-lang-yaml="`role`" pulumi-lang-java="`role`">`role`</span>, <span pulumi-lang-nodejs="`emailAddress`" pulumi-lang-dotnet="`EmailAddress`" pulumi-lang-go="`emailAddress`" pulumi-lang-python="`email_address`" pulumi-lang-yaml="`emailAddress`" pulumi-lang-java="`emailAddress`">`email_address`</span>.
+        :param _builtins.str attribute_to_query_by: Value must be one of <span pulumi-lang-nodejs="`type`" pulumi-lang-dotnet="`Type`" pulumi-lang-go="`type`" pulumi-lang-python="`type`" pulumi-lang-yaml="`type`" pulumi-lang-java="`type`" pulumi-lang-hcl="`type`">`type`</span>, <span pulumi-lang-nodejs="`role`" pulumi-lang-dotnet="`Role`" pulumi-lang-go="`role`" pulumi-lang-python="`role`" pulumi-lang-yaml="`role`" pulumi-lang-java="`role`" pulumi-lang-hcl="`role`">`role`</span>, <span pulumi-lang-nodejs="`emailAddress`" pulumi-lang-dotnet="`EmailAddress`" pulumi-lang-go="`emailAddress`" pulumi-lang-python="`email_address`" pulumi-lang-yaml="`emailAddress`" pulumi-lang-java="`emailAddress`" pulumi-lang-hcl="`email_address`">`emailAddress`</span>.
         :param _builtins.str file_id: The Google Doc file ID
         """
         pulumi.set(__self__, "attribute_to_query_by", attribute_to_query_by)
@@ -16020,7 +16132,7 @@ class WorkflowTaskRemoveGoogleDocsPermissionsTaskParams(dict):
     @pulumi.getter(name="attributeToQueryBy")
     def attribute_to_query_by(self) -> _builtins.str:
         """
-        Value must be one of <span pulumi-lang-nodejs="`type`" pulumi-lang-dotnet="`Type`" pulumi-lang-go="`type`" pulumi-lang-python="`type`" pulumi-lang-yaml="`type`" pulumi-lang-java="`type`">`type`</span>, <span pulumi-lang-nodejs="`role`" pulumi-lang-dotnet="`Role`" pulumi-lang-go="`role`" pulumi-lang-python="`role`" pulumi-lang-yaml="`role`" pulumi-lang-java="`role`">`role`</span>, <span pulumi-lang-nodejs="`emailAddress`" pulumi-lang-dotnet="`EmailAddress`" pulumi-lang-go="`emailAddress`" pulumi-lang-python="`email_address`" pulumi-lang-yaml="`emailAddress`" pulumi-lang-java="`emailAddress`">`email_address`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`type`" pulumi-lang-dotnet="`Type`" pulumi-lang-go="`type`" pulumi-lang-python="`type`" pulumi-lang-yaml="`type`" pulumi-lang-java="`type`" pulumi-lang-hcl="`type`">`type`</span>, <span pulumi-lang-nodejs="`role`" pulumi-lang-dotnet="`Role`" pulumi-lang-go="`role`" pulumi-lang-python="`role`" pulumi-lang-yaml="`role`" pulumi-lang-java="`role`" pulumi-lang-hcl="`role`">`role`</span>, <span pulumi-lang-nodejs="`emailAddress`" pulumi-lang-dotnet="`EmailAddress`" pulumi-lang-go="`emailAddress`" pulumi-lang-python="`email_address`" pulumi-lang-yaml="`emailAddress`" pulumi-lang-java="`emailAddress`" pulumi-lang-hcl="`email_address`">`emailAddress`</span>.
         """
         return pulumi.get(self, "attribute_to_query_by")
 
@@ -16068,8 +16180,8 @@ class WorkflowTaskRenameMicrosoftTeamsChannelTaskParams(dict):
                  title: _builtins.str,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] team: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] team: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "channel", channel)
         pulumi.set(__self__, "team", team)
@@ -16081,7 +16193,7 @@ class WorkflowTaskRenameMicrosoftTeamsChannelTaskParams(dict):
     @pulumi.getter
     def channel(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "channel")
 
@@ -16089,7 +16201,7 @@ class WorkflowTaskRenameMicrosoftTeamsChannelTaskParams(dict):
     @pulumi.getter
     def team(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "team")
 
@@ -16128,7 +16240,7 @@ class WorkflowTaskRenameSlackChannelTaskParams(dict):
                  title: _builtins.str,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "channel", channel)
         pulumi.set(__self__, "title", title)
@@ -16139,7 +16251,7 @@ class WorkflowTaskRenameSlackChannelTaskParams(dict):
     @pulumi.getter
     def channel(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "channel")
 
@@ -16735,7 +16847,7 @@ class WorkflowTaskSendSlackBlocksTaskParams(dict):
         :param _builtins.str blocks: Support liquid markup. Needs to be a valid JSON string after liquid is parsed
         :param _builtins.str attachments: Support liquid markup. Needs to be a valid JSON string after liquid is parsed
         :param _builtins.bool broadcast_thread_reply_to_channel: Value must be one of true or false
-        :param Mapping[str, _builtins.str] parent_message_thread_task: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. A hash where [id] is the task id of the parent task that sent a message, and [name] is the name of the parent task
+        :param Mapping[str, _builtins.str] parent_message_thread_task: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. A hash where [id] is the task id of the parent task that sent a message, and [name] is the name of the parent task
         :param _builtins.bool pin_to_channel: Value must be one of true or false
         :param _builtins.bool send_as_ephemeral: Value must be one of true or false
         :param _builtins.bool send_only_as_threaded_message: When set to true, if the parent for this threaded message cannot be found the message will be skipped.. Value must be one of true or false
@@ -16808,7 +16920,7 @@ class WorkflowTaskSendSlackBlocksTaskParams(dict):
     @pulumi.getter(name="parentMessageThreadTask")
     def parent_message_thread_task(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. A hash where [id] is the task id of the parent task that sent a message, and [name] is the name of the parent task
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. A hash where [id] is the task id of the parent task that sent a message, and [name] is the name of the parent task
         """
         return pulumi.get(self, "parent_message_thread_task")
 
@@ -16979,10 +17091,10 @@ class WorkflowTaskSendSlackMessageTaskParams(dict):
                  update_parent_message: Optional[_builtins.bool] = None):
         """
         :param _builtins.str text: The message text
-        :param Sequence[_builtins.str] actionables: Value must be one of <span pulumi-lang-nodejs="`updateSummary`" pulumi-lang-dotnet="`UpdateSummary`" pulumi-lang-go="`updateSummary`" pulumi-lang-python="`update_summary`" pulumi-lang-yaml="`updateSummary`" pulumi-lang-java="`updateSummary`">`update_summary`</span>, <span pulumi-lang-nodejs="`updateStatus`" pulumi-lang-dotnet="`UpdateStatus`" pulumi-lang-go="`updateStatus`" pulumi-lang-python="`update_status`" pulumi-lang-yaml="`updateStatus`" pulumi-lang-java="`updateStatus`">`update_status`</span>, <span pulumi-lang-nodejs="`archiveChannel`" pulumi-lang-dotnet="`ArchiveChannel`" pulumi-lang-go="`archiveChannel`" pulumi-lang-python="`archive_channel`" pulumi-lang-yaml="`archiveChannel`" pulumi-lang-java="`archiveChannel`">`archive_channel`</span>, <span pulumi-lang-nodejs="`manageIncidentRoles`" pulumi-lang-dotnet="`ManageIncidentRoles`" pulumi-lang-go="`manageIncidentRoles`" pulumi-lang-python="`manage_incident_roles`" pulumi-lang-yaml="`manageIncidentRoles`" pulumi-lang-java="`manageIncidentRoles`">`manage_incident_roles`</span>, <span pulumi-lang-nodejs="`updateIncident`" pulumi-lang-dotnet="`UpdateIncident`" pulumi-lang-go="`updateIncident`" pulumi-lang-python="`update_incident`" pulumi-lang-yaml="`updateIncident`" pulumi-lang-java="`updateIncident`">`update_incident`</span>, <span pulumi-lang-nodejs="`allCommands`" pulumi-lang-dotnet="`AllCommands`" pulumi-lang-go="`allCommands`" pulumi-lang-python="`all_commands`" pulumi-lang-yaml="`allCommands`" pulumi-lang-java="`allCommands`">`all_commands`</span>, <span pulumi-lang-nodejs="`leaveFeedback`" pulumi-lang-dotnet="`LeaveFeedback`" pulumi-lang-go="`leaveFeedback`" pulumi-lang-python="`leave_feedback`" pulumi-lang-yaml="`leaveFeedback`" pulumi-lang-java="`leaveFeedback`">`leave_feedback`</span>, <span pulumi-lang-nodejs="`manageFormFields`" pulumi-lang-dotnet="`ManageFormFields`" pulumi-lang-go="`manageFormFields`" pulumi-lang-python="`manage_form_fields`" pulumi-lang-yaml="`manageFormFields`" pulumi-lang-java="`manageFormFields`">`manage_form_fields`</span>, <span pulumi-lang-nodejs="`manageActionItems`" pulumi-lang-dotnet="`ManageActionItems`" pulumi-lang-go="`manageActionItems`" pulumi-lang-python="`manage_action_items`" pulumi-lang-yaml="`manageActionItems`" pulumi-lang-java="`manageActionItems`">`manage_action_items`</span>, <span pulumi-lang-nodejs="`viewTasks`" pulumi-lang-dotnet="`ViewTasks`" pulumi-lang-go="`viewTasks`" pulumi-lang-python="`view_tasks`" pulumi-lang-yaml="`viewTasks`" pulumi-lang-java="`viewTasks`">`view_tasks`</span>, <span pulumi-lang-nodejs="`addPagerdutyResponders`" pulumi-lang-dotnet="`AddPagerdutyResponders`" pulumi-lang-go="`addPagerdutyResponders`" pulumi-lang-python="`add_pagerduty_responders`" pulumi-lang-yaml="`addPagerdutyResponders`" pulumi-lang-java="`addPagerdutyResponders`">`add_pagerduty_responders`</span>, <span pulumi-lang-nodejs="`addOpsgenieResponders`" pulumi-lang-dotnet="`AddOpsgenieResponders`" pulumi-lang-go="`addOpsgenieResponders`" pulumi-lang-python="`add_opsgenie_responders`" pulumi-lang-yaml="`addOpsgenieResponders`" pulumi-lang-java="`addOpsgenieResponders`">`add_opsgenie_responders`</span>, <span pulumi-lang-nodejs="`addVictorOpsResponders`" pulumi-lang-dotnet="`AddVictorOpsResponders`" pulumi-lang-go="`addVictorOpsResponders`" pulumi-lang-python="`add_victor_ops_responders`" pulumi-lang-yaml="`addVictorOpsResponders`" pulumi-lang-java="`addVictorOpsResponders`">`add_victor_ops_responders`</span>, <span pulumi-lang-nodejs="`updateStatusPage`" pulumi-lang-dotnet="`UpdateStatusPage`" pulumi-lang-go="`updateStatusPage`" pulumi-lang-python="`update_status_page`" pulumi-lang-yaml="`updateStatusPage`" pulumi-lang-java="`updateStatusPage`">`update_status_page`</span>, <span pulumi-lang-nodejs="`pauseReminder`" pulumi-lang-dotnet="`PauseReminder`" pulumi-lang-go="`pauseReminder`" pulumi-lang-python="`pause_reminder`" pulumi-lang-yaml="`pauseReminder`" pulumi-lang-java="`pauseReminder`">`pause_reminder`</span>, <span pulumi-lang-nodejs="`snoozeReminder`" pulumi-lang-dotnet="`SnoozeReminder`" pulumi-lang-go="`snoozeReminder`" pulumi-lang-python="`snooze_reminder`" pulumi-lang-yaml="`snoozeReminder`" pulumi-lang-java="`snoozeReminder`">`snooze_reminder`</span>, <span pulumi-lang-nodejs="`restartReminder`" pulumi-lang-dotnet="`RestartReminder`" pulumi-lang-go="`restartReminder`" pulumi-lang-python="`restart_reminder`" pulumi-lang-yaml="`restartReminder`" pulumi-lang-java="`restartReminder`">`restart_reminder`</span>, <span pulumi-lang-nodejs="`cancelIncident`" pulumi-lang-dotnet="`CancelIncident`" pulumi-lang-go="`cancelIncident`" pulumi-lang-python="`cancel_incident`" pulumi-lang-yaml="`cancelIncident`" pulumi-lang-java="`cancelIncident`">`cancel_incident`</span>, <span pulumi-lang-nodejs="`deleteMessage`" pulumi-lang-dotnet="`DeleteMessage`" pulumi-lang-go="`deleteMessage`" pulumi-lang-python="`delete_message`" pulumi-lang-yaml="`deleteMessage`" pulumi-lang-java="`deleteMessage`">`delete_message`</span>.
+        :param Sequence[_builtins.str] actionables: Value must be one of <span pulumi-lang-nodejs="`updateSummary`" pulumi-lang-dotnet="`UpdateSummary`" pulumi-lang-go="`updateSummary`" pulumi-lang-python="`update_summary`" pulumi-lang-yaml="`updateSummary`" pulumi-lang-java="`updateSummary`" pulumi-lang-hcl="`update_summary`">`updateSummary`</span>, <span pulumi-lang-nodejs="`updateStatus`" pulumi-lang-dotnet="`UpdateStatus`" pulumi-lang-go="`updateStatus`" pulumi-lang-python="`update_status`" pulumi-lang-yaml="`updateStatus`" pulumi-lang-java="`updateStatus`" pulumi-lang-hcl="`update_status`">`updateStatus`</span>, <span pulumi-lang-nodejs="`archiveChannel`" pulumi-lang-dotnet="`ArchiveChannel`" pulumi-lang-go="`archiveChannel`" pulumi-lang-python="`archive_channel`" pulumi-lang-yaml="`archiveChannel`" pulumi-lang-java="`archiveChannel`" pulumi-lang-hcl="`archive_channel`">`archiveChannel`</span>, <span pulumi-lang-nodejs="`manageIncidentRoles`" pulumi-lang-dotnet="`ManageIncidentRoles`" pulumi-lang-go="`manageIncidentRoles`" pulumi-lang-python="`manage_incident_roles`" pulumi-lang-yaml="`manageIncidentRoles`" pulumi-lang-java="`manageIncidentRoles`" pulumi-lang-hcl="`manage_incident_roles`">`manageIncidentRoles`</span>, <span pulumi-lang-nodejs="`updateIncident`" pulumi-lang-dotnet="`UpdateIncident`" pulumi-lang-go="`updateIncident`" pulumi-lang-python="`update_incident`" pulumi-lang-yaml="`updateIncident`" pulumi-lang-java="`updateIncident`" pulumi-lang-hcl="`update_incident`">`updateIncident`</span>, <span pulumi-lang-nodejs="`allCommands`" pulumi-lang-dotnet="`AllCommands`" pulumi-lang-go="`allCommands`" pulumi-lang-python="`all_commands`" pulumi-lang-yaml="`allCommands`" pulumi-lang-java="`allCommands`" pulumi-lang-hcl="`all_commands`">`allCommands`</span>, <span pulumi-lang-nodejs="`leaveFeedback`" pulumi-lang-dotnet="`LeaveFeedback`" pulumi-lang-go="`leaveFeedback`" pulumi-lang-python="`leave_feedback`" pulumi-lang-yaml="`leaveFeedback`" pulumi-lang-java="`leaveFeedback`" pulumi-lang-hcl="`leave_feedback`">`leaveFeedback`</span>, <span pulumi-lang-nodejs="`manageFormFields`" pulumi-lang-dotnet="`ManageFormFields`" pulumi-lang-go="`manageFormFields`" pulumi-lang-python="`manage_form_fields`" pulumi-lang-yaml="`manageFormFields`" pulumi-lang-java="`manageFormFields`" pulumi-lang-hcl="`manage_form_fields`">`manageFormFields`</span>, <span pulumi-lang-nodejs="`manageActionItems`" pulumi-lang-dotnet="`ManageActionItems`" pulumi-lang-go="`manageActionItems`" pulumi-lang-python="`manage_action_items`" pulumi-lang-yaml="`manageActionItems`" pulumi-lang-java="`manageActionItems`" pulumi-lang-hcl="`manage_action_items`">`manageActionItems`</span>, <span pulumi-lang-nodejs="`viewTasks`" pulumi-lang-dotnet="`ViewTasks`" pulumi-lang-go="`viewTasks`" pulumi-lang-python="`view_tasks`" pulumi-lang-yaml="`viewTasks`" pulumi-lang-java="`viewTasks`" pulumi-lang-hcl="`view_tasks`">`viewTasks`</span>, <span pulumi-lang-nodejs="`addPagerdutyResponders`" pulumi-lang-dotnet="`AddPagerdutyResponders`" pulumi-lang-go="`addPagerdutyResponders`" pulumi-lang-python="`add_pagerduty_responders`" pulumi-lang-yaml="`addPagerdutyResponders`" pulumi-lang-java="`addPagerdutyResponders`" pulumi-lang-hcl="`add_pagerduty_responders`">`addPagerdutyResponders`</span>, <span pulumi-lang-nodejs="`addOpsgenieResponders`" pulumi-lang-dotnet="`AddOpsgenieResponders`" pulumi-lang-go="`addOpsgenieResponders`" pulumi-lang-python="`add_opsgenie_responders`" pulumi-lang-yaml="`addOpsgenieResponders`" pulumi-lang-java="`addOpsgenieResponders`" pulumi-lang-hcl="`add_opsgenie_responders`">`addOpsgenieResponders`</span>, <span pulumi-lang-nodejs="`addVictorOpsResponders`" pulumi-lang-dotnet="`AddVictorOpsResponders`" pulumi-lang-go="`addVictorOpsResponders`" pulumi-lang-python="`add_victor_ops_responders`" pulumi-lang-yaml="`addVictorOpsResponders`" pulumi-lang-java="`addVictorOpsResponders`" pulumi-lang-hcl="`add_victor_ops_responders`">`addVictorOpsResponders`</span>, <span pulumi-lang-nodejs="`updateStatusPage`" pulumi-lang-dotnet="`UpdateStatusPage`" pulumi-lang-go="`updateStatusPage`" pulumi-lang-python="`update_status_page`" pulumi-lang-yaml="`updateStatusPage`" pulumi-lang-java="`updateStatusPage`" pulumi-lang-hcl="`update_status_page`">`updateStatusPage`</span>, <span pulumi-lang-nodejs="`pauseReminder`" pulumi-lang-dotnet="`PauseReminder`" pulumi-lang-go="`pauseReminder`" pulumi-lang-python="`pause_reminder`" pulumi-lang-yaml="`pauseReminder`" pulumi-lang-java="`pauseReminder`" pulumi-lang-hcl="`pause_reminder`">`pauseReminder`</span>, <span pulumi-lang-nodejs="`snoozeReminder`" pulumi-lang-dotnet="`SnoozeReminder`" pulumi-lang-go="`snoozeReminder`" pulumi-lang-python="`snooze_reminder`" pulumi-lang-yaml="`snoozeReminder`" pulumi-lang-java="`snoozeReminder`" pulumi-lang-hcl="`snooze_reminder`">`snoozeReminder`</span>, <span pulumi-lang-nodejs="`restartReminder`" pulumi-lang-dotnet="`RestartReminder`" pulumi-lang-go="`restartReminder`" pulumi-lang-python="`restart_reminder`" pulumi-lang-yaml="`restartReminder`" pulumi-lang-java="`restartReminder`" pulumi-lang-hcl="`restart_reminder`">`restartReminder`</span>, <span pulumi-lang-nodejs="`cancelIncident`" pulumi-lang-dotnet="`CancelIncident`" pulumi-lang-go="`cancelIncident`" pulumi-lang-python="`cancel_incident`" pulumi-lang-yaml="`cancelIncident`" pulumi-lang-java="`cancelIncident`" pulumi-lang-hcl="`cancel_incident`">`cancelIncident`</span>, <span pulumi-lang-nodejs="`deleteMessage`" pulumi-lang-dotnet="`DeleteMessage`" pulumi-lang-go="`deleteMessage`" pulumi-lang-python="`delete_message`" pulumi-lang-yaml="`deleteMessage`" pulumi-lang-java="`deleteMessage`" pulumi-lang-hcl="`delete_message`">`deleteMessage`</span>.
         :param _builtins.bool broadcast_thread_reply_to_channel: Value must be one of true or false
         :param _builtins.str color: A hex color
-        :param Mapping[str, _builtins.str] parent_message_thread_task: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. A hash where [id] is the task id of the parent task that sent a message, and [name] is the name of the parent task
+        :param Mapping[str, _builtins.str] parent_message_thread_task: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. A hash where [id] is the task id of the parent task that sent a message, and [name] is the name of the parent task
         :param _builtins.bool pin_to_channel: Value must be one of true or false
         :param _builtins.bool send_as_ephemeral: Value must be one of true or false
         :param _builtins.bool send_only_as_threaded_message: When set to true, if the parent for this threaded message cannot be found the message will be skipped.. Value must be one of true or false
@@ -17029,7 +17141,7 @@ class WorkflowTaskSendSlackMessageTaskParams(dict):
     @pulumi.getter
     def actionables(self) -> Optional[Sequence[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`updateSummary`" pulumi-lang-dotnet="`UpdateSummary`" pulumi-lang-go="`updateSummary`" pulumi-lang-python="`update_summary`" pulumi-lang-yaml="`updateSummary`" pulumi-lang-java="`updateSummary`">`update_summary`</span>, <span pulumi-lang-nodejs="`updateStatus`" pulumi-lang-dotnet="`UpdateStatus`" pulumi-lang-go="`updateStatus`" pulumi-lang-python="`update_status`" pulumi-lang-yaml="`updateStatus`" pulumi-lang-java="`updateStatus`">`update_status`</span>, <span pulumi-lang-nodejs="`archiveChannel`" pulumi-lang-dotnet="`ArchiveChannel`" pulumi-lang-go="`archiveChannel`" pulumi-lang-python="`archive_channel`" pulumi-lang-yaml="`archiveChannel`" pulumi-lang-java="`archiveChannel`">`archive_channel`</span>, <span pulumi-lang-nodejs="`manageIncidentRoles`" pulumi-lang-dotnet="`ManageIncidentRoles`" pulumi-lang-go="`manageIncidentRoles`" pulumi-lang-python="`manage_incident_roles`" pulumi-lang-yaml="`manageIncidentRoles`" pulumi-lang-java="`manageIncidentRoles`">`manage_incident_roles`</span>, <span pulumi-lang-nodejs="`updateIncident`" pulumi-lang-dotnet="`UpdateIncident`" pulumi-lang-go="`updateIncident`" pulumi-lang-python="`update_incident`" pulumi-lang-yaml="`updateIncident`" pulumi-lang-java="`updateIncident`">`update_incident`</span>, <span pulumi-lang-nodejs="`allCommands`" pulumi-lang-dotnet="`AllCommands`" pulumi-lang-go="`allCommands`" pulumi-lang-python="`all_commands`" pulumi-lang-yaml="`allCommands`" pulumi-lang-java="`allCommands`">`all_commands`</span>, <span pulumi-lang-nodejs="`leaveFeedback`" pulumi-lang-dotnet="`LeaveFeedback`" pulumi-lang-go="`leaveFeedback`" pulumi-lang-python="`leave_feedback`" pulumi-lang-yaml="`leaveFeedback`" pulumi-lang-java="`leaveFeedback`">`leave_feedback`</span>, <span pulumi-lang-nodejs="`manageFormFields`" pulumi-lang-dotnet="`ManageFormFields`" pulumi-lang-go="`manageFormFields`" pulumi-lang-python="`manage_form_fields`" pulumi-lang-yaml="`manageFormFields`" pulumi-lang-java="`manageFormFields`">`manage_form_fields`</span>, <span pulumi-lang-nodejs="`manageActionItems`" pulumi-lang-dotnet="`ManageActionItems`" pulumi-lang-go="`manageActionItems`" pulumi-lang-python="`manage_action_items`" pulumi-lang-yaml="`manageActionItems`" pulumi-lang-java="`manageActionItems`">`manage_action_items`</span>, <span pulumi-lang-nodejs="`viewTasks`" pulumi-lang-dotnet="`ViewTasks`" pulumi-lang-go="`viewTasks`" pulumi-lang-python="`view_tasks`" pulumi-lang-yaml="`viewTasks`" pulumi-lang-java="`viewTasks`">`view_tasks`</span>, <span pulumi-lang-nodejs="`addPagerdutyResponders`" pulumi-lang-dotnet="`AddPagerdutyResponders`" pulumi-lang-go="`addPagerdutyResponders`" pulumi-lang-python="`add_pagerduty_responders`" pulumi-lang-yaml="`addPagerdutyResponders`" pulumi-lang-java="`addPagerdutyResponders`">`add_pagerduty_responders`</span>, <span pulumi-lang-nodejs="`addOpsgenieResponders`" pulumi-lang-dotnet="`AddOpsgenieResponders`" pulumi-lang-go="`addOpsgenieResponders`" pulumi-lang-python="`add_opsgenie_responders`" pulumi-lang-yaml="`addOpsgenieResponders`" pulumi-lang-java="`addOpsgenieResponders`">`add_opsgenie_responders`</span>, <span pulumi-lang-nodejs="`addVictorOpsResponders`" pulumi-lang-dotnet="`AddVictorOpsResponders`" pulumi-lang-go="`addVictorOpsResponders`" pulumi-lang-python="`add_victor_ops_responders`" pulumi-lang-yaml="`addVictorOpsResponders`" pulumi-lang-java="`addVictorOpsResponders`">`add_victor_ops_responders`</span>, <span pulumi-lang-nodejs="`updateStatusPage`" pulumi-lang-dotnet="`UpdateStatusPage`" pulumi-lang-go="`updateStatusPage`" pulumi-lang-python="`update_status_page`" pulumi-lang-yaml="`updateStatusPage`" pulumi-lang-java="`updateStatusPage`">`update_status_page`</span>, <span pulumi-lang-nodejs="`pauseReminder`" pulumi-lang-dotnet="`PauseReminder`" pulumi-lang-go="`pauseReminder`" pulumi-lang-python="`pause_reminder`" pulumi-lang-yaml="`pauseReminder`" pulumi-lang-java="`pauseReminder`">`pause_reminder`</span>, <span pulumi-lang-nodejs="`snoozeReminder`" pulumi-lang-dotnet="`SnoozeReminder`" pulumi-lang-go="`snoozeReminder`" pulumi-lang-python="`snooze_reminder`" pulumi-lang-yaml="`snoozeReminder`" pulumi-lang-java="`snoozeReminder`">`snooze_reminder`</span>, <span pulumi-lang-nodejs="`restartReminder`" pulumi-lang-dotnet="`RestartReminder`" pulumi-lang-go="`restartReminder`" pulumi-lang-python="`restart_reminder`" pulumi-lang-yaml="`restartReminder`" pulumi-lang-java="`restartReminder`">`restart_reminder`</span>, <span pulumi-lang-nodejs="`cancelIncident`" pulumi-lang-dotnet="`CancelIncident`" pulumi-lang-go="`cancelIncident`" pulumi-lang-python="`cancel_incident`" pulumi-lang-yaml="`cancelIncident`" pulumi-lang-java="`cancelIncident`">`cancel_incident`</span>, <span pulumi-lang-nodejs="`deleteMessage`" pulumi-lang-dotnet="`DeleteMessage`" pulumi-lang-go="`deleteMessage`" pulumi-lang-python="`delete_message`" pulumi-lang-yaml="`deleteMessage`" pulumi-lang-java="`deleteMessage`">`delete_message`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`updateSummary`" pulumi-lang-dotnet="`UpdateSummary`" pulumi-lang-go="`updateSummary`" pulumi-lang-python="`update_summary`" pulumi-lang-yaml="`updateSummary`" pulumi-lang-java="`updateSummary`" pulumi-lang-hcl="`update_summary`">`updateSummary`</span>, <span pulumi-lang-nodejs="`updateStatus`" pulumi-lang-dotnet="`UpdateStatus`" pulumi-lang-go="`updateStatus`" pulumi-lang-python="`update_status`" pulumi-lang-yaml="`updateStatus`" pulumi-lang-java="`updateStatus`" pulumi-lang-hcl="`update_status`">`updateStatus`</span>, <span pulumi-lang-nodejs="`archiveChannel`" pulumi-lang-dotnet="`ArchiveChannel`" pulumi-lang-go="`archiveChannel`" pulumi-lang-python="`archive_channel`" pulumi-lang-yaml="`archiveChannel`" pulumi-lang-java="`archiveChannel`" pulumi-lang-hcl="`archive_channel`">`archiveChannel`</span>, <span pulumi-lang-nodejs="`manageIncidentRoles`" pulumi-lang-dotnet="`ManageIncidentRoles`" pulumi-lang-go="`manageIncidentRoles`" pulumi-lang-python="`manage_incident_roles`" pulumi-lang-yaml="`manageIncidentRoles`" pulumi-lang-java="`manageIncidentRoles`" pulumi-lang-hcl="`manage_incident_roles`">`manageIncidentRoles`</span>, <span pulumi-lang-nodejs="`updateIncident`" pulumi-lang-dotnet="`UpdateIncident`" pulumi-lang-go="`updateIncident`" pulumi-lang-python="`update_incident`" pulumi-lang-yaml="`updateIncident`" pulumi-lang-java="`updateIncident`" pulumi-lang-hcl="`update_incident`">`updateIncident`</span>, <span pulumi-lang-nodejs="`allCommands`" pulumi-lang-dotnet="`AllCommands`" pulumi-lang-go="`allCommands`" pulumi-lang-python="`all_commands`" pulumi-lang-yaml="`allCommands`" pulumi-lang-java="`allCommands`" pulumi-lang-hcl="`all_commands`">`allCommands`</span>, <span pulumi-lang-nodejs="`leaveFeedback`" pulumi-lang-dotnet="`LeaveFeedback`" pulumi-lang-go="`leaveFeedback`" pulumi-lang-python="`leave_feedback`" pulumi-lang-yaml="`leaveFeedback`" pulumi-lang-java="`leaveFeedback`" pulumi-lang-hcl="`leave_feedback`">`leaveFeedback`</span>, <span pulumi-lang-nodejs="`manageFormFields`" pulumi-lang-dotnet="`ManageFormFields`" pulumi-lang-go="`manageFormFields`" pulumi-lang-python="`manage_form_fields`" pulumi-lang-yaml="`manageFormFields`" pulumi-lang-java="`manageFormFields`" pulumi-lang-hcl="`manage_form_fields`">`manageFormFields`</span>, <span pulumi-lang-nodejs="`manageActionItems`" pulumi-lang-dotnet="`ManageActionItems`" pulumi-lang-go="`manageActionItems`" pulumi-lang-python="`manage_action_items`" pulumi-lang-yaml="`manageActionItems`" pulumi-lang-java="`manageActionItems`" pulumi-lang-hcl="`manage_action_items`">`manageActionItems`</span>, <span pulumi-lang-nodejs="`viewTasks`" pulumi-lang-dotnet="`ViewTasks`" pulumi-lang-go="`viewTasks`" pulumi-lang-python="`view_tasks`" pulumi-lang-yaml="`viewTasks`" pulumi-lang-java="`viewTasks`" pulumi-lang-hcl="`view_tasks`">`viewTasks`</span>, <span pulumi-lang-nodejs="`addPagerdutyResponders`" pulumi-lang-dotnet="`AddPagerdutyResponders`" pulumi-lang-go="`addPagerdutyResponders`" pulumi-lang-python="`add_pagerduty_responders`" pulumi-lang-yaml="`addPagerdutyResponders`" pulumi-lang-java="`addPagerdutyResponders`" pulumi-lang-hcl="`add_pagerduty_responders`">`addPagerdutyResponders`</span>, <span pulumi-lang-nodejs="`addOpsgenieResponders`" pulumi-lang-dotnet="`AddOpsgenieResponders`" pulumi-lang-go="`addOpsgenieResponders`" pulumi-lang-python="`add_opsgenie_responders`" pulumi-lang-yaml="`addOpsgenieResponders`" pulumi-lang-java="`addOpsgenieResponders`" pulumi-lang-hcl="`add_opsgenie_responders`">`addOpsgenieResponders`</span>, <span pulumi-lang-nodejs="`addVictorOpsResponders`" pulumi-lang-dotnet="`AddVictorOpsResponders`" pulumi-lang-go="`addVictorOpsResponders`" pulumi-lang-python="`add_victor_ops_responders`" pulumi-lang-yaml="`addVictorOpsResponders`" pulumi-lang-java="`addVictorOpsResponders`" pulumi-lang-hcl="`add_victor_ops_responders`">`addVictorOpsResponders`</span>, <span pulumi-lang-nodejs="`updateStatusPage`" pulumi-lang-dotnet="`UpdateStatusPage`" pulumi-lang-go="`updateStatusPage`" pulumi-lang-python="`update_status_page`" pulumi-lang-yaml="`updateStatusPage`" pulumi-lang-java="`updateStatusPage`" pulumi-lang-hcl="`update_status_page`">`updateStatusPage`</span>, <span pulumi-lang-nodejs="`pauseReminder`" pulumi-lang-dotnet="`PauseReminder`" pulumi-lang-go="`pauseReminder`" pulumi-lang-python="`pause_reminder`" pulumi-lang-yaml="`pauseReminder`" pulumi-lang-java="`pauseReminder`" pulumi-lang-hcl="`pause_reminder`">`pauseReminder`</span>, <span pulumi-lang-nodejs="`snoozeReminder`" pulumi-lang-dotnet="`SnoozeReminder`" pulumi-lang-go="`snoozeReminder`" pulumi-lang-python="`snooze_reminder`" pulumi-lang-yaml="`snoozeReminder`" pulumi-lang-java="`snoozeReminder`" pulumi-lang-hcl="`snooze_reminder`">`snoozeReminder`</span>, <span pulumi-lang-nodejs="`restartReminder`" pulumi-lang-dotnet="`RestartReminder`" pulumi-lang-go="`restartReminder`" pulumi-lang-python="`restart_reminder`" pulumi-lang-yaml="`restartReminder`" pulumi-lang-java="`restartReminder`" pulumi-lang-hcl="`restart_reminder`">`restartReminder`</span>, <span pulumi-lang-nodejs="`cancelIncident`" pulumi-lang-dotnet="`CancelIncident`" pulumi-lang-go="`cancelIncident`" pulumi-lang-python="`cancel_incident`" pulumi-lang-yaml="`cancelIncident`" pulumi-lang-java="`cancelIncident`" pulumi-lang-hcl="`cancel_incident`">`cancelIncident`</span>, <span pulumi-lang-nodejs="`deleteMessage`" pulumi-lang-dotnet="`DeleteMessage`" pulumi-lang-go="`deleteMessage`" pulumi-lang-python="`delete_message`" pulumi-lang-yaml="`deleteMessage`" pulumi-lang-java="`deleteMessage`" pulumi-lang-hcl="`delete_message`">`deleteMessage`</span>.
         """
         return pulumi.get(self, "actionables")
 
@@ -17058,7 +17170,7 @@ class WorkflowTaskSendSlackMessageTaskParams(dict):
     @pulumi.getter(name="parentMessageThreadTask")
     def parent_message_thread_task(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. A hash where [id] is the task id of the parent task that sent a message, and [name] is the name of the parent task
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. A hash where [id] is the task id of the parent task that sent a message, and [name] is the name of the parent task
         """
         return pulumi.get(self, "parent_message_thread_task")
 
@@ -17756,10 +17868,10 @@ class WorkflowTaskTriggerWorkflowTaskParams(dict):
                  check_workflow_conditions: Optional[_builtins.bool] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param _builtins.str attribute_to_query_by: ["(incident) kind can only match [:id, :slug, :sequential_id, :pagerduty_incident_id, :opsgenie_incident_id, :victor_ops_incident_id, :jira_issue_id, :asana_task_id, :shortcut_task_id, :linear_issue_id, :zendesk_ticket_id, :motion_task_id, :trello_card_id, :airtable_record_id, :shortcut_story_id, :github_issue_id, :freshservice_ticket_id, :freshservice_task_id, :clickup_task_id]", "(post_mortem) kind can only match [:id]", "(action_item) kind can only match [:id, :jira_issue_id, :asana_task_id, :shortcut_task_id, :linear_issue_id, :zendesk_ticket_id, :motion_task_id, :trello_card_id, :airtable_record_id, :shortcut_story_id, :github_issue_id, :freshservice_ticket_id, :freshservice_task_id, :clickup_task_id]", "(pulse) kind can only match [:id]", "(alert) kind can only match [:id]"]. Value must be one of <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span>, <span pulumi-lang-nodejs="`slug`" pulumi-lang-dotnet="`Slug`" pulumi-lang-go="`slug`" pulumi-lang-python="`slug`" pulumi-lang-yaml="`slug`" pulumi-lang-java="`slug`">`slug`</span>, <span pulumi-lang-nodejs="`sequentialId`" pulumi-lang-dotnet="`SequentialId`" pulumi-lang-go="`sequentialId`" pulumi-lang-python="`sequential_id`" pulumi-lang-yaml="`sequentialId`" pulumi-lang-java="`sequentialId`">`sequential_id`</span>, <span pulumi-lang-nodejs="`pagerdutyIncidentId`" pulumi-lang-dotnet="`PagerdutyIncidentId`" pulumi-lang-go="`pagerdutyIncidentId`" pulumi-lang-python="`pagerduty_incident_id`" pulumi-lang-yaml="`pagerdutyIncidentId`" pulumi-lang-java="`pagerdutyIncidentId`">`pagerduty_incident_id`</span>, <span pulumi-lang-nodejs="`opsgenieIncidentId`" pulumi-lang-dotnet="`OpsgenieIncidentId`" pulumi-lang-go="`opsgenieIncidentId`" pulumi-lang-python="`opsgenie_incident_id`" pulumi-lang-yaml="`opsgenieIncidentId`" pulumi-lang-java="`opsgenieIncidentId`">`opsgenie_incident_id`</span>, <span pulumi-lang-nodejs="`victorOpsIncidentId`" pulumi-lang-dotnet="`VictorOpsIncidentId`" pulumi-lang-go="`victorOpsIncidentId`" pulumi-lang-python="`victor_ops_incident_id`" pulumi-lang-yaml="`victorOpsIncidentId`" pulumi-lang-java="`victorOpsIncidentId`">`victor_ops_incident_id`</span>, <span pulumi-lang-nodejs="`jiraIssueId`" pulumi-lang-dotnet="`JiraIssueId`" pulumi-lang-go="`jiraIssueId`" pulumi-lang-python="`jira_issue_id`" pulumi-lang-yaml="`jiraIssueId`" pulumi-lang-java="`jiraIssueId`">`jira_issue_id`</span>, <span pulumi-lang-nodejs="`asanaTaskId`" pulumi-lang-dotnet="`AsanaTaskId`" pulumi-lang-go="`asanaTaskId`" pulumi-lang-python="`asana_task_id`" pulumi-lang-yaml="`asanaTaskId`" pulumi-lang-java="`asanaTaskId`">`asana_task_id`</span>, <span pulumi-lang-nodejs="`shortcutTaskId`" pulumi-lang-dotnet="`ShortcutTaskId`" pulumi-lang-go="`shortcutTaskId`" pulumi-lang-python="`shortcut_task_id`" pulumi-lang-yaml="`shortcutTaskId`" pulumi-lang-java="`shortcutTaskId`">`shortcut_task_id`</span>, <span pulumi-lang-nodejs="`linearIssueId`" pulumi-lang-dotnet="`LinearIssueId`" pulumi-lang-go="`linearIssueId`" pulumi-lang-python="`linear_issue_id`" pulumi-lang-yaml="`linearIssueId`" pulumi-lang-java="`linearIssueId`">`linear_issue_id`</span>, <span pulumi-lang-nodejs="`zendeskTicketId`" pulumi-lang-dotnet="`ZendeskTicketId`" pulumi-lang-go="`zendeskTicketId`" pulumi-lang-python="`zendesk_ticket_id`" pulumi-lang-yaml="`zendeskTicketId`" pulumi-lang-java="`zendeskTicketId`">`zendesk_ticket_id`</span>, <span pulumi-lang-nodejs="`motionTaskId`" pulumi-lang-dotnet="`MotionTaskId`" pulumi-lang-go="`motionTaskId`" pulumi-lang-python="`motion_task_id`" pulumi-lang-yaml="`motionTaskId`" pulumi-lang-java="`motionTaskId`">`motion_task_id`</span>, <span pulumi-lang-nodejs="`trelloCardId`" pulumi-lang-dotnet="`TrelloCardId`" pulumi-lang-go="`trelloCardId`" pulumi-lang-python="`trello_card_id`" pulumi-lang-yaml="`trelloCardId`" pulumi-lang-java="`trelloCardId`">`trello_card_id`</span>, <span pulumi-lang-nodejs="`airtableRecordId`" pulumi-lang-dotnet="`AirtableRecordId`" pulumi-lang-go="`airtableRecordId`" pulumi-lang-python="`airtable_record_id`" pulumi-lang-yaml="`airtableRecordId`" pulumi-lang-java="`airtableRecordId`">`airtable_record_id`</span>, <span pulumi-lang-nodejs="`shortcutStoryId`" pulumi-lang-dotnet="`ShortcutStoryId`" pulumi-lang-go="`shortcutStoryId`" pulumi-lang-python="`shortcut_story_id`" pulumi-lang-yaml="`shortcutStoryId`" pulumi-lang-java="`shortcutStoryId`">`shortcut_story_id`</span>, <span pulumi-lang-nodejs="`githubIssueId`" pulumi-lang-dotnet="`GithubIssueId`" pulumi-lang-go="`githubIssueId`" pulumi-lang-python="`github_issue_id`" pulumi-lang-yaml="`githubIssueId`" pulumi-lang-java="`githubIssueId`">`github_issue_id`</span>, <span pulumi-lang-nodejs="`freshserviceTicketId`" pulumi-lang-dotnet="`FreshserviceTicketId`" pulumi-lang-go="`freshserviceTicketId`" pulumi-lang-python="`freshservice_ticket_id`" pulumi-lang-yaml="`freshserviceTicketId`" pulumi-lang-java="`freshserviceTicketId`">`freshservice_ticket_id`</span>, <span pulumi-lang-nodejs="`freshserviceTaskId`" pulumi-lang-dotnet="`FreshserviceTaskId`" pulumi-lang-go="`freshserviceTaskId`" pulumi-lang-python="`freshservice_task_id`" pulumi-lang-yaml="`freshserviceTaskId`" pulumi-lang-java="`freshserviceTaskId`">`freshservice_task_id`</span>, <span pulumi-lang-nodejs="`clickupTaskId`" pulumi-lang-dotnet="`ClickupTaskId`" pulumi-lang-go="`clickupTaskId`" pulumi-lang-python="`clickup_task_id`" pulumi-lang-yaml="`clickupTaskId`" pulumi-lang-java="`clickupTaskId`">`clickup_task_id`</span>.
-        :param _builtins.str kind: Value must be one of <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`">`incident`</span>, <span pulumi-lang-nodejs="`postMortem`" pulumi-lang-dotnet="`PostMortem`" pulumi-lang-go="`postMortem`" pulumi-lang-python="`post_mortem`" pulumi-lang-yaml="`postMortem`" pulumi-lang-java="`postMortem`">`post_mortem`</span>, <span pulumi-lang-nodejs="`actionItem`" pulumi-lang-dotnet="`ActionItem`" pulumi-lang-go="`actionItem`" pulumi-lang-python="`action_item`" pulumi-lang-yaml="`actionItem`" pulumi-lang-java="`actionItem`">`action_item`</span>, <span pulumi-lang-nodejs="`pulse`" pulumi-lang-dotnet="`Pulse`" pulumi-lang-go="`pulse`" pulumi-lang-python="`pulse`" pulumi-lang-yaml="`pulse`" pulumi-lang-java="`pulse`">`pulse`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`">`alert`</span>.
-        :param Mapping[str, _builtins.str] resource: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param Mapping[str, _builtins.str] workflow: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param _builtins.str attribute_to_query_by: ["(incident) kind can only match [:id, :slug, :sequential_id, :pagerduty_incident_id, :opsgenie_incident_id, :victor_ops_incident_id, :jira_issue_id, :asana_task_id, :shortcut_task_id, :linear_issue_id, :zendesk_ticket_id, :motion_task_id, :trello_card_id, :airtable_record_id, :shortcut_story_id, :github_issue_id, :freshservice_ticket_id, :freshservice_task_id, :clickup_task_id]", "(post_mortem) kind can only match [:id]", "(action_item) kind can only match [:id, :jira_issue_id, :asana_task_id, :shortcut_task_id, :linear_issue_id, :zendesk_ticket_id, :motion_task_id, :trello_card_id, :airtable_record_id, :shortcut_story_id, :github_issue_id, :freshservice_ticket_id, :freshservice_task_id, :clickup_task_id]", "(pulse) kind can only match [:id]", "(alert) kind can only match [:id]"]. Value must be one of <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span>, <span pulumi-lang-nodejs="`slug`" pulumi-lang-dotnet="`Slug`" pulumi-lang-go="`slug`" pulumi-lang-python="`slug`" pulumi-lang-yaml="`slug`" pulumi-lang-java="`slug`" pulumi-lang-hcl="`slug`">`slug`</span>, <span pulumi-lang-nodejs="`sequentialId`" pulumi-lang-dotnet="`SequentialId`" pulumi-lang-go="`sequentialId`" pulumi-lang-python="`sequential_id`" pulumi-lang-yaml="`sequentialId`" pulumi-lang-java="`sequentialId`" pulumi-lang-hcl="`sequential_id`">`sequentialId`</span>, <span pulumi-lang-nodejs="`pagerdutyIncidentId`" pulumi-lang-dotnet="`PagerdutyIncidentId`" pulumi-lang-go="`pagerdutyIncidentId`" pulumi-lang-python="`pagerduty_incident_id`" pulumi-lang-yaml="`pagerdutyIncidentId`" pulumi-lang-java="`pagerdutyIncidentId`" pulumi-lang-hcl="`pagerduty_incident_id`">`pagerdutyIncidentId`</span>, <span pulumi-lang-nodejs="`opsgenieIncidentId`" pulumi-lang-dotnet="`OpsgenieIncidentId`" pulumi-lang-go="`opsgenieIncidentId`" pulumi-lang-python="`opsgenie_incident_id`" pulumi-lang-yaml="`opsgenieIncidentId`" pulumi-lang-java="`opsgenieIncidentId`" pulumi-lang-hcl="`opsgenie_incident_id`">`opsgenieIncidentId`</span>, <span pulumi-lang-nodejs="`victorOpsIncidentId`" pulumi-lang-dotnet="`VictorOpsIncidentId`" pulumi-lang-go="`victorOpsIncidentId`" pulumi-lang-python="`victor_ops_incident_id`" pulumi-lang-yaml="`victorOpsIncidentId`" pulumi-lang-java="`victorOpsIncidentId`" pulumi-lang-hcl="`victor_ops_incident_id`">`victorOpsIncidentId`</span>, <span pulumi-lang-nodejs="`jiraIssueId`" pulumi-lang-dotnet="`JiraIssueId`" pulumi-lang-go="`jiraIssueId`" pulumi-lang-python="`jira_issue_id`" pulumi-lang-yaml="`jiraIssueId`" pulumi-lang-java="`jiraIssueId`" pulumi-lang-hcl="`jira_issue_id`">`jiraIssueId`</span>, <span pulumi-lang-nodejs="`asanaTaskId`" pulumi-lang-dotnet="`AsanaTaskId`" pulumi-lang-go="`asanaTaskId`" pulumi-lang-python="`asana_task_id`" pulumi-lang-yaml="`asanaTaskId`" pulumi-lang-java="`asanaTaskId`" pulumi-lang-hcl="`asana_task_id`">`asanaTaskId`</span>, <span pulumi-lang-nodejs="`shortcutTaskId`" pulumi-lang-dotnet="`ShortcutTaskId`" pulumi-lang-go="`shortcutTaskId`" pulumi-lang-python="`shortcut_task_id`" pulumi-lang-yaml="`shortcutTaskId`" pulumi-lang-java="`shortcutTaskId`" pulumi-lang-hcl="`shortcut_task_id`">`shortcutTaskId`</span>, <span pulumi-lang-nodejs="`linearIssueId`" pulumi-lang-dotnet="`LinearIssueId`" pulumi-lang-go="`linearIssueId`" pulumi-lang-python="`linear_issue_id`" pulumi-lang-yaml="`linearIssueId`" pulumi-lang-java="`linearIssueId`" pulumi-lang-hcl="`linear_issue_id`">`linearIssueId`</span>, <span pulumi-lang-nodejs="`zendeskTicketId`" pulumi-lang-dotnet="`ZendeskTicketId`" pulumi-lang-go="`zendeskTicketId`" pulumi-lang-python="`zendesk_ticket_id`" pulumi-lang-yaml="`zendeskTicketId`" pulumi-lang-java="`zendeskTicketId`" pulumi-lang-hcl="`zendesk_ticket_id`">`zendeskTicketId`</span>, <span pulumi-lang-nodejs="`motionTaskId`" pulumi-lang-dotnet="`MotionTaskId`" pulumi-lang-go="`motionTaskId`" pulumi-lang-python="`motion_task_id`" pulumi-lang-yaml="`motionTaskId`" pulumi-lang-java="`motionTaskId`" pulumi-lang-hcl="`motion_task_id`">`motionTaskId`</span>, <span pulumi-lang-nodejs="`trelloCardId`" pulumi-lang-dotnet="`TrelloCardId`" pulumi-lang-go="`trelloCardId`" pulumi-lang-python="`trello_card_id`" pulumi-lang-yaml="`trelloCardId`" pulumi-lang-java="`trelloCardId`" pulumi-lang-hcl="`trello_card_id`">`trelloCardId`</span>, <span pulumi-lang-nodejs="`airtableRecordId`" pulumi-lang-dotnet="`AirtableRecordId`" pulumi-lang-go="`airtableRecordId`" pulumi-lang-python="`airtable_record_id`" pulumi-lang-yaml="`airtableRecordId`" pulumi-lang-java="`airtableRecordId`" pulumi-lang-hcl="`airtable_record_id`">`airtableRecordId`</span>, <span pulumi-lang-nodejs="`shortcutStoryId`" pulumi-lang-dotnet="`ShortcutStoryId`" pulumi-lang-go="`shortcutStoryId`" pulumi-lang-python="`shortcut_story_id`" pulumi-lang-yaml="`shortcutStoryId`" pulumi-lang-java="`shortcutStoryId`" pulumi-lang-hcl="`shortcut_story_id`">`shortcutStoryId`</span>, <span pulumi-lang-nodejs="`githubIssueId`" pulumi-lang-dotnet="`GithubIssueId`" pulumi-lang-go="`githubIssueId`" pulumi-lang-python="`github_issue_id`" pulumi-lang-yaml="`githubIssueId`" pulumi-lang-java="`githubIssueId`" pulumi-lang-hcl="`github_issue_id`">`githubIssueId`</span>, <span pulumi-lang-nodejs="`freshserviceTicketId`" pulumi-lang-dotnet="`FreshserviceTicketId`" pulumi-lang-go="`freshserviceTicketId`" pulumi-lang-python="`freshservice_ticket_id`" pulumi-lang-yaml="`freshserviceTicketId`" pulumi-lang-java="`freshserviceTicketId`" pulumi-lang-hcl="`freshservice_ticket_id`">`freshserviceTicketId`</span>, <span pulumi-lang-nodejs="`freshserviceTaskId`" pulumi-lang-dotnet="`FreshserviceTaskId`" pulumi-lang-go="`freshserviceTaskId`" pulumi-lang-python="`freshservice_task_id`" pulumi-lang-yaml="`freshserviceTaskId`" pulumi-lang-java="`freshserviceTaskId`" pulumi-lang-hcl="`freshservice_task_id`">`freshserviceTaskId`</span>, <span pulumi-lang-nodejs="`clickupTaskId`" pulumi-lang-dotnet="`ClickupTaskId`" pulumi-lang-go="`clickupTaskId`" pulumi-lang-python="`clickup_task_id`" pulumi-lang-yaml="`clickupTaskId`" pulumi-lang-java="`clickupTaskId`" pulumi-lang-hcl="`clickup_task_id`">`clickupTaskId`</span>.
+        :param _builtins.str kind: Value must be one of <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`" pulumi-lang-hcl="`incident`">`incident`</span>, <span pulumi-lang-nodejs="`postMortem`" pulumi-lang-dotnet="`PostMortem`" pulumi-lang-go="`postMortem`" pulumi-lang-python="`post_mortem`" pulumi-lang-yaml="`postMortem`" pulumi-lang-java="`postMortem`" pulumi-lang-hcl="`post_mortem`">`postMortem`</span>, <span pulumi-lang-nodejs="`actionItem`" pulumi-lang-dotnet="`ActionItem`" pulumi-lang-go="`actionItem`" pulumi-lang-python="`action_item`" pulumi-lang-yaml="`actionItem`" pulumi-lang-java="`actionItem`" pulumi-lang-hcl="`action_item`">`actionItem`</span>, <span pulumi-lang-nodejs="`pulse`" pulumi-lang-dotnet="`Pulse`" pulumi-lang-go="`pulse`" pulumi-lang-python="`pulse`" pulumi-lang-yaml="`pulse`" pulumi-lang-java="`pulse`" pulumi-lang-hcl="`pulse`">`pulse`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`" pulumi-lang-hcl="`alert`">`alert`</span>.
+        :param Mapping[str, _builtins.str] resource: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] workflow: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.bool check_workflow_conditions: Value must be one of true or false
         """
         pulumi.set(__self__, "attribute_to_query_by", attribute_to_query_by)
@@ -17775,7 +17887,7 @@ class WorkflowTaskTriggerWorkflowTaskParams(dict):
     @pulumi.getter(name="attributeToQueryBy")
     def attribute_to_query_by(self) -> _builtins.str:
         """
-        ["(incident) kind can only match [:id, :slug, :sequential_id, :pagerduty_incident_id, :opsgenie_incident_id, :victor_ops_incident_id, :jira_issue_id, :asana_task_id, :shortcut_task_id, :linear_issue_id, :zendesk_ticket_id, :motion_task_id, :trello_card_id, :airtable_record_id, :shortcut_story_id, :github_issue_id, :freshservice_ticket_id, :freshservice_task_id, :clickup_task_id]", "(post_mortem) kind can only match [:id]", "(action_item) kind can only match [:id, :jira_issue_id, :asana_task_id, :shortcut_task_id, :linear_issue_id, :zendesk_ticket_id, :motion_task_id, :trello_card_id, :airtable_record_id, :shortcut_story_id, :github_issue_id, :freshservice_ticket_id, :freshservice_task_id, :clickup_task_id]", "(pulse) kind can only match [:id]", "(alert) kind can only match [:id]"]. Value must be one of <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span>, <span pulumi-lang-nodejs="`slug`" pulumi-lang-dotnet="`Slug`" pulumi-lang-go="`slug`" pulumi-lang-python="`slug`" pulumi-lang-yaml="`slug`" pulumi-lang-java="`slug`">`slug`</span>, <span pulumi-lang-nodejs="`sequentialId`" pulumi-lang-dotnet="`SequentialId`" pulumi-lang-go="`sequentialId`" pulumi-lang-python="`sequential_id`" pulumi-lang-yaml="`sequentialId`" pulumi-lang-java="`sequentialId`">`sequential_id`</span>, <span pulumi-lang-nodejs="`pagerdutyIncidentId`" pulumi-lang-dotnet="`PagerdutyIncidentId`" pulumi-lang-go="`pagerdutyIncidentId`" pulumi-lang-python="`pagerduty_incident_id`" pulumi-lang-yaml="`pagerdutyIncidentId`" pulumi-lang-java="`pagerdutyIncidentId`">`pagerduty_incident_id`</span>, <span pulumi-lang-nodejs="`opsgenieIncidentId`" pulumi-lang-dotnet="`OpsgenieIncidentId`" pulumi-lang-go="`opsgenieIncidentId`" pulumi-lang-python="`opsgenie_incident_id`" pulumi-lang-yaml="`opsgenieIncidentId`" pulumi-lang-java="`opsgenieIncidentId`">`opsgenie_incident_id`</span>, <span pulumi-lang-nodejs="`victorOpsIncidentId`" pulumi-lang-dotnet="`VictorOpsIncidentId`" pulumi-lang-go="`victorOpsIncidentId`" pulumi-lang-python="`victor_ops_incident_id`" pulumi-lang-yaml="`victorOpsIncidentId`" pulumi-lang-java="`victorOpsIncidentId`">`victor_ops_incident_id`</span>, <span pulumi-lang-nodejs="`jiraIssueId`" pulumi-lang-dotnet="`JiraIssueId`" pulumi-lang-go="`jiraIssueId`" pulumi-lang-python="`jira_issue_id`" pulumi-lang-yaml="`jiraIssueId`" pulumi-lang-java="`jiraIssueId`">`jira_issue_id`</span>, <span pulumi-lang-nodejs="`asanaTaskId`" pulumi-lang-dotnet="`AsanaTaskId`" pulumi-lang-go="`asanaTaskId`" pulumi-lang-python="`asana_task_id`" pulumi-lang-yaml="`asanaTaskId`" pulumi-lang-java="`asanaTaskId`">`asana_task_id`</span>, <span pulumi-lang-nodejs="`shortcutTaskId`" pulumi-lang-dotnet="`ShortcutTaskId`" pulumi-lang-go="`shortcutTaskId`" pulumi-lang-python="`shortcut_task_id`" pulumi-lang-yaml="`shortcutTaskId`" pulumi-lang-java="`shortcutTaskId`">`shortcut_task_id`</span>, <span pulumi-lang-nodejs="`linearIssueId`" pulumi-lang-dotnet="`LinearIssueId`" pulumi-lang-go="`linearIssueId`" pulumi-lang-python="`linear_issue_id`" pulumi-lang-yaml="`linearIssueId`" pulumi-lang-java="`linearIssueId`">`linear_issue_id`</span>, <span pulumi-lang-nodejs="`zendeskTicketId`" pulumi-lang-dotnet="`ZendeskTicketId`" pulumi-lang-go="`zendeskTicketId`" pulumi-lang-python="`zendesk_ticket_id`" pulumi-lang-yaml="`zendeskTicketId`" pulumi-lang-java="`zendeskTicketId`">`zendesk_ticket_id`</span>, <span pulumi-lang-nodejs="`motionTaskId`" pulumi-lang-dotnet="`MotionTaskId`" pulumi-lang-go="`motionTaskId`" pulumi-lang-python="`motion_task_id`" pulumi-lang-yaml="`motionTaskId`" pulumi-lang-java="`motionTaskId`">`motion_task_id`</span>, <span pulumi-lang-nodejs="`trelloCardId`" pulumi-lang-dotnet="`TrelloCardId`" pulumi-lang-go="`trelloCardId`" pulumi-lang-python="`trello_card_id`" pulumi-lang-yaml="`trelloCardId`" pulumi-lang-java="`trelloCardId`">`trello_card_id`</span>, <span pulumi-lang-nodejs="`airtableRecordId`" pulumi-lang-dotnet="`AirtableRecordId`" pulumi-lang-go="`airtableRecordId`" pulumi-lang-python="`airtable_record_id`" pulumi-lang-yaml="`airtableRecordId`" pulumi-lang-java="`airtableRecordId`">`airtable_record_id`</span>, <span pulumi-lang-nodejs="`shortcutStoryId`" pulumi-lang-dotnet="`ShortcutStoryId`" pulumi-lang-go="`shortcutStoryId`" pulumi-lang-python="`shortcut_story_id`" pulumi-lang-yaml="`shortcutStoryId`" pulumi-lang-java="`shortcutStoryId`">`shortcut_story_id`</span>, <span pulumi-lang-nodejs="`githubIssueId`" pulumi-lang-dotnet="`GithubIssueId`" pulumi-lang-go="`githubIssueId`" pulumi-lang-python="`github_issue_id`" pulumi-lang-yaml="`githubIssueId`" pulumi-lang-java="`githubIssueId`">`github_issue_id`</span>, <span pulumi-lang-nodejs="`freshserviceTicketId`" pulumi-lang-dotnet="`FreshserviceTicketId`" pulumi-lang-go="`freshserviceTicketId`" pulumi-lang-python="`freshservice_ticket_id`" pulumi-lang-yaml="`freshserviceTicketId`" pulumi-lang-java="`freshserviceTicketId`">`freshservice_ticket_id`</span>, <span pulumi-lang-nodejs="`freshserviceTaskId`" pulumi-lang-dotnet="`FreshserviceTaskId`" pulumi-lang-go="`freshserviceTaskId`" pulumi-lang-python="`freshservice_task_id`" pulumi-lang-yaml="`freshserviceTaskId`" pulumi-lang-java="`freshserviceTaskId`">`freshservice_task_id`</span>, <span pulumi-lang-nodejs="`clickupTaskId`" pulumi-lang-dotnet="`ClickupTaskId`" pulumi-lang-go="`clickupTaskId`" pulumi-lang-python="`clickup_task_id`" pulumi-lang-yaml="`clickupTaskId`" pulumi-lang-java="`clickupTaskId`">`clickup_task_id`</span>.
+        ["(incident) kind can only match [:id, :slug, :sequential_id, :pagerduty_incident_id, :opsgenie_incident_id, :victor_ops_incident_id, :jira_issue_id, :asana_task_id, :shortcut_task_id, :linear_issue_id, :zendesk_ticket_id, :motion_task_id, :trello_card_id, :airtable_record_id, :shortcut_story_id, :github_issue_id, :freshservice_ticket_id, :freshservice_task_id, :clickup_task_id]", "(post_mortem) kind can only match [:id]", "(action_item) kind can only match [:id, :jira_issue_id, :asana_task_id, :shortcut_task_id, :linear_issue_id, :zendesk_ticket_id, :motion_task_id, :trello_card_id, :airtable_record_id, :shortcut_story_id, :github_issue_id, :freshservice_ticket_id, :freshservice_task_id, :clickup_task_id]", "(pulse) kind can only match [:id]", "(alert) kind can only match [:id]"]. Value must be one of <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span>, <span pulumi-lang-nodejs="`slug`" pulumi-lang-dotnet="`Slug`" pulumi-lang-go="`slug`" pulumi-lang-python="`slug`" pulumi-lang-yaml="`slug`" pulumi-lang-java="`slug`" pulumi-lang-hcl="`slug`">`slug`</span>, <span pulumi-lang-nodejs="`sequentialId`" pulumi-lang-dotnet="`SequentialId`" pulumi-lang-go="`sequentialId`" pulumi-lang-python="`sequential_id`" pulumi-lang-yaml="`sequentialId`" pulumi-lang-java="`sequentialId`" pulumi-lang-hcl="`sequential_id`">`sequentialId`</span>, <span pulumi-lang-nodejs="`pagerdutyIncidentId`" pulumi-lang-dotnet="`PagerdutyIncidentId`" pulumi-lang-go="`pagerdutyIncidentId`" pulumi-lang-python="`pagerduty_incident_id`" pulumi-lang-yaml="`pagerdutyIncidentId`" pulumi-lang-java="`pagerdutyIncidentId`" pulumi-lang-hcl="`pagerduty_incident_id`">`pagerdutyIncidentId`</span>, <span pulumi-lang-nodejs="`opsgenieIncidentId`" pulumi-lang-dotnet="`OpsgenieIncidentId`" pulumi-lang-go="`opsgenieIncidentId`" pulumi-lang-python="`opsgenie_incident_id`" pulumi-lang-yaml="`opsgenieIncidentId`" pulumi-lang-java="`opsgenieIncidentId`" pulumi-lang-hcl="`opsgenie_incident_id`">`opsgenieIncidentId`</span>, <span pulumi-lang-nodejs="`victorOpsIncidentId`" pulumi-lang-dotnet="`VictorOpsIncidentId`" pulumi-lang-go="`victorOpsIncidentId`" pulumi-lang-python="`victor_ops_incident_id`" pulumi-lang-yaml="`victorOpsIncidentId`" pulumi-lang-java="`victorOpsIncidentId`" pulumi-lang-hcl="`victor_ops_incident_id`">`victorOpsIncidentId`</span>, <span pulumi-lang-nodejs="`jiraIssueId`" pulumi-lang-dotnet="`JiraIssueId`" pulumi-lang-go="`jiraIssueId`" pulumi-lang-python="`jira_issue_id`" pulumi-lang-yaml="`jiraIssueId`" pulumi-lang-java="`jiraIssueId`" pulumi-lang-hcl="`jira_issue_id`">`jiraIssueId`</span>, <span pulumi-lang-nodejs="`asanaTaskId`" pulumi-lang-dotnet="`AsanaTaskId`" pulumi-lang-go="`asanaTaskId`" pulumi-lang-python="`asana_task_id`" pulumi-lang-yaml="`asanaTaskId`" pulumi-lang-java="`asanaTaskId`" pulumi-lang-hcl="`asana_task_id`">`asanaTaskId`</span>, <span pulumi-lang-nodejs="`shortcutTaskId`" pulumi-lang-dotnet="`ShortcutTaskId`" pulumi-lang-go="`shortcutTaskId`" pulumi-lang-python="`shortcut_task_id`" pulumi-lang-yaml="`shortcutTaskId`" pulumi-lang-java="`shortcutTaskId`" pulumi-lang-hcl="`shortcut_task_id`">`shortcutTaskId`</span>, <span pulumi-lang-nodejs="`linearIssueId`" pulumi-lang-dotnet="`LinearIssueId`" pulumi-lang-go="`linearIssueId`" pulumi-lang-python="`linear_issue_id`" pulumi-lang-yaml="`linearIssueId`" pulumi-lang-java="`linearIssueId`" pulumi-lang-hcl="`linear_issue_id`">`linearIssueId`</span>, <span pulumi-lang-nodejs="`zendeskTicketId`" pulumi-lang-dotnet="`ZendeskTicketId`" pulumi-lang-go="`zendeskTicketId`" pulumi-lang-python="`zendesk_ticket_id`" pulumi-lang-yaml="`zendeskTicketId`" pulumi-lang-java="`zendeskTicketId`" pulumi-lang-hcl="`zendesk_ticket_id`">`zendeskTicketId`</span>, <span pulumi-lang-nodejs="`motionTaskId`" pulumi-lang-dotnet="`MotionTaskId`" pulumi-lang-go="`motionTaskId`" pulumi-lang-python="`motion_task_id`" pulumi-lang-yaml="`motionTaskId`" pulumi-lang-java="`motionTaskId`" pulumi-lang-hcl="`motion_task_id`">`motionTaskId`</span>, <span pulumi-lang-nodejs="`trelloCardId`" pulumi-lang-dotnet="`TrelloCardId`" pulumi-lang-go="`trelloCardId`" pulumi-lang-python="`trello_card_id`" pulumi-lang-yaml="`trelloCardId`" pulumi-lang-java="`trelloCardId`" pulumi-lang-hcl="`trello_card_id`">`trelloCardId`</span>, <span pulumi-lang-nodejs="`airtableRecordId`" pulumi-lang-dotnet="`AirtableRecordId`" pulumi-lang-go="`airtableRecordId`" pulumi-lang-python="`airtable_record_id`" pulumi-lang-yaml="`airtableRecordId`" pulumi-lang-java="`airtableRecordId`" pulumi-lang-hcl="`airtable_record_id`">`airtableRecordId`</span>, <span pulumi-lang-nodejs="`shortcutStoryId`" pulumi-lang-dotnet="`ShortcutStoryId`" pulumi-lang-go="`shortcutStoryId`" pulumi-lang-python="`shortcut_story_id`" pulumi-lang-yaml="`shortcutStoryId`" pulumi-lang-java="`shortcutStoryId`" pulumi-lang-hcl="`shortcut_story_id`">`shortcutStoryId`</span>, <span pulumi-lang-nodejs="`githubIssueId`" pulumi-lang-dotnet="`GithubIssueId`" pulumi-lang-go="`githubIssueId`" pulumi-lang-python="`github_issue_id`" pulumi-lang-yaml="`githubIssueId`" pulumi-lang-java="`githubIssueId`" pulumi-lang-hcl="`github_issue_id`">`githubIssueId`</span>, <span pulumi-lang-nodejs="`freshserviceTicketId`" pulumi-lang-dotnet="`FreshserviceTicketId`" pulumi-lang-go="`freshserviceTicketId`" pulumi-lang-python="`freshservice_ticket_id`" pulumi-lang-yaml="`freshserviceTicketId`" pulumi-lang-java="`freshserviceTicketId`" pulumi-lang-hcl="`freshservice_ticket_id`">`freshserviceTicketId`</span>, <span pulumi-lang-nodejs="`freshserviceTaskId`" pulumi-lang-dotnet="`FreshserviceTaskId`" pulumi-lang-go="`freshserviceTaskId`" pulumi-lang-python="`freshservice_task_id`" pulumi-lang-yaml="`freshserviceTaskId`" pulumi-lang-java="`freshserviceTaskId`" pulumi-lang-hcl="`freshservice_task_id`">`freshserviceTaskId`</span>, <span pulumi-lang-nodejs="`clickupTaskId`" pulumi-lang-dotnet="`ClickupTaskId`" pulumi-lang-go="`clickupTaskId`" pulumi-lang-python="`clickup_task_id`" pulumi-lang-yaml="`clickupTaskId`" pulumi-lang-java="`clickupTaskId`" pulumi-lang-hcl="`clickup_task_id`">`clickupTaskId`</span>.
         """
         return pulumi.get(self, "attribute_to_query_by")
 
@@ -17783,7 +17895,7 @@ class WorkflowTaskTriggerWorkflowTaskParams(dict):
     @pulumi.getter
     def kind(self) -> _builtins.str:
         """
-        Value must be one of <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`">`incident`</span>, <span pulumi-lang-nodejs="`postMortem`" pulumi-lang-dotnet="`PostMortem`" pulumi-lang-go="`postMortem`" pulumi-lang-python="`post_mortem`" pulumi-lang-yaml="`postMortem`" pulumi-lang-java="`postMortem`">`post_mortem`</span>, <span pulumi-lang-nodejs="`actionItem`" pulumi-lang-dotnet="`ActionItem`" pulumi-lang-go="`actionItem`" pulumi-lang-python="`action_item`" pulumi-lang-yaml="`actionItem`" pulumi-lang-java="`actionItem`">`action_item`</span>, <span pulumi-lang-nodejs="`pulse`" pulumi-lang-dotnet="`Pulse`" pulumi-lang-go="`pulse`" pulumi-lang-python="`pulse`" pulumi-lang-yaml="`pulse`" pulumi-lang-java="`pulse`">`pulse`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`">`alert`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`" pulumi-lang-hcl="`incident`">`incident`</span>, <span pulumi-lang-nodejs="`postMortem`" pulumi-lang-dotnet="`PostMortem`" pulumi-lang-go="`postMortem`" pulumi-lang-python="`post_mortem`" pulumi-lang-yaml="`postMortem`" pulumi-lang-java="`postMortem`" pulumi-lang-hcl="`post_mortem`">`postMortem`</span>, <span pulumi-lang-nodejs="`actionItem`" pulumi-lang-dotnet="`ActionItem`" pulumi-lang-go="`actionItem`" pulumi-lang-python="`action_item`" pulumi-lang-yaml="`actionItem`" pulumi-lang-java="`actionItem`" pulumi-lang-hcl="`action_item`">`actionItem`</span>, <span pulumi-lang-nodejs="`pulse`" pulumi-lang-dotnet="`Pulse`" pulumi-lang-go="`pulse`" pulumi-lang-python="`pulse`" pulumi-lang-yaml="`pulse`" pulumi-lang-java="`pulse`" pulumi-lang-hcl="`pulse`">`pulse`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`" pulumi-lang-hcl="`alert`">`alert`</span>.
         """
         return pulumi.get(self, "kind")
 
@@ -17791,7 +17903,7 @@ class WorkflowTaskTriggerWorkflowTaskParams(dict):
     @pulumi.getter
     def resource(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "resource")
 
@@ -17799,7 +17911,7 @@ class WorkflowTaskTriggerWorkflowTaskParams(dict):
     @pulumi.getter
     def workflow(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "workflow")
 
@@ -17901,15 +18013,15 @@ class WorkflowTaskUpdateActionItemTaskParams(dict):
                  summary: Optional[_builtins.str] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param _builtins.str attribute_to_query_by: Attribute of the action item to match against. Value must be one of <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span>, <span pulumi-lang-nodejs="`jiraIssueId`" pulumi-lang-dotnet="`JiraIssueId`" pulumi-lang-go="`jiraIssueId`" pulumi-lang-python="`jira_issue_id`" pulumi-lang-yaml="`jiraIssueId`" pulumi-lang-java="`jiraIssueId`">`jira_issue_id`</span>, <span pulumi-lang-nodejs="`asanaTaskId`" pulumi-lang-dotnet="`AsanaTaskId`" pulumi-lang-go="`asanaTaskId`" pulumi-lang-python="`asana_task_id`" pulumi-lang-yaml="`asanaTaskId`" pulumi-lang-java="`asanaTaskId`">`asana_task_id`</span>, <span pulumi-lang-nodejs="`shortcutTaskId`" pulumi-lang-dotnet="`ShortcutTaskId`" pulumi-lang-go="`shortcutTaskId`" pulumi-lang-python="`shortcut_task_id`" pulumi-lang-yaml="`shortcutTaskId`" pulumi-lang-java="`shortcutTaskId`">`shortcut_task_id`</span>, <span pulumi-lang-nodejs="`linearIssueId`" pulumi-lang-dotnet="`LinearIssueId`" pulumi-lang-go="`linearIssueId`" pulumi-lang-python="`linear_issue_id`" pulumi-lang-yaml="`linearIssueId`" pulumi-lang-java="`linearIssueId`">`linear_issue_id`</span>, <span pulumi-lang-nodejs="`zendeskTicketId`" pulumi-lang-dotnet="`ZendeskTicketId`" pulumi-lang-go="`zendeskTicketId`" pulumi-lang-python="`zendesk_ticket_id`" pulumi-lang-yaml="`zendeskTicketId`" pulumi-lang-java="`zendeskTicketId`">`zendesk_ticket_id`</span>, <span pulumi-lang-nodejs="`motionTaskId`" pulumi-lang-dotnet="`MotionTaskId`" pulumi-lang-go="`motionTaskId`" pulumi-lang-python="`motion_task_id`" pulumi-lang-yaml="`motionTaskId`" pulumi-lang-java="`motionTaskId`">`motion_task_id`</span>, <span pulumi-lang-nodejs="`trelloCardId`" pulumi-lang-dotnet="`TrelloCardId`" pulumi-lang-go="`trelloCardId`" pulumi-lang-python="`trello_card_id`" pulumi-lang-yaml="`trelloCardId`" pulumi-lang-java="`trelloCardId`">`trello_card_id`</span>, <span pulumi-lang-nodejs="`airtableRecordId`" pulumi-lang-dotnet="`AirtableRecordId`" pulumi-lang-go="`airtableRecordId`" pulumi-lang-python="`airtable_record_id`" pulumi-lang-yaml="`airtableRecordId`" pulumi-lang-java="`airtableRecordId`">`airtable_record_id`</span>, <span pulumi-lang-nodejs="`shortcutStoryId`" pulumi-lang-dotnet="`ShortcutStoryId`" pulumi-lang-go="`shortcutStoryId`" pulumi-lang-python="`shortcut_story_id`" pulumi-lang-yaml="`shortcutStoryId`" pulumi-lang-java="`shortcutStoryId`">`shortcut_story_id`</span>, <span pulumi-lang-nodejs="`githubIssueId`" pulumi-lang-dotnet="`GithubIssueId`" pulumi-lang-go="`githubIssueId`" pulumi-lang-python="`github_issue_id`" pulumi-lang-yaml="`githubIssueId`" pulumi-lang-java="`githubIssueId`">`github_issue_id`</span>, <span pulumi-lang-nodejs="`gitlabIssueId`" pulumi-lang-dotnet="`GitlabIssueId`" pulumi-lang-go="`gitlabIssueId`" pulumi-lang-python="`gitlab_issue_id`" pulumi-lang-yaml="`gitlabIssueId`" pulumi-lang-java="`gitlabIssueId`">`gitlab_issue_id`</span>, <span pulumi-lang-nodejs="`freshserviceTicketId`" pulumi-lang-dotnet="`FreshserviceTicketId`" pulumi-lang-go="`freshserviceTicketId`" pulumi-lang-python="`freshservice_ticket_id`" pulumi-lang-yaml="`freshserviceTicketId`" pulumi-lang-java="`freshserviceTicketId`">`freshservice_ticket_id`</span>, <span pulumi-lang-nodejs="`freshserviceTaskId`" pulumi-lang-dotnet="`FreshserviceTaskId`" pulumi-lang-go="`freshserviceTaskId`" pulumi-lang-python="`freshservice_task_id`" pulumi-lang-yaml="`freshserviceTaskId`" pulumi-lang-java="`freshserviceTaskId`">`freshservice_task_id`</span>, <span pulumi-lang-nodejs="`clickupTaskId`" pulumi-lang-dotnet="`ClickupTaskId`" pulumi-lang-go="`clickupTaskId`" pulumi-lang-python="`clickup_task_id`" pulumi-lang-yaml="`clickupTaskId`" pulumi-lang-java="`clickupTaskId`">`clickup_task_id`</span>.
-        :param _builtins.str query_value: Value that<span pulumi-lang-nodejs=" attributeToQueryBy " pulumi-lang-dotnet=" AttributeToQueryBy " pulumi-lang-go=" attributeToQueryBy " pulumi-lang-python=" attribute_to_query_by " pulumi-lang-yaml=" attributeToQueryBy " pulumi-lang-java=" attributeToQueryBy "> attribute_to_query_by </span>to uses to match against
-        :param Mapping[str, _builtins.str] assigned_to_user: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.  The user this action item is assigned to
-        :param _builtins.str assigned_to_user_id: [DEPRECATED] Use<span pulumi-lang-nodejs=" assignedToUser " pulumi-lang-dotnet=" AssignedToUser " pulumi-lang-go=" assignedToUser " pulumi-lang-python=" assigned_to_user " pulumi-lang-yaml=" assignedToUser " pulumi-lang-java=" assignedToUser "> assigned_to_user </span>attribute instead. The user id this action item is assigned to
+        :param _builtins.str attribute_to_query_by: Attribute of the action item to match against. Value must be one of <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span>, <span pulumi-lang-nodejs="`jiraIssueId`" pulumi-lang-dotnet="`JiraIssueId`" pulumi-lang-go="`jiraIssueId`" pulumi-lang-python="`jira_issue_id`" pulumi-lang-yaml="`jiraIssueId`" pulumi-lang-java="`jiraIssueId`" pulumi-lang-hcl="`jira_issue_id`">`jiraIssueId`</span>, <span pulumi-lang-nodejs="`asanaTaskId`" pulumi-lang-dotnet="`AsanaTaskId`" pulumi-lang-go="`asanaTaskId`" pulumi-lang-python="`asana_task_id`" pulumi-lang-yaml="`asanaTaskId`" pulumi-lang-java="`asanaTaskId`" pulumi-lang-hcl="`asana_task_id`">`asanaTaskId`</span>, <span pulumi-lang-nodejs="`shortcutTaskId`" pulumi-lang-dotnet="`ShortcutTaskId`" pulumi-lang-go="`shortcutTaskId`" pulumi-lang-python="`shortcut_task_id`" pulumi-lang-yaml="`shortcutTaskId`" pulumi-lang-java="`shortcutTaskId`" pulumi-lang-hcl="`shortcut_task_id`">`shortcutTaskId`</span>, <span pulumi-lang-nodejs="`linearIssueId`" pulumi-lang-dotnet="`LinearIssueId`" pulumi-lang-go="`linearIssueId`" pulumi-lang-python="`linear_issue_id`" pulumi-lang-yaml="`linearIssueId`" pulumi-lang-java="`linearIssueId`" pulumi-lang-hcl="`linear_issue_id`">`linearIssueId`</span>, <span pulumi-lang-nodejs="`zendeskTicketId`" pulumi-lang-dotnet="`ZendeskTicketId`" pulumi-lang-go="`zendeskTicketId`" pulumi-lang-python="`zendesk_ticket_id`" pulumi-lang-yaml="`zendeskTicketId`" pulumi-lang-java="`zendeskTicketId`" pulumi-lang-hcl="`zendesk_ticket_id`">`zendeskTicketId`</span>, <span pulumi-lang-nodejs="`motionTaskId`" pulumi-lang-dotnet="`MotionTaskId`" pulumi-lang-go="`motionTaskId`" pulumi-lang-python="`motion_task_id`" pulumi-lang-yaml="`motionTaskId`" pulumi-lang-java="`motionTaskId`" pulumi-lang-hcl="`motion_task_id`">`motionTaskId`</span>, <span pulumi-lang-nodejs="`trelloCardId`" pulumi-lang-dotnet="`TrelloCardId`" pulumi-lang-go="`trelloCardId`" pulumi-lang-python="`trello_card_id`" pulumi-lang-yaml="`trelloCardId`" pulumi-lang-java="`trelloCardId`" pulumi-lang-hcl="`trello_card_id`">`trelloCardId`</span>, <span pulumi-lang-nodejs="`airtableRecordId`" pulumi-lang-dotnet="`AirtableRecordId`" pulumi-lang-go="`airtableRecordId`" pulumi-lang-python="`airtable_record_id`" pulumi-lang-yaml="`airtableRecordId`" pulumi-lang-java="`airtableRecordId`" pulumi-lang-hcl="`airtable_record_id`">`airtableRecordId`</span>, <span pulumi-lang-nodejs="`shortcutStoryId`" pulumi-lang-dotnet="`ShortcutStoryId`" pulumi-lang-go="`shortcutStoryId`" pulumi-lang-python="`shortcut_story_id`" pulumi-lang-yaml="`shortcutStoryId`" pulumi-lang-java="`shortcutStoryId`" pulumi-lang-hcl="`shortcut_story_id`">`shortcutStoryId`</span>, <span pulumi-lang-nodejs="`githubIssueId`" pulumi-lang-dotnet="`GithubIssueId`" pulumi-lang-go="`githubIssueId`" pulumi-lang-python="`github_issue_id`" pulumi-lang-yaml="`githubIssueId`" pulumi-lang-java="`githubIssueId`" pulumi-lang-hcl="`github_issue_id`">`githubIssueId`</span>, <span pulumi-lang-nodejs="`gitlabIssueId`" pulumi-lang-dotnet="`GitlabIssueId`" pulumi-lang-go="`gitlabIssueId`" pulumi-lang-python="`gitlab_issue_id`" pulumi-lang-yaml="`gitlabIssueId`" pulumi-lang-java="`gitlabIssueId`" pulumi-lang-hcl="`gitlab_issue_id`">`gitlabIssueId`</span>, <span pulumi-lang-nodejs="`freshserviceTicketId`" pulumi-lang-dotnet="`FreshserviceTicketId`" pulumi-lang-go="`freshserviceTicketId`" pulumi-lang-python="`freshservice_ticket_id`" pulumi-lang-yaml="`freshserviceTicketId`" pulumi-lang-java="`freshserviceTicketId`" pulumi-lang-hcl="`freshservice_ticket_id`">`freshserviceTicketId`</span>, <span pulumi-lang-nodejs="`freshserviceTaskId`" pulumi-lang-dotnet="`FreshserviceTaskId`" pulumi-lang-go="`freshserviceTaskId`" pulumi-lang-python="`freshservice_task_id`" pulumi-lang-yaml="`freshserviceTaskId`" pulumi-lang-java="`freshserviceTaskId`" pulumi-lang-hcl="`freshservice_task_id`">`freshserviceTaskId`</span>, <span pulumi-lang-nodejs="`clickupTaskId`" pulumi-lang-dotnet="`ClickupTaskId`" pulumi-lang-go="`clickupTaskId`" pulumi-lang-python="`clickup_task_id`" pulumi-lang-yaml="`clickupTaskId`" pulumi-lang-java="`clickupTaskId`" pulumi-lang-hcl="`clickup_task_id`">`clickupTaskId`</span>.
+        :param _builtins.str query_value: Value that<span pulumi-lang-nodejs=" attributeToQueryBy " pulumi-lang-dotnet=" AttributeToQueryBy " pulumi-lang-go=" attributeToQueryBy " pulumi-lang-python=" attribute_to_query_by " pulumi-lang-yaml=" attributeToQueryBy " pulumi-lang-java=" attributeToQueryBy " pulumi-lang-hcl=" attribute_to_query_by "> attributeToQueryBy </span>to uses to match against
+        :param Mapping[str, _builtins.str] assigned_to_user: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.  The user this action item is assigned to
+        :param _builtins.str assigned_to_user_id: [DEPRECATED] Use<span pulumi-lang-nodejs=" assignedToUser " pulumi-lang-dotnet=" AssignedToUser " pulumi-lang-go=" assignedToUser " pulumi-lang-python=" assigned_to_user " pulumi-lang-yaml=" assignedToUser " pulumi-lang-java=" assignedToUser " pulumi-lang-hcl=" assigned_to_user "> assignedToUser </span>attribute instead. The user id this action item is assigned to
         :param _builtins.str custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON
         :param _builtins.str description: The action item description
         :param _builtins.bool post_to_incident_timeline: Value must be one of true or false
-        :param _builtins.str priority: The action item priority. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
-        :param _builtins.str status: The action item status. Value must be one of <span pulumi-lang-nodejs="`open`" pulumi-lang-dotnet="`Open`" pulumi-lang-go="`open`" pulumi-lang-python="`open`" pulumi-lang-yaml="`open`" pulumi-lang-java="`open`">`open`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`done`" pulumi-lang-dotnet="`Done`" pulumi-lang-go="`done`" pulumi-lang-python="`done`" pulumi-lang-yaml="`done`" pulumi-lang-java="`done`">`done`</span>.
+        :param _builtins.str priority: The action item priority. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
+        :param _builtins.str status: The action item status. Value must be one of <span pulumi-lang-nodejs="`open`" pulumi-lang-dotnet="`Open`" pulumi-lang-go="`open`" pulumi-lang-python="`open`" pulumi-lang-yaml="`open`" pulumi-lang-java="`open`" pulumi-lang-hcl="`open`">`open`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`done`" pulumi-lang-dotnet="`Done`" pulumi-lang-go="`done`" pulumi-lang-python="`done`" pulumi-lang-yaml="`done`" pulumi-lang-java="`done`" pulumi-lang-hcl="`done`">`done`</span>.
         :param _builtins.str summary: Brief description of the action item
         """
         pulumi.set(__self__, "attribute_to_query_by", attribute_to_query_by)
@@ -17939,7 +18051,7 @@ class WorkflowTaskUpdateActionItemTaskParams(dict):
     @pulumi.getter(name="attributeToQueryBy")
     def attribute_to_query_by(self) -> _builtins.str:
         """
-        Attribute of the action item to match against. Value must be one of <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span>, <span pulumi-lang-nodejs="`jiraIssueId`" pulumi-lang-dotnet="`JiraIssueId`" pulumi-lang-go="`jiraIssueId`" pulumi-lang-python="`jira_issue_id`" pulumi-lang-yaml="`jiraIssueId`" pulumi-lang-java="`jiraIssueId`">`jira_issue_id`</span>, <span pulumi-lang-nodejs="`asanaTaskId`" pulumi-lang-dotnet="`AsanaTaskId`" pulumi-lang-go="`asanaTaskId`" pulumi-lang-python="`asana_task_id`" pulumi-lang-yaml="`asanaTaskId`" pulumi-lang-java="`asanaTaskId`">`asana_task_id`</span>, <span pulumi-lang-nodejs="`shortcutTaskId`" pulumi-lang-dotnet="`ShortcutTaskId`" pulumi-lang-go="`shortcutTaskId`" pulumi-lang-python="`shortcut_task_id`" pulumi-lang-yaml="`shortcutTaskId`" pulumi-lang-java="`shortcutTaskId`">`shortcut_task_id`</span>, <span pulumi-lang-nodejs="`linearIssueId`" pulumi-lang-dotnet="`LinearIssueId`" pulumi-lang-go="`linearIssueId`" pulumi-lang-python="`linear_issue_id`" pulumi-lang-yaml="`linearIssueId`" pulumi-lang-java="`linearIssueId`">`linear_issue_id`</span>, <span pulumi-lang-nodejs="`zendeskTicketId`" pulumi-lang-dotnet="`ZendeskTicketId`" pulumi-lang-go="`zendeskTicketId`" pulumi-lang-python="`zendesk_ticket_id`" pulumi-lang-yaml="`zendeskTicketId`" pulumi-lang-java="`zendeskTicketId`">`zendesk_ticket_id`</span>, <span pulumi-lang-nodejs="`motionTaskId`" pulumi-lang-dotnet="`MotionTaskId`" pulumi-lang-go="`motionTaskId`" pulumi-lang-python="`motion_task_id`" pulumi-lang-yaml="`motionTaskId`" pulumi-lang-java="`motionTaskId`">`motion_task_id`</span>, <span pulumi-lang-nodejs="`trelloCardId`" pulumi-lang-dotnet="`TrelloCardId`" pulumi-lang-go="`trelloCardId`" pulumi-lang-python="`trello_card_id`" pulumi-lang-yaml="`trelloCardId`" pulumi-lang-java="`trelloCardId`">`trello_card_id`</span>, <span pulumi-lang-nodejs="`airtableRecordId`" pulumi-lang-dotnet="`AirtableRecordId`" pulumi-lang-go="`airtableRecordId`" pulumi-lang-python="`airtable_record_id`" pulumi-lang-yaml="`airtableRecordId`" pulumi-lang-java="`airtableRecordId`">`airtable_record_id`</span>, <span pulumi-lang-nodejs="`shortcutStoryId`" pulumi-lang-dotnet="`ShortcutStoryId`" pulumi-lang-go="`shortcutStoryId`" pulumi-lang-python="`shortcut_story_id`" pulumi-lang-yaml="`shortcutStoryId`" pulumi-lang-java="`shortcutStoryId`">`shortcut_story_id`</span>, <span pulumi-lang-nodejs="`githubIssueId`" pulumi-lang-dotnet="`GithubIssueId`" pulumi-lang-go="`githubIssueId`" pulumi-lang-python="`github_issue_id`" pulumi-lang-yaml="`githubIssueId`" pulumi-lang-java="`githubIssueId`">`github_issue_id`</span>, <span pulumi-lang-nodejs="`gitlabIssueId`" pulumi-lang-dotnet="`GitlabIssueId`" pulumi-lang-go="`gitlabIssueId`" pulumi-lang-python="`gitlab_issue_id`" pulumi-lang-yaml="`gitlabIssueId`" pulumi-lang-java="`gitlabIssueId`">`gitlab_issue_id`</span>, <span pulumi-lang-nodejs="`freshserviceTicketId`" pulumi-lang-dotnet="`FreshserviceTicketId`" pulumi-lang-go="`freshserviceTicketId`" pulumi-lang-python="`freshservice_ticket_id`" pulumi-lang-yaml="`freshserviceTicketId`" pulumi-lang-java="`freshserviceTicketId`">`freshservice_ticket_id`</span>, <span pulumi-lang-nodejs="`freshserviceTaskId`" pulumi-lang-dotnet="`FreshserviceTaskId`" pulumi-lang-go="`freshserviceTaskId`" pulumi-lang-python="`freshservice_task_id`" pulumi-lang-yaml="`freshserviceTaskId`" pulumi-lang-java="`freshserviceTaskId`">`freshservice_task_id`</span>, <span pulumi-lang-nodejs="`clickupTaskId`" pulumi-lang-dotnet="`ClickupTaskId`" pulumi-lang-go="`clickupTaskId`" pulumi-lang-python="`clickup_task_id`" pulumi-lang-yaml="`clickupTaskId`" pulumi-lang-java="`clickupTaskId`">`clickup_task_id`</span>.
+        Attribute of the action item to match against. Value must be one of <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span>, <span pulumi-lang-nodejs="`jiraIssueId`" pulumi-lang-dotnet="`JiraIssueId`" pulumi-lang-go="`jiraIssueId`" pulumi-lang-python="`jira_issue_id`" pulumi-lang-yaml="`jiraIssueId`" pulumi-lang-java="`jiraIssueId`" pulumi-lang-hcl="`jira_issue_id`">`jiraIssueId`</span>, <span pulumi-lang-nodejs="`asanaTaskId`" pulumi-lang-dotnet="`AsanaTaskId`" pulumi-lang-go="`asanaTaskId`" pulumi-lang-python="`asana_task_id`" pulumi-lang-yaml="`asanaTaskId`" pulumi-lang-java="`asanaTaskId`" pulumi-lang-hcl="`asana_task_id`">`asanaTaskId`</span>, <span pulumi-lang-nodejs="`shortcutTaskId`" pulumi-lang-dotnet="`ShortcutTaskId`" pulumi-lang-go="`shortcutTaskId`" pulumi-lang-python="`shortcut_task_id`" pulumi-lang-yaml="`shortcutTaskId`" pulumi-lang-java="`shortcutTaskId`" pulumi-lang-hcl="`shortcut_task_id`">`shortcutTaskId`</span>, <span pulumi-lang-nodejs="`linearIssueId`" pulumi-lang-dotnet="`LinearIssueId`" pulumi-lang-go="`linearIssueId`" pulumi-lang-python="`linear_issue_id`" pulumi-lang-yaml="`linearIssueId`" pulumi-lang-java="`linearIssueId`" pulumi-lang-hcl="`linear_issue_id`">`linearIssueId`</span>, <span pulumi-lang-nodejs="`zendeskTicketId`" pulumi-lang-dotnet="`ZendeskTicketId`" pulumi-lang-go="`zendeskTicketId`" pulumi-lang-python="`zendesk_ticket_id`" pulumi-lang-yaml="`zendeskTicketId`" pulumi-lang-java="`zendeskTicketId`" pulumi-lang-hcl="`zendesk_ticket_id`">`zendeskTicketId`</span>, <span pulumi-lang-nodejs="`motionTaskId`" pulumi-lang-dotnet="`MotionTaskId`" pulumi-lang-go="`motionTaskId`" pulumi-lang-python="`motion_task_id`" pulumi-lang-yaml="`motionTaskId`" pulumi-lang-java="`motionTaskId`" pulumi-lang-hcl="`motion_task_id`">`motionTaskId`</span>, <span pulumi-lang-nodejs="`trelloCardId`" pulumi-lang-dotnet="`TrelloCardId`" pulumi-lang-go="`trelloCardId`" pulumi-lang-python="`trello_card_id`" pulumi-lang-yaml="`trelloCardId`" pulumi-lang-java="`trelloCardId`" pulumi-lang-hcl="`trello_card_id`">`trelloCardId`</span>, <span pulumi-lang-nodejs="`airtableRecordId`" pulumi-lang-dotnet="`AirtableRecordId`" pulumi-lang-go="`airtableRecordId`" pulumi-lang-python="`airtable_record_id`" pulumi-lang-yaml="`airtableRecordId`" pulumi-lang-java="`airtableRecordId`" pulumi-lang-hcl="`airtable_record_id`">`airtableRecordId`</span>, <span pulumi-lang-nodejs="`shortcutStoryId`" pulumi-lang-dotnet="`ShortcutStoryId`" pulumi-lang-go="`shortcutStoryId`" pulumi-lang-python="`shortcut_story_id`" pulumi-lang-yaml="`shortcutStoryId`" pulumi-lang-java="`shortcutStoryId`" pulumi-lang-hcl="`shortcut_story_id`">`shortcutStoryId`</span>, <span pulumi-lang-nodejs="`githubIssueId`" pulumi-lang-dotnet="`GithubIssueId`" pulumi-lang-go="`githubIssueId`" pulumi-lang-python="`github_issue_id`" pulumi-lang-yaml="`githubIssueId`" pulumi-lang-java="`githubIssueId`" pulumi-lang-hcl="`github_issue_id`">`githubIssueId`</span>, <span pulumi-lang-nodejs="`gitlabIssueId`" pulumi-lang-dotnet="`GitlabIssueId`" pulumi-lang-go="`gitlabIssueId`" pulumi-lang-python="`gitlab_issue_id`" pulumi-lang-yaml="`gitlabIssueId`" pulumi-lang-java="`gitlabIssueId`" pulumi-lang-hcl="`gitlab_issue_id`">`gitlabIssueId`</span>, <span pulumi-lang-nodejs="`freshserviceTicketId`" pulumi-lang-dotnet="`FreshserviceTicketId`" pulumi-lang-go="`freshserviceTicketId`" pulumi-lang-python="`freshservice_ticket_id`" pulumi-lang-yaml="`freshserviceTicketId`" pulumi-lang-java="`freshserviceTicketId`" pulumi-lang-hcl="`freshservice_ticket_id`">`freshserviceTicketId`</span>, <span pulumi-lang-nodejs="`freshserviceTaskId`" pulumi-lang-dotnet="`FreshserviceTaskId`" pulumi-lang-go="`freshserviceTaskId`" pulumi-lang-python="`freshservice_task_id`" pulumi-lang-yaml="`freshserviceTaskId`" pulumi-lang-java="`freshserviceTaskId`" pulumi-lang-hcl="`freshservice_task_id`">`freshserviceTaskId`</span>, <span pulumi-lang-nodejs="`clickupTaskId`" pulumi-lang-dotnet="`ClickupTaskId`" pulumi-lang-go="`clickupTaskId`" pulumi-lang-python="`clickup_task_id`" pulumi-lang-yaml="`clickupTaskId`" pulumi-lang-java="`clickupTaskId`" pulumi-lang-hcl="`clickup_task_id`">`clickupTaskId`</span>.
         """
         return pulumi.get(self, "attribute_to_query_by")
 
@@ -17947,7 +18059,7 @@ class WorkflowTaskUpdateActionItemTaskParams(dict):
     @pulumi.getter(name="queryValue")
     def query_value(self) -> _builtins.str:
         """
-        Value that<span pulumi-lang-nodejs=" attributeToQueryBy " pulumi-lang-dotnet=" AttributeToQueryBy " pulumi-lang-go=" attributeToQueryBy " pulumi-lang-python=" attribute_to_query_by " pulumi-lang-yaml=" attributeToQueryBy " pulumi-lang-java=" attributeToQueryBy "> attribute_to_query_by </span>to uses to match against
+        Value that<span pulumi-lang-nodejs=" attributeToQueryBy " pulumi-lang-dotnet=" AttributeToQueryBy " pulumi-lang-go=" attributeToQueryBy " pulumi-lang-python=" attribute_to_query_by " pulumi-lang-yaml=" attributeToQueryBy " pulumi-lang-java=" attributeToQueryBy " pulumi-lang-hcl=" attribute_to_query_by "> attributeToQueryBy </span>to uses to match against
         """
         return pulumi.get(self, "query_value")
 
@@ -17955,7 +18067,7 @@ class WorkflowTaskUpdateActionItemTaskParams(dict):
     @pulumi.getter(name="assignedToUser")
     def assigned_to_user(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.  The user this action item is assigned to
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.  The user this action item is assigned to
         """
         return pulumi.get(self, "assigned_to_user")
 
@@ -17963,7 +18075,7 @@ class WorkflowTaskUpdateActionItemTaskParams(dict):
     @pulumi.getter(name="assignedToUserId")
     def assigned_to_user_id(self) -> Optional[_builtins.str]:
         """
-        [DEPRECATED] Use<span pulumi-lang-nodejs=" assignedToUser " pulumi-lang-dotnet=" AssignedToUser " pulumi-lang-go=" assignedToUser " pulumi-lang-python=" assigned_to_user " pulumi-lang-yaml=" assignedToUser " pulumi-lang-java=" assignedToUser "> assigned_to_user </span>attribute instead. The user id this action item is assigned to
+        [DEPRECATED] Use<span pulumi-lang-nodejs=" assignedToUser " pulumi-lang-dotnet=" AssignedToUser " pulumi-lang-go=" assignedToUser " pulumi-lang-python=" assigned_to_user " pulumi-lang-yaml=" assignedToUser " pulumi-lang-java=" assignedToUser " pulumi-lang-hcl=" assigned_to_user "> assignedToUser </span>attribute instead. The user id this action item is assigned to
         """
         return pulumi.get(self, "assigned_to_user_id")
 
@@ -18000,7 +18112,7 @@ class WorkflowTaskUpdateActionItemTaskParams(dict):
     @pulumi.getter
     def priority(self) -> Optional[_builtins.str]:
         """
-        The action item priority. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        The action item priority. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         """
         return pulumi.get(self, "priority")
 
@@ -18008,7 +18120,7 @@ class WorkflowTaskUpdateActionItemTaskParams(dict):
     @pulumi.getter
     def status(self) -> Optional[_builtins.str]:
         """
-        The action item status. Value must be one of <span pulumi-lang-nodejs="`open`" pulumi-lang-dotnet="`Open`" pulumi-lang-go="`open`" pulumi-lang-python="`open`" pulumi-lang-yaml="`open`" pulumi-lang-java="`open`">`open`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`">`in_progress`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`done`" pulumi-lang-dotnet="`Done`" pulumi-lang-go="`done`" pulumi-lang-python="`done`" pulumi-lang-yaml="`done`" pulumi-lang-java="`done`">`done`</span>.
+        The action item status. Value must be one of <span pulumi-lang-nodejs="`open`" pulumi-lang-dotnet="`Open`" pulumi-lang-go="`open`" pulumi-lang-python="`open`" pulumi-lang-yaml="`open`" pulumi-lang-java="`open`" pulumi-lang-hcl="`open`">`open`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`done`" pulumi-lang-dotnet="`Done`" pulumi-lang-go="`done`" pulumi-lang-python="`done`" pulumi-lang-yaml="`done`" pulumi-lang-java="`done`" pulumi-lang-hcl="`done`">`done`</span>.
         """
         return pulumi.get(self, "status")
 
@@ -18154,11 +18266,11 @@ class WorkflowTaskUpdateAsanaTaskTaskParams(dict):
                  task_type: Optional[_builtins.str] = None,
                  title: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str task_id: The task id
         :param _builtins.str assign_user_email: The assigned user's email
         :param _builtins.str custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON
-        :param _builtins.str dependency_direction: Value must be one of <span pulumi-lang-nodejs="`blocking`" pulumi-lang-dotnet="`Blocking`" pulumi-lang-go="`blocking`" pulumi-lang-python="`blocking`" pulumi-lang-yaml="`blocking`" pulumi-lang-java="`blocking`">`blocking`</span>, <span pulumi-lang-nodejs="`blockedBy`" pulumi-lang-dotnet="`BlockedBy`" pulumi-lang-go="`blockedBy`" pulumi-lang-python="`blocked_by`" pulumi-lang-yaml="`blockedBy`" pulumi-lang-java="`blockedBy`">`blocked_by`</span>.
+        :param _builtins.str dependency_direction: Value must be one of <span pulumi-lang-nodejs="`blocking`" pulumi-lang-dotnet="`Blocking`" pulumi-lang-go="`blocking`" pulumi-lang-python="`blocking`" pulumi-lang-yaml="`blocking`" pulumi-lang-java="`blocking`" pulumi-lang-hcl="`blocking`">`blocking`</span>, <span pulumi-lang-nodejs="`blockedBy`" pulumi-lang-dotnet="`BlockedBy`" pulumi-lang-go="`blockedBy`" pulumi-lang-python="`blocked_by`" pulumi-lang-yaml="`blockedBy`" pulumi-lang-java="`blockedBy`" pulumi-lang-hcl="`blocked_by`">`blockedBy`</span>.
         :param Sequence[_builtins.str] dependent_task_ids: Dependent task ids. Supports liquid syntax
         :param _builtins.str due_date: The due date
         :param _builtins.str title: The task title
@@ -18186,7 +18298,7 @@ class WorkflowTaskUpdateAsanaTaskTaskParams(dict):
     @pulumi.getter
     def completion(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "completion")
 
@@ -18218,7 +18330,7 @@ class WorkflowTaskUpdateAsanaTaskTaskParams(dict):
     @pulumi.getter(name="dependencyDirection")
     def dependency_direction(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`blocking`" pulumi-lang-dotnet="`Blocking`" pulumi-lang-go="`blocking`" pulumi-lang-python="`blocking`" pulumi-lang-yaml="`blocking`" pulumi-lang-java="`blocking`">`blocking`</span>, <span pulumi-lang-nodejs="`blockedBy`" pulumi-lang-dotnet="`BlockedBy`" pulumi-lang-go="`blockedBy`" pulumi-lang-python="`blocked_by`" pulumi-lang-yaml="`blockedBy`" pulumi-lang-java="`blockedBy`">`blocked_by`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`blocking`" pulumi-lang-dotnet="`Blocking`" pulumi-lang-go="`blocking`" pulumi-lang-python="`blocking`" pulumi-lang-yaml="`blocking`" pulumi-lang-java="`blocking`" pulumi-lang-hcl="`blocking`">`blocking`</span>, <span pulumi-lang-nodejs="`blockedBy`" pulumi-lang-dotnet="`BlockedBy`" pulumi-lang-go="`blockedBy`" pulumi-lang-python="`blocked_by`" pulumi-lang-yaml="`blockedBy`" pulumi-lang-java="`blockedBy`" pulumi-lang-hcl="`blocked_by`">`blockedBy`</span>.
         """
         return pulumi.get(self, "dependency_direction")
 
@@ -18280,7 +18392,7 @@ class WorkflowTaskUpdateAttachedAlertsTaskParams(dict):
                  status: _builtins.str,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param _builtins.str status: Value must be one of <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>.
+        :param _builtins.str status: Value must be one of <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`" pulumi-lang-hcl="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>.
         """
         pulumi.set(__self__, "status", status)
         if task_type is not None:
@@ -18290,7 +18402,7 @@ class WorkflowTaskUpdateAttachedAlertsTaskParams(dict):
     @pulumi.getter
     def status(self) -> _builtins.str:
         """
-        Value must be one of <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`" pulumi-lang-hcl="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>.
         """
         return pulumi.get(self, "status")
 
@@ -18342,7 +18454,7 @@ class WorkflowTaskUpdateClickupTaskTaskParams(dict):
         :param _builtins.str custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON
         :param _builtins.str description: The task description
         :param _builtins.str due_date: The due date
-        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         :param _builtins.str tags: The task tags
         :param _builtins.str task_payload: Additional ClickUp task attributes. Will be merged into whatever was specified in this tasks current parameters. Can contain liquid markup and need to be valid JSON
         :param _builtins.str title: The task title
@@ -18401,7 +18513,7 @@ class WorkflowTaskUpdateClickupTaskTaskParams(dict):
     @pulumi.getter
     def priority(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         """
         return pulumi.get(self, "priority")
 
@@ -18471,7 +18583,7 @@ class WorkflowTaskUpdateCodaPageTaskParams(dict):
         :param _builtins.str content: The Coda page content
         :param _builtins.str doc_id: The Coda doc id
         :param _builtins.str subtitle: The Coda page subtitle
-        :param Mapping[str, _builtins.str] template: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] template: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str title: The Coda page title
         """
         pulumi.set(__self__, "page_id", page_id)
@@ -18529,7 +18641,7 @@ class WorkflowTaskUpdateCodaPageTaskParams(dict):
     @pulumi.getter
     def template(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "template")
 
@@ -18576,9 +18688,9 @@ class WorkflowTaskUpdateConfluencePageTaskParams(dict):
         """
         :param _builtins.str file_id: The Confluence page ID
         :param _builtins.str content: The Confluence page content
-        :param Mapping[str, _builtins.str] integration: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Specify integration id if you have more than one Confluence instance
+        :param Mapping[str, _builtins.str] integration: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Specify integration id if you have more than one Confluence instance
         :param _builtins.str post_mortem_template_id: Retrospective template to use when updating page, if desired
-        :param Mapping[str, _builtins.str] template: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The Confluence template to use
+        :param Mapping[str, _builtins.str] template: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The Confluence template to use
         :param _builtins.str title: The Confluence page title
         """
         pulumi.set(__self__, "file_id", file_id)
@@ -18615,7 +18727,7 @@ class WorkflowTaskUpdateConfluencePageTaskParams(dict):
     @pulumi.getter
     def integration(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Specify integration id if you have more than one Confluence instance
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Specify integration id if you have more than one Confluence instance
         """
         return pulumi.get(self, "integration")
 
@@ -18636,7 +18748,7 @@ class WorkflowTaskUpdateConfluencePageTaskParams(dict):
     @pulumi.getter
     def template(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The Confluence template to use
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The Confluence template to use
         """
         return pulumi.get(self, "template")
 
@@ -18683,9 +18795,9 @@ class WorkflowTaskUpdateDatadogNotebookTaskParams(dict):
         """
         :param _builtins.str file_id: The Datadog notebook ID
         :param _builtins.str content: The Datadog notebook content
-        :param _builtins.str kind: The notebook type. Value must be one of <span pulumi-lang-nodejs="`postmortem`" pulumi-lang-dotnet="`Postmortem`" pulumi-lang-go="`postmortem`" pulumi-lang-python="`postmortem`" pulumi-lang-yaml="`postmortem`" pulumi-lang-java="`postmortem`">`postmortem`</span>, <span pulumi-lang-nodejs="`runbook`" pulumi-lang-dotnet="`Runbook`" pulumi-lang-go="`runbook`" pulumi-lang-python="`runbook`" pulumi-lang-yaml="`runbook`" pulumi-lang-java="`runbook`">`runbook`</span>, <span pulumi-lang-nodejs="`investigation`" pulumi-lang-dotnet="`Investigation`" pulumi-lang-go="`investigation`" pulumi-lang-python="`investigation`" pulumi-lang-yaml="`investigation`" pulumi-lang-java="`investigation`">`investigation`</span>, <span pulumi-lang-nodejs="`documentation`" pulumi-lang-dotnet="`Documentation`" pulumi-lang-go="`documentation`" pulumi-lang-python="`documentation`" pulumi-lang-yaml="`documentation`" pulumi-lang-java="`documentation`">`documentation`</span>, <span pulumi-lang-nodejs="`report`" pulumi-lang-dotnet="`Report`" pulumi-lang-go="`report`" pulumi-lang-python="`report`" pulumi-lang-yaml="`report`" pulumi-lang-java="`report`">`report`</span>.
+        :param _builtins.str kind: The notebook type. Value must be one of <span pulumi-lang-nodejs="`postmortem`" pulumi-lang-dotnet="`Postmortem`" pulumi-lang-go="`postmortem`" pulumi-lang-python="`postmortem`" pulumi-lang-yaml="`postmortem`" pulumi-lang-java="`postmortem`" pulumi-lang-hcl="`postmortem`">`postmortem`</span>, <span pulumi-lang-nodejs="`runbook`" pulumi-lang-dotnet="`Runbook`" pulumi-lang-go="`runbook`" pulumi-lang-python="`runbook`" pulumi-lang-yaml="`runbook`" pulumi-lang-java="`runbook`" pulumi-lang-hcl="`runbook`">`runbook`</span>, <span pulumi-lang-nodejs="`investigation`" pulumi-lang-dotnet="`Investigation`" pulumi-lang-go="`investigation`" pulumi-lang-python="`investigation`" pulumi-lang-yaml="`investigation`" pulumi-lang-java="`investigation`" pulumi-lang-hcl="`investigation`">`investigation`</span>, <span pulumi-lang-nodejs="`documentation`" pulumi-lang-dotnet="`Documentation`" pulumi-lang-go="`documentation`" pulumi-lang-python="`documentation`" pulumi-lang-yaml="`documentation`" pulumi-lang-java="`documentation`" pulumi-lang-hcl="`documentation`">`documentation`</span>, <span pulumi-lang-nodejs="`report`" pulumi-lang-dotnet="`Report`" pulumi-lang-go="`report`" pulumi-lang-python="`report`" pulumi-lang-yaml="`report`" pulumi-lang-java="`report`" pulumi-lang-hcl="`report`">`report`</span>.
         :param _builtins.str post_mortem_template_id: Retrospective template to use when updating notebook, if desired
-        :param Mapping[str, _builtins.str] template: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The Datadog notebook template to use
+        :param Mapping[str, _builtins.str] template: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The Datadog notebook template to use
         :param _builtins.str title: The Datadog notebook title
         """
         pulumi.set(__self__, "file_id", file_id)
@@ -18722,7 +18834,7 @@ class WorkflowTaskUpdateDatadogNotebookTaskParams(dict):
     @pulumi.getter
     def kind(self) -> Optional[_builtins.str]:
         """
-        The notebook type. Value must be one of <span pulumi-lang-nodejs="`postmortem`" pulumi-lang-dotnet="`Postmortem`" pulumi-lang-go="`postmortem`" pulumi-lang-python="`postmortem`" pulumi-lang-yaml="`postmortem`" pulumi-lang-java="`postmortem`">`postmortem`</span>, <span pulumi-lang-nodejs="`runbook`" pulumi-lang-dotnet="`Runbook`" pulumi-lang-go="`runbook`" pulumi-lang-python="`runbook`" pulumi-lang-yaml="`runbook`" pulumi-lang-java="`runbook`">`runbook`</span>, <span pulumi-lang-nodejs="`investigation`" pulumi-lang-dotnet="`Investigation`" pulumi-lang-go="`investigation`" pulumi-lang-python="`investigation`" pulumi-lang-yaml="`investigation`" pulumi-lang-java="`investigation`">`investigation`</span>, <span pulumi-lang-nodejs="`documentation`" pulumi-lang-dotnet="`Documentation`" pulumi-lang-go="`documentation`" pulumi-lang-python="`documentation`" pulumi-lang-yaml="`documentation`" pulumi-lang-java="`documentation`">`documentation`</span>, <span pulumi-lang-nodejs="`report`" pulumi-lang-dotnet="`Report`" pulumi-lang-go="`report`" pulumi-lang-python="`report`" pulumi-lang-yaml="`report`" pulumi-lang-java="`report`">`report`</span>.
+        The notebook type. Value must be one of <span pulumi-lang-nodejs="`postmortem`" pulumi-lang-dotnet="`Postmortem`" pulumi-lang-go="`postmortem`" pulumi-lang-python="`postmortem`" pulumi-lang-yaml="`postmortem`" pulumi-lang-java="`postmortem`" pulumi-lang-hcl="`postmortem`">`postmortem`</span>, <span pulumi-lang-nodejs="`runbook`" pulumi-lang-dotnet="`Runbook`" pulumi-lang-go="`runbook`" pulumi-lang-python="`runbook`" pulumi-lang-yaml="`runbook`" pulumi-lang-java="`runbook`" pulumi-lang-hcl="`runbook`">`runbook`</span>, <span pulumi-lang-nodejs="`investigation`" pulumi-lang-dotnet="`Investigation`" pulumi-lang-go="`investigation`" pulumi-lang-python="`investigation`" pulumi-lang-yaml="`investigation`" pulumi-lang-java="`investigation`" pulumi-lang-hcl="`investigation`">`investigation`</span>, <span pulumi-lang-nodejs="`documentation`" pulumi-lang-dotnet="`Documentation`" pulumi-lang-go="`documentation`" pulumi-lang-python="`documentation`" pulumi-lang-yaml="`documentation`" pulumi-lang-java="`documentation`" pulumi-lang-hcl="`documentation`">`documentation`</span>, <span pulumi-lang-nodejs="`report`" pulumi-lang-dotnet="`Report`" pulumi-lang-go="`report`" pulumi-lang-python="`report`" pulumi-lang-yaml="`report`" pulumi-lang-java="`report`" pulumi-lang-hcl="`report`">`report`</span>.
         """
         return pulumi.get(self, "kind")
 
@@ -18743,7 +18855,7 @@ class WorkflowTaskUpdateDatadogNotebookTaskParams(dict):
     @pulumi.getter
     def template(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The Datadog notebook template to use
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The Datadog notebook template to use
         """
         return pulumi.get(self, "template")
 
@@ -18875,13 +18987,13 @@ class WorkflowTaskUpdateGithubIssueTaskParams(dict):
                  task_type: Optional[_builtins.str] = None,
                  title: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str issue_id: The issue id
         :param _builtins.str body: The issue body
-        :param Mapping[str, _builtins.str] issue_type: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The issue type
+        :param Mapping[str, _builtins.str] issue_type: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The issue type
         :param Sequence['WorkflowTaskUpdateGithubIssueTaskParamsLabelArgs'] labels: The issue labels
-        :param _builtins.str labels_mode: How to apply labels. 'replace' (default) overwrites all existing labels. 'append' adds to existing labels without removing them.. Value must be one of <span pulumi-lang-nodejs="`replace`" pulumi-lang-dotnet="`Replace`" pulumi-lang-go="`replace`" pulumi-lang-python="`replace`" pulumi-lang-yaml="`replace`" pulumi-lang-java="`replace`">`replace`</span>, <span pulumi-lang-nodejs="`append`" pulumi-lang-dotnet="`Append`" pulumi-lang-go="`append`" pulumi-lang-python="`append`" pulumi-lang-yaml="`append`" pulumi-lang-java="`append`">`append`</span>.
-        :param Mapping[str, _builtins.str] repository: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The repository (used for loading labels and issue types)
+        :param _builtins.str labels_mode: How to apply labels. 'replace' (default) overwrites all existing labels. 'append' adds to existing labels without removing them.. Value must be one of <span pulumi-lang-nodejs="`replace`" pulumi-lang-dotnet="`Replace`" pulumi-lang-go="`replace`" pulumi-lang-python="`replace`" pulumi-lang-yaml="`replace`" pulumi-lang-java="`replace`" pulumi-lang-hcl="`replace`">`replace`</span>, <span pulumi-lang-nodejs="`append`" pulumi-lang-dotnet="`Append`" pulumi-lang-go="`append`" pulumi-lang-python="`append`" pulumi-lang-yaml="`append`" pulumi-lang-java="`append`" pulumi-lang-hcl="`append`">`append`</span>.
+        :param Mapping[str, _builtins.str] repository: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The repository (used for loading labels and issue types)
         :param _builtins.str title: The issue title
         """
         pulumi.set(__self__, "completion", completion)
@@ -18905,7 +19017,7 @@ class WorkflowTaskUpdateGithubIssueTaskParams(dict):
     @pulumi.getter
     def completion(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "completion")
 
@@ -18929,7 +19041,7 @@ class WorkflowTaskUpdateGithubIssueTaskParams(dict):
     @pulumi.getter(name="issueType")
     def issue_type(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The issue type
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The issue type
         """
         return pulumi.get(self, "issue_type")
 
@@ -18945,7 +19057,7 @@ class WorkflowTaskUpdateGithubIssueTaskParams(dict):
     @pulumi.getter(name="labelsMode")
     def labels_mode(self) -> Optional[_builtins.str]:
         """
-        How to apply labels. 'replace' (default) overwrites all existing labels. 'append' adds to existing labels without removing them.. Value must be one of <span pulumi-lang-nodejs="`replace`" pulumi-lang-dotnet="`Replace`" pulumi-lang-go="`replace`" pulumi-lang-python="`replace`" pulumi-lang-yaml="`replace`" pulumi-lang-java="`replace`">`replace`</span>, <span pulumi-lang-nodejs="`append`" pulumi-lang-dotnet="`Append`" pulumi-lang-go="`append`" pulumi-lang-python="`append`" pulumi-lang-yaml="`append`" pulumi-lang-java="`append`">`append`</span>.
+        How to apply labels. 'replace' (default) overwrites all existing labels. 'append' adds to existing labels without removing them.. Value must be one of <span pulumi-lang-nodejs="`replace`" pulumi-lang-dotnet="`Replace`" pulumi-lang-go="`replace`" pulumi-lang-python="`replace`" pulumi-lang-yaml="`replace`" pulumi-lang-java="`replace`" pulumi-lang-hcl="`replace`">`replace`</span>, <span pulumi-lang-nodejs="`append`" pulumi-lang-dotnet="`Append`" pulumi-lang-go="`append`" pulumi-lang-python="`append`" pulumi-lang-yaml="`append`" pulumi-lang-java="`append`" pulumi-lang-hcl="`append`">`append`</span>.
         """
         return pulumi.get(self, "labels_mode")
 
@@ -18953,7 +19065,7 @@ class WorkflowTaskUpdateGithubIssueTaskParams(dict):
     @pulumi.getter
     def repository(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The repository (used for loading labels and issue types)
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The repository (used for loading labels and issue types)
         """
         return pulumi.get(self, "repository")
 
@@ -19025,11 +19137,11 @@ class WorkflowTaskUpdateGitlabIssueTaskParams(dict):
                  task_type: Optional[_builtins.str] = None,
                  title: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param _builtins.str issue_id: The issue id
         :param _builtins.str description: The issue description
         :param _builtins.str due_date: The due date
-        :param _builtins.str issue_type: The issue type. Value must be one of <span pulumi-lang-nodejs="`issue`" pulumi-lang-dotnet="`Issue`" pulumi-lang-go="`issue`" pulumi-lang-python="`issue`" pulumi-lang-yaml="`issue`" pulumi-lang-java="`issue`">`issue`</span>, <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`">`incident`</span>, <span pulumi-lang-nodejs="`testCase`" pulumi-lang-dotnet="`TestCase`" pulumi-lang-go="`testCase`" pulumi-lang-python="`test_case`" pulumi-lang-yaml="`testCase`" pulumi-lang-java="`testCase`">`test_case`</span>, <span pulumi-lang-nodejs="`task`" pulumi-lang-dotnet="`Task`" pulumi-lang-go="`task`" pulumi-lang-python="`task`" pulumi-lang-yaml="`task`" pulumi-lang-java="`task`">`task`</span>.
+        :param _builtins.str issue_type: The issue type. Value must be one of <span pulumi-lang-nodejs="`issue`" pulumi-lang-dotnet="`Issue`" pulumi-lang-go="`issue`" pulumi-lang-python="`issue`" pulumi-lang-yaml="`issue`" pulumi-lang-java="`issue`" pulumi-lang-hcl="`issue`">`issue`</span>, <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`" pulumi-lang-hcl="`incident`">`incident`</span>, <span pulumi-lang-nodejs="`testCase`" pulumi-lang-dotnet="`TestCase`" pulumi-lang-go="`testCase`" pulumi-lang-python="`test_case`" pulumi-lang-yaml="`testCase`" pulumi-lang-java="`testCase`" pulumi-lang-hcl="`test_case`">`testCase`</span>, <span pulumi-lang-nodejs="`task`" pulumi-lang-dotnet="`Task`" pulumi-lang-go="`task`" pulumi-lang-python="`task`" pulumi-lang-yaml="`task`" pulumi-lang-java="`task`" pulumi-lang-hcl="`task`">`task`</span>.
         :param _builtins.str labels: The issue labels
         :param _builtins.str title: The issue title
         """
@@ -19052,7 +19164,7 @@ class WorkflowTaskUpdateGitlabIssueTaskParams(dict):
     @pulumi.getter
     def completion(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "completion")
 
@@ -19084,7 +19196,7 @@ class WorkflowTaskUpdateGitlabIssueTaskParams(dict):
     @pulumi.getter(name="issueType")
     def issue_type(self) -> Optional[_builtins.str]:
         """
-        The issue type. Value must be one of <span pulumi-lang-nodejs="`issue`" pulumi-lang-dotnet="`Issue`" pulumi-lang-go="`issue`" pulumi-lang-python="`issue`" pulumi-lang-yaml="`issue`" pulumi-lang-java="`issue`">`issue`</span>, <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`">`incident`</span>, <span pulumi-lang-nodejs="`testCase`" pulumi-lang-dotnet="`TestCase`" pulumi-lang-go="`testCase`" pulumi-lang-python="`test_case`" pulumi-lang-yaml="`testCase`" pulumi-lang-java="`testCase`">`test_case`</span>, <span pulumi-lang-nodejs="`task`" pulumi-lang-dotnet="`Task`" pulumi-lang-go="`task`" pulumi-lang-python="`task`" pulumi-lang-yaml="`task`" pulumi-lang-java="`task`">`task`</span>.
+        The issue type. Value must be one of <span pulumi-lang-nodejs="`issue`" pulumi-lang-dotnet="`Issue`" pulumi-lang-go="`issue`" pulumi-lang-python="`issue`" pulumi-lang-yaml="`issue`" pulumi-lang-java="`issue`" pulumi-lang-hcl="`issue`">`issue`</span>, <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`" pulumi-lang-hcl="`incident`">`incident`</span>, <span pulumi-lang-nodejs="`testCase`" pulumi-lang-dotnet="`TestCase`" pulumi-lang-go="`testCase`" pulumi-lang-python="`test_case`" pulumi-lang-yaml="`testCase`" pulumi-lang-java="`testCase`" pulumi-lang-hcl="`test_case`">`testCase`</span>, <span pulumi-lang-nodejs="`task`" pulumi-lang-dotnet="`Task`" pulumi-lang-go="`task`" pulumi-lang-python="`task`" pulumi-lang-yaml="`task`" pulumi-lang-java="`task`" pulumi-lang-hcl="`task`">`task`</span>.
         """
         return pulumi.get(self, "issue_type")
 
@@ -19659,7 +19771,7 @@ class WorkflowTaskUpdateIncidentTaskParams(dict):
                  title: Optional[_builtins.str] = None):
         """
         :param _builtins.str incident_id: The incident id to update or id of any attribute on the incident
-        :param _builtins.str attribute_to_query_by: Value must be one of <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span>, <span pulumi-lang-nodejs="`slug`" pulumi-lang-dotnet="`Slug`" pulumi-lang-go="`slug`" pulumi-lang-python="`slug`" pulumi-lang-yaml="`slug`" pulumi-lang-java="`slug`">`slug`</span>, <span pulumi-lang-nodejs="`sequentialId`" pulumi-lang-dotnet="`SequentialId`" pulumi-lang-go="`sequentialId`" pulumi-lang-python="`sequential_id`" pulumi-lang-yaml="`sequentialId`" pulumi-lang-java="`sequentialId`">`sequential_id`</span>, <span pulumi-lang-nodejs="`pagerdutyIncidentId`" pulumi-lang-dotnet="`PagerdutyIncidentId`" pulumi-lang-go="`pagerdutyIncidentId`" pulumi-lang-python="`pagerduty_incident_id`" pulumi-lang-yaml="`pagerdutyIncidentId`" pulumi-lang-java="`pagerdutyIncidentId`">`pagerduty_incident_id`</span>, <span pulumi-lang-nodejs="`opsgenieIncidentId`" pulumi-lang-dotnet="`OpsgenieIncidentId`" pulumi-lang-go="`opsgenieIncidentId`" pulumi-lang-python="`opsgenie_incident_id`" pulumi-lang-yaml="`opsgenieIncidentId`" pulumi-lang-java="`opsgenieIncidentId`">`opsgenie_incident_id`</span>, <span pulumi-lang-nodejs="`victorOpsIncidentId`" pulumi-lang-dotnet="`VictorOpsIncidentId`" pulumi-lang-go="`victorOpsIncidentId`" pulumi-lang-python="`victor_ops_incident_id`" pulumi-lang-yaml="`victorOpsIncidentId`" pulumi-lang-java="`victorOpsIncidentId`">`victor_ops_incident_id`</span>, <span pulumi-lang-nodejs="`jiraIssueId`" pulumi-lang-dotnet="`JiraIssueId`" pulumi-lang-go="`jiraIssueId`" pulumi-lang-python="`jira_issue_id`" pulumi-lang-yaml="`jiraIssueId`" pulumi-lang-java="`jiraIssueId`">`jira_issue_id`</span>, <span pulumi-lang-nodejs="`asanaTaskId`" pulumi-lang-dotnet="`AsanaTaskId`" pulumi-lang-go="`asanaTaskId`" pulumi-lang-python="`asana_task_id`" pulumi-lang-yaml="`asanaTaskId`" pulumi-lang-java="`asanaTaskId`">`asana_task_id`</span>, <span pulumi-lang-nodejs="`shortcutTaskId`" pulumi-lang-dotnet="`ShortcutTaskId`" pulumi-lang-go="`shortcutTaskId`" pulumi-lang-python="`shortcut_task_id`" pulumi-lang-yaml="`shortcutTaskId`" pulumi-lang-java="`shortcutTaskId`">`shortcut_task_id`</span>, <span pulumi-lang-nodejs="`linearIssueId`" pulumi-lang-dotnet="`LinearIssueId`" pulumi-lang-go="`linearIssueId`" pulumi-lang-python="`linear_issue_id`" pulumi-lang-yaml="`linearIssueId`" pulumi-lang-java="`linearIssueId`">`linear_issue_id`</span>, <span pulumi-lang-nodejs="`zendeskTicketId`" pulumi-lang-dotnet="`ZendeskTicketId`" pulumi-lang-go="`zendeskTicketId`" pulumi-lang-python="`zendesk_ticket_id`" pulumi-lang-yaml="`zendeskTicketId`" pulumi-lang-java="`zendeskTicketId`">`zendesk_ticket_id`</span>, <span pulumi-lang-nodejs="`motionTaskId`" pulumi-lang-dotnet="`MotionTaskId`" pulumi-lang-go="`motionTaskId`" pulumi-lang-python="`motion_task_id`" pulumi-lang-yaml="`motionTaskId`" pulumi-lang-java="`motionTaskId`">`motion_task_id`</span>, <span pulumi-lang-nodejs="`trelloCardId`" pulumi-lang-dotnet="`TrelloCardId`" pulumi-lang-go="`trelloCardId`" pulumi-lang-python="`trello_card_id`" pulumi-lang-yaml="`trelloCardId`" pulumi-lang-java="`trelloCardId`">`trello_card_id`</span>, <span pulumi-lang-nodejs="`airtableRecordId`" pulumi-lang-dotnet="`AirtableRecordId`" pulumi-lang-go="`airtableRecordId`" pulumi-lang-python="`airtable_record_id`" pulumi-lang-yaml="`airtableRecordId`" pulumi-lang-java="`airtableRecordId`">`airtable_record_id`</span>, <span pulumi-lang-nodejs="`shortcutStoryId`" pulumi-lang-dotnet="`ShortcutStoryId`" pulumi-lang-go="`shortcutStoryId`" pulumi-lang-python="`shortcut_story_id`" pulumi-lang-yaml="`shortcutStoryId`" pulumi-lang-java="`shortcutStoryId`">`shortcut_story_id`</span>, <span pulumi-lang-nodejs="`githubIssueId`" pulumi-lang-dotnet="`GithubIssueId`" pulumi-lang-go="`githubIssueId`" pulumi-lang-python="`github_issue_id`" pulumi-lang-yaml="`githubIssueId`" pulumi-lang-java="`githubIssueId`">`github_issue_id`</span>, <span pulumi-lang-nodejs="`gitlabIssueId`" pulumi-lang-dotnet="`GitlabIssueId`" pulumi-lang-go="`gitlabIssueId`" pulumi-lang-python="`gitlab_issue_id`" pulumi-lang-yaml="`gitlabIssueId`" pulumi-lang-java="`gitlabIssueId`">`gitlab_issue_id`</span>, <span pulumi-lang-nodejs="`freshserviceTicketId`" pulumi-lang-dotnet="`FreshserviceTicketId`" pulumi-lang-go="`freshserviceTicketId`" pulumi-lang-python="`freshservice_ticket_id`" pulumi-lang-yaml="`freshserviceTicketId`" pulumi-lang-java="`freshserviceTicketId`">`freshservice_ticket_id`</span>, <span pulumi-lang-nodejs="`freshserviceTaskId`" pulumi-lang-dotnet="`FreshserviceTaskId`" pulumi-lang-go="`freshserviceTaskId`" pulumi-lang-python="`freshservice_task_id`" pulumi-lang-yaml="`freshserviceTaskId`" pulumi-lang-java="`freshserviceTaskId`">`freshservice_task_id`</span>, <span pulumi-lang-nodejs="`clickupTaskId`" pulumi-lang-dotnet="`ClickupTaskId`" pulumi-lang-go="`clickupTaskId`" pulumi-lang-python="`clickup_task_id`" pulumi-lang-yaml="`clickupTaskId`" pulumi-lang-java="`clickupTaskId`">`clickup_task_id`</span>.
+        :param _builtins.str attribute_to_query_by: Value must be one of <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span>, <span pulumi-lang-nodejs="`slug`" pulumi-lang-dotnet="`Slug`" pulumi-lang-go="`slug`" pulumi-lang-python="`slug`" pulumi-lang-yaml="`slug`" pulumi-lang-java="`slug`" pulumi-lang-hcl="`slug`">`slug`</span>, <span pulumi-lang-nodejs="`sequentialId`" pulumi-lang-dotnet="`SequentialId`" pulumi-lang-go="`sequentialId`" pulumi-lang-python="`sequential_id`" pulumi-lang-yaml="`sequentialId`" pulumi-lang-java="`sequentialId`" pulumi-lang-hcl="`sequential_id`">`sequentialId`</span>, <span pulumi-lang-nodejs="`pagerdutyIncidentId`" pulumi-lang-dotnet="`PagerdutyIncidentId`" pulumi-lang-go="`pagerdutyIncidentId`" pulumi-lang-python="`pagerduty_incident_id`" pulumi-lang-yaml="`pagerdutyIncidentId`" pulumi-lang-java="`pagerdutyIncidentId`" pulumi-lang-hcl="`pagerduty_incident_id`">`pagerdutyIncidentId`</span>, <span pulumi-lang-nodejs="`opsgenieIncidentId`" pulumi-lang-dotnet="`OpsgenieIncidentId`" pulumi-lang-go="`opsgenieIncidentId`" pulumi-lang-python="`opsgenie_incident_id`" pulumi-lang-yaml="`opsgenieIncidentId`" pulumi-lang-java="`opsgenieIncidentId`" pulumi-lang-hcl="`opsgenie_incident_id`">`opsgenieIncidentId`</span>, <span pulumi-lang-nodejs="`victorOpsIncidentId`" pulumi-lang-dotnet="`VictorOpsIncidentId`" pulumi-lang-go="`victorOpsIncidentId`" pulumi-lang-python="`victor_ops_incident_id`" pulumi-lang-yaml="`victorOpsIncidentId`" pulumi-lang-java="`victorOpsIncidentId`" pulumi-lang-hcl="`victor_ops_incident_id`">`victorOpsIncidentId`</span>, <span pulumi-lang-nodejs="`jiraIssueId`" pulumi-lang-dotnet="`JiraIssueId`" pulumi-lang-go="`jiraIssueId`" pulumi-lang-python="`jira_issue_id`" pulumi-lang-yaml="`jiraIssueId`" pulumi-lang-java="`jiraIssueId`" pulumi-lang-hcl="`jira_issue_id`">`jiraIssueId`</span>, <span pulumi-lang-nodejs="`asanaTaskId`" pulumi-lang-dotnet="`AsanaTaskId`" pulumi-lang-go="`asanaTaskId`" pulumi-lang-python="`asana_task_id`" pulumi-lang-yaml="`asanaTaskId`" pulumi-lang-java="`asanaTaskId`" pulumi-lang-hcl="`asana_task_id`">`asanaTaskId`</span>, <span pulumi-lang-nodejs="`shortcutTaskId`" pulumi-lang-dotnet="`ShortcutTaskId`" pulumi-lang-go="`shortcutTaskId`" pulumi-lang-python="`shortcut_task_id`" pulumi-lang-yaml="`shortcutTaskId`" pulumi-lang-java="`shortcutTaskId`" pulumi-lang-hcl="`shortcut_task_id`">`shortcutTaskId`</span>, <span pulumi-lang-nodejs="`linearIssueId`" pulumi-lang-dotnet="`LinearIssueId`" pulumi-lang-go="`linearIssueId`" pulumi-lang-python="`linear_issue_id`" pulumi-lang-yaml="`linearIssueId`" pulumi-lang-java="`linearIssueId`" pulumi-lang-hcl="`linear_issue_id`">`linearIssueId`</span>, <span pulumi-lang-nodejs="`zendeskTicketId`" pulumi-lang-dotnet="`ZendeskTicketId`" pulumi-lang-go="`zendeskTicketId`" pulumi-lang-python="`zendesk_ticket_id`" pulumi-lang-yaml="`zendeskTicketId`" pulumi-lang-java="`zendeskTicketId`" pulumi-lang-hcl="`zendesk_ticket_id`">`zendeskTicketId`</span>, <span pulumi-lang-nodejs="`motionTaskId`" pulumi-lang-dotnet="`MotionTaskId`" pulumi-lang-go="`motionTaskId`" pulumi-lang-python="`motion_task_id`" pulumi-lang-yaml="`motionTaskId`" pulumi-lang-java="`motionTaskId`" pulumi-lang-hcl="`motion_task_id`">`motionTaskId`</span>, <span pulumi-lang-nodejs="`trelloCardId`" pulumi-lang-dotnet="`TrelloCardId`" pulumi-lang-go="`trelloCardId`" pulumi-lang-python="`trello_card_id`" pulumi-lang-yaml="`trelloCardId`" pulumi-lang-java="`trelloCardId`" pulumi-lang-hcl="`trello_card_id`">`trelloCardId`</span>, <span pulumi-lang-nodejs="`airtableRecordId`" pulumi-lang-dotnet="`AirtableRecordId`" pulumi-lang-go="`airtableRecordId`" pulumi-lang-python="`airtable_record_id`" pulumi-lang-yaml="`airtableRecordId`" pulumi-lang-java="`airtableRecordId`" pulumi-lang-hcl="`airtable_record_id`">`airtableRecordId`</span>, <span pulumi-lang-nodejs="`shortcutStoryId`" pulumi-lang-dotnet="`ShortcutStoryId`" pulumi-lang-go="`shortcutStoryId`" pulumi-lang-python="`shortcut_story_id`" pulumi-lang-yaml="`shortcutStoryId`" pulumi-lang-java="`shortcutStoryId`" pulumi-lang-hcl="`shortcut_story_id`">`shortcutStoryId`</span>, <span pulumi-lang-nodejs="`githubIssueId`" pulumi-lang-dotnet="`GithubIssueId`" pulumi-lang-go="`githubIssueId`" pulumi-lang-python="`github_issue_id`" pulumi-lang-yaml="`githubIssueId`" pulumi-lang-java="`githubIssueId`" pulumi-lang-hcl="`github_issue_id`">`githubIssueId`</span>, <span pulumi-lang-nodejs="`gitlabIssueId`" pulumi-lang-dotnet="`GitlabIssueId`" pulumi-lang-go="`gitlabIssueId`" pulumi-lang-python="`gitlab_issue_id`" pulumi-lang-yaml="`gitlabIssueId`" pulumi-lang-java="`gitlabIssueId`" pulumi-lang-hcl="`gitlab_issue_id`">`gitlabIssueId`</span>, <span pulumi-lang-nodejs="`freshserviceTicketId`" pulumi-lang-dotnet="`FreshserviceTicketId`" pulumi-lang-go="`freshserviceTicketId`" pulumi-lang-python="`freshservice_ticket_id`" pulumi-lang-yaml="`freshserviceTicketId`" pulumi-lang-java="`freshserviceTicketId`" pulumi-lang-hcl="`freshservice_ticket_id`">`freshserviceTicketId`</span>, <span pulumi-lang-nodejs="`freshserviceTaskId`" pulumi-lang-dotnet="`FreshserviceTaskId`" pulumi-lang-go="`freshserviceTaskId`" pulumi-lang-python="`freshservice_task_id`" pulumi-lang-yaml="`freshserviceTaskId`" pulumi-lang-java="`freshserviceTaskId`" pulumi-lang-hcl="`freshservice_task_id`">`freshserviceTaskId`</span>, <span pulumi-lang-nodejs="`clickupTaskId`" pulumi-lang-dotnet="`ClickupTaskId`" pulumi-lang-go="`clickupTaskId`" pulumi-lang-python="`clickup_task_id`" pulumi-lang-yaml="`clickupTaskId`" pulumi-lang-java="`clickupTaskId`" pulumi-lang-hcl="`clickup_task_id`">`clickupTaskId`</span>.
         :param _builtins.str custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON. Use 'services', 'functionalities', or 'groups' keys with arrays of names/slugs for name/slug lookup
         :param Sequence[_builtins.str] functionality_ids: Array of functionality UUIDs
         :param Sequence[_builtins.str] group_ids: Array of group/team UUIDs
@@ -19723,7 +19835,7 @@ class WorkflowTaskUpdateIncidentTaskParams(dict):
     @pulumi.getter(name="attributeToQueryBy")
     def attribute_to_query_by(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span>, <span pulumi-lang-nodejs="`slug`" pulumi-lang-dotnet="`Slug`" pulumi-lang-go="`slug`" pulumi-lang-python="`slug`" pulumi-lang-yaml="`slug`" pulumi-lang-java="`slug`">`slug`</span>, <span pulumi-lang-nodejs="`sequentialId`" pulumi-lang-dotnet="`SequentialId`" pulumi-lang-go="`sequentialId`" pulumi-lang-python="`sequential_id`" pulumi-lang-yaml="`sequentialId`" pulumi-lang-java="`sequentialId`">`sequential_id`</span>, <span pulumi-lang-nodejs="`pagerdutyIncidentId`" pulumi-lang-dotnet="`PagerdutyIncidentId`" pulumi-lang-go="`pagerdutyIncidentId`" pulumi-lang-python="`pagerduty_incident_id`" pulumi-lang-yaml="`pagerdutyIncidentId`" pulumi-lang-java="`pagerdutyIncidentId`">`pagerduty_incident_id`</span>, <span pulumi-lang-nodejs="`opsgenieIncidentId`" pulumi-lang-dotnet="`OpsgenieIncidentId`" pulumi-lang-go="`opsgenieIncidentId`" pulumi-lang-python="`opsgenie_incident_id`" pulumi-lang-yaml="`opsgenieIncidentId`" pulumi-lang-java="`opsgenieIncidentId`">`opsgenie_incident_id`</span>, <span pulumi-lang-nodejs="`victorOpsIncidentId`" pulumi-lang-dotnet="`VictorOpsIncidentId`" pulumi-lang-go="`victorOpsIncidentId`" pulumi-lang-python="`victor_ops_incident_id`" pulumi-lang-yaml="`victorOpsIncidentId`" pulumi-lang-java="`victorOpsIncidentId`">`victor_ops_incident_id`</span>, <span pulumi-lang-nodejs="`jiraIssueId`" pulumi-lang-dotnet="`JiraIssueId`" pulumi-lang-go="`jiraIssueId`" pulumi-lang-python="`jira_issue_id`" pulumi-lang-yaml="`jiraIssueId`" pulumi-lang-java="`jiraIssueId`">`jira_issue_id`</span>, <span pulumi-lang-nodejs="`asanaTaskId`" pulumi-lang-dotnet="`AsanaTaskId`" pulumi-lang-go="`asanaTaskId`" pulumi-lang-python="`asana_task_id`" pulumi-lang-yaml="`asanaTaskId`" pulumi-lang-java="`asanaTaskId`">`asana_task_id`</span>, <span pulumi-lang-nodejs="`shortcutTaskId`" pulumi-lang-dotnet="`ShortcutTaskId`" pulumi-lang-go="`shortcutTaskId`" pulumi-lang-python="`shortcut_task_id`" pulumi-lang-yaml="`shortcutTaskId`" pulumi-lang-java="`shortcutTaskId`">`shortcut_task_id`</span>, <span pulumi-lang-nodejs="`linearIssueId`" pulumi-lang-dotnet="`LinearIssueId`" pulumi-lang-go="`linearIssueId`" pulumi-lang-python="`linear_issue_id`" pulumi-lang-yaml="`linearIssueId`" pulumi-lang-java="`linearIssueId`">`linear_issue_id`</span>, <span pulumi-lang-nodejs="`zendeskTicketId`" pulumi-lang-dotnet="`ZendeskTicketId`" pulumi-lang-go="`zendeskTicketId`" pulumi-lang-python="`zendesk_ticket_id`" pulumi-lang-yaml="`zendeskTicketId`" pulumi-lang-java="`zendeskTicketId`">`zendesk_ticket_id`</span>, <span pulumi-lang-nodejs="`motionTaskId`" pulumi-lang-dotnet="`MotionTaskId`" pulumi-lang-go="`motionTaskId`" pulumi-lang-python="`motion_task_id`" pulumi-lang-yaml="`motionTaskId`" pulumi-lang-java="`motionTaskId`">`motion_task_id`</span>, <span pulumi-lang-nodejs="`trelloCardId`" pulumi-lang-dotnet="`TrelloCardId`" pulumi-lang-go="`trelloCardId`" pulumi-lang-python="`trello_card_id`" pulumi-lang-yaml="`trelloCardId`" pulumi-lang-java="`trelloCardId`">`trello_card_id`</span>, <span pulumi-lang-nodejs="`airtableRecordId`" pulumi-lang-dotnet="`AirtableRecordId`" pulumi-lang-go="`airtableRecordId`" pulumi-lang-python="`airtable_record_id`" pulumi-lang-yaml="`airtableRecordId`" pulumi-lang-java="`airtableRecordId`">`airtable_record_id`</span>, <span pulumi-lang-nodejs="`shortcutStoryId`" pulumi-lang-dotnet="`ShortcutStoryId`" pulumi-lang-go="`shortcutStoryId`" pulumi-lang-python="`shortcut_story_id`" pulumi-lang-yaml="`shortcutStoryId`" pulumi-lang-java="`shortcutStoryId`">`shortcut_story_id`</span>, <span pulumi-lang-nodejs="`githubIssueId`" pulumi-lang-dotnet="`GithubIssueId`" pulumi-lang-go="`githubIssueId`" pulumi-lang-python="`github_issue_id`" pulumi-lang-yaml="`githubIssueId`" pulumi-lang-java="`githubIssueId`">`github_issue_id`</span>, <span pulumi-lang-nodejs="`gitlabIssueId`" pulumi-lang-dotnet="`GitlabIssueId`" pulumi-lang-go="`gitlabIssueId`" pulumi-lang-python="`gitlab_issue_id`" pulumi-lang-yaml="`gitlabIssueId`" pulumi-lang-java="`gitlabIssueId`">`gitlab_issue_id`</span>, <span pulumi-lang-nodejs="`freshserviceTicketId`" pulumi-lang-dotnet="`FreshserviceTicketId`" pulumi-lang-go="`freshserviceTicketId`" pulumi-lang-python="`freshservice_ticket_id`" pulumi-lang-yaml="`freshserviceTicketId`" pulumi-lang-java="`freshserviceTicketId`">`freshservice_ticket_id`</span>, <span pulumi-lang-nodejs="`freshserviceTaskId`" pulumi-lang-dotnet="`FreshserviceTaskId`" pulumi-lang-go="`freshserviceTaskId`" pulumi-lang-python="`freshservice_task_id`" pulumi-lang-yaml="`freshserviceTaskId`" pulumi-lang-java="`freshserviceTaskId`">`freshservice_task_id`</span>, <span pulumi-lang-nodejs="`clickupTaskId`" pulumi-lang-dotnet="`ClickupTaskId`" pulumi-lang-go="`clickupTaskId`" pulumi-lang-python="`clickup_task_id`" pulumi-lang-yaml="`clickupTaskId`" pulumi-lang-java="`clickupTaskId`">`clickup_task_id`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span>, <span pulumi-lang-nodejs="`slug`" pulumi-lang-dotnet="`Slug`" pulumi-lang-go="`slug`" pulumi-lang-python="`slug`" pulumi-lang-yaml="`slug`" pulumi-lang-java="`slug`" pulumi-lang-hcl="`slug`">`slug`</span>, <span pulumi-lang-nodejs="`sequentialId`" pulumi-lang-dotnet="`SequentialId`" pulumi-lang-go="`sequentialId`" pulumi-lang-python="`sequential_id`" pulumi-lang-yaml="`sequentialId`" pulumi-lang-java="`sequentialId`" pulumi-lang-hcl="`sequential_id`">`sequentialId`</span>, <span pulumi-lang-nodejs="`pagerdutyIncidentId`" pulumi-lang-dotnet="`PagerdutyIncidentId`" pulumi-lang-go="`pagerdutyIncidentId`" pulumi-lang-python="`pagerduty_incident_id`" pulumi-lang-yaml="`pagerdutyIncidentId`" pulumi-lang-java="`pagerdutyIncidentId`" pulumi-lang-hcl="`pagerduty_incident_id`">`pagerdutyIncidentId`</span>, <span pulumi-lang-nodejs="`opsgenieIncidentId`" pulumi-lang-dotnet="`OpsgenieIncidentId`" pulumi-lang-go="`opsgenieIncidentId`" pulumi-lang-python="`opsgenie_incident_id`" pulumi-lang-yaml="`opsgenieIncidentId`" pulumi-lang-java="`opsgenieIncidentId`" pulumi-lang-hcl="`opsgenie_incident_id`">`opsgenieIncidentId`</span>, <span pulumi-lang-nodejs="`victorOpsIncidentId`" pulumi-lang-dotnet="`VictorOpsIncidentId`" pulumi-lang-go="`victorOpsIncidentId`" pulumi-lang-python="`victor_ops_incident_id`" pulumi-lang-yaml="`victorOpsIncidentId`" pulumi-lang-java="`victorOpsIncidentId`" pulumi-lang-hcl="`victor_ops_incident_id`">`victorOpsIncidentId`</span>, <span pulumi-lang-nodejs="`jiraIssueId`" pulumi-lang-dotnet="`JiraIssueId`" pulumi-lang-go="`jiraIssueId`" pulumi-lang-python="`jira_issue_id`" pulumi-lang-yaml="`jiraIssueId`" pulumi-lang-java="`jiraIssueId`" pulumi-lang-hcl="`jira_issue_id`">`jiraIssueId`</span>, <span pulumi-lang-nodejs="`asanaTaskId`" pulumi-lang-dotnet="`AsanaTaskId`" pulumi-lang-go="`asanaTaskId`" pulumi-lang-python="`asana_task_id`" pulumi-lang-yaml="`asanaTaskId`" pulumi-lang-java="`asanaTaskId`" pulumi-lang-hcl="`asana_task_id`">`asanaTaskId`</span>, <span pulumi-lang-nodejs="`shortcutTaskId`" pulumi-lang-dotnet="`ShortcutTaskId`" pulumi-lang-go="`shortcutTaskId`" pulumi-lang-python="`shortcut_task_id`" pulumi-lang-yaml="`shortcutTaskId`" pulumi-lang-java="`shortcutTaskId`" pulumi-lang-hcl="`shortcut_task_id`">`shortcutTaskId`</span>, <span pulumi-lang-nodejs="`linearIssueId`" pulumi-lang-dotnet="`LinearIssueId`" pulumi-lang-go="`linearIssueId`" pulumi-lang-python="`linear_issue_id`" pulumi-lang-yaml="`linearIssueId`" pulumi-lang-java="`linearIssueId`" pulumi-lang-hcl="`linear_issue_id`">`linearIssueId`</span>, <span pulumi-lang-nodejs="`zendeskTicketId`" pulumi-lang-dotnet="`ZendeskTicketId`" pulumi-lang-go="`zendeskTicketId`" pulumi-lang-python="`zendesk_ticket_id`" pulumi-lang-yaml="`zendeskTicketId`" pulumi-lang-java="`zendeskTicketId`" pulumi-lang-hcl="`zendesk_ticket_id`">`zendeskTicketId`</span>, <span pulumi-lang-nodejs="`motionTaskId`" pulumi-lang-dotnet="`MotionTaskId`" pulumi-lang-go="`motionTaskId`" pulumi-lang-python="`motion_task_id`" pulumi-lang-yaml="`motionTaskId`" pulumi-lang-java="`motionTaskId`" pulumi-lang-hcl="`motion_task_id`">`motionTaskId`</span>, <span pulumi-lang-nodejs="`trelloCardId`" pulumi-lang-dotnet="`TrelloCardId`" pulumi-lang-go="`trelloCardId`" pulumi-lang-python="`trello_card_id`" pulumi-lang-yaml="`trelloCardId`" pulumi-lang-java="`trelloCardId`" pulumi-lang-hcl="`trello_card_id`">`trelloCardId`</span>, <span pulumi-lang-nodejs="`airtableRecordId`" pulumi-lang-dotnet="`AirtableRecordId`" pulumi-lang-go="`airtableRecordId`" pulumi-lang-python="`airtable_record_id`" pulumi-lang-yaml="`airtableRecordId`" pulumi-lang-java="`airtableRecordId`" pulumi-lang-hcl="`airtable_record_id`">`airtableRecordId`</span>, <span pulumi-lang-nodejs="`shortcutStoryId`" pulumi-lang-dotnet="`ShortcutStoryId`" pulumi-lang-go="`shortcutStoryId`" pulumi-lang-python="`shortcut_story_id`" pulumi-lang-yaml="`shortcutStoryId`" pulumi-lang-java="`shortcutStoryId`" pulumi-lang-hcl="`shortcut_story_id`">`shortcutStoryId`</span>, <span pulumi-lang-nodejs="`githubIssueId`" pulumi-lang-dotnet="`GithubIssueId`" pulumi-lang-go="`githubIssueId`" pulumi-lang-python="`github_issue_id`" pulumi-lang-yaml="`githubIssueId`" pulumi-lang-java="`githubIssueId`" pulumi-lang-hcl="`github_issue_id`">`githubIssueId`</span>, <span pulumi-lang-nodejs="`gitlabIssueId`" pulumi-lang-dotnet="`GitlabIssueId`" pulumi-lang-go="`gitlabIssueId`" pulumi-lang-python="`gitlab_issue_id`" pulumi-lang-yaml="`gitlabIssueId`" pulumi-lang-java="`gitlabIssueId`" pulumi-lang-hcl="`gitlab_issue_id`">`gitlabIssueId`</span>, <span pulumi-lang-nodejs="`freshserviceTicketId`" pulumi-lang-dotnet="`FreshserviceTicketId`" pulumi-lang-go="`freshserviceTicketId`" pulumi-lang-python="`freshservice_ticket_id`" pulumi-lang-yaml="`freshserviceTicketId`" pulumi-lang-java="`freshserviceTicketId`" pulumi-lang-hcl="`freshservice_ticket_id`">`freshserviceTicketId`</span>, <span pulumi-lang-nodejs="`freshserviceTaskId`" pulumi-lang-dotnet="`FreshserviceTaskId`" pulumi-lang-go="`freshserviceTaskId`" pulumi-lang-python="`freshservice_task_id`" pulumi-lang-yaml="`freshserviceTaskId`" pulumi-lang-java="`freshserviceTaskId`" pulumi-lang-hcl="`freshservice_task_id`">`freshserviceTaskId`</span>, <span pulumi-lang-nodejs="`clickupTaskId`" pulumi-lang-dotnet="`ClickupTaskId`" pulumi-lang-go="`clickupTaskId`" pulumi-lang-python="`clickup_task_id`" pulumi-lang-yaml="`clickupTaskId`" pulumi-lang-java="`clickupTaskId`" pulumi-lang-hcl="`clickup_task_id`">`clickupTaskId`</span>.
         """
         return pulumi.get(self, "attribute_to_query_by")
 
@@ -19884,11 +19996,11 @@ class WorkflowTaskUpdateJiraIssueTaskParams(dict):
         :param _builtins.str custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON
         :param _builtins.str description: The issue description
         :param _builtins.str due_date: The due date
-        :param Mapping[str, _builtins.str] integration: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Specify integration id if you have more than one Jira instance
+        :param Mapping[str, _builtins.str] integration: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Specify integration id if you have more than one Jira instance
         :param _builtins.str labels: The issue labels
-        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         :param _builtins.str reporter_user_email: The reporter user's email
-        :param Mapping[str, _builtins.str] status: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The status id and display name
+        :param Mapping[str, _builtins.str] status: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The status id and display name
         :param _builtins.str title: The issue title
         :param _builtins.str update_payload: Update payload. Can contain liquid markup and need to be valid JSON
         """
@@ -19971,7 +20083,7 @@ class WorkflowTaskUpdateJiraIssueTaskParams(dict):
     @pulumi.getter
     def integration(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. Specify integration id if you have more than one Jira instance
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Specify integration id if you have more than one Jira instance
         """
         return pulumi.get(self, "integration")
 
@@ -19987,7 +20099,7 @@ class WorkflowTaskUpdateJiraIssueTaskParams(dict):
     @pulumi.getter
     def priority(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         """
         return pulumi.get(self, "priority")
 
@@ -20003,7 +20115,7 @@ class WorkflowTaskUpdateJiraIssueTaskParams(dict):
     @pulumi.getter
     def status(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The status id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The status id and display name
         """
         return pulumi.get(self, "status")
 
@@ -20066,9 +20178,9 @@ class WorkflowTaskUpdateLinearIssueTaskParams(dict):
         :param _builtins.str issue_id: The issue id
         :param _builtins.str assign_user_email: The assigned user's email
         :param _builtins.str description: The issue description
-        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
-        :param Mapping[str, _builtins.str] project: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The project id and display name
-        :param Mapping[str, _builtins.str] state: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The state id and display name
+        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
+        :param Mapping[str, _builtins.str] project: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The project id and display name
+        :param Mapping[str, _builtins.str] state: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The state id and display name
         :param _builtins.str title: The issue title
         """
         pulumi.set(__self__, "issue_id", issue_id)
@@ -20122,7 +20234,7 @@ class WorkflowTaskUpdateLinearIssueTaskParams(dict):
     @pulumi.getter
     def priority(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         """
         return pulumi.get(self, "priority")
 
@@ -20130,7 +20242,7 @@ class WorkflowTaskUpdateLinearIssueTaskParams(dict):
     @pulumi.getter
     def project(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The project id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The project id and display name
         """
         return pulumi.get(self, "project")
 
@@ -20138,7 +20250,7 @@ class WorkflowTaskUpdateLinearIssueTaskParams(dict):
     @pulumi.getter
     def state(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The state id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The state id and display name
         """
         return pulumi.get(self, "state")
 
@@ -20212,7 +20324,7 @@ class WorkflowTaskUpdateMotionTaskTaskParams(dict):
         :param _builtins.str description: The task description
         :param _builtins.str due_date: The due date
         :param _builtins.str duration: The duration. Eg.  "NONE", "REMINDER", or a integer greater than 0.
-        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         :param _builtins.str title: The task title
         """
         pulumi.set(__self__, "task_id", task_id)
@@ -20272,7 +20384,7 @@ class WorkflowTaskUpdateMotionTaskTaskParams(dict):
     @pulumi.getter
     def priority(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         """
         return pulumi.get(self, "priority")
 
@@ -20431,8 +20543,8 @@ class WorkflowTaskUpdateOpsgenieAlertTaskParams(dict):
                  task_type: Optional[_builtins.str] = None):
         """
         :param _builtins.str alert_id: Opsgenie Alert ID
-        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
-        :param _builtins.str priority: Value must be one of `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param _builtins.str priority: Value must be one of `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         :param _builtins.str description: Description field of the alert that is generally used to provide a detailed information about the alert
         :param _builtins.str message: Message of the alert
         """
@@ -20458,7 +20570,7 @@ class WorkflowTaskUpdateOpsgenieAlertTaskParams(dict):
     @pulumi.getter
     def completion(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "completion")
 
@@ -20466,7 +20578,7 @@ class WorkflowTaskUpdateOpsgenieAlertTaskParams(dict):
     @pulumi.getter
     def priority(self) -> _builtins.str:
         """
-        Value must be one of `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        Value must be one of `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         """
         return pulumi.get(self, "priority")
 
@@ -20524,8 +20636,8 @@ class WorkflowTaskUpdateOpsgenieIncidentTaskParams(dict):
         :param _builtins.str opsgenie_incident_id: The Opsgenie incident ID, this can also be a Rootly incident variable
         :param _builtins.str description: Description field of the alert that is generally used to provide a detailed information about the alert
         :param _builtins.str message: Message of the alert
-        :param _builtins.str priority: Value must be one of `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>, ``.
-        :param _builtins.str status: Value must be one of <span pulumi-lang-nodejs="`resolve`" pulumi-lang-dotnet="`Resolve`" pulumi-lang-go="`resolve`" pulumi-lang-python="`resolve`" pulumi-lang-yaml="`resolve`" pulumi-lang-java="`resolve`">`resolve`</span>, <span pulumi-lang-nodejs="`open`" pulumi-lang-dotnet="`Open`" pulumi-lang-go="`open`" pulumi-lang-python="`open`" pulumi-lang-yaml="`open`" pulumi-lang-java="`open`">`open`</span>, <span pulumi-lang-nodejs="`close`" pulumi-lang-dotnet="`Close`" pulumi-lang-go="`close`" pulumi-lang-python="`close`" pulumi-lang-yaml="`close`" pulumi-lang-java="`close`">`close`</span>, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        :param _builtins.str priority: Value must be one of `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>, ``.
+        :param _builtins.str status: Value must be one of <span pulumi-lang-nodejs="`resolve`" pulumi-lang-dotnet="`Resolve`" pulumi-lang-go="`resolve`" pulumi-lang-python="`resolve`" pulumi-lang-yaml="`resolve`" pulumi-lang-java="`resolve`" pulumi-lang-hcl="`resolve`">`resolve`</span>, <span pulumi-lang-nodejs="`open`" pulumi-lang-dotnet="`Open`" pulumi-lang-go="`open`" pulumi-lang-python="`open`" pulumi-lang-yaml="`open`" pulumi-lang-java="`open`" pulumi-lang-hcl="`open`">`open`</span>, <span pulumi-lang-nodejs="`close`" pulumi-lang-dotnet="`Close`" pulumi-lang-go="`close`" pulumi-lang-python="`close`" pulumi-lang-yaml="`close`" pulumi-lang-java="`close`" pulumi-lang-hcl="`close`">`close`</span>, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         """
         pulumi.set(__self__, "opsgenie_incident_id", opsgenie_incident_id)
         if description is not None:
@@ -20567,7 +20679,7 @@ class WorkflowTaskUpdateOpsgenieIncidentTaskParams(dict):
     @pulumi.getter
     def priority(self) -> Optional[_builtins.str]:
         """
-        Value must be one of `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>, ``.
+        Value must be one of `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>, ``.
         """
         return pulumi.get(self, "priority")
 
@@ -20575,7 +20687,7 @@ class WorkflowTaskUpdateOpsgenieIncidentTaskParams(dict):
     @pulumi.getter
     def status(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`resolve`" pulumi-lang-dotnet="`Resolve`" pulumi-lang-go="`resolve`" pulumi-lang-python="`resolve`" pulumi-lang-yaml="`resolve`" pulumi-lang-java="`resolve`">`resolve`</span>, <span pulumi-lang-nodejs="`open`" pulumi-lang-dotnet="`Open`" pulumi-lang-go="`open`" pulumi-lang-python="`open`" pulumi-lang-yaml="`open`" pulumi-lang-java="`open`">`open`</span>, <span pulumi-lang-nodejs="`close`" pulumi-lang-dotnet="`Close`" pulumi-lang-go="`close`" pulumi-lang-python="`close`" pulumi-lang-yaml="`close`" pulumi-lang-java="`close`">`close`</span>, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`resolve`" pulumi-lang-dotnet="`Resolve`" pulumi-lang-go="`resolve`" pulumi-lang-python="`resolve`" pulumi-lang-yaml="`resolve`" pulumi-lang-java="`resolve`" pulumi-lang-hcl="`resolve`">`resolve`</span>, <span pulumi-lang-nodejs="`open`" pulumi-lang-dotnet="`Open`" pulumi-lang-go="`open`" pulumi-lang-python="`open`" pulumi-lang-yaml="`open`" pulumi-lang-java="`open`" pulumi-lang-hcl="`open`">`open`</span>, <span pulumi-lang-nodejs="`close`" pulumi-lang-dotnet="`Close`" pulumi-lang-go="`close`" pulumi-lang-python="`close`" pulumi-lang-yaml="`close`" pulumi-lang-java="`close`" pulumi-lang-hcl="`close`">`close`</span>, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         """
         return pulumi.get(self, "status")
 
@@ -20622,9 +20734,9 @@ class WorkflowTaskUpdatePagerdutyIncidentTaskParams(dict):
         :param _builtins.str escalation_level: Escalation level of policy attached to incident
         :param _builtins.str priority: PagerDuty incident priority, selecting auto will let Rootly auto map our incident severity
         :param _builtins.str resolution: A message outlining the incident's resolution in PagerDuty
-        :param _builtins.str status: Value must be one of <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        :param _builtins.str status: Value must be one of <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`" pulumi-lang-hcl="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         :param _builtins.str title: Title to update to
-        :param _builtins.str urgency: PagerDuty incident urgency, selecting auto will let Rootly auto map our incident severity. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        :param _builtins.str urgency: PagerDuty incident urgency, selecting auto will let Rootly auto map our incident severity. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         """
         pulumi.set(__self__, "pagerduty_incident_id", pagerduty_incident_id)
         if escalation_level is not None:
@@ -20678,7 +20790,7 @@ class WorkflowTaskUpdatePagerdutyIncidentTaskParams(dict):
     @pulumi.getter
     def status(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`" pulumi-lang-hcl="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         """
         return pulumi.get(self, "status")
 
@@ -20699,7 +20811,7 @@ class WorkflowTaskUpdatePagerdutyIncidentTaskParams(dict):
     @pulumi.getter
     def urgency(self) -> Optional[_builtins.str]:
         """
-        PagerDuty incident urgency, selecting auto will let Rootly auto map our incident severity. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        PagerDuty incident urgency, selecting auto will let Rootly auto map our incident severity. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         """
         return pulumi.get(self, "urgency")
 
@@ -20739,9 +20851,9 @@ class WorkflowTaskUpdatePagertreeAlertTaskParams(dict):
         :param _builtins.str description: Description of alert as text
         :param _builtins.bool incident: Setting to true makes an alert a Pagertree incident. Value must be one of true or false
         :param _builtins.str pagertree_alert_id: The prefix ID of the Pagertree alert
-        :param _builtins.str severity: Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>, `SEV-1`, `SEV-2`, `SEV-3`, `SEV-4`.
+        :param _builtins.str severity: Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>, `SEV-1`, `SEV-2`, `SEV-3`, `SEV-4`.
         :param _builtins.str title: Title of alert as text
-        :param _builtins.str urgency: Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        :param _builtins.str urgency: Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`" pulumi-lang-hcl="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         """
         if description is not None:
             pulumi.set(__self__, "description", description)
@@ -20790,7 +20902,7 @@ class WorkflowTaskUpdatePagertreeAlertTaskParams(dict):
     @pulumi.getter
     def severity(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>, `SEV-1`, `SEV-2`, `SEV-3`, `SEV-4`.
+        Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>, `SEV-1`, `SEV-2`, `SEV-3`, `SEV-4`.
         """
         return pulumi.get(self, "severity")
 
@@ -20816,7 +20928,7 @@ class WorkflowTaskUpdatePagertreeAlertTaskParams(dict):
     @pulumi.getter
     def urgency(self) -> Optional[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`">`low`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`" pulumi-lang-hcl="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         """
         return pulumi.get(self, "urgency")
 
@@ -20994,10 +21106,10 @@ class WorkflowTaskUpdateServiceNowIncidentTaskParams(dict):
                  title: Optional[_builtins.str] = None):
         """
         :param _builtins.str incident_id: The incident id
-        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The completion id and display name
+        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The completion id and display name
         :param _builtins.str custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON
         :param _builtins.str description: The incident description
-        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         :param _builtins.str title: The incident title
         """
         pulumi.set(__self__, "incident_id", incident_id)
@@ -21026,7 +21138,7 @@ class WorkflowTaskUpdateServiceNowIncidentTaskParams(dict):
     @pulumi.getter
     def completion(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The completion id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The completion id and display name
         """
         return pulumi.get(self, "completion")
 
@@ -21050,7 +21162,7 @@ class WorkflowTaskUpdateServiceNowIncidentTaskParams(dict):
     @pulumi.getter
     def priority(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         """
         return pulumi.get(self, "priority")
 
@@ -21183,7 +21295,7 @@ class WorkflowTaskUpdateShortcutStoryTaskParams(dict):
                  task_type: Optional[_builtins.str] = None,
                  title: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] archivation: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The archivation id and display name
+        :param Mapping[str, _builtins.str] archivation: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The archivation id and display name
         :param _builtins.str story_id: The story id
         :param _builtins.str description: The incident description
         :param _builtins.str due_date: The due date
@@ -21207,7 +21319,7 @@ class WorkflowTaskUpdateShortcutStoryTaskParams(dict):
     @pulumi.getter
     def archivation(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The archivation id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The archivation id and display name
         """
         return pulumi.get(self, "archivation")
 
@@ -21287,7 +21399,7 @@ class WorkflowTaskUpdateShortcutTaskTaskParams(dict):
                  description: Optional[_builtins.str] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The completion id and display name
+        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The completion id and display name
         :param _builtins.str parent_story_id: The parent story
         :param _builtins.str task_id: The task id
         :param _builtins.str description: The task description
@@ -21304,7 +21416,7 @@ class WorkflowTaskUpdateShortcutTaskTaskParams(dict):
     @pulumi.getter
     def completion(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The completion id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The completion id and display name
         """
         return pulumi.get(self, "completion")
 
@@ -21362,7 +21474,7 @@ class WorkflowTaskUpdateSlackChannelTopicTaskParams(dict):
                  topic: _builtins.str,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        :param Mapping[str, _builtins.str] channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         pulumi.set(__self__, "channel", channel)
         pulumi.set(__self__, "topic", topic)
@@ -21373,7 +21485,7 @@ class WorkflowTaskUpdateSlackChannelTopicTaskParams(dict):
     @pulumi.getter
     def channel(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>.
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
         return pulumi.get(self, "channel")
 
@@ -21414,7 +21526,7 @@ class WorkflowTaskUpdateStatusTaskParams(dict):
                  inactivity_timeout: Optional[_builtins.str] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param _builtins.str status: Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`">`in_triage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`">`started`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>.
+        :param _builtins.str status: Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`" pulumi-lang-hcl="`in_triage`">`inTriage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`" pulumi-lang-hcl="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`" pulumi-lang-hcl="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>.
         :param _builtins.str inactivity_timeout: In format '1 hour', '1 day', etc
         """
         pulumi.set(__self__, "status", status)
@@ -21427,7 +21539,7 @@ class WorkflowTaskUpdateStatusTaskParams(dict):
     @pulumi.getter
     def status(self) -> _builtins.str:
         """
-        Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`">`in_triage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`">`started`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`">`cancelled`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`" pulumi-lang-hcl="`in_triage`">`inTriage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`" pulumi-lang-hcl="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`" pulumi-lang-hcl="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>.
         """
         return pulumi.get(self, "status")
 
@@ -21479,12 +21591,12 @@ class WorkflowTaskUpdateTrelloCardTaskParams(dict):
                  task_type: Optional[_builtins.str] = None,
                  title: Optional[_builtins.str] = None):
         """
-        :param Mapping[str, _builtins.str] archivation: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The archivation id and display name
+        :param Mapping[str, _builtins.str] archivation: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The archivation id and display name
         :param _builtins.str card_id: The card id
-        :param Mapping[str, _builtins.str] board: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The board id and display name
+        :param Mapping[str, _builtins.str] board: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The board id and display name
         :param _builtins.str description: The card description
         :param _builtins.str due_date: The due date
-        :param Mapping[str, _builtins.str] list: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The list id and display name
+        :param Mapping[str, _builtins.str] list: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The list id and display name
         :param _builtins.str title: The card title
         """
         pulumi.set(__self__, "archivation", archivation)
@@ -21508,7 +21620,7 @@ class WorkflowTaskUpdateTrelloCardTaskParams(dict):
     @pulumi.getter
     def archivation(self) -> Mapping[str, _builtins.str]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The archivation id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The archivation id and display name
         """
         return pulumi.get(self, "archivation")
 
@@ -21524,7 +21636,7 @@ class WorkflowTaskUpdateTrelloCardTaskParams(dict):
     @pulumi.getter
     def board(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The board id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The board id and display name
         """
         return pulumi.get(self, "board")
 
@@ -21553,7 +21665,7 @@ class WorkflowTaskUpdateTrelloCardTaskParams(dict):
     @pulumi.getter
     def list(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The list id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The list id and display name
         """
         return pulumi.get(self, "list")
 
@@ -21619,8 +21731,8 @@ class WorkflowTaskUpdateVictorOpsIncidentTaskParams(dict):
                  resolution_message: Optional[_builtins.str] = None,
                  task_type: Optional[_builtins.str] = None):
         """
-        :param _builtins.str status: Value must be one of <span pulumi-lang-nodejs="`resolve`" pulumi-lang-dotnet="`Resolve`" pulumi-lang-go="`resolve`" pulumi-lang-python="`resolve`" pulumi-lang-yaml="`resolve`" pulumi-lang-java="`resolve`">`resolve`</span>, <span pulumi-lang-nodejs="`ack`" pulumi-lang-dotnet="`Ack`" pulumi-lang-go="`ack`" pulumi-lang-python="`ack`" pulumi-lang-yaml="`ack`" pulumi-lang-java="`ack`">`ack`</span>, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
-        :param _builtins.str victor_ops_incident_id: The<span pulumi-lang-nodejs=" victorOps " pulumi-lang-dotnet=" VictorOps " pulumi-lang-go=" victorOps " pulumi-lang-python=" victor_ops " pulumi-lang-yaml=" victorOps " pulumi-lang-java=" victorOps "> victor_ops </span>incident ID, this can also be a Rootly incident variable
+        :param _builtins.str status: Value must be one of <span pulumi-lang-nodejs="`resolve`" pulumi-lang-dotnet="`Resolve`" pulumi-lang-go="`resolve`" pulumi-lang-python="`resolve`" pulumi-lang-yaml="`resolve`" pulumi-lang-java="`resolve`" pulumi-lang-hcl="`resolve`">`resolve`</span>, <span pulumi-lang-nodejs="`ack`" pulumi-lang-dotnet="`Ack`" pulumi-lang-go="`ack`" pulumi-lang-python="`ack`" pulumi-lang-yaml="`ack`" pulumi-lang-java="`ack`" pulumi-lang-hcl="`ack`">`ack`</span>, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
+        :param _builtins.str victor_ops_incident_id: The<span pulumi-lang-nodejs=" victorOps " pulumi-lang-dotnet=" VictorOps " pulumi-lang-go=" victorOps " pulumi-lang-python=" victor_ops " pulumi-lang-yaml=" victorOps " pulumi-lang-java=" victorOps " pulumi-lang-hcl=" victor_ops "> victorOps </span>incident ID, this can also be a Rootly incident variable
         :param _builtins.str resolution_message: Resolution message
         """
         pulumi.set(__self__, "status", status)
@@ -21634,7 +21746,7 @@ class WorkflowTaskUpdateVictorOpsIncidentTaskParams(dict):
     @pulumi.getter
     def status(self) -> _builtins.str:
         """
-        Value must be one of <span pulumi-lang-nodejs="`resolve`" pulumi-lang-dotnet="`Resolve`" pulumi-lang-go="`resolve`" pulumi-lang-python="`resolve`" pulumi-lang-yaml="`resolve`" pulumi-lang-java="`resolve`">`resolve`</span>, <span pulumi-lang-nodejs="`ack`" pulumi-lang-dotnet="`Ack`" pulumi-lang-go="`ack`" pulumi-lang-python="`ack`" pulumi-lang-yaml="`ack`" pulumi-lang-java="`ack`">`ack`</span>, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`">`auto`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`resolve`" pulumi-lang-dotnet="`Resolve`" pulumi-lang-go="`resolve`" pulumi-lang-python="`resolve`" pulumi-lang-yaml="`resolve`" pulumi-lang-java="`resolve`" pulumi-lang-hcl="`resolve`">`resolve`</span>, <span pulumi-lang-nodejs="`ack`" pulumi-lang-dotnet="`Ack`" pulumi-lang-go="`ack`" pulumi-lang-python="`ack`" pulumi-lang-yaml="`ack`" pulumi-lang-java="`ack`" pulumi-lang-hcl="`ack`">`ack`</span>, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         """
         return pulumi.get(self, "status")
 
@@ -21642,7 +21754,7 @@ class WorkflowTaskUpdateVictorOpsIncidentTaskParams(dict):
     @pulumi.getter(name="victorOpsIncidentId")
     def victor_ops_incident_id(self) -> _builtins.str:
         """
-        The<span pulumi-lang-nodejs=" victorOps " pulumi-lang-dotnet=" VictorOps " pulumi-lang-go=" victorOps " pulumi-lang-python=" victor_ops " pulumi-lang-yaml=" victorOps " pulumi-lang-java=" victorOps "> victor_ops </span>incident ID, this can also be a Rootly incident variable
+        The<span pulumi-lang-nodejs=" victorOps " pulumi-lang-dotnet=" VictorOps " pulumi-lang-go=" victorOps " pulumi-lang-python=" victor_ops " pulumi-lang-yaml=" victorOps " pulumi-lang-java=" victorOps " pulumi-lang-hcl=" victor_ops "> victorOps </span>incident ID, this can also be a Rootly incident variable
         """
         return pulumi.get(self, "victor_ops_incident_id")
 
@@ -21696,9 +21808,9 @@ class WorkflowTaskUpdateZendeskTicketTaskParams(dict):
                  ticket_payload: Optional[_builtins.str] = None):
         """
         :param _builtins.str ticket_id: The ticket id
-        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The completion id and display name
+        :param Mapping[str, _builtins.str] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The completion id and display name
         :param _builtins.str custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON
-        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        :param Mapping[str, _builtins.str] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         :param _builtins.str subject: The ticket subject
         :param _builtins.str tags: The ticket tags
         :param _builtins.str ticket_payload: Additional Zendesk ticket attributes. Will be merged into whatever was specified in this tasks current parameters. Can contain liquid markup and need to be valid JSON
@@ -21731,7 +21843,7 @@ class WorkflowTaskUpdateZendeskTicketTaskParams(dict):
     @pulumi.getter
     def completion(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The completion id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The completion id and display name
         """
         return pulumi.get(self, "completion")
 
@@ -21747,7 +21859,7 @@ class WorkflowTaskUpdateZendeskTicketTaskParams(dict):
     @pulumi.getter
     def priority(self) -> Optional[Mapping[str, _builtins.str]]:
         """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`">`name`</span>. The priority id and display name
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         """
         return pulumi.get(self, "priority")
 
@@ -21784,622 +21896,706 @@ class WorkflowTaskUpdateZendeskTicketTaskParams(dict):
 @pulumi.output_type
 class GetCausesCauseResult(dict):
     def __init__(__self__, *,
-                 description: _builtins.str,
-                 id: _builtins.str,
-                 name: _builtins.str,
-                 slug: _builtins.str):
-        pulumi.set(__self__, "description", description)
-        pulumi.set(__self__, "id", id)
-        pulumi.set(__self__, "name", name)
-        pulumi.set(__self__, "slug", slug)
+                 description: Optional[_builtins.str] = None,
+                 id: Optional[_builtins.str] = None,
+                 name: Optional[_builtins.str] = None,
+                 slug: Optional[_builtins.str] = None):
+        if description is not None:
+            pulumi.set(__self__, "description", description)
+        if id is not None:
+            pulumi.set(__self__, "id", id)
+        if name is not None:
+            pulumi.set(__self__, "name", name)
+        if slug is not None:
+            pulumi.set(__self__, "slug", slug)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> _builtins.str:
+    def description(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter
-    def id(self) -> _builtins.str:
+    def id(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "id")
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> _builtins.str:
+    def name(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "name")
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> _builtins.str:
+    def slug(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "slug")
 
 
 @pulumi.output_type
 class GetCustomFieldOptionsCustomFieldOptionResult(dict):
     def __init__(__self__, *,
-                 color: _builtins.str,
-                 custom_field_id: _builtins.float,
-                 id: _builtins.str,
-                 position: _builtins.float,
-                 value: _builtins.str):
-        pulumi.set(__self__, "color", color)
-        pulumi.set(__self__, "custom_field_id", custom_field_id)
-        pulumi.set(__self__, "id", id)
-        pulumi.set(__self__, "position", position)
-        pulumi.set(__self__, "value", value)
+                 color: Optional[_builtins.str] = None,
+                 custom_field_id: Optional[_builtins.float] = None,
+                 id: Optional[_builtins.str] = None,
+                 position: Optional[_builtins.float] = None,
+                 value: Optional[_builtins.str] = None):
+        if color is not None:
+            pulumi.set(__self__, "color", color)
+        if custom_field_id is not None:
+            pulumi.set(__self__, "custom_field_id", custom_field_id)
+        if id is not None:
+            pulumi.set(__self__, "id", id)
+        if position is not None:
+            pulumi.set(__self__, "position", position)
+        if value is not None:
+            pulumi.set(__self__, "value", value)
 
     @_builtins.property
     @pulumi.getter
-    def color(self) -> _builtins.str:
+    def color(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "color")
 
     @_builtins.property
     @pulumi.getter(name="customFieldId")
-    def custom_field_id(self) -> _builtins.float:
+    def custom_field_id(self) -> Optional[_builtins.float]:
         return pulumi.get(self, "custom_field_id")
 
     @_builtins.property
     @pulumi.getter
-    def id(self) -> _builtins.str:
+    def id(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "id")
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> _builtins.float:
+    def position(self) -> Optional[_builtins.float]:
         return pulumi.get(self, "position")
 
     @_builtins.property
     @pulumi.getter
-    def value(self) -> _builtins.str:
+    def value(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "value")
 
 
 @pulumi.output_type
 class GetCustomFieldsCustomFieldResult(dict):
     def __init__(__self__, *,
-                 description: _builtins.str,
-                 enabled: _builtins.bool,
-                 id: _builtins.str,
-                 kind: _builtins.str,
-                 label: _builtins.str,
-                 requireds: Sequence[_builtins.str],
-                 showns: Sequence[_builtins.str],
-                 slug: _builtins.str):
-        pulumi.set(__self__, "description", description)
-        pulumi.set(__self__, "enabled", enabled)
-        pulumi.set(__self__, "id", id)
-        pulumi.set(__self__, "kind", kind)
-        pulumi.set(__self__, "label", label)
-        pulumi.set(__self__, "requireds", requireds)
-        pulumi.set(__self__, "showns", showns)
-        pulumi.set(__self__, "slug", slug)
+                 description: Optional[_builtins.str] = None,
+                 enabled: Optional[_builtins.bool] = None,
+                 id: Optional[_builtins.str] = None,
+                 kind: Optional[_builtins.str] = None,
+                 label: Optional[_builtins.str] = None,
+                 requireds: Optional[Sequence[_builtins.str]] = None,
+                 showns: Optional[Sequence[_builtins.str]] = None,
+                 slug: Optional[_builtins.str] = None):
+        if description is not None:
+            pulumi.set(__self__, "description", description)
+        if enabled is not None:
+            pulumi.set(__self__, "enabled", enabled)
+        if id is not None:
+            pulumi.set(__self__, "id", id)
+        if kind is not None:
+            pulumi.set(__self__, "kind", kind)
+        if label is not None:
+            pulumi.set(__self__, "label", label)
+        if requireds is not None:
+            pulumi.set(__self__, "requireds", requireds)
+        if showns is not None:
+            pulumi.set(__self__, "showns", showns)
+        if slug is not None:
+            pulumi.set(__self__, "slug", slug)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> _builtins.str:
+    def description(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter
-    def enabled(self) -> _builtins.bool:
+    def enabled(self) -> Optional[_builtins.bool]:
         return pulumi.get(self, "enabled")
 
     @_builtins.property
     @pulumi.getter
-    def id(self) -> _builtins.str:
+    def id(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "id")
 
     @_builtins.property
     @pulumi.getter
-    def kind(self) -> _builtins.str:
+    def kind(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "kind")
 
     @_builtins.property
     @pulumi.getter
-    def label(self) -> _builtins.str:
+    def label(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "label")
 
     @_builtins.property
     @pulumi.getter
-    def requireds(self) -> Sequence[_builtins.str]:
+    def requireds(self) -> Optional[Sequence[_builtins.str]]:
         return pulumi.get(self, "requireds")
 
     @_builtins.property
     @pulumi.getter
-    def showns(self) -> Sequence[_builtins.str]:
+    def showns(self) -> Optional[Sequence[_builtins.str]]:
         return pulumi.get(self, "showns")
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> _builtins.str:
+    def slug(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "slug")
 
 
 @pulumi.output_type
 class GetEnvironmentsEnvironmentResult(dict):
     def __init__(__self__, *,
-                 color: _builtins.str,
-                 description: _builtins.str,
-                 id: _builtins.str,
-                 name: _builtins.str,
-                 slug: _builtins.str):
-        pulumi.set(__self__, "color", color)
-        pulumi.set(__self__, "description", description)
-        pulumi.set(__self__, "id", id)
-        pulumi.set(__self__, "name", name)
-        pulumi.set(__self__, "slug", slug)
+                 color: Optional[_builtins.str] = None,
+                 description: Optional[_builtins.str] = None,
+                 id: Optional[_builtins.str] = None,
+                 name: Optional[_builtins.str] = None,
+                 slug: Optional[_builtins.str] = None):
+        if color is not None:
+            pulumi.set(__self__, "color", color)
+        if description is not None:
+            pulumi.set(__self__, "description", description)
+        if id is not None:
+            pulumi.set(__self__, "id", id)
+        if name is not None:
+            pulumi.set(__self__, "name", name)
+        if slug is not None:
+            pulumi.set(__self__, "slug", slug)
 
     @_builtins.property
     @pulumi.getter
-    def color(self) -> _builtins.str:
+    def color(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "color")
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> _builtins.str:
+    def description(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter
-    def id(self) -> _builtins.str:
+    def id(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "id")
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> _builtins.str:
+    def name(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "name")
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> _builtins.str:
+    def slug(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "slug")
 
 
 @pulumi.output_type
 class GetFunctionalitiesFunctionalityResult(dict):
     def __init__(__self__, *,
-                 color: _builtins.str,
-                 description: _builtins.str,
-                 id: _builtins.str,
-                 name: _builtins.str,
-                 slug: _builtins.str):
-        pulumi.set(__self__, "color", color)
-        pulumi.set(__self__, "description", description)
-        pulumi.set(__self__, "id", id)
-        pulumi.set(__self__, "name", name)
-        pulumi.set(__self__, "slug", slug)
+                 color: Optional[_builtins.str] = None,
+                 description: Optional[_builtins.str] = None,
+                 id: Optional[_builtins.str] = None,
+                 name: Optional[_builtins.str] = None,
+                 slug: Optional[_builtins.str] = None):
+        if color is not None:
+            pulumi.set(__self__, "color", color)
+        if description is not None:
+            pulumi.set(__self__, "description", description)
+        if id is not None:
+            pulumi.set(__self__, "id", id)
+        if name is not None:
+            pulumi.set(__self__, "name", name)
+        if slug is not None:
+            pulumi.set(__self__, "slug", slug)
 
     @_builtins.property
     @pulumi.getter
-    def color(self) -> _builtins.str:
+    def color(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "color")
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> _builtins.str:
+    def description(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter
-    def id(self) -> _builtins.str:
+    def id(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "id")
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> _builtins.str:
+    def name(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "name")
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> _builtins.str:
+    def slug(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "slug")
 
 
 @pulumi.output_type
 class GetIncidentRolesIncidentRoleResult(dict):
     def __init__(__self__, *,
-                 description: _builtins.str,
-                 enabled: _builtins.bool,
-                 id: _builtins.str,
-                 name: _builtins.str,
-                 slug: _builtins.str,
-                 summary: _builtins.str):
-        pulumi.set(__self__, "description", description)
-        pulumi.set(__self__, "enabled", enabled)
-        pulumi.set(__self__, "id", id)
-        pulumi.set(__self__, "name", name)
-        pulumi.set(__self__, "slug", slug)
-        pulumi.set(__self__, "summary", summary)
+                 description: Optional[_builtins.str] = None,
+                 enabled: Optional[_builtins.bool] = None,
+                 id: Optional[_builtins.str] = None,
+                 name: Optional[_builtins.str] = None,
+                 slug: Optional[_builtins.str] = None,
+                 summary: Optional[_builtins.str] = None):
+        if description is not None:
+            pulumi.set(__self__, "description", description)
+        if enabled is not None:
+            pulumi.set(__self__, "enabled", enabled)
+        if id is not None:
+            pulumi.set(__self__, "id", id)
+        if name is not None:
+            pulumi.set(__self__, "name", name)
+        if slug is not None:
+            pulumi.set(__self__, "slug", slug)
+        if summary is not None:
+            pulumi.set(__self__, "summary", summary)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> _builtins.str:
+    def description(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter
-    def enabled(self) -> _builtins.bool:
+    def enabled(self) -> Optional[_builtins.bool]:
         return pulumi.get(self, "enabled")
 
     @_builtins.property
     @pulumi.getter
-    def id(self) -> _builtins.str:
+    def id(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "id")
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> _builtins.str:
+    def name(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "name")
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> _builtins.str:
+    def slug(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "slug")
 
     @_builtins.property
     @pulumi.getter
-    def summary(self) -> _builtins.str:
+    def summary(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "summary")
 
 
 @pulumi.output_type
 class GetIncidentTypesIncidentTypeResult(dict):
     def __init__(__self__, *,
-                 description: _builtins.str,
-                 id: _builtins.str,
-                 name: _builtins.str,
-                 slug: _builtins.str):
-        pulumi.set(__self__, "description", description)
-        pulumi.set(__self__, "id", id)
-        pulumi.set(__self__, "name", name)
-        pulumi.set(__self__, "slug", slug)
+                 description: Optional[_builtins.str] = None,
+                 id: Optional[_builtins.str] = None,
+                 name: Optional[_builtins.str] = None,
+                 slug: Optional[_builtins.str] = None):
+        if description is not None:
+            pulumi.set(__self__, "description", description)
+        if id is not None:
+            pulumi.set(__self__, "id", id)
+        if name is not None:
+            pulumi.set(__self__, "name", name)
+        if slug is not None:
+            pulumi.set(__self__, "slug", slug)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> _builtins.str:
+    def description(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter
-    def id(self) -> _builtins.str:
+    def id(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "id")
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> _builtins.str:
+    def name(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "name")
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> _builtins.str:
+    def slug(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "slug")
 
 
 @pulumi.output_type
 class GetServicesServiceResult(dict):
     def __init__(__self__, *,
-                 alert_broadcast_channel: Mapping[str, _builtins.str],
-                 alert_broadcast_enabled: _builtins.bool,
-                 alert_urgency_id: _builtins.str,
-                 alerts_email_address: _builtins.str,
-                 alerts_email_enabled: _builtins.bool,
-                 backstage_id: _builtins.str,
-                 color: _builtins.str,
-                 cortex_id: _builtins.str,
-                 description: _builtins.str,
-                 environment_ids: Sequence[_builtins.str],
-                 escalation_policy_id: _builtins.str,
-                 external_id: _builtins.str,
-                 github_repository_branch: _builtins.str,
-                 github_repository_name: _builtins.str,
-                 gitlab_repository_branch: _builtins.str,
-                 gitlab_repository_name: _builtins.str,
-                 id: _builtins.str,
-                 incident_broadcast_channel: Mapping[str, _builtins.str],
-                 incident_broadcast_enabled: _builtins.bool,
-                 kubernetes_deployment_name: _builtins.str,
-                 name: _builtins.str,
-                 notify_emails: Sequence[_builtins.str],
-                 opsgenie_id: _builtins.str,
-                 owner_group_ids: Sequence[_builtins.str],
-                 owner_user_ids: Sequence[_builtins.str],
-                 pagerduty_id: _builtins.str,
-                 position: _builtins.float,
-                 properties: Sequence[_builtins.str],
-                 public_description: _builtins.str,
-                 service_ids: Sequence[_builtins.str],
-                 service_now_ci_sys_id: _builtins.str,
-                 slack_aliases: Sequence[_builtins.str],
-                 slack_channels: Sequence[_builtins.str],
-                 slug: _builtins.str):
-        pulumi.set(__self__, "alert_broadcast_channel", alert_broadcast_channel)
-        pulumi.set(__self__, "alert_broadcast_enabled", alert_broadcast_enabled)
-        pulumi.set(__self__, "alert_urgency_id", alert_urgency_id)
-        pulumi.set(__self__, "alerts_email_address", alerts_email_address)
-        pulumi.set(__self__, "alerts_email_enabled", alerts_email_enabled)
-        pulumi.set(__self__, "backstage_id", backstage_id)
-        pulumi.set(__self__, "color", color)
-        pulumi.set(__self__, "cortex_id", cortex_id)
-        pulumi.set(__self__, "description", description)
-        pulumi.set(__self__, "environment_ids", environment_ids)
-        pulumi.set(__self__, "escalation_policy_id", escalation_policy_id)
-        pulumi.set(__self__, "external_id", external_id)
-        pulumi.set(__self__, "github_repository_branch", github_repository_branch)
-        pulumi.set(__self__, "github_repository_name", github_repository_name)
-        pulumi.set(__self__, "gitlab_repository_branch", gitlab_repository_branch)
-        pulumi.set(__self__, "gitlab_repository_name", gitlab_repository_name)
-        pulumi.set(__self__, "id", id)
-        pulumi.set(__self__, "incident_broadcast_channel", incident_broadcast_channel)
-        pulumi.set(__self__, "incident_broadcast_enabled", incident_broadcast_enabled)
-        pulumi.set(__self__, "kubernetes_deployment_name", kubernetes_deployment_name)
-        pulumi.set(__self__, "name", name)
-        pulumi.set(__self__, "notify_emails", notify_emails)
-        pulumi.set(__self__, "opsgenie_id", opsgenie_id)
-        pulumi.set(__self__, "owner_group_ids", owner_group_ids)
-        pulumi.set(__self__, "owner_user_ids", owner_user_ids)
-        pulumi.set(__self__, "pagerduty_id", pagerduty_id)
-        pulumi.set(__self__, "position", position)
-        pulumi.set(__self__, "properties", properties)
-        pulumi.set(__self__, "public_description", public_description)
-        pulumi.set(__self__, "service_ids", service_ids)
-        pulumi.set(__self__, "service_now_ci_sys_id", service_now_ci_sys_id)
-        pulumi.set(__self__, "slack_aliases", slack_aliases)
-        pulumi.set(__self__, "slack_channels", slack_channels)
-        pulumi.set(__self__, "slug", slug)
+                 alert_broadcast_channel: Optional[Mapping[str, _builtins.str]] = None,
+                 alert_broadcast_enabled: Optional[_builtins.bool] = None,
+                 alert_urgency_id: Optional[_builtins.str] = None,
+                 alerts_email_address: Optional[_builtins.str] = None,
+                 alerts_email_enabled: Optional[_builtins.bool] = None,
+                 backstage_id: Optional[_builtins.str] = None,
+                 color: Optional[_builtins.str] = None,
+                 cortex_id: Optional[_builtins.str] = None,
+                 description: Optional[_builtins.str] = None,
+                 environment_ids: Optional[Sequence[_builtins.str]] = None,
+                 escalation_policy_id: Optional[_builtins.str] = None,
+                 external_id: Optional[_builtins.str] = None,
+                 github_repository_branch: Optional[_builtins.str] = None,
+                 github_repository_name: Optional[_builtins.str] = None,
+                 gitlab_repository_branch: Optional[_builtins.str] = None,
+                 gitlab_repository_name: Optional[_builtins.str] = None,
+                 id: Optional[_builtins.str] = None,
+                 incident_broadcast_channel: Optional[Mapping[str, _builtins.str]] = None,
+                 incident_broadcast_enabled: Optional[_builtins.bool] = None,
+                 kubernetes_deployment_name: Optional[_builtins.str] = None,
+                 name: Optional[_builtins.str] = None,
+                 notify_emails: Optional[Sequence[_builtins.str]] = None,
+                 opsgenie_id: Optional[_builtins.str] = None,
+                 owner_group_ids: Optional[Sequence[_builtins.str]] = None,
+                 owner_user_ids: Optional[Sequence[_builtins.str]] = None,
+                 pagerduty_id: Optional[_builtins.str] = None,
+                 position: Optional[_builtins.float] = None,
+                 properties: Optional[Sequence[_builtins.str]] = None,
+                 public_description: Optional[_builtins.str] = None,
+                 service_ids: Optional[Sequence[_builtins.str]] = None,
+                 service_now_ci_sys_id: Optional[_builtins.str] = None,
+                 slack_aliases: Optional[Sequence[_builtins.str]] = None,
+                 slack_channels: Optional[Sequence[_builtins.str]] = None,
+                 slug: Optional[_builtins.str] = None):
+        if alert_broadcast_channel is not None:
+            pulumi.set(__self__, "alert_broadcast_channel", alert_broadcast_channel)
+        if alert_broadcast_enabled is not None:
+            pulumi.set(__self__, "alert_broadcast_enabled", alert_broadcast_enabled)
+        if alert_urgency_id is not None:
+            pulumi.set(__self__, "alert_urgency_id", alert_urgency_id)
+        if alerts_email_address is not None:
+            pulumi.set(__self__, "alerts_email_address", alerts_email_address)
+        if alerts_email_enabled is not None:
+            pulumi.set(__self__, "alerts_email_enabled", alerts_email_enabled)
+        if backstage_id is not None:
+            pulumi.set(__self__, "backstage_id", backstage_id)
+        if color is not None:
+            pulumi.set(__self__, "color", color)
+        if cortex_id is not None:
+            pulumi.set(__self__, "cortex_id", cortex_id)
+        if description is not None:
+            pulumi.set(__self__, "description", description)
+        if environment_ids is not None:
+            pulumi.set(__self__, "environment_ids", environment_ids)
+        if escalation_policy_id is not None:
+            pulumi.set(__self__, "escalation_policy_id", escalation_policy_id)
+        if external_id is not None:
+            pulumi.set(__self__, "external_id", external_id)
+        if github_repository_branch is not None:
+            pulumi.set(__self__, "github_repository_branch", github_repository_branch)
+        if github_repository_name is not None:
+            pulumi.set(__self__, "github_repository_name", github_repository_name)
+        if gitlab_repository_branch is not None:
+            pulumi.set(__self__, "gitlab_repository_branch", gitlab_repository_branch)
+        if gitlab_repository_name is not None:
+            pulumi.set(__self__, "gitlab_repository_name", gitlab_repository_name)
+        if id is not None:
+            pulumi.set(__self__, "id", id)
+        if incident_broadcast_channel is not None:
+            pulumi.set(__self__, "incident_broadcast_channel", incident_broadcast_channel)
+        if incident_broadcast_enabled is not None:
+            pulumi.set(__self__, "incident_broadcast_enabled", incident_broadcast_enabled)
+        if kubernetes_deployment_name is not None:
+            pulumi.set(__self__, "kubernetes_deployment_name", kubernetes_deployment_name)
+        if name is not None:
+            pulumi.set(__self__, "name", name)
+        if notify_emails is not None:
+            pulumi.set(__self__, "notify_emails", notify_emails)
+        if opsgenie_id is not None:
+            pulumi.set(__self__, "opsgenie_id", opsgenie_id)
+        if owner_group_ids is not None:
+            pulumi.set(__self__, "owner_group_ids", owner_group_ids)
+        if owner_user_ids is not None:
+            pulumi.set(__self__, "owner_user_ids", owner_user_ids)
+        if pagerduty_id is not None:
+            pulumi.set(__self__, "pagerduty_id", pagerduty_id)
+        if position is not None:
+            pulumi.set(__self__, "position", position)
+        if properties is not None:
+            pulumi.set(__self__, "properties", properties)
+        if public_description is not None:
+            pulumi.set(__self__, "public_description", public_description)
+        if service_ids is not None:
+            pulumi.set(__self__, "service_ids", service_ids)
+        if service_now_ci_sys_id is not None:
+            pulumi.set(__self__, "service_now_ci_sys_id", service_now_ci_sys_id)
+        if slack_aliases is not None:
+            pulumi.set(__self__, "slack_aliases", slack_aliases)
+        if slack_channels is not None:
+            pulumi.set(__self__, "slack_channels", slack_channels)
+        if slug is not None:
+            pulumi.set(__self__, "slug", slug)
 
     @_builtins.property
     @pulumi.getter(name="alertBroadcastChannel")
-    def alert_broadcast_channel(self) -> Mapping[str, _builtins.str]:
+    def alert_broadcast_channel(self) -> Optional[Mapping[str, _builtins.str]]:
         return pulumi.get(self, "alert_broadcast_channel")
 
     @_builtins.property
     @pulumi.getter(name="alertBroadcastEnabled")
-    def alert_broadcast_enabled(self) -> _builtins.bool:
+    def alert_broadcast_enabled(self) -> Optional[_builtins.bool]:
         return pulumi.get(self, "alert_broadcast_enabled")
 
     @_builtins.property
     @pulumi.getter(name="alertUrgencyId")
-    def alert_urgency_id(self) -> _builtins.str:
+    def alert_urgency_id(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "alert_urgency_id")
 
     @_builtins.property
     @pulumi.getter(name="alertsEmailAddress")
-    def alerts_email_address(self) -> _builtins.str:
+    def alerts_email_address(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "alerts_email_address")
 
     @_builtins.property
     @pulumi.getter(name="alertsEmailEnabled")
-    def alerts_email_enabled(self) -> _builtins.bool:
+    def alerts_email_enabled(self) -> Optional[_builtins.bool]:
         return pulumi.get(self, "alerts_email_enabled")
 
     @_builtins.property
     @pulumi.getter(name="backstageId")
-    def backstage_id(self) -> _builtins.str:
+    def backstage_id(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "backstage_id")
 
     @_builtins.property
     @pulumi.getter
-    def color(self) -> _builtins.str:
+    def color(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "color")
 
     @_builtins.property
     @pulumi.getter(name="cortexId")
-    def cortex_id(self) -> _builtins.str:
+    def cortex_id(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "cortex_id")
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> _builtins.str:
+    def description(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter(name="environmentIds")
-    def environment_ids(self) -> Sequence[_builtins.str]:
+    def environment_ids(self) -> Optional[Sequence[_builtins.str]]:
         return pulumi.get(self, "environment_ids")
 
     @_builtins.property
     @pulumi.getter(name="escalationPolicyId")
-    def escalation_policy_id(self) -> _builtins.str:
+    def escalation_policy_id(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "escalation_policy_id")
 
     @_builtins.property
     @pulumi.getter(name="externalId")
-    def external_id(self) -> _builtins.str:
+    def external_id(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "external_id")
 
     @_builtins.property
     @pulumi.getter(name="githubRepositoryBranch")
-    def github_repository_branch(self) -> _builtins.str:
+    def github_repository_branch(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "github_repository_branch")
 
     @_builtins.property
     @pulumi.getter(name="githubRepositoryName")
-    def github_repository_name(self) -> _builtins.str:
+    def github_repository_name(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "github_repository_name")
 
     @_builtins.property
     @pulumi.getter(name="gitlabRepositoryBranch")
-    def gitlab_repository_branch(self) -> _builtins.str:
+    def gitlab_repository_branch(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "gitlab_repository_branch")
 
     @_builtins.property
     @pulumi.getter(name="gitlabRepositoryName")
-    def gitlab_repository_name(self) -> _builtins.str:
+    def gitlab_repository_name(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "gitlab_repository_name")
 
     @_builtins.property
     @pulumi.getter
-    def id(self) -> _builtins.str:
+    def id(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "id")
 
     @_builtins.property
     @pulumi.getter(name="incidentBroadcastChannel")
-    def incident_broadcast_channel(self) -> Mapping[str, _builtins.str]:
+    def incident_broadcast_channel(self) -> Optional[Mapping[str, _builtins.str]]:
         return pulumi.get(self, "incident_broadcast_channel")
 
     @_builtins.property
     @pulumi.getter(name="incidentBroadcastEnabled")
-    def incident_broadcast_enabled(self) -> _builtins.bool:
+    def incident_broadcast_enabled(self) -> Optional[_builtins.bool]:
         return pulumi.get(self, "incident_broadcast_enabled")
 
     @_builtins.property
     @pulumi.getter(name="kubernetesDeploymentName")
-    def kubernetes_deployment_name(self) -> _builtins.str:
+    def kubernetes_deployment_name(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "kubernetes_deployment_name")
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> _builtins.str:
+    def name(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "name")
 
     @_builtins.property
     @pulumi.getter(name="notifyEmails")
-    def notify_emails(self) -> Sequence[_builtins.str]:
+    def notify_emails(self) -> Optional[Sequence[_builtins.str]]:
         return pulumi.get(self, "notify_emails")
 
     @_builtins.property
     @pulumi.getter(name="opsgenieId")
-    def opsgenie_id(self) -> _builtins.str:
+    def opsgenie_id(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "opsgenie_id")
 
     @_builtins.property
     @pulumi.getter(name="ownerGroupIds")
-    def owner_group_ids(self) -> Sequence[_builtins.str]:
+    def owner_group_ids(self) -> Optional[Sequence[_builtins.str]]:
         return pulumi.get(self, "owner_group_ids")
 
     @_builtins.property
     @pulumi.getter(name="ownerUserIds")
-    def owner_user_ids(self) -> Sequence[_builtins.str]:
+    def owner_user_ids(self) -> Optional[Sequence[_builtins.str]]:
         return pulumi.get(self, "owner_user_ids")
 
     @_builtins.property
     @pulumi.getter(name="pagerdutyId")
-    def pagerduty_id(self) -> _builtins.str:
+    def pagerduty_id(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "pagerduty_id")
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> _builtins.float:
+    def position(self) -> Optional[_builtins.float]:
         return pulumi.get(self, "position")
 
     @_builtins.property
     @pulumi.getter
-    def properties(self) -> Sequence[_builtins.str]:
+    def properties(self) -> Optional[Sequence[_builtins.str]]:
         return pulumi.get(self, "properties")
 
     @_builtins.property
     @pulumi.getter(name="publicDescription")
-    def public_description(self) -> _builtins.str:
+    def public_description(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "public_description")
 
     @_builtins.property
     @pulumi.getter(name="serviceIds")
-    def service_ids(self) -> Sequence[_builtins.str]:
+    def service_ids(self) -> Optional[Sequence[_builtins.str]]:
         return pulumi.get(self, "service_ids")
 
     @_builtins.property
     @pulumi.getter(name="serviceNowCiSysId")
-    def service_now_ci_sys_id(self) -> _builtins.str:
+    def service_now_ci_sys_id(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "service_now_ci_sys_id")
 
     @_builtins.property
     @pulumi.getter(name="slackAliases")
-    def slack_aliases(self) -> Sequence[_builtins.str]:
+    def slack_aliases(self) -> Optional[Sequence[_builtins.str]]:
         return pulumi.get(self, "slack_aliases")
 
     @_builtins.property
     @pulumi.getter(name="slackChannels")
-    def slack_channels(self) -> Sequence[_builtins.str]:
+    def slack_channels(self) -> Optional[Sequence[_builtins.str]]:
         return pulumi.get(self, "slack_channels")
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> _builtins.str:
+    def slug(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "slug")
 
 
 @pulumi.output_type
 class GetSeveritiesSeverityResult(dict):
     def __init__(__self__, *,
-                 color: _builtins.str,
-                 description: _builtins.str,
-                 id: _builtins.str,
-                 name: _builtins.str,
-                 severity: _builtins.str,
-                 slug: _builtins.str):
-        pulumi.set(__self__, "color", color)
-        pulumi.set(__self__, "description", description)
-        pulumi.set(__self__, "id", id)
-        pulumi.set(__self__, "name", name)
-        pulumi.set(__self__, "severity", severity)
-        pulumi.set(__self__, "slug", slug)
+                 color: Optional[_builtins.str] = None,
+                 description: Optional[_builtins.str] = None,
+                 id: Optional[_builtins.str] = None,
+                 name: Optional[_builtins.str] = None,
+                 severity: Optional[_builtins.str] = None,
+                 slug: Optional[_builtins.str] = None):
+        if color is not None:
+            pulumi.set(__self__, "color", color)
+        if description is not None:
+            pulumi.set(__self__, "description", description)
+        if id is not None:
+            pulumi.set(__self__, "id", id)
+        if name is not None:
+            pulumi.set(__self__, "name", name)
+        if severity is not None:
+            pulumi.set(__self__, "severity", severity)
+        if slug is not None:
+            pulumi.set(__self__, "slug", slug)
 
     @_builtins.property
     @pulumi.getter
-    def color(self) -> _builtins.str:
+    def color(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "color")
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> _builtins.str:
+    def description(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter
-    def id(self) -> _builtins.str:
+    def id(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "id")
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> _builtins.str:
+    def name(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "name")
 
     @_builtins.property
     @pulumi.getter
-    def severity(self) -> _builtins.str:
+    def severity(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "severity")
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> _builtins.str:
+    def slug(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "slug")
 
 
 @pulumi.output_type
 class GetTeamsTeamResult(dict):
     def __init__(__self__, *,
-                 color: _builtins.str,
-                 description: _builtins.str,
-                 id: _builtins.str,
-                 name: _builtins.str,
-                 slug: _builtins.str):
-        pulumi.set(__self__, "color", color)
-        pulumi.set(__self__, "description", description)
-        pulumi.set(__self__, "id", id)
-        pulumi.set(__self__, "name", name)
-        pulumi.set(__self__, "slug", slug)
+                 color: Optional[_builtins.str] = None,
+                 description: Optional[_builtins.str] = None,
+                 id: Optional[_builtins.str] = None,
+                 name: Optional[_builtins.str] = None,
+                 slug: Optional[_builtins.str] = None):
+        if color is not None:
+            pulumi.set(__self__, "color", color)
+        if description is not None:
+            pulumi.set(__self__, "description", description)
+        if id is not None:
+            pulumi.set(__self__, "id", id)
+        if name is not None:
+            pulumi.set(__self__, "name", name)
+        if slug is not None:
+            pulumi.set(__self__, "slug", slug)
 
     @_builtins.property
     @pulumi.getter
-    def color(self) -> _builtins.str:
+    def color(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "color")
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> _builtins.str:
+    def description(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter
-    def id(self) -> _builtins.str:
+    def id(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "id")
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> _builtins.str:
+    def name(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "name")
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> _builtins.str:
+    def slug(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "slug")
+
+

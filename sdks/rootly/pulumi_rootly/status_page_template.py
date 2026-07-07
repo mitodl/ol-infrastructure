@@ -21,20 +21,20 @@ class StatusPageTemplateArgs:
     def __init__(__self__, *,
                  body: pulumi.Input[_builtins.str],
                  title: pulumi.Input[_builtins.str],
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 should_notify_subscribers: Optional[pulumi.Input[_builtins.bool]] = None,
-                 status_page_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 status_page_template_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 update_status: Optional[pulumi.Input[_builtins.str]] = None,
-                 update_title: Optional[pulumi.Input[_builtins.str]] = None):
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 should_notify_subscribers: pulumi.Input[Optional[_builtins.bool]] = None,
+                 status_page_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 status_page_template_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 update_status: pulumi.Input[Optional[_builtins.str]] = None,
+                 update_title: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a StatusPageTemplate resource.
 
         :param pulumi.Input[_builtins.str] body: Description of the event the template will populate
         :param pulumi.Input[_builtins.str] title: Title of the template
-        :param pulumi.Input[_builtins.str] kind: The kind of the status page template. Value must be one of <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>.
+        :param pulumi.Input[_builtins.str] kind: The kind of the status page template. Value must be one of <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`" pulumi-lang-hcl="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>.
         :param pulumi.Input[_builtins.float] position: Position of the workflow task
         :param pulumi.Input[_builtins.bool] should_notify_subscribers: Controls if incident subscribers should be notified. Value must be one of true or false
         :param pulumi.Input[_builtins.str] update_status: Status of the event the template will populate
@@ -85,110 +85,110 @@ class StatusPageTemplateArgs:
 
     @_builtins.property
     @pulumi.getter
-    def enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         return pulumi.get(self, "enabled")
 
     @enabled.setter
-    def enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "enabled", value)
 
     @_builtins.property
     @pulumi.getter
-    def kind(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def kind(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The kind of the status page template. Value must be one of <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>.
+        The kind of the status page template. Value must be one of <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`" pulumi-lang-hcl="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>.
         """
         return pulumi.get(self, "kind")
 
     @kind.setter
-    def kind(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def kind(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "kind", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Position of the workflow task
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter(name="shouldNotifySubscribers")
-    def should_notify_subscribers(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def should_notify_subscribers(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Controls if incident subscribers should be notified. Value must be one of true or false
         """
         return pulumi.get(self, "should_notify_subscribers")
 
     @should_notify_subscribers.setter
-    def should_notify_subscribers(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def should_notify_subscribers(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "should_notify_subscribers", value)
 
     @_builtins.property
     @pulumi.getter(name="statusPageId")
-    def status_page_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def status_page_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "status_page_id")
 
     @status_page_id.setter
-    def status_page_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def status_page_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "status_page_id", value)
 
     @_builtins.property
     @pulumi.getter(name="statusPageTemplateId")
-    def status_page_template_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def status_page_template_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "status_page_template_id")
 
     @status_page_template_id.setter
-    def status_page_template_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def status_page_template_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "status_page_template_id", value)
 
     @_builtins.property
     @pulumi.getter(name="updateStatus")
-    def update_status(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def update_status(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Status of the event the template will populate
         """
         return pulumi.get(self, "update_status")
 
     @update_status.setter
-    def update_status(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def update_status(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "update_status", value)
 
     @_builtins.property
     @pulumi.getter(name="updateTitle")
-    def update_title(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def update_title(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Title that will be used for the status page update
         """
         return pulumi.get(self, "update_title")
 
     @update_title.setter
-    def update_title(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def update_title(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "update_title", value)
 
 
 @pulumi.input_type
 class _StatusPageTemplateState:
     def __init__(__self__, *,
-                 body: Optional[pulumi.Input[_builtins.str]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 should_notify_subscribers: Optional[pulumi.Input[_builtins.bool]] = None,
-                 status_page_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 status_page_template_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 title: Optional[pulumi.Input[_builtins.str]] = None,
-                 update_status: Optional[pulumi.Input[_builtins.str]] = None,
-                 update_title: Optional[pulumi.Input[_builtins.str]] = None):
+                 body: pulumi.Input[Optional[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 should_notify_subscribers: pulumi.Input[Optional[_builtins.bool]] = None,
+                 status_page_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 status_page_template_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 title: pulumi.Input[Optional[_builtins.str]] = None,
+                 update_status: pulumi.Input[Optional[_builtins.str]] = None,
+                 update_title: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering StatusPageTemplate resources.
 
         :param pulumi.Input[_builtins.str] body: Description of the event the template will populate
-        :param pulumi.Input[_builtins.str] kind: The kind of the status page template. Value must be one of <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>.
+        :param pulumi.Input[_builtins.str] kind: The kind of the status page template. Value must be one of <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`" pulumi-lang-hcl="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>.
         :param pulumi.Input[_builtins.float] position: Position of the workflow task
         :param pulumi.Input[_builtins.bool] should_notify_subscribers: Controls if incident subscribers should be notified. Value must be one of true or false
         :param pulumi.Input[_builtins.str] title: Title of the template
@@ -218,113 +218,113 @@ class _StatusPageTemplateState:
 
     @_builtins.property
     @pulumi.getter
-    def body(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def body(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Description of the event the template will populate
         """
         return pulumi.get(self, "body")
 
     @body.setter
-    def body(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def body(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "body", value)
 
     @_builtins.property
     @pulumi.getter
-    def enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         return pulumi.get(self, "enabled")
 
     @enabled.setter
-    def enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "enabled", value)
 
     @_builtins.property
     @pulumi.getter
-    def kind(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def kind(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The kind of the status page template. Value must be one of <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>.
+        The kind of the status page template. Value must be one of <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`" pulumi-lang-hcl="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>.
         """
         return pulumi.get(self, "kind")
 
     @kind.setter
-    def kind(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def kind(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "kind", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Position of the workflow task
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter(name="shouldNotifySubscribers")
-    def should_notify_subscribers(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def should_notify_subscribers(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Controls if incident subscribers should be notified. Value must be one of true or false
         """
         return pulumi.get(self, "should_notify_subscribers")
 
     @should_notify_subscribers.setter
-    def should_notify_subscribers(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def should_notify_subscribers(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "should_notify_subscribers", value)
 
     @_builtins.property
     @pulumi.getter(name="statusPageId")
-    def status_page_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def status_page_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "status_page_id")
 
     @status_page_id.setter
-    def status_page_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def status_page_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "status_page_id", value)
 
     @_builtins.property
     @pulumi.getter(name="statusPageTemplateId")
-    def status_page_template_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def status_page_template_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "status_page_template_id")
 
     @status_page_template_id.setter
-    def status_page_template_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def status_page_template_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "status_page_template_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def title(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def title(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Title of the template
         """
         return pulumi.get(self, "title")
 
     @title.setter
-    def title(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def title(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "title", value)
 
     @_builtins.property
     @pulumi.getter(name="updateStatus")
-    def update_status(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def update_status(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Status of the event the template will populate
         """
         return pulumi.get(self, "update_status")
 
     @update_status.setter
-    def update_status(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def update_status(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "update_status", value)
 
     @_builtins.property
     @pulumi.getter(name="updateTitle")
-    def update_title(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def update_title(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Title that will be used for the status page update
         """
         return pulumi.get(self, "update_title")
 
     @update_title.setter
-    def update_title(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def update_title(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "update_title", value)
 
 
@@ -334,16 +334,16 @@ class StatusPageTemplate(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 body: Optional[pulumi.Input[_builtins.str]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 should_notify_subscribers: Optional[pulumi.Input[_builtins.bool]] = None,
-                 status_page_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 status_page_template_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 title: Optional[pulumi.Input[_builtins.str]] = None,
-                 update_status: Optional[pulumi.Input[_builtins.str]] = None,
-                 update_title: Optional[pulumi.Input[_builtins.str]] = None,
+                 body: pulumi.Input[Optional[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 should_notify_subscribers: pulumi.Input[Optional[_builtins.bool]] = None,
+                 status_page_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 status_page_template_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 title: pulumi.Input[Optional[_builtins.str]] = None,
+                 update_status: pulumi.Input[Optional[_builtins.str]] = None,
+                 update_title: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a StatusPageTemplate resource with the given unique name, props, and options.
@@ -351,7 +351,7 @@ class StatusPageTemplate(pulumi.CustomResource):
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.str] body: Description of the event the template will populate
-        :param pulumi.Input[_builtins.str] kind: The kind of the status page template. Value must be one of <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>.
+        :param pulumi.Input[_builtins.str] kind: The kind of the status page template. Value must be one of <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`" pulumi-lang-hcl="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>.
         :param pulumi.Input[_builtins.float] position: Position of the workflow task
         :param pulumi.Input[_builtins.bool] should_notify_subscribers: Controls if incident subscribers should be notified. Value must be one of true or false
         :param pulumi.Input[_builtins.str] title: Title of the template
@@ -382,16 +382,16 @@ class StatusPageTemplate(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 body: Optional[pulumi.Input[_builtins.str]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 should_notify_subscribers: Optional[pulumi.Input[_builtins.bool]] = None,
-                 status_page_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 status_page_template_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 title: Optional[pulumi.Input[_builtins.str]] = None,
-                 update_status: Optional[pulumi.Input[_builtins.str]] = None,
-                 update_title: Optional[pulumi.Input[_builtins.str]] = None,
+                 body: pulumi.Input[Optional[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 should_notify_subscribers: pulumi.Input[Optional[_builtins.bool]] = None,
+                 status_page_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 status_page_template_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 title: pulumi.Input[Optional[_builtins.str]] = None,
+                 update_status: pulumi.Input[Optional[_builtins.str]] = None,
+                 update_title: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -426,16 +426,16 @@ class StatusPageTemplate(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            body: Optional[pulumi.Input[_builtins.str]] = None,
-            enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-            kind: Optional[pulumi.Input[_builtins.str]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None,
-            should_notify_subscribers: Optional[pulumi.Input[_builtins.bool]] = None,
-            status_page_id: Optional[pulumi.Input[_builtins.str]] = None,
-            status_page_template_id: Optional[pulumi.Input[_builtins.str]] = None,
-            title: Optional[pulumi.Input[_builtins.str]] = None,
-            update_status: Optional[pulumi.Input[_builtins.str]] = None,
-            update_title: Optional[pulumi.Input[_builtins.str]] = None) -> 'StatusPageTemplate':
+            body: pulumi.Input[Optional[_builtins.str]] = None,
+            enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+            kind: pulumi.Input[Optional[_builtins.str]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None,
+            should_notify_subscribers: pulumi.Input[Optional[_builtins.bool]] = None,
+            status_page_id: pulumi.Input[Optional[_builtins.str]] = None,
+            status_page_template_id: pulumi.Input[Optional[_builtins.str]] = None,
+            title: pulumi.Input[Optional[_builtins.str]] = None,
+            update_status: pulumi.Input[Optional[_builtins.str]] = None,
+            update_title: pulumi.Input[Optional[_builtins.str]] = None) -> 'StatusPageTemplate':
         """
         Get an existing StatusPageTemplate resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -444,7 +444,7 @@ class StatusPageTemplate(pulumi.CustomResource):
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.str] body: Description of the event the template will populate
-        :param pulumi.Input[_builtins.str] kind: The kind of the status page template. Value must be one of <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>.
+        :param pulumi.Input[_builtins.str] kind: The kind of the status page template. Value must be one of <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`" pulumi-lang-hcl="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>.
         :param pulumi.Input[_builtins.float] position: Position of the workflow task
         :param pulumi.Input[_builtins.bool] should_notify_subscribers: Controls if incident subscribers should be notified. Value must be one of true or false
         :param pulumi.Input[_builtins.str] title: Title of the template
@@ -484,7 +484,7 @@ class StatusPageTemplate(pulumi.CustomResource):
     @pulumi.getter
     def kind(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        The kind of the status page template. Value must be one of <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`">`scheduled`</span>.
+        The kind of the status page template. Value must be one of <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`" pulumi-lang-hcl="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>.
         """
         return pulumi.get(self, "kind")
 
@@ -537,3 +537,4 @@ class StatusPageTemplate(pulumi.CustomResource):
         Title that will be used for the status page update
         """
         return pulumi.get(self, "update_title")
+

@@ -267,6 +267,12 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             "src/bridge/lib/versions.py",
         ],
     ),
+    "rootly": SimplePulumiParams(
+        app_name="rootly",
+        pulumi_project_path="saas/rootly/",
+        pulumi_project_name="ol-saas-rootly",
+        stages=["Production"],
+    ),
     "starrocks": SimplePulumiParams(
         app_name="starrocks",
         pulumi_project_path="applications/starrocks/",

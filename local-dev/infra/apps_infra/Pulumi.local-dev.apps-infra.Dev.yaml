@@ -1,0 +1,16 @@
+---
+config:
+  # Path to the kubeconfig for the k3d cluster.
+  # Defaults to ${HOME}/.kube/config if not set.
+  ol-local-dev-apps-infra:kubeconfig: ""
+  # Domain configuration
+  ol-local-dev-apps-infra:root_domain: "mit.dev"
+  ol-local-dev-apps-infra:keycloak_hostname: "sso.ol.mit.dev"
+  ol-local-dev-apps-infra:keycloak_url: "https://sso.ol.mit.dev"
+  # OIDC client secrets for local dev (plaintext, never commit real secrets)
+  # These are default local-only values; override in your local tilt_config.json
+  ol-local-dev-apps-infra:mitlearn_client_secret: "local-dev-mitlearn-secret" # pragma: allowlist secret
+  ol-local-dev-apps-infra:learn_ai_client_secret: "local-dev-learn-ai-secret" # pragma: allowlist secret
+  ol-local-dev-apps-infra:mitxonline_client_secret: "local-dev-mitxonline-secret" # pragma: allowlist secret
+  ol-local-dev-apps-infra:unified_ecommerce_client_secret: "local-dev-unified-ecommerce-secret" # pragma: allowlist secret
+encryptionsalt: v1:PidwC1BukA0=:v1:fQSvxydFUaIrKsEE:C/DV/mn+diHPVUfZrl/5F5QXOYhEuw==

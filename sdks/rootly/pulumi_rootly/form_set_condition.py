@@ -21,15 +21,15 @@ class FormSetConditionArgs:
     def __init__(__self__, *,
                  form_field_id: pulumi.Input[_builtins.str],
                  values: pulumi.Input[Sequence[pulumi.Input[_builtins.str]]],
-                 comparison: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_set_condition_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_set_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 comparison: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_set_condition_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_set_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a FormSetCondition resource.
 
         :param pulumi.Input[_builtins.str] form_field_id: The form field this condition applies.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] values: The values for comparison.
-        :param pulumi.Input[_builtins.str] comparison: The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`">`equal`</span>.
+        :param pulumi.Input[_builtins.str] comparison: The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`" pulumi-lang-hcl="`equal`">`equal`</span>.
         :param pulumi.Input[_builtins.str] form_set_id: The form set this condition applies.
         """
         pulumi.set(__self__, "form_field_id", form_field_id)
@@ -67,50 +67,50 @@ class FormSetConditionArgs:
 
     @_builtins.property
     @pulumi.getter
-    def comparison(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def comparison(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`">`equal`</span>.
+        The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`" pulumi-lang-hcl="`equal`">`equal`</span>.
         """
         return pulumi.get(self, "comparison")
 
     @comparison.setter
-    def comparison(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def comparison(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "comparison", value)
 
     @_builtins.property
     @pulumi.getter(name="formSetConditionId")
-    def form_set_condition_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def form_set_condition_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "form_set_condition_id")
 
     @form_set_condition_id.setter
-    def form_set_condition_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def form_set_condition_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form_set_condition_id", value)
 
     @_builtins.property
     @pulumi.getter(name="formSetId")
-    def form_set_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def form_set_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The form set this condition applies.
         """
         return pulumi.get(self, "form_set_id")
 
     @form_set_id.setter
-    def form_set_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def form_set_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form_set_id", value)
 
 
 @pulumi.input_type
 class _FormSetConditionState:
     def __init__(__self__, *,
-                 comparison: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_set_condition_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_set_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 values: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None):
+                 comparison: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_set_condition_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_set_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 values: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None):
         """
         Input properties used for looking up and filtering FormSetCondition resources.
 
-        :param pulumi.Input[_builtins.str] comparison: The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`">`equal`</span>.
+        :param pulumi.Input[_builtins.str] comparison: The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`" pulumi-lang-hcl="`equal`">`equal`</span>.
         :param pulumi.Input[_builtins.str] form_field_id: The form field this condition applies.
         :param pulumi.Input[_builtins.str] form_set_id: The form set this condition applies.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] values: The values for comparison.
@@ -128,59 +128,59 @@ class _FormSetConditionState:
 
     @_builtins.property
     @pulumi.getter
-    def comparison(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def comparison(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`">`equal`</span>.
+        The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`" pulumi-lang-hcl="`equal`">`equal`</span>.
         """
         return pulumi.get(self, "comparison")
 
     @comparison.setter
-    def comparison(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def comparison(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "comparison", value)
 
     @_builtins.property
     @pulumi.getter(name="formFieldId")
-    def form_field_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def form_field_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The form field this condition applies.
         """
         return pulumi.get(self, "form_field_id")
 
     @form_field_id.setter
-    def form_field_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def form_field_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form_field_id", value)
 
     @_builtins.property
     @pulumi.getter(name="formSetConditionId")
-    def form_set_condition_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def form_set_condition_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "form_set_condition_id")
 
     @form_set_condition_id.setter
-    def form_set_condition_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def form_set_condition_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form_set_condition_id", value)
 
     @_builtins.property
     @pulumi.getter(name="formSetId")
-    def form_set_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def form_set_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The form set this condition applies.
         """
         return pulumi.get(self, "form_set_id")
 
     @form_set_id.setter
-    def form_set_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def form_set_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form_set_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def values(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def values(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         The values for comparison.
         """
         return pulumi.get(self, "values")
 
     @values.setter
-    def values(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def values(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "values", value)
 
 
@@ -190,18 +190,18 @@ class FormSetCondition(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 comparison: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_set_condition_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_set_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 values: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 comparison: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_set_condition_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_set_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 values: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  __props__=None):
         """
         Create a FormSetCondition resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] comparison: The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`">`equal`</span>.
+        :param pulumi.Input[_builtins.str] comparison: The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`" pulumi-lang-hcl="`equal`">`equal`</span>.
         :param pulumi.Input[_builtins.str] form_field_id: The form field this condition applies.
         :param pulumi.Input[_builtins.str] form_set_id: The form set this condition applies.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] values: The values for comparison.
@@ -230,11 +230,11 @@ class FormSetCondition(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 comparison: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_set_condition_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_set_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 values: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 comparison: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_set_condition_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_set_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 values: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -264,11 +264,11 @@ class FormSetCondition(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            comparison: Optional[pulumi.Input[_builtins.str]] = None,
-            form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-            form_set_condition_id: Optional[pulumi.Input[_builtins.str]] = None,
-            form_set_id: Optional[pulumi.Input[_builtins.str]] = None,
-            values: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None) -> 'FormSetCondition':
+            comparison: pulumi.Input[Optional[_builtins.str]] = None,
+            form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+            form_set_condition_id: pulumi.Input[Optional[_builtins.str]] = None,
+            form_set_id: pulumi.Input[Optional[_builtins.str]] = None,
+            values: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None) -> 'FormSetCondition':
         """
         Get an existing FormSetCondition resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -276,7 +276,7 @@ class FormSetCondition(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] comparison: The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`">`equal`</span>.
+        :param pulumi.Input[_builtins.str] comparison: The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`" pulumi-lang-hcl="`equal`">`equal`</span>.
         :param pulumi.Input[_builtins.str] form_field_id: The form field this condition applies.
         :param pulumi.Input[_builtins.str] form_set_id: The form set this condition applies.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] values: The values for comparison.
@@ -296,7 +296,7 @@ class FormSetCondition(pulumi.CustomResource):
     @pulumi.getter
     def comparison(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`">`equal`</span>.
+        The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`" pulumi-lang-hcl="`equal`">`equal`</span>.
         """
         return pulumi.get(self, "comparison")
 
@@ -328,3 +328,4 @@ class FormSetCondition(pulumi.CustomResource):
         The values for comparison.
         """
         return pulumi.get(self, "values")
+

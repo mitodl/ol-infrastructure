@@ -21,53 +21,54 @@ __all__ = ['LiveCallRouterArgs', 'LiveCallRouter']
 @pulumi.input_type
 class LiveCallRouterArgs:
     def __init__(__self__, *,
+                 country_code: pulumi.Input[_builtins.str],
                  paging_targets: pulumi.Input[Sequence[pulumi.Input['LiveCallRouterPagingTargetArgs']]],
                  phone_number: pulumi.Input[_builtins.str],
-                 alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 caller_greeting: Optional[pulumi.Input[_builtins.str]] = None,
-                 calling_tree_prompt: Optional[pulumi.Input[_builtins.str]] = None,
-                 country_code: Optional[pulumi.Input[_builtins.str]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 escalation_level_delay_in_seconds: Optional[pulumi.Input[_builtins.float]] = None,
-                 escalation_policy_trigger_params: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
-                 kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 live_call_router_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 phone_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 sent_to_voicemail_delay: Optional[pulumi.Input[_builtins.float]] = None,
-                 should_auto_resolve_alert_on_call_end: Optional[pulumi.Input[_builtins.bool]] = None,
-                 should_redirect_to_voicemail_on_no_answer: Optional[pulumi.Input[_builtins.bool]] = None,
-                 voicemail_greeting: Optional[pulumi.Input[_builtins.str]] = None,
-                 waiting_music_url: Optional[pulumi.Input[_builtins.str]] = None):
+                 phone_type: pulumi.Input[_builtins.str],
+                 voicemail_greeting: pulumi.Input[_builtins.str],
+                 alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 caller_greeting: pulumi.Input[Optional[_builtins.str]] = None,
+                 calling_tree_prompt: pulumi.Input[Optional[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 escalation_level_delay_in_seconds: pulumi.Input[Optional[_builtins.float]] = None,
+                 escalation_policy_trigger_params: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 live_call_router_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 sent_to_voicemail_delay: pulumi.Input[Optional[_builtins.float]] = None,
+                 should_auto_resolve_alert_on_call_end: pulumi.Input[Optional[_builtins.bool]] = None,
+                 should_redirect_to_voicemail_on_no_answer: pulumi.Input[Optional[_builtins.bool]] = None,
+                 waiting_music_url: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a LiveCallRouter resource.
 
+        :param pulumi.Input[_builtins.str] country_code: The country code of the live_call_router. Value must be one of `AU`, `CA`, `DE`, `NL`, `NZ`, `GB`, `US`.
         :param pulumi.Input[Sequence[pulumi.Input['LiveCallRouterPagingTargetArgs']]] paging_targets: Paging targets that callers can select from when this live call router is configured as a phone tree.
-        :param pulumi.Input[_builtins.str] phone_number: You can select a phone number using<span pulumi-lang-nodejs=" generatePhoneNumber " pulumi-lang-dotnet=" GeneratePhoneNumber " pulumi-lang-go=" generatePhoneNumber " pulumi-lang-python=" generate_phone_number " pulumi-lang-yaml=" generatePhoneNumber " pulumi-lang-java=" generatePhoneNumber "> generate_phone_number </span>API and pass that phone number here to register
+        :param pulumi.Input[_builtins.str] phone_number: You can select a phone number using <span pulumi-lang-nodejs="[generatePhoneNumber]" pulumi-lang-dotnet="[GeneratePhoneNumber]" pulumi-lang-go="[generatePhoneNumber]" pulumi-lang-python="[generate_phone_number]" pulumi-lang-yaml="[generatePhoneNumber]" pulumi-lang-java="[generatePhoneNumber]" pulumi-lang-hcl="[generate_phone_number]">[generatePhoneNumber]</span>(https://docs.rootly.com/api-reference/livecallrouters/generates-a-phone-number-for-live-call-router) API and pass that phone number here to register
+        :param pulumi.Input[_builtins.str] phone_type: The phone type of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`local`" pulumi-lang-dotnet="`Local`" pulumi-lang-go="`local`" pulumi-lang-python="`local`" pulumi-lang-yaml="`local`" pulumi-lang-java="`local`" pulumi-lang-hcl="`local`">`local`</span>, <span pulumi-lang-nodejs="`tollFree`" pulumi-lang-dotnet="`TollFree`" pulumi-lang-go="`tollFree`" pulumi-lang-python="`toll_free`" pulumi-lang-yaml="`tollFree`" pulumi-lang-java="`tollFree`" pulumi-lang-hcl="`toll_free`">`tollFree`</span>, <span pulumi-lang-nodejs="`mobile`" pulumi-lang-dotnet="`Mobile`" pulumi-lang-go="`mobile`" pulumi-lang-python="`mobile`" pulumi-lang-yaml="`mobile`" pulumi-lang-java="`mobile`" pulumi-lang-hcl="`mobile`">`mobile`</span>.
+        :param pulumi.Input[_builtins.str] voicemail_greeting: The voicemail greeting of the live_call_router
         :param pulumi.Input[_builtins.str] alert_urgency_id: This is used in escalation paths to determine who to page
         :param pulumi.Input[_builtins.str] caller_greeting: The caller greeting message of the live_call_router
         :param pulumi.Input[_builtins.str] calling_tree_prompt: The audio instructions callers will hear when they call this number, prompting them to select from available options to route their call
-        :param pulumi.Input[_builtins.str] country_code: The country code of the live_call_router. Value must be one of `AU`, `CA`, `DE`, `NL`, `NZ`, `GB`, `US`.
         :param pulumi.Input[_builtins.float] escalation_level_delay_in_seconds: This overrides the delay (seconds) in escalation levels
-        :param pulumi.Input[_builtins.str] kind: The kind of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`voicemail`" pulumi-lang-dotnet="`Voicemail`" pulumi-lang-go="`voicemail`" pulumi-lang-python="`voicemail`" pulumi-lang-yaml="`voicemail`" pulumi-lang-java="`voicemail`">`voicemail`</span>, <span pulumi-lang-nodejs="`live`" pulumi-lang-dotnet="`Live`" pulumi-lang-go="`live`" pulumi-lang-python="`live`" pulumi-lang-yaml="`live`" pulumi-lang-java="`live`">`live`</span>.
+        :param pulumi.Input[_builtins.str] kind: The kind of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`voicemail`" pulumi-lang-dotnet="`Voicemail`" pulumi-lang-go="`voicemail`" pulumi-lang-python="`voicemail`" pulumi-lang-yaml="`voicemail`" pulumi-lang-java="`voicemail`" pulumi-lang-hcl="`voicemail`">`voicemail`</span>, <span pulumi-lang-nodejs="`live`" pulumi-lang-dotnet="`Live`" pulumi-lang-go="`live`" pulumi-lang-python="`live`" pulumi-lang-yaml="`live`" pulumi-lang-java="`live`" pulumi-lang-hcl="`live`">`live`</span>.
         :param pulumi.Input[_builtins.str] name: The name of the live_call_router
-        :param pulumi.Input[_builtins.str] phone_type: The phone type of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`local`" pulumi-lang-dotnet="`Local`" pulumi-lang-go="`local`" pulumi-lang-python="`local`" pulumi-lang-yaml="`local`" pulumi-lang-java="`local`">`local`</span>, <span pulumi-lang-nodejs="`tollFree`" pulumi-lang-dotnet="`TollFree`" pulumi-lang-go="`tollFree`" pulumi-lang-python="`toll_free`" pulumi-lang-yaml="`tollFree`" pulumi-lang-java="`tollFree`">`toll_free`</span>, <span pulumi-lang-nodejs="`mobile`" pulumi-lang-dotnet="`Mobile`" pulumi-lang-go="`mobile`" pulumi-lang-python="`mobile`" pulumi-lang-yaml="`mobile`" pulumi-lang-java="`mobile`">`mobile`</span>.
         :param pulumi.Input[_builtins.float] sent_to_voicemail_delay: The delay (seconds) after which the caller in redirected to voicemail
         :param pulumi.Input[_builtins.bool] should_auto_resolve_alert_on_call_end: This overrides the delay (seconds) in escalation levels. Value must be one of true or false
         :param pulumi.Input[_builtins.bool] should_redirect_to_voicemail_on_no_answer: This prompts the caller to choose voicemail or connect live. Value must be one of true or false
-        :param pulumi.Input[_builtins.str] voicemail_greeting: The voicemail greeting of the live_call_router
         :param pulumi.Input[_builtins.str] waiting_music_url: The waiting music URL of the live_call_router. Value must be one of `https://storage.rootly.com/twilio/voicemail/ClockworkWaltz.mp3`, `https://storage.rootly.com/twilio/voicemail/ith_brahms-116-4.mp3`, `https://storage.rootly.com/twilio/voicemail/Mellotroniac_-_Flight_Of_Young_Hearts_Flute.mp3`, `https://storage.rootly.com/twilio/voicemail/BusyStrings.mp3`, `https://storage.rootly.com/twilio/voicemail/oldDog_-_endless_goodbye_%28instr.%29.mp3`, `https://storage.rootly.com/twilio/voicemail/MARKOVICHAMP-Borghestral.mp3`, `https://storage.rootly.com/twilio/voicemail/ith_chopin-15-2.mp3`.
         """
+        pulumi.set(__self__, "country_code", country_code)
         pulumi.set(__self__, "paging_targets", paging_targets)
         pulumi.set(__self__, "phone_number", phone_number)
+        pulumi.set(__self__, "phone_type", phone_type)
+        pulumi.set(__self__, "voicemail_greeting", voicemail_greeting)
         if alert_urgency_id is not None:
             pulumi.set(__self__, "alert_urgency_id", alert_urgency_id)
         if caller_greeting is not None:
             pulumi.set(__self__, "caller_greeting", caller_greeting)
         if calling_tree_prompt is not None:
             pulumi.set(__self__, "calling_tree_prompt", calling_tree_prompt)
-        if country_code is not None:
-            pulumi.set(__self__, "country_code", country_code)
         if enabled is not None:
             pulumi.set(__self__, "enabled", enabled)
         if escalation_level_delay_in_seconds is not None:
@@ -80,18 +81,26 @@ class LiveCallRouterArgs:
             pulumi.set(__self__, "live_call_router_id", live_call_router_id)
         if name is not None:
             pulumi.set(__self__, "name", name)
-        if phone_type is not None:
-            pulumi.set(__self__, "phone_type", phone_type)
         if sent_to_voicemail_delay is not None:
             pulumi.set(__self__, "sent_to_voicemail_delay", sent_to_voicemail_delay)
         if should_auto_resolve_alert_on_call_end is not None:
             pulumi.set(__self__, "should_auto_resolve_alert_on_call_end", should_auto_resolve_alert_on_call_end)
         if should_redirect_to_voicemail_on_no_answer is not None:
             pulumi.set(__self__, "should_redirect_to_voicemail_on_no_answer", should_redirect_to_voicemail_on_no_answer)
-        if voicemail_greeting is not None:
-            pulumi.set(__self__, "voicemail_greeting", voicemail_greeting)
         if waiting_music_url is not None:
             pulumi.set(__self__, "waiting_music_url", waiting_music_url)
+
+    @_builtins.property
+    @pulumi.getter(name="countryCode")
+    def country_code(self) -> pulumi.Input[_builtins.str]:
+        """
+        The country code of the live_call_router. Value must be one of `AU`, `CA`, `DE`, `NL`, `NZ`, `GB`, `US`.
+        """
+        return pulumi.get(self, "country_code")
+
+    @country_code.setter
+    def country_code(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "country_code", value)
 
     @_builtins.property
     @pulumi.getter(name="pagingTargets")
@@ -109,7 +118,7 @@ class LiveCallRouterArgs:
     @pulumi.getter(name="phoneNumber")
     def phone_number(self) -> pulumi.Input[_builtins.str]:
         """
-        You can select a phone number using<span pulumi-lang-nodejs=" generatePhoneNumber " pulumi-lang-dotnet=" GeneratePhoneNumber " pulumi-lang-go=" generatePhoneNumber " pulumi-lang-python=" generate_phone_number " pulumi-lang-yaml=" generatePhoneNumber " pulumi-lang-java=" generatePhoneNumber "> generate_phone_number </span>API and pass that phone number here to register
+        You can select a phone number using <span pulumi-lang-nodejs="[generatePhoneNumber]" pulumi-lang-dotnet="[GeneratePhoneNumber]" pulumi-lang-go="[generatePhoneNumber]" pulumi-lang-python="[generate_phone_number]" pulumi-lang-yaml="[generatePhoneNumber]" pulumi-lang-java="[generatePhoneNumber]" pulumi-lang-hcl="[generate_phone_number]">[generatePhoneNumber]</span>(https://docs.rootly.com/api-reference/livecallrouters/generates-a-phone-number-for-live-call-router) API and pass that phone number here to register
         """
         return pulumi.get(self, "phone_number")
 
@@ -118,210 +127,198 @@ class LiveCallRouterArgs:
         pulumi.set(self, "phone_number", value)
 
     @_builtins.property
-    @pulumi.getter(name="alertUrgencyId")
-    def alert_urgency_id(self) -> Optional[pulumi.Input[_builtins.str]]:
-        """
-        This is used in escalation paths to determine who to page
-        """
-        return pulumi.get(self, "alert_urgency_id")
-
-    @alert_urgency_id.setter
-    def alert_urgency_id(self, value: Optional[pulumi.Input[_builtins.str]]):
-        pulumi.set(self, "alert_urgency_id", value)
-
-    @_builtins.property
-    @pulumi.getter(name="callerGreeting")
-    def caller_greeting(self) -> Optional[pulumi.Input[_builtins.str]]:
-        """
-        The caller greeting message of the live_call_router
-        """
-        return pulumi.get(self, "caller_greeting")
-
-    @caller_greeting.setter
-    def caller_greeting(self, value: Optional[pulumi.Input[_builtins.str]]):
-        pulumi.set(self, "caller_greeting", value)
-
-    @_builtins.property
-    @pulumi.getter(name="callingTreePrompt")
-    def calling_tree_prompt(self) -> Optional[pulumi.Input[_builtins.str]]:
-        """
-        The audio instructions callers will hear when they call this number, prompting them to select from available options to route their call
-        """
-        return pulumi.get(self, "calling_tree_prompt")
-
-    @calling_tree_prompt.setter
-    def calling_tree_prompt(self, value: Optional[pulumi.Input[_builtins.str]]):
-        pulumi.set(self, "calling_tree_prompt", value)
-
-    @_builtins.property
-    @pulumi.getter(name="countryCode")
-    def country_code(self) -> Optional[pulumi.Input[_builtins.str]]:
-        """
-        The country code of the live_call_router. Value must be one of `AU`, `CA`, `DE`, `NL`, `NZ`, `GB`, `US`.
-        """
-        return pulumi.get(self, "country_code")
-
-    @country_code.setter
-    def country_code(self, value: Optional[pulumi.Input[_builtins.str]]):
-        pulumi.set(self, "country_code", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
-        return pulumi.get(self, "enabled")
-
-    @enabled.setter
-    def enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
-        pulumi.set(self, "enabled", value)
-
-    @_builtins.property
-    @pulumi.getter(name="escalationLevelDelayInSeconds")
-    def escalation_level_delay_in_seconds(self) -> Optional[pulumi.Input[_builtins.float]]:
-        """
-        This overrides the delay (seconds) in escalation levels
-        """
-        return pulumi.get(self, "escalation_level_delay_in_seconds")
-
-    @escalation_level_delay_in_seconds.setter
-    def escalation_level_delay_in_seconds(self, value: Optional[pulumi.Input[_builtins.float]]):
-        pulumi.set(self, "escalation_level_delay_in_seconds", value)
-
-    @_builtins.property
-    @pulumi.getter(name="escalationPolicyTriggerParams")
-    def escalation_policy_trigger_params(self) -> Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]]:
-        return pulumi.get(self, "escalation_policy_trigger_params")
-
-    @escalation_policy_trigger_params.setter
-    def escalation_policy_trigger_params(self, value: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]]):
-        pulumi.set(self, "escalation_policy_trigger_params", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def kind(self) -> Optional[pulumi.Input[_builtins.str]]:
-        """
-        The kind of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`voicemail`" pulumi-lang-dotnet="`Voicemail`" pulumi-lang-go="`voicemail`" pulumi-lang-python="`voicemail`" pulumi-lang-yaml="`voicemail`" pulumi-lang-java="`voicemail`">`voicemail`</span>, <span pulumi-lang-nodejs="`live`" pulumi-lang-dotnet="`Live`" pulumi-lang-go="`live`" pulumi-lang-python="`live`" pulumi-lang-yaml="`live`" pulumi-lang-java="`live`">`live`</span>.
-        """
-        return pulumi.get(self, "kind")
-
-    @kind.setter
-    def kind(self, value: Optional[pulumi.Input[_builtins.str]]):
-        pulumi.set(self, "kind", value)
-
-    @_builtins.property
-    @pulumi.getter(name="liveCallRouterId")
-    def live_call_router_id(self) -> Optional[pulumi.Input[_builtins.str]]:
-        return pulumi.get(self, "live_call_router_id")
-
-    @live_call_router_id.setter
-    def live_call_router_id(self, value: Optional[pulumi.Input[_builtins.str]]):
-        pulumi.set(self, "live_call_router_id", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
-        """
-        The name of the live_call_router
-        """
-        return pulumi.get(self, "name")
-
-    @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
-        pulumi.set(self, "name", value)
-
-    @_builtins.property
     @pulumi.getter(name="phoneType")
-    def phone_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def phone_type(self) -> pulumi.Input[_builtins.str]:
         """
-        The phone type of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`local`" pulumi-lang-dotnet="`Local`" pulumi-lang-go="`local`" pulumi-lang-python="`local`" pulumi-lang-yaml="`local`" pulumi-lang-java="`local`">`local`</span>, <span pulumi-lang-nodejs="`tollFree`" pulumi-lang-dotnet="`TollFree`" pulumi-lang-go="`tollFree`" pulumi-lang-python="`toll_free`" pulumi-lang-yaml="`tollFree`" pulumi-lang-java="`tollFree`">`toll_free`</span>, <span pulumi-lang-nodejs="`mobile`" pulumi-lang-dotnet="`Mobile`" pulumi-lang-go="`mobile`" pulumi-lang-python="`mobile`" pulumi-lang-yaml="`mobile`" pulumi-lang-java="`mobile`">`mobile`</span>.
+        The phone type of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`local`" pulumi-lang-dotnet="`Local`" pulumi-lang-go="`local`" pulumi-lang-python="`local`" pulumi-lang-yaml="`local`" pulumi-lang-java="`local`" pulumi-lang-hcl="`local`">`local`</span>, <span pulumi-lang-nodejs="`tollFree`" pulumi-lang-dotnet="`TollFree`" pulumi-lang-go="`tollFree`" pulumi-lang-python="`toll_free`" pulumi-lang-yaml="`tollFree`" pulumi-lang-java="`tollFree`" pulumi-lang-hcl="`toll_free`">`tollFree`</span>, <span pulumi-lang-nodejs="`mobile`" pulumi-lang-dotnet="`Mobile`" pulumi-lang-go="`mobile`" pulumi-lang-python="`mobile`" pulumi-lang-yaml="`mobile`" pulumi-lang-java="`mobile`" pulumi-lang-hcl="`mobile`">`mobile`</span>.
         """
         return pulumi.get(self, "phone_type")
 
     @phone_type.setter
-    def phone_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def phone_type(self, value: pulumi.Input[_builtins.str]):
         pulumi.set(self, "phone_type", value)
 
     @_builtins.property
-    @pulumi.getter(name="sentToVoicemailDelay")
-    def sent_to_voicemail_delay(self) -> Optional[pulumi.Input[_builtins.float]]:
-        """
-        The delay (seconds) after which the caller in redirected to voicemail
-        """
-        return pulumi.get(self, "sent_to_voicemail_delay")
-
-    @sent_to_voicemail_delay.setter
-    def sent_to_voicemail_delay(self, value: Optional[pulumi.Input[_builtins.float]]):
-        pulumi.set(self, "sent_to_voicemail_delay", value)
-
-    @_builtins.property
-    @pulumi.getter(name="shouldAutoResolveAlertOnCallEnd")
-    def should_auto_resolve_alert_on_call_end(self) -> Optional[pulumi.Input[_builtins.bool]]:
-        """
-        This overrides the delay (seconds) in escalation levels. Value must be one of true or false
-        """
-        return pulumi.get(self, "should_auto_resolve_alert_on_call_end")
-
-    @should_auto_resolve_alert_on_call_end.setter
-    def should_auto_resolve_alert_on_call_end(self, value: Optional[pulumi.Input[_builtins.bool]]):
-        pulumi.set(self, "should_auto_resolve_alert_on_call_end", value)
-
-    @_builtins.property
-    @pulumi.getter(name="shouldRedirectToVoicemailOnNoAnswer")
-    def should_redirect_to_voicemail_on_no_answer(self) -> Optional[pulumi.Input[_builtins.bool]]:
-        """
-        This prompts the caller to choose voicemail or connect live. Value must be one of true or false
-        """
-        return pulumi.get(self, "should_redirect_to_voicemail_on_no_answer")
-
-    @should_redirect_to_voicemail_on_no_answer.setter
-    def should_redirect_to_voicemail_on_no_answer(self, value: Optional[pulumi.Input[_builtins.bool]]):
-        pulumi.set(self, "should_redirect_to_voicemail_on_no_answer", value)
-
-    @_builtins.property
     @pulumi.getter(name="voicemailGreeting")
-    def voicemail_greeting(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def voicemail_greeting(self) -> pulumi.Input[_builtins.str]:
         """
         The voicemail greeting of the live_call_router
         """
         return pulumi.get(self, "voicemail_greeting")
 
     @voicemail_greeting.setter
-    def voicemail_greeting(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def voicemail_greeting(self, value: pulumi.Input[_builtins.str]):
         pulumi.set(self, "voicemail_greeting", value)
 
     @_builtins.property
+    @pulumi.getter(name="alertUrgencyId")
+    def alert_urgency_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        This is used in escalation paths to determine who to page
+        """
+        return pulumi.get(self, "alert_urgency_id")
+
+    @alert_urgency_id.setter
+    def alert_urgency_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "alert_urgency_id", value)
+
+    @_builtins.property
+    @pulumi.getter(name="callerGreeting")
+    def caller_greeting(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The caller greeting message of the live_call_router
+        """
+        return pulumi.get(self, "caller_greeting")
+
+    @caller_greeting.setter
+    def caller_greeting(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "caller_greeting", value)
+
+    @_builtins.property
+    @pulumi.getter(name="callingTreePrompt")
+    def calling_tree_prompt(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The audio instructions callers will hear when they call this number, prompting them to select from available options to route their call
+        """
+        return pulumi.get(self, "calling_tree_prompt")
+
+    @calling_tree_prompt.setter
+    def calling_tree_prompt(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "calling_tree_prompt", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        return pulumi.get(self, "enabled")
+
+    @enabled.setter
+    def enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "enabled", value)
+
+    @_builtins.property
+    @pulumi.getter(name="escalationLevelDelayInSeconds")
+    def escalation_level_delay_in_seconds(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        This overrides the delay (seconds) in escalation levels
+        """
+        return pulumi.get(self, "escalation_level_delay_in_seconds")
+
+    @escalation_level_delay_in_seconds.setter
+    def escalation_level_delay_in_seconds(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "escalation_level_delay_in_seconds", value)
+
+    @_builtins.property
+    @pulumi.getter(name="escalationPolicyTriggerParams")
+    def escalation_policy_trigger_params(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
+        return pulumi.get(self, "escalation_policy_trigger_params")
+
+    @escalation_policy_trigger_params.setter
+    def escalation_policy_trigger_params(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "escalation_policy_trigger_params", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def kind(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The kind of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`voicemail`" pulumi-lang-dotnet="`Voicemail`" pulumi-lang-go="`voicemail`" pulumi-lang-python="`voicemail`" pulumi-lang-yaml="`voicemail`" pulumi-lang-java="`voicemail`" pulumi-lang-hcl="`voicemail`">`voicemail`</span>, <span pulumi-lang-nodejs="`live`" pulumi-lang-dotnet="`Live`" pulumi-lang-go="`live`" pulumi-lang-python="`live`" pulumi-lang-yaml="`live`" pulumi-lang-java="`live`" pulumi-lang-hcl="`live`">`live`</span>.
+        """
+        return pulumi.get(self, "kind")
+
+    @kind.setter
+    def kind(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "kind", value)
+
+    @_builtins.property
+    @pulumi.getter(name="liveCallRouterId")
+    def live_call_router_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "live_call_router_id")
+
+    @live_call_router_id.setter
+    def live_call_router_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "live_call_router_id", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The name of the live_call_router
+        """
+        return pulumi.get(self, "name")
+
+    @name.setter
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "name", value)
+
+    @_builtins.property
+    @pulumi.getter(name="sentToVoicemailDelay")
+    def sent_to_voicemail_delay(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        The delay (seconds) after which the caller in redirected to voicemail
+        """
+        return pulumi.get(self, "sent_to_voicemail_delay")
+
+    @sent_to_voicemail_delay.setter
+    def sent_to_voicemail_delay(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "sent_to_voicemail_delay", value)
+
+    @_builtins.property
+    @pulumi.getter(name="shouldAutoResolveAlertOnCallEnd")
+    def should_auto_resolve_alert_on_call_end(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        This overrides the delay (seconds) in escalation levels. Value must be one of true or false
+        """
+        return pulumi.get(self, "should_auto_resolve_alert_on_call_end")
+
+    @should_auto_resolve_alert_on_call_end.setter
+    def should_auto_resolve_alert_on_call_end(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "should_auto_resolve_alert_on_call_end", value)
+
+    @_builtins.property
+    @pulumi.getter(name="shouldRedirectToVoicemailOnNoAnswer")
+    def should_redirect_to_voicemail_on_no_answer(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        This prompts the caller to choose voicemail or connect live. Value must be one of true or false
+        """
+        return pulumi.get(self, "should_redirect_to_voicemail_on_no_answer")
+
+    @should_redirect_to_voicemail_on_no_answer.setter
+    def should_redirect_to_voicemail_on_no_answer(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "should_redirect_to_voicemail_on_no_answer", value)
+
+    @_builtins.property
     @pulumi.getter(name="waitingMusicUrl")
-    def waiting_music_url(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def waiting_music_url(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The waiting music URL of the live_call_router. Value must be one of `https://storage.rootly.com/twilio/voicemail/ClockworkWaltz.mp3`, `https://storage.rootly.com/twilio/voicemail/ith_brahms-116-4.mp3`, `https://storage.rootly.com/twilio/voicemail/Mellotroniac_-_Flight_Of_Young_Hearts_Flute.mp3`, `https://storage.rootly.com/twilio/voicemail/BusyStrings.mp3`, `https://storage.rootly.com/twilio/voicemail/oldDog_-_endless_goodbye_%28instr.%29.mp3`, `https://storage.rootly.com/twilio/voicemail/MARKOVICHAMP-Borghestral.mp3`, `https://storage.rootly.com/twilio/voicemail/ith_chopin-15-2.mp3`.
         """
         return pulumi.get(self, "waiting_music_url")
 
     @waiting_music_url.setter
-    def waiting_music_url(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def waiting_music_url(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "waiting_music_url", value)
 
 
 @pulumi.input_type
 class _LiveCallRouterState:
     def __init__(__self__, *,
-                 alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 caller_greeting: Optional[pulumi.Input[_builtins.str]] = None,
-                 calling_tree_prompt: Optional[pulumi.Input[_builtins.str]] = None,
-                 country_code: Optional[pulumi.Input[_builtins.str]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 escalation_level_delay_in_seconds: Optional[pulumi.Input[_builtins.float]] = None,
-                 escalation_policy_trigger_params: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
-                 kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 live_call_router_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 paging_targets: Optional[pulumi.Input[Sequence[pulumi.Input['LiveCallRouterPagingTargetArgs']]]] = None,
-                 phone_number: Optional[pulumi.Input[_builtins.str]] = None,
-                 phone_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 sent_to_voicemail_delay: Optional[pulumi.Input[_builtins.float]] = None,
-                 should_auto_resolve_alert_on_call_end: Optional[pulumi.Input[_builtins.bool]] = None,
-                 should_redirect_to_voicemail_on_no_answer: Optional[pulumi.Input[_builtins.bool]] = None,
-                 voicemail_greeting: Optional[pulumi.Input[_builtins.str]] = None,
-                 waiting_music_url: Optional[pulumi.Input[_builtins.str]] = None):
+                 alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 caller_greeting: pulumi.Input[Optional[_builtins.str]] = None,
+                 calling_tree_prompt: pulumi.Input[Optional[_builtins.str]] = None,
+                 country_code: pulumi.Input[Optional[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 escalation_level_delay_in_seconds: pulumi.Input[Optional[_builtins.float]] = None,
+                 escalation_policy_trigger_params: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 live_call_router_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 paging_targets: pulumi.Input[Optional[Sequence[pulumi.Input['LiveCallRouterPagingTargetArgs']]]] = None,
+                 phone_number: pulumi.Input[Optional[_builtins.str]] = None,
+                 phone_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 sent_to_voicemail_delay: pulumi.Input[Optional[_builtins.float]] = None,
+                 should_auto_resolve_alert_on_call_end: pulumi.Input[Optional[_builtins.bool]] = None,
+                 should_redirect_to_voicemail_on_no_answer: pulumi.Input[Optional[_builtins.bool]] = None,
+                 voicemail_greeting: pulumi.Input[Optional[_builtins.str]] = None,
+                 waiting_music_url: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering LiveCallRouter resources.
 
@@ -330,11 +327,11 @@ class _LiveCallRouterState:
         :param pulumi.Input[_builtins.str] calling_tree_prompt: The audio instructions callers will hear when they call this number, prompting them to select from available options to route their call
         :param pulumi.Input[_builtins.str] country_code: The country code of the live_call_router. Value must be one of `AU`, `CA`, `DE`, `NL`, `NZ`, `GB`, `US`.
         :param pulumi.Input[_builtins.float] escalation_level_delay_in_seconds: This overrides the delay (seconds) in escalation levels
-        :param pulumi.Input[_builtins.str] kind: The kind of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`voicemail`" pulumi-lang-dotnet="`Voicemail`" pulumi-lang-go="`voicemail`" pulumi-lang-python="`voicemail`" pulumi-lang-yaml="`voicemail`" pulumi-lang-java="`voicemail`">`voicemail`</span>, <span pulumi-lang-nodejs="`live`" pulumi-lang-dotnet="`Live`" pulumi-lang-go="`live`" pulumi-lang-python="`live`" pulumi-lang-yaml="`live`" pulumi-lang-java="`live`">`live`</span>.
+        :param pulumi.Input[_builtins.str] kind: The kind of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`voicemail`" pulumi-lang-dotnet="`Voicemail`" pulumi-lang-go="`voicemail`" pulumi-lang-python="`voicemail`" pulumi-lang-yaml="`voicemail`" pulumi-lang-java="`voicemail`" pulumi-lang-hcl="`voicemail`">`voicemail`</span>, <span pulumi-lang-nodejs="`live`" pulumi-lang-dotnet="`Live`" pulumi-lang-go="`live`" pulumi-lang-python="`live`" pulumi-lang-yaml="`live`" pulumi-lang-java="`live`" pulumi-lang-hcl="`live`">`live`</span>.
         :param pulumi.Input[_builtins.str] name: The name of the live_call_router
         :param pulumi.Input[Sequence[pulumi.Input['LiveCallRouterPagingTargetArgs']]] paging_targets: Paging targets that callers can select from when this live call router is configured as a phone tree.
-        :param pulumi.Input[_builtins.str] phone_number: You can select a phone number using<span pulumi-lang-nodejs=" generatePhoneNumber " pulumi-lang-dotnet=" GeneratePhoneNumber " pulumi-lang-go=" generatePhoneNumber " pulumi-lang-python=" generate_phone_number " pulumi-lang-yaml=" generatePhoneNumber " pulumi-lang-java=" generatePhoneNumber "> generate_phone_number </span>API and pass that phone number here to register
-        :param pulumi.Input[_builtins.str] phone_type: The phone type of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`local`" pulumi-lang-dotnet="`Local`" pulumi-lang-go="`local`" pulumi-lang-python="`local`" pulumi-lang-yaml="`local`" pulumi-lang-java="`local`">`local`</span>, <span pulumi-lang-nodejs="`tollFree`" pulumi-lang-dotnet="`TollFree`" pulumi-lang-go="`tollFree`" pulumi-lang-python="`toll_free`" pulumi-lang-yaml="`tollFree`" pulumi-lang-java="`tollFree`">`toll_free`</span>, <span pulumi-lang-nodejs="`mobile`" pulumi-lang-dotnet="`Mobile`" pulumi-lang-go="`mobile`" pulumi-lang-python="`mobile`" pulumi-lang-yaml="`mobile`" pulumi-lang-java="`mobile`">`mobile`</span>.
+        :param pulumi.Input[_builtins.str] phone_number: You can select a phone number using <span pulumi-lang-nodejs="[generatePhoneNumber]" pulumi-lang-dotnet="[GeneratePhoneNumber]" pulumi-lang-go="[generatePhoneNumber]" pulumi-lang-python="[generate_phone_number]" pulumi-lang-yaml="[generatePhoneNumber]" pulumi-lang-java="[generatePhoneNumber]" pulumi-lang-hcl="[generate_phone_number]">[generatePhoneNumber]</span>(https://docs.rootly.com/api-reference/livecallrouters/generates-a-phone-number-for-live-call-router) API and pass that phone number here to register
+        :param pulumi.Input[_builtins.str] phone_type: The phone type of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`local`" pulumi-lang-dotnet="`Local`" pulumi-lang-go="`local`" pulumi-lang-python="`local`" pulumi-lang-yaml="`local`" pulumi-lang-java="`local`" pulumi-lang-hcl="`local`">`local`</span>, <span pulumi-lang-nodejs="`tollFree`" pulumi-lang-dotnet="`TollFree`" pulumi-lang-go="`tollFree`" pulumi-lang-python="`toll_free`" pulumi-lang-yaml="`tollFree`" pulumi-lang-java="`tollFree`" pulumi-lang-hcl="`toll_free`">`tollFree`</span>, <span pulumi-lang-nodejs="`mobile`" pulumi-lang-dotnet="`Mobile`" pulumi-lang-go="`mobile`" pulumi-lang-python="`mobile`" pulumi-lang-yaml="`mobile`" pulumi-lang-java="`mobile`" pulumi-lang-hcl="`mobile`">`mobile`</span>.
         :param pulumi.Input[_builtins.float] sent_to_voicemail_delay: The delay (seconds) after which the caller in redirected to voicemail
         :param pulumi.Input[_builtins.bool] should_auto_resolve_alert_on_call_end: This overrides the delay (seconds) in escalation levels. Value must be one of true or false
         :param pulumi.Input[_builtins.bool] should_redirect_to_voicemail_on_no_answer: This prompts the caller to choose voicemail or connect live. Value must be one of true or false
@@ -380,209 +377,209 @@ class _LiveCallRouterState:
 
     @_builtins.property
     @pulumi.getter(name="alertUrgencyId")
-    def alert_urgency_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alert_urgency_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         This is used in escalation paths to determine who to page
         """
         return pulumi.get(self, "alert_urgency_id")
 
     @alert_urgency_id.setter
-    def alert_urgency_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alert_urgency_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alert_urgency_id", value)
 
     @_builtins.property
     @pulumi.getter(name="callerGreeting")
-    def caller_greeting(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def caller_greeting(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The caller greeting message of the live_call_router
         """
         return pulumi.get(self, "caller_greeting")
 
     @caller_greeting.setter
-    def caller_greeting(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def caller_greeting(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "caller_greeting", value)
 
     @_builtins.property
     @pulumi.getter(name="callingTreePrompt")
-    def calling_tree_prompt(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def calling_tree_prompt(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The audio instructions callers will hear when they call this number, prompting them to select from available options to route their call
         """
         return pulumi.get(self, "calling_tree_prompt")
 
     @calling_tree_prompt.setter
-    def calling_tree_prompt(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def calling_tree_prompt(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "calling_tree_prompt", value)
 
     @_builtins.property
     @pulumi.getter(name="countryCode")
-    def country_code(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def country_code(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The country code of the live_call_router. Value must be one of `AU`, `CA`, `DE`, `NL`, `NZ`, `GB`, `US`.
         """
         return pulumi.get(self, "country_code")
 
     @country_code.setter
-    def country_code(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def country_code(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "country_code", value)
 
     @_builtins.property
     @pulumi.getter
-    def enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         return pulumi.get(self, "enabled")
 
     @enabled.setter
-    def enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "enabled", value)
 
     @_builtins.property
     @pulumi.getter(name="escalationLevelDelayInSeconds")
-    def escalation_level_delay_in_seconds(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def escalation_level_delay_in_seconds(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         This overrides the delay (seconds) in escalation levels
         """
         return pulumi.get(self, "escalation_level_delay_in_seconds")
 
     @escalation_level_delay_in_seconds.setter
-    def escalation_level_delay_in_seconds(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def escalation_level_delay_in_seconds(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "escalation_level_delay_in_seconds", value)
 
     @_builtins.property
     @pulumi.getter(name="escalationPolicyTriggerParams")
-    def escalation_policy_trigger_params(self) -> Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]]:
+    def escalation_policy_trigger_params(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "escalation_policy_trigger_params")
 
     @escalation_policy_trigger_params.setter
-    def escalation_policy_trigger_params(self, value: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]]):
+    def escalation_policy_trigger_params(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "escalation_policy_trigger_params", value)
 
     @_builtins.property
     @pulumi.getter
-    def kind(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def kind(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The kind of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`voicemail`" pulumi-lang-dotnet="`Voicemail`" pulumi-lang-go="`voicemail`" pulumi-lang-python="`voicemail`" pulumi-lang-yaml="`voicemail`" pulumi-lang-java="`voicemail`">`voicemail`</span>, <span pulumi-lang-nodejs="`live`" pulumi-lang-dotnet="`Live`" pulumi-lang-go="`live`" pulumi-lang-python="`live`" pulumi-lang-yaml="`live`" pulumi-lang-java="`live`">`live`</span>.
+        The kind of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`voicemail`" pulumi-lang-dotnet="`Voicemail`" pulumi-lang-go="`voicemail`" pulumi-lang-python="`voicemail`" pulumi-lang-yaml="`voicemail`" pulumi-lang-java="`voicemail`" pulumi-lang-hcl="`voicemail`">`voicemail`</span>, <span pulumi-lang-nodejs="`live`" pulumi-lang-dotnet="`Live`" pulumi-lang-go="`live`" pulumi-lang-python="`live`" pulumi-lang-yaml="`live`" pulumi-lang-java="`live`" pulumi-lang-hcl="`live`">`live`</span>.
         """
         return pulumi.get(self, "kind")
 
     @kind.setter
-    def kind(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def kind(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "kind", value)
 
     @_builtins.property
     @pulumi.getter(name="liveCallRouterId")
-    def live_call_router_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def live_call_router_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "live_call_router_id")
 
     @live_call_router_id.setter
-    def live_call_router_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def live_call_router_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "live_call_router_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the live_call_router
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="pagingTargets")
-    def paging_targets(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['LiveCallRouterPagingTargetArgs']]]]:
+    def paging_targets(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['LiveCallRouterPagingTargetArgs']]]]:
         """
         Paging targets that callers can select from when this live call router is configured as a phone tree.
         """
         return pulumi.get(self, "paging_targets")
 
     @paging_targets.setter
-    def paging_targets(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['LiveCallRouterPagingTargetArgs']]]]):
+    def paging_targets(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['LiveCallRouterPagingTargetArgs']]]]):
         pulumi.set(self, "paging_targets", value)
 
     @_builtins.property
     @pulumi.getter(name="phoneNumber")
-    def phone_number(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def phone_number(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        You can select a phone number using<span pulumi-lang-nodejs=" generatePhoneNumber " pulumi-lang-dotnet=" GeneratePhoneNumber " pulumi-lang-go=" generatePhoneNumber " pulumi-lang-python=" generate_phone_number " pulumi-lang-yaml=" generatePhoneNumber " pulumi-lang-java=" generatePhoneNumber "> generate_phone_number </span>API and pass that phone number here to register
+        You can select a phone number using <span pulumi-lang-nodejs="[generatePhoneNumber]" pulumi-lang-dotnet="[GeneratePhoneNumber]" pulumi-lang-go="[generatePhoneNumber]" pulumi-lang-python="[generate_phone_number]" pulumi-lang-yaml="[generatePhoneNumber]" pulumi-lang-java="[generatePhoneNumber]" pulumi-lang-hcl="[generate_phone_number]">[generatePhoneNumber]</span>(https://docs.rootly.com/api-reference/livecallrouters/generates-a-phone-number-for-live-call-router) API and pass that phone number here to register
         """
         return pulumi.get(self, "phone_number")
 
     @phone_number.setter
-    def phone_number(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def phone_number(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "phone_number", value)
 
     @_builtins.property
     @pulumi.getter(name="phoneType")
-    def phone_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def phone_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The phone type of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`local`" pulumi-lang-dotnet="`Local`" pulumi-lang-go="`local`" pulumi-lang-python="`local`" pulumi-lang-yaml="`local`" pulumi-lang-java="`local`">`local`</span>, <span pulumi-lang-nodejs="`tollFree`" pulumi-lang-dotnet="`TollFree`" pulumi-lang-go="`tollFree`" pulumi-lang-python="`toll_free`" pulumi-lang-yaml="`tollFree`" pulumi-lang-java="`tollFree`">`toll_free`</span>, <span pulumi-lang-nodejs="`mobile`" pulumi-lang-dotnet="`Mobile`" pulumi-lang-go="`mobile`" pulumi-lang-python="`mobile`" pulumi-lang-yaml="`mobile`" pulumi-lang-java="`mobile`">`mobile`</span>.
+        The phone type of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`local`" pulumi-lang-dotnet="`Local`" pulumi-lang-go="`local`" pulumi-lang-python="`local`" pulumi-lang-yaml="`local`" pulumi-lang-java="`local`" pulumi-lang-hcl="`local`">`local`</span>, <span pulumi-lang-nodejs="`tollFree`" pulumi-lang-dotnet="`TollFree`" pulumi-lang-go="`tollFree`" pulumi-lang-python="`toll_free`" pulumi-lang-yaml="`tollFree`" pulumi-lang-java="`tollFree`" pulumi-lang-hcl="`toll_free`">`tollFree`</span>, <span pulumi-lang-nodejs="`mobile`" pulumi-lang-dotnet="`Mobile`" pulumi-lang-go="`mobile`" pulumi-lang-python="`mobile`" pulumi-lang-yaml="`mobile`" pulumi-lang-java="`mobile`" pulumi-lang-hcl="`mobile`">`mobile`</span>.
         """
         return pulumi.get(self, "phone_type")
 
     @phone_type.setter
-    def phone_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def phone_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "phone_type", value)
 
     @_builtins.property
     @pulumi.getter(name="sentToVoicemailDelay")
-    def sent_to_voicemail_delay(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def sent_to_voicemail_delay(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The delay (seconds) after which the caller in redirected to voicemail
         """
         return pulumi.get(self, "sent_to_voicemail_delay")
 
     @sent_to_voicemail_delay.setter
-    def sent_to_voicemail_delay(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def sent_to_voicemail_delay(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "sent_to_voicemail_delay", value)
 
     @_builtins.property
     @pulumi.getter(name="shouldAutoResolveAlertOnCallEnd")
-    def should_auto_resolve_alert_on_call_end(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def should_auto_resolve_alert_on_call_end(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         This overrides the delay (seconds) in escalation levels. Value must be one of true or false
         """
         return pulumi.get(self, "should_auto_resolve_alert_on_call_end")
 
     @should_auto_resolve_alert_on_call_end.setter
-    def should_auto_resolve_alert_on_call_end(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def should_auto_resolve_alert_on_call_end(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "should_auto_resolve_alert_on_call_end", value)
 
     @_builtins.property
     @pulumi.getter(name="shouldRedirectToVoicemailOnNoAnswer")
-    def should_redirect_to_voicemail_on_no_answer(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def should_redirect_to_voicemail_on_no_answer(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         This prompts the caller to choose voicemail or connect live. Value must be one of true or false
         """
         return pulumi.get(self, "should_redirect_to_voicemail_on_no_answer")
 
     @should_redirect_to_voicemail_on_no_answer.setter
-    def should_redirect_to_voicemail_on_no_answer(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def should_redirect_to_voicemail_on_no_answer(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "should_redirect_to_voicemail_on_no_answer", value)
 
     @_builtins.property
     @pulumi.getter(name="voicemailGreeting")
-    def voicemail_greeting(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def voicemail_greeting(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The voicemail greeting of the live_call_router
         """
         return pulumi.get(self, "voicemail_greeting")
 
     @voicemail_greeting.setter
-    def voicemail_greeting(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def voicemail_greeting(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "voicemail_greeting", value)
 
     @_builtins.property
     @pulumi.getter(name="waitingMusicUrl")
-    def waiting_music_url(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def waiting_music_url(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The waiting music URL of the live_call_router. Value must be one of `https://storage.rootly.com/twilio/voicemail/ClockworkWaltz.mp3`, `https://storage.rootly.com/twilio/voicemail/ith_brahms-116-4.mp3`, `https://storage.rootly.com/twilio/voicemail/Mellotroniac_-_Flight_Of_Young_Hearts_Flute.mp3`, `https://storage.rootly.com/twilio/voicemail/BusyStrings.mp3`, `https://storage.rootly.com/twilio/voicemail/oldDog_-_endless_goodbye_%28instr.%29.mp3`, `https://storage.rootly.com/twilio/voicemail/MARKOVICHAMP-Borghestral.mp3`, `https://storage.rootly.com/twilio/voicemail/ith_chopin-15-2.mp3`.
         """
         return pulumi.get(self, "waiting_music_url")
 
     @waiting_music_url.setter
-    def waiting_music_url(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def waiting_music_url(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "waiting_music_url", value)
 
 
@@ -592,24 +589,24 @@ class LiveCallRouter(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 caller_greeting: Optional[pulumi.Input[_builtins.str]] = None,
-                 calling_tree_prompt: Optional[pulumi.Input[_builtins.str]] = None,
-                 country_code: Optional[pulumi.Input[_builtins.str]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 escalation_level_delay_in_seconds: Optional[pulumi.Input[_builtins.float]] = None,
-                 escalation_policy_trigger_params: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
-                 kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 live_call_router_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 paging_targets: Optional[pulumi.Input[Sequence[pulumi.Input[Union['LiveCallRouterPagingTargetArgs', 'LiveCallRouterPagingTargetArgsDict']]]]] = None,
-                 phone_number: Optional[pulumi.Input[_builtins.str]] = None,
-                 phone_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 sent_to_voicemail_delay: Optional[pulumi.Input[_builtins.float]] = None,
-                 should_auto_resolve_alert_on_call_end: Optional[pulumi.Input[_builtins.bool]] = None,
-                 should_redirect_to_voicemail_on_no_answer: Optional[pulumi.Input[_builtins.bool]] = None,
-                 voicemail_greeting: Optional[pulumi.Input[_builtins.str]] = None,
-                 waiting_music_url: Optional[pulumi.Input[_builtins.str]] = None,
+                 alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 caller_greeting: pulumi.Input[Optional[_builtins.str]] = None,
+                 calling_tree_prompt: pulumi.Input[Optional[_builtins.str]] = None,
+                 country_code: pulumi.Input[Optional[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 escalation_level_delay_in_seconds: pulumi.Input[Optional[_builtins.float]] = None,
+                 escalation_policy_trigger_params: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 live_call_router_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 paging_targets: pulumi.Input[Optional[Sequence[pulumi.Input[Union['LiveCallRouterPagingTargetArgs', 'LiveCallRouterPagingTargetArgsDict']]]]] = None,
+                 phone_number: pulumi.Input[Optional[_builtins.str]] = None,
+                 phone_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 sent_to_voicemail_delay: pulumi.Input[Optional[_builtins.float]] = None,
+                 should_auto_resolve_alert_on_call_end: pulumi.Input[Optional[_builtins.bool]] = None,
+                 should_redirect_to_voicemail_on_no_answer: pulumi.Input[Optional[_builtins.bool]] = None,
+                 voicemail_greeting: pulumi.Input[Optional[_builtins.str]] = None,
+                 waiting_music_url: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a LiveCallRouter resource with the given unique name, props, and options.
@@ -621,11 +618,11 @@ class LiveCallRouter(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] calling_tree_prompt: The audio instructions callers will hear when they call this number, prompting them to select from available options to route their call
         :param pulumi.Input[_builtins.str] country_code: The country code of the live_call_router. Value must be one of `AU`, `CA`, `DE`, `NL`, `NZ`, `GB`, `US`.
         :param pulumi.Input[_builtins.float] escalation_level_delay_in_seconds: This overrides the delay (seconds) in escalation levels
-        :param pulumi.Input[_builtins.str] kind: The kind of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`voicemail`" pulumi-lang-dotnet="`Voicemail`" pulumi-lang-go="`voicemail`" pulumi-lang-python="`voicemail`" pulumi-lang-yaml="`voicemail`" pulumi-lang-java="`voicemail`">`voicemail`</span>, <span pulumi-lang-nodejs="`live`" pulumi-lang-dotnet="`Live`" pulumi-lang-go="`live`" pulumi-lang-python="`live`" pulumi-lang-yaml="`live`" pulumi-lang-java="`live`">`live`</span>.
+        :param pulumi.Input[_builtins.str] kind: The kind of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`voicemail`" pulumi-lang-dotnet="`Voicemail`" pulumi-lang-go="`voicemail`" pulumi-lang-python="`voicemail`" pulumi-lang-yaml="`voicemail`" pulumi-lang-java="`voicemail`" pulumi-lang-hcl="`voicemail`">`voicemail`</span>, <span pulumi-lang-nodejs="`live`" pulumi-lang-dotnet="`Live`" pulumi-lang-go="`live`" pulumi-lang-python="`live`" pulumi-lang-yaml="`live`" pulumi-lang-java="`live`" pulumi-lang-hcl="`live`">`live`</span>.
         :param pulumi.Input[_builtins.str] name: The name of the live_call_router
         :param pulumi.Input[Sequence[pulumi.Input[Union['LiveCallRouterPagingTargetArgs', 'LiveCallRouterPagingTargetArgsDict']]]] paging_targets: Paging targets that callers can select from when this live call router is configured as a phone tree.
-        :param pulumi.Input[_builtins.str] phone_number: You can select a phone number using<span pulumi-lang-nodejs=" generatePhoneNumber " pulumi-lang-dotnet=" GeneratePhoneNumber " pulumi-lang-go=" generatePhoneNumber " pulumi-lang-python=" generate_phone_number " pulumi-lang-yaml=" generatePhoneNumber " pulumi-lang-java=" generatePhoneNumber "> generate_phone_number </span>API and pass that phone number here to register
-        :param pulumi.Input[_builtins.str] phone_type: The phone type of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`local`" pulumi-lang-dotnet="`Local`" pulumi-lang-go="`local`" pulumi-lang-python="`local`" pulumi-lang-yaml="`local`" pulumi-lang-java="`local`">`local`</span>, <span pulumi-lang-nodejs="`tollFree`" pulumi-lang-dotnet="`TollFree`" pulumi-lang-go="`tollFree`" pulumi-lang-python="`toll_free`" pulumi-lang-yaml="`tollFree`" pulumi-lang-java="`tollFree`">`toll_free`</span>, <span pulumi-lang-nodejs="`mobile`" pulumi-lang-dotnet="`Mobile`" pulumi-lang-go="`mobile`" pulumi-lang-python="`mobile`" pulumi-lang-yaml="`mobile`" pulumi-lang-java="`mobile`">`mobile`</span>.
+        :param pulumi.Input[_builtins.str] phone_number: You can select a phone number using <span pulumi-lang-nodejs="[generatePhoneNumber]" pulumi-lang-dotnet="[GeneratePhoneNumber]" pulumi-lang-go="[generatePhoneNumber]" pulumi-lang-python="[generate_phone_number]" pulumi-lang-yaml="[generatePhoneNumber]" pulumi-lang-java="[generatePhoneNumber]" pulumi-lang-hcl="[generate_phone_number]">[generatePhoneNumber]</span>(https://docs.rootly.com/api-reference/livecallrouters/generates-a-phone-number-for-live-call-router) API and pass that phone number here to register
+        :param pulumi.Input[_builtins.str] phone_type: The phone type of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`local`" pulumi-lang-dotnet="`Local`" pulumi-lang-go="`local`" pulumi-lang-python="`local`" pulumi-lang-yaml="`local`" pulumi-lang-java="`local`" pulumi-lang-hcl="`local`">`local`</span>, <span pulumi-lang-nodejs="`tollFree`" pulumi-lang-dotnet="`TollFree`" pulumi-lang-go="`tollFree`" pulumi-lang-python="`toll_free`" pulumi-lang-yaml="`tollFree`" pulumi-lang-java="`tollFree`" pulumi-lang-hcl="`toll_free`">`tollFree`</span>, <span pulumi-lang-nodejs="`mobile`" pulumi-lang-dotnet="`Mobile`" pulumi-lang-go="`mobile`" pulumi-lang-python="`mobile`" pulumi-lang-yaml="`mobile`" pulumi-lang-java="`mobile`" pulumi-lang-hcl="`mobile`">`mobile`</span>.
         :param pulumi.Input[_builtins.float] sent_to_voicemail_delay: The delay (seconds) after which the caller in redirected to voicemail
         :param pulumi.Input[_builtins.bool] should_auto_resolve_alert_on_call_end: This overrides the delay (seconds) in escalation levels. Value must be one of true or false
         :param pulumi.Input[_builtins.bool] should_redirect_to_voicemail_on_no_answer: This prompts the caller to choose voicemail or connect live. Value must be one of true or false
@@ -656,24 +653,24 @@ class LiveCallRouter(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 caller_greeting: Optional[pulumi.Input[_builtins.str]] = None,
-                 calling_tree_prompt: Optional[pulumi.Input[_builtins.str]] = None,
-                 country_code: Optional[pulumi.Input[_builtins.str]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 escalation_level_delay_in_seconds: Optional[pulumi.Input[_builtins.float]] = None,
-                 escalation_policy_trigger_params: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
-                 kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 live_call_router_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 paging_targets: Optional[pulumi.Input[Sequence[pulumi.Input[Union['LiveCallRouterPagingTargetArgs', 'LiveCallRouterPagingTargetArgsDict']]]]] = None,
-                 phone_number: Optional[pulumi.Input[_builtins.str]] = None,
-                 phone_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 sent_to_voicemail_delay: Optional[pulumi.Input[_builtins.float]] = None,
-                 should_auto_resolve_alert_on_call_end: Optional[pulumi.Input[_builtins.bool]] = None,
-                 should_redirect_to_voicemail_on_no_answer: Optional[pulumi.Input[_builtins.bool]] = None,
-                 voicemail_greeting: Optional[pulumi.Input[_builtins.str]] = None,
-                 waiting_music_url: Optional[pulumi.Input[_builtins.str]] = None,
+                 alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 caller_greeting: pulumi.Input[Optional[_builtins.str]] = None,
+                 calling_tree_prompt: pulumi.Input[Optional[_builtins.str]] = None,
+                 country_code: pulumi.Input[Optional[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 escalation_level_delay_in_seconds: pulumi.Input[Optional[_builtins.float]] = None,
+                 escalation_policy_trigger_params: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 live_call_router_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 paging_targets: pulumi.Input[Optional[Sequence[pulumi.Input[Union['LiveCallRouterPagingTargetArgs', 'LiveCallRouterPagingTargetArgsDict']]]]] = None,
+                 phone_number: pulumi.Input[Optional[_builtins.str]] = None,
+                 phone_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 sent_to_voicemail_delay: pulumi.Input[Optional[_builtins.float]] = None,
+                 should_auto_resolve_alert_on_call_end: pulumi.Input[Optional[_builtins.bool]] = None,
+                 should_redirect_to_voicemail_on_no_answer: pulumi.Input[Optional[_builtins.bool]] = None,
+                 voicemail_greeting: pulumi.Input[Optional[_builtins.str]] = None,
+                 waiting_music_url: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -686,6 +683,8 @@ class LiveCallRouter(pulumi.CustomResource):
             __props__.__dict__["alert_urgency_id"] = alert_urgency_id
             __props__.__dict__["caller_greeting"] = caller_greeting
             __props__.__dict__["calling_tree_prompt"] = calling_tree_prompt
+            if country_code is None and not opts.urn:
+                raise TypeError("Missing required property 'country_code'")
             __props__.__dict__["country_code"] = country_code
             __props__.__dict__["enabled"] = enabled
             __props__.__dict__["escalation_level_delay_in_seconds"] = escalation_level_delay_in_seconds
@@ -699,10 +698,14 @@ class LiveCallRouter(pulumi.CustomResource):
             if phone_number is None and not opts.urn:
                 raise TypeError("Missing required property 'phone_number'")
             __props__.__dict__["phone_number"] = phone_number
+            if phone_type is None and not opts.urn:
+                raise TypeError("Missing required property 'phone_type'")
             __props__.__dict__["phone_type"] = phone_type
             __props__.__dict__["sent_to_voicemail_delay"] = sent_to_voicemail_delay
             __props__.__dict__["should_auto_resolve_alert_on_call_end"] = should_auto_resolve_alert_on_call_end
             __props__.__dict__["should_redirect_to_voicemail_on_no_answer"] = should_redirect_to_voicemail_on_no_answer
+            if voicemail_greeting is None and not opts.urn:
+                raise TypeError("Missing required property 'voicemail_greeting'")
             __props__.__dict__["voicemail_greeting"] = voicemail_greeting
             __props__.__dict__["waiting_music_url"] = waiting_music_url
         super(LiveCallRouter, __self__).__init__(
@@ -716,24 +719,24 @@ class LiveCallRouter(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-            caller_greeting: Optional[pulumi.Input[_builtins.str]] = None,
-            calling_tree_prompt: Optional[pulumi.Input[_builtins.str]] = None,
-            country_code: Optional[pulumi.Input[_builtins.str]] = None,
-            enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-            escalation_level_delay_in_seconds: Optional[pulumi.Input[_builtins.float]] = None,
-            escalation_policy_trigger_params: Optional[pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
-            kind: Optional[pulumi.Input[_builtins.str]] = None,
-            live_call_router_id: Optional[pulumi.Input[_builtins.str]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            paging_targets: Optional[pulumi.Input[Sequence[pulumi.Input[Union['LiveCallRouterPagingTargetArgs', 'LiveCallRouterPagingTargetArgsDict']]]]] = None,
-            phone_number: Optional[pulumi.Input[_builtins.str]] = None,
-            phone_type: Optional[pulumi.Input[_builtins.str]] = None,
-            sent_to_voicemail_delay: Optional[pulumi.Input[_builtins.float]] = None,
-            should_auto_resolve_alert_on_call_end: Optional[pulumi.Input[_builtins.bool]] = None,
-            should_redirect_to_voicemail_on_no_answer: Optional[pulumi.Input[_builtins.bool]] = None,
-            voicemail_greeting: Optional[pulumi.Input[_builtins.str]] = None,
-            waiting_music_url: Optional[pulumi.Input[_builtins.str]] = None) -> 'LiveCallRouter':
+            alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+            caller_greeting: pulumi.Input[Optional[_builtins.str]] = None,
+            calling_tree_prompt: pulumi.Input[Optional[_builtins.str]] = None,
+            country_code: pulumi.Input[Optional[_builtins.str]] = None,
+            enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+            escalation_level_delay_in_seconds: pulumi.Input[Optional[_builtins.float]] = None,
+            escalation_policy_trigger_params: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+            kind: pulumi.Input[Optional[_builtins.str]] = None,
+            live_call_router_id: pulumi.Input[Optional[_builtins.str]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            paging_targets: pulumi.Input[Optional[Sequence[pulumi.Input[Union['LiveCallRouterPagingTargetArgs', 'LiveCallRouterPagingTargetArgsDict']]]]] = None,
+            phone_number: pulumi.Input[Optional[_builtins.str]] = None,
+            phone_type: pulumi.Input[Optional[_builtins.str]] = None,
+            sent_to_voicemail_delay: pulumi.Input[Optional[_builtins.float]] = None,
+            should_auto_resolve_alert_on_call_end: pulumi.Input[Optional[_builtins.bool]] = None,
+            should_redirect_to_voicemail_on_no_answer: pulumi.Input[Optional[_builtins.bool]] = None,
+            voicemail_greeting: pulumi.Input[Optional[_builtins.str]] = None,
+            waiting_music_url: pulumi.Input[Optional[_builtins.str]] = None) -> 'LiveCallRouter':
         """
         Get an existing LiveCallRouter resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -746,11 +749,11 @@ class LiveCallRouter(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] calling_tree_prompt: The audio instructions callers will hear when they call this number, prompting them to select from available options to route their call
         :param pulumi.Input[_builtins.str] country_code: The country code of the live_call_router. Value must be one of `AU`, `CA`, `DE`, `NL`, `NZ`, `GB`, `US`.
         :param pulumi.Input[_builtins.float] escalation_level_delay_in_seconds: This overrides the delay (seconds) in escalation levels
-        :param pulumi.Input[_builtins.str] kind: The kind of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`voicemail`" pulumi-lang-dotnet="`Voicemail`" pulumi-lang-go="`voicemail`" pulumi-lang-python="`voicemail`" pulumi-lang-yaml="`voicemail`" pulumi-lang-java="`voicemail`">`voicemail`</span>, <span pulumi-lang-nodejs="`live`" pulumi-lang-dotnet="`Live`" pulumi-lang-go="`live`" pulumi-lang-python="`live`" pulumi-lang-yaml="`live`" pulumi-lang-java="`live`">`live`</span>.
+        :param pulumi.Input[_builtins.str] kind: The kind of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`voicemail`" pulumi-lang-dotnet="`Voicemail`" pulumi-lang-go="`voicemail`" pulumi-lang-python="`voicemail`" pulumi-lang-yaml="`voicemail`" pulumi-lang-java="`voicemail`" pulumi-lang-hcl="`voicemail`">`voicemail`</span>, <span pulumi-lang-nodejs="`live`" pulumi-lang-dotnet="`Live`" pulumi-lang-go="`live`" pulumi-lang-python="`live`" pulumi-lang-yaml="`live`" pulumi-lang-java="`live`" pulumi-lang-hcl="`live`">`live`</span>.
         :param pulumi.Input[_builtins.str] name: The name of the live_call_router
         :param pulumi.Input[Sequence[pulumi.Input[Union['LiveCallRouterPagingTargetArgs', 'LiveCallRouterPagingTargetArgsDict']]]] paging_targets: Paging targets that callers can select from when this live call router is configured as a phone tree.
-        :param pulumi.Input[_builtins.str] phone_number: You can select a phone number using<span pulumi-lang-nodejs=" generatePhoneNumber " pulumi-lang-dotnet=" GeneratePhoneNumber " pulumi-lang-go=" generatePhoneNumber " pulumi-lang-python=" generate_phone_number " pulumi-lang-yaml=" generatePhoneNumber " pulumi-lang-java=" generatePhoneNumber "> generate_phone_number </span>API and pass that phone number here to register
-        :param pulumi.Input[_builtins.str] phone_type: The phone type of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`local`" pulumi-lang-dotnet="`Local`" pulumi-lang-go="`local`" pulumi-lang-python="`local`" pulumi-lang-yaml="`local`" pulumi-lang-java="`local`">`local`</span>, <span pulumi-lang-nodejs="`tollFree`" pulumi-lang-dotnet="`TollFree`" pulumi-lang-go="`tollFree`" pulumi-lang-python="`toll_free`" pulumi-lang-yaml="`tollFree`" pulumi-lang-java="`tollFree`">`toll_free`</span>, <span pulumi-lang-nodejs="`mobile`" pulumi-lang-dotnet="`Mobile`" pulumi-lang-go="`mobile`" pulumi-lang-python="`mobile`" pulumi-lang-yaml="`mobile`" pulumi-lang-java="`mobile`">`mobile`</span>.
+        :param pulumi.Input[_builtins.str] phone_number: You can select a phone number using <span pulumi-lang-nodejs="[generatePhoneNumber]" pulumi-lang-dotnet="[GeneratePhoneNumber]" pulumi-lang-go="[generatePhoneNumber]" pulumi-lang-python="[generate_phone_number]" pulumi-lang-yaml="[generatePhoneNumber]" pulumi-lang-java="[generatePhoneNumber]" pulumi-lang-hcl="[generate_phone_number]">[generatePhoneNumber]</span>(https://docs.rootly.com/api-reference/livecallrouters/generates-a-phone-number-for-live-call-router) API and pass that phone number here to register
+        :param pulumi.Input[_builtins.str] phone_type: The phone type of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`local`" pulumi-lang-dotnet="`Local`" pulumi-lang-go="`local`" pulumi-lang-python="`local`" pulumi-lang-yaml="`local`" pulumi-lang-java="`local`" pulumi-lang-hcl="`local`">`local`</span>, <span pulumi-lang-nodejs="`tollFree`" pulumi-lang-dotnet="`TollFree`" pulumi-lang-go="`tollFree`" pulumi-lang-python="`toll_free`" pulumi-lang-yaml="`tollFree`" pulumi-lang-java="`tollFree`" pulumi-lang-hcl="`toll_free`">`tollFree`</span>, <span pulumi-lang-nodejs="`mobile`" pulumi-lang-dotnet="`Mobile`" pulumi-lang-go="`mobile`" pulumi-lang-python="`mobile`" pulumi-lang-yaml="`mobile`" pulumi-lang-java="`mobile`" pulumi-lang-hcl="`mobile`">`mobile`</span>.
         :param pulumi.Input[_builtins.float] sent_to_voicemail_delay: The delay (seconds) after which the caller in redirected to voicemail
         :param pulumi.Input[_builtins.bool] should_auto_resolve_alert_on_call_end: This overrides the delay (seconds) in escalation levels. Value must be one of true or false
         :param pulumi.Input[_builtins.bool] should_redirect_to_voicemail_on_no_answer: This prompts the caller to choose voicemail or connect live. Value must be one of true or false
@@ -807,7 +810,7 @@ class LiveCallRouter(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter(name="countryCode")
-    def country_code(self) -> pulumi.Output[Optional[_builtins.str]]:
+    def country_code(self) -> pulumi.Output[_builtins.str]:
         """
         The country code of the live_call_router. Value must be one of `AU`, `CA`, `DE`, `NL`, `NZ`, `GB`, `US`.
         """
@@ -835,7 +838,7 @@ class LiveCallRouter(pulumi.CustomResource):
     @pulumi.getter
     def kind(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        The kind of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`voicemail`" pulumi-lang-dotnet="`Voicemail`" pulumi-lang-go="`voicemail`" pulumi-lang-python="`voicemail`" pulumi-lang-yaml="`voicemail`" pulumi-lang-java="`voicemail`">`voicemail`</span>, <span pulumi-lang-nodejs="`live`" pulumi-lang-dotnet="`Live`" pulumi-lang-go="`live`" pulumi-lang-python="`live`" pulumi-lang-yaml="`live`" pulumi-lang-java="`live`">`live`</span>.
+        The kind of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`voicemail`" pulumi-lang-dotnet="`Voicemail`" pulumi-lang-go="`voicemail`" pulumi-lang-python="`voicemail`" pulumi-lang-yaml="`voicemail`" pulumi-lang-java="`voicemail`" pulumi-lang-hcl="`voicemail`">`voicemail`</span>, <span pulumi-lang-nodejs="`live`" pulumi-lang-dotnet="`Live`" pulumi-lang-go="`live`" pulumi-lang-python="`live`" pulumi-lang-yaml="`live`" pulumi-lang-java="`live`" pulumi-lang-hcl="`live`">`live`</span>.
         """
         return pulumi.get(self, "kind")
 
@@ -864,15 +867,15 @@ class LiveCallRouter(pulumi.CustomResource):
     @pulumi.getter(name="phoneNumber")
     def phone_number(self) -> pulumi.Output[_builtins.str]:
         """
-        You can select a phone number using<span pulumi-lang-nodejs=" generatePhoneNumber " pulumi-lang-dotnet=" GeneratePhoneNumber " pulumi-lang-go=" generatePhoneNumber " pulumi-lang-python=" generate_phone_number " pulumi-lang-yaml=" generatePhoneNumber " pulumi-lang-java=" generatePhoneNumber "> generate_phone_number </span>API and pass that phone number here to register
+        You can select a phone number using <span pulumi-lang-nodejs="[generatePhoneNumber]" pulumi-lang-dotnet="[GeneratePhoneNumber]" pulumi-lang-go="[generatePhoneNumber]" pulumi-lang-python="[generate_phone_number]" pulumi-lang-yaml="[generatePhoneNumber]" pulumi-lang-java="[generatePhoneNumber]" pulumi-lang-hcl="[generate_phone_number]">[generatePhoneNumber]</span>(https://docs.rootly.com/api-reference/livecallrouters/generates-a-phone-number-for-live-call-router) API and pass that phone number here to register
         """
         return pulumi.get(self, "phone_number")
 
     @_builtins.property
     @pulumi.getter(name="phoneType")
-    def phone_type(self) -> pulumi.Output[Optional[_builtins.str]]:
+    def phone_type(self) -> pulumi.Output[_builtins.str]:
         """
-        The phone type of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`local`" pulumi-lang-dotnet="`Local`" pulumi-lang-go="`local`" pulumi-lang-python="`local`" pulumi-lang-yaml="`local`" pulumi-lang-java="`local`">`local`</span>, <span pulumi-lang-nodejs="`tollFree`" pulumi-lang-dotnet="`TollFree`" pulumi-lang-go="`tollFree`" pulumi-lang-python="`toll_free`" pulumi-lang-yaml="`tollFree`" pulumi-lang-java="`tollFree`">`toll_free`</span>, <span pulumi-lang-nodejs="`mobile`" pulumi-lang-dotnet="`Mobile`" pulumi-lang-go="`mobile`" pulumi-lang-python="`mobile`" pulumi-lang-yaml="`mobile`" pulumi-lang-java="`mobile`">`mobile`</span>.
+        The phone type of the live_call_router. Value must be one of <span pulumi-lang-nodejs="`local`" pulumi-lang-dotnet="`Local`" pulumi-lang-go="`local`" pulumi-lang-python="`local`" pulumi-lang-yaml="`local`" pulumi-lang-java="`local`" pulumi-lang-hcl="`local`">`local`</span>, <span pulumi-lang-nodejs="`tollFree`" pulumi-lang-dotnet="`TollFree`" pulumi-lang-go="`tollFree`" pulumi-lang-python="`toll_free`" pulumi-lang-yaml="`tollFree`" pulumi-lang-java="`tollFree`" pulumi-lang-hcl="`toll_free`">`tollFree`</span>, <span pulumi-lang-nodejs="`mobile`" pulumi-lang-dotnet="`Mobile`" pulumi-lang-go="`mobile`" pulumi-lang-python="`mobile`" pulumi-lang-yaml="`mobile`" pulumi-lang-java="`mobile`" pulumi-lang-hcl="`mobile`">`mobile`</span>.
         """
         return pulumi.get(self, "phone_type")
 
@@ -915,3 +918,4 @@ class LiveCallRouter(pulumi.CustomResource):
         The waiting music URL of the live_call_router. Value must be one of `https://storage.rootly.com/twilio/voicemail/ClockworkWaltz.mp3`, `https://storage.rootly.com/twilio/voicemail/ith_brahms-116-4.mp3`, `https://storage.rootly.com/twilio/voicemail/Mellotroniac_-_Flight_Of_Young_Hearts_Flute.mp3`, `https://storage.rootly.com/twilio/voicemail/BusyStrings.mp3`, `https://storage.rootly.com/twilio/voicemail/oldDog_-_endless_goodbye_%28instr.%29.mp3`, `https://storage.rootly.com/twilio/voicemail/MARKOVICHAMP-Borghestral.mp3`, `https://storage.rootly.com/twilio/voicemail/ith_chopin-15-2.mp3`.
         """
         return pulumi.get(self, "waiting_music_url")
+

@@ -92,9 +92,9 @@ def get_incident_sub_status(assigned_at: Optional[Mapping[str, _builtins.str]] =
         id=pulumi.get(__ret__, 'id'),
         incident_id=pulumi.get(__ret__, 'incident_id'),
         sub_status_id=pulumi.get(__ret__, 'sub_status_id'))
-def get_incident_sub_status_output(assigned_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
-                                   incident_id: Optional[pulumi.Input[_builtins.str]] = None,
-                                   sub_status_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_incident_sub_status_output(assigned_at: pulumi.Input[Optional[Optional[Mapping[str, _builtins.str]]]] = None,
+                                   incident_id: pulumi.Input[Optional[_builtins.str]] = None,
+                                   sub_status_id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                                    opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetIncidentSubStatusResult]:
     """
     Use this data source to access information about an existing resource.

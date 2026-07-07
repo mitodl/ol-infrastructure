@@ -78,6 +78,16 @@ config:
   keycloak_realm:ol-data-platform-openmetadata-client-roles:
   - "open_metadata_admin"
   - "open_metadata_user"
+  keycloak_realm:ol-data-platform-starrocks-redirect-uris:
+  - "https://lakehouse.starrocks.ol.mit.edu/*"
+  - "https://lakehouse.starrocks.ol.mit.edu/api/oauth2"
+  keycloak_realm:ol-data-platform-starrocks-client-roles:
+  - "ol_platform_admin"
+  - "ol_data_engineer"
+  - "ol_data_analyst"
+  - "ol_researcher"
+  - "ol_instructor"
+  - "ol_business_analyst"
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   keycloak_realm:olapps_email_theme: ol-learn
@@ -119,5 +129,9 @@ config:
   - "https://ocw-studio.odl.mit.edu/"
   keycloak_realm:ol-mit-ocw-studio-web-origins:
   - "https://ocw-studio.odl.mit.edu"
+  keycloak_realm:ol-platform-engineering-opik-redirect-uris:
+  - https://opik.ol.mit.edu/*
+  keycloak_realm:ol-platform-engineering-openlit-redirect-uris:
+  - https://openlit.ol.mit.edu/*
   keycloak_realm:ol-mit-ldap-bind-password:
     secure: v1:xuY2YgyBZnGNLTMy:ZnmyEmcaAOFd8EsiQX+7uG4rBcyP5QmVbI2HI39kkDllxf2TFRovQA==

@@ -9,21 +9,25 @@ Key differences from the existing jupyterhub/deployment.py:
 - No course image pre-puller
 """
 
+import base64
+import json
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference
+from pulumi import Config, InvokeOptions, ResourceOptions, StackReference
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.lib.versions import JUPYTERHUB_CHART_VERSION, MARIMO_JUPYTERLAB_VERSION
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole
 from ol_infrastructure.components.services.apisix import (
-    OLApisixRoute,
-    OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+)
+from ol_infrastructure.components.services.apisix_gateway_api import (
+    OLApisixHTTPRoute,
+    OLApisixHTTPRouteConfig,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -159,6 +163,36 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
         ),
     )
 
+    # Docker-registry pull secret for ghcr.io/mitodl private images.
+    # The odlbot GitHub PAT (read:packages scope) is read from Vault at deploy time
+    # and written as a kubernetes.io/dockerconfigjson secret so KubeSpawner can pull
+    # ghcr.io/mitodl/marimo-jupyterlab without anonymous auth (which GHCR denies).
+    odlbot_github_token = vault.generic.get_secret_output(
+        path="secret-operations/global/odlbot-github-access-token",
+        opts=InvokeOptions(parent=vault_policy),
+    )
+    ghcr_pull_secret_name = f"{base_name}-ghcr-pull-secret"
+
+    def _make_dockerconfig_json(token: str) -> str:
+        auth = base64.b64encode(f"odlbot:{token}".encode()).decode()
+        return json.dumps({"auths": {"ghcr.io": {"auth": auth}}})
+
+    ghcr_pull_secret = kubernetes.core.v1.Secret(
+        f"{base_name}-ghcr-pull-secret-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=ghcr_pull_secret_name,
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+        type="kubernetes.io/dockerconfigjson",
+        string_data={
+            ".dockerconfigjson": odlbot_github_token.data["value"].apply(
+                _make_dockerconfig_json
+            ),
+        },
+        opts=ResourceOptions(depends_on=[vault_k8s_resources]),
+    )
+
     # VaultStaticSecret: syncs ol-marimo-client OIDC credentials into the namespace
     # so the hub pod can read OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET from env vars.
     oidc_secret_name = "jupyterhub-data-oidc-secret"  # noqa: S105  # pragma: allowlist secret
@@ -249,7 +283,9 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
         opts=ResourceOptions(depends_on=app_vault_backend),
     )
 
-    # APISIX shared plugins (request-id, etc.) — no OIDC plugin; JupyterHub owns auth
+    # APISIX shared plugins (request-id, prometheus, etc.) — creates both v2
+    # ApisixPluginConfig (legacy) and v1alpha1 PluginConfig (Gateway API) resources
+    # under the same name so OLApisixHTTPRoute can reference it via ExtensionRef.
     shared_plugins = OLApisixSharedPlugins(
         name=f"ol-{base_name}-external-service-apisix-plugins",
         plugin_config=OLApisixSharedPluginsConfig(
@@ -261,7 +297,8 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
         ),
     )
 
-    # TLS certificate for the JupyterHub domain
+    # TLS certificate for the JupyterHub domain. ApisixTls is still required
+    # for APISIX to perform TLS termination even when routing via HTTPRoute.
     api_tls_secret_name = f"api-{base_name}-tls-pair"
     OLCertManagerCert(
         f"ol-{base_name}-cert-manager-certificate-{stack_info.env_suffix}",
@@ -275,24 +312,43 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
         ),
     )
 
-    # APISIX route: TLS termination + WebSocket proxying. No openid-connect plugin.
-    OLApisixRoute(
-        name=f"ol-{base_name}-k8s-apisix-route-{stack_info.env_suffix}",
-        k8s_namespace=namespace,
-        k8s_labels=application_labels,
+    # Gateway API HTTPRoute — replaces legacy ApisixRoute CRD.
+    # External-DNS reads spec.hostnames and creates the Route53 record automatically
+    # (via --source=gateway-httproute) pointing at the APISIX ELB, so no manual
+    # eks:apisix_domains entry is needed.
+    # Port 80 is passed as a numeric value because proxy-public exposes port 80
+    # named "http", and the port-name-to-number mapping in OLApisixHTTPRoute
+    # defaults "http" to the nginx default (8071) which is wrong here.
+    OLApisixHTTPRoute(
+        name=f"ol-{base_name}-k8s-apisix-httproute-{stack_info.env_suffix}",
         route_configs=[
-            OLApisixRouteConfig(
+            OLApisixHTTPRouteConfig(
                 route_name=base_name,
-                priority=0,
                 shared_plugin_config_name=shared_plugins.resource_name,
                 plugins=[],
                 hosts=[domain_name],
                 paths=["/*"],
                 backend_service_name="proxy-public",
-                backend_service_port="http",
+                backend_service_port=80,
+                # APISIX only upgrades WebSockets when the routed Service port
+                # advertises appProtocol: kubernetes.io/ws. z2jh's proxy-public
+                # can't set that on its main port, so websocket=True makes the
+                # component create a sibling "proxy-public-ws" Service (selecting
+                # the CHP proxy pods) with the hint and route through it. Without
+                # this, /marimo/ws (and all kernel/terminal sockets) arrive as
+                # plain GETs and marimo reports "kernel not found".
                 websocket=True,
+                websocket_backend_selector={
+                    "app": "jupyterhub",
+                    "component": "proxy",
+                    "release": base_name,
+                },
+                # proxy-public maps numeric port 80 -> named targetPort "http".
+                websocket_backend_target_port="http",
             ),
         ],
+        k8s_namespace=namespace,
+        k8s_labels=application_labels,
         opts=ResourceOptions(delete_before_replace=True),
     )
 
@@ -318,6 +374,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
             "keycloak_realm": keycloak_realm,
             "login_service": "MIT OL Data Platform",
             "username_claim": "preferred_username",
+            "base_url": f"https://{domain_name}",
         }
     )
 
@@ -430,16 +487,55 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                         # Use Always while MARIMO_JUPYTERLAB_VERSION is "latest";
                         # switch to IfNotPresent once pinned to a versioned tag.
                         "pullPolicy": "Always",
+                        "pullSecrets": [ghcr_pull_secret_name],
                     },
                     "cmd": ["jupyterhub-singleuser"],
                     "startTimeout": 300,
                     "networkPolicy": {"enabled": False},
+                    # Seed a getting-started notebook into the user's home on
+                    # first login. cp -n is a no-op if the file already exists,
+                    # so user edits are never overwritten by a pod restart.
+                    "lifecycleHooks": {
+                        "postStart": {
+                            "exec": {
+                                "command": [
+                                    "sh",
+                                    "-c",
+                                    "mkdir -p /home/jovyan/notebooks && "
+                                    "cp -n "
+                                    "/usr/local/share/marimo/templates/"
+                                    "getting_started.py "
+                                    "/home/jovyan/notebooks/getting_started.py",
+                                ]
+                            }
+                        }
+                    },
+                    # Configure marimo-jupyter-extension to run each notebook in
+                    # an isolated uv virtual environment (sandbox mode). uvx reads
+                    # the `/// script` PEP 723 inline metadata header in each .py
+                    # file to install exactly the packages that notebook declares,
+                    # ensuring reproducibility. UV_CACHE_DIR points to the EFS home
+                    # volume so venvs persist across pod restarts and are not
+                    # recreated on every open. timeout=120 covers the first-open
+                    # cost of downloading and building the per-notebook venv.
+                    "extraFiles": {
+                        "jupyter-server-config": {
+                            "mountPath": "/etc/jupyter/jupyter_server_config.py",
+                            "stringData": (
+                                "c.MarimoProxyConfig.uvx_path"
+                                ' = "/usr/local/bin/uvx"\n'
+                                "c.MarimoProxyConfig.timeout = 120\n"
+                            ),
+                        }
+                    },
                     "extraEnv": {
                         "TRINO_HOST": trino_host,
                         "TRINO_PORT": "443",
                         "JUPYTERHUB_SINGLEUSER_APP": (
                             "jupyter_server.serverapp.ServerApp"
                         ),
+                        # uv cache on EFS so per-notebook venvs survive pod restarts
+                        "UV_CACHE_DIR": "/home/jovyan/.cache/uv",
                     },
                     "storage": {
                         "type": "dynamic",
@@ -462,6 +558,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                 app_db_creds_dynamic_secret,
                 oidc_static_secret,
                 crypt_key_static_secret,
+                ghcr_pull_secret,
             ],
         ),
     )

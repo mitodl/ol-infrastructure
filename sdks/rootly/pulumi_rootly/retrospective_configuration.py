@@ -19,11 +19,11 @@ __all__ = ['RetrospectiveConfigurationArgs', 'RetrospectiveConfiguration']
 @pulumi.input_type
 class RetrospectiveConfigurationArgs:
     def __init__(__self__, *,
-                 group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 retrospective_configuration_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 severity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None):
+                 group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 incident_type_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 retrospective_configuration_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 severity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None):
         """
         The set of arguments for constructing a RetrospectiveConfiguration resource.
 
@@ -45,70 +45,70 @@ class RetrospectiveConfigurationArgs:
 
     @_builtins.property
     @pulumi.getter(name="groupIds")
-    def group_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def group_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Teams associated with the retrospective configuration.
         """
         return pulumi.get(self, "group_ids")
 
     @group_ids.setter
-    def group_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def group_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "group_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentTypeIds")
-    def incident_type_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def incident_type_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Incident types associated with the retrospective configuration.
         """
         return pulumi.get(self, "incident_type_ids")
 
     @incident_type_ids.setter
-    def incident_type_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def incident_type_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "incident_type_ids", value)
 
     @_builtins.property
     @pulumi.getter
-    def kind(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def kind(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The kind of the retrospective configuration.
         """
         return pulumi.get(self, "kind")
 
     @kind.setter
-    def kind(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def kind(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "kind", value)
 
     @_builtins.property
     @pulumi.getter(name="retrospectiveConfigurationId")
-    def retrospective_configuration_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def retrospective_configuration_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "retrospective_configuration_id")
 
     @retrospective_configuration_id.setter
-    def retrospective_configuration_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def retrospective_configuration_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "retrospective_configuration_id", value)
 
     @_builtins.property
     @pulumi.getter(name="severityIds")
-    def severity_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def severity_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Severities associated with the retrospective configuration.
         """
         return pulumi.get(self, "severity_ids")
 
     @severity_ids.setter
-    def severity_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def severity_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "severity_ids", value)
 
 
 @pulumi.input_type
 class _RetrospectiveConfigurationState:
     def __init__(__self__, *,
-                 group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 retrospective_configuration_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 severity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None):
+                 group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 incident_type_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 retrospective_configuration_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 severity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None):
         """
         Input properties used for looking up and filtering RetrospectiveConfiguration resources.
 
@@ -130,59 +130,59 @@ class _RetrospectiveConfigurationState:
 
     @_builtins.property
     @pulumi.getter(name="groupIds")
-    def group_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def group_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Teams associated with the retrospective configuration.
         """
         return pulumi.get(self, "group_ids")
 
     @group_ids.setter
-    def group_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def group_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "group_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentTypeIds")
-    def incident_type_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def incident_type_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Incident types associated with the retrospective configuration.
         """
         return pulumi.get(self, "incident_type_ids")
 
     @incident_type_ids.setter
-    def incident_type_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def incident_type_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "incident_type_ids", value)
 
     @_builtins.property
     @pulumi.getter
-    def kind(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def kind(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The kind of the retrospective configuration.
         """
         return pulumi.get(self, "kind")
 
     @kind.setter
-    def kind(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def kind(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "kind", value)
 
     @_builtins.property
     @pulumi.getter(name="retrospectiveConfigurationId")
-    def retrospective_configuration_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def retrospective_configuration_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "retrospective_configuration_id")
 
     @retrospective_configuration_id.setter
-    def retrospective_configuration_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def retrospective_configuration_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "retrospective_configuration_id", value)
 
     @_builtins.property
     @pulumi.getter(name="severityIds")
-    def severity_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def severity_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Severities associated with the retrospective configuration.
         """
         return pulumi.get(self, "severity_ids")
 
     @severity_ids.setter
-    def severity_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def severity_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "severity_ids", value)
 
 
@@ -192,11 +192,11 @@ class RetrospectiveConfiguration(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 retrospective_configuration_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 severity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 incident_type_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 retrospective_configuration_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 severity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  __props__=None):
         """
         Create a RetrospectiveConfiguration resource with the given unique name, props, and options.
@@ -232,11 +232,11 @@ class RetrospectiveConfiguration(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 retrospective_configuration_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 severity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 incident_type_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 retrospective_configuration_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 severity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -262,11 +262,11 @@ class RetrospectiveConfiguration(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            kind: Optional[pulumi.Input[_builtins.str]] = None,
-            retrospective_configuration_id: Optional[pulumi.Input[_builtins.str]] = None,
-            severity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None) -> 'RetrospectiveConfiguration':
+            group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            incident_type_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            kind: pulumi.Input[Optional[_builtins.str]] = None,
+            retrospective_configuration_id: pulumi.Input[Optional[_builtins.str]] = None,
+            severity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None) -> 'RetrospectiveConfiguration':
         """
         Get an existing RetrospectiveConfiguration resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -326,3 +326,4 @@ class RetrospectiveConfiguration(pulumi.CustomResource):
         Severities associated with the retrospective configuration.
         """
         return pulumi.get(self, "severity_ids")
+

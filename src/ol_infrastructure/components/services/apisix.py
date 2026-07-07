@@ -11,6 +11,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
+from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 
 class OLApisixPluginConfig(BaseModel):
@@ -39,6 +40,13 @@ class OLApisixRouteConfig(BaseModel):
     plugins: list[OLApisixPluginConfig] = []
     hosts: list[str] = []
     paths: list[str] = []
+    # Optional ApisixRoute ``match.exprs`` entries for matching on headers,
+    # query args, cookies, etc. in addition to host/path. Each entry follows the
+    # ApisixRoute v2 schema, e.g.
+    # ``{"subject": {"scope": "Header", "name": "Authorization"},
+    #    "op": "RegexMatch", "value": ".+"}``.
+    # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_route/#advanced-route-matching
+    exprs: list[dict[str, Any]] | None = None
     backend_service_name: str | None = None
     backend_service_port: str | NonNegativeInt | None = None
     # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_route/#service-resolution-granularity
@@ -147,6 +155,7 @@ class OLApisixRoute(ComponentResource):
                 "match": {
                     "hosts": route_config.hosts,
                     "paths": route_config.paths,
+                    **({"exprs": route_config.exprs} if route_config.exprs else {}),
                 },
                 "websocket": route_config.websocket,
                 "timeout": {
@@ -315,6 +324,13 @@ class OLApisixSharedPluginsConfig(BaseModel):
     application_name: str
     resource_suffix: str = "shared-plugins"
     enable_defaults: bool = True
+    # Attach the opentelemetry plugin (OTLP trace export) to every route that
+    # references this shared plugin config.  Automatically disabled on CI, where
+    # the plugin is not loaded into APISIX and the Grafana Alloy collector does
+    # not exist (see infrastructure/aws/eks/apisix_official.py).  A route that
+    # references a plugin APISIX has not loaded is rejected, so the route-level
+    # attachment must be gated to match the cluster-level plugin enablement.
+    enable_opentelemetry: bool = True
     k8s_labels: dict[str, str] = {}
     k8s_namespace: str
     plugins: list[dict[str, Any]] = []
@@ -385,10 +401,31 @@ class OLApisixSharedPlugins(ComponentResource):
             },
         ]
 
+        # opentelemetry emits an OTLP trace span per request.  ``always_on`` head
+        # sampling exports every span to the Grafana Alloy receiver, which then
+        # applies tail sampling (keep errors, keep slow traces, probabilistic
+        # remainder) before forwarding to Grafana Cloud (see grafana.py).  The
+        # collector address and resource attributes are set cluster-wide via the
+        # plugin's plugin_attr block in apisix_official.py.
+        __opentelemetry_plugin: dict[str, Any] = {
+            "name": "opentelemetry",
+            "enable": True,
+            "config": {"sampler": {"name": "always_on"}},
+        }
+
         resource_options = ResourceOptions(parent=self).merge(opts)
 
         if plugin_config.enable_defaults:
             plugin_config.plugins.extend(__default_plugins)
+
+        # Gate on CI to match the cluster-level plugin enablement: APISIX does not
+        # load the opentelemetry plugin on CI, so attaching it to a route there
+        # would cause the route config to be rejected.
+        if (
+            plugin_config.enable_opentelemetry
+            and parse_stack().env_suffix.lower() != "ci"
+        ):
+            plugin_config.plugins.append(__opentelemetry_plugin)
 
         self.resource_name = (
             f"{plugin_config.application_name}-{plugin_config.resource_suffix}"

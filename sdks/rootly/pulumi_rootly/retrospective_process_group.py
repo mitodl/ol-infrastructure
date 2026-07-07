@@ -20,9 +20,9 @@ __all__ = ['RetrospectiveProcessGroupArgs', 'RetrospectiveProcessGroup']
 class RetrospectiveProcessGroupArgs:
     def __init__(__self__, *,
                  sub_status_id: pulumi.Input[_builtins.str],
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 retrospective_process_group_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 retrospective_process_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 retrospective_process_group_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 retrospective_process_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a RetrospectiveProcessGroup resource.
         """
@@ -45,39 +45,39 @@ class RetrospectiveProcessGroupArgs:
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter(name="retrospectiveProcessGroupId")
-    def retrospective_process_group_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def retrospective_process_group_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "retrospective_process_group_id")
 
     @retrospective_process_group_id.setter
-    def retrospective_process_group_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def retrospective_process_group_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "retrospective_process_group_id", value)
 
     @_builtins.property
     @pulumi.getter(name="retrospectiveProcessId")
-    def retrospective_process_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def retrospective_process_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "retrospective_process_id")
 
     @retrospective_process_id.setter
-    def retrospective_process_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def retrospective_process_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "retrospective_process_id", value)
 
 
 @pulumi.input_type
 class _RetrospectiveProcessGroupState:
     def __init__(__self__, *,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 retrospective_process_group_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 retrospective_process_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 sub_status_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 retrospective_process_group_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 retrospective_process_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 sub_status_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering RetrospectiveProcessGroup resources.
         """
@@ -92,38 +92,38 @@ class _RetrospectiveProcessGroupState:
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter(name="retrospectiveProcessGroupId")
-    def retrospective_process_group_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def retrospective_process_group_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "retrospective_process_group_id")
 
     @retrospective_process_group_id.setter
-    def retrospective_process_group_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def retrospective_process_group_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "retrospective_process_group_id", value)
 
     @_builtins.property
     @pulumi.getter(name="retrospectiveProcessId")
-    def retrospective_process_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def retrospective_process_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "retrospective_process_id")
 
     @retrospective_process_id.setter
-    def retrospective_process_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def retrospective_process_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "retrospective_process_id", value)
 
     @_builtins.property
     @pulumi.getter(name="subStatusId")
-    def sub_status_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def sub_status_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "sub_status_id")
 
     @sub_status_id.setter
-    def sub_status_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def sub_status_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "sub_status_id", value)
 
 
@@ -133,10 +133,10 @@ class RetrospectiveProcessGroup(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 retrospective_process_group_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 retrospective_process_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 sub_status_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 retrospective_process_group_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 retrospective_process_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 sub_status_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a RetrospectiveProcessGroup resource with the given unique name, props, and options.
@@ -168,10 +168,10 @@ class RetrospectiveProcessGroup(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 retrospective_process_group_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 retrospective_process_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 sub_status_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 retrospective_process_group_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 retrospective_process_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 sub_status_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -198,10 +198,10 @@ class RetrospectiveProcessGroup(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None,
-            retrospective_process_group_id: Optional[pulumi.Input[_builtins.str]] = None,
-            retrospective_process_id: Optional[pulumi.Input[_builtins.str]] = None,
-            sub_status_id: Optional[pulumi.Input[_builtins.str]] = None) -> 'RetrospectiveProcessGroup':
+            position: pulumi.Input[Optional[_builtins.float]] = None,
+            retrospective_process_group_id: pulumi.Input[Optional[_builtins.str]] = None,
+            retrospective_process_id: pulumi.Input[Optional[_builtins.str]] = None,
+            sub_status_id: pulumi.Input[Optional[_builtins.str]] = None) -> 'RetrospectiveProcessGroup':
         """
         Get an existing RetrospectiveProcessGroup resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -239,3 +239,4 @@ class RetrospectiveProcessGroup(pulumi.CustomResource):
     @pulumi.getter(name="subStatusId")
     def sub_status_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "sub_status_id")
+

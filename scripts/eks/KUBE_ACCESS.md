@@ -1,13 +1,67 @@
 # Developer EKS Access
 
-See https://pe.ol.mit.edu/how_to/developer_eks_access/ for instructions on
-how to initially set up developer access to EKS and learn about the available
-commands.
+See https://pe.ol.mit.edu/how_to/developer_eks_access/ for initial setup and
+background on access requirements.
 
-Once that is complete, you can use the helper bash script `eks.sh` as a shortcut
-for regenerating AWS creds, creating/overwriting your `~/.kube/config` file,
-setting a context (default is "applications-qa") and optionally listing the
-pods available in a namespace.
+## Preferred workflow
 
-You should run `source eks.env` after the script finishes to ensure the
-environment values are applied to your shell.
+The preferred entrypoint is the cyclopts-based CLI in `scripts/eks/eks.py`.
+It manages a single `~/.kube/config` file covering all OL EKS clusters.
+
+Generate a kubeconfig for all clusters:
+
+```bash
+uv run python scripts/eks/eks.py setup
+```
+
+By default this creates a **readonly** kubeconfig. You can also choose an
+access mode at setup time:
+
+```bash
+uv run python scripts/eks/eks.py setup --mode readonly
+uv run python scripts/eks/eks.py setup --mode developer
+uv run python scripts/eks/eks.py setup --mode admin
+```
+
+Optional current context:
+
+```bash
+uv run python scripts/eks/eks.py setup --mode readonly --current-context applications-qa
+```
+
+Optional paired readonly contexts for automation tools:
+
+```bash
+uv run python scripts/eks/eks.py setup --mode developer --include-readonly-contexts
+```
+
+## How auth works
+
+The generated kubeconfig uses an `exec` plugin that calls back into
+`scripts/eks/eks.py`.
+
+- `readonly` and `developer` modes are OIDC-first.
+- Vault authentication and generated AWS credentials are cached locally under
+  `~/.cache/ol-infrastructure/eks/`.
+- Users do **not** need to run `source eks.env` or manually refresh temporary
+  AWS credentials before using `kubectl`.
+- The tool currently manages and overwrites `~/.kube/config` directly.
+- Developer and admin kubeconfigs write only operator contexts by default.
+  Add `--include-readonly-contexts` if you also want paired `-readonly`
+  contexts for automation.
+
+## Access modes
+
+- `readonly` — safe exploratory access everywhere using `AmazonEKSViewPolicy`
+- `developer` — existing shared developer write permissions
+- `admin` — existing cluster-specific admin access
+
+> Note: admin mode still relies on the existing AWS assume-role path for the
+> cluster admin role. Readonly and developer modes are the primary OIDC-first,
+> cached flows.
+
+## Legacy helper
+
+`scripts/eks/eks.sh` is still present for compatibility, but it represents the
+older workflow that required generating shell AWS credentials separately. Prefer
+`uv run python scripts/eks/eks.py setup ...` for new usage.

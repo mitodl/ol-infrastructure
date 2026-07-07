@@ -22,20 +22,20 @@ class HeartbeatArgs:
                  alert_summary: pulumi.Input[_builtins.str],
                  interval: pulumi.Input[_builtins.float],
                  notification_target_id: pulumi.Input[_builtins.str],
-                 alert_description: Optional[pulumi.Input[_builtins.str]] = None,
-                 alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 email_address: Optional[pulumi.Input[_builtins.str]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 expires_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 heartbeat_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 interval_unit: Optional[pulumi.Input[_builtins.str]] = None,
-                 last_pinged_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 notification_target_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 ping_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 secret: Optional[pulumi.Input[_builtins.str]] = None,
-                 status: Optional[pulumi.Input[_builtins.str]] = None):
+                 alert_description: pulumi.Input[Optional[_builtins.str]] = None,
+                 alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 email_address: pulumi.Input[Optional[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 expires_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 heartbeat_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 interval_unit: pulumi.Input[Optional[_builtins.str]] = None,
+                 last_pinged_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 notification_target_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 ping_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret: pulumi.Input[Optional[_builtins.str]] = None,
+                 status: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a Heartbeat resource.
 
@@ -45,13 +45,13 @@ class HeartbeatArgs:
         :param pulumi.Input[_builtins.str] description: The description of the heartbeat
         :param pulumi.Input[_builtins.str] email_address: Email address to receive heartbeat pings.
         :param pulumi.Input[_builtins.str] expires_at: When heartbeat expires
-        :param pulumi.Input[_builtins.str] interval_unit: Value must be one of <span pulumi-lang-nodejs="`minutes`" pulumi-lang-dotnet="`Minutes`" pulumi-lang-go="`minutes`" pulumi-lang-python="`minutes`" pulumi-lang-yaml="`minutes`" pulumi-lang-java="`minutes`">`minutes`</span>, <span pulumi-lang-nodejs="`hours`" pulumi-lang-dotnet="`Hours`" pulumi-lang-go="`hours`" pulumi-lang-python="`hours`" pulumi-lang-yaml="`hours`" pulumi-lang-java="`hours`">`hours`</span>, <span pulumi-lang-nodejs="`days`" pulumi-lang-dotnet="`Days`" pulumi-lang-go="`days`" pulumi-lang-python="`days`" pulumi-lang-yaml="`days`" pulumi-lang-java="`days`">`days`</span>.
+        :param pulumi.Input[_builtins.str] interval_unit: Value must be one of <span pulumi-lang-nodejs="`minutes`" pulumi-lang-dotnet="`Minutes`" pulumi-lang-go="`minutes`" pulumi-lang-python="`minutes`" pulumi-lang-yaml="`minutes`" pulumi-lang-java="`minutes`" pulumi-lang-hcl="`minutes`">`minutes`</span>, <span pulumi-lang-nodejs="`hours`" pulumi-lang-dotnet="`Hours`" pulumi-lang-go="`hours`" pulumi-lang-python="`hours`" pulumi-lang-yaml="`hours`" pulumi-lang-java="`hours`" pulumi-lang-hcl="`hours`">`hours`</span>, <span pulumi-lang-nodejs="`days`" pulumi-lang-dotnet="`Days`" pulumi-lang-go="`days`" pulumi-lang-python="`days`" pulumi-lang-yaml="`days`" pulumi-lang-java="`days`" pulumi-lang-hcl="`days`">`days`</span>.
         :param pulumi.Input[_builtins.str] last_pinged_at: When the heartbeat was last pinged.
         :param pulumi.Input[_builtins.str] name: The name of the heartbeat
         :param pulumi.Input[_builtins.str] notification_target_type: The type of the notification target. Please contact support if you encounter issues using `Functionality` as a target type.. Value must be one of `User`, `Group`, `Service`, `EscalationPolicy`, `Functionality`.
         :param pulumi.Input[_builtins.str] ping_url: URL to receive heartbeat pings.
         :param pulumi.Input[_builtins.str] secret: Secret used as bearer token when pinging heartbeat.
-        :param pulumi.Input[_builtins.str] status: Value must be one of <span pulumi-lang-nodejs="`waiting`" pulumi-lang-dotnet="`Waiting`" pulumi-lang-go="`waiting`" pulumi-lang-python="`waiting`" pulumi-lang-yaml="`waiting`" pulumi-lang-java="`waiting`">`waiting`</span>, <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`">`active`</span>, <span pulumi-lang-nodejs="`expired`" pulumi-lang-dotnet="`Expired`" pulumi-lang-go="`expired`" pulumi-lang-python="`expired`" pulumi-lang-yaml="`expired`" pulumi-lang-java="`expired`">`expired`</span>.
+        :param pulumi.Input[_builtins.str] status: Value must be one of <span pulumi-lang-nodejs="`waiting`" pulumi-lang-dotnet="`Waiting`" pulumi-lang-go="`waiting`" pulumi-lang-python="`waiting`" pulumi-lang-yaml="`waiting`" pulumi-lang-java="`waiting`" pulumi-lang-hcl="`waiting`">`waiting`</span>, <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`" pulumi-lang-hcl="`active`">`active`</span>, <span pulumi-lang-nodejs="`expired`" pulumi-lang-dotnet="`Expired`" pulumi-lang-go="`expired`" pulumi-lang-python="`expired`" pulumi-lang-yaml="`expired`" pulumi-lang-java="`expired`" pulumi-lang-hcl="`expired`">`expired`</span>.
         """
         pulumi.set(__self__, "alert_summary", alert_summary)
         pulumi.set(__self__, "interval", interval)
@@ -117,187 +117,187 @@ class HeartbeatArgs:
 
     @_builtins.property
     @pulumi.getter(name="alertDescription")
-    def alert_description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alert_description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Description of alerts triggered when heartbeat expires.
         """
         return pulumi.get(self, "alert_description")
 
     @alert_description.setter
-    def alert_description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alert_description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alert_description", value)
 
     @_builtins.property
     @pulumi.getter(name="alertUrgencyId")
-    def alert_urgency_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alert_urgency_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Urgency of alerts triggered when heartbeat expires.
         """
         return pulumi.get(self, "alert_urgency_id")
 
     @alert_urgency_id.setter
-    def alert_urgency_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alert_urgency_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alert_urgency_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the heartbeat
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="emailAddress")
-    def email_address(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def email_address(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Email address to receive heartbeat pings.
         """
         return pulumi.get(self, "email_address")
 
     @email_address.setter
-    def email_address(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def email_address(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "email_address", value)
 
     @_builtins.property
     @pulumi.getter
-    def enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         return pulumi.get(self, "enabled")
 
     @enabled.setter
-    def enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "enabled", value)
 
     @_builtins.property
     @pulumi.getter(name="expiresAt")
-    def expires_at(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def expires_at(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         When heartbeat expires
         """
         return pulumi.get(self, "expires_at")
 
     @expires_at.setter
-    def expires_at(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def expires_at(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "expires_at", value)
 
     @_builtins.property
     @pulumi.getter(name="heartbeatId")
-    def heartbeat_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def heartbeat_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "heartbeat_id")
 
     @heartbeat_id.setter
-    def heartbeat_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def heartbeat_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "heartbeat_id", value)
 
     @_builtins.property
     @pulumi.getter(name="intervalUnit")
-    def interval_unit(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def interval_unit(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`minutes`" pulumi-lang-dotnet="`Minutes`" pulumi-lang-go="`minutes`" pulumi-lang-python="`minutes`" pulumi-lang-yaml="`minutes`" pulumi-lang-java="`minutes`">`minutes`</span>, <span pulumi-lang-nodejs="`hours`" pulumi-lang-dotnet="`Hours`" pulumi-lang-go="`hours`" pulumi-lang-python="`hours`" pulumi-lang-yaml="`hours`" pulumi-lang-java="`hours`">`hours`</span>, <span pulumi-lang-nodejs="`days`" pulumi-lang-dotnet="`Days`" pulumi-lang-go="`days`" pulumi-lang-python="`days`" pulumi-lang-yaml="`days`" pulumi-lang-java="`days`">`days`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`minutes`" pulumi-lang-dotnet="`Minutes`" pulumi-lang-go="`minutes`" pulumi-lang-python="`minutes`" pulumi-lang-yaml="`minutes`" pulumi-lang-java="`minutes`" pulumi-lang-hcl="`minutes`">`minutes`</span>, <span pulumi-lang-nodejs="`hours`" pulumi-lang-dotnet="`Hours`" pulumi-lang-go="`hours`" pulumi-lang-python="`hours`" pulumi-lang-yaml="`hours`" pulumi-lang-java="`hours`" pulumi-lang-hcl="`hours`">`hours`</span>, <span pulumi-lang-nodejs="`days`" pulumi-lang-dotnet="`Days`" pulumi-lang-go="`days`" pulumi-lang-python="`days`" pulumi-lang-yaml="`days`" pulumi-lang-java="`days`" pulumi-lang-hcl="`days`">`days`</span>.
         """
         return pulumi.get(self, "interval_unit")
 
     @interval_unit.setter
-    def interval_unit(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def interval_unit(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "interval_unit", value)
 
     @_builtins.property
     @pulumi.getter(name="lastPingedAt")
-    def last_pinged_at(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def last_pinged_at(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         When the heartbeat was last pinged.
         """
         return pulumi.get(self, "last_pinged_at")
 
     @last_pinged_at.setter
-    def last_pinged_at(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def last_pinged_at(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "last_pinged_at", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the heartbeat
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="notificationTargetType")
-    def notification_target_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def notification_target_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The type of the notification target. Please contact support if you encounter issues using `Functionality` as a target type.. Value must be one of `User`, `Group`, `Service`, `EscalationPolicy`, `Functionality`.
         """
         return pulumi.get(self, "notification_target_type")
 
     @notification_target_type.setter
-    def notification_target_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def notification_target_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "notification_target_type", value)
 
     @_builtins.property
     @pulumi.getter(name="pingUrl")
-    def ping_url(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def ping_url(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         URL to receive heartbeat pings.
         """
         return pulumi.get(self, "ping_url")
 
     @ping_url.setter
-    def ping_url(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def ping_url(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "ping_url", value)
 
     @_builtins.property
     @pulumi.getter
-    def secret(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def secret(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Secret used as bearer token when pinging heartbeat.
         """
         return pulumi.get(self, "secret")
 
     @secret.setter
-    def secret(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def secret(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "secret", value)
 
     @_builtins.property
     @pulumi.getter
-    def status(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def status(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`waiting`" pulumi-lang-dotnet="`Waiting`" pulumi-lang-go="`waiting`" pulumi-lang-python="`waiting`" pulumi-lang-yaml="`waiting`" pulumi-lang-java="`waiting`">`waiting`</span>, <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`">`active`</span>, <span pulumi-lang-nodejs="`expired`" pulumi-lang-dotnet="`Expired`" pulumi-lang-go="`expired`" pulumi-lang-python="`expired`" pulumi-lang-yaml="`expired`" pulumi-lang-java="`expired`">`expired`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`waiting`" pulumi-lang-dotnet="`Waiting`" pulumi-lang-go="`waiting`" pulumi-lang-python="`waiting`" pulumi-lang-yaml="`waiting`" pulumi-lang-java="`waiting`" pulumi-lang-hcl="`waiting`">`waiting`</span>, <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`" pulumi-lang-hcl="`active`">`active`</span>, <span pulumi-lang-nodejs="`expired`" pulumi-lang-dotnet="`Expired`" pulumi-lang-go="`expired`" pulumi-lang-python="`expired`" pulumi-lang-yaml="`expired`" pulumi-lang-java="`expired`" pulumi-lang-hcl="`expired`">`expired`</span>.
         """
         return pulumi.get(self, "status")
 
     @status.setter
-    def status(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def status(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "status", value)
 
 
 @pulumi.input_type
 class _HeartbeatState:
     def __init__(__self__, *,
-                 alert_description: Optional[pulumi.Input[_builtins.str]] = None,
-                 alert_summary: Optional[pulumi.Input[_builtins.str]] = None,
-                 alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 email_address: Optional[pulumi.Input[_builtins.str]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 expires_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 heartbeat_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 interval: Optional[pulumi.Input[_builtins.float]] = None,
-                 interval_unit: Optional[pulumi.Input[_builtins.str]] = None,
-                 last_pinged_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 notification_target_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 notification_target_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 ping_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 secret: Optional[pulumi.Input[_builtins.str]] = None,
-                 status: Optional[pulumi.Input[_builtins.str]] = None):
+                 alert_description: pulumi.Input[Optional[_builtins.str]] = None,
+                 alert_summary: pulumi.Input[Optional[_builtins.str]] = None,
+                 alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 email_address: pulumi.Input[Optional[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 expires_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 heartbeat_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 interval: pulumi.Input[Optional[_builtins.float]] = None,
+                 interval_unit: pulumi.Input[Optional[_builtins.str]] = None,
+                 last_pinged_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 notification_target_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 notification_target_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 ping_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret: pulumi.Input[Optional[_builtins.str]] = None,
+                 status: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering Heartbeat resources.
 
@@ -307,13 +307,13 @@ class _HeartbeatState:
         :param pulumi.Input[_builtins.str] description: The description of the heartbeat
         :param pulumi.Input[_builtins.str] email_address: Email address to receive heartbeat pings.
         :param pulumi.Input[_builtins.str] expires_at: When heartbeat expires
-        :param pulumi.Input[_builtins.str] interval_unit: Value must be one of <span pulumi-lang-nodejs="`minutes`" pulumi-lang-dotnet="`Minutes`" pulumi-lang-go="`minutes`" pulumi-lang-python="`minutes`" pulumi-lang-yaml="`minutes`" pulumi-lang-java="`minutes`">`minutes`</span>, <span pulumi-lang-nodejs="`hours`" pulumi-lang-dotnet="`Hours`" pulumi-lang-go="`hours`" pulumi-lang-python="`hours`" pulumi-lang-yaml="`hours`" pulumi-lang-java="`hours`">`hours`</span>, <span pulumi-lang-nodejs="`days`" pulumi-lang-dotnet="`Days`" pulumi-lang-go="`days`" pulumi-lang-python="`days`" pulumi-lang-yaml="`days`" pulumi-lang-java="`days`">`days`</span>.
+        :param pulumi.Input[_builtins.str] interval_unit: Value must be one of <span pulumi-lang-nodejs="`minutes`" pulumi-lang-dotnet="`Minutes`" pulumi-lang-go="`minutes`" pulumi-lang-python="`minutes`" pulumi-lang-yaml="`minutes`" pulumi-lang-java="`minutes`" pulumi-lang-hcl="`minutes`">`minutes`</span>, <span pulumi-lang-nodejs="`hours`" pulumi-lang-dotnet="`Hours`" pulumi-lang-go="`hours`" pulumi-lang-python="`hours`" pulumi-lang-yaml="`hours`" pulumi-lang-java="`hours`" pulumi-lang-hcl="`hours`">`hours`</span>, <span pulumi-lang-nodejs="`days`" pulumi-lang-dotnet="`Days`" pulumi-lang-go="`days`" pulumi-lang-python="`days`" pulumi-lang-yaml="`days`" pulumi-lang-java="`days`" pulumi-lang-hcl="`days`">`days`</span>.
         :param pulumi.Input[_builtins.str] last_pinged_at: When the heartbeat was last pinged.
         :param pulumi.Input[_builtins.str] name: The name of the heartbeat
         :param pulumi.Input[_builtins.str] notification_target_type: The type of the notification target. Please contact support if you encounter issues using `Functionality` as a target type.. Value must be one of `User`, `Group`, `Service`, `EscalationPolicy`, `Functionality`.
         :param pulumi.Input[_builtins.str] ping_url: URL to receive heartbeat pings.
         :param pulumi.Input[_builtins.str] secret: Secret used as bearer token when pinging heartbeat.
-        :param pulumi.Input[_builtins.str] status: Value must be one of <span pulumi-lang-nodejs="`waiting`" pulumi-lang-dotnet="`Waiting`" pulumi-lang-go="`waiting`" pulumi-lang-python="`waiting`" pulumi-lang-yaml="`waiting`" pulumi-lang-java="`waiting`">`waiting`</span>, <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`">`active`</span>, <span pulumi-lang-nodejs="`expired`" pulumi-lang-dotnet="`Expired`" pulumi-lang-go="`expired`" pulumi-lang-python="`expired`" pulumi-lang-yaml="`expired`" pulumi-lang-java="`expired`">`expired`</span>.
+        :param pulumi.Input[_builtins.str] status: Value must be one of <span pulumi-lang-nodejs="`waiting`" pulumi-lang-dotnet="`Waiting`" pulumi-lang-go="`waiting`" pulumi-lang-python="`waiting`" pulumi-lang-yaml="`waiting`" pulumi-lang-java="`waiting`" pulumi-lang-hcl="`waiting`">`waiting`</span>, <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`" pulumi-lang-hcl="`active`">`active`</span>, <span pulumi-lang-nodejs="`expired`" pulumi-lang-dotnet="`Expired`" pulumi-lang-go="`expired`" pulumi-lang-python="`expired`" pulumi-lang-yaml="`expired`" pulumi-lang-java="`expired`" pulumi-lang-hcl="`expired`">`expired`</span>.
         """
         if alert_description is not None:
             pulumi.set(__self__, "alert_description", alert_description)
@@ -352,194 +352,194 @@ class _HeartbeatState:
 
     @_builtins.property
     @pulumi.getter(name="alertDescription")
-    def alert_description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alert_description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Description of alerts triggered when heartbeat expires.
         """
         return pulumi.get(self, "alert_description")
 
     @alert_description.setter
-    def alert_description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alert_description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alert_description", value)
 
     @_builtins.property
     @pulumi.getter(name="alertSummary")
-    def alert_summary(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alert_summary(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Summary of alerts triggered when heartbeat expires.
         """
         return pulumi.get(self, "alert_summary")
 
     @alert_summary.setter
-    def alert_summary(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alert_summary(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alert_summary", value)
 
     @_builtins.property
     @pulumi.getter(name="alertUrgencyId")
-    def alert_urgency_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alert_urgency_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Urgency of alerts triggered when heartbeat expires.
         """
         return pulumi.get(self, "alert_urgency_id")
 
     @alert_urgency_id.setter
-    def alert_urgency_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alert_urgency_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alert_urgency_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the heartbeat
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="emailAddress")
-    def email_address(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def email_address(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Email address to receive heartbeat pings.
         """
         return pulumi.get(self, "email_address")
 
     @email_address.setter
-    def email_address(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def email_address(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "email_address", value)
 
     @_builtins.property
     @pulumi.getter
-    def enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         return pulumi.get(self, "enabled")
 
     @enabled.setter
-    def enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "enabled", value)
 
     @_builtins.property
     @pulumi.getter(name="expiresAt")
-    def expires_at(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def expires_at(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         When heartbeat expires
         """
         return pulumi.get(self, "expires_at")
 
     @expires_at.setter
-    def expires_at(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def expires_at(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "expires_at", value)
 
     @_builtins.property
     @pulumi.getter(name="heartbeatId")
-    def heartbeat_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def heartbeat_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "heartbeat_id")
 
     @heartbeat_id.setter
-    def heartbeat_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def heartbeat_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "heartbeat_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def interval(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def interval(self) -> pulumi.Input[Optional[_builtins.float]]:
         return pulumi.get(self, "interval")
 
     @interval.setter
-    def interval(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def interval(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "interval", value)
 
     @_builtins.property
     @pulumi.getter(name="intervalUnit")
-    def interval_unit(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def interval_unit(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`minutes`" pulumi-lang-dotnet="`Minutes`" pulumi-lang-go="`minutes`" pulumi-lang-python="`minutes`" pulumi-lang-yaml="`minutes`" pulumi-lang-java="`minutes`">`minutes`</span>, <span pulumi-lang-nodejs="`hours`" pulumi-lang-dotnet="`Hours`" pulumi-lang-go="`hours`" pulumi-lang-python="`hours`" pulumi-lang-yaml="`hours`" pulumi-lang-java="`hours`">`hours`</span>, <span pulumi-lang-nodejs="`days`" pulumi-lang-dotnet="`Days`" pulumi-lang-go="`days`" pulumi-lang-python="`days`" pulumi-lang-yaml="`days`" pulumi-lang-java="`days`">`days`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`minutes`" pulumi-lang-dotnet="`Minutes`" pulumi-lang-go="`minutes`" pulumi-lang-python="`minutes`" pulumi-lang-yaml="`minutes`" pulumi-lang-java="`minutes`" pulumi-lang-hcl="`minutes`">`minutes`</span>, <span pulumi-lang-nodejs="`hours`" pulumi-lang-dotnet="`Hours`" pulumi-lang-go="`hours`" pulumi-lang-python="`hours`" pulumi-lang-yaml="`hours`" pulumi-lang-java="`hours`" pulumi-lang-hcl="`hours`">`hours`</span>, <span pulumi-lang-nodejs="`days`" pulumi-lang-dotnet="`Days`" pulumi-lang-go="`days`" pulumi-lang-python="`days`" pulumi-lang-yaml="`days`" pulumi-lang-java="`days`" pulumi-lang-hcl="`days`">`days`</span>.
         """
         return pulumi.get(self, "interval_unit")
 
     @interval_unit.setter
-    def interval_unit(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def interval_unit(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "interval_unit", value)
 
     @_builtins.property
     @pulumi.getter(name="lastPingedAt")
-    def last_pinged_at(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def last_pinged_at(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         When the heartbeat was last pinged.
         """
         return pulumi.get(self, "last_pinged_at")
 
     @last_pinged_at.setter
-    def last_pinged_at(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def last_pinged_at(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "last_pinged_at", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the heartbeat
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="notificationTargetId")
-    def notification_target_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def notification_target_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "notification_target_id")
 
     @notification_target_id.setter
-    def notification_target_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def notification_target_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "notification_target_id", value)
 
     @_builtins.property
     @pulumi.getter(name="notificationTargetType")
-    def notification_target_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def notification_target_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The type of the notification target. Please contact support if you encounter issues using `Functionality` as a target type.. Value must be one of `User`, `Group`, `Service`, `EscalationPolicy`, `Functionality`.
         """
         return pulumi.get(self, "notification_target_type")
 
     @notification_target_type.setter
-    def notification_target_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def notification_target_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "notification_target_type", value)
 
     @_builtins.property
     @pulumi.getter(name="pingUrl")
-    def ping_url(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def ping_url(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         URL to receive heartbeat pings.
         """
         return pulumi.get(self, "ping_url")
 
     @ping_url.setter
-    def ping_url(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def ping_url(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "ping_url", value)
 
     @_builtins.property
     @pulumi.getter
-    def secret(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def secret(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Secret used as bearer token when pinging heartbeat.
         """
         return pulumi.get(self, "secret")
 
     @secret.setter
-    def secret(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def secret(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "secret", value)
 
     @_builtins.property
     @pulumi.getter
-    def status(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def status(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`waiting`" pulumi-lang-dotnet="`Waiting`" pulumi-lang-go="`waiting`" pulumi-lang-python="`waiting`" pulumi-lang-yaml="`waiting`" pulumi-lang-java="`waiting`">`waiting`</span>, <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`">`active`</span>, <span pulumi-lang-nodejs="`expired`" pulumi-lang-dotnet="`Expired`" pulumi-lang-go="`expired`" pulumi-lang-python="`expired`" pulumi-lang-yaml="`expired`" pulumi-lang-java="`expired`">`expired`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`waiting`" pulumi-lang-dotnet="`Waiting`" pulumi-lang-go="`waiting`" pulumi-lang-python="`waiting`" pulumi-lang-yaml="`waiting`" pulumi-lang-java="`waiting`" pulumi-lang-hcl="`waiting`">`waiting`</span>, <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`" pulumi-lang-hcl="`active`">`active`</span>, <span pulumi-lang-nodejs="`expired`" pulumi-lang-dotnet="`Expired`" pulumi-lang-go="`expired`" pulumi-lang-python="`expired`" pulumi-lang-yaml="`expired`" pulumi-lang-java="`expired`" pulumi-lang-hcl="`expired`">`expired`</span>.
         """
         return pulumi.get(self, "status")
 
     @status.setter
-    def status(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def status(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "status", value)
 
 
@@ -549,23 +549,23 @@ class Heartbeat(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 alert_description: Optional[pulumi.Input[_builtins.str]] = None,
-                 alert_summary: Optional[pulumi.Input[_builtins.str]] = None,
-                 alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 email_address: Optional[pulumi.Input[_builtins.str]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 expires_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 heartbeat_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 interval: Optional[pulumi.Input[_builtins.float]] = None,
-                 interval_unit: Optional[pulumi.Input[_builtins.str]] = None,
-                 last_pinged_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 notification_target_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 notification_target_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 ping_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 secret: Optional[pulumi.Input[_builtins.str]] = None,
-                 status: Optional[pulumi.Input[_builtins.str]] = None,
+                 alert_description: pulumi.Input[Optional[_builtins.str]] = None,
+                 alert_summary: pulumi.Input[Optional[_builtins.str]] = None,
+                 alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 email_address: pulumi.Input[Optional[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 expires_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 heartbeat_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 interval: pulumi.Input[Optional[_builtins.float]] = None,
+                 interval_unit: pulumi.Input[Optional[_builtins.str]] = None,
+                 last_pinged_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 notification_target_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 notification_target_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 ping_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret: pulumi.Input[Optional[_builtins.str]] = None,
+                 status: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a Heartbeat resource with the given unique name, props, and options.
@@ -578,13 +578,13 @@ class Heartbeat(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] description: The description of the heartbeat
         :param pulumi.Input[_builtins.str] email_address: Email address to receive heartbeat pings.
         :param pulumi.Input[_builtins.str] expires_at: When heartbeat expires
-        :param pulumi.Input[_builtins.str] interval_unit: Value must be one of <span pulumi-lang-nodejs="`minutes`" pulumi-lang-dotnet="`Minutes`" pulumi-lang-go="`minutes`" pulumi-lang-python="`minutes`" pulumi-lang-yaml="`minutes`" pulumi-lang-java="`minutes`">`minutes`</span>, <span pulumi-lang-nodejs="`hours`" pulumi-lang-dotnet="`Hours`" pulumi-lang-go="`hours`" pulumi-lang-python="`hours`" pulumi-lang-yaml="`hours`" pulumi-lang-java="`hours`">`hours`</span>, <span pulumi-lang-nodejs="`days`" pulumi-lang-dotnet="`Days`" pulumi-lang-go="`days`" pulumi-lang-python="`days`" pulumi-lang-yaml="`days`" pulumi-lang-java="`days`">`days`</span>.
+        :param pulumi.Input[_builtins.str] interval_unit: Value must be one of <span pulumi-lang-nodejs="`minutes`" pulumi-lang-dotnet="`Minutes`" pulumi-lang-go="`minutes`" pulumi-lang-python="`minutes`" pulumi-lang-yaml="`minutes`" pulumi-lang-java="`minutes`" pulumi-lang-hcl="`minutes`">`minutes`</span>, <span pulumi-lang-nodejs="`hours`" pulumi-lang-dotnet="`Hours`" pulumi-lang-go="`hours`" pulumi-lang-python="`hours`" pulumi-lang-yaml="`hours`" pulumi-lang-java="`hours`" pulumi-lang-hcl="`hours`">`hours`</span>, <span pulumi-lang-nodejs="`days`" pulumi-lang-dotnet="`Days`" pulumi-lang-go="`days`" pulumi-lang-python="`days`" pulumi-lang-yaml="`days`" pulumi-lang-java="`days`" pulumi-lang-hcl="`days`">`days`</span>.
         :param pulumi.Input[_builtins.str] last_pinged_at: When the heartbeat was last pinged.
         :param pulumi.Input[_builtins.str] name: The name of the heartbeat
         :param pulumi.Input[_builtins.str] notification_target_type: The type of the notification target. Please contact support if you encounter issues using `Functionality` as a target type.. Value must be one of `User`, `Group`, `Service`, `EscalationPolicy`, `Functionality`.
         :param pulumi.Input[_builtins.str] ping_url: URL to receive heartbeat pings.
         :param pulumi.Input[_builtins.str] secret: Secret used as bearer token when pinging heartbeat.
-        :param pulumi.Input[_builtins.str] status: Value must be one of <span pulumi-lang-nodejs="`waiting`" pulumi-lang-dotnet="`Waiting`" pulumi-lang-go="`waiting`" pulumi-lang-python="`waiting`" pulumi-lang-yaml="`waiting`" pulumi-lang-java="`waiting`">`waiting`</span>, <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`">`active`</span>, <span pulumi-lang-nodejs="`expired`" pulumi-lang-dotnet="`Expired`" pulumi-lang-go="`expired`" pulumi-lang-python="`expired`" pulumi-lang-yaml="`expired`" pulumi-lang-java="`expired`">`expired`</span>.
+        :param pulumi.Input[_builtins.str] status: Value must be one of <span pulumi-lang-nodejs="`waiting`" pulumi-lang-dotnet="`Waiting`" pulumi-lang-go="`waiting`" pulumi-lang-python="`waiting`" pulumi-lang-yaml="`waiting`" pulumi-lang-java="`waiting`" pulumi-lang-hcl="`waiting`">`waiting`</span>, <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`" pulumi-lang-hcl="`active`">`active`</span>, <span pulumi-lang-nodejs="`expired`" pulumi-lang-dotnet="`Expired`" pulumi-lang-go="`expired`" pulumi-lang-python="`expired`" pulumi-lang-yaml="`expired`" pulumi-lang-java="`expired`" pulumi-lang-hcl="`expired`">`expired`</span>.
         """
         ...
     @overload
@@ -610,23 +610,23 @@ class Heartbeat(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 alert_description: Optional[pulumi.Input[_builtins.str]] = None,
-                 alert_summary: Optional[pulumi.Input[_builtins.str]] = None,
-                 alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 email_address: Optional[pulumi.Input[_builtins.str]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 expires_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 heartbeat_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 interval: Optional[pulumi.Input[_builtins.float]] = None,
-                 interval_unit: Optional[pulumi.Input[_builtins.str]] = None,
-                 last_pinged_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 notification_target_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 notification_target_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 ping_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 secret: Optional[pulumi.Input[_builtins.str]] = None,
-                 status: Optional[pulumi.Input[_builtins.str]] = None,
+                 alert_description: pulumi.Input[Optional[_builtins.str]] = None,
+                 alert_summary: pulumi.Input[Optional[_builtins.str]] = None,
+                 alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 email_address: pulumi.Input[Optional[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 expires_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 heartbeat_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 interval: pulumi.Input[Optional[_builtins.float]] = None,
+                 interval_unit: pulumi.Input[Optional[_builtins.str]] = None,
+                 last_pinged_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 notification_target_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 notification_target_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 ping_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret: pulumi.Input[Optional[_builtins.str]] = None,
+                 status: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -670,23 +670,23 @@ class Heartbeat(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            alert_description: Optional[pulumi.Input[_builtins.str]] = None,
-            alert_summary: Optional[pulumi.Input[_builtins.str]] = None,
-            alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            email_address: Optional[pulumi.Input[_builtins.str]] = None,
-            enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-            expires_at: Optional[pulumi.Input[_builtins.str]] = None,
-            heartbeat_id: Optional[pulumi.Input[_builtins.str]] = None,
-            interval: Optional[pulumi.Input[_builtins.float]] = None,
-            interval_unit: Optional[pulumi.Input[_builtins.str]] = None,
-            last_pinged_at: Optional[pulumi.Input[_builtins.str]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            notification_target_id: Optional[pulumi.Input[_builtins.str]] = None,
-            notification_target_type: Optional[pulumi.Input[_builtins.str]] = None,
-            ping_url: Optional[pulumi.Input[_builtins.str]] = None,
-            secret: Optional[pulumi.Input[_builtins.str]] = None,
-            status: Optional[pulumi.Input[_builtins.str]] = None) -> 'Heartbeat':
+            alert_description: pulumi.Input[Optional[_builtins.str]] = None,
+            alert_summary: pulumi.Input[Optional[_builtins.str]] = None,
+            alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            email_address: pulumi.Input[Optional[_builtins.str]] = None,
+            enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+            expires_at: pulumi.Input[Optional[_builtins.str]] = None,
+            heartbeat_id: pulumi.Input[Optional[_builtins.str]] = None,
+            interval: pulumi.Input[Optional[_builtins.float]] = None,
+            interval_unit: pulumi.Input[Optional[_builtins.str]] = None,
+            last_pinged_at: pulumi.Input[Optional[_builtins.str]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            notification_target_id: pulumi.Input[Optional[_builtins.str]] = None,
+            notification_target_type: pulumi.Input[Optional[_builtins.str]] = None,
+            ping_url: pulumi.Input[Optional[_builtins.str]] = None,
+            secret: pulumi.Input[Optional[_builtins.str]] = None,
+            status: pulumi.Input[Optional[_builtins.str]] = None) -> 'Heartbeat':
         """
         Get an existing Heartbeat resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -700,13 +700,13 @@ class Heartbeat(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] description: The description of the heartbeat
         :param pulumi.Input[_builtins.str] email_address: Email address to receive heartbeat pings.
         :param pulumi.Input[_builtins.str] expires_at: When heartbeat expires
-        :param pulumi.Input[_builtins.str] interval_unit: Value must be one of <span pulumi-lang-nodejs="`minutes`" pulumi-lang-dotnet="`Minutes`" pulumi-lang-go="`minutes`" pulumi-lang-python="`minutes`" pulumi-lang-yaml="`minutes`" pulumi-lang-java="`minutes`">`minutes`</span>, <span pulumi-lang-nodejs="`hours`" pulumi-lang-dotnet="`Hours`" pulumi-lang-go="`hours`" pulumi-lang-python="`hours`" pulumi-lang-yaml="`hours`" pulumi-lang-java="`hours`">`hours`</span>, <span pulumi-lang-nodejs="`days`" pulumi-lang-dotnet="`Days`" pulumi-lang-go="`days`" pulumi-lang-python="`days`" pulumi-lang-yaml="`days`" pulumi-lang-java="`days`">`days`</span>.
+        :param pulumi.Input[_builtins.str] interval_unit: Value must be one of <span pulumi-lang-nodejs="`minutes`" pulumi-lang-dotnet="`Minutes`" pulumi-lang-go="`minutes`" pulumi-lang-python="`minutes`" pulumi-lang-yaml="`minutes`" pulumi-lang-java="`minutes`" pulumi-lang-hcl="`minutes`">`minutes`</span>, <span pulumi-lang-nodejs="`hours`" pulumi-lang-dotnet="`Hours`" pulumi-lang-go="`hours`" pulumi-lang-python="`hours`" pulumi-lang-yaml="`hours`" pulumi-lang-java="`hours`" pulumi-lang-hcl="`hours`">`hours`</span>, <span pulumi-lang-nodejs="`days`" pulumi-lang-dotnet="`Days`" pulumi-lang-go="`days`" pulumi-lang-python="`days`" pulumi-lang-yaml="`days`" pulumi-lang-java="`days`" pulumi-lang-hcl="`days`">`days`</span>.
         :param pulumi.Input[_builtins.str] last_pinged_at: When the heartbeat was last pinged.
         :param pulumi.Input[_builtins.str] name: The name of the heartbeat
         :param pulumi.Input[_builtins.str] notification_target_type: The type of the notification target. Please contact support if you encounter issues using `Functionality` as a target type.. Value must be one of `User`, `Group`, `Service`, `EscalationPolicy`, `Functionality`.
         :param pulumi.Input[_builtins.str] ping_url: URL to receive heartbeat pings.
         :param pulumi.Input[_builtins.str] secret: Secret used as bearer token when pinging heartbeat.
-        :param pulumi.Input[_builtins.str] status: Value must be one of <span pulumi-lang-nodejs="`waiting`" pulumi-lang-dotnet="`Waiting`" pulumi-lang-go="`waiting`" pulumi-lang-python="`waiting`" pulumi-lang-yaml="`waiting`" pulumi-lang-java="`waiting`">`waiting`</span>, <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`">`active`</span>, <span pulumi-lang-nodejs="`expired`" pulumi-lang-dotnet="`Expired`" pulumi-lang-go="`expired`" pulumi-lang-python="`expired`" pulumi-lang-yaml="`expired`" pulumi-lang-java="`expired`">`expired`</span>.
+        :param pulumi.Input[_builtins.str] status: Value must be one of <span pulumi-lang-nodejs="`waiting`" pulumi-lang-dotnet="`Waiting`" pulumi-lang-go="`waiting`" pulumi-lang-python="`waiting`" pulumi-lang-yaml="`waiting`" pulumi-lang-java="`waiting`" pulumi-lang-hcl="`waiting`">`waiting`</span>, <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`" pulumi-lang-hcl="`active`">`active`</span>, <span pulumi-lang-nodejs="`expired`" pulumi-lang-dotnet="`Expired`" pulumi-lang-go="`expired`" pulumi-lang-python="`expired`" pulumi-lang-yaml="`expired`" pulumi-lang-java="`expired`" pulumi-lang-hcl="`expired`">`expired`</span>.
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
@@ -798,7 +798,7 @@ class Heartbeat(pulumi.CustomResource):
     @pulumi.getter(name="intervalUnit")
     def interval_unit(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`minutes`" pulumi-lang-dotnet="`Minutes`" pulumi-lang-go="`minutes`" pulumi-lang-python="`minutes`" pulumi-lang-yaml="`minutes`" pulumi-lang-java="`minutes`">`minutes`</span>, <span pulumi-lang-nodejs="`hours`" pulumi-lang-dotnet="`Hours`" pulumi-lang-go="`hours`" pulumi-lang-python="`hours`" pulumi-lang-yaml="`hours`" pulumi-lang-java="`hours`">`hours`</span>, <span pulumi-lang-nodejs="`days`" pulumi-lang-dotnet="`Days`" pulumi-lang-go="`days`" pulumi-lang-python="`days`" pulumi-lang-yaml="`days`" pulumi-lang-java="`days`">`days`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`minutes`" pulumi-lang-dotnet="`Minutes`" pulumi-lang-go="`minutes`" pulumi-lang-python="`minutes`" pulumi-lang-yaml="`minutes`" pulumi-lang-java="`minutes`" pulumi-lang-hcl="`minutes`">`minutes`</span>, <span pulumi-lang-nodejs="`hours`" pulumi-lang-dotnet="`Hours`" pulumi-lang-go="`hours`" pulumi-lang-python="`hours`" pulumi-lang-yaml="`hours`" pulumi-lang-java="`hours`" pulumi-lang-hcl="`hours`">`hours`</span>, <span pulumi-lang-nodejs="`days`" pulumi-lang-dotnet="`Days`" pulumi-lang-go="`days`" pulumi-lang-python="`days`" pulumi-lang-yaml="`days`" pulumi-lang-java="`days`" pulumi-lang-hcl="`days`">`days`</span>.
         """
         return pulumi.get(self, "interval_unit")
 
@@ -851,6 +851,7 @@ class Heartbeat(pulumi.CustomResource):
     @pulumi.getter
     def status(self) -> pulumi.Output[_builtins.str]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`waiting`" pulumi-lang-dotnet="`Waiting`" pulumi-lang-go="`waiting`" pulumi-lang-python="`waiting`" pulumi-lang-yaml="`waiting`" pulumi-lang-java="`waiting`">`waiting`</span>, <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`">`active`</span>, <span pulumi-lang-nodejs="`expired`" pulumi-lang-dotnet="`Expired`" pulumi-lang-go="`expired`" pulumi-lang-python="`expired`" pulumi-lang-yaml="`expired`" pulumi-lang-java="`expired`">`expired`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`waiting`" pulumi-lang-dotnet="`Waiting`" pulumi-lang-go="`waiting`" pulumi-lang-python="`waiting`" pulumi-lang-yaml="`waiting`" pulumi-lang-java="`waiting`" pulumi-lang-hcl="`waiting`">`waiting`</span>, <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`" pulumi-lang-hcl="`active`">`active`</span>, <span pulumi-lang-nodejs="`expired`" pulumi-lang-dotnet="`Expired`" pulumi-lang-go="`expired`" pulumi-lang-python="`expired`" pulumi-lang-yaml="`expired`" pulumi-lang-java="`expired`" pulumi-lang-hcl="`expired`">`expired`</span>.
         """
         return pulumi.get(self, "status")
+

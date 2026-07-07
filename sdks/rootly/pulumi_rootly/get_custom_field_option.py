@@ -80,8 +80,8 @@ def get_custom_field_option(color: Optional[_builtins.str] = None,
         color=pulumi.get(__ret__, 'color'),
         id=pulumi.get(__ret__, 'id'),
         value=pulumi.get(__ret__, 'value'))
-def get_custom_field_option_output(color: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                                   value: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_custom_field_option_output(color: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                                   value: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                                    opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetCustomFieldOptionResult]:
     """
     Use this data source to access information about an existing resource.

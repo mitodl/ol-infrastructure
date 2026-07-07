@@ -92,9 +92,9 @@ def get_cause(created_at: Optional[Mapping[str, _builtins.str]] = None,
         id=pulumi.get(__ret__, 'id'),
         name=pulumi.get(__ret__, 'name'),
         slug=pulumi.get(__ret__, 'slug'))
-def get_cause_output(created_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
-                     name: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                     slug: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_cause_output(created_at: pulumi.Input[Optional[Optional[Mapping[str, _builtins.str]]]] = None,
+                     name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                     slug: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                      opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetCauseResult]:
     """
     Use this data source to access information about an existing resource.

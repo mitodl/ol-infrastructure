@@ -1,0 +1,68 @@
+# mit-learn Next.js frontend Tiltfile
+#
+# Builds the `local-dev` stage of Dockerfile.web, which runs `next dev` (HMR).
+# Source changes are live-synced into the container; Next.js hot-reloads
+# them without an image rebuild or pod restart.
+#
+# NEXT_PUBLIC_* values are injected at runtime from deployment.yaml env vars
+# (surfaced to the browser via PublicEnvScript) — they are NOT build args.
+# next.config.js derives allowedDevOrigins from NEXT_PUBLIC_ORIGIN, so the
+# dev server accepts HMR requests proxied through learn.<root-domain>.
+#
+# The build context is the mit-learn repo root (needed for yarn workspaces).
+# When the sibling mit-learn repo is not checked out, Tilt uses the prebuilt
+# DockerHub image (mitodl/mit-learn-nextjs-app:latest) without a local build;
+# that image is the production `runner` stage (no hot reload).
+
+load("../../tiltlib.star", "k8s_yaml_with_domain")
+
+workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
+APP_DIR = os.path.join(workspace_root, "mit-learn")
+IMAGE = 'mitodl/mit-learn-nextjs-app'
+_DIR = config.main_dir + "/local-dev/apps/mit-learn-nextjs"
+_rd = os.environ.get("LOCAL_DEV_ROOT_DOMAIN", "mit.dev")
+
+if os.path.exists(os.path.join(APP_DIR, '.git')):
+    docker_build(
+        IMAGE,
+        context=APP_DIR,
+        dockerfile=APP_DIR + '/frontends/main/Dockerfile.web',
+        target='local-dev',
+        only=[
+            'frontends/',
+            'package.json',
+            '.yarnrc.yml',
+            '.yarn/',
+            'yarn.lock',
+        ],
+        # node_modules: host installs are OS/arch-specific and must not reach
+        # the container. .next: host build artifacts would fight the
+        # container's own dev-server cache.
+        ignore=[
+            '**/node_modules',
+            '**/.next',
+        ],
+        live_update=[
+            sync(os.path.join(APP_DIR, 'frontends'), '/app/frontends'),
+            sync(os.path.join(APP_DIR, 'package.json'), '/app/package.json'),
+            sync(os.path.join(APP_DIR, 'yarn.lock'), '/app/yarn.lock'),
+            # Reinstall node deps when the lockfile changes.
+            run(
+                'cd /app && yarn install --immutable',
+                trigger=[
+                    os.path.join(APP_DIR, 'yarn.lock'),
+                ],
+            ),
+        ],
+    )
+
+k8s_yaml_with_domain([
+    'deployment.yaml',
+    'apisix-routes.yaml',
+])
+
+k8s_resource(
+    'mitlearn-nextjs',
+    port_forwards=['3000:3000'],
+    labels=['mit-learn'],
+)

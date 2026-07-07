@@ -5,6 +5,7 @@
 
 import json
 import os
+from typing import Any, cast
 
 import boto3
 import pulumi_aws as aws
@@ -15,6 +16,7 @@ from botocore.exceptions import ClientError
 from pulumi import (
     Alias,
     Config,
+    Input,
     Output,
     ResourceOptions,
     export,
@@ -113,6 +115,7 @@ vault_stack = make_stack_reference(
 )
 vault_auth_stack = make_stack_reference(projects.VAULT_AUTH, "operations.Production")
 concourse_stack = make_stack_reference(projects.CONCOURSE, "Production")
+concourse_qa_stack = make_stack_reference(projects.CONCOURSE, "QA")
 
 business_unit = env_config.require("business_unit") or "operations"
 target_vpc = network_stack.require_output(env_config.require("target_vpc"))
@@ -197,10 +200,11 @@ default_assume_role_policy = {
 # This also lets concourse be a cluster administrator
 #
 # We hook adminsitrators directly by username ARNs
-admin_assume_role_policy_document = concourse_stack.require_output(
-    "infra-instance-role-arn"
+admin_assume_role_policy_document = Output.all(
+    prod_arn=concourse_stack.require_output("infra-instance-role-arn"),
+    qa_arn=concourse_qa_stack.require_output("infra-instance-role-arn"),
 ).apply(
-    lambda arn: json.dumps(
+    lambda arns: json.dumps(
         {
             "Version": IAM_POLICY_VERSION,
             "Statement": [
@@ -213,7 +217,7 @@ admin_assume_role_policy_document = concourse_stack.require_output(
                             f"arn:aws:iam::{aws_account.account_id}:user/{username}"
                             for username in EKS_ADMIN_USERNAMES
                         ]
-                        + [arn],
+                        + [arns["prod_arn"], arns["qa_arn"]],
                     },
                 }
             ],
@@ -251,6 +255,18 @@ access_entries = {
             ),
         },
         kubernetes_groups=["admin"],
+    ),
+    "readonly": eks.AccessEntryArgs(
+        principal_arn=vault_auth_stack.require_output("eks_shared_readonly_role_arn"),
+        access_policies={
+            "readonly": eks.AccessPolicyAssociationArgs(
+                access_scope=aws.eks.AccessPolicyAssociationAccessScopeArgs(
+                    type="cluster",
+                ),
+                policy_arn="arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy",
+            ),
+        },
+        kubernetes_groups=["view"],
     ),
     # Note: Node role access entry is automatically created by EKS for self-managed
     # node groups when authentication_mode="API". No explicit creation needed.
@@ -373,7 +389,7 @@ cluster = eks.Cluster(
     # Ref: https://docs.aws.amazon.com/eks/latest/userguide/security-groups-pods-deployment.html
     # Ref: https://docs.aws.amazon.com/eks/latest/userguide/sg-pods-example-deployment.html
     # Ref: https://github.com/aws/amazon-vpc-cni-k8s/blob/master/README.md
-    vpc_cni_options=eks.cluster.VpcCniOptionsArgs(
+    vpc_cni_options=eks.VpcCniOptionsArgs(
         cni_external_snat=False,
         configuration_values={"env": {"POD_SECURITY_GROUP_ENFORCING_MODE": "standard"}},
         custom_network_config=False,
@@ -470,7 +486,7 @@ node_role = aws.iam.Role(
     path=f"/ol-infrastructure/eks/{cluster_name}/",
     tags=aws_config.tags,
 )
-managed_node_policy_arns = [
+managed_node_policy_arns: list[Input[str]] = [
     "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
     "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
     "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
@@ -484,10 +500,10 @@ if eks_config.get_bool("efs_csi_provisioner"):
     managed_node_policy_arns.append(
         "arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy"
     )
-for i, policy in enumerate(managed_node_policy_arns):
+for i, policy_arn in enumerate(managed_node_policy_arns):
     aws.iam.RolePolicyAttachment(
         f"{cluster_name}-eks-node-role-policy-attachment-{i}",
-        policy_arn=policy,
+        policy_arn=policy_arn,
         role=node_role.id,
         opts=ResourceOptions(parent=node_role),
     )
@@ -598,7 +614,9 @@ for ng_name, ng_config in configured_node_groups.items():
         )
     node_group_sec_group = eks.NodeGroupSecurityGroup(
         f"{cluster_name}-eks-nodegroup-{ng_name}-secgroup",
-        cluster_security_group=cluster.cluster_security_group,
+        cluster_security_group=cast(
+            Output[aws.ec2.SecurityGroup], cluster.cluster_security_group
+        ),
         eks_cluster=cluster.eks_cluster,
         vpc_id=target_vpc["id"],
         tags=aws_config.tags,
@@ -749,39 +767,42 @@ if eks_config.get_bool("ebs_csi_provisioner"):
         f"{cluster_name}-ebs-csi-driver-kms-for-encryption-policy",
         name=f"{cluster_name}-ebs-csi-driver-kms-for-encryption-policy",
         path=f"/ol-infrastructure/eks/{cluster_name}/",
-        policy=kms_ebs.apply(
-            lambda kms_config: lint_iam_policy(
-                {
-                    "Version": IAM_POLICY_VERSION,
-                    "Statement": [
-                        {
-                            "Effect": "Allow",
-                            "Action": [
-                                "kms:CreateGrant",
-                                "kms:ListGrants",
-                                "kms:RevokeGrant",
-                            ],
-                            "Resource": [kms_config["arn"]],
-                            "Condition": {
-                                "Bool": {"kms:GrantIsForAWSResource": "true"}
+        policy=cast(
+            Output[str],
+            kms_ebs.apply(
+                lambda kms_config: lint_iam_policy(
+                    {
+                        "Version": IAM_POLICY_VERSION,
+                        "Statement": [
+                            {
+                                "Effect": "Allow",
+                                "Action": [
+                                    "kms:CreateGrant",
+                                    "kms:ListGrants",
+                                    "kms:RevokeGrant",
+                                ],
+                                "Resource": [kms_config["arn"]],
+                                "Condition": {
+                                    "Bool": {"kms:GrantIsForAWSResource": "true"}
+                                },
                             },
-                        },
-                        {
-                            "Effect": "Allow",
-                            "Action": [
-                                "kms:Encrypt",
-                                "kms:Decrypt",
-                                "kms:ReEncrypt*",
-                                "kms:GenerateDataKey*",
-                                "kms:DescribeKey",
-                            ],
-                            "Resource": [kms_config["arn"]],
-                        },
-                    ],
-                },
-                parliament_config=csi_driver_role_parliament_config,
-                stringify=True,
-            )
+                            {
+                                "Effect": "Allow",
+                                "Action": [
+                                    "kms:Encrypt",
+                                    "kms:Decrypt",
+                                    "kms:ReEncrypt*",
+                                    "kms:GenerateDataKey*",
+                                    "kms:DescribeKey",
+                                ],
+                                "Resource": [kms_config["arn"]],
+                            },
+                        ],
+                    },
+                    parliament_config=csi_driver_role_parliament_config,
+                    stringify=True,
+                )
+            ),
         ),
         opts=ResourceOptions(parent=ebs_csi_driver_role, depends_on=cluster),
     )
@@ -985,7 +1006,7 @@ create_core_dns_resources(
 ############################################################
 # Setup Fastly provider (shared by Traefik and APISIX)
 ############################################################
-fastly_provider = get_fastly_provider(wrap_in_pulumi_options=False)
+fastly_provider = cast(Any, get_fastly_provider(wrap_in_pulumi_options=False))
 
 ############################################################
 # Setup AWS integrations

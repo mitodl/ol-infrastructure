@@ -20,15 +20,15 @@ __all__ = ['PlaybookArgs', 'Playbook']
 class PlaybookArgs:
     def __init__(__self__, *,
                  title: pulumi.Input[_builtins.str],
-                 environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 external_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 playbook_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 severity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 summary: Optional[pulumi.Input[_builtins.str]] = None):
+                 environment_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 external_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 functionality_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 incident_type_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 playbook_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 severity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 summary: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a Playbook resource.
 
@@ -76,123 +76,123 @@ class PlaybookArgs:
 
     @_builtins.property
     @pulumi.getter(name="environmentIds")
-    def environment_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def environment_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         The Environment IDs to attach to the incident
         """
         return pulumi.get(self, "environment_ids")
 
     @environment_ids.setter
-    def environment_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def environment_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "environment_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="externalUrl")
-    def external_url(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def external_url(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The external url of the playbook
         """
         return pulumi.get(self, "external_url")
 
     @external_url.setter
-    def external_url(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def external_url(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "external_url", value)
 
     @_builtins.property
     @pulumi.getter(name="functionalityIds")
-    def functionality_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def functionality_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         The Functionality IDs to attach to the incident
         """
         return pulumi.get(self, "functionality_ids")
 
     @functionality_ids.setter
-    def functionality_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def functionality_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "functionality_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="groupIds")
-    def group_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def group_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         The Team IDs to attach to the incident
         """
         return pulumi.get(self, "group_ids")
 
     @group_ids.setter
-    def group_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def group_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "group_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentTypeIds")
-    def incident_type_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def incident_type_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         The Incident Type IDs to attach to the incident
         """
         return pulumi.get(self, "incident_type_ids")
 
     @incident_type_ids.setter
-    def incident_type_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def incident_type_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "incident_type_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="playbookId")
-    def playbook_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def playbook_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "playbook_id")
 
     @playbook_id.setter
-    def playbook_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def playbook_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "playbook_id", value)
 
     @_builtins.property
     @pulumi.getter(name="serviceIds")
-    def service_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def service_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         The Service IDs to attach to the incident
         """
         return pulumi.get(self, "service_ids")
 
     @service_ids.setter
-    def service_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def service_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "service_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="severityIds")
-    def severity_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def severity_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         The Severity IDs to attach to the incident
         """
         return pulumi.get(self, "severity_ids")
 
     @severity_ids.setter
-    def severity_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def severity_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "severity_ids", value)
 
     @_builtins.property
     @pulumi.getter
-    def summary(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def summary(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The summary of the playbook
         """
         return pulumi.get(self, "summary")
 
     @summary.setter
-    def summary(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def summary(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "summary", value)
 
 
 @pulumi.input_type
 class _PlaybookState:
     def __init__(__self__, *,
-                 environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 external_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 playbook_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 severity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 summary: Optional[pulumi.Input[_builtins.str]] = None,
-                 title: Optional[pulumi.Input[_builtins.str]] = None):
+                 environment_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 external_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 functionality_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 incident_type_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 playbook_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 severity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 summary: pulumi.Input[Optional[_builtins.str]] = None,
+                 title: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering Playbook resources.
 
@@ -229,119 +229,119 @@ class _PlaybookState:
 
     @_builtins.property
     @pulumi.getter(name="environmentIds")
-    def environment_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def environment_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         The Environment IDs to attach to the incident
         """
         return pulumi.get(self, "environment_ids")
 
     @environment_ids.setter
-    def environment_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def environment_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "environment_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="externalUrl")
-    def external_url(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def external_url(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The external url of the playbook
         """
         return pulumi.get(self, "external_url")
 
     @external_url.setter
-    def external_url(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def external_url(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "external_url", value)
 
     @_builtins.property
     @pulumi.getter(name="functionalityIds")
-    def functionality_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def functionality_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         The Functionality IDs to attach to the incident
         """
         return pulumi.get(self, "functionality_ids")
 
     @functionality_ids.setter
-    def functionality_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def functionality_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "functionality_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="groupIds")
-    def group_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def group_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         The Team IDs to attach to the incident
         """
         return pulumi.get(self, "group_ids")
 
     @group_ids.setter
-    def group_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def group_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "group_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentTypeIds")
-    def incident_type_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def incident_type_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         The Incident Type IDs to attach to the incident
         """
         return pulumi.get(self, "incident_type_ids")
 
     @incident_type_ids.setter
-    def incident_type_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def incident_type_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "incident_type_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="playbookId")
-    def playbook_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def playbook_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "playbook_id")
 
     @playbook_id.setter
-    def playbook_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def playbook_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "playbook_id", value)
 
     @_builtins.property
     @pulumi.getter(name="serviceIds")
-    def service_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def service_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         The Service IDs to attach to the incident
         """
         return pulumi.get(self, "service_ids")
 
     @service_ids.setter
-    def service_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def service_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "service_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="severityIds")
-    def severity_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def severity_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         The Severity IDs to attach to the incident
         """
         return pulumi.get(self, "severity_ids")
 
     @severity_ids.setter
-    def severity_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def severity_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "severity_ids", value)
 
     @_builtins.property
     @pulumi.getter
-    def summary(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def summary(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The summary of the playbook
         """
         return pulumi.get(self, "summary")
 
     @summary.setter
-    def summary(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def summary(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "summary", value)
 
     @_builtins.property
     @pulumi.getter
-    def title(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def title(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The title of the playbook
         """
         return pulumi.get(self, "title")
 
     @title.setter
-    def title(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def title(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "title", value)
 
 
@@ -351,16 +351,16 @@ class Playbook(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 external_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 playbook_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 severity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 summary: Optional[pulumi.Input[_builtins.str]] = None,
-                 title: Optional[pulumi.Input[_builtins.str]] = None,
+                 environment_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 external_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 functionality_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 incident_type_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 playbook_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 severity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 summary: pulumi.Input[Optional[_builtins.str]] = None,
+                 title: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a Playbook resource with the given unique name, props, and options.
@@ -401,16 +401,16 @@ class Playbook(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 external_url: Optional[pulumi.Input[_builtins.str]] = None,
-                 functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 playbook_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 severity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 summary: Optional[pulumi.Input[_builtins.str]] = None,
-                 title: Optional[pulumi.Input[_builtins.str]] = None,
+                 environment_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 external_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 functionality_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 incident_type_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 playbook_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 severity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 summary: pulumi.Input[Optional[_builtins.str]] = None,
+                 title: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -443,16 +443,16 @@ class Playbook(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            external_url: Optional[pulumi.Input[_builtins.str]] = None,
-            functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            playbook_id: Optional[pulumi.Input[_builtins.str]] = None,
-            service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            severity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            summary: Optional[pulumi.Input[_builtins.str]] = None,
-            title: Optional[pulumi.Input[_builtins.str]] = None) -> 'Playbook':
+            environment_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            external_url: pulumi.Input[Optional[_builtins.str]] = None,
+            functionality_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            incident_type_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            playbook_id: pulumi.Input[Optional[_builtins.str]] = None,
+            service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            severity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            summary: pulumi.Input[Optional[_builtins.str]] = None,
+            title: pulumi.Input[Optional[_builtins.str]] = None) -> 'Playbook':
         """
         Get an existing Playbook resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -488,7 +488,7 @@ class Playbook(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter(name="environmentIds")
-    def environment_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
+    def environment_ids(self) -> pulumi.Output[Sequence[_builtins.str]]:
         """
         The Environment IDs to attach to the incident
         """
@@ -504,7 +504,7 @@ class Playbook(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter(name="functionalityIds")
-    def functionality_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
+    def functionality_ids(self) -> pulumi.Output[Sequence[_builtins.str]]:
         """
         The Functionality IDs to attach to the incident
         """
@@ -512,7 +512,7 @@ class Playbook(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter(name="groupIds")
-    def group_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
+    def group_ids(self) -> pulumi.Output[Sequence[_builtins.str]]:
         """
         The Team IDs to attach to the incident
         """
@@ -520,7 +520,7 @@ class Playbook(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter(name="incidentTypeIds")
-    def incident_type_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
+    def incident_type_ids(self) -> pulumi.Output[Sequence[_builtins.str]]:
         """
         The Incident Type IDs to attach to the incident
         """
@@ -533,7 +533,7 @@ class Playbook(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter(name="serviceIds")
-    def service_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
+    def service_ids(self) -> pulumi.Output[Sequence[_builtins.str]]:
         """
         The Service IDs to attach to the incident
         """
@@ -541,7 +541,7 @@ class Playbook(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter(name="severityIds")
-    def severity_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
+    def severity_ids(self) -> pulumi.Output[Sequence[_builtins.str]]:
         """
         The Severity IDs to attach to the incident
         """
@@ -562,3 +562,4 @@ class Playbook(pulumi.CustomResource):
         The title of the playbook
         """
         return pulumi.get(self, "title")
+

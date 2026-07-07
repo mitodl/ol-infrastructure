@@ -1,0 +1,11 @@
+---
+name: ol-application-toolhive-apps
+runtime: python
+description: >
+  Deploy the application agent-class MCP workloads on the operations EKS cluster.
+  This stack owns the toolhive-apps namespace and will hold the MCPServer /
+  VirtualMCPServer / MCPGroup resources used by application agents. The ToolHive
+  operator and CRDs that reconcile these resources are installed by the
+  ol-application-toolhive-operator stack.
+backend:
+  url: s3://mitol-pulumi-state/

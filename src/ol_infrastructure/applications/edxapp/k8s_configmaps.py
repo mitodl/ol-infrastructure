@@ -52,6 +52,11 @@ def _build_interpolated_config_dict(
         Configuration dictionary for 60-interpolated-config.yaml
     """
     domains = edxapp_config.require_object("domains")
+    enabled_mfes: dict[str, str] = edxapp_config.get_object("enabled_mfes") or {}
+    site_project_config = edxapp_config.get_object("site_project")
+    site_project_mfe_apps: list[str] = (
+        list(site_project_config.get("mfe_apps", [])) if site_project_config else []
+    )
 
     # Determine marketing domain based on deployment type
     marketing_domain = (
@@ -161,7 +166,17 @@ def _build_interpolated_config_dict(
         "MIT_LEARN_AI_XBLOCK_PROBLEM_SET_LIST_URL": f"https://{edxapp_config.require('mit_learn_api_domain')}/ai/api/v0/problem_set_list",
         "MIT_LEARN_AI_XBLOCK_CHAT_RATING_URL": f"https://{edxapp_config.require('mit_learn_api_domain')}/ai/api/v0/chat_sessions/",
         "MIT_LEARN_LOGO": f"https://{domains['lms']}/static/mitxonline/images/mit-learn-logo.svg",
+        "ADMIN_CONSOLE_MICROFRONTEND_URL": (
+            f"https://{domains['lms']}/admin-console"
+            if "admin_console" in enabled_mfes
+            else None
+        ),
         "COURSE_AUTHORING_MICROFRONTEND_URL": f"https://{domains['studio']}/authoring",
+        "INSTRUCTOR_MICROFRONTEND_URL": (
+            f"https://{domains['lms']}/apps/instructor-dashboard"
+            if "instructor-dashboard" in site_project_mfe_apps
+            else None
+        ),
         "LEARNING_MICROFRONTEND_URL": f"https://{domains['lms']}/learn",
         "LMS_BASE": domains["lms"],
         "LMS_INTERNAL_ROOT_URL": f"https://{domains['lms']}",
@@ -192,6 +207,23 @@ def _build_interpolated_config_dict(
         "OTEL_SERVICE_NAME": env_name + "-edxapp",
         "OTEL_LOG_LEVEL": "info",
         "ECOMMERCE_PUBLIC_URL_ROOT": domains["lms"],
+        "ENABLE_MFE_CONFIG_API": True,
+        "FRONTEND_SITE_CONFIG": {
+            "basename": "/",
+            "lmsBaseUrl": f"https://{domains['lms']}",
+            "loginUrl": f"https://{domains['lms']}/login",
+            "logoutUrl": f"https://{domains['lms']}/logout",
+            "headerLogoImageUrl": f"https://{domains['lms']}/static/{stack_info.env_prefix}/images/logo.svg",
+            "accessTokenCookieName": f"{env_name}-edx-jwt-cookie-header-payload",
+            "languagePreferenceCookieName": f"{env_name}-openedx-language-preference",
+            "userInfoCookieName": f"{env_name}-edx-user-info",
+            "csrfTokenApiPath": "/csrf/api/v1/token",
+            "commonAppConfig": {
+                "mitolFooter": {
+                    "accessibilityUrl": "https://accessibility.mit.edu/",
+                },
+            },
+        },
     }
 
     # Ref: https://docs.openedx.org/en/latest/site_ops/how-tos/use_typesense_search_backend.html
@@ -247,6 +279,16 @@ def _build_interpolated_config_dict(
                 },
             }
         )
+        config["FRONTEND_SITE_CONFIG"]["commonAppConfig"]["mitolFooter"].update(
+            {
+                "privacyPolicyUrl": f"https://{marketing_domain}/privacy",
+                "termsOfServiceUrl": f"https://{marketing_domain}/terms",
+                "honorCodeUrl": f"https://{marketing_domain}/honor-code/",
+                "aboutUrl": f"https://{marketing_domain}/about",
+                "supportUrl": f"https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/",
+                "copyrightText": "\u00a9 MIT Open Learning. All rights reserved except where noted.",
+            }
+        )
 
     # xPro-specific configuration
     elif stack_info.env_prefix == "xpro":
@@ -274,6 +316,16 @@ def _build_interpolated_config_dict(
                 },
             }
         )
+        config["FRONTEND_SITE_CONFIG"]["commonAppConfig"]["mitolFooter"].update(
+            {
+                "privacyPolicyUrl": f"https://{marketing_domain}/privacy-policy/",
+                "termsOfServiceUrl": f"https://{marketing_domain}/terms-of-service/",
+                "honorCodeUrl": f"https://{marketing_domain}/honor-code/",
+                "aboutUrl": f"https://{marketing_domain}/about-us",
+                "supportUrl": f"https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/",
+                "copyrightText": "\u00a9 MIT xPRO. All rights reserved except where noted.",
+            }
+        )
 
     # MITx Online-specific configuration
     elif stack_info.env_prefix == "mitxonline":
@@ -291,6 +343,7 @@ def _build_interpolated_config_dict(
                     "use_extracted_html_block", False
                 ),
                 "DATAPLATFORM_CERTIFICATE_BASE_URL": f"https://{data_platform_domain}/superset/dashboard/da9e03d3-e1bb-45b8-981f-208deca90e7a/",
+                "DATAPLATFORM_CERTIFICATE_NATIVE_FILTER_ID": "NATIVE_FILTER-UVtY6Gfiky0BXiPZ5w2qr",
                 "ENABLE_AUTO_LANGUAGE_SELECTION": edxapp_config.get_bool(
                     "enable_auto_language_selection"
                 )
@@ -303,7 +356,7 @@ def _build_interpolated_config_dict(
                     f"https://{edxapp_config.require('mit_learn_api_domain')}/logout",
                 ],
                 "MKTG_URLS": {
-                    "ROOT": f"https://{marketing_domain}/",
+                    "ROOT": f"https://{edxapp_config.require('mit_learn_domain')}/",
                 },
                 "MKTG_URL_OVERRIDES": {
                     "TOS": f"https://{edxapp_config.require('mit_learn_domain')}/terms",
@@ -321,6 +374,16 @@ def _build_interpolated_config_dict(
                         "fail_silently": False,
                     }
                 },
+            }
+        )
+        config["FRONTEND_SITE_CONFIG"]["commonAppConfig"]["mitolFooter"].update(
+            {
+                "privacyPolicyUrl": f"https://{marketing_domain}/privacy-policy/",
+                "termsOfServiceUrl": f"https://{marketing_domain}/terms-of-service/",
+                "honorCodeUrl": f"https://{marketing_domain}/honor-code/",
+                "aboutUrl": f"https://{marketing_domain}/about-us/",
+                "supportUrl": f"https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/",
+                "copyrightText": "\u00a9 MIT Open Learning. All rights reserved except where noted.",
             }
         )
 
@@ -586,7 +649,7 @@ def create_k8s_configmaps(  # noqa: PLR0915
         "PROGRAM_CONSOLE_MICROFRONTEND_URL": None,
         "REGISTRATION_VALIDATION_RATELIMIT": "1000000/minute",
         "REGISTRATION_RATELIMIT": "1000000/minute",
-        "RATELIMIT_RATE": "600/m",
+        "RATELIMIT_RATE": "1200/m",
         "RECALCULATE_GRADES_ROUTING_KEY": "edx.lms.core.default",
         "STUDENT_FILEUPLOAD_MAX_SIZE": 52428800,
         "TRACKING_SEGMENTIO_WEBHOOK_SECRET": "",

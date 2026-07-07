@@ -21,33 +21,33 @@ __all__ = ['AlertsSourceArgs', 'AlertsSource']
 @pulumi.input_type
 class AlertsSourceArgs:
     def __init__(__self__, *,
-                 alert_source_fields_attributes: Optional[pulumi.Input[Sequence[pulumi.Input['AlertsSourceAlertSourceFieldsAttributeArgs']]]] = None,
-                 alert_source_urgency_rules_attributes: Optional[pulumi.Input[Sequence[pulumi.Input['AlertsSourceAlertSourceUrgencyRulesAttributeArgs']]]] = None,
-                 alert_template_attributes: Optional[pulumi.Input['AlertsSourceAlertTemplateAttributesArgs']] = None,
-                 alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 alerts_source_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 deduplicate_alerts_by_key: Optional[pulumi.Input[_builtins.bool]] = None,
-                 deduplication_key_kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 deduplication_key_path: Optional[pulumi.Input[_builtins.str]] = None,
-                 deduplication_key_regexp: Optional[pulumi.Input[_builtins.str]] = None,
-                 email: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 owner_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 resolution_rule_attributes: Optional[pulumi.Input['AlertsSourceResolutionRuleAttributesArgs']] = None,
-                 secret: Optional[pulumi.Input[_builtins.str]] = None,
-                 source_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 sourceable_attributes: Optional[pulumi.Input['AlertsSourceSourceableAttributesArgs']] = None,
-                 status: Optional[pulumi.Input[_builtins.str]] = None,
-                 webhook_endpoint: Optional[pulumi.Input[_builtins.str]] = None):
+                 alert_source_fields_attributes: pulumi.Input[Optional[Sequence[pulumi.Input['AlertsSourceAlertSourceFieldsAttributeArgs']]]] = None,
+                 alert_source_urgency_rules_attributes: pulumi.Input[Optional[Sequence[pulumi.Input['AlertsSourceAlertSourceUrgencyRulesAttributeArgs']]]] = None,
+                 alert_template_attributes: pulumi.Input[Optional['AlertsSourceAlertTemplateAttributesArgs']] = None,
+                 alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 alerts_source_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 deduplicate_alerts_by_key: pulumi.Input[Optional[_builtins.bool]] = None,
+                 deduplication_key_kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 deduplication_key_path: pulumi.Input[Optional[_builtins.str]] = None,
+                 deduplication_key_regexp: pulumi.Input[Optional[_builtins.str]] = None,
+                 email: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 owner_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 resolution_rule_attributes: pulumi.Input[Optional['AlertsSourceResolutionRuleAttributesArgs']] = None,
+                 secret: pulumi.Input[Optional[_builtins.str]] = None,
+                 source_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 sourceable_attributes: pulumi.Input[Optional['AlertsSourceSourceableAttributesArgs']] = None,
+                 status: pulumi.Input[Optional[_builtins.str]] = None,
+                 webhook_endpoint: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a AlertsSource resource.
 
         :param pulumi.Input[Sequence[pulumi.Input['AlertsSourceAlertSourceFieldsAttributeArgs']]] alert_source_fields_attributes: List of alert fields to be added to the alert source. Note: This attribute requires the alert field feature to be enabled on your account. Contact Rootly customer support if you need assistance with this feature.
         :param pulumi.Input[Sequence[pulumi.Input['AlertsSourceAlertSourceUrgencyRulesAttributeArgs']]] alert_source_urgency_rules_attributes: List of rules that define the conditions under which the alert urgency will be set automatically based on the alert payload
-        :param pulumi.Input['AlertsSourceAlertTemplateAttributesArgs'] alert_template_attributes: Note that when alert fields are enabled at the team level, alert template attributes cannot be provided. Use <span pulumi-lang-nodejs="`alertSourceFieldsAttributes`" pulumi-lang-dotnet="`AlertSourceFieldsAttributes`" pulumi-lang-go="`alertSourceFieldsAttributes`" pulumi-lang-python="`alert_source_fields_attributes`" pulumi-lang-yaml="`alertSourceFieldsAttributes`" pulumi-lang-java="`alertSourceFieldsAttributes`">`alert_source_fields_attributes`</span> instead.
+        :param pulumi.Input['AlertsSourceAlertTemplateAttributesArgs'] alert_template_attributes: Note that when alert fields are enabled at the team level, alert template attributes cannot be provided. Use <span pulumi-lang-nodejs="`alertSourceFieldsAttributes`" pulumi-lang-dotnet="`AlertSourceFieldsAttributes`" pulumi-lang-go="`alertSourceFieldsAttributes`" pulumi-lang-python="`alert_source_fields_attributes`" pulumi-lang-yaml="`alertSourceFieldsAttributes`" pulumi-lang-java="`alertSourceFieldsAttributes`" pulumi-lang-hcl="`alert_source_fields_attributes`">`alertSourceFieldsAttributes`</span> instead.
         :param pulumi.Input[_builtins.str] alert_urgency_id: ID for the default alert urgency assigned to this alert source
-        :param pulumi.Input[_builtins.bool] deduplicate_alerts_by_key: Toggle alert deduplication using deduplication key. If enabled,<span pulumi-lang-nodejs=" deduplicationKeyKind " pulumi-lang-dotnet=" DeduplicationKeyKind " pulumi-lang-go=" deduplicationKeyKind " pulumi-lang-python=" deduplication_key_kind " pulumi-lang-yaml=" deduplicationKeyKind " pulumi-lang-java=" deduplicationKeyKind "> deduplication_key_kind </span>and<span pulumi-lang-nodejs=" deduplicationKeyPath " pulumi-lang-dotnet=" DeduplicationKeyPath " pulumi-lang-go=" deduplicationKeyPath " pulumi-lang-python=" deduplication_key_path " pulumi-lang-yaml=" deduplicationKeyPath " pulumi-lang-java=" deduplicationKeyPath "> deduplication_key_path </span>are required.. Value must be one of true or false
-        :param pulumi.Input[_builtins.str] deduplication_key_kind: Kind of deduplication key.. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>.
+        :param pulumi.Input[_builtins.bool] deduplicate_alerts_by_key: Toggle alert deduplication using deduplication key. If enabled,<span pulumi-lang-nodejs=" deduplicationKeyKind " pulumi-lang-dotnet=" DeduplicationKeyKind " pulumi-lang-go=" deduplicationKeyKind " pulumi-lang-python=" deduplication_key_kind " pulumi-lang-yaml=" deduplicationKeyKind " pulumi-lang-java=" deduplicationKeyKind " pulumi-lang-hcl=" deduplication_key_kind "> deduplicationKeyKind </span>and<span pulumi-lang-nodejs=" deduplicationKeyPath " pulumi-lang-dotnet=" DeduplicationKeyPath " pulumi-lang-go=" deduplicationKeyPath " pulumi-lang-python=" deduplication_key_path " pulumi-lang-yaml=" deduplicationKeyPath " pulumi-lang-java=" deduplicationKeyPath " pulumi-lang-hcl=" deduplication_key_path "> deduplicationKeyPath </span>are required.. Value must be one of true or false
+        :param pulumi.Input[_builtins.str] deduplication_key_kind: Kind of deduplication key.. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>.
         :param pulumi.Input[_builtins.str] deduplication_key_path: Path to deduplication key. This is a JSON Path to extract the deduplication key from the request body.
         :param pulumi.Input[_builtins.str] deduplication_key_regexp: Regular expression to extract key from value found at key path.
         :param pulumi.Input[_builtins.str] email: The email generated for email alert sources
@@ -55,9 +55,9 @@ class AlertsSourceArgs:
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] owner_group_ids: List of team IDs that will own the alert source
         :param pulumi.Input['AlertsSourceResolutionRuleAttributesArgs'] resolution_rule_attributes: Provide additional attributes for email alerts source
         :param pulumi.Input[_builtins.str] secret: The secret used to authenticate non-email alert sources
-        :param pulumi.Input[_builtins.str] source_type: The alert source type. Value must be one of <span pulumi-lang-nodejs="`email`" pulumi-lang-dotnet="`Email`" pulumi-lang-go="`email`" pulumi-lang-python="`email`" pulumi-lang-yaml="`email`" pulumi-lang-java="`email`">`email`</span>, <span pulumi-lang-nodejs="`appDynamics`" pulumi-lang-dotnet="`AppDynamics`" pulumi-lang-go="`appDynamics`" pulumi-lang-python="`app_dynamics`" pulumi-lang-yaml="`appDynamics`" pulumi-lang-java="`appDynamics`">`app_dynamics`</span>, <span pulumi-lang-nodejs="`catchpoint`" pulumi-lang-dotnet="`Catchpoint`" pulumi-lang-go="`catchpoint`" pulumi-lang-python="`catchpoint`" pulumi-lang-yaml="`catchpoint`" pulumi-lang-java="`catchpoint`">`catchpoint`</span>, <span pulumi-lang-nodejs="`datadog`" pulumi-lang-dotnet="`Datadog`" pulumi-lang-go="`datadog`" pulumi-lang-python="`datadog`" pulumi-lang-yaml="`datadog`" pulumi-lang-java="`datadog`">`datadog`</span>, <span pulumi-lang-nodejs="`alertmanager`" pulumi-lang-dotnet="`Alertmanager`" pulumi-lang-go="`alertmanager`" pulumi-lang-python="`alertmanager`" pulumi-lang-yaml="`alertmanager`" pulumi-lang-java="`alertmanager`">`alertmanager`</span>, <span pulumi-lang-nodejs="`googleCloud`" pulumi-lang-dotnet="`GoogleCloud`" pulumi-lang-go="`googleCloud`" pulumi-lang-python="`google_cloud`" pulumi-lang-yaml="`googleCloud`" pulumi-lang-java="`googleCloud`">`google_cloud`</span>, <span pulumi-lang-nodejs="`grafana`" pulumi-lang-dotnet="`Grafana`" pulumi-lang-go="`grafana`" pulumi-lang-python="`grafana`" pulumi-lang-yaml="`grafana`" pulumi-lang-java="`grafana`">`grafana`</span>, <span pulumi-lang-nodejs="`sentry`" pulumi-lang-dotnet="`Sentry`" pulumi-lang-go="`sentry`" pulumi-lang-python="`sentry`" pulumi-lang-yaml="`sentry`" pulumi-lang-java="`sentry`">`sentry`</span>, <span pulumi-lang-nodejs="`genericWebhook`" pulumi-lang-dotnet="`GenericWebhook`" pulumi-lang-go="`genericWebhook`" pulumi-lang-python="`generic_webhook`" pulumi-lang-yaml="`genericWebhook`" pulumi-lang-java="`genericWebhook`">`generic_webhook`</span>, <span pulumi-lang-nodejs="`cloudWatch`" pulumi-lang-dotnet="`CloudWatch`" pulumi-lang-go="`cloudWatch`" pulumi-lang-python="`cloud_watch`" pulumi-lang-yaml="`cloudWatch`" pulumi-lang-java="`cloudWatch`">`cloud_watch`</span>, <span pulumi-lang-nodejs="`checkly`" pulumi-lang-dotnet="`Checkly`" pulumi-lang-go="`checkly`" pulumi-lang-python="`checkly`" pulumi-lang-yaml="`checkly`" pulumi-lang-java="`checkly`">`checkly`</span>, <span pulumi-lang-nodejs="`azure`" pulumi-lang-dotnet="`Azure`" pulumi-lang-go="`azure`" pulumi-lang-python="`azure`" pulumi-lang-yaml="`azure`" pulumi-lang-java="`azure`">`azure`</span>, <span pulumi-lang-nodejs="`newRelic`" pulumi-lang-dotnet="`NewRelic`" pulumi-lang-go="`newRelic`" pulumi-lang-python="`new_relic`" pulumi-lang-yaml="`newRelic`" pulumi-lang-java="`newRelic`">`new_relic`</span>, <span pulumi-lang-nodejs="`splunk`" pulumi-lang-dotnet="`Splunk`" pulumi-lang-go="`splunk`" pulumi-lang-python="`splunk`" pulumi-lang-yaml="`splunk`" pulumi-lang-java="`splunk`">`splunk`</span>, <span pulumi-lang-nodejs="`chronosphere`" pulumi-lang-dotnet="`Chronosphere`" pulumi-lang-go="`chronosphere`" pulumi-lang-python="`chronosphere`" pulumi-lang-yaml="`chronosphere`" pulumi-lang-java="`chronosphere`">`chronosphere`</span>, <span pulumi-lang-nodejs="`appOptics`" pulumi-lang-dotnet="`AppOptics`" pulumi-lang-go="`appOptics`" pulumi-lang-python="`app_optics`" pulumi-lang-yaml="`appOptics`" pulumi-lang-java="`appOptics`">`app_optics`</span>, <span pulumi-lang-nodejs="`bugSnag`" pulumi-lang-dotnet="`BugSnag`" pulumi-lang-go="`bugSnag`" pulumi-lang-python="`bug_snag`" pulumi-lang-yaml="`bugSnag`" pulumi-lang-java="`bugSnag`">`bug_snag`</span>, <span pulumi-lang-nodejs="`honeycomb`" pulumi-lang-dotnet="`Honeycomb`" pulumi-lang-go="`honeycomb`" pulumi-lang-python="`honeycomb`" pulumi-lang-yaml="`honeycomb`" pulumi-lang-java="`honeycomb`">`honeycomb`</span>, <span pulumi-lang-nodejs="`monteCarlo`" pulumi-lang-dotnet="`MonteCarlo`" pulumi-lang-go="`monteCarlo`" pulumi-lang-python="`monte_carlo`" pulumi-lang-yaml="`monteCarlo`" pulumi-lang-java="`monteCarlo`">`monte_carlo`</span>, <span pulumi-lang-nodejs="`nagios`" pulumi-lang-dotnet="`Nagios`" pulumi-lang-go="`nagios`" pulumi-lang-python="`nagios`" pulumi-lang-yaml="`nagios`" pulumi-lang-java="`nagios`">`nagios`</span>, <span pulumi-lang-nodejs="`prtg`" pulumi-lang-dotnet="`Prtg`" pulumi-lang-go="`prtg`" pulumi-lang-python="`prtg`" pulumi-lang-yaml="`prtg`" pulumi-lang-java="`prtg`">`prtg`</span>.
-        :param pulumi.Input['AlertsSourceSourceableAttributesArgs'] sourceable_attributes: Provide additional attributes for<span pulumi-lang-nodejs=" genericWebhook " pulumi-lang-dotnet=" GenericWebhook " pulumi-lang-go=" genericWebhook " pulumi-lang-python=" generic_webhook " pulumi-lang-yaml=" genericWebhook " pulumi-lang-java=" genericWebhook "> generic_webhook </span>alerts source
-        :param pulumi.Input[_builtins.str] status: The status of the alert source. Value must be one of <span pulumi-lang-nodejs="`connected`" pulumi-lang-dotnet="`Connected`" pulumi-lang-go="`connected`" pulumi-lang-python="`connected`" pulumi-lang-yaml="`connected`" pulumi-lang-java="`connected`">`connected`</span>, <span pulumi-lang-nodejs="`setupComplete`" pulumi-lang-dotnet="`SetupComplete`" pulumi-lang-go="`setupComplete`" pulumi-lang-python="`setup_complete`" pulumi-lang-yaml="`setupComplete`" pulumi-lang-java="`setupComplete`">`setup_complete`</span>, <span pulumi-lang-nodejs="`setupIncomplete`" pulumi-lang-dotnet="`SetupIncomplete`" pulumi-lang-go="`setupIncomplete`" pulumi-lang-python="`setup_incomplete`" pulumi-lang-yaml="`setupIncomplete`" pulumi-lang-java="`setupIncomplete`">`setup_incomplete`</span>.
+        :param pulumi.Input[_builtins.str] source_type: The alert source type. Value must be one of <span pulumi-lang-nodejs="`email`" pulumi-lang-dotnet="`Email`" pulumi-lang-go="`email`" pulumi-lang-python="`email`" pulumi-lang-yaml="`email`" pulumi-lang-java="`email`" pulumi-lang-hcl="`email`">`email`</span>, <span pulumi-lang-nodejs="`appDynamics`" pulumi-lang-dotnet="`AppDynamics`" pulumi-lang-go="`appDynamics`" pulumi-lang-python="`app_dynamics`" pulumi-lang-yaml="`appDynamics`" pulumi-lang-java="`appDynamics`" pulumi-lang-hcl="`app_dynamics`">`appDynamics`</span>, <span pulumi-lang-nodejs="`catchpoint`" pulumi-lang-dotnet="`Catchpoint`" pulumi-lang-go="`catchpoint`" pulumi-lang-python="`catchpoint`" pulumi-lang-yaml="`catchpoint`" pulumi-lang-java="`catchpoint`" pulumi-lang-hcl="`catchpoint`">`catchpoint`</span>, <span pulumi-lang-nodejs="`datadog`" pulumi-lang-dotnet="`Datadog`" pulumi-lang-go="`datadog`" pulumi-lang-python="`datadog`" pulumi-lang-yaml="`datadog`" pulumi-lang-java="`datadog`" pulumi-lang-hcl="`datadog`">`datadog`</span>, <span pulumi-lang-nodejs="`dynatrace`" pulumi-lang-dotnet="`Dynatrace`" pulumi-lang-go="`dynatrace`" pulumi-lang-python="`dynatrace`" pulumi-lang-yaml="`dynatrace`" pulumi-lang-java="`dynatrace`" pulumi-lang-hcl="`dynatrace`">`dynatrace`</span>, <span pulumi-lang-nodejs="`alertmanager`" pulumi-lang-dotnet="`Alertmanager`" pulumi-lang-go="`alertmanager`" pulumi-lang-python="`alertmanager`" pulumi-lang-yaml="`alertmanager`" pulumi-lang-java="`alertmanager`" pulumi-lang-hcl="`alertmanager`">`alertmanager`</span>, <span pulumi-lang-nodejs="`googleCloud`" pulumi-lang-dotnet="`GoogleCloud`" pulumi-lang-go="`googleCloud`" pulumi-lang-python="`google_cloud`" pulumi-lang-yaml="`googleCloud`" pulumi-lang-java="`googleCloud`" pulumi-lang-hcl="`google_cloud`">`googleCloud`</span>, <span pulumi-lang-nodejs="`grafana`" pulumi-lang-dotnet="`Grafana`" pulumi-lang-go="`grafana`" pulumi-lang-python="`grafana`" pulumi-lang-yaml="`grafana`" pulumi-lang-java="`grafana`" pulumi-lang-hcl="`grafana`">`grafana`</span>, <span pulumi-lang-nodejs="`sentry`" pulumi-lang-dotnet="`Sentry`" pulumi-lang-go="`sentry`" pulumi-lang-python="`sentry`" pulumi-lang-yaml="`sentry`" pulumi-lang-java="`sentry`" pulumi-lang-hcl="`sentry`">`sentry`</span>, <span pulumi-lang-nodejs="`genericWebhook`" pulumi-lang-dotnet="`GenericWebhook`" pulumi-lang-go="`genericWebhook`" pulumi-lang-python="`generic_webhook`" pulumi-lang-yaml="`genericWebhook`" pulumi-lang-java="`genericWebhook`" pulumi-lang-hcl="`generic_webhook`">`genericWebhook`</span>, <span pulumi-lang-nodejs="`cloudWatch`" pulumi-lang-dotnet="`CloudWatch`" pulumi-lang-go="`cloudWatch`" pulumi-lang-python="`cloud_watch`" pulumi-lang-yaml="`cloudWatch`" pulumi-lang-java="`cloudWatch`" pulumi-lang-hcl="`cloud_watch`">`cloudWatch`</span>, <span pulumi-lang-nodejs="`awsSns`" pulumi-lang-dotnet="`AwsSns`" pulumi-lang-go="`awsSns`" pulumi-lang-python="`aws_sns`" pulumi-lang-yaml="`awsSns`" pulumi-lang-java="`awsSns`" pulumi-lang-hcl="`aws_sns`">`awsSns`</span>, <span pulumi-lang-nodejs="`checkly`" pulumi-lang-dotnet="`Checkly`" pulumi-lang-go="`checkly`" pulumi-lang-python="`checkly`" pulumi-lang-yaml="`checkly`" pulumi-lang-java="`checkly`" pulumi-lang-hcl="`checkly`">`checkly`</span>, <span pulumi-lang-nodejs="`azure`" pulumi-lang-dotnet="`Azure`" pulumi-lang-go="`azure`" pulumi-lang-python="`azure`" pulumi-lang-yaml="`azure`" pulumi-lang-java="`azure`" pulumi-lang-hcl="`azure`">`azure`</span>, <span pulumi-lang-nodejs="`newRelic`" pulumi-lang-dotnet="`NewRelic`" pulumi-lang-go="`newRelic`" pulumi-lang-python="`new_relic`" pulumi-lang-yaml="`newRelic`" pulumi-lang-java="`newRelic`" pulumi-lang-hcl="`new_relic`">`newRelic`</span>, <span pulumi-lang-nodejs="`splunk`" pulumi-lang-dotnet="`Splunk`" pulumi-lang-go="`splunk`" pulumi-lang-python="`splunk`" pulumi-lang-yaml="`splunk`" pulumi-lang-java="`splunk`" pulumi-lang-hcl="`splunk`">`splunk`</span>, <span pulumi-lang-nodejs="`chronosphere`" pulumi-lang-dotnet="`Chronosphere`" pulumi-lang-go="`chronosphere`" pulumi-lang-python="`chronosphere`" pulumi-lang-yaml="`chronosphere`" pulumi-lang-java="`chronosphere`" pulumi-lang-hcl="`chronosphere`">`chronosphere`</span>, <span pulumi-lang-nodejs="`appOptics`" pulumi-lang-dotnet="`AppOptics`" pulumi-lang-go="`appOptics`" pulumi-lang-python="`app_optics`" pulumi-lang-yaml="`appOptics`" pulumi-lang-java="`appOptics`" pulumi-lang-hcl="`app_optics`">`appOptics`</span>, <span pulumi-lang-nodejs="`bugSnag`" pulumi-lang-dotnet="`BugSnag`" pulumi-lang-go="`bugSnag`" pulumi-lang-python="`bug_snag`" pulumi-lang-yaml="`bugSnag`" pulumi-lang-java="`bugSnag`" pulumi-lang-hcl="`bug_snag`">`bugSnag`</span>, <span pulumi-lang-nodejs="`honeycomb`" pulumi-lang-dotnet="`Honeycomb`" pulumi-lang-go="`honeycomb`" pulumi-lang-python="`honeycomb`" pulumi-lang-yaml="`honeycomb`" pulumi-lang-java="`honeycomb`" pulumi-lang-hcl="`honeycomb`">`honeycomb`</span>, <span pulumi-lang-nodejs="`monteCarlo`" pulumi-lang-dotnet="`MonteCarlo`" pulumi-lang-go="`monteCarlo`" pulumi-lang-python="`monte_carlo`" pulumi-lang-yaml="`monteCarlo`" pulumi-lang-java="`monteCarlo`" pulumi-lang-hcl="`monte_carlo`">`monteCarlo`</span>, <span pulumi-lang-nodejs="`nagios`" pulumi-lang-dotnet="`Nagios`" pulumi-lang-go="`nagios`" pulumi-lang-python="`nagios`" pulumi-lang-yaml="`nagios`" pulumi-lang-java="`nagios`" pulumi-lang-hcl="`nagios`">`nagios`</span>, <span pulumi-lang-nodejs="`prtg`" pulumi-lang-dotnet="`Prtg`" pulumi-lang-go="`prtg`" pulumi-lang-python="`prtg`" pulumi-lang-yaml="`prtg`" pulumi-lang-java="`prtg`" pulumi-lang-hcl="`prtg`">`prtg`</span>.
+        :param pulumi.Input['AlertsSourceSourceableAttributesArgs'] sourceable_attributes: Provide additional attributes for<span pulumi-lang-nodejs=" genericWebhook " pulumi-lang-dotnet=" GenericWebhook " pulumi-lang-go=" genericWebhook " pulumi-lang-python=" generic_webhook " pulumi-lang-yaml=" genericWebhook " pulumi-lang-java=" genericWebhook " pulumi-lang-hcl=" generic_webhook "> genericWebhook </span>alerts source
+        :param pulumi.Input[_builtins.str] status: The status of the alert source. Value must be one of <span pulumi-lang-nodejs="`connected`" pulumi-lang-dotnet="`Connected`" pulumi-lang-go="`connected`" pulumi-lang-python="`connected`" pulumi-lang-yaml="`connected`" pulumi-lang-java="`connected`" pulumi-lang-hcl="`connected`">`connected`</span>, <span pulumi-lang-nodejs="`setupComplete`" pulumi-lang-dotnet="`SetupComplete`" pulumi-lang-go="`setupComplete`" pulumi-lang-python="`setup_complete`" pulumi-lang-yaml="`setupComplete`" pulumi-lang-java="`setupComplete`" pulumi-lang-hcl="`setup_complete`">`setupComplete`</span>, <span pulumi-lang-nodejs="`setupIncomplete`" pulumi-lang-dotnet="`SetupIncomplete`" pulumi-lang-go="`setupIncomplete`" pulumi-lang-python="`setup_incomplete`" pulumi-lang-yaml="`setupIncomplete`" pulumi-lang-java="`setupIncomplete`" pulumi-lang-hcl="`setup_incomplete`">`setupIncomplete`</span>.
         :param pulumi.Input[_builtins.str] webhook_endpoint: The webhook URL generated for non-email alert sources
         """
         if alert_source_fields_attributes is not None:
@@ -99,248 +99,248 @@ class AlertsSourceArgs:
 
     @_builtins.property
     @pulumi.getter(name="alertSourceFieldsAttributes")
-    def alert_source_fields_attributes(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['AlertsSourceAlertSourceFieldsAttributeArgs']]]]:
+    def alert_source_fields_attributes(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['AlertsSourceAlertSourceFieldsAttributeArgs']]]]:
         """
         List of alert fields to be added to the alert source. Note: This attribute requires the alert field feature to be enabled on your account. Contact Rootly customer support if you need assistance with this feature.
         """
         return pulumi.get(self, "alert_source_fields_attributes")
 
     @alert_source_fields_attributes.setter
-    def alert_source_fields_attributes(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['AlertsSourceAlertSourceFieldsAttributeArgs']]]]):
+    def alert_source_fields_attributes(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['AlertsSourceAlertSourceFieldsAttributeArgs']]]]):
         pulumi.set(self, "alert_source_fields_attributes", value)
 
     @_builtins.property
     @pulumi.getter(name="alertSourceUrgencyRulesAttributes")
-    def alert_source_urgency_rules_attributes(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['AlertsSourceAlertSourceUrgencyRulesAttributeArgs']]]]:
+    def alert_source_urgency_rules_attributes(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['AlertsSourceAlertSourceUrgencyRulesAttributeArgs']]]]:
         """
         List of rules that define the conditions under which the alert urgency will be set automatically based on the alert payload
         """
         return pulumi.get(self, "alert_source_urgency_rules_attributes")
 
     @alert_source_urgency_rules_attributes.setter
-    def alert_source_urgency_rules_attributes(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['AlertsSourceAlertSourceUrgencyRulesAttributeArgs']]]]):
+    def alert_source_urgency_rules_attributes(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['AlertsSourceAlertSourceUrgencyRulesAttributeArgs']]]]):
         pulumi.set(self, "alert_source_urgency_rules_attributes", value)
 
     @_builtins.property
     @pulumi.getter(name="alertTemplateAttributes")
-    def alert_template_attributes(self) -> Optional[pulumi.Input['AlertsSourceAlertTemplateAttributesArgs']]:
+    def alert_template_attributes(self) -> pulumi.Input[Optional['AlertsSourceAlertTemplateAttributesArgs']]:
         """
-        Note that when alert fields are enabled at the team level, alert template attributes cannot be provided. Use <span pulumi-lang-nodejs="`alertSourceFieldsAttributes`" pulumi-lang-dotnet="`AlertSourceFieldsAttributes`" pulumi-lang-go="`alertSourceFieldsAttributes`" pulumi-lang-python="`alert_source_fields_attributes`" pulumi-lang-yaml="`alertSourceFieldsAttributes`" pulumi-lang-java="`alertSourceFieldsAttributes`">`alert_source_fields_attributes`</span> instead.
+        Note that when alert fields are enabled at the team level, alert template attributes cannot be provided. Use <span pulumi-lang-nodejs="`alertSourceFieldsAttributes`" pulumi-lang-dotnet="`AlertSourceFieldsAttributes`" pulumi-lang-go="`alertSourceFieldsAttributes`" pulumi-lang-python="`alert_source_fields_attributes`" pulumi-lang-yaml="`alertSourceFieldsAttributes`" pulumi-lang-java="`alertSourceFieldsAttributes`" pulumi-lang-hcl="`alert_source_fields_attributes`">`alertSourceFieldsAttributes`</span> instead.
         """
         return pulumi.get(self, "alert_template_attributes")
 
     @alert_template_attributes.setter
-    def alert_template_attributes(self, value: Optional[pulumi.Input['AlertsSourceAlertTemplateAttributesArgs']]):
+    def alert_template_attributes(self, value: pulumi.Input[Optional['AlertsSourceAlertTemplateAttributesArgs']]):
         pulumi.set(self, "alert_template_attributes", value)
 
     @_builtins.property
     @pulumi.getter(name="alertUrgencyId")
-    def alert_urgency_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alert_urgency_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         ID for the default alert urgency assigned to this alert source
         """
         return pulumi.get(self, "alert_urgency_id")
 
     @alert_urgency_id.setter
-    def alert_urgency_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alert_urgency_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alert_urgency_id", value)
 
     @_builtins.property
     @pulumi.getter(name="alertsSourceId")
-    def alerts_source_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alerts_source_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "alerts_source_id")
 
     @alerts_source_id.setter
-    def alerts_source_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alerts_source_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alerts_source_id", value)
 
     @_builtins.property
     @pulumi.getter(name="deduplicateAlertsByKey")
-    def deduplicate_alerts_by_key(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def deduplicate_alerts_by_key(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Toggle alert deduplication using deduplication key. If enabled,<span pulumi-lang-nodejs=" deduplicationKeyKind " pulumi-lang-dotnet=" DeduplicationKeyKind " pulumi-lang-go=" deduplicationKeyKind " pulumi-lang-python=" deduplication_key_kind " pulumi-lang-yaml=" deduplicationKeyKind " pulumi-lang-java=" deduplicationKeyKind "> deduplication_key_kind </span>and<span pulumi-lang-nodejs=" deduplicationKeyPath " pulumi-lang-dotnet=" DeduplicationKeyPath " pulumi-lang-go=" deduplicationKeyPath " pulumi-lang-python=" deduplication_key_path " pulumi-lang-yaml=" deduplicationKeyPath " pulumi-lang-java=" deduplicationKeyPath "> deduplication_key_path </span>are required.. Value must be one of true or false
+        Toggle alert deduplication using deduplication key. If enabled,<span pulumi-lang-nodejs=" deduplicationKeyKind " pulumi-lang-dotnet=" DeduplicationKeyKind " pulumi-lang-go=" deduplicationKeyKind " pulumi-lang-python=" deduplication_key_kind " pulumi-lang-yaml=" deduplicationKeyKind " pulumi-lang-java=" deduplicationKeyKind " pulumi-lang-hcl=" deduplication_key_kind "> deduplicationKeyKind </span>and<span pulumi-lang-nodejs=" deduplicationKeyPath " pulumi-lang-dotnet=" DeduplicationKeyPath " pulumi-lang-go=" deduplicationKeyPath " pulumi-lang-python=" deduplication_key_path " pulumi-lang-yaml=" deduplicationKeyPath " pulumi-lang-java=" deduplicationKeyPath " pulumi-lang-hcl=" deduplication_key_path "> deduplicationKeyPath </span>are required.. Value must be one of true or false
         """
         return pulumi.get(self, "deduplicate_alerts_by_key")
 
     @deduplicate_alerts_by_key.setter
-    def deduplicate_alerts_by_key(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def deduplicate_alerts_by_key(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "deduplicate_alerts_by_key", value)
 
     @_builtins.property
     @pulumi.getter(name="deduplicationKeyKind")
-    def deduplication_key_kind(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def deduplication_key_kind(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Kind of deduplication key.. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>.
+        Kind of deduplication key.. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>.
         """
         return pulumi.get(self, "deduplication_key_kind")
 
     @deduplication_key_kind.setter
-    def deduplication_key_kind(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def deduplication_key_kind(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "deduplication_key_kind", value)
 
     @_builtins.property
     @pulumi.getter(name="deduplicationKeyPath")
-    def deduplication_key_path(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def deduplication_key_path(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Path to deduplication key. This is a JSON Path to extract the deduplication key from the request body.
         """
         return pulumi.get(self, "deduplication_key_path")
 
     @deduplication_key_path.setter
-    def deduplication_key_path(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def deduplication_key_path(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "deduplication_key_path", value)
 
     @_builtins.property
     @pulumi.getter(name="deduplicationKeyRegexp")
-    def deduplication_key_regexp(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def deduplication_key_regexp(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Regular expression to extract key from value found at key path.
         """
         return pulumi.get(self, "deduplication_key_regexp")
 
     @deduplication_key_regexp.setter
-    def deduplication_key_regexp(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def deduplication_key_regexp(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "deduplication_key_regexp", value)
 
     @_builtins.property
     @pulumi.getter
-    def email(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def email(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The email generated for email alert sources
         """
         return pulumi.get(self, "email")
 
     @email.setter
-    def email(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def email(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "email", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the alert source
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="ownerGroupIds")
-    def owner_group_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def owner_group_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         List of team IDs that will own the alert source
         """
         return pulumi.get(self, "owner_group_ids")
 
     @owner_group_ids.setter
-    def owner_group_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def owner_group_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "owner_group_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="resolutionRuleAttributes")
-    def resolution_rule_attributes(self) -> Optional[pulumi.Input['AlertsSourceResolutionRuleAttributesArgs']]:
+    def resolution_rule_attributes(self) -> pulumi.Input[Optional['AlertsSourceResolutionRuleAttributesArgs']]:
         """
         Provide additional attributes for email alerts source
         """
         return pulumi.get(self, "resolution_rule_attributes")
 
     @resolution_rule_attributes.setter
-    def resolution_rule_attributes(self, value: Optional[pulumi.Input['AlertsSourceResolutionRuleAttributesArgs']]):
+    def resolution_rule_attributes(self, value: pulumi.Input[Optional['AlertsSourceResolutionRuleAttributesArgs']]):
         pulumi.set(self, "resolution_rule_attributes", value)
 
     @_builtins.property
     @pulumi.getter
-    def secret(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def secret(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The secret used to authenticate non-email alert sources
         """
         return pulumi.get(self, "secret")
 
     @secret.setter
-    def secret(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def secret(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "secret", value)
 
     @_builtins.property
     @pulumi.getter(name="sourceType")
-    def source_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def source_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The alert source type. Value must be one of <span pulumi-lang-nodejs="`email`" pulumi-lang-dotnet="`Email`" pulumi-lang-go="`email`" pulumi-lang-python="`email`" pulumi-lang-yaml="`email`" pulumi-lang-java="`email`">`email`</span>, <span pulumi-lang-nodejs="`appDynamics`" pulumi-lang-dotnet="`AppDynamics`" pulumi-lang-go="`appDynamics`" pulumi-lang-python="`app_dynamics`" pulumi-lang-yaml="`appDynamics`" pulumi-lang-java="`appDynamics`">`app_dynamics`</span>, <span pulumi-lang-nodejs="`catchpoint`" pulumi-lang-dotnet="`Catchpoint`" pulumi-lang-go="`catchpoint`" pulumi-lang-python="`catchpoint`" pulumi-lang-yaml="`catchpoint`" pulumi-lang-java="`catchpoint`">`catchpoint`</span>, <span pulumi-lang-nodejs="`datadog`" pulumi-lang-dotnet="`Datadog`" pulumi-lang-go="`datadog`" pulumi-lang-python="`datadog`" pulumi-lang-yaml="`datadog`" pulumi-lang-java="`datadog`">`datadog`</span>, <span pulumi-lang-nodejs="`alertmanager`" pulumi-lang-dotnet="`Alertmanager`" pulumi-lang-go="`alertmanager`" pulumi-lang-python="`alertmanager`" pulumi-lang-yaml="`alertmanager`" pulumi-lang-java="`alertmanager`">`alertmanager`</span>, <span pulumi-lang-nodejs="`googleCloud`" pulumi-lang-dotnet="`GoogleCloud`" pulumi-lang-go="`googleCloud`" pulumi-lang-python="`google_cloud`" pulumi-lang-yaml="`googleCloud`" pulumi-lang-java="`googleCloud`">`google_cloud`</span>, <span pulumi-lang-nodejs="`grafana`" pulumi-lang-dotnet="`Grafana`" pulumi-lang-go="`grafana`" pulumi-lang-python="`grafana`" pulumi-lang-yaml="`grafana`" pulumi-lang-java="`grafana`">`grafana`</span>, <span pulumi-lang-nodejs="`sentry`" pulumi-lang-dotnet="`Sentry`" pulumi-lang-go="`sentry`" pulumi-lang-python="`sentry`" pulumi-lang-yaml="`sentry`" pulumi-lang-java="`sentry`">`sentry`</span>, <span pulumi-lang-nodejs="`genericWebhook`" pulumi-lang-dotnet="`GenericWebhook`" pulumi-lang-go="`genericWebhook`" pulumi-lang-python="`generic_webhook`" pulumi-lang-yaml="`genericWebhook`" pulumi-lang-java="`genericWebhook`">`generic_webhook`</span>, <span pulumi-lang-nodejs="`cloudWatch`" pulumi-lang-dotnet="`CloudWatch`" pulumi-lang-go="`cloudWatch`" pulumi-lang-python="`cloud_watch`" pulumi-lang-yaml="`cloudWatch`" pulumi-lang-java="`cloudWatch`">`cloud_watch`</span>, <span pulumi-lang-nodejs="`checkly`" pulumi-lang-dotnet="`Checkly`" pulumi-lang-go="`checkly`" pulumi-lang-python="`checkly`" pulumi-lang-yaml="`checkly`" pulumi-lang-java="`checkly`">`checkly`</span>, <span pulumi-lang-nodejs="`azure`" pulumi-lang-dotnet="`Azure`" pulumi-lang-go="`azure`" pulumi-lang-python="`azure`" pulumi-lang-yaml="`azure`" pulumi-lang-java="`azure`">`azure`</span>, <span pulumi-lang-nodejs="`newRelic`" pulumi-lang-dotnet="`NewRelic`" pulumi-lang-go="`newRelic`" pulumi-lang-python="`new_relic`" pulumi-lang-yaml="`newRelic`" pulumi-lang-java="`newRelic`">`new_relic`</span>, <span pulumi-lang-nodejs="`splunk`" pulumi-lang-dotnet="`Splunk`" pulumi-lang-go="`splunk`" pulumi-lang-python="`splunk`" pulumi-lang-yaml="`splunk`" pulumi-lang-java="`splunk`">`splunk`</span>, <span pulumi-lang-nodejs="`chronosphere`" pulumi-lang-dotnet="`Chronosphere`" pulumi-lang-go="`chronosphere`" pulumi-lang-python="`chronosphere`" pulumi-lang-yaml="`chronosphere`" pulumi-lang-java="`chronosphere`">`chronosphere`</span>, <span pulumi-lang-nodejs="`appOptics`" pulumi-lang-dotnet="`AppOptics`" pulumi-lang-go="`appOptics`" pulumi-lang-python="`app_optics`" pulumi-lang-yaml="`appOptics`" pulumi-lang-java="`appOptics`">`app_optics`</span>, <span pulumi-lang-nodejs="`bugSnag`" pulumi-lang-dotnet="`BugSnag`" pulumi-lang-go="`bugSnag`" pulumi-lang-python="`bug_snag`" pulumi-lang-yaml="`bugSnag`" pulumi-lang-java="`bugSnag`">`bug_snag`</span>, <span pulumi-lang-nodejs="`honeycomb`" pulumi-lang-dotnet="`Honeycomb`" pulumi-lang-go="`honeycomb`" pulumi-lang-python="`honeycomb`" pulumi-lang-yaml="`honeycomb`" pulumi-lang-java="`honeycomb`">`honeycomb`</span>, <span pulumi-lang-nodejs="`monteCarlo`" pulumi-lang-dotnet="`MonteCarlo`" pulumi-lang-go="`monteCarlo`" pulumi-lang-python="`monte_carlo`" pulumi-lang-yaml="`monteCarlo`" pulumi-lang-java="`monteCarlo`">`monte_carlo`</span>, <span pulumi-lang-nodejs="`nagios`" pulumi-lang-dotnet="`Nagios`" pulumi-lang-go="`nagios`" pulumi-lang-python="`nagios`" pulumi-lang-yaml="`nagios`" pulumi-lang-java="`nagios`">`nagios`</span>, <span pulumi-lang-nodejs="`prtg`" pulumi-lang-dotnet="`Prtg`" pulumi-lang-go="`prtg`" pulumi-lang-python="`prtg`" pulumi-lang-yaml="`prtg`" pulumi-lang-java="`prtg`">`prtg`</span>.
+        The alert source type. Value must be one of <span pulumi-lang-nodejs="`email`" pulumi-lang-dotnet="`Email`" pulumi-lang-go="`email`" pulumi-lang-python="`email`" pulumi-lang-yaml="`email`" pulumi-lang-java="`email`" pulumi-lang-hcl="`email`">`email`</span>, <span pulumi-lang-nodejs="`appDynamics`" pulumi-lang-dotnet="`AppDynamics`" pulumi-lang-go="`appDynamics`" pulumi-lang-python="`app_dynamics`" pulumi-lang-yaml="`appDynamics`" pulumi-lang-java="`appDynamics`" pulumi-lang-hcl="`app_dynamics`">`appDynamics`</span>, <span pulumi-lang-nodejs="`catchpoint`" pulumi-lang-dotnet="`Catchpoint`" pulumi-lang-go="`catchpoint`" pulumi-lang-python="`catchpoint`" pulumi-lang-yaml="`catchpoint`" pulumi-lang-java="`catchpoint`" pulumi-lang-hcl="`catchpoint`">`catchpoint`</span>, <span pulumi-lang-nodejs="`datadog`" pulumi-lang-dotnet="`Datadog`" pulumi-lang-go="`datadog`" pulumi-lang-python="`datadog`" pulumi-lang-yaml="`datadog`" pulumi-lang-java="`datadog`" pulumi-lang-hcl="`datadog`">`datadog`</span>, <span pulumi-lang-nodejs="`dynatrace`" pulumi-lang-dotnet="`Dynatrace`" pulumi-lang-go="`dynatrace`" pulumi-lang-python="`dynatrace`" pulumi-lang-yaml="`dynatrace`" pulumi-lang-java="`dynatrace`" pulumi-lang-hcl="`dynatrace`">`dynatrace`</span>, <span pulumi-lang-nodejs="`alertmanager`" pulumi-lang-dotnet="`Alertmanager`" pulumi-lang-go="`alertmanager`" pulumi-lang-python="`alertmanager`" pulumi-lang-yaml="`alertmanager`" pulumi-lang-java="`alertmanager`" pulumi-lang-hcl="`alertmanager`">`alertmanager`</span>, <span pulumi-lang-nodejs="`googleCloud`" pulumi-lang-dotnet="`GoogleCloud`" pulumi-lang-go="`googleCloud`" pulumi-lang-python="`google_cloud`" pulumi-lang-yaml="`googleCloud`" pulumi-lang-java="`googleCloud`" pulumi-lang-hcl="`google_cloud`">`googleCloud`</span>, <span pulumi-lang-nodejs="`grafana`" pulumi-lang-dotnet="`Grafana`" pulumi-lang-go="`grafana`" pulumi-lang-python="`grafana`" pulumi-lang-yaml="`grafana`" pulumi-lang-java="`grafana`" pulumi-lang-hcl="`grafana`">`grafana`</span>, <span pulumi-lang-nodejs="`sentry`" pulumi-lang-dotnet="`Sentry`" pulumi-lang-go="`sentry`" pulumi-lang-python="`sentry`" pulumi-lang-yaml="`sentry`" pulumi-lang-java="`sentry`" pulumi-lang-hcl="`sentry`">`sentry`</span>, <span pulumi-lang-nodejs="`genericWebhook`" pulumi-lang-dotnet="`GenericWebhook`" pulumi-lang-go="`genericWebhook`" pulumi-lang-python="`generic_webhook`" pulumi-lang-yaml="`genericWebhook`" pulumi-lang-java="`genericWebhook`" pulumi-lang-hcl="`generic_webhook`">`genericWebhook`</span>, <span pulumi-lang-nodejs="`cloudWatch`" pulumi-lang-dotnet="`CloudWatch`" pulumi-lang-go="`cloudWatch`" pulumi-lang-python="`cloud_watch`" pulumi-lang-yaml="`cloudWatch`" pulumi-lang-java="`cloudWatch`" pulumi-lang-hcl="`cloud_watch`">`cloudWatch`</span>, <span pulumi-lang-nodejs="`awsSns`" pulumi-lang-dotnet="`AwsSns`" pulumi-lang-go="`awsSns`" pulumi-lang-python="`aws_sns`" pulumi-lang-yaml="`awsSns`" pulumi-lang-java="`awsSns`" pulumi-lang-hcl="`aws_sns`">`awsSns`</span>, <span pulumi-lang-nodejs="`checkly`" pulumi-lang-dotnet="`Checkly`" pulumi-lang-go="`checkly`" pulumi-lang-python="`checkly`" pulumi-lang-yaml="`checkly`" pulumi-lang-java="`checkly`" pulumi-lang-hcl="`checkly`">`checkly`</span>, <span pulumi-lang-nodejs="`azure`" pulumi-lang-dotnet="`Azure`" pulumi-lang-go="`azure`" pulumi-lang-python="`azure`" pulumi-lang-yaml="`azure`" pulumi-lang-java="`azure`" pulumi-lang-hcl="`azure`">`azure`</span>, <span pulumi-lang-nodejs="`newRelic`" pulumi-lang-dotnet="`NewRelic`" pulumi-lang-go="`newRelic`" pulumi-lang-python="`new_relic`" pulumi-lang-yaml="`newRelic`" pulumi-lang-java="`newRelic`" pulumi-lang-hcl="`new_relic`">`newRelic`</span>, <span pulumi-lang-nodejs="`splunk`" pulumi-lang-dotnet="`Splunk`" pulumi-lang-go="`splunk`" pulumi-lang-python="`splunk`" pulumi-lang-yaml="`splunk`" pulumi-lang-java="`splunk`" pulumi-lang-hcl="`splunk`">`splunk`</span>, <span pulumi-lang-nodejs="`chronosphere`" pulumi-lang-dotnet="`Chronosphere`" pulumi-lang-go="`chronosphere`" pulumi-lang-python="`chronosphere`" pulumi-lang-yaml="`chronosphere`" pulumi-lang-java="`chronosphere`" pulumi-lang-hcl="`chronosphere`">`chronosphere`</span>, <span pulumi-lang-nodejs="`appOptics`" pulumi-lang-dotnet="`AppOptics`" pulumi-lang-go="`appOptics`" pulumi-lang-python="`app_optics`" pulumi-lang-yaml="`appOptics`" pulumi-lang-java="`appOptics`" pulumi-lang-hcl="`app_optics`">`appOptics`</span>, <span pulumi-lang-nodejs="`bugSnag`" pulumi-lang-dotnet="`BugSnag`" pulumi-lang-go="`bugSnag`" pulumi-lang-python="`bug_snag`" pulumi-lang-yaml="`bugSnag`" pulumi-lang-java="`bugSnag`" pulumi-lang-hcl="`bug_snag`">`bugSnag`</span>, <span pulumi-lang-nodejs="`honeycomb`" pulumi-lang-dotnet="`Honeycomb`" pulumi-lang-go="`honeycomb`" pulumi-lang-python="`honeycomb`" pulumi-lang-yaml="`honeycomb`" pulumi-lang-java="`honeycomb`" pulumi-lang-hcl="`honeycomb`">`honeycomb`</span>, <span pulumi-lang-nodejs="`monteCarlo`" pulumi-lang-dotnet="`MonteCarlo`" pulumi-lang-go="`monteCarlo`" pulumi-lang-python="`monte_carlo`" pulumi-lang-yaml="`monteCarlo`" pulumi-lang-java="`monteCarlo`" pulumi-lang-hcl="`monte_carlo`">`monteCarlo`</span>, <span pulumi-lang-nodejs="`nagios`" pulumi-lang-dotnet="`Nagios`" pulumi-lang-go="`nagios`" pulumi-lang-python="`nagios`" pulumi-lang-yaml="`nagios`" pulumi-lang-java="`nagios`" pulumi-lang-hcl="`nagios`">`nagios`</span>, <span pulumi-lang-nodejs="`prtg`" pulumi-lang-dotnet="`Prtg`" pulumi-lang-go="`prtg`" pulumi-lang-python="`prtg`" pulumi-lang-yaml="`prtg`" pulumi-lang-java="`prtg`" pulumi-lang-hcl="`prtg`">`prtg`</span>.
         """
         return pulumi.get(self, "source_type")
 
     @source_type.setter
-    def source_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def source_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "source_type", value)
 
     @_builtins.property
     @pulumi.getter(name="sourceableAttributes")
-    def sourceable_attributes(self) -> Optional[pulumi.Input['AlertsSourceSourceableAttributesArgs']]:
+    def sourceable_attributes(self) -> pulumi.Input[Optional['AlertsSourceSourceableAttributesArgs']]:
         """
-        Provide additional attributes for<span pulumi-lang-nodejs=" genericWebhook " pulumi-lang-dotnet=" GenericWebhook " pulumi-lang-go=" genericWebhook " pulumi-lang-python=" generic_webhook " pulumi-lang-yaml=" genericWebhook " pulumi-lang-java=" genericWebhook "> generic_webhook </span>alerts source
+        Provide additional attributes for<span pulumi-lang-nodejs=" genericWebhook " pulumi-lang-dotnet=" GenericWebhook " pulumi-lang-go=" genericWebhook " pulumi-lang-python=" generic_webhook " pulumi-lang-yaml=" genericWebhook " pulumi-lang-java=" genericWebhook " pulumi-lang-hcl=" generic_webhook "> genericWebhook </span>alerts source
         """
         return pulumi.get(self, "sourceable_attributes")
 
     @sourceable_attributes.setter
-    def sourceable_attributes(self, value: Optional[pulumi.Input['AlertsSourceSourceableAttributesArgs']]):
+    def sourceable_attributes(self, value: pulumi.Input[Optional['AlertsSourceSourceableAttributesArgs']]):
         pulumi.set(self, "sourceable_attributes", value)
 
     @_builtins.property
     @pulumi.getter
-    def status(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def status(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The status of the alert source. Value must be one of <span pulumi-lang-nodejs="`connected`" pulumi-lang-dotnet="`Connected`" pulumi-lang-go="`connected`" pulumi-lang-python="`connected`" pulumi-lang-yaml="`connected`" pulumi-lang-java="`connected`">`connected`</span>, <span pulumi-lang-nodejs="`setupComplete`" pulumi-lang-dotnet="`SetupComplete`" pulumi-lang-go="`setupComplete`" pulumi-lang-python="`setup_complete`" pulumi-lang-yaml="`setupComplete`" pulumi-lang-java="`setupComplete`">`setup_complete`</span>, <span pulumi-lang-nodejs="`setupIncomplete`" pulumi-lang-dotnet="`SetupIncomplete`" pulumi-lang-go="`setupIncomplete`" pulumi-lang-python="`setup_incomplete`" pulumi-lang-yaml="`setupIncomplete`" pulumi-lang-java="`setupIncomplete`">`setup_incomplete`</span>.
+        The status of the alert source. Value must be one of <span pulumi-lang-nodejs="`connected`" pulumi-lang-dotnet="`Connected`" pulumi-lang-go="`connected`" pulumi-lang-python="`connected`" pulumi-lang-yaml="`connected`" pulumi-lang-java="`connected`" pulumi-lang-hcl="`connected`">`connected`</span>, <span pulumi-lang-nodejs="`setupComplete`" pulumi-lang-dotnet="`SetupComplete`" pulumi-lang-go="`setupComplete`" pulumi-lang-python="`setup_complete`" pulumi-lang-yaml="`setupComplete`" pulumi-lang-java="`setupComplete`" pulumi-lang-hcl="`setup_complete`">`setupComplete`</span>, <span pulumi-lang-nodejs="`setupIncomplete`" pulumi-lang-dotnet="`SetupIncomplete`" pulumi-lang-go="`setupIncomplete`" pulumi-lang-python="`setup_incomplete`" pulumi-lang-yaml="`setupIncomplete`" pulumi-lang-java="`setupIncomplete`" pulumi-lang-hcl="`setup_incomplete`">`setupIncomplete`</span>.
         """
         return pulumi.get(self, "status")
 
     @status.setter
-    def status(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def status(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "status", value)
 
     @_builtins.property
     @pulumi.getter(name="webhookEndpoint")
-    def webhook_endpoint(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def webhook_endpoint(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The webhook URL generated for non-email alert sources
         """
         return pulumi.get(self, "webhook_endpoint")
 
     @webhook_endpoint.setter
-    def webhook_endpoint(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def webhook_endpoint(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "webhook_endpoint", value)
 
 
 @pulumi.input_type
 class _AlertsSourceState:
     def __init__(__self__, *,
-                 alert_source_fields_attributes: Optional[pulumi.Input[Sequence[pulumi.Input['AlertsSourceAlertSourceFieldsAttributeArgs']]]] = None,
-                 alert_source_urgency_rules_attributes: Optional[pulumi.Input[Sequence[pulumi.Input['AlertsSourceAlertSourceUrgencyRulesAttributeArgs']]]] = None,
-                 alert_template_attributes: Optional[pulumi.Input['AlertsSourceAlertTemplateAttributesArgs']] = None,
-                 alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 alerts_source_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 deduplicate_alerts_by_key: Optional[pulumi.Input[_builtins.bool]] = None,
-                 deduplication_key_kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 deduplication_key_path: Optional[pulumi.Input[_builtins.str]] = None,
-                 deduplication_key_regexp: Optional[pulumi.Input[_builtins.str]] = None,
-                 email: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 owner_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 resolution_rule_attributes: Optional[pulumi.Input['AlertsSourceResolutionRuleAttributesArgs']] = None,
-                 secret: Optional[pulumi.Input[_builtins.str]] = None,
-                 source_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 sourceable_attributes: Optional[pulumi.Input['AlertsSourceSourceableAttributesArgs']] = None,
-                 status: Optional[pulumi.Input[_builtins.str]] = None,
-                 webhook_endpoint: Optional[pulumi.Input[_builtins.str]] = None):
+                 alert_source_fields_attributes: pulumi.Input[Optional[Sequence[pulumi.Input['AlertsSourceAlertSourceFieldsAttributeArgs']]]] = None,
+                 alert_source_urgency_rules_attributes: pulumi.Input[Optional[Sequence[pulumi.Input['AlertsSourceAlertSourceUrgencyRulesAttributeArgs']]]] = None,
+                 alert_template_attributes: pulumi.Input[Optional['AlertsSourceAlertTemplateAttributesArgs']] = None,
+                 alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 alerts_source_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 deduplicate_alerts_by_key: pulumi.Input[Optional[_builtins.bool]] = None,
+                 deduplication_key_kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 deduplication_key_path: pulumi.Input[Optional[_builtins.str]] = None,
+                 deduplication_key_regexp: pulumi.Input[Optional[_builtins.str]] = None,
+                 email: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 owner_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 resolution_rule_attributes: pulumi.Input[Optional['AlertsSourceResolutionRuleAttributesArgs']] = None,
+                 secret: pulumi.Input[Optional[_builtins.str]] = None,
+                 source_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 sourceable_attributes: pulumi.Input[Optional['AlertsSourceSourceableAttributesArgs']] = None,
+                 status: pulumi.Input[Optional[_builtins.str]] = None,
+                 webhook_endpoint: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering AlertsSource resources.
 
         :param pulumi.Input[Sequence[pulumi.Input['AlertsSourceAlertSourceFieldsAttributeArgs']]] alert_source_fields_attributes: List of alert fields to be added to the alert source. Note: This attribute requires the alert field feature to be enabled on your account. Contact Rootly customer support if you need assistance with this feature.
         :param pulumi.Input[Sequence[pulumi.Input['AlertsSourceAlertSourceUrgencyRulesAttributeArgs']]] alert_source_urgency_rules_attributes: List of rules that define the conditions under which the alert urgency will be set automatically based on the alert payload
-        :param pulumi.Input['AlertsSourceAlertTemplateAttributesArgs'] alert_template_attributes: Note that when alert fields are enabled at the team level, alert template attributes cannot be provided. Use <span pulumi-lang-nodejs="`alertSourceFieldsAttributes`" pulumi-lang-dotnet="`AlertSourceFieldsAttributes`" pulumi-lang-go="`alertSourceFieldsAttributes`" pulumi-lang-python="`alert_source_fields_attributes`" pulumi-lang-yaml="`alertSourceFieldsAttributes`" pulumi-lang-java="`alertSourceFieldsAttributes`">`alert_source_fields_attributes`</span> instead.
+        :param pulumi.Input['AlertsSourceAlertTemplateAttributesArgs'] alert_template_attributes: Note that when alert fields are enabled at the team level, alert template attributes cannot be provided. Use <span pulumi-lang-nodejs="`alertSourceFieldsAttributes`" pulumi-lang-dotnet="`AlertSourceFieldsAttributes`" pulumi-lang-go="`alertSourceFieldsAttributes`" pulumi-lang-python="`alert_source_fields_attributes`" pulumi-lang-yaml="`alertSourceFieldsAttributes`" pulumi-lang-java="`alertSourceFieldsAttributes`" pulumi-lang-hcl="`alert_source_fields_attributes`">`alertSourceFieldsAttributes`</span> instead.
         :param pulumi.Input[_builtins.str] alert_urgency_id: ID for the default alert urgency assigned to this alert source
-        :param pulumi.Input[_builtins.bool] deduplicate_alerts_by_key: Toggle alert deduplication using deduplication key. If enabled,<span pulumi-lang-nodejs=" deduplicationKeyKind " pulumi-lang-dotnet=" DeduplicationKeyKind " pulumi-lang-go=" deduplicationKeyKind " pulumi-lang-python=" deduplication_key_kind " pulumi-lang-yaml=" deduplicationKeyKind " pulumi-lang-java=" deduplicationKeyKind "> deduplication_key_kind </span>and<span pulumi-lang-nodejs=" deduplicationKeyPath " pulumi-lang-dotnet=" DeduplicationKeyPath " pulumi-lang-go=" deduplicationKeyPath " pulumi-lang-python=" deduplication_key_path " pulumi-lang-yaml=" deduplicationKeyPath " pulumi-lang-java=" deduplicationKeyPath "> deduplication_key_path </span>are required.. Value must be one of true or false
-        :param pulumi.Input[_builtins.str] deduplication_key_kind: Kind of deduplication key.. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>.
+        :param pulumi.Input[_builtins.bool] deduplicate_alerts_by_key: Toggle alert deduplication using deduplication key. If enabled,<span pulumi-lang-nodejs=" deduplicationKeyKind " pulumi-lang-dotnet=" DeduplicationKeyKind " pulumi-lang-go=" deduplicationKeyKind " pulumi-lang-python=" deduplication_key_kind " pulumi-lang-yaml=" deduplicationKeyKind " pulumi-lang-java=" deduplicationKeyKind " pulumi-lang-hcl=" deduplication_key_kind "> deduplicationKeyKind </span>and<span pulumi-lang-nodejs=" deduplicationKeyPath " pulumi-lang-dotnet=" DeduplicationKeyPath " pulumi-lang-go=" deduplicationKeyPath " pulumi-lang-python=" deduplication_key_path " pulumi-lang-yaml=" deduplicationKeyPath " pulumi-lang-java=" deduplicationKeyPath " pulumi-lang-hcl=" deduplication_key_path "> deduplicationKeyPath </span>are required.. Value must be one of true or false
+        :param pulumi.Input[_builtins.str] deduplication_key_kind: Kind of deduplication key.. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>.
         :param pulumi.Input[_builtins.str] deduplication_key_path: Path to deduplication key. This is a JSON Path to extract the deduplication key from the request body.
         :param pulumi.Input[_builtins.str] deduplication_key_regexp: Regular expression to extract key from value found at key path.
         :param pulumi.Input[_builtins.str] email: The email generated for email alert sources
@@ -348,9 +348,9 @@ class _AlertsSourceState:
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] owner_group_ids: List of team IDs that will own the alert source
         :param pulumi.Input['AlertsSourceResolutionRuleAttributesArgs'] resolution_rule_attributes: Provide additional attributes for email alerts source
         :param pulumi.Input[_builtins.str] secret: The secret used to authenticate non-email alert sources
-        :param pulumi.Input[_builtins.str] source_type: The alert source type. Value must be one of <span pulumi-lang-nodejs="`email`" pulumi-lang-dotnet="`Email`" pulumi-lang-go="`email`" pulumi-lang-python="`email`" pulumi-lang-yaml="`email`" pulumi-lang-java="`email`">`email`</span>, <span pulumi-lang-nodejs="`appDynamics`" pulumi-lang-dotnet="`AppDynamics`" pulumi-lang-go="`appDynamics`" pulumi-lang-python="`app_dynamics`" pulumi-lang-yaml="`appDynamics`" pulumi-lang-java="`appDynamics`">`app_dynamics`</span>, <span pulumi-lang-nodejs="`catchpoint`" pulumi-lang-dotnet="`Catchpoint`" pulumi-lang-go="`catchpoint`" pulumi-lang-python="`catchpoint`" pulumi-lang-yaml="`catchpoint`" pulumi-lang-java="`catchpoint`">`catchpoint`</span>, <span pulumi-lang-nodejs="`datadog`" pulumi-lang-dotnet="`Datadog`" pulumi-lang-go="`datadog`" pulumi-lang-python="`datadog`" pulumi-lang-yaml="`datadog`" pulumi-lang-java="`datadog`">`datadog`</span>, <span pulumi-lang-nodejs="`alertmanager`" pulumi-lang-dotnet="`Alertmanager`" pulumi-lang-go="`alertmanager`" pulumi-lang-python="`alertmanager`" pulumi-lang-yaml="`alertmanager`" pulumi-lang-java="`alertmanager`">`alertmanager`</span>, <span pulumi-lang-nodejs="`googleCloud`" pulumi-lang-dotnet="`GoogleCloud`" pulumi-lang-go="`googleCloud`" pulumi-lang-python="`google_cloud`" pulumi-lang-yaml="`googleCloud`" pulumi-lang-java="`googleCloud`">`google_cloud`</span>, <span pulumi-lang-nodejs="`grafana`" pulumi-lang-dotnet="`Grafana`" pulumi-lang-go="`grafana`" pulumi-lang-python="`grafana`" pulumi-lang-yaml="`grafana`" pulumi-lang-java="`grafana`">`grafana`</span>, <span pulumi-lang-nodejs="`sentry`" pulumi-lang-dotnet="`Sentry`" pulumi-lang-go="`sentry`" pulumi-lang-python="`sentry`" pulumi-lang-yaml="`sentry`" pulumi-lang-java="`sentry`">`sentry`</span>, <span pulumi-lang-nodejs="`genericWebhook`" pulumi-lang-dotnet="`GenericWebhook`" pulumi-lang-go="`genericWebhook`" pulumi-lang-python="`generic_webhook`" pulumi-lang-yaml="`genericWebhook`" pulumi-lang-java="`genericWebhook`">`generic_webhook`</span>, <span pulumi-lang-nodejs="`cloudWatch`" pulumi-lang-dotnet="`CloudWatch`" pulumi-lang-go="`cloudWatch`" pulumi-lang-python="`cloud_watch`" pulumi-lang-yaml="`cloudWatch`" pulumi-lang-java="`cloudWatch`">`cloud_watch`</span>, <span pulumi-lang-nodejs="`checkly`" pulumi-lang-dotnet="`Checkly`" pulumi-lang-go="`checkly`" pulumi-lang-python="`checkly`" pulumi-lang-yaml="`checkly`" pulumi-lang-java="`checkly`">`checkly`</span>, <span pulumi-lang-nodejs="`azure`" pulumi-lang-dotnet="`Azure`" pulumi-lang-go="`azure`" pulumi-lang-python="`azure`" pulumi-lang-yaml="`azure`" pulumi-lang-java="`azure`">`azure`</span>, <span pulumi-lang-nodejs="`newRelic`" pulumi-lang-dotnet="`NewRelic`" pulumi-lang-go="`newRelic`" pulumi-lang-python="`new_relic`" pulumi-lang-yaml="`newRelic`" pulumi-lang-java="`newRelic`">`new_relic`</span>, <span pulumi-lang-nodejs="`splunk`" pulumi-lang-dotnet="`Splunk`" pulumi-lang-go="`splunk`" pulumi-lang-python="`splunk`" pulumi-lang-yaml="`splunk`" pulumi-lang-java="`splunk`">`splunk`</span>, <span pulumi-lang-nodejs="`chronosphere`" pulumi-lang-dotnet="`Chronosphere`" pulumi-lang-go="`chronosphere`" pulumi-lang-python="`chronosphere`" pulumi-lang-yaml="`chronosphere`" pulumi-lang-java="`chronosphere`">`chronosphere`</span>, <span pulumi-lang-nodejs="`appOptics`" pulumi-lang-dotnet="`AppOptics`" pulumi-lang-go="`appOptics`" pulumi-lang-python="`app_optics`" pulumi-lang-yaml="`appOptics`" pulumi-lang-java="`appOptics`">`app_optics`</span>, <span pulumi-lang-nodejs="`bugSnag`" pulumi-lang-dotnet="`BugSnag`" pulumi-lang-go="`bugSnag`" pulumi-lang-python="`bug_snag`" pulumi-lang-yaml="`bugSnag`" pulumi-lang-java="`bugSnag`">`bug_snag`</span>, <span pulumi-lang-nodejs="`honeycomb`" pulumi-lang-dotnet="`Honeycomb`" pulumi-lang-go="`honeycomb`" pulumi-lang-python="`honeycomb`" pulumi-lang-yaml="`honeycomb`" pulumi-lang-java="`honeycomb`">`honeycomb`</span>, <span pulumi-lang-nodejs="`monteCarlo`" pulumi-lang-dotnet="`MonteCarlo`" pulumi-lang-go="`monteCarlo`" pulumi-lang-python="`monte_carlo`" pulumi-lang-yaml="`monteCarlo`" pulumi-lang-java="`monteCarlo`">`monte_carlo`</span>, <span pulumi-lang-nodejs="`nagios`" pulumi-lang-dotnet="`Nagios`" pulumi-lang-go="`nagios`" pulumi-lang-python="`nagios`" pulumi-lang-yaml="`nagios`" pulumi-lang-java="`nagios`">`nagios`</span>, <span pulumi-lang-nodejs="`prtg`" pulumi-lang-dotnet="`Prtg`" pulumi-lang-go="`prtg`" pulumi-lang-python="`prtg`" pulumi-lang-yaml="`prtg`" pulumi-lang-java="`prtg`">`prtg`</span>.
-        :param pulumi.Input['AlertsSourceSourceableAttributesArgs'] sourceable_attributes: Provide additional attributes for<span pulumi-lang-nodejs=" genericWebhook " pulumi-lang-dotnet=" GenericWebhook " pulumi-lang-go=" genericWebhook " pulumi-lang-python=" generic_webhook " pulumi-lang-yaml=" genericWebhook " pulumi-lang-java=" genericWebhook "> generic_webhook </span>alerts source
-        :param pulumi.Input[_builtins.str] status: The status of the alert source. Value must be one of <span pulumi-lang-nodejs="`connected`" pulumi-lang-dotnet="`Connected`" pulumi-lang-go="`connected`" pulumi-lang-python="`connected`" pulumi-lang-yaml="`connected`" pulumi-lang-java="`connected`">`connected`</span>, <span pulumi-lang-nodejs="`setupComplete`" pulumi-lang-dotnet="`SetupComplete`" pulumi-lang-go="`setupComplete`" pulumi-lang-python="`setup_complete`" pulumi-lang-yaml="`setupComplete`" pulumi-lang-java="`setupComplete`">`setup_complete`</span>, <span pulumi-lang-nodejs="`setupIncomplete`" pulumi-lang-dotnet="`SetupIncomplete`" pulumi-lang-go="`setupIncomplete`" pulumi-lang-python="`setup_incomplete`" pulumi-lang-yaml="`setupIncomplete`" pulumi-lang-java="`setupIncomplete`">`setup_incomplete`</span>.
+        :param pulumi.Input[_builtins.str] source_type: The alert source type. Value must be one of <span pulumi-lang-nodejs="`email`" pulumi-lang-dotnet="`Email`" pulumi-lang-go="`email`" pulumi-lang-python="`email`" pulumi-lang-yaml="`email`" pulumi-lang-java="`email`" pulumi-lang-hcl="`email`">`email`</span>, <span pulumi-lang-nodejs="`appDynamics`" pulumi-lang-dotnet="`AppDynamics`" pulumi-lang-go="`appDynamics`" pulumi-lang-python="`app_dynamics`" pulumi-lang-yaml="`appDynamics`" pulumi-lang-java="`appDynamics`" pulumi-lang-hcl="`app_dynamics`">`appDynamics`</span>, <span pulumi-lang-nodejs="`catchpoint`" pulumi-lang-dotnet="`Catchpoint`" pulumi-lang-go="`catchpoint`" pulumi-lang-python="`catchpoint`" pulumi-lang-yaml="`catchpoint`" pulumi-lang-java="`catchpoint`" pulumi-lang-hcl="`catchpoint`">`catchpoint`</span>, <span pulumi-lang-nodejs="`datadog`" pulumi-lang-dotnet="`Datadog`" pulumi-lang-go="`datadog`" pulumi-lang-python="`datadog`" pulumi-lang-yaml="`datadog`" pulumi-lang-java="`datadog`" pulumi-lang-hcl="`datadog`">`datadog`</span>, <span pulumi-lang-nodejs="`dynatrace`" pulumi-lang-dotnet="`Dynatrace`" pulumi-lang-go="`dynatrace`" pulumi-lang-python="`dynatrace`" pulumi-lang-yaml="`dynatrace`" pulumi-lang-java="`dynatrace`" pulumi-lang-hcl="`dynatrace`">`dynatrace`</span>, <span pulumi-lang-nodejs="`alertmanager`" pulumi-lang-dotnet="`Alertmanager`" pulumi-lang-go="`alertmanager`" pulumi-lang-python="`alertmanager`" pulumi-lang-yaml="`alertmanager`" pulumi-lang-java="`alertmanager`" pulumi-lang-hcl="`alertmanager`">`alertmanager`</span>, <span pulumi-lang-nodejs="`googleCloud`" pulumi-lang-dotnet="`GoogleCloud`" pulumi-lang-go="`googleCloud`" pulumi-lang-python="`google_cloud`" pulumi-lang-yaml="`googleCloud`" pulumi-lang-java="`googleCloud`" pulumi-lang-hcl="`google_cloud`">`googleCloud`</span>, <span pulumi-lang-nodejs="`grafana`" pulumi-lang-dotnet="`Grafana`" pulumi-lang-go="`grafana`" pulumi-lang-python="`grafana`" pulumi-lang-yaml="`grafana`" pulumi-lang-java="`grafana`" pulumi-lang-hcl="`grafana`">`grafana`</span>, <span pulumi-lang-nodejs="`sentry`" pulumi-lang-dotnet="`Sentry`" pulumi-lang-go="`sentry`" pulumi-lang-python="`sentry`" pulumi-lang-yaml="`sentry`" pulumi-lang-java="`sentry`" pulumi-lang-hcl="`sentry`">`sentry`</span>, <span pulumi-lang-nodejs="`genericWebhook`" pulumi-lang-dotnet="`GenericWebhook`" pulumi-lang-go="`genericWebhook`" pulumi-lang-python="`generic_webhook`" pulumi-lang-yaml="`genericWebhook`" pulumi-lang-java="`genericWebhook`" pulumi-lang-hcl="`generic_webhook`">`genericWebhook`</span>, <span pulumi-lang-nodejs="`cloudWatch`" pulumi-lang-dotnet="`CloudWatch`" pulumi-lang-go="`cloudWatch`" pulumi-lang-python="`cloud_watch`" pulumi-lang-yaml="`cloudWatch`" pulumi-lang-java="`cloudWatch`" pulumi-lang-hcl="`cloud_watch`">`cloudWatch`</span>, <span pulumi-lang-nodejs="`awsSns`" pulumi-lang-dotnet="`AwsSns`" pulumi-lang-go="`awsSns`" pulumi-lang-python="`aws_sns`" pulumi-lang-yaml="`awsSns`" pulumi-lang-java="`awsSns`" pulumi-lang-hcl="`aws_sns`">`awsSns`</span>, <span pulumi-lang-nodejs="`checkly`" pulumi-lang-dotnet="`Checkly`" pulumi-lang-go="`checkly`" pulumi-lang-python="`checkly`" pulumi-lang-yaml="`checkly`" pulumi-lang-java="`checkly`" pulumi-lang-hcl="`checkly`">`checkly`</span>, <span pulumi-lang-nodejs="`azure`" pulumi-lang-dotnet="`Azure`" pulumi-lang-go="`azure`" pulumi-lang-python="`azure`" pulumi-lang-yaml="`azure`" pulumi-lang-java="`azure`" pulumi-lang-hcl="`azure`">`azure`</span>, <span pulumi-lang-nodejs="`newRelic`" pulumi-lang-dotnet="`NewRelic`" pulumi-lang-go="`newRelic`" pulumi-lang-python="`new_relic`" pulumi-lang-yaml="`newRelic`" pulumi-lang-java="`newRelic`" pulumi-lang-hcl="`new_relic`">`newRelic`</span>, <span pulumi-lang-nodejs="`splunk`" pulumi-lang-dotnet="`Splunk`" pulumi-lang-go="`splunk`" pulumi-lang-python="`splunk`" pulumi-lang-yaml="`splunk`" pulumi-lang-java="`splunk`" pulumi-lang-hcl="`splunk`">`splunk`</span>, <span pulumi-lang-nodejs="`chronosphere`" pulumi-lang-dotnet="`Chronosphere`" pulumi-lang-go="`chronosphere`" pulumi-lang-python="`chronosphere`" pulumi-lang-yaml="`chronosphere`" pulumi-lang-java="`chronosphere`" pulumi-lang-hcl="`chronosphere`">`chronosphere`</span>, <span pulumi-lang-nodejs="`appOptics`" pulumi-lang-dotnet="`AppOptics`" pulumi-lang-go="`appOptics`" pulumi-lang-python="`app_optics`" pulumi-lang-yaml="`appOptics`" pulumi-lang-java="`appOptics`" pulumi-lang-hcl="`app_optics`">`appOptics`</span>, <span pulumi-lang-nodejs="`bugSnag`" pulumi-lang-dotnet="`BugSnag`" pulumi-lang-go="`bugSnag`" pulumi-lang-python="`bug_snag`" pulumi-lang-yaml="`bugSnag`" pulumi-lang-java="`bugSnag`" pulumi-lang-hcl="`bug_snag`">`bugSnag`</span>, <span pulumi-lang-nodejs="`honeycomb`" pulumi-lang-dotnet="`Honeycomb`" pulumi-lang-go="`honeycomb`" pulumi-lang-python="`honeycomb`" pulumi-lang-yaml="`honeycomb`" pulumi-lang-java="`honeycomb`" pulumi-lang-hcl="`honeycomb`">`honeycomb`</span>, <span pulumi-lang-nodejs="`monteCarlo`" pulumi-lang-dotnet="`MonteCarlo`" pulumi-lang-go="`monteCarlo`" pulumi-lang-python="`monte_carlo`" pulumi-lang-yaml="`monteCarlo`" pulumi-lang-java="`monteCarlo`" pulumi-lang-hcl="`monte_carlo`">`monteCarlo`</span>, <span pulumi-lang-nodejs="`nagios`" pulumi-lang-dotnet="`Nagios`" pulumi-lang-go="`nagios`" pulumi-lang-python="`nagios`" pulumi-lang-yaml="`nagios`" pulumi-lang-java="`nagios`" pulumi-lang-hcl="`nagios`">`nagios`</span>, <span pulumi-lang-nodejs="`prtg`" pulumi-lang-dotnet="`Prtg`" pulumi-lang-go="`prtg`" pulumi-lang-python="`prtg`" pulumi-lang-yaml="`prtg`" pulumi-lang-java="`prtg`" pulumi-lang-hcl="`prtg`">`prtg`</span>.
+        :param pulumi.Input['AlertsSourceSourceableAttributesArgs'] sourceable_attributes: Provide additional attributes for<span pulumi-lang-nodejs=" genericWebhook " pulumi-lang-dotnet=" GenericWebhook " pulumi-lang-go=" genericWebhook " pulumi-lang-python=" generic_webhook " pulumi-lang-yaml=" genericWebhook " pulumi-lang-java=" genericWebhook " pulumi-lang-hcl=" generic_webhook "> genericWebhook </span>alerts source
+        :param pulumi.Input[_builtins.str] status: The status of the alert source. Value must be one of <span pulumi-lang-nodejs="`connected`" pulumi-lang-dotnet="`Connected`" pulumi-lang-go="`connected`" pulumi-lang-python="`connected`" pulumi-lang-yaml="`connected`" pulumi-lang-java="`connected`" pulumi-lang-hcl="`connected`">`connected`</span>, <span pulumi-lang-nodejs="`setupComplete`" pulumi-lang-dotnet="`SetupComplete`" pulumi-lang-go="`setupComplete`" pulumi-lang-python="`setup_complete`" pulumi-lang-yaml="`setupComplete`" pulumi-lang-java="`setupComplete`" pulumi-lang-hcl="`setup_complete`">`setupComplete`</span>, <span pulumi-lang-nodejs="`setupIncomplete`" pulumi-lang-dotnet="`SetupIncomplete`" pulumi-lang-go="`setupIncomplete`" pulumi-lang-python="`setup_incomplete`" pulumi-lang-yaml="`setupIncomplete`" pulumi-lang-java="`setupIncomplete`" pulumi-lang-hcl="`setup_incomplete`">`setupIncomplete`</span>.
         :param pulumi.Input[_builtins.str] webhook_endpoint: The webhook URL generated for non-email alert sources
         """
         if alert_source_fields_attributes is not None:
@@ -392,215 +392,215 @@ class _AlertsSourceState:
 
     @_builtins.property
     @pulumi.getter(name="alertSourceFieldsAttributes")
-    def alert_source_fields_attributes(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['AlertsSourceAlertSourceFieldsAttributeArgs']]]]:
+    def alert_source_fields_attributes(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['AlertsSourceAlertSourceFieldsAttributeArgs']]]]:
         """
         List of alert fields to be added to the alert source. Note: This attribute requires the alert field feature to be enabled on your account. Contact Rootly customer support if you need assistance with this feature.
         """
         return pulumi.get(self, "alert_source_fields_attributes")
 
     @alert_source_fields_attributes.setter
-    def alert_source_fields_attributes(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['AlertsSourceAlertSourceFieldsAttributeArgs']]]]):
+    def alert_source_fields_attributes(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['AlertsSourceAlertSourceFieldsAttributeArgs']]]]):
         pulumi.set(self, "alert_source_fields_attributes", value)
 
     @_builtins.property
     @pulumi.getter(name="alertSourceUrgencyRulesAttributes")
-    def alert_source_urgency_rules_attributes(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['AlertsSourceAlertSourceUrgencyRulesAttributeArgs']]]]:
+    def alert_source_urgency_rules_attributes(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['AlertsSourceAlertSourceUrgencyRulesAttributeArgs']]]]:
         """
         List of rules that define the conditions under which the alert urgency will be set automatically based on the alert payload
         """
         return pulumi.get(self, "alert_source_urgency_rules_attributes")
 
     @alert_source_urgency_rules_attributes.setter
-    def alert_source_urgency_rules_attributes(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['AlertsSourceAlertSourceUrgencyRulesAttributeArgs']]]]):
+    def alert_source_urgency_rules_attributes(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['AlertsSourceAlertSourceUrgencyRulesAttributeArgs']]]]):
         pulumi.set(self, "alert_source_urgency_rules_attributes", value)
 
     @_builtins.property
     @pulumi.getter(name="alertTemplateAttributes")
-    def alert_template_attributes(self) -> Optional[pulumi.Input['AlertsSourceAlertTemplateAttributesArgs']]:
+    def alert_template_attributes(self) -> pulumi.Input[Optional['AlertsSourceAlertTemplateAttributesArgs']]:
         """
-        Note that when alert fields are enabled at the team level, alert template attributes cannot be provided. Use <span pulumi-lang-nodejs="`alertSourceFieldsAttributes`" pulumi-lang-dotnet="`AlertSourceFieldsAttributes`" pulumi-lang-go="`alertSourceFieldsAttributes`" pulumi-lang-python="`alert_source_fields_attributes`" pulumi-lang-yaml="`alertSourceFieldsAttributes`" pulumi-lang-java="`alertSourceFieldsAttributes`">`alert_source_fields_attributes`</span> instead.
+        Note that when alert fields are enabled at the team level, alert template attributes cannot be provided. Use <span pulumi-lang-nodejs="`alertSourceFieldsAttributes`" pulumi-lang-dotnet="`AlertSourceFieldsAttributes`" pulumi-lang-go="`alertSourceFieldsAttributes`" pulumi-lang-python="`alert_source_fields_attributes`" pulumi-lang-yaml="`alertSourceFieldsAttributes`" pulumi-lang-java="`alertSourceFieldsAttributes`" pulumi-lang-hcl="`alert_source_fields_attributes`">`alertSourceFieldsAttributes`</span> instead.
         """
         return pulumi.get(self, "alert_template_attributes")
 
     @alert_template_attributes.setter
-    def alert_template_attributes(self, value: Optional[pulumi.Input['AlertsSourceAlertTemplateAttributesArgs']]):
+    def alert_template_attributes(self, value: pulumi.Input[Optional['AlertsSourceAlertTemplateAttributesArgs']]):
         pulumi.set(self, "alert_template_attributes", value)
 
     @_builtins.property
     @pulumi.getter(name="alertUrgencyId")
-    def alert_urgency_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alert_urgency_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         ID for the default alert urgency assigned to this alert source
         """
         return pulumi.get(self, "alert_urgency_id")
 
     @alert_urgency_id.setter
-    def alert_urgency_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alert_urgency_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alert_urgency_id", value)
 
     @_builtins.property
     @pulumi.getter(name="alertsSourceId")
-    def alerts_source_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alerts_source_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "alerts_source_id")
 
     @alerts_source_id.setter
-    def alerts_source_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alerts_source_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alerts_source_id", value)
 
     @_builtins.property
     @pulumi.getter(name="deduplicateAlertsByKey")
-    def deduplicate_alerts_by_key(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def deduplicate_alerts_by_key(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Toggle alert deduplication using deduplication key. If enabled,<span pulumi-lang-nodejs=" deduplicationKeyKind " pulumi-lang-dotnet=" DeduplicationKeyKind " pulumi-lang-go=" deduplicationKeyKind " pulumi-lang-python=" deduplication_key_kind " pulumi-lang-yaml=" deduplicationKeyKind " pulumi-lang-java=" deduplicationKeyKind "> deduplication_key_kind </span>and<span pulumi-lang-nodejs=" deduplicationKeyPath " pulumi-lang-dotnet=" DeduplicationKeyPath " pulumi-lang-go=" deduplicationKeyPath " pulumi-lang-python=" deduplication_key_path " pulumi-lang-yaml=" deduplicationKeyPath " pulumi-lang-java=" deduplicationKeyPath "> deduplication_key_path </span>are required.. Value must be one of true or false
+        Toggle alert deduplication using deduplication key. If enabled,<span pulumi-lang-nodejs=" deduplicationKeyKind " pulumi-lang-dotnet=" DeduplicationKeyKind " pulumi-lang-go=" deduplicationKeyKind " pulumi-lang-python=" deduplication_key_kind " pulumi-lang-yaml=" deduplicationKeyKind " pulumi-lang-java=" deduplicationKeyKind " pulumi-lang-hcl=" deduplication_key_kind "> deduplicationKeyKind </span>and<span pulumi-lang-nodejs=" deduplicationKeyPath " pulumi-lang-dotnet=" DeduplicationKeyPath " pulumi-lang-go=" deduplicationKeyPath " pulumi-lang-python=" deduplication_key_path " pulumi-lang-yaml=" deduplicationKeyPath " pulumi-lang-java=" deduplicationKeyPath " pulumi-lang-hcl=" deduplication_key_path "> deduplicationKeyPath </span>are required.. Value must be one of true or false
         """
         return pulumi.get(self, "deduplicate_alerts_by_key")
 
     @deduplicate_alerts_by_key.setter
-    def deduplicate_alerts_by_key(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def deduplicate_alerts_by_key(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "deduplicate_alerts_by_key", value)
 
     @_builtins.property
     @pulumi.getter(name="deduplicationKeyKind")
-    def deduplication_key_kind(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def deduplication_key_kind(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Kind of deduplication key.. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>.
+        Kind of deduplication key.. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>.
         """
         return pulumi.get(self, "deduplication_key_kind")
 
     @deduplication_key_kind.setter
-    def deduplication_key_kind(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def deduplication_key_kind(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "deduplication_key_kind", value)
 
     @_builtins.property
     @pulumi.getter(name="deduplicationKeyPath")
-    def deduplication_key_path(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def deduplication_key_path(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Path to deduplication key. This is a JSON Path to extract the deduplication key from the request body.
         """
         return pulumi.get(self, "deduplication_key_path")
 
     @deduplication_key_path.setter
-    def deduplication_key_path(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def deduplication_key_path(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "deduplication_key_path", value)
 
     @_builtins.property
     @pulumi.getter(name="deduplicationKeyRegexp")
-    def deduplication_key_regexp(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def deduplication_key_regexp(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Regular expression to extract key from value found at key path.
         """
         return pulumi.get(self, "deduplication_key_regexp")
 
     @deduplication_key_regexp.setter
-    def deduplication_key_regexp(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def deduplication_key_regexp(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "deduplication_key_regexp", value)
 
     @_builtins.property
     @pulumi.getter
-    def email(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def email(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The email generated for email alert sources
         """
         return pulumi.get(self, "email")
 
     @email.setter
-    def email(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def email(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "email", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the alert source
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="ownerGroupIds")
-    def owner_group_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def owner_group_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         List of team IDs that will own the alert source
         """
         return pulumi.get(self, "owner_group_ids")
 
     @owner_group_ids.setter
-    def owner_group_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def owner_group_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "owner_group_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="resolutionRuleAttributes")
-    def resolution_rule_attributes(self) -> Optional[pulumi.Input['AlertsSourceResolutionRuleAttributesArgs']]:
+    def resolution_rule_attributes(self) -> pulumi.Input[Optional['AlertsSourceResolutionRuleAttributesArgs']]:
         """
         Provide additional attributes for email alerts source
         """
         return pulumi.get(self, "resolution_rule_attributes")
 
     @resolution_rule_attributes.setter
-    def resolution_rule_attributes(self, value: Optional[pulumi.Input['AlertsSourceResolutionRuleAttributesArgs']]):
+    def resolution_rule_attributes(self, value: pulumi.Input[Optional['AlertsSourceResolutionRuleAttributesArgs']]):
         pulumi.set(self, "resolution_rule_attributes", value)
 
     @_builtins.property
     @pulumi.getter
-    def secret(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def secret(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The secret used to authenticate non-email alert sources
         """
         return pulumi.get(self, "secret")
 
     @secret.setter
-    def secret(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def secret(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "secret", value)
 
     @_builtins.property
     @pulumi.getter(name="sourceType")
-    def source_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def source_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The alert source type. Value must be one of <span pulumi-lang-nodejs="`email`" pulumi-lang-dotnet="`Email`" pulumi-lang-go="`email`" pulumi-lang-python="`email`" pulumi-lang-yaml="`email`" pulumi-lang-java="`email`">`email`</span>, <span pulumi-lang-nodejs="`appDynamics`" pulumi-lang-dotnet="`AppDynamics`" pulumi-lang-go="`appDynamics`" pulumi-lang-python="`app_dynamics`" pulumi-lang-yaml="`appDynamics`" pulumi-lang-java="`appDynamics`">`app_dynamics`</span>, <span pulumi-lang-nodejs="`catchpoint`" pulumi-lang-dotnet="`Catchpoint`" pulumi-lang-go="`catchpoint`" pulumi-lang-python="`catchpoint`" pulumi-lang-yaml="`catchpoint`" pulumi-lang-java="`catchpoint`">`catchpoint`</span>, <span pulumi-lang-nodejs="`datadog`" pulumi-lang-dotnet="`Datadog`" pulumi-lang-go="`datadog`" pulumi-lang-python="`datadog`" pulumi-lang-yaml="`datadog`" pulumi-lang-java="`datadog`">`datadog`</span>, <span pulumi-lang-nodejs="`alertmanager`" pulumi-lang-dotnet="`Alertmanager`" pulumi-lang-go="`alertmanager`" pulumi-lang-python="`alertmanager`" pulumi-lang-yaml="`alertmanager`" pulumi-lang-java="`alertmanager`">`alertmanager`</span>, <span pulumi-lang-nodejs="`googleCloud`" pulumi-lang-dotnet="`GoogleCloud`" pulumi-lang-go="`googleCloud`" pulumi-lang-python="`google_cloud`" pulumi-lang-yaml="`googleCloud`" pulumi-lang-java="`googleCloud`">`google_cloud`</span>, <span pulumi-lang-nodejs="`grafana`" pulumi-lang-dotnet="`Grafana`" pulumi-lang-go="`grafana`" pulumi-lang-python="`grafana`" pulumi-lang-yaml="`grafana`" pulumi-lang-java="`grafana`">`grafana`</span>, <span pulumi-lang-nodejs="`sentry`" pulumi-lang-dotnet="`Sentry`" pulumi-lang-go="`sentry`" pulumi-lang-python="`sentry`" pulumi-lang-yaml="`sentry`" pulumi-lang-java="`sentry`">`sentry`</span>, <span pulumi-lang-nodejs="`genericWebhook`" pulumi-lang-dotnet="`GenericWebhook`" pulumi-lang-go="`genericWebhook`" pulumi-lang-python="`generic_webhook`" pulumi-lang-yaml="`genericWebhook`" pulumi-lang-java="`genericWebhook`">`generic_webhook`</span>, <span pulumi-lang-nodejs="`cloudWatch`" pulumi-lang-dotnet="`CloudWatch`" pulumi-lang-go="`cloudWatch`" pulumi-lang-python="`cloud_watch`" pulumi-lang-yaml="`cloudWatch`" pulumi-lang-java="`cloudWatch`">`cloud_watch`</span>, <span pulumi-lang-nodejs="`checkly`" pulumi-lang-dotnet="`Checkly`" pulumi-lang-go="`checkly`" pulumi-lang-python="`checkly`" pulumi-lang-yaml="`checkly`" pulumi-lang-java="`checkly`">`checkly`</span>, <span pulumi-lang-nodejs="`azure`" pulumi-lang-dotnet="`Azure`" pulumi-lang-go="`azure`" pulumi-lang-python="`azure`" pulumi-lang-yaml="`azure`" pulumi-lang-java="`azure`">`azure`</span>, <span pulumi-lang-nodejs="`newRelic`" pulumi-lang-dotnet="`NewRelic`" pulumi-lang-go="`newRelic`" pulumi-lang-python="`new_relic`" pulumi-lang-yaml="`newRelic`" pulumi-lang-java="`newRelic`">`new_relic`</span>, <span pulumi-lang-nodejs="`splunk`" pulumi-lang-dotnet="`Splunk`" pulumi-lang-go="`splunk`" pulumi-lang-python="`splunk`" pulumi-lang-yaml="`splunk`" pulumi-lang-java="`splunk`">`splunk`</span>, <span pulumi-lang-nodejs="`chronosphere`" pulumi-lang-dotnet="`Chronosphere`" pulumi-lang-go="`chronosphere`" pulumi-lang-python="`chronosphere`" pulumi-lang-yaml="`chronosphere`" pulumi-lang-java="`chronosphere`">`chronosphere`</span>, <span pulumi-lang-nodejs="`appOptics`" pulumi-lang-dotnet="`AppOptics`" pulumi-lang-go="`appOptics`" pulumi-lang-python="`app_optics`" pulumi-lang-yaml="`appOptics`" pulumi-lang-java="`appOptics`">`app_optics`</span>, <span pulumi-lang-nodejs="`bugSnag`" pulumi-lang-dotnet="`BugSnag`" pulumi-lang-go="`bugSnag`" pulumi-lang-python="`bug_snag`" pulumi-lang-yaml="`bugSnag`" pulumi-lang-java="`bugSnag`">`bug_snag`</span>, <span pulumi-lang-nodejs="`honeycomb`" pulumi-lang-dotnet="`Honeycomb`" pulumi-lang-go="`honeycomb`" pulumi-lang-python="`honeycomb`" pulumi-lang-yaml="`honeycomb`" pulumi-lang-java="`honeycomb`">`honeycomb`</span>, <span pulumi-lang-nodejs="`monteCarlo`" pulumi-lang-dotnet="`MonteCarlo`" pulumi-lang-go="`monteCarlo`" pulumi-lang-python="`monte_carlo`" pulumi-lang-yaml="`monteCarlo`" pulumi-lang-java="`monteCarlo`">`monte_carlo`</span>, <span pulumi-lang-nodejs="`nagios`" pulumi-lang-dotnet="`Nagios`" pulumi-lang-go="`nagios`" pulumi-lang-python="`nagios`" pulumi-lang-yaml="`nagios`" pulumi-lang-java="`nagios`">`nagios`</span>, <span pulumi-lang-nodejs="`prtg`" pulumi-lang-dotnet="`Prtg`" pulumi-lang-go="`prtg`" pulumi-lang-python="`prtg`" pulumi-lang-yaml="`prtg`" pulumi-lang-java="`prtg`">`prtg`</span>.
+        The alert source type. Value must be one of <span pulumi-lang-nodejs="`email`" pulumi-lang-dotnet="`Email`" pulumi-lang-go="`email`" pulumi-lang-python="`email`" pulumi-lang-yaml="`email`" pulumi-lang-java="`email`" pulumi-lang-hcl="`email`">`email`</span>, <span pulumi-lang-nodejs="`appDynamics`" pulumi-lang-dotnet="`AppDynamics`" pulumi-lang-go="`appDynamics`" pulumi-lang-python="`app_dynamics`" pulumi-lang-yaml="`appDynamics`" pulumi-lang-java="`appDynamics`" pulumi-lang-hcl="`app_dynamics`">`appDynamics`</span>, <span pulumi-lang-nodejs="`catchpoint`" pulumi-lang-dotnet="`Catchpoint`" pulumi-lang-go="`catchpoint`" pulumi-lang-python="`catchpoint`" pulumi-lang-yaml="`catchpoint`" pulumi-lang-java="`catchpoint`" pulumi-lang-hcl="`catchpoint`">`catchpoint`</span>, <span pulumi-lang-nodejs="`datadog`" pulumi-lang-dotnet="`Datadog`" pulumi-lang-go="`datadog`" pulumi-lang-python="`datadog`" pulumi-lang-yaml="`datadog`" pulumi-lang-java="`datadog`" pulumi-lang-hcl="`datadog`">`datadog`</span>, <span pulumi-lang-nodejs="`dynatrace`" pulumi-lang-dotnet="`Dynatrace`" pulumi-lang-go="`dynatrace`" pulumi-lang-python="`dynatrace`" pulumi-lang-yaml="`dynatrace`" pulumi-lang-java="`dynatrace`" pulumi-lang-hcl="`dynatrace`">`dynatrace`</span>, <span pulumi-lang-nodejs="`alertmanager`" pulumi-lang-dotnet="`Alertmanager`" pulumi-lang-go="`alertmanager`" pulumi-lang-python="`alertmanager`" pulumi-lang-yaml="`alertmanager`" pulumi-lang-java="`alertmanager`" pulumi-lang-hcl="`alertmanager`">`alertmanager`</span>, <span pulumi-lang-nodejs="`googleCloud`" pulumi-lang-dotnet="`GoogleCloud`" pulumi-lang-go="`googleCloud`" pulumi-lang-python="`google_cloud`" pulumi-lang-yaml="`googleCloud`" pulumi-lang-java="`googleCloud`" pulumi-lang-hcl="`google_cloud`">`googleCloud`</span>, <span pulumi-lang-nodejs="`grafana`" pulumi-lang-dotnet="`Grafana`" pulumi-lang-go="`grafana`" pulumi-lang-python="`grafana`" pulumi-lang-yaml="`grafana`" pulumi-lang-java="`grafana`" pulumi-lang-hcl="`grafana`">`grafana`</span>, <span pulumi-lang-nodejs="`sentry`" pulumi-lang-dotnet="`Sentry`" pulumi-lang-go="`sentry`" pulumi-lang-python="`sentry`" pulumi-lang-yaml="`sentry`" pulumi-lang-java="`sentry`" pulumi-lang-hcl="`sentry`">`sentry`</span>, <span pulumi-lang-nodejs="`genericWebhook`" pulumi-lang-dotnet="`GenericWebhook`" pulumi-lang-go="`genericWebhook`" pulumi-lang-python="`generic_webhook`" pulumi-lang-yaml="`genericWebhook`" pulumi-lang-java="`genericWebhook`" pulumi-lang-hcl="`generic_webhook`">`genericWebhook`</span>, <span pulumi-lang-nodejs="`cloudWatch`" pulumi-lang-dotnet="`CloudWatch`" pulumi-lang-go="`cloudWatch`" pulumi-lang-python="`cloud_watch`" pulumi-lang-yaml="`cloudWatch`" pulumi-lang-java="`cloudWatch`" pulumi-lang-hcl="`cloud_watch`">`cloudWatch`</span>, <span pulumi-lang-nodejs="`awsSns`" pulumi-lang-dotnet="`AwsSns`" pulumi-lang-go="`awsSns`" pulumi-lang-python="`aws_sns`" pulumi-lang-yaml="`awsSns`" pulumi-lang-java="`awsSns`" pulumi-lang-hcl="`aws_sns`">`awsSns`</span>, <span pulumi-lang-nodejs="`checkly`" pulumi-lang-dotnet="`Checkly`" pulumi-lang-go="`checkly`" pulumi-lang-python="`checkly`" pulumi-lang-yaml="`checkly`" pulumi-lang-java="`checkly`" pulumi-lang-hcl="`checkly`">`checkly`</span>, <span pulumi-lang-nodejs="`azure`" pulumi-lang-dotnet="`Azure`" pulumi-lang-go="`azure`" pulumi-lang-python="`azure`" pulumi-lang-yaml="`azure`" pulumi-lang-java="`azure`" pulumi-lang-hcl="`azure`">`azure`</span>, <span pulumi-lang-nodejs="`newRelic`" pulumi-lang-dotnet="`NewRelic`" pulumi-lang-go="`newRelic`" pulumi-lang-python="`new_relic`" pulumi-lang-yaml="`newRelic`" pulumi-lang-java="`newRelic`" pulumi-lang-hcl="`new_relic`">`newRelic`</span>, <span pulumi-lang-nodejs="`splunk`" pulumi-lang-dotnet="`Splunk`" pulumi-lang-go="`splunk`" pulumi-lang-python="`splunk`" pulumi-lang-yaml="`splunk`" pulumi-lang-java="`splunk`" pulumi-lang-hcl="`splunk`">`splunk`</span>, <span pulumi-lang-nodejs="`chronosphere`" pulumi-lang-dotnet="`Chronosphere`" pulumi-lang-go="`chronosphere`" pulumi-lang-python="`chronosphere`" pulumi-lang-yaml="`chronosphere`" pulumi-lang-java="`chronosphere`" pulumi-lang-hcl="`chronosphere`">`chronosphere`</span>, <span pulumi-lang-nodejs="`appOptics`" pulumi-lang-dotnet="`AppOptics`" pulumi-lang-go="`appOptics`" pulumi-lang-python="`app_optics`" pulumi-lang-yaml="`appOptics`" pulumi-lang-java="`appOptics`" pulumi-lang-hcl="`app_optics`">`appOptics`</span>, <span pulumi-lang-nodejs="`bugSnag`" pulumi-lang-dotnet="`BugSnag`" pulumi-lang-go="`bugSnag`" pulumi-lang-python="`bug_snag`" pulumi-lang-yaml="`bugSnag`" pulumi-lang-java="`bugSnag`" pulumi-lang-hcl="`bug_snag`">`bugSnag`</span>, <span pulumi-lang-nodejs="`honeycomb`" pulumi-lang-dotnet="`Honeycomb`" pulumi-lang-go="`honeycomb`" pulumi-lang-python="`honeycomb`" pulumi-lang-yaml="`honeycomb`" pulumi-lang-java="`honeycomb`" pulumi-lang-hcl="`honeycomb`">`honeycomb`</span>, <span pulumi-lang-nodejs="`monteCarlo`" pulumi-lang-dotnet="`MonteCarlo`" pulumi-lang-go="`monteCarlo`" pulumi-lang-python="`monte_carlo`" pulumi-lang-yaml="`monteCarlo`" pulumi-lang-java="`monteCarlo`" pulumi-lang-hcl="`monte_carlo`">`monteCarlo`</span>, <span pulumi-lang-nodejs="`nagios`" pulumi-lang-dotnet="`Nagios`" pulumi-lang-go="`nagios`" pulumi-lang-python="`nagios`" pulumi-lang-yaml="`nagios`" pulumi-lang-java="`nagios`" pulumi-lang-hcl="`nagios`">`nagios`</span>, <span pulumi-lang-nodejs="`prtg`" pulumi-lang-dotnet="`Prtg`" pulumi-lang-go="`prtg`" pulumi-lang-python="`prtg`" pulumi-lang-yaml="`prtg`" pulumi-lang-java="`prtg`" pulumi-lang-hcl="`prtg`">`prtg`</span>.
         """
         return pulumi.get(self, "source_type")
 
     @source_type.setter
-    def source_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def source_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "source_type", value)
 
     @_builtins.property
     @pulumi.getter(name="sourceableAttributes")
-    def sourceable_attributes(self) -> Optional[pulumi.Input['AlertsSourceSourceableAttributesArgs']]:
+    def sourceable_attributes(self) -> pulumi.Input[Optional['AlertsSourceSourceableAttributesArgs']]:
         """
-        Provide additional attributes for<span pulumi-lang-nodejs=" genericWebhook " pulumi-lang-dotnet=" GenericWebhook " pulumi-lang-go=" genericWebhook " pulumi-lang-python=" generic_webhook " pulumi-lang-yaml=" genericWebhook " pulumi-lang-java=" genericWebhook "> generic_webhook </span>alerts source
+        Provide additional attributes for<span pulumi-lang-nodejs=" genericWebhook " pulumi-lang-dotnet=" GenericWebhook " pulumi-lang-go=" genericWebhook " pulumi-lang-python=" generic_webhook " pulumi-lang-yaml=" genericWebhook " pulumi-lang-java=" genericWebhook " pulumi-lang-hcl=" generic_webhook "> genericWebhook </span>alerts source
         """
         return pulumi.get(self, "sourceable_attributes")
 
     @sourceable_attributes.setter
-    def sourceable_attributes(self, value: Optional[pulumi.Input['AlertsSourceSourceableAttributesArgs']]):
+    def sourceable_attributes(self, value: pulumi.Input[Optional['AlertsSourceSourceableAttributesArgs']]):
         pulumi.set(self, "sourceable_attributes", value)
 
     @_builtins.property
     @pulumi.getter
-    def status(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def status(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The status of the alert source. Value must be one of <span pulumi-lang-nodejs="`connected`" pulumi-lang-dotnet="`Connected`" pulumi-lang-go="`connected`" pulumi-lang-python="`connected`" pulumi-lang-yaml="`connected`" pulumi-lang-java="`connected`">`connected`</span>, <span pulumi-lang-nodejs="`setupComplete`" pulumi-lang-dotnet="`SetupComplete`" pulumi-lang-go="`setupComplete`" pulumi-lang-python="`setup_complete`" pulumi-lang-yaml="`setupComplete`" pulumi-lang-java="`setupComplete`">`setup_complete`</span>, <span pulumi-lang-nodejs="`setupIncomplete`" pulumi-lang-dotnet="`SetupIncomplete`" pulumi-lang-go="`setupIncomplete`" pulumi-lang-python="`setup_incomplete`" pulumi-lang-yaml="`setupIncomplete`" pulumi-lang-java="`setupIncomplete`">`setup_incomplete`</span>.
+        The status of the alert source. Value must be one of <span pulumi-lang-nodejs="`connected`" pulumi-lang-dotnet="`Connected`" pulumi-lang-go="`connected`" pulumi-lang-python="`connected`" pulumi-lang-yaml="`connected`" pulumi-lang-java="`connected`" pulumi-lang-hcl="`connected`">`connected`</span>, <span pulumi-lang-nodejs="`setupComplete`" pulumi-lang-dotnet="`SetupComplete`" pulumi-lang-go="`setupComplete`" pulumi-lang-python="`setup_complete`" pulumi-lang-yaml="`setupComplete`" pulumi-lang-java="`setupComplete`" pulumi-lang-hcl="`setup_complete`">`setupComplete`</span>, <span pulumi-lang-nodejs="`setupIncomplete`" pulumi-lang-dotnet="`SetupIncomplete`" pulumi-lang-go="`setupIncomplete`" pulumi-lang-python="`setup_incomplete`" pulumi-lang-yaml="`setupIncomplete`" pulumi-lang-java="`setupIncomplete`" pulumi-lang-hcl="`setup_incomplete`">`setupIncomplete`</span>.
         """
         return pulumi.get(self, "status")
 
     @status.setter
-    def status(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def status(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "status", value)
 
     @_builtins.property
     @pulumi.getter(name="webhookEndpoint")
-    def webhook_endpoint(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def webhook_endpoint(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The webhook URL generated for non-email alert sources
         """
         return pulumi.get(self, "webhook_endpoint")
 
     @webhook_endpoint.setter
-    def webhook_endpoint(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def webhook_endpoint(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "webhook_endpoint", value)
 
 
@@ -610,24 +610,24 @@ class AlertsSource(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 alert_source_fields_attributes: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertsSourceAlertSourceFieldsAttributeArgs', 'AlertsSourceAlertSourceFieldsAttributeArgsDict']]]]] = None,
-                 alert_source_urgency_rules_attributes: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertsSourceAlertSourceUrgencyRulesAttributeArgs', 'AlertsSourceAlertSourceUrgencyRulesAttributeArgsDict']]]]] = None,
-                 alert_template_attributes: Optional[pulumi.Input[Union['AlertsSourceAlertTemplateAttributesArgs', 'AlertsSourceAlertTemplateAttributesArgsDict']]] = None,
-                 alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 alerts_source_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 deduplicate_alerts_by_key: Optional[pulumi.Input[_builtins.bool]] = None,
-                 deduplication_key_kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 deduplication_key_path: Optional[pulumi.Input[_builtins.str]] = None,
-                 deduplication_key_regexp: Optional[pulumi.Input[_builtins.str]] = None,
-                 email: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 owner_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 resolution_rule_attributes: Optional[pulumi.Input[Union['AlertsSourceResolutionRuleAttributesArgs', 'AlertsSourceResolutionRuleAttributesArgsDict']]] = None,
-                 secret: Optional[pulumi.Input[_builtins.str]] = None,
-                 source_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 sourceable_attributes: Optional[pulumi.Input[Union['AlertsSourceSourceableAttributesArgs', 'AlertsSourceSourceableAttributesArgsDict']]] = None,
-                 status: Optional[pulumi.Input[_builtins.str]] = None,
-                 webhook_endpoint: Optional[pulumi.Input[_builtins.str]] = None,
+                 alert_source_fields_attributes: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertsSourceAlertSourceFieldsAttributeArgs', 'AlertsSourceAlertSourceFieldsAttributeArgsDict']]]]] = None,
+                 alert_source_urgency_rules_attributes: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertsSourceAlertSourceUrgencyRulesAttributeArgs', 'AlertsSourceAlertSourceUrgencyRulesAttributeArgsDict']]]]] = None,
+                 alert_template_attributes: pulumi.Input[Optional[Union['AlertsSourceAlertTemplateAttributesArgs', 'AlertsSourceAlertTemplateAttributesArgsDict']]] = None,
+                 alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 alerts_source_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 deduplicate_alerts_by_key: pulumi.Input[Optional[_builtins.bool]] = None,
+                 deduplication_key_kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 deduplication_key_path: pulumi.Input[Optional[_builtins.str]] = None,
+                 deduplication_key_regexp: pulumi.Input[Optional[_builtins.str]] = None,
+                 email: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 owner_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 resolution_rule_attributes: pulumi.Input[Optional[Union['AlertsSourceResolutionRuleAttributesArgs', 'AlertsSourceResolutionRuleAttributesArgsDict']]] = None,
+                 secret: pulumi.Input[Optional[_builtins.str]] = None,
+                 source_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 sourceable_attributes: pulumi.Input[Optional[Union['AlertsSourceSourceableAttributesArgs', 'AlertsSourceSourceableAttributesArgsDict']]] = None,
+                 status: pulumi.Input[Optional[_builtins.str]] = None,
+                 webhook_endpoint: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a AlertsSource resource with the given unique name, props, and options.
@@ -636,10 +636,10 @@ class AlertsSource(pulumi.CustomResource):
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[Sequence[pulumi.Input[Union['AlertsSourceAlertSourceFieldsAttributeArgs', 'AlertsSourceAlertSourceFieldsAttributeArgsDict']]]] alert_source_fields_attributes: List of alert fields to be added to the alert source. Note: This attribute requires the alert field feature to be enabled on your account. Contact Rootly customer support if you need assistance with this feature.
         :param pulumi.Input[Sequence[pulumi.Input[Union['AlertsSourceAlertSourceUrgencyRulesAttributeArgs', 'AlertsSourceAlertSourceUrgencyRulesAttributeArgsDict']]]] alert_source_urgency_rules_attributes: List of rules that define the conditions under which the alert urgency will be set automatically based on the alert payload
-        :param pulumi.Input[Union['AlertsSourceAlertTemplateAttributesArgs', 'AlertsSourceAlertTemplateAttributesArgsDict']] alert_template_attributes: Note that when alert fields are enabled at the team level, alert template attributes cannot be provided. Use <span pulumi-lang-nodejs="`alertSourceFieldsAttributes`" pulumi-lang-dotnet="`AlertSourceFieldsAttributes`" pulumi-lang-go="`alertSourceFieldsAttributes`" pulumi-lang-python="`alert_source_fields_attributes`" pulumi-lang-yaml="`alertSourceFieldsAttributes`" pulumi-lang-java="`alertSourceFieldsAttributes`">`alert_source_fields_attributes`</span> instead.
+        :param pulumi.Input[Union['AlertsSourceAlertTemplateAttributesArgs', 'AlertsSourceAlertTemplateAttributesArgsDict']] alert_template_attributes: Note that when alert fields are enabled at the team level, alert template attributes cannot be provided. Use <span pulumi-lang-nodejs="`alertSourceFieldsAttributes`" pulumi-lang-dotnet="`AlertSourceFieldsAttributes`" pulumi-lang-go="`alertSourceFieldsAttributes`" pulumi-lang-python="`alert_source_fields_attributes`" pulumi-lang-yaml="`alertSourceFieldsAttributes`" pulumi-lang-java="`alertSourceFieldsAttributes`" pulumi-lang-hcl="`alert_source_fields_attributes`">`alertSourceFieldsAttributes`</span> instead.
         :param pulumi.Input[_builtins.str] alert_urgency_id: ID for the default alert urgency assigned to this alert source
-        :param pulumi.Input[_builtins.bool] deduplicate_alerts_by_key: Toggle alert deduplication using deduplication key. If enabled,<span pulumi-lang-nodejs=" deduplicationKeyKind " pulumi-lang-dotnet=" DeduplicationKeyKind " pulumi-lang-go=" deduplicationKeyKind " pulumi-lang-python=" deduplication_key_kind " pulumi-lang-yaml=" deduplicationKeyKind " pulumi-lang-java=" deduplicationKeyKind "> deduplication_key_kind </span>and<span pulumi-lang-nodejs=" deduplicationKeyPath " pulumi-lang-dotnet=" DeduplicationKeyPath " pulumi-lang-go=" deduplicationKeyPath " pulumi-lang-python=" deduplication_key_path " pulumi-lang-yaml=" deduplicationKeyPath " pulumi-lang-java=" deduplicationKeyPath "> deduplication_key_path </span>are required.. Value must be one of true or false
-        :param pulumi.Input[_builtins.str] deduplication_key_kind: Kind of deduplication key.. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>.
+        :param pulumi.Input[_builtins.bool] deduplicate_alerts_by_key: Toggle alert deduplication using deduplication key. If enabled,<span pulumi-lang-nodejs=" deduplicationKeyKind " pulumi-lang-dotnet=" DeduplicationKeyKind " pulumi-lang-go=" deduplicationKeyKind " pulumi-lang-python=" deduplication_key_kind " pulumi-lang-yaml=" deduplicationKeyKind " pulumi-lang-java=" deduplicationKeyKind " pulumi-lang-hcl=" deduplication_key_kind "> deduplicationKeyKind </span>and<span pulumi-lang-nodejs=" deduplicationKeyPath " pulumi-lang-dotnet=" DeduplicationKeyPath " pulumi-lang-go=" deduplicationKeyPath " pulumi-lang-python=" deduplication_key_path " pulumi-lang-yaml=" deduplicationKeyPath " pulumi-lang-java=" deduplicationKeyPath " pulumi-lang-hcl=" deduplication_key_path "> deduplicationKeyPath </span>are required.. Value must be one of true or false
+        :param pulumi.Input[_builtins.str] deduplication_key_kind: Kind of deduplication key.. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>.
         :param pulumi.Input[_builtins.str] deduplication_key_path: Path to deduplication key. This is a JSON Path to extract the deduplication key from the request body.
         :param pulumi.Input[_builtins.str] deduplication_key_regexp: Regular expression to extract key from value found at key path.
         :param pulumi.Input[_builtins.str] email: The email generated for email alert sources
@@ -647,9 +647,9 @@ class AlertsSource(pulumi.CustomResource):
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] owner_group_ids: List of team IDs that will own the alert source
         :param pulumi.Input[Union['AlertsSourceResolutionRuleAttributesArgs', 'AlertsSourceResolutionRuleAttributesArgsDict']] resolution_rule_attributes: Provide additional attributes for email alerts source
         :param pulumi.Input[_builtins.str] secret: The secret used to authenticate non-email alert sources
-        :param pulumi.Input[_builtins.str] source_type: The alert source type. Value must be one of <span pulumi-lang-nodejs="`email`" pulumi-lang-dotnet="`Email`" pulumi-lang-go="`email`" pulumi-lang-python="`email`" pulumi-lang-yaml="`email`" pulumi-lang-java="`email`">`email`</span>, <span pulumi-lang-nodejs="`appDynamics`" pulumi-lang-dotnet="`AppDynamics`" pulumi-lang-go="`appDynamics`" pulumi-lang-python="`app_dynamics`" pulumi-lang-yaml="`appDynamics`" pulumi-lang-java="`appDynamics`">`app_dynamics`</span>, <span pulumi-lang-nodejs="`catchpoint`" pulumi-lang-dotnet="`Catchpoint`" pulumi-lang-go="`catchpoint`" pulumi-lang-python="`catchpoint`" pulumi-lang-yaml="`catchpoint`" pulumi-lang-java="`catchpoint`">`catchpoint`</span>, <span pulumi-lang-nodejs="`datadog`" pulumi-lang-dotnet="`Datadog`" pulumi-lang-go="`datadog`" pulumi-lang-python="`datadog`" pulumi-lang-yaml="`datadog`" pulumi-lang-java="`datadog`">`datadog`</span>, <span pulumi-lang-nodejs="`alertmanager`" pulumi-lang-dotnet="`Alertmanager`" pulumi-lang-go="`alertmanager`" pulumi-lang-python="`alertmanager`" pulumi-lang-yaml="`alertmanager`" pulumi-lang-java="`alertmanager`">`alertmanager`</span>, <span pulumi-lang-nodejs="`googleCloud`" pulumi-lang-dotnet="`GoogleCloud`" pulumi-lang-go="`googleCloud`" pulumi-lang-python="`google_cloud`" pulumi-lang-yaml="`googleCloud`" pulumi-lang-java="`googleCloud`">`google_cloud`</span>, <span pulumi-lang-nodejs="`grafana`" pulumi-lang-dotnet="`Grafana`" pulumi-lang-go="`grafana`" pulumi-lang-python="`grafana`" pulumi-lang-yaml="`grafana`" pulumi-lang-java="`grafana`">`grafana`</span>, <span pulumi-lang-nodejs="`sentry`" pulumi-lang-dotnet="`Sentry`" pulumi-lang-go="`sentry`" pulumi-lang-python="`sentry`" pulumi-lang-yaml="`sentry`" pulumi-lang-java="`sentry`">`sentry`</span>, <span pulumi-lang-nodejs="`genericWebhook`" pulumi-lang-dotnet="`GenericWebhook`" pulumi-lang-go="`genericWebhook`" pulumi-lang-python="`generic_webhook`" pulumi-lang-yaml="`genericWebhook`" pulumi-lang-java="`genericWebhook`">`generic_webhook`</span>, <span pulumi-lang-nodejs="`cloudWatch`" pulumi-lang-dotnet="`CloudWatch`" pulumi-lang-go="`cloudWatch`" pulumi-lang-python="`cloud_watch`" pulumi-lang-yaml="`cloudWatch`" pulumi-lang-java="`cloudWatch`">`cloud_watch`</span>, <span pulumi-lang-nodejs="`checkly`" pulumi-lang-dotnet="`Checkly`" pulumi-lang-go="`checkly`" pulumi-lang-python="`checkly`" pulumi-lang-yaml="`checkly`" pulumi-lang-java="`checkly`">`checkly`</span>, <span pulumi-lang-nodejs="`azure`" pulumi-lang-dotnet="`Azure`" pulumi-lang-go="`azure`" pulumi-lang-python="`azure`" pulumi-lang-yaml="`azure`" pulumi-lang-java="`azure`">`azure`</span>, <span pulumi-lang-nodejs="`newRelic`" pulumi-lang-dotnet="`NewRelic`" pulumi-lang-go="`newRelic`" pulumi-lang-python="`new_relic`" pulumi-lang-yaml="`newRelic`" pulumi-lang-java="`newRelic`">`new_relic`</span>, <span pulumi-lang-nodejs="`splunk`" pulumi-lang-dotnet="`Splunk`" pulumi-lang-go="`splunk`" pulumi-lang-python="`splunk`" pulumi-lang-yaml="`splunk`" pulumi-lang-java="`splunk`">`splunk`</span>, <span pulumi-lang-nodejs="`chronosphere`" pulumi-lang-dotnet="`Chronosphere`" pulumi-lang-go="`chronosphere`" pulumi-lang-python="`chronosphere`" pulumi-lang-yaml="`chronosphere`" pulumi-lang-java="`chronosphere`">`chronosphere`</span>, <span pulumi-lang-nodejs="`appOptics`" pulumi-lang-dotnet="`AppOptics`" pulumi-lang-go="`appOptics`" pulumi-lang-python="`app_optics`" pulumi-lang-yaml="`appOptics`" pulumi-lang-java="`appOptics`">`app_optics`</span>, <span pulumi-lang-nodejs="`bugSnag`" pulumi-lang-dotnet="`BugSnag`" pulumi-lang-go="`bugSnag`" pulumi-lang-python="`bug_snag`" pulumi-lang-yaml="`bugSnag`" pulumi-lang-java="`bugSnag`">`bug_snag`</span>, <span pulumi-lang-nodejs="`honeycomb`" pulumi-lang-dotnet="`Honeycomb`" pulumi-lang-go="`honeycomb`" pulumi-lang-python="`honeycomb`" pulumi-lang-yaml="`honeycomb`" pulumi-lang-java="`honeycomb`">`honeycomb`</span>, <span pulumi-lang-nodejs="`monteCarlo`" pulumi-lang-dotnet="`MonteCarlo`" pulumi-lang-go="`monteCarlo`" pulumi-lang-python="`monte_carlo`" pulumi-lang-yaml="`monteCarlo`" pulumi-lang-java="`monteCarlo`">`monte_carlo`</span>, <span pulumi-lang-nodejs="`nagios`" pulumi-lang-dotnet="`Nagios`" pulumi-lang-go="`nagios`" pulumi-lang-python="`nagios`" pulumi-lang-yaml="`nagios`" pulumi-lang-java="`nagios`">`nagios`</span>, <span pulumi-lang-nodejs="`prtg`" pulumi-lang-dotnet="`Prtg`" pulumi-lang-go="`prtg`" pulumi-lang-python="`prtg`" pulumi-lang-yaml="`prtg`" pulumi-lang-java="`prtg`">`prtg`</span>.
-        :param pulumi.Input[Union['AlertsSourceSourceableAttributesArgs', 'AlertsSourceSourceableAttributesArgsDict']] sourceable_attributes: Provide additional attributes for<span pulumi-lang-nodejs=" genericWebhook " pulumi-lang-dotnet=" GenericWebhook " pulumi-lang-go=" genericWebhook " pulumi-lang-python=" generic_webhook " pulumi-lang-yaml=" genericWebhook " pulumi-lang-java=" genericWebhook "> generic_webhook </span>alerts source
-        :param pulumi.Input[_builtins.str] status: The status of the alert source. Value must be one of <span pulumi-lang-nodejs="`connected`" pulumi-lang-dotnet="`Connected`" pulumi-lang-go="`connected`" pulumi-lang-python="`connected`" pulumi-lang-yaml="`connected`" pulumi-lang-java="`connected`">`connected`</span>, <span pulumi-lang-nodejs="`setupComplete`" pulumi-lang-dotnet="`SetupComplete`" pulumi-lang-go="`setupComplete`" pulumi-lang-python="`setup_complete`" pulumi-lang-yaml="`setupComplete`" pulumi-lang-java="`setupComplete`">`setup_complete`</span>, <span pulumi-lang-nodejs="`setupIncomplete`" pulumi-lang-dotnet="`SetupIncomplete`" pulumi-lang-go="`setupIncomplete`" pulumi-lang-python="`setup_incomplete`" pulumi-lang-yaml="`setupIncomplete`" pulumi-lang-java="`setupIncomplete`">`setup_incomplete`</span>.
+        :param pulumi.Input[_builtins.str] source_type: The alert source type. Value must be one of <span pulumi-lang-nodejs="`email`" pulumi-lang-dotnet="`Email`" pulumi-lang-go="`email`" pulumi-lang-python="`email`" pulumi-lang-yaml="`email`" pulumi-lang-java="`email`" pulumi-lang-hcl="`email`">`email`</span>, <span pulumi-lang-nodejs="`appDynamics`" pulumi-lang-dotnet="`AppDynamics`" pulumi-lang-go="`appDynamics`" pulumi-lang-python="`app_dynamics`" pulumi-lang-yaml="`appDynamics`" pulumi-lang-java="`appDynamics`" pulumi-lang-hcl="`app_dynamics`">`appDynamics`</span>, <span pulumi-lang-nodejs="`catchpoint`" pulumi-lang-dotnet="`Catchpoint`" pulumi-lang-go="`catchpoint`" pulumi-lang-python="`catchpoint`" pulumi-lang-yaml="`catchpoint`" pulumi-lang-java="`catchpoint`" pulumi-lang-hcl="`catchpoint`">`catchpoint`</span>, <span pulumi-lang-nodejs="`datadog`" pulumi-lang-dotnet="`Datadog`" pulumi-lang-go="`datadog`" pulumi-lang-python="`datadog`" pulumi-lang-yaml="`datadog`" pulumi-lang-java="`datadog`" pulumi-lang-hcl="`datadog`">`datadog`</span>, <span pulumi-lang-nodejs="`dynatrace`" pulumi-lang-dotnet="`Dynatrace`" pulumi-lang-go="`dynatrace`" pulumi-lang-python="`dynatrace`" pulumi-lang-yaml="`dynatrace`" pulumi-lang-java="`dynatrace`" pulumi-lang-hcl="`dynatrace`">`dynatrace`</span>, <span pulumi-lang-nodejs="`alertmanager`" pulumi-lang-dotnet="`Alertmanager`" pulumi-lang-go="`alertmanager`" pulumi-lang-python="`alertmanager`" pulumi-lang-yaml="`alertmanager`" pulumi-lang-java="`alertmanager`" pulumi-lang-hcl="`alertmanager`">`alertmanager`</span>, <span pulumi-lang-nodejs="`googleCloud`" pulumi-lang-dotnet="`GoogleCloud`" pulumi-lang-go="`googleCloud`" pulumi-lang-python="`google_cloud`" pulumi-lang-yaml="`googleCloud`" pulumi-lang-java="`googleCloud`" pulumi-lang-hcl="`google_cloud`">`googleCloud`</span>, <span pulumi-lang-nodejs="`grafana`" pulumi-lang-dotnet="`Grafana`" pulumi-lang-go="`grafana`" pulumi-lang-python="`grafana`" pulumi-lang-yaml="`grafana`" pulumi-lang-java="`grafana`" pulumi-lang-hcl="`grafana`">`grafana`</span>, <span pulumi-lang-nodejs="`sentry`" pulumi-lang-dotnet="`Sentry`" pulumi-lang-go="`sentry`" pulumi-lang-python="`sentry`" pulumi-lang-yaml="`sentry`" pulumi-lang-java="`sentry`" pulumi-lang-hcl="`sentry`">`sentry`</span>, <span pulumi-lang-nodejs="`genericWebhook`" pulumi-lang-dotnet="`GenericWebhook`" pulumi-lang-go="`genericWebhook`" pulumi-lang-python="`generic_webhook`" pulumi-lang-yaml="`genericWebhook`" pulumi-lang-java="`genericWebhook`" pulumi-lang-hcl="`generic_webhook`">`genericWebhook`</span>, <span pulumi-lang-nodejs="`cloudWatch`" pulumi-lang-dotnet="`CloudWatch`" pulumi-lang-go="`cloudWatch`" pulumi-lang-python="`cloud_watch`" pulumi-lang-yaml="`cloudWatch`" pulumi-lang-java="`cloudWatch`" pulumi-lang-hcl="`cloud_watch`">`cloudWatch`</span>, <span pulumi-lang-nodejs="`awsSns`" pulumi-lang-dotnet="`AwsSns`" pulumi-lang-go="`awsSns`" pulumi-lang-python="`aws_sns`" pulumi-lang-yaml="`awsSns`" pulumi-lang-java="`awsSns`" pulumi-lang-hcl="`aws_sns`">`awsSns`</span>, <span pulumi-lang-nodejs="`checkly`" pulumi-lang-dotnet="`Checkly`" pulumi-lang-go="`checkly`" pulumi-lang-python="`checkly`" pulumi-lang-yaml="`checkly`" pulumi-lang-java="`checkly`" pulumi-lang-hcl="`checkly`">`checkly`</span>, <span pulumi-lang-nodejs="`azure`" pulumi-lang-dotnet="`Azure`" pulumi-lang-go="`azure`" pulumi-lang-python="`azure`" pulumi-lang-yaml="`azure`" pulumi-lang-java="`azure`" pulumi-lang-hcl="`azure`">`azure`</span>, <span pulumi-lang-nodejs="`newRelic`" pulumi-lang-dotnet="`NewRelic`" pulumi-lang-go="`newRelic`" pulumi-lang-python="`new_relic`" pulumi-lang-yaml="`newRelic`" pulumi-lang-java="`newRelic`" pulumi-lang-hcl="`new_relic`">`newRelic`</span>, <span pulumi-lang-nodejs="`splunk`" pulumi-lang-dotnet="`Splunk`" pulumi-lang-go="`splunk`" pulumi-lang-python="`splunk`" pulumi-lang-yaml="`splunk`" pulumi-lang-java="`splunk`" pulumi-lang-hcl="`splunk`">`splunk`</span>, <span pulumi-lang-nodejs="`chronosphere`" pulumi-lang-dotnet="`Chronosphere`" pulumi-lang-go="`chronosphere`" pulumi-lang-python="`chronosphere`" pulumi-lang-yaml="`chronosphere`" pulumi-lang-java="`chronosphere`" pulumi-lang-hcl="`chronosphere`">`chronosphere`</span>, <span pulumi-lang-nodejs="`appOptics`" pulumi-lang-dotnet="`AppOptics`" pulumi-lang-go="`appOptics`" pulumi-lang-python="`app_optics`" pulumi-lang-yaml="`appOptics`" pulumi-lang-java="`appOptics`" pulumi-lang-hcl="`app_optics`">`appOptics`</span>, <span pulumi-lang-nodejs="`bugSnag`" pulumi-lang-dotnet="`BugSnag`" pulumi-lang-go="`bugSnag`" pulumi-lang-python="`bug_snag`" pulumi-lang-yaml="`bugSnag`" pulumi-lang-java="`bugSnag`" pulumi-lang-hcl="`bug_snag`">`bugSnag`</span>, <span pulumi-lang-nodejs="`honeycomb`" pulumi-lang-dotnet="`Honeycomb`" pulumi-lang-go="`honeycomb`" pulumi-lang-python="`honeycomb`" pulumi-lang-yaml="`honeycomb`" pulumi-lang-java="`honeycomb`" pulumi-lang-hcl="`honeycomb`">`honeycomb`</span>, <span pulumi-lang-nodejs="`monteCarlo`" pulumi-lang-dotnet="`MonteCarlo`" pulumi-lang-go="`monteCarlo`" pulumi-lang-python="`monte_carlo`" pulumi-lang-yaml="`monteCarlo`" pulumi-lang-java="`monteCarlo`" pulumi-lang-hcl="`monte_carlo`">`monteCarlo`</span>, <span pulumi-lang-nodejs="`nagios`" pulumi-lang-dotnet="`Nagios`" pulumi-lang-go="`nagios`" pulumi-lang-python="`nagios`" pulumi-lang-yaml="`nagios`" pulumi-lang-java="`nagios`" pulumi-lang-hcl="`nagios`">`nagios`</span>, <span pulumi-lang-nodejs="`prtg`" pulumi-lang-dotnet="`Prtg`" pulumi-lang-go="`prtg`" pulumi-lang-python="`prtg`" pulumi-lang-yaml="`prtg`" pulumi-lang-java="`prtg`" pulumi-lang-hcl="`prtg`">`prtg`</span>.
+        :param pulumi.Input[Union['AlertsSourceSourceableAttributesArgs', 'AlertsSourceSourceableAttributesArgsDict']] sourceable_attributes: Provide additional attributes for<span pulumi-lang-nodejs=" genericWebhook " pulumi-lang-dotnet=" GenericWebhook " pulumi-lang-go=" genericWebhook " pulumi-lang-python=" generic_webhook " pulumi-lang-yaml=" genericWebhook " pulumi-lang-java=" genericWebhook " pulumi-lang-hcl=" generic_webhook "> genericWebhook </span>alerts source
+        :param pulumi.Input[_builtins.str] status: The status of the alert source. Value must be one of <span pulumi-lang-nodejs="`connected`" pulumi-lang-dotnet="`Connected`" pulumi-lang-go="`connected`" pulumi-lang-python="`connected`" pulumi-lang-yaml="`connected`" pulumi-lang-java="`connected`" pulumi-lang-hcl="`connected`">`connected`</span>, <span pulumi-lang-nodejs="`setupComplete`" pulumi-lang-dotnet="`SetupComplete`" pulumi-lang-go="`setupComplete`" pulumi-lang-python="`setup_complete`" pulumi-lang-yaml="`setupComplete`" pulumi-lang-java="`setupComplete`" pulumi-lang-hcl="`setup_complete`">`setupComplete`</span>, <span pulumi-lang-nodejs="`setupIncomplete`" pulumi-lang-dotnet="`SetupIncomplete`" pulumi-lang-go="`setupIncomplete`" pulumi-lang-python="`setup_incomplete`" pulumi-lang-yaml="`setupIncomplete`" pulumi-lang-java="`setupIncomplete`" pulumi-lang-hcl="`setup_incomplete`">`setupIncomplete`</span>.
         :param pulumi.Input[_builtins.str] webhook_endpoint: The webhook URL generated for non-email alert sources
         """
         ...
@@ -676,24 +676,24 @@ class AlertsSource(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 alert_source_fields_attributes: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertsSourceAlertSourceFieldsAttributeArgs', 'AlertsSourceAlertSourceFieldsAttributeArgsDict']]]]] = None,
-                 alert_source_urgency_rules_attributes: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertsSourceAlertSourceUrgencyRulesAttributeArgs', 'AlertsSourceAlertSourceUrgencyRulesAttributeArgsDict']]]]] = None,
-                 alert_template_attributes: Optional[pulumi.Input[Union['AlertsSourceAlertTemplateAttributesArgs', 'AlertsSourceAlertTemplateAttributesArgsDict']]] = None,
-                 alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 alerts_source_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 deduplicate_alerts_by_key: Optional[pulumi.Input[_builtins.bool]] = None,
-                 deduplication_key_kind: Optional[pulumi.Input[_builtins.str]] = None,
-                 deduplication_key_path: Optional[pulumi.Input[_builtins.str]] = None,
-                 deduplication_key_regexp: Optional[pulumi.Input[_builtins.str]] = None,
-                 email: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 owner_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 resolution_rule_attributes: Optional[pulumi.Input[Union['AlertsSourceResolutionRuleAttributesArgs', 'AlertsSourceResolutionRuleAttributesArgsDict']]] = None,
-                 secret: Optional[pulumi.Input[_builtins.str]] = None,
-                 source_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 sourceable_attributes: Optional[pulumi.Input[Union['AlertsSourceSourceableAttributesArgs', 'AlertsSourceSourceableAttributesArgsDict']]] = None,
-                 status: Optional[pulumi.Input[_builtins.str]] = None,
-                 webhook_endpoint: Optional[pulumi.Input[_builtins.str]] = None,
+                 alert_source_fields_attributes: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertsSourceAlertSourceFieldsAttributeArgs', 'AlertsSourceAlertSourceFieldsAttributeArgsDict']]]]] = None,
+                 alert_source_urgency_rules_attributes: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertsSourceAlertSourceUrgencyRulesAttributeArgs', 'AlertsSourceAlertSourceUrgencyRulesAttributeArgsDict']]]]] = None,
+                 alert_template_attributes: pulumi.Input[Optional[Union['AlertsSourceAlertTemplateAttributesArgs', 'AlertsSourceAlertTemplateAttributesArgsDict']]] = None,
+                 alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 alerts_source_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 deduplicate_alerts_by_key: pulumi.Input[Optional[_builtins.bool]] = None,
+                 deduplication_key_kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 deduplication_key_path: pulumi.Input[Optional[_builtins.str]] = None,
+                 deduplication_key_regexp: pulumi.Input[Optional[_builtins.str]] = None,
+                 email: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 owner_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 resolution_rule_attributes: pulumi.Input[Optional[Union['AlertsSourceResolutionRuleAttributesArgs', 'AlertsSourceResolutionRuleAttributesArgsDict']]] = None,
+                 secret: pulumi.Input[Optional[_builtins.str]] = None,
+                 source_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 sourceable_attributes: pulumi.Input[Optional[Union['AlertsSourceSourceableAttributesArgs', 'AlertsSourceSourceableAttributesArgsDict']]] = None,
+                 status: pulumi.Input[Optional[_builtins.str]] = None,
+                 webhook_endpoint: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -734,24 +734,24 @@ class AlertsSource(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            alert_source_fields_attributes: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertsSourceAlertSourceFieldsAttributeArgs', 'AlertsSourceAlertSourceFieldsAttributeArgsDict']]]]] = None,
-            alert_source_urgency_rules_attributes: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertsSourceAlertSourceUrgencyRulesAttributeArgs', 'AlertsSourceAlertSourceUrgencyRulesAttributeArgsDict']]]]] = None,
-            alert_template_attributes: Optional[pulumi.Input[Union['AlertsSourceAlertTemplateAttributesArgs', 'AlertsSourceAlertTemplateAttributesArgsDict']]] = None,
-            alert_urgency_id: Optional[pulumi.Input[_builtins.str]] = None,
-            alerts_source_id: Optional[pulumi.Input[_builtins.str]] = None,
-            deduplicate_alerts_by_key: Optional[pulumi.Input[_builtins.bool]] = None,
-            deduplication_key_kind: Optional[pulumi.Input[_builtins.str]] = None,
-            deduplication_key_path: Optional[pulumi.Input[_builtins.str]] = None,
-            deduplication_key_regexp: Optional[pulumi.Input[_builtins.str]] = None,
-            email: Optional[pulumi.Input[_builtins.str]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            owner_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            resolution_rule_attributes: Optional[pulumi.Input[Union['AlertsSourceResolutionRuleAttributesArgs', 'AlertsSourceResolutionRuleAttributesArgsDict']]] = None,
-            secret: Optional[pulumi.Input[_builtins.str]] = None,
-            source_type: Optional[pulumi.Input[_builtins.str]] = None,
-            sourceable_attributes: Optional[pulumi.Input[Union['AlertsSourceSourceableAttributesArgs', 'AlertsSourceSourceableAttributesArgsDict']]] = None,
-            status: Optional[pulumi.Input[_builtins.str]] = None,
-            webhook_endpoint: Optional[pulumi.Input[_builtins.str]] = None) -> 'AlertsSource':
+            alert_source_fields_attributes: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertsSourceAlertSourceFieldsAttributeArgs', 'AlertsSourceAlertSourceFieldsAttributeArgsDict']]]]] = None,
+            alert_source_urgency_rules_attributes: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertsSourceAlertSourceUrgencyRulesAttributeArgs', 'AlertsSourceAlertSourceUrgencyRulesAttributeArgsDict']]]]] = None,
+            alert_template_attributes: pulumi.Input[Optional[Union['AlertsSourceAlertTemplateAttributesArgs', 'AlertsSourceAlertTemplateAttributesArgsDict']]] = None,
+            alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+            alerts_source_id: pulumi.Input[Optional[_builtins.str]] = None,
+            deduplicate_alerts_by_key: pulumi.Input[Optional[_builtins.bool]] = None,
+            deduplication_key_kind: pulumi.Input[Optional[_builtins.str]] = None,
+            deduplication_key_path: pulumi.Input[Optional[_builtins.str]] = None,
+            deduplication_key_regexp: pulumi.Input[Optional[_builtins.str]] = None,
+            email: pulumi.Input[Optional[_builtins.str]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            owner_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            resolution_rule_attributes: pulumi.Input[Optional[Union['AlertsSourceResolutionRuleAttributesArgs', 'AlertsSourceResolutionRuleAttributesArgsDict']]] = None,
+            secret: pulumi.Input[Optional[_builtins.str]] = None,
+            source_type: pulumi.Input[Optional[_builtins.str]] = None,
+            sourceable_attributes: pulumi.Input[Optional[Union['AlertsSourceSourceableAttributesArgs', 'AlertsSourceSourceableAttributesArgsDict']]] = None,
+            status: pulumi.Input[Optional[_builtins.str]] = None,
+            webhook_endpoint: pulumi.Input[Optional[_builtins.str]] = None) -> 'AlertsSource':
         """
         Get an existing AlertsSource resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -761,10 +761,10 @@ class AlertsSource(pulumi.CustomResource):
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[Sequence[pulumi.Input[Union['AlertsSourceAlertSourceFieldsAttributeArgs', 'AlertsSourceAlertSourceFieldsAttributeArgsDict']]]] alert_source_fields_attributes: List of alert fields to be added to the alert source. Note: This attribute requires the alert field feature to be enabled on your account. Contact Rootly customer support if you need assistance with this feature.
         :param pulumi.Input[Sequence[pulumi.Input[Union['AlertsSourceAlertSourceUrgencyRulesAttributeArgs', 'AlertsSourceAlertSourceUrgencyRulesAttributeArgsDict']]]] alert_source_urgency_rules_attributes: List of rules that define the conditions under which the alert urgency will be set automatically based on the alert payload
-        :param pulumi.Input[Union['AlertsSourceAlertTemplateAttributesArgs', 'AlertsSourceAlertTemplateAttributesArgsDict']] alert_template_attributes: Note that when alert fields are enabled at the team level, alert template attributes cannot be provided. Use <span pulumi-lang-nodejs="`alertSourceFieldsAttributes`" pulumi-lang-dotnet="`AlertSourceFieldsAttributes`" pulumi-lang-go="`alertSourceFieldsAttributes`" pulumi-lang-python="`alert_source_fields_attributes`" pulumi-lang-yaml="`alertSourceFieldsAttributes`" pulumi-lang-java="`alertSourceFieldsAttributes`">`alert_source_fields_attributes`</span> instead.
+        :param pulumi.Input[Union['AlertsSourceAlertTemplateAttributesArgs', 'AlertsSourceAlertTemplateAttributesArgsDict']] alert_template_attributes: Note that when alert fields are enabled at the team level, alert template attributes cannot be provided. Use <span pulumi-lang-nodejs="`alertSourceFieldsAttributes`" pulumi-lang-dotnet="`AlertSourceFieldsAttributes`" pulumi-lang-go="`alertSourceFieldsAttributes`" pulumi-lang-python="`alert_source_fields_attributes`" pulumi-lang-yaml="`alertSourceFieldsAttributes`" pulumi-lang-java="`alertSourceFieldsAttributes`" pulumi-lang-hcl="`alert_source_fields_attributes`">`alertSourceFieldsAttributes`</span> instead.
         :param pulumi.Input[_builtins.str] alert_urgency_id: ID for the default alert urgency assigned to this alert source
-        :param pulumi.Input[_builtins.bool] deduplicate_alerts_by_key: Toggle alert deduplication using deduplication key. If enabled,<span pulumi-lang-nodejs=" deduplicationKeyKind " pulumi-lang-dotnet=" DeduplicationKeyKind " pulumi-lang-go=" deduplicationKeyKind " pulumi-lang-python=" deduplication_key_kind " pulumi-lang-yaml=" deduplicationKeyKind " pulumi-lang-java=" deduplicationKeyKind "> deduplication_key_kind </span>and<span pulumi-lang-nodejs=" deduplicationKeyPath " pulumi-lang-dotnet=" DeduplicationKeyPath " pulumi-lang-go=" deduplicationKeyPath " pulumi-lang-python=" deduplication_key_path " pulumi-lang-yaml=" deduplicationKeyPath " pulumi-lang-java=" deduplicationKeyPath "> deduplication_key_path </span>are required.. Value must be one of true or false
-        :param pulumi.Input[_builtins.str] deduplication_key_kind: Kind of deduplication key.. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>.
+        :param pulumi.Input[_builtins.bool] deduplicate_alerts_by_key: Toggle alert deduplication using deduplication key. If enabled,<span pulumi-lang-nodejs=" deduplicationKeyKind " pulumi-lang-dotnet=" DeduplicationKeyKind " pulumi-lang-go=" deduplicationKeyKind " pulumi-lang-python=" deduplication_key_kind " pulumi-lang-yaml=" deduplicationKeyKind " pulumi-lang-java=" deduplicationKeyKind " pulumi-lang-hcl=" deduplication_key_kind "> deduplicationKeyKind </span>and<span pulumi-lang-nodejs=" deduplicationKeyPath " pulumi-lang-dotnet=" DeduplicationKeyPath " pulumi-lang-go=" deduplicationKeyPath " pulumi-lang-python=" deduplication_key_path " pulumi-lang-yaml=" deduplicationKeyPath " pulumi-lang-java=" deduplicationKeyPath " pulumi-lang-hcl=" deduplication_key_path "> deduplicationKeyPath </span>are required.. Value must be one of true or false
+        :param pulumi.Input[_builtins.str] deduplication_key_kind: Kind of deduplication key.. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>.
         :param pulumi.Input[_builtins.str] deduplication_key_path: Path to deduplication key. This is a JSON Path to extract the deduplication key from the request body.
         :param pulumi.Input[_builtins.str] deduplication_key_regexp: Regular expression to extract key from value found at key path.
         :param pulumi.Input[_builtins.str] email: The email generated for email alert sources
@@ -772,9 +772,9 @@ class AlertsSource(pulumi.CustomResource):
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] owner_group_ids: List of team IDs that will own the alert source
         :param pulumi.Input[Union['AlertsSourceResolutionRuleAttributesArgs', 'AlertsSourceResolutionRuleAttributesArgsDict']] resolution_rule_attributes: Provide additional attributes for email alerts source
         :param pulumi.Input[_builtins.str] secret: The secret used to authenticate non-email alert sources
-        :param pulumi.Input[_builtins.str] source_type: The alert source type. Value must be one of <span pulumi-lang-nodejs="`email`" pulumi-lang-dotnet="`Email`" pulumi-lang-go="`email`" pulumi-lang-python="`email`" pulumi-lang-yaml="`email`" pulumi-lang-java="`email`">`email`</span>, <span pulumi-lang-nodejs="`appDynamics`" pulumi-lang-dotnet="`AppDynamics`" pulumi-lang-go="`appDynamics`" pulumi-lang-python="`app_dynamics`" pulumi-lang-yaml="`appDynamics`" pulumi-lang-java="`appDynamics`">`app_dynamics`</span>, <span pulumi-lang-nodejs="`catchpoint`" pulumi-lang-dotnet="`Catchpoint`" pulumi-lang-go="`catchpoint`" pulumi-lang-python="`catchpoint`" pulumi-lang-yaml="`catchpoint`" pulumi-lang-java="`catchpoint`">`catchpoint`</span>, <span pulumi-lang-nodejs="`datadog`" pulumi-lang-dotnet="`Datadog`" pulumi-lang-go="`datadog`" pulumi-lang-python="`datadog`" pulumi-lang-yaml="`datadog`" pulumi-lang-java="`datadog`">`datadog`</span>, <span pulumi-lang-nodejs="`alertmanager`" pulumi-lang-dotnet="`Alertmanager`" pulumi-lang-go="`alertmanager`" pulumi-lang-python="`alertmanager`" pulumi-lang-yaml="`alertmanager`" pulumi-lang-java="`alertmanager`">`alertmanager`</span>, <span pulumi-lang-nodejs="`googleCloud`" pulumi-lang-dotnet="`GoogleCloud`" pulumi-lang-go="`googleCloud`" pulumi-lang-python="`google_cloud`" pulumi-lang-yaml="`googleCloud`" pulumi-lang-java="`googleCloud`">`google_cloud`</span>, <span pulumi-lang-nodejs="`grafana`" pulumi-lang-dotnet="`Grafana`" pulumi-lang-go="`grafana`" pulumi-lang-python="`grafana`" pulumi-lang-yaml="`grafana`" pulumi-lang-java="`grafana`">`grafana`</span>, <span pulumi-lang-nodejs="`sentry`" pulumi-lang-dotnet="`Sentry`" pulumi-lang-go="`sentry`" pulumi-lang-python="`sentry`" pulumi-lang-yaml="`sentry`" pulumi-lang-java="`sentry`">`sentry`</span>, <span pulumi-lang-nodejs="`genericWebhook`" pulumi-lang-dotnet="`GenericWebhook`" pulumi-lang-go="`genericWebhook`" pulumi-lang-python="`generic_webhook`" pulumi-lang-yaml="`genericWebhook`" pulumi-lang-java="`genericWebhook`">`generic_webhook`</span>, <span pulumi-lang-nodejs="`cloudWatch`" pulumi-lang-dotnet="`CloudWatch`" pulumi-lang-go="`cloudWatch`" pulumi-lang-python="`cloud_watch`" pulumi-lang-yaml="`cloudWatch`" pulumi-lang-java="`cloudWatch`">`cloud_watch`</span>, <span pulumi-lang-nodejs="`checkly`" pulumi-lang-dotnet="`Checkly`" pulumi-lang-go="`checkly`" pulumi-lang-python="`checkly`" pulumi-lang-yaml="`checkly`" pulumi-lang-java="`checkly`">`checkly`</span>, <span pulumi-lang-nodejs="`azure`" pulumi-lang-dotnet="`Azure`" pulumi-lang-go="`azure`" pulumi-lang-python="`azure`" pulumi-lang-yaml="`azure`" pulumi-lang-java="`azure`">`azure`</span>, <span pulumi-lang-nodejs="`newRelic`" pulumi-lang-dotnet="`NewRelic`" pulumi-lang-go="`newRelic`" pulumi-lang-python="`new_relic`" pulumi-lang-yaml="`newRelic`" pulumi-lang-java="`newRelic`">`new_relic`</span>, <span pulumi-lang-nodejs="`splunk`" pulumi-lang-dotnet="`Splunk`" pulumi-lang-go="`splunk`" pulumi-lang-python="`splunk`" pulumi-lang-yaml="`splunk`" pulumi-lang-java="`splunk`">`splunk`</span>, <span pulumi-lang-nodejs="`chronosphere`" pulumi-lang-dotnet="`Chronosphere`" pulumi-lang-go="`chronosphere`" pulumi-lang-python="`chronosphere`" pulumi-lang-yaml="`chronosphere`" pulumi-lang-java="`chronosphere`">`chronosphere`</span>, <span pulumi-lang-nodejs="`appOptics`" pulumi-lang-dotnet="`AppOptics`" pulumi-lang-go="`appOptics`" pulumi-lang-python="`app_optics`" pulumi-lang-yaml="`appOptics`" pulumi-lang-java="`appOptics`">`app_optics`</span>, <span pulumi-lang-nodejs="`bugSnag`" pulumi-lang-dotnet="`BugSnag`" pulumi-lang-go="`bugSnag`" pulumi-lang-python="`bug_snag`" pulumi-lang-yaml="`bugSnag`" pulumi-lang-java="`bugSnag`">`bug_snag`</span>, <span pulumi-lang-nodejs="`honeycomb`" pulumi-lang-dotnet="`Honeycomb`" pulumi-lang-go="`honeycomb`" pulumi-lang-python="`honeycomb`" pulumi-lang-yaml="`honeycomb`" pulumi-lang-java="`honeycomb`">`honeycomb`</span>, <span pulumi-lang-nodejs="`monteCarlo`" pulumi-lang-dotnet="`MonteCarlo`" pulumi-lang-go="`monteCarlo`" pulumi-lang-python="`monte_carlo`" pulumi-lang-yaml="`monteCarlo`" pulumi-lang-java="`monteCarlo`">`monte_carlo`</span>, <span pulumi-lang-nodejs="`nagios`" pulumi-lang-dotnet="`Nagios`" pulumi-lang-go="`nagios`" pulumi-lang-python="`nagios`" pulumi-lang-yaml="`nagios`" pulumi-lang-java="`nagios`">`nagios`</span>, <span pulumi-lang-nodejs="`prtg`" pulumi-lang-dotnet="`Prtg`" pulumi-lang-go="`prtg`" pulumi-lang-python="`prtg`" pulumi-lang-yaml="`prtg`" pulumi-lang-java="`prtg`">`prtg`</span>.
-        :param pulumi.Input[Union['AlertsSourceSourceableAttributesArgs', 'AlertsSourceSourceableAttributesArgsDict']] sourceable_attributes: Provide additional attributes for<span pulumi-lang-nodejs=" genericWebhook " pulumi-lang-dotnet=" GenericWebhook " pulumi-lang-go=" genericWebhook " pulumi-lang-python=" generic_webhook " pulumi-lang-yaml=" genericWebhook " pulumi-lang-java=" genericWebhook "> generic_webhook </span>alerts source
-        :param pulumi.Input[_builtins.str] status: The status of the alert source. Value must be one of <span pulumi-lang-nodejs="`connected`" pulumi-lang-dotnet="`Connected`" pulumi-lang-go="`connected`" pulumi-lang-python="`connected`" pulumi-lang-yaml="`connected`" pulumi-lang-java="`connected`">`connected`</span>, <span pulumi-lang-nodejs="`setupComplete`" pulumi-lang-dotnet="`SetupComplete`" pulumi-lang-go="`setupComplete`" pulumi-lang-python="`setup_complete`" pulumi-lang-yaml="`setupComplete`" pulumi-lang-java="`setupComplete`">`setup_complete`</span>, <span pulumi-lang-nodejs="`setupIncomplete`" pulumi-lang-dotnet="`SetupIncomplete`" pulumi-lang-go="`setupIncomplete`" pulumi-lang-python="`setup_incomplete`" pulumi-lang-yaml="`setupIncomplete`" pulumi-lang-java="`setupIncomplete`">`setup_incomplete`</span>.
+        :param pulumi.Input[_builtins.str] source_type: The alert source type. Value must be one of <span pulumi-lang-nodejs="`email`" pulumi-lang-dotnet="`Email`" pulumi-lang-go="`email`" pulumi-lang-python="`email`" pulumi-lang-yaml="`email`" pulumi-lang-java="`email`" pulumi-lang-hcl="`email`">`email`</span>, <span pulumi-lang-nodejs="`appDynamics`" pulumi-lang-dotnet="`AppDynamics`" pulumi-lang-go="`appDynamics`" pulumi-lang-python="`app_dynamics`" pulumi-lang-yaml="`appDynamics`" pulumi-lang-java="`appDynamics`" pulumi-lang-hcl="`app_dynamics`">`appDynamics`</span>, <span pulumi-lang-nodejs="`catchpoint`" pulumi-lang-dotnet="`Catchpoint`" pulumi-lang-go="`catchpoint`" pulumi-lang-python="`catchpoint`" pulumi-lang-yaml="`catchpoint`" pulumi-lang-java="`catchpoint`" pulumi-lang-hcl="`catchpoint`">`catchpoint`</span>, <span pulumi-lang-nodejs="`datadog`" pulumi-lang-dotnet="`Datadog`" pulumi-lang-go="`datadog`" pulumi-lang-python="`datadog`" pulumi-lang-yaml="`datadog`" pulumi-lang-java="`datadog`" pulumi-lang-hcl="`datadog`">`datadog`</span>, <span pulumi-lang-nodejs="`dynatrace`" pulumi-lang-dotnet="`Dynatrace`" pulumi-lang-go="`dynatrace`" pulumi-lang-python="`dynatrace`" pulumi-lang-yaml="`dynatrace`" pulumi-lang-java="`dynatrace`" pulumi-lang-hcl="`dynatrace`">`dynatrace`</span>, <span pulumi-lang-nodejs="`alertmanager`" pulumi-lang-dotnet="`Alertmanager`" pulumi-lang-go="`alertmanager`" pulumi-lang-python="`alertmanager`" pulumi-lang-yaml="`alertmanager`" pulumi-lang-java="`alertmanager`" pulumi-lang-hcl="`alertmanager`">`alertmanager`</span>, <span pulumi-lang-nodejs="`googleCloud`" pulumi-lang-dotnet="`GoogleCloud`" pulumi-lang-go="`googleCloud`" pulumi-lang-python="`google_cloud`" pulumi-lang-yaml="`googleCloud`" pulumi-lang-java="`googleCloud`" pulumi-lang-hcl="`google_cloud`">`googleCloud`</span>, <span pulumi-lang-nodejs="`grafana`" pulumi-lang-dotnet="`Grafana`" pulumi-lang-go="`grafana`" pulumi-lang-python="`grafana`" pulumi-lang-yaml="`grafana`" pulumi-lang-java="`grafana`" pulumi-lang-hcl="`grafana`">`grafana`</span>, <span pulumi-lang-nodejs="`sentry`" pulumi-lang-dotnet="`Sentry`" pulumi-lang-go="`sentry`" pulumi-lang-python="`sentry`" pulumi-lang-yaml="`sentry`" pulumi-lang-java="`sentry`" pulumi-lang-hcl="`sentry`">`sentry`</span>, <span pulumi-lang-nodejs="`genericWebhook`" pulumi-lang-dotnet="`GenericWebhook`" pulumi-lang-go="`genericWebhook`" pulumi-lang-python="`generic_webhook`" pulumi-lang-yaml="`genericWebhook`" pulumi-lang-java="`genericWebhook`" pulumi-lang-hcl="`generic_webhook`">`genericWebhook`</span>, <span pulumi-lang-nodejs="`cloudWatch`" pulumi-lang-dotnet="`CloudWatch`" pulumi-lang-go="`cloudWatch`" pulumi-lang-python="`cloud_watch`" pulumi-lang-yaml="`cloudWatch`" pulumi-lang-java="`cloudWatch`" pulumi-lang-hcl="`cloud_watch`">`cloudWatch`</span>, <span pulumi-lang-nodejs="`awsSns`" pulumi-lang-dotnet="`AwsSns`" pulumi-lang-go="`awsSns`" pulumi-lang-python="`aws_sns`" pulumi-lang-yaml="`awsSns`" pulumi-lang-java="`awsSns`" pulumi-lang-hcl="`aws_sns`">`awsSns`</span>, <span pulumi-lang-nodejs="`checkly`" pulumi-lang-dotnet="`Checkly`" pulumi-lang-go="`checkly`" pulumi-lang-python="`checkly`" pulumi-lang-yaml="`checkly`" pulumi-lang-java="`checkly`" pulumi-lang-hcl="`checkly`">`checkly`</span>, <span pulumi-lang-nodejs="`azure`" pulumi-lang-dotnet="`Azure`" pulumi-lang-go="`azure`" pulumi-lang-python="`azure`" pulumi-lang-yaml="`azure`" pulumi-lang-java="`azure`" pulumi-lang-hcl="`azure`">`azure`</span>, <span pulumi-lang-nodejs="`newRelic`" pulumi-lang-dotnet="`NewRelic`" pulumi-lang-go="`newRelic`" pulumi-lang-python="`new_relic`" pulumi-lang-yaml="`newRelic`" pulumi-lang-java="`newRelic`" pulumi-lang-hcl="`new_relic`">`newRelic`</span>, <span pulumi-lang-nodejs="`splunk`" pulumi-lang-dotnet="`Splunk`" pulumi-lang-go="`splunk`" pulumi-lang-python="`splunk`" pulumi-lang-yaml="`splunk`" pulumi-lang-java="`splunk`" pulumi-lang-hcl="`splunk`">`splunk`</span>, <span pulumi-lang-nodejs="`chronosphere`" pulumi-lang-dotnet="`Chronosphere`" pulumi-lang-go="`chronosphere`" pulumi-lang-python="`chronosphere`" pulumi-lang-yaml="`chronosphere`" pulumi-lang-java="`chronosphere`" pulumi-lang-hcl="`chronosphere`">`chronosphere`</span>, <span pulumi-lang-nodejs="`appOptics`" pulumi-lang-dotnet="`AppOptics`" pulumi-lang-go="`appOptics`" pulumi-lang-python="`app_optics`" pulumi-lang-yaml="`appOptics`" pulumi-lang-java="`appOptics`" pulumi-lang-hcl="`app_optics`">`appOptics`</span>, <span pulumi-lang-nodejs="`bugSnag`" pulumi-lang-dotnet="`BugSnag`" pulumi-lang-go="`bugSnag`" pulumi-lang-python="`bug_snag`" pulumi-lang-yaml="`bugSnag`" pulumi-lang-java="`bugSnag`" pulumi-lang-hcl="`bug_snag`">`bugSnag`</span>, <span pulumi-lang-nodejs="`honeycomb`" pulumi-lang-dotnet="`Honeycomb`" pulumi-lang-go="`honeycomb`" pulumi-lang-python="`honeycomb`" pulumi-lang-yaml="`honeycomb`" pulumi-lang-java="`honeycomb`" pulumi-lang-hcl="`honeycomb`">`honeycomb`</span>, <span pulumi-lang-nodejs="`monteCarlo`" pulumi-lang-dotnet="`MonteCarlo`" pulumi-lang-go="`monteCarlo`" pulumi-lang-python="`monte_carlo`" pulumi-lang-yaml="`monteCarlo`" pulumi-lang-java="`monteCarlo`" pulumi-lang-hcl="`monte_carlo`">`monteCarlo`</span>, <span pulumi-lang-nodejs="`nagios`" pulumi-lang-dotnet="`Nagios`" pulumi-lang-go="`nagios`" pulumi-lang-python="`nagios`" pulumi-lang-yaml="`nagios`" pulumi-lang-java="`nagios`" pulumi-lang-hcl="`nagios`">`nagios`</span>, <span pulumi-lang-nodejs="`prtg`" pulumi-lang-dotnet="`Prtg`" pulumi-lang-go="`prtg`" pulumi-lang-python="`prtg`" pulumi-lang-yaml="`prtg`" pulumi-lang-java="`prtg`" pulumi-lang-hcl="`prtg`">`prtg`</span>.
+        :param pulumi.Input[Union['AlertsSourceSourceableAttributesArgs', 'AlertsSourceSourceableAttributesArgsDict']] sourceable_attributes: Provide additional attributes for<span pulumi-lang-nodejs=" genericWebhook " pulumi-lang-dotnet=" GenericWebhook " pulumi-lang-go=" genericWebhook " pulumi-lang-python=" generic_webhook " pulumi-lang-yaml=" genericWebhook " pulumi-lang-java=" genericWebhook " pulumi-lang-hcl=" generic_webhook "> genericWebhook </span>alerts source
+        :param pulumi.Input[_builtins.str] status: The status of the alert source. Value must be one of <span pulumi-lang-nodejs="`connected`" pulumi-lang-dotnet="`Connected`" pulumi-lang-go="`connected`" pulumi-lang-python="`connected`" pulumi-lang-yaml="`connected`" pulumi-lang-java="`connected`" pulumi-lang-hcl="`connected`">`connected`</span>, <span pulumi-lang-nodejs="`setupComplete`" pulumi-lang-dotnet="`SetupComplete`" pulumi-lang-go="`setupComplete`" pulumi-lang-python="`setup_complete`" pulumi-lang-yaml="`setupComplete`" pulumi-lang-java="`setupComplete`" pulumi-lang-hcl="`setup_complete`">`setupComplete`</span>, <span pulumi-lang-nodejs="`setupIncomplete`" pulumi-lang-dotnet="`SetupIncomplete`" pulumi-lang-go="`setupIncomplete`" pulumi-lang-python="`setup_incomplete`" pulumi-lang-yaml="`setupIncomplete`" pulumi-lang-java="`setupIncomplete`" pulumi-lang-hcl="`setup_incomplete`">`setupIncomplete`</span>.
         :param pulumi.Input[_builtins.str] webhook_endpoint: The webhook URL generated for non-email alert sources
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
@@ -821,7 +821,7 @@ class AlertsSource(pulumi.CustomResource):
     @pulumi.getter(name="alertTemplateAttributes")
     def alert_template_attributes(self) -> pulumi.Output[Optional['outputs.AlertsSourceAlertTemplateAttributes']]:
         """
-        Note that when alert fields are enabled at the team level, alert template attributes cannot be provided. Use <span pulumi-lang-nodejs="`alertSourceFieldsAttributes`" pulumi-lang-dotnet="`AlertSourceFieldsAttributes`" pulumi-lang-go="`alertSourceFieldsAttributes`" pulumi-lang-python="`alert_source_fields_attributes`" pulumi-lang-yaml="`alertSourceFieldsAttributes`" pulumi-lang-java="`alertSourceFieldsAttributes`">`alert_source_fields_attributes`</span> instead.
+        Note that when alert fields are enabled at the team level, alert template attributes cannot be provided. Use <span pulumi-lang-nodejs="`alertSourceFieldsAttributes`" pulumi-lang-dotnet="`AlertSourceFieldsAttributes`" pulumi-lang-go="`alertSourceFieldsAttributes`" pulumi-lang-python="`alert_source_fields_attributes`" pulumi-lang-yaml="`alertSourceFieldsAttributes`" pulumi-lang-java="`alertSourceFieldsAttributes`" pulumi-lang-hcl="`alert_source_fields_attributes`">`alertSourceFieldsAttributes`</span> instead.
         """
         return pulumi.get(self, "alert_template_attributes")
 
@@ -842,7 +842,7 @@ class AlertsSource(pulumi.CustomResource):
     @pulumi.getter(name="deduplicateAlertsByKey")
     def deduplicate_alerts_by_key(self) -> pulumi.Output[_builtins.bool]:
         """
-        Toggle alert deduplication using deduplication key. If enabled,<span pulumi-lang-nodejs=" deduplicationKeyKind " pulumi-lang-dotnet=" DeduplicationKeyKind " pulumi-lang-go=" deduplicationKeyKind " pulumi-lang-python=" deduplication_key_kind " pulumi-lang-yaml=" deduplicationKeyKind " pulumi-lang-java=" deduplicationKeyKind "> deduplication_key_kind </span>and<span pulumi-lang-nodejs=" deduplicationKeyPath " pulumi-lang-dotnet=" DeduplicationKeyPath " pulumi-lang-go=" deduplicationKeyPath " pulumi-lang-python=" deduplication_key_path " pulumi-lang-yaml=" deduplicationKeyPath " pulumi-lang-java=" deduplicationKeyPath "> deduplication_key_path </span>are required.. Value must be one of true or false
+        Toggle alert deduplication using deduplication key. If enabled,<span pulumi-lang-nodejs=" deduplicationKeyKind " pulumi-lang-dotnet=" DeduplicationKeyKind " pulumi-lang-go=" deduplicationKeyKind " pulumi-lang-python=" deduplication_key_kind " pulumi-lang-yaml=" deduplicationKeyKind " pulumi-lang-java=" deduplicationKeyKind " pulumi-lang-hcl=" deduplication_key_kind "> deduplicationKeyKind </span>and<span pulumi-lang-nodejs=" deduplicationKeyPath " pulumi-lang-dotnet=" DeduplicationKeyPath " pulumi-lang-go=" deduplicationKeyPath " pulumi-lang-python=" deduplication_key_path " pulumi-lang-yaml=" deduplicationKeyPath " pulumi-lang-java=" deduplicationKeyPath " pulumi-lang-hcl=" deduplication_key_path "> deduplicationKeyPath </span>are required.. Value must be one of true or false
         """
         return pulumi.get(self, "deduplicate_alerts_by_key")
 
@@ -850,7 +850,7 @@ class AlertsSource(pulumi.CustomResource):
     @pulumi.getter(name="deduplicationKeyKind")
     def deduplication_key_kind(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Kind of deduplication key.. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`">`payload`</span>.
+        Kind of deduplication key.. Value must be one of <span pulumi-lang-nodejs="`payload`" pulumi-lang-dotnet="`Payload`" pulumi-lang-go="`payload`" pulumi-lang-python="`payload`" pulumi-lang-yaml="`payload`" pulumi-lang-java="`payload`" pulumi-lang-hcl="`payload`">`payload`</span>.
         """
         return pulumi.get(self, "deduplication_key_kind")
 
@@ -914,7 +914,7 @@ class AlertsSource(pulumi.CustomResource):
     @pulumi.getter(name="sourceType")
     def source_type(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        The alert source type. Value must be one of <span pulumi-lang-nodejs="`email`" pulumi-lang-dotnet="`Email`" pulumi-lang-go="`email`" pulumi-lang-python="`email`" pulumi-lang-yaml="`email`" pulumi-lang-java="`email`">`email`</span>, <span pulumi-lang-nodejs="`appDynamics`" pulumi-lang-dotnet="`AppDynamics`" pulumi-lang-go="`appDynamics`" pulumi-lang-python="`app_dynamics`" pulumi-lang-yaml="`appDynamics`" pulumi-lang-java="`appDynamics`">`app_dynamics`</span>, <span pulumi-lang-nodejs="`catchpoint`" pulumi-lang-dotnet="`Catchpoint`" pulumi-lang-go="`catchpoint`" pulumi-lang-python="`catchpoint`" pulumi-lang-yaml="`catchpoint`" pulumi-lang-java="`catchpoint`">`catchpoint`</span>, <span pulumi-lang-nodejs="`datadog`" pulumi-lang-dotnet="`Datadog`" pulumi-lang-go="`datadog`" pulumi-lang-python="`datadog`" pulumi-lang-yaml="`datadog`" pulumi-lang-java="`datadog`">`datadog`</span>, <span pulumi-lang-nodejs="`alertmanager`" pulumi-lang-dotnet="`Alertmanager`" pulumi-lang-go="`alertmanager`" pulumi-lang-python="`alertmanager`" pulumi-lang-yaml="`alertmanager`" pulumi-lang-java="`alertmanager`">`alertmanager`</span>, <span pulumi-lang-nodejs="`googleCloud`" pulumi-lang-dotnet="`GoogleCloud`" pulumi-lang-go="`googleCloud`" pulumi-lang-python="`google_cloud`" pulumi-lang-yaml="`googleCloud`" pulumi-lang-java="`googleCloud`">`google_cloud`</span>, <span pulumi-lang-nodejs="`grafana`" pulumi-lang-dotnet="`Grafana`" pulumi-lang-go="`grafana`" pulumi-lang-python="`grafana`" pulumi-lang-yaml="`grafana`" pulumi-lang-java="`grafana`">`grafana`</span>, <span pulumi-lang-nodejs="`sentry`" pulumi-lang-dotnet="`Sentry`" pulumi-lang-go="`sentry`" pulumi-lang-python="`sentry`" pulumi-lang-yaml="`sentry`" pulumi-lang-java="`sentry`">`sentry`</span>, <span pulumi-lang-nodejs="`genericWebhook`" pulumi-lang-dotnet="`GenericWebhook`" pulumi-lang-go="`genericWebhook`" pulumi-lang-python="`generic_webhook`" pulumi-lang-yaml="`genericWebhook`" pulumi-lang-java="`genericWebhook`">`generic_webhook`</span>, <span pulumi-lang-nodejs="`cloudWatch`" pulumi-lang-dotnet="`CloudWatch`" pulumi-lang-go="`cloudWatch`" pulumi-lang-python="`cloud_watch`" pulumi-lang-yaml="`cloudWatch`" pulumi-lang-java="`cloudWatch`">`cloud_watch`</span>, <span pulumi-lang-nodejs="`checkly`" pulumi-lang-dotnet="`Checkly`" pulumi-lang-go="`checkly`" pulumi-lang-python="`checkly`" pulumi-lang-yaml="`checkly`" pulumi-lang-java="`checkly`">`checkly`</span>, <span pulumi-lang-nodejs="`azure`" pulumi-lang-dotnet="`Azure`" pulumi-lang-go="`azure`" pulumi-lang-python="`azure`" pulumi-lang-yaml="`azure`" pulumi-lang-java="`azure`">`azure`</span>, <span pulumi-lang-nodejs="`newRelic`" pulumi-lang-dotnet="`NewRelic`" pulumi-lang-go="`newRelic`" pulumi-lang-python="`new_relic`" pulumi-lang-yaml="`newRelic`" pulumi-lang-java="`newRelic`">`new_relic`</span>, <span pulumi-lang-nodejs="`splunk`" pulumi-lang-dotnet="`Splunk`" pulumi-lang-go="`splunk`" pulumi-lang-python="`splunk`" pulumi-lang-yaml="`splunk`" pulumi-lang-java="`splunk`">`splunk`</span>, <span pulumi-lang-nodejs="`chronosphere`" pulumi-lang-dotnet="`Chronosphere`" pulumi-lang-go="`chronosphere`" pulumi-lang-python="`chronosphere`" pulumi-lang-yaml="`chronosphere`" pulumi-lang-java="`chronosphere`">`chronosphere`</span>, <span pulumi-lang-nodejs="`appOptics`" pulumi-lang-dotnet="`AppOptics`" pulumi-lang-go="`appOptics`" pulumi-lang-python="`app_optics`" pulumi-lang-yaml="`appOptics`" pulumi-lang-java="`appOptics`">`app_optics`</span>, <span pulumi-lang-nodejs="`bugSnag`" pulumi-lang-dotnet="`BugSnag`" pulumi-lang-go="`bugSnag`" pulumi-lang-python="`bug_snag`" pulumi-lang-yaml="`bugSnag`" pulumi-lang-java="`bugSnag`">`bug_snag`</span>, <span pulumi-lang-nodejs="`honeycomb`" pulumi-lang-dotnet="`Honeycomb`" pulumi-lang-go="`honeycomb`" pulumi-lang-python="`honeycomb`" pulumi-lang-yaml="`honeycomb`" pulumi-lang-java="`honeycomb`">`honeycomb`</span>, <span pulumi-lang-nodejs="`monteCarlo`" pulumi-lang-dotnet="`MonteCarlo`" pulumi-lang-go="`monteCarlo`" pulumi-lang-python="`monte_carlo`" pulumi-lang-yaml="`monteCarlo`" pulumi-lang-java="`monteCarlo`">`monte_carlo`</span>, <span pulumi-lang-nodejs="`nagios`" pulumi-lang-dotnet="`Nagios`" pulumi-lang-go="`nagios`" pulumi-lang-python="`nagios`" pulumi-lang-yaml="`nagios`" pulumi-lang-java="`nagios`">`nagios`</span>, <span pulumi-lang-nodejs="`prtg`" pulumi-lang-dotnet="`Prtg`" pulumi-lang-go="`prtg`" pulumi-lang-python="`prtg`" pulumi-lang-yaml="`prtg`" pulumi-lang-java="`prtg`">`prtg`</span>.
+        The alert source type. Value must be one of <span pulumi-lang-nodejs="`email`" pulumi-lang-dotnet="`Email`" pulumi-lang-go="`email`" pulumi-lang-python="`email`" pulumi-lang-yaml="`email`" pulumi-lang-java="`email`" pulumi-lang-hcl="`email`">`email`</span>, <span pulumi-lang-nodejs="`appDynamics`" pulumi-lang-dotnet="`AppDynamics`" pulumi-lang-go="`appDynamics`" pulumi-lang-python="`app_dynamics`" pulumi-lang-yaml="`appDynamics`" pulumi-lang-java="`appDynamics`" pulumi-lang-hcl="`app_dynamics`">`appDynamics`</span>, <span pulumi-lang-nodejs="`catchpoint`" pulumi-lang-dotnet="`Catchpoint`" pulumi-lang-go="`catchpoint`" pulumi-lang-python="`catchpoint`" pulumi-lang-yaml="`catchpoint`" pulumi-lang-java="`catchpoint`" pulumi-lang-hcl="`catchpoint`">`catchpoint`</span>, <span pulumi-lang-nodejs="`datadog`" pulumi-lang-dotnet="`Datadog`" pulumi-lang-go="`datadog`" pulumi-lang-python="`datadog`" pulumi-lang-yaml="`datadog`" pulumi-lang-java="`datadog`" pulumi-lang-hcl="`datadog`">`datadog`</span>, <span pulumi-lang-nodejs="`dynatrace`" pulumi-lang-dotnet="`Dynatrace`" pulumi-lang-go="`dynatrace`" pulumi-lang-python="`dynatrace`" pulumi-lang-yaml="`dynatrace`" pulumi-lang-java="`dynatrace`" pulumi-lang-hcl="`dynatrace`">`dynatrace`</span>, <span pulumi-lang-nodejs="`alertmanager`" pulumi-lang-dotnet="`Alertmanager`" pulumi-lang-go="`alertmanager`" pulumi-lang-python="`alertmanager`" pulumi-lang-yaml="`alertmanager`" pulumi-lang-java="`alertmanager`" pulumi-lang-hcl="`alertmanager`">`alertmanager`</span>, <span pulumi-lang-nodejs="`googleCloud`" pulumi-lang-dotnet="`GoogleCloud`" pulumi-lang-go="`googleCloud`" pulumi-lang-python="`google_cloud`" pulumi-lang-yaml="`googleCloud`" pulumi-lang-java="`googleCloud`" pulumi-lang-hcl="`google_cloud`">`googleCloud`</span>, <span pulumi-lang-nodejs="`grafana`" pulumi-lang-dotnet="`Grafana`" pulumi-lang-go="`grafana`" pulumi-lang-python="`grafana`" pulumi-lang-yaml="`grafana`" pulumi-lang-java="`grafana`" pulumi-lang-hcl="`grafana`">`grafana`</span>, <span pulumi-lang-nodejs="`sentry`" pulumi-lang-dotnet="`Sentry`" pulumi-lang-go="`sentry`" pulumi-lang-python="`sentry`" pulumi-lang-yaml="`sentry`" pulumi-lang-java="`sentry`" pulumi-lang-hcl="`sentry`">`sentry`</span>, <span pulumi-lang-nodejs="`genericWebhook`" pulumi-lang-dotnet="`GenericWebhook`" pulumi-lang-go="`genericWebhook`" pulumi-lang-python="`generic_webhook`" pulumi-lang-yaml="`genericWebhook`" pulumi-lang-java="`genericWebhook`" pulumi-lang-hcl="`generic_webhook`">`genericWebhook`</span>, <span pulumi-lang-nodejs="`cloudWatch`" pulumi-lang-dotnet="`CloudWatch`" pulumi-lang-go="`cloudWatch`" pulumi-lang-python="`cloud_watch`" pulumi-lang-yaml="`cloudWatch`" pulumi-lang-java="`cloudWatch`" pulumi-lang-hcl="`cloud_watch`">`cloudWatch`</span>, <span pulumi-lang-nodejs="`awsSns`" pulumi-lang-dotnet="`AwsSns`" pulumi-lang-go="`awsSns`" pulumi-lang-python="`aws_sns`" pulumi-lang-yaml="`awsSns`" pulumi-lang-java="`awsSns`" pulumi-lang-hcl="`aws_sns`">`awsSns`</span>, <span pulumi-lang-nodejs="`checkly`" pulumi-lang-dotnet="`Checkly`" pulumi-lang-go="`checkly`" pulumi-lang-python="`checkly`" pulumi-lang-yaml="`checkly`" pulumi-lang-java="`checkly`" pulumi-lang-hcl="`checkly`">`checkly`</span>, <span pulumi-lang-nodejs="`azure`" pulumi-lang-dotnet="`Azure`" pulumi-lang-go="`azure`" pulumi-lang-python="`azure`" pulumi-lang-yaml="`azure`" pulumi-lang-java="`azure`" pulumi-lang-hcl="`azure`">`azure`</span>, <span pulumi-lang-nodejs="`newRelic`" pulumi-lang-dotnet="`NewRelic`" pulumi-lang-go="`newRelic`" pulumi-lang-python="`new_relic`" pulumi-lang-yaml="`newRelic`" pulumi-lang-java="`newRelic`" pulumi-lang-hcl="`new_relic`">`newRelic`</span>, <span pulumi-lang-nodejs="`splunk`" pulumi-lang-dotnet="`Splunk`" pulumi-lang-go="`splunk`" pulumi-lang-python="`splunk`" pulumi-lang-yaml="`splunk`" pulumi-lang-java="`splunk`" pulumi-lang-hcl="`splunk`">`splunk`</span>, <span pulumi-lang-nodejs="`chronosphere`" pulumi-lang-dotnet="`Chronosphere`" pulumi-lang-go="`chronosphere`" pulumi-lang-python="`chronosphere`" pulumi-lang-yaml="`chronosphere`" pulumi-lang-java="`chronosphere`" pulumi-lang-hcl="`chronosphere`">`chronosphere`</span>, <span pulumi-lang-nodejs="`appOptics`" pulumi-lang-dotnet="`AppOptics`" pulumi-lang-go="`appOptics`" pulumi-lang-python="`app_optics`" pulumi-lang-yaml="`appOptics`" pulumi-lang-java="`appOptics`" pulumi-lang-hcl="`app_optics`">`appOptics`</span>, <span pulumi-lang-nodejs="`bugSnag`" pulumi-lang-dotnet="`BugSnag`" pulumi-lang-go="`bugSnag`" pulumi-lang-python="`bug_snag`" pulumi-lang-yaml="`bugSnag`" pulumi-lang-java="`bugSnag`" pulumi-lang-hcl="`bug_snag`">`bugSnag`</span>, <span pulumi-lang-nodejs="`honeycomb`" pulumi-lang-dotnet="`Honeycomb`" pulumi-lang-go="`honeycomb`" pulumi-lang-python="`honeycomb`" pulumi-lang-yaml="`honeycomb`" pulumi-lang-java="`honeycomb`" pulumi-lang-hcl="`honeycomb`">`honeycomb`</span>, <span pulumi-lang-nodejs="`monteCarlo`" pulumi-lang-dotnet="`MonteCarlo`" pulumi-lang-go="`monteCarlo`" pulumi-lang-python="`monte_carlo`" pulumi-lang-yaml="`monteCarlo`" pulumi-lang-java="`monteCarlo`" pulumi-lang-hcl="`monte_carlo`">`monteCarlo`</span>, <span pulumi-lang-nodejs="`nagios`" pulumi-lang-dotnet="`Nagios`" pulumi-lang-go="`nagios`" pulumi-lang-python="`nagios`" pulumi-lang-yaml="`nagios`" pulumi-lang-java="`nagios`" pulumi-lang-hcl="`nagios`">`nagios`</span>, <span pulumi-lang-nodejs="`prtg`" pulumi-lang-dotnet="`Prtg`" pulumi-lang-go="`prtg`" pulumi-lang-python="`prtg`" pulumi-lang-yaml="`prtg`" pulumi-lang-java="`prtg`" pulumi-lang-hcl="`prtg`">`prtg`</span>.
         """
         return pulumi.get(self, "source_type")
 
@@ -922,7 +922,7 @@ class AlertsSource(pulumi.CustomResource):
     @pulumi.getter(name="sourceableAttributes")
     def sourceable_attributes(self) -> pulumi.Output[Optional['outputs.AlertsSourceSourceableAttributes']]:
         """
-        Provide additional attributes for<span pulumi-lang-nodejs=" genericWebhook " pulumi-lang-dotnet=" GenericWebhook " pulumi-lang-go=" genericWebhook " pulumi-lang-python=" generic_webhook " pulumi-lang-yaml=" genericWebhook " pulumi-lang-java=" genericWebhook "> generic_webhook </span>alerts source
+        Provide additional attributes for<span pulumi-lang-nodejs=" genericWebhook " pulumi-lang-dotnet=" GenericWebhook " pulumi-lang-go=" genericWebhook " pulumi-lang-python=" generic_webhook " pulumi-lang-yaml=" genericWebhook " pulumi-lang-java=" genericWebhook " pulumi-lang-hcl=" generic_webhook "> genericWebhook </span>alerts source
         """
         return pulumi.get(self, "sourceable_attributes")
 
@@ -930,7 +930,7 @@ class AlertsSource(pulumi.CustomResource):
     @pulumi.getter
     def status(self) -> pulumi.Output[_builtins.str]:
         """
-        The status of the alert source. Value must be one of <span pulumi-lang-nodejs="`connected`" pulumi-lang-dotnet="`Connected`" pulumi-lang-go="`connected`" pulumi-lang-python="`connected`" pulumi-lang-yaml="`connected`" pulumi-lang-java="`connected`">`connected`</span>, <span pulumi-lang-nodejs="`setupComplete`" pulumi-lang-dotnet="`SetupComplete`" pulumi-lang-go="`setupComplete`" pulumi-lang-python="`setup_complete`" pulumi-lang-yaml="`setupComplete`" pulumi-lang-java="`setupComplete`">`setup_complete`</span>, <span pulumi-lang-nodejs="`setupIncomplete`" pulumi-lang-dotnet="`SetupIncomplete`" pulumi-lang-go="`setupIncomplete`" pulumi-lang-python="`setup_incomplete`" pulumi-lang-yaml="`setupIncomplete`" pulumi-lang-java="`setupIncomplete`">`setup_incomplete`</span>.
+        The status of the alert source. Value must be one of <span pulumi-lang-nodejs="`connected`" pulumi-lang-dotnet="`Connected`" pulumi-lang-go="`connected`" pulumi-lang-python="`connected`" pulumi-lang-yaml="`connected`" pulumi-lang-java="`connected`" pulumi-lang-hcl="`connected`">`connected`</span>, <span pulumi-lang-nodejs="`setupComplete`" pulumi-lang-dotnet="`SetupComplete`" pulumi-lang-go="`setupComplete`" pulumi-lang-python="`setup_complete`" pulumi-lang-yaml="`setupComplete`" pulumi-lang-java="`setupComplete`" pulumi-lang-hcl="`setup_complete`">`setupComplete`</span>, <span pulumi-lang-nodejs="`setupIncomplete`" pulumi-lang-dotnet="`SetupIncomplete`" pulumi-lang-go="`setupIncomplete`" pulumi-lang-python="`setup_incomplete`" pulumi-lang-yaml="`setupIncomplete`" pulumi-lang-java="`setupIncomplete`" pulumi-lang-hcl="`setup_incomplete`">`setupIncomplete`</span>.
         """
         return pulumi.get(self, "status")
 
@@ -941,3 +941,4 @@ class AlertsSource(pulumi.CustomResource):
         The webhook URL generated for non-email alert sources
         """
         return pulumi.get(self, "webhook_endpoint")
+

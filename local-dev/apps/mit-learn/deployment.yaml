@@ -1,0 +1,501 @@
+---
+# ─────────────────────────────────────────────────────────────
+# Web Deployment (granian ASGI + nginx sidecar)
+# ─────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mitlearn-webapp
+  namespace: mit-learn
+  labels:
+    app: mitlearn
+    component: webapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mitlearn
+      component: webapp
+  template:
+    metadata:
+      labels:
+        app: mitlearn
+        component: webapp
+    spec:
+      initContainers:
+        # Merge the image's system CA bundle with the mkcert root so pods trust
+        # both public HTTPS endpoints and local-dev TLS. SSL_CERT_FILE /
+        # REQUESTS_CA_BUNDLE point at /etc/ssl/local-dev/rootCA.pem (the merged
+        # file), not the mkcert-only cert.
+      - name: ca-bundle-merge
+        image: mitodl/mit-learn-app:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+        - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /mkcert
+          readOnly: true
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+
+          # Run migrations, fixtures, and qdrant collection setup before the app
+          # server starts. This mirrors the Heroku release phase + run-django-dev.sh.
+      - name: bootstrap
+        image: mitodl/mit-learn-app:latest
+        imagePullPolicy: IfNotPresent
+        workingDir: /src
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          set -eo pipefail
+          echo "==> Collecting static files..."
+          python manage.py collectstatic --noinput --clear
+
+          echo "==> Running migrations..."
+          python manage.py migrate --noinput
+
+          echo "==> Running data migrations..."
+          RUN_DATA_MIGRATIONS=true python manage.py migrate --noinput
+
+          echo "==> Creating cache tables..."
+          python manage.py createcachetable
+
+          echo "==> Clearing cache..."
+          python manage.py clear_cache
+
+          echo "==> Loading fixtures..."
+          python manage.py loaddata platforms schools departments offered_by
+
+          echo "==> Creating Qdrant collections..."
+          python manage.py create_qdrant_collections
+
+          echo "==> Pruning subscription queries..."
+          python manage.py prune_subscription_queries
+
+          echo "==> Bootstrap complete."
+        envFrom:
+        - configMapRef:
+            name: mitlearn-env
+        - secretRef:
+            name: mitlearn-secrets
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            memory: 2Gi
+        volumeMounts:
+        - name: static-files
+          mountPath: /src/staticfiles
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+
+      containers:
+        # granian ASGI application server
+      - name: app
+        image: mitodl/mit-learn-app:latest
+        imagePullPolicy: IfNotPresent
+        workingDir: /src
+        command:
+        - granian
+        - --interface
+        - asgi
+        - --host
+        - "0.0.0.0"
+        - --port
+        - "8061"
+        # Single worker locally: reloads re-import Django once instead of
+        # twice competing for CPU, and ASGI handles dev concurrency fine.
+        - --workers
+        - "1"
+        - --blocking-threads
+        - "1"
+        # Auto-reload on Tilt live-update syncs. Watches the working dir
+        # (/src); ignore dirs that churn without affecting Python.
+        - --reload
+        - --reload-ignore-dirs
+        - frontends
+        - --reload-ignore-dirs
+        - staticfiles
+        # Workers often fail to stop gracefully (cause undiagnosed; same
+        # symptom as granian#470) — every reload pays this full timeout
+        # before SIGKILL, so keep it short.
+        - --workers-kill-timeout
+        - "1"
+        - main.asgi:application
+        ports:
+        - containerPort: 8061
+          name: asgi
+        envFrom:
+        - configMapRef:
+            name: mitlearn-env
+        - secretRef:
+            name: mitlearn-secrets
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            memory: 2Gi
+        readinessProbe:
+          httpGet:
+            path: /health/
+            port: 8061
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          failureThreshold: 6
+          timeoutSeconds: 5
+        # Generous liveness: granian --reload makes /health/ hang while workers
+        # re-import Django after a live-update sync; don't kill mid-reload.
+        livenessProbe:
+          httpGet:
+            path: /health/
+            port: 8061
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          failureThreshold: 10
+          timeoutSeconds: 10
+        volumeMounts:
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+
+          # nginx reverse proxy (serves static files, proxies to granian)
+      - name: nginx
+        image: nginx:1.27-alpine
+        ports:
+        - containerPort: 8060
+          name: http
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: default.conf
+        - name: static-files
+          mountPath: /src/staticfiles
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 128Mi
+
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: mitlearn-nginx-conf
+      - name: static-files
+        emptyDir: {}
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
+      - name: combined-ca
+        emptyDir: {}
+
+---
+# ─────────────────────────────────────────────────────────────
+# Celery Worker — default queue
+# ─────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mitlearn-worker-default
+  namespace: mit-learn
+  labels:
+    app: mitlearn
+    component: worker-default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mitlearn
+      component: worker-default
+  template:
+    metadata:
+      labels:
+        app: mitlearn
+        component: worker-default
+    spec:
+      initContainers:
+      - name: ca-bundle-merge
+        image: mitodl/mit-learn-app:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+        - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /mkcert
+          readOnly: true
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+      containers:
+      - name: celery
+        image: mitodl/mit-learn-app:latest
+        imagePullPolicy: IfNotPresent
+        workingDir: /src
+        command:
+        - celery
+        - -A
+        - main.celery:app
+        - worker
+        - -Q
+        - default
+        - --loglevel=info
+        - --concurrency=2
+        envFrom:
+        - configMapRef:
+            name: mitlearn-env
+        - secretRef:
+            name: mitlearn-secrets
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            memory: 2Gi
+        volumeMounts:
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
+      - name: combined-ca
+        emptyDir: {}
+---
+# ─────────────────────────────────────────────────────────────
+# Celery Worker — edx_content queue
+# ─────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mitlearn-worker-edx-content
+  namespace: mit-learn
+  labels:
+    app: mitlearn
+    component: worker-edx-content
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mitlearn
+      component: worker-edx-content
+  template:
+    metadata:
+      labels:
+        app: mitlearn
+        component: worker-edx-content
+    spec:
+      initContainers:
+      - name: ca-bundle-merge
+        image: mitodl/mit-learn-app:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+        - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /mkcert
+          readOnly: true
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+      containers:
+      - name: celery
+        image: mitodl/mit-learn-app:latest
+        imagePullPolicy: IfNotPresent
+        workingDir: /src
+        command:
+        - celery
+        - -A
+        - main.celery:app
+        - worker
+        - -Q
+        - edx_content
+        - --loglevel=info
+        - --concurrency=2
+        envFrom:
+        - configMapRef:
+            name: mitlearn-env
+        - secretRef:
+            name: mitlearn-secrets
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            memory: 2Gi
+        volumeMounts:
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
+      - name: combined-ca
+        emptyDir: {}
+---
+# ─────────────────────────────────────────────────────────────
+# Celery Worker — embeddings queue
+# ─────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mitlearn-worker-embeddings
+  namespace: mit-learn
+  labels:
+    app: mitlearn
+    component: worker-embeddings
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mitlearn
+      component: worker-embeddings
+  template:
+    metadata:
+      labels:
+        app: mitlearn
+        component: worker-embeddings
+    spec:
+      initContainers:
+      - name: ca-bundle-merge
+        image: mitodl/mit-learn-app:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+        - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /mkcert
+          readOnly: true
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+      containers:
+      - name: celery
+        image: mitodl/mit-learn-app:latest
+        imagePullPolicy: IfNotPresent
+        workingDir: /src
+        command:
+        - celery
+        - -A
+        - main.celery:app
+        - worker
+        - -Q
+        - embeddings
+        - --loglevel=info
+        - --concurrency=1
+        envFrom:
+        - configMapRef:
+            name: mitlearn-env
+        - secretRef:
+            name: mitlearn-secrets
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            memory: 2Gi
+        volumeMounts:
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
+      - name: combined-ca
+        emptyDir: {}
+---
+# ─────────────────────────────────────────────────────────────
+# Celery Beat (scheduler)
+# ─────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mitlearn-beat
+  namespace: mit-learn
+  labels:
+    app: mitlearn
+    component: beat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mitlearn
+      component: beat
+  template:
+    metadata:
+      labels:
+        app: mitlearn
+        component: beat
+    spec:
+      initContainers:
+      - name: ca-bundle-merge
+        image: mitodl/mit-learn-app:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+        - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /mkcert
+          readOnly: true
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+      containers:
+      - name: celery-beat
+        image: mitodl/mit-learn-app:latest
+        imagePullPolicy: IfNotPresent
+        workingDir: /src
+        command:
+        - celery
+        - -A
+        - main.celery:app
+        - beat
+        - --loglevel=info
+        envFrom:
+        - configMapRef:
+            name: mitlearn-env
+        - secretRef:
+            name: mitlearn-secrets
+        resources:
+          requests:
+            cpu: 50m
+            memory: 256Mi
+          limits:
+            memory: 512Mi
+        volumeMounts:
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
+      - name: combined-ca
+        emptyDir: {}
+---
+# ─────────────────────────────────────────────────────────────
+# Service (ClusterIP) — web
+# ─────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: mitlearn-webapp
+  namespace: mit-learn
+  labels:
+    app: mitlearn
+    component: webapp
+spec:
+  selector:
+    app: mitlearn
+    component: webapp
+  ports:
+  - name: http
+    port: 8060
+    targetPort: http

@@ -80,8 +80,8 @@ def get_webhooks_endpoint(name: Optional[_builtins.str] = None,
         id=pulumi.get(__ret__, 'id'),
         name=pulumi.get(__ret__, 'name'),
         slug=pulumi.get(__ret__, 'slug'))
-def get_webhooks_endpoint_output(name: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                                 slug: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_webhooks_endpoint_output(name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                                 slug: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                                  opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetWebhooksEndpointResult]:
     """
     Use this data source to access information about an existing resource.

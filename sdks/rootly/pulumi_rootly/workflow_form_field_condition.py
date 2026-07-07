@@ -20,19 +20,19 @@ __all__ = ['WorkflowFormFieldConditionArgs', 'WorkflowFormFieldCondition']
 class WorkflowFormFieldConditionArgs:
     def __init__(__self__, *,
                  form_field_id: pulumi.Input[_builtins.str],
-                 incident_condition: Optional[pulumi.Input[_builtins.str]] = None,
-                 selected_catalog_entity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_cause_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_option_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_user_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-                 values: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 workflow_form_field_condition_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 workflow_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 incident_condition: pulumi.Input[Optional[_builtins.str]] = None,
+                 selected_catalog_entity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_cause_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_environment_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_functionality_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_incident_type_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_option_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_user_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 values: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 workflow_form_field_condition_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a WorkflowFormFieldCondition resource.
 
@@ -82,145 +82,145 @@ class WorkflowFormFieldConditionArgs:
 
     @_builtins.property
     @pulumi.getter(name="incidentCondition")
-    def incident_condition(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def incident_condition(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The trigger condition. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition")
 
     @incident_condition.setter
-    def incident_condition(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def incident_condition(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "incident_condition", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedCatalogEntityIds")
-    def selected_catalog_entity_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def selected_catalog_entity_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "selected_catalog_entity_ids")
 
     @selected_catalog_entity_ids.setter
-    def selected_catalog_entity_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def selected_catalog_entity_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "selected_catalog_entity_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedCauseIds")
-    def selected_cause_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def selected_cause_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "selected_cause_ids")
 
     @selected_cause_ids.setter
-    def selected_cause_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def selected_cause_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "selected_cause_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedEnvironmentIds")
-    def selected_environment_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def selected_environment_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "selected_environment_ids")
 
     @selected_environment_ids.setter
-    def selected_environment_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def selected_environment_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "selected_environment_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedFunctionalityIds")
-    def selected_functionality_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def selected_functionality_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "selected_functionality_ids")
 
     @selected_functionality_ids.setter
-    def selected_functionality_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def selected_functionality_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "selected_functionality_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedGroupIds")
-    def selected_group_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def selected_group_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "selected_group_ids")
 
     @selected_group_ids.setter
-    def selected_group_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def selected_group_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "selected_group_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedIncidentTypeIds")
-    def selected_incident_type_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def selected_incident_type_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "selected_incident_type_ids")
 
     @selected_incident_type_ids.setter
-    def selected_incident_type_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def selected_incident_type_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "selected_incident_type_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedOptionIds")
-    def selected_option_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def selected_option_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "selected_option_ids")
 
     @selected_option_ids.setter
-    def selected_option_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def selected_option_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "selected_option_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedServiceIds")
-    def selected_service_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def selected_service_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "selected_service_ids")
 
     @selected_service_ids.setter
-    def selected_service_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def selected_service_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "selected_service_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedUserIds")
-    def selected_user_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]]:
+    def selected_user_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]:
         return pulumi.get(self, "selected_user_ids")
 
     @selected_user_ids.setter
-    def selected_user_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]]):
+    def selected_user_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]):
         pulumi.set(self, "selected_user_ids", value)
 
     @_builtins.property
     @pulumi.getter
-    def values(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def values(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "values")
 
     @values.setter
-    def values(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def values(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "values", value)
 
     @_builtins.property
     @pulumi.getter(name="workflowFormFieldConditionId")
-    def workflow_form_field_condition_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def workflow_form_field_condition_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "workflow_form_field_condition_id")
 
     @workflow_form_field_condition_id.setter
-    def workflow_form_field_condition_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def workflow_form_field_condition_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "workflow_form_field_condition_id", value)
 
     @_builtins.property
     @pulumi.getter(name="workflowId")
-    def workflow_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def workflow_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The workflow for this condition
         """
         return pulumi.get(self, "workflow_id")
 
     @workflow_id.setter
-    def workflow_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def workflow_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "workflow_id", value)
 
 
 @pulumi.input_type
 class _WorkflowFormFieldConditionState:
     def __init__(__self__, *,
-                 form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_condition: Optional[pulumi.Input[_builtins.str]] = None,
-                 selected_catalog_entity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_cause_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_option_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_user_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-                 values: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 workflow_form_field_condition_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 workflow_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_condition: pulumi.Input[Optional[_builtins.str]] = None,
+                 selected_catalog_entity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_cause_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_environment_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_functionality_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_incident_type_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_option_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_user_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 values: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 workflow_form_field_condition_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering WorkflowFormFieldCondition resources.
 
@@ -259,137 +259,137 @@ class _WorkflowFormFieldConditionState:
 
     @_builtins.property
     @pulumi.getter(name="formFieldId")
-    def form_field_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def form_field_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The custom field for this condition
         """
         return pulumi.get(self, "form_field_id")
 
     @form_field_id.setter
-    def form_field_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def form_field_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form_field_id", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentCondition")
-    def incident_condition(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def incident_condition(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The trigger condition. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         return pulumi.get(self, "incident_condition")
 
     @incident_condition.setter
-    def incident_condition(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def incident_condition(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "incident_condition", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedCatalogEntityIds")
-    def selected_catalog_entity_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def selected_catalog_entity_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "selected_catalog_entity_ids")
 
     @selected_catalog_entity_ids.setter
-    def selected_catalog_entity_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def selected_catalog_entity_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "selected_catalog_entity_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedCauseIds")
-    def selected_cause_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def selected_cause_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "selected_cause_ids")
 
     @selected_cause_ids.setter
-    def selected_cause_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def selected_cause_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "selected_cause_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedEnvironmentIds")
-    def selected_environment_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def selected_environment_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "selected_environment_ids")
 
     @selected_environment_ids.setter
-    def selected_environment_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def selected_environment_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "selected_environment_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedFunctionalityIds")
-    def selected_functionality_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def selected_functionality_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "selected_functionality_ids")
 
     @selected_functionality_ids.setter
-    def selected_functionality_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def selected_functionality_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "selected_functionality_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedGroupIds")
-    def selected_group_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def selected_group_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "selected_group_ids")
 
     @selected_group_ids.setter
-    def selected_group_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def selected_group_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "selected_group_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedIncidentTypeIds")
-    def selected_incident_type_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def selected_incident_type_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "selected_incident_type_ids")
 
     @selected_incident_type_ids.setter
-    def selected_incident_type_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def selected_incident_type_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "selected_incident_type_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedOptionIds")
-    def selected_option_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def selected_option_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "selected_option_ids")
 
     @selected_option_ids.setter
-    def selected_option_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def selected_option_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "selected_option_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedServiceIds")
-    def selected_service_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def selected_service_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "selected_service_ids")
 
     @selected_service_ids.setter
-    def selected_service_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def selected_service_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "selected_service_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="selectedUserIds")
-    def selected_user_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]]:
+    def selected_user_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]:
         return pulumi.get(self, "selected_user_ids")
 
     @selected_user_ids.setter
-    def selected_user_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]]):
+    def selected_user_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]):
         pulumi.set(self, "selected_user_ids", value)
 
     @_builtins.property
     @pulumi.getter
-    def values(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def values(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "values")
 
     @values.setter
-    def values(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def values(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "values", value)
 
     @_builtins.property
     @pulumi.getter(name="workflowFormFieldConditionId")
-    def workflow_form_field_condition_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def workflow_form_field_condition_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "workflow_form_field_condition_id")
 
     @workflow_form_field_condition_id.setter
-    def workflow_form_field_condition_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def workflow_form_field_condition_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "workflow_form_field_condition_id", value)
 
     @_builtins.property
     @pulumi.getter(name="workflowId")
-    def workflow_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def workflow_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The workflow for this condition
         """
         return pulumi.get(self, "workflow_id")
 
     @workflow_id.setter
-    def workflow_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def workflow_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "workflow_id", value)
 
 
@@ -399,20 +399,20 @@ class WorkflowFormFieldCondition(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_condition: Optional[pulumi.Input[_builtins.str]] = None,
-                 selected_catalog_entity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_cause_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_option_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_user_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-                 values: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 workflow_form_field_condition_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 workflow_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_condition: pulumi.Input[Optional[_builtins.str]] = None,
+                 selected_catalog_entity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_cause_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_environment_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_functionality_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_incident_type_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_option_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_user_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 values: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 workflow_form_field_condition_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a WorkflowFormFieldCondition resource with the given unique name, props, and options.
@@ -447,20 +447,20 @@ class WorkflowFormFieldCondition(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_condition: Optional[pulumi.Input[_builtins.str]] = None,
-                 selected_catalog_entity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_cause_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_option_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 selected_user_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-                 values: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 workflow_form_field_condition_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 workflow_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_condition: pulumi.Input[Optional[_builtins.str]] = None,
+                 selected_catalog_entity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_cause_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_environment_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_functionality_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_incident_type_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_option_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 selected_user_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 values: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 workflow_form_field_condition_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -497,20 +497,20 @@ class WorkflowFormFieldCondition(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-            incident_condition: Optional[pulumi.Input[_builtins.str]] = None,
-            selected_catalog_entity_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            selected_cause_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            selected_environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            selected_functionality_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            selected_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            selected_incident_type_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            selected_option_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            selected_service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            selected_user_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-            values: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            workflow_form_field_condition_id: Optional[pulumi.Input[_builtins.str]] = None,
-            workflow_id: Optional[pulumi.Input[_builtins.str]] = None) -> 'WorkflowFormFieldCondition':
+            form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+            incident_condition: pulumi.Input[Optional[_builtins.str]] = None,
+            selected_catalog_entity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            selected_cause_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            selected_environment_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            selected_functionality_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            selected_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            selected_incident_type_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            selected_option_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            selected_service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            selected_user_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+            values: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            workflow_form_field_condition_id: pulumi.Input[Optional[_builtins.str]] = None,
+            workflow_id: pulumi.Input[Optional[_builtins.str]] = None) -> 'WorkflowFormFieldCondition':
         """
         Get an existing WorkflowFormFieldCondition resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -620,3 +620,4 @@ class WorkflowFormFieldCondition(pulumi.CustomResource):
         The workflow for this condition
         """
         return pulumi.get(self, "workflow_id")
+

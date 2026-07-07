@@ -128,12 +128,12 @@ def get_communications_group(communication_type_id: Optional[_builtins.str] = No
         is_private=pulumi.get(__ret__, 'is_private'),
         name=pulumi.get(__ret__, 'name'),
         slug=pulumi.get(__ret__, 'slug'))
-def get_communications_group_output(communication_type_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                                    condition_type: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                                    created_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
-                                    is_private: Optional[pulumi.Input[Optional[_builtins.bool]]] = None,
-                                    name: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                                    slug: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_communications_group_output(communication_type_id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                                    condition_type: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                                    created_at: pulumi.Input[Optional[Optional[Mapping[str, _builtins.str]]]] = None,
+                                    is_private: pulumi.Input[Optional[Optional[_builtins.bool]]] = None,
+                                    name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                                    slug: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                                     opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetCommunicationsGroupResult]:
     """
     Use this data source to access information about an existing resource.

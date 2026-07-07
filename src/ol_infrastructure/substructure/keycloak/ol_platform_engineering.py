@@ -4,10 +4,10 @@ import json
 
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions
+from pulumi import Alias, Config, Output, ResourceOptions
 
 
-def create_ol_platform_engineering_realm(  # noqa: PLR0913
+def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     env_name: str,
@@ -168,6 +168,168 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913
         ).apply(json.dumps),
     )
     # AIRBYTE [END] # noqa: ERA001
+
+    # OPIK [START] # noqa: ERA001
+    # Opik (Comet LLM observability) has no native OIDC in its open-source
+    # edition, so authentication is enforced by APISIX in front of it. This
+    # CONFIDENTIAL client backs both the interactive UI login (standard flow)
+    # and the service-account / client-credentials flow that SDK clients use to
+    # mint bearer tokens for the /api ingestion path (see the opik application
+    # stack). Credentials are published to Vault for the APISIX openid-connect
+    # plugin to consume via the Vault Secrets Operator.
+    ol_platform_engineering_opik_client = keycloak.openid.Client(
+        "ol-platform-engineering-opik-client",
+        name="ol-platform-engineering-opik-client",
+        realm_id="ol-platform-engineering",
+        client_id="ol-opik-client",
+        client_secret=keycloak_realm_config.get(
+            "ol-platform-engineering-opik-client-secret"
+        ),
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        service_accounts_enabled=True,
+        direct_access_grants_enabled=False,
+        valid_redirect_uris=keycloak_realm_config.get_object(
+            "ol-platform-engineering-opik-redirect-uris"
+        ),
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    vault.generic.Secret(
+        "ol-platform-engineering-opik-client-vault-oidc-credentials",
+        path="secret-operations/sso/opik",
+        data_json=Output.all(
+            url=ol_platform_engineering_opik_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+            ),
+            client_id=ol_platform_engineering_opik_client.client_id,
+            client_secret=ol_platform_engineering_opik_client.client_secret,
+            # Independent random value required by the APISIX openid-connect
+            # plugin for session signing; not part of the OAuth credentials.
+            secret=session_secret,
+            realm_id=ol_platform_engineering_opik_client.realm_id,
+            realm_name="ol-platform-engineering",
+            realm_public_key=ol_platform_engineering_opik_client.realm_id.apply(
+                fetch_realm_public_key_partial
+            ),
+        ).apply(json.dumps),
+        # This secret was previously created by the ol-data-platform realm
+        # module at the same Vault path. Alias it so Pulumi performs an in-place
+        # move/update (rewriting the credentials for the new realm's client)
+        # instead of create+delete — the latter would delete the shared Vault
+        # path after writing it, leaving it empty.
+        opts=ResourceOptions(
+            aliases=[Alias(name="ol-data-platform-opik-client-vault-oidc-credentials")]
+        ),
+    )
+    # OPIK [END] # noqa: ERA001
+
+    # TOOLHIVE [START] # noqa: ERA001
+    # Authentication for the ToolHive SWE VirtualMCPServer is handled by ToolHive's
+    # embedded OAuth authorization server (spec.authServerConfig — see the
+    # ol-application-toolhive-swe stack). That embedded auth server is the OAuth
+    # provider MCP clients talk to; it BROKERS interactive login to this realm as an
+    # upstream OIDC provider. So from Keycloak's perspective the vMCP is a single
+    # ordinary CONFIDENTIAL web-app client: it runs the authorization-code flow and
+    # Keycloak redirects back to the vMCP's ``/oauth/callback``. MCP clients register
+    # dynamically against the vMCP (DCR), so no per-client Keycloak config is needed.
+    #
+    # The client secret is published to Vault so the Vault Secrets Operator can sync
+    # it into the toolhive-swe namespace, where ToolHive references it as the
+    # upstream provider's ``clientSecretRef``.
+    if stack_info.env_suffix == "production":
+        toolhive_swe_resource_url = "https://toolhive-swe.ol.mit.edu"
+    else:
+        toolhive_swe_resource_url = (
+            f"https://toolhive-swe.{stack_info.env_suffix}.ol.mit.edu"
+        )
+    ol_platform_engineering_toolhive_client = keycloak.openid.Client(
+        "ol-platform-engineering-toolhive-client",
+        name="ol-platform-engineering-toolhive-client",
+        realm_id="ol-platform-engineering",
+        client_id="ol-toolhive-client",
+        client_secret=keycloak_realm_config.get(
+            "ol-platform-engineering-toolhive-client-secret"
+        ),
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        service_accounts_enabled=False,
+        direct_access_grants_enabled=False,
+        # ToolHive's embedded auth server is the only OAuth client of this realm;
+        # Keycloak redirects back to the vMCP broker's callback after login.
+        valid_redirect_uris=[f"{toolhive_swe_resource_url}/oauth/callback"],
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    vault.generic.Secret(
+        "ol-platform-engineering-toolhive-client-vault-oidc-credentials",
+        path="secret-operations/sso/toolhive",
+        data_json=Output.all(
+            url=ol_platform_engineering_toolhive_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+            ),
+            client_id=ol_platform_engineering_toolhive_client.client_id,
+            client_secret=ol_platform_engineering_toolhive_client.client_secret,
+            # Independent random value carried for parity with other SSO entries;
+            # not used by ToolHive's upstream provider config.
+            secret=session_secret,
+            realm_id=ol_platform_engineering_toolhive_client.realm_id,
+            realm_name="ol-platform-engineering",
+            realm_public_key=ol_platform_engineering_toolhive_client.realm_id.apply(
+                fetch_realm_public_key_partial
+            ),
+        ).apply(json.dumps),
+    )
+    # TOOLHIVE [END] # noqa: ERA001
+
+    # OPENLIT [START] # noqa: ERA001
+    # OpenLIT (LLM/GenAI observability) has no native auth in its open-source
+    # edition, so authentication is enforced by APISIX in front of it. This
+    # CONFIDENTIAL client backs the interactive UI login (standard flow); unlike
+    # Opik there is no service-account / client-credentials flow because no
+    # bearer-token ingestion path is exposed through this ingress. Credentials
+    # are published to Vault for the APISIX openid-connect plugin to consume via
+    # the Vault Secrets Operator.
+    ol_platform_engineering_openlit_client = keycloak.openid.Client(
+        "ol-platform-engineering-openlit-client",
+        name="ol-platform-engineering-openlit-client",
+        realm_id="ol-platform-engineering",
+        client_id="ol-openlit-client",
+        client_secret=keycloak_realm_config.get(
+            "ol-platform-engineering-openlit-client-secret"
+        ),
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        service_accounts_enabled=False,
+        valid_redirect_uris=keycloak_realm_config.get_object(
+            "ol-platform-engineering-openlit-redirect-uris"
+        ),
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    vault.generic.Secret(
+        "ol-platform-engineering-openlit-client-vault-oidc-credentials",
+        path="secret-operations/sso/openlit",
+        data_json=Output.all(
+            url=ol_platform_engineering_openlit_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+            ),
+            client_id=ol_platform_engineering_openlit_client.client_id,
+            client_secret=ol_platform_engineering_openlit_client.client_secret,
+            # Independent random value required by the APISIX openid-connect
+            # plugin for session signing; not part of the OAuth credentials.
+            secret=session_secret,
+            realm_id=ol_platform_engineering_openlit_client.realm_id,
+            realm_name="ol-platform-engineering",
+            realm_public_key=ol_platform_engineering_openlit_client.realm_id.apply(
+                fetch_realm_public_key_partial
+            ),
+        ).apply(json.dumps),
+    )
+    # OPENLIT [END] # noqa: ERA001
 
     # JUPYTERHUB [START] # noqa: ERA001
     ol_platform_engineering_jupyterhub_client = keycloak.openid.Client(

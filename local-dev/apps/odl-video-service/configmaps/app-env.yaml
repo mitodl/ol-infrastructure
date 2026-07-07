@@ -1,0 +1,63 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: odlvideo-env
+  namespace: odl-video-service
+data:
+  DJANGO_SETTINGS_MODULE: "odl_video.settings"
+  ODL_VIDEO_BASE_URL: "https://video.odl.mit.dev"
+  ODL_VIDEO_DB_DISABLE_SSL: "True"
+  ODL_VIDEO_ENVIRONMENT: "local"
+  ODL_VIDEO_ADMIN_EMAIL: "admin@odl.local"
+  ODL_VIDEO_FROM_EMAIL: "MIT ODL Video <ol-engineering-support@mit.edu>"
+  ODL_VIDEO_SUPPORT_EMAIL: "MIT ODL Video <ol-engineering-support@mit.edu>"
+  ODL_VIDEO_SECURE_SSL_REDIRECT: "False"
+  ODL_VIDEO_LOG_LEVEL: "INFO"
+  NODE_ENV: "production"
+  USE_SHIBBOLETH: "False"
+  # DEBUG must stay False: the prod image does not ship the nplusone profiler,
+  # which settings.py imports unconditionally when DEBUG is True, crashing the
+  # app. Auth is handled by USE_SHIBBOLETH=False, not DEBUG.
+  DEBUG: "False"
+  ALLOWED_HOSTS: "*"
+  USE_X_FORWARDED_HOST: "True"
+  USE_X_FORWARDED_PORT: "True"
+
+  # mkcert root CA — trusts the local wildcard TLS cert for inter-pod HTTPS
+  REQUESTS_CA_BUNDLE: "/etc/ssl/local-dev/rootCA.pem"
+  SSL_CERT_FILE: "/etc/ssl/local-dev/rootCA.pem"
+
+  # Valkey
+  REDIS_URL: "redis://valkey.local-infra.svc.cluster.local:6379/0"
+  CELERY_BROKER_URL: "redis://valkey.local-infra.svc.cluster.local:6379/1"
+  REDIS_MAX_CONNECTIONS: "65000"
+
+  # AWS stub values (no real S3 in local dev — videos won't transcode)
+  AWS_REGION: "us-east-1"
+  AWS_S3_DOMAIN: "s3.amazonaws.com"
+  VIDEO_S3_BUCKET: "local-dev-odlvideo"
+  VIDEO_S3_TRANSCODE_BUCKET: "local-dev-odlvideo-transcode"
+  VIDEO_S3_THUMBNAIL_BUCKET: "local-dev-odlvideo-thumbnails"
+  VIDEO_S3_SUBTITLE_BUCKET: "local-dev-odlvideo-subtitles"
+  VIDEO_S3_WATCH_BUCKET: "local-dev-odlvideo-watch"
+  VIDEO_S3_THUMBNAIL_PREFIX: "thumbnails"
+  VIDEO_S3_TRANSCODE_PREFIX: "transcoded"
+  VIDEO_S3_UPLOAD_PREFIX: ""
+  VIDEO_STATUS_UPDATE_FREQUENCY: "60"
+  VIDEO_WATCH_BUCKET_FREQUENCY: "600"
+
+  # Encoding presets (stub values — actual transcoding not available locally)
+  ET_HLS_PRESET_IDS: "1351620000001-200010,1351620000001-200020,1351620000001-200050"
+  ET_MP4_PRESET_ID: "1669811490975-riqq25"
+  ET_PRESET_IDS: "1504127981921-c2jlwt"
+  FEATURE_RETRANSCODE_ENABLED: "True"
+
+  # Email
+  ODL_VIDEO_EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
+  ODL_VIDEO_EMAIL_HOST: "mailpit.local-infra.svc.cluster.local"
+  ODL_VIDEO_EMAIL_PORT: "1025"
+  ODL_VIDEO_EMAIL_TLS: "False"
+
+  # Status token
+  STATUS_TOKEN: "local"

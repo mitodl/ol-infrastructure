@@ -76,11 +76,11 @@ config:
     secure: v1:qzfe99Jb8n0TnEQS:Y6fSOS8lksj7WvED+V7kCtV7arDtwx7184Fw330Mwh9JDHW72rVd8y7Nm0fF8ANCcFCwDV5EwSU2Fcc+X47NHDOLCOQv16lyB6jWOF2mTr/veRax6MbXY9NlLmsfp9EBQesDCitULbkz9hyHcHT3GPI=
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
-    communications: communications
+    admin_console: admin-console
     authoring: authoring
+    communications: communications
     discussions: discuss
     gradebook: gradebook
-    instructor: instructor
     learning: learn
     ora_grading: ora-grading
   edxapp:github_org_api_url: https://github.mit.edu/api/v3/orgs/mitxonline
@@ -139,21 +139,25 @@ config:
         memory_request: "4Gi"
         memory_limit: "6Gi"
   mongodb:atlas_project_id: 61f0a63f8bc1f86a073a7148
-  redis:instance_type: cache.r7g.2xlarge
+  redis:instance_type: cache.r7g.4xlarge
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   edxapp:edx_xqueue_secrets:
     secure: v1:I908pKo1+e7AaI1G:3+503zdh2L0tIfjet0xORJi18Q8T+A14gZIN6JnbFCNPRvcY4RjELrAnAMSx1j/YcGIAR6coDt+90c0t8fk2Gp+UaNPZabDH6CXesFHqHMXHucX0nyJBLeGwNu0bVYWxQs9Q3xb4xnD8WsnTTsLZEjr+WOsy06sCcuwtGM/bTzbCEAny3kQQuMfDzDd9lX8bzzJF9swldA==
   edxapp:k8s_vpc: applications_vpc
   meilisearch:deploy: "true"
-  meilisearch:enabled: "false"
+  meilisearch:enabled: "true"
   meilisearch:domain: meilisearch.courses.learn.mit.edu
   meilisearch:replica_count: "1"
   meilisearch:pv_size: 100Gi
   meilisearch:cpu_request: "250m"
   meilisearch:memory_request: "1Gi"
-  meilisearch:memory_limit: "1Gi"
+  meilisearch:memory_limit: "4Gi"
   typesense:deploy: "true"
   typesense:enabled: "true"
   typesense:course_search_enabled: "true"
   typesense:forum_search_enabled: "false"
+  edxapp:site_project:
+    deployment: mitxonline
+    mfe_apps:
+    - instructor-dashboard

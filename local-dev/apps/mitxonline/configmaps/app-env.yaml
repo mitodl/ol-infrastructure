@@ -1,0 +1,59 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mitxonline-env
+  namespace: mitxonline
+data:
+  DJANGO_SETTINGS_MODULE: "main.settings"
+  MITX_ONLINE_BASE_URL: "https://mitxonline.mit.dev"
+  MITXONLINE_DOCKER_BASE_URL: "https://mitxonline.mit.dev"
+  MITX_ONLINE_DB_DISABLE_SSL: "True"
+  MITX_ONLINE_USE_S3: "False"
+  # Must stay False: the production image (see Tiltfile) has no dev deps, so
+  # DEBUG=True would import debug_toolbar → boot crash.
+  DEBUG: "False"
+  ALLOWED_HOSTS: "*"
+  USE_X_FORWARDED_HOST: "True"
+  USE_X_FORWARDED_PORT: "True"
+
+  # mkcert root CA — trusts the local wildcard TLS cert for inter-pod HTTPS
+  REQUESTS_CA_BUNDLE: "/etc/ssl/local-dev/rootCA.pem"
+  SSL_CERT_FILE: "/etc/ssl/local-dev/rootCA.pem"
+
+  # Site config
+  SITE_NAME: "MITx Online"
+  MITX_ONLINE_ENVIRONMENT: "local"
+  MITX_ONLINE_ADMIN_EMAIL: "admin@odl.local"
+  MITX_ONLINE_FROM_EMAIL: "MIT Learn <mitlearn-support@mit.edu>"
+  MITX_ONLINE_REPLY_TO_ADDRESS: "MIT Learn <mitlearn-support@mit.edu>"
+  MITX_ONLINE_SUPPORT_EMAIL: "mitlearn-support@mit.edu"
+  MITX_ONLINE_OAUTH_PROVIDER: "mitxonline-oauth2"
+  MITX_ONLINE_SECURE_SSL_REDIRECT: "False"
+  EXPOSE_OIDC_LOGIN: "True"
+
+  # Keycloak
+  KEYCLOAK_BASE_URL: "https://sso.ol.mit.dev"
+  KEYCLOAK_REALM_NAME: "olapps"
+  KEYCLOAK_DISCOVERY_URL: "https://sso.ol.mit.dev/realms/olapps/.well-known/openid-configuration"
+
+  # Valkey
+  REDIS_URL: "redis://valkey.local-infra.svc.cluster.local:6379/0"
+  CELERY_BROKER_URL: "redis://valkey.local-infra.svc.cluster.local:6379/1"
+  CELERY_RESULT_BACKEND: "redis://valkey.local-infra.svc.cluster.local:6379/1"
+
+  # Email
+  EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
+  EMAIL_HOST: "mailpit.local-infra.svc.cluster.local"
+  EMAIL_PORT: "1025"
+  EMAIL_USE_TLS: "False"
+
+  # Required mitxonline email vars (stub values for local dev — email not sent)
+  MAILGUN_SENDER_DOMAIN: "local.dev"
+  MAILGUN_KEY: "local-dev-stub-mailgun-key"
+  # Required OpenEdX API credentials (stub — OpenEdX integration degraded locally)
+  OPENEDX_API_CLIENT_ID: "local-dev-openedx-client-id"  # pragma: allowlist secret
+  OPENEDX_API_CLIENT_SECRET: "local-dev-openedx-client-secret"  # pragma: allowlist secret
+
+  # Unified Ecommerce (optional — disable if not running)
+  UNIFIED_ECOMMERCE_URL: ""

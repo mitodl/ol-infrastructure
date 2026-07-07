@@ -22,15 +22,15 @@ class AuthorizationArgs:
                  authorizable_id: pulumi.Input[_builtins.str],
                  grantee_id: pulumi.Input[_builtins.str],
                  permissions: pulumi.Input[Sequence[pulumi.Input[_builtins.str]]],
-                 authorizable_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 authorization_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 grantee_type: Optional[pulumi.Input[_builtins.str]] = None):
+                 authorizable_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 authorization_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 grantee_type: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a Authorization resource.
 
         :param pulumi.Input[_builtins.str] authorizable_id: The id of the resource being accessed.
         :param pulumi.Input[_builtins.str] grantee_id: The resource id granted access.
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] permissions: Value must be one of <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`">`read`</span>, <span pulumi-lang-nodejs="`update`" pulumi-lang-dotnet="`Update`" pulumi-lang-go="`update`" pulumi-lang-python="`update`" pulumi-lang-yaml="`update`" pulumi-lang-java="`update`">`update`</span>, <span pulumi-lang-nodejs="`authorize`" pulumi-lang-dotnet="`Authorize`" pulumi-lang-go="`authorize`" pulumi-lang-python="`authorize`" pulumi-lang-yaml="`authorize`" pulumi-lang-java="`authorize`">`authorize`</span>, <span pulumi-lang-nodejs="`destroy`" pulumi-lang-dotnet="`Destroy`" pulumi-lang-go="`destroy`" pulumi-lang-python="`destroy`" pulumi-lang-yaml="`destroy`" pulumi-lang-java="`destroy`">`destroy`</span>.
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] permissions: Value must be one of <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`" pulumi-lang-hcl="`read`">`read`</span>, <span pulumi-lang-nodejs="`update`" pulumi-lang-dotnet="`Update`" pulumi-lang-go="`update`" pulumi-lang-python="`update`" pulumi-lang-yaml="`update`" pulumi-lang-java="`update`" pulumi-lang-hcl="`update`">`update`</span>, <span pulumi-lang-nodejs="`authorize`" pulumi-lang-dotnet="`Authorize`" pulumi-lang-go="`authorize`" pulumi-lang-python="`authorize`" pulumi-lang-yaml="`authorize`" pulumi-lang-java="`authorize`" pulumi-lang-hcl="`authorize`">`authorize`</span>, <span pulumi-lang-nodejs="`destroy`" pulumi-lang-dotnet="`Destroy`" pulumi-lang-go="`destroy`" pulumi-lang-python="`destroy`" pulumi-lang-yaml="`destroy`" pulumi-lang-java="`destroy`" pulumi-lang-hcl="`destroy`">`destroy`</span>.
         :param pulumi.Input[_builtins.str] authorizable_type: The type of resource being accessed.. Value must be one of `Dashboard`.
         :param pulumi.Input[_builtins.str] grantee_type: The type of resource granted access.. Value must be one of `User`, `Team`.
         """
@@ -72,7 +72,7 @@ class AuthorizationArgs:
     @pulumi.getter
     def permissions(self) -> pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`">`read`</span>, <span pulumi-lang-nodejs="`update`" pulumi-lang-dotnet="`Update`" pulumi-lang-go="`update`" pulumi-lang-python="`update`" pulumi-lang-yaml="`update`" pulumi-lang-java="`update`">`update`</span>, <span pulumi-lang-nodejs="`authorize`" pulumi-lang-dotnet="`Authorize`" pulumi-lang-go="`authorize`" pulumi-lang-python="`authorize`" pulumi-lang-yaml="`authorize`" pulumi-lang-java="`authorize`">`authorize`</span>, <span pulumi-lang-nodejs="`destroy`" pulumi-lang-dotnet="`Destroy`" pulumi-lang-go="`destroy`" pulumi-lang-python="`destroy`" pulumi-lang-yaml="`destroy`" pulumi-lang-java="`destroy`">`destroy`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`" pulumi-lang-hcl="`read`">`read`</span>, <span pulumi-lang-nodejs="`update`" pulumi-lang-dotnet="`Update`" pulumi-lang-go="`update`" pulumi-lang-python="`update`" pulumi-lang-yaml="`update`" pulumi-lang-java="`update`" pulumi-lang-hcl="`update`">`update`</span>, <span pulumi-lang-nodejs="`authorize`" pulumi-lang-dotnet="`Authorize`" pulumi-lang-go="`authorize`" pulumi-lang-python="`authorize`" pulumi-lang-yaml="`authorize`" pulumi-lang-java="`authorize`" pulumi-lang-hcl="`authorize`">`authorize`</span>, <span pulumi-lang-nodejs="`destroy`" pulumi-lang-dotnet="`Destroy`" pulumi-lang-go="`destroy`" pulumi-lang-python="`destroy`" pulumi-lang-yaml="`destroy`" pulumi-lang-java="`destroy`" pulumi-lang-hcl="`destroy`">`destroy`</span>.
         """
         return pulumi.get(self, "permissions")
 
@@ -82,47 +82,47 @@ class AuthorizationArgs:
 
     @_builtins.property
     @pulumi.getter(name="authorizableType")
-    def authorizable_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def authorizable_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The type of resource being accessed.. Value must be one of `Dashboard`.
         """
         return pulumi.get(self, "authorizable_type")
 
     @authorizable_type.setter
-    def authorizable_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def authorizable_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "authorizable_type", value)
 
     @_builtins.property
     @pulumi.getter(name="authorizationId")
-    def authorization_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def authorization_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "authorization_id")
 
     @authorization_id.setter
-    def authorization_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def authorization_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "authorization_id", value)
 
     @_builtins.property
     @pulumi.getter(name="granteeType")
-    def grantee_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def grantee_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The type of resource granted access.. Value must be one of `User`, `Team`.
         """
         return pulumi.get(self, "grantee_type")
 
     @grantee_type.setter
-    def grantee_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def grantee_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "grantee_type", value)
 
 
 @pulumi.input_type
 class _AuthorizationState:
     def __init__(__self__, *,
-                 authorizable_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 authorizable_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 authorization_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 grantee_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 grantee_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 permissions: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None):
+                 authorizable_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 authorizable_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 authorization_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 grantee_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 grantee_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 permissions: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None):
         """
         Input properties used for looking up and filtering Authorization resources.
 
@@ -130,7 +130,7 @@ class _AuthorizationState:
         :param pulumi.Input[_builtins.str] authorizable_type: The type of resource being accessed.. Value must be one of `Dashboard`.
         :param pulumi.Input[_builtins.str] grantee_id: The resource id granted access.
         :param pulumi.Input[_builtins.str] grantee_type: The type of resource granted access.. Value must be one of `User`, `Team`.
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] permissions: Value must be one of <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`">`read`</span>, <span pulumi-lang-nodejs="`update`" pulumi-lang-dotnet="`Update`" pulumi-lang-go="`update`" pulumi-lang-python="`update`" pulumi-lang-yaml="`update`" pulumi-lang-java="`update`">`update`</span>, <span pulumi-lang-nodejs="`authorize`" pulumi-lang-dotnet="`Authorize`" pulumi-lang-go="`authorize`" pulumi-lang-python="`authorize`" pulumi-lang-yaml="`authorize`" pulumi-lang-java="`authorize`">`authorize`</span>, <span pulumi-lang-nodejs="`destroy`" pulumi-lang-dotnet="`Destroy`" pulumi-lang-go="`destroy`" pulumi-lang-python="`destroy`" pulumi-lang-yaml="`destroy`" pulumi-lang-java="`destroy`">`destroy`</span>.
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] permissions: Value must be one of <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`" pulumi-lang-hcl="`read`">`read`</span>, <span pulumi-lang-nodejs="`update`" pulumi-lang-dotnet="`Update`" pulumi-lang-go="`update`" pulumi-lang-python="`update`" pulumi-lang-yaml="`update`" pulumi-lang-java="`update`" pulumi-lang-hcl="`update`">`update`</span>, <span pulumi-lang-nodejs="`authorize`" pulumi-lang-dotnet="`Authorize`" pulumi-lang-go="`authorize`" pulumi-lang-python="`authorize`" pulumi-lang-yaml="`authorize`" pulumi-lang-java="`authorize`" pulumi-lang-hcl="`authorize`">`authorize`</span>, <span pulumi-lang-nodejs="`destroy`" pulumi-lang-dotnet="`Destroy`" pulumi-lang-go="`destroy`" pulumi-lang-python="`destroy`" pulumi-lang-yaml="`destroy`" pulumi-lang-java="`destroy`" pulumi-lang-hcl="`destroy`">`destroy`</span>.
         """
         if authorizable_id is not None:
             pulumi.set(__self__, "authorizable_id", authorizable_id)
@@ -147,71 +147,71 @@ class _AuthorizationState:
 
     @_builtins.property
     @pulumi.getter(name="authorizableId")
-    def authorizable_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def authorizable_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The id of the resource being accessed.
         """
         return pulumi.get(self, "authorizable_id")
 
     @authorizable_id.setter
-    def authorizable_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def authorizable_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "authorizable_id", value)
 
     @_builtins.property
     @pulumi.getter(name="authorizableType")
-    def authorizable_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def authorizable_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The type of resource being accessed.. Value must be one of `Dashboard`.
         """
         return pulumi.get(self, "authorizable_type")
 
     @authorizable_type.setter
-    def authorizable_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def authorizable_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "authorizable_type", value)
 
     @_builtins.property
     @pulumi.getter(name="authorizationId")
-    def authorization_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def authorization_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "authorization_id")
 
     @authorization_id.setter
-    def authorization_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def authorization_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "authorization_id", value)
 
     @_builtins.property
     @pulumi.getter(name="granteeId")
-    def grantee_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def grantee_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The resource id granted access.
         """
         return pulumi.get(self, "grantee_id")
 
     @grantee_id.setter
-    def grantee_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def grantee_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "grantee_id", value)
 
     @_builtins.property
     @pulumi.getter(name="granteeType")
-    def grantee_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def grantee_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The type of resource granted access.. Value must be one of `User`, `Team`.
         """
         return pulumi.get(self, "grantee_type")
 
     @grantee_type.setter
-    def grantee_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def grantee_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "grantee_type", value)
 
     @_builtins.property
     @pulumi.getter
-    def permissions(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def permissions(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`">`read`</span>, <span pulumi-lang-nodejs="`update`" pulumi-lang-dotnet="`Update`" pulumi-lang-go="`update`" pulumi-lang-python="`update`" pulumi-lang-yaml="`update`" pulumi-lang-java="`update`">`update`</span>, <span pulumi-lang-nodejs="`authorize`" pulumi-lang-dotnet="`Authorize`" pulumi-lang-go="`authorize`" pulumi-lang-python="`authorize`" pulumi-lang-yaml="`authorize`" pulumi-lang-java="`authorize`">`authorize`</span>, <span pulumi-lang-nodejs="`destroy`" pulumi-lang-dotnet="`Destroy`" pulumi-lang-go="`destroy`" pulumi-lang-python="`destroy`" pulumi-lang-yaml="`destroy`" pulumi-lang-java="`destroy`">`destroy`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`" pulumi-lang-hcl="`read`">`read`</span>, <span pulumi-lang-nodejs="`update`" pulumi-lang-dotnet="`Update`" pulumi-lang-go="`update`" pulumi-lang-python="`update`" pulumi-lang-yaml="`update`" pulumi-lang-java="`update`" pulumi-lang-hcl="`update`">`update`</span>, <span pulumi-lang-nodejs="`authorize`" pulumi-lang-dotnet="`Authorize`" pulumi-lang-go="`authorize`" pulumi-lang-python="`authorize`" pulumi-lang-yaml="`authorize`" pulumi-lang-java="`authorize`" pulumi-lang-hcl="`authorize`">`authorize`</span>, <span pulumi-lang-nodejs="`destroy`" pulumi-lang-dotnet="`Destroy`" pulumi-lang-go="`destroy`" pulumi-lang-python="`destroy`" pulumi-lang-yaml="`destroy`" pulumi-lang-java="`destroy`" pulumi-lang-hcl="`destroy`">`destroy`</span>.
         """
         return pulumi.get(self, "permissions")
 
     @permissions.setter
-    def permissions(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def permissions(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "permissions", value)
 
 
@@ -221,12 +221,12 @@ class Authorization(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 authorizable_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 authorizable_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 authorization_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 grantee_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 grantee_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 permissions: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 authorizable_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 authorizable_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 authorization_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 grantee_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 grantee_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 permissions: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  __props__=None):
         """
         Create a Authorization resource with the given unique name, props, and options.
@@ -237,7 +237,7 @@ class Authorization(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] authorizable_type: The type of resource being accessed.. Value must be one of `Dashboard`.
         :param pulumi.Input[_builtins.str] grantee_id: The resource id granted access.
         :param pulumi.Input[_builtins.str] grantee_type: The type of resource granted access.. Value must be one of `User`, `Team`.
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] permissions: Value must be one of <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`">`read`</span>, <span pulumi-lang-nodejs="`update`" pulumi-lang-dotnet="`Update`" pulumi-lang-go="`update`" pulumi-lang-python="`update`" pulumi-lang-yaml="`update`" pulumi-lang-java="`update`">`update`</span>, <span pulumi-lang-nodejs="`authorize`" pulumi-lang-dotnet="`Authorize`" pulumi-lang-go="`authorize`" pulumi-lang-python="`authorize`" pulumi-lang-yaml="`authorize`" pulumi-lang-java="`authorize`">`authorize`</span>, <span pulumi-lang-nodejs="`destroy`" pulumi-lang-dotnet="`Destroy`" pulumi-lang-go="`destroy`" pulumi-lang-python="`destroy`" pulumi-lang-yaml="`destroy`" pulumi-lang-java="`destroy`">`destroy`</span>.
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] permissions: Value must be one of <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`" pulumi-lang-hcl="`read`">`read`</span>, <span pulumi-lang-nodejs="`update`" pulumi-lang-dotnet="`Update`" pulumi-lang-go="`update`" pulumi-lang-python="`update`" pulumi-lang-yaml="`update`" pulumi-lang-java="`update`" pulumi-lang-hcl="`update`">`update`</span>, <span pulumi-lang-nodejs="`authorize`" pulumi-lang-dotnet="`Authorize`" pulumi-lang-go="`authorize`" pulumi-lang-python="`authorize`" pulumi-lang-yaml="`authorize`" pulumi-lang-java="`authorize`" pulumi-lang-hcl="`authorize`">`authorize`</span>, <span pulumi-lang-nodejs="`destroy`" pulumi-lang-dotnet="`Destroy`" pulumi-lang-go="`destroy`" pulumi-lang-python="`destroy`" pulumi-lang-yaml="`destroy`" pulumi-lang-java="`destroy`" pulumi-lang-hcl="`destroy`">`destroy`</span>.
         """
         ...
     @overload
@@ -263,12 +263,12 @@ class Authorization(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 authorizable_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 authorizable_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 authorization_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 grantee_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 grantee_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 permissions: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 authorizable_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 authorizable_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 authorization_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 grantee_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 grantee_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 permissions: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -301,12 +301,12 @@ class Authorization(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            authorizable_id: Optional[pulumi.Input[_builtins.str]] = None,
-            authorizable_type: Optional[pulumi.Input[_builtins.str]] = None,
-            authorization_id: Optional[pulumi.Input[_builtins.str]] = None,
-            grantee_id: Optional[pulumi.Input[_builtins.str]] = None,
-            grantee_type: Optional[pulumi.Input[_builtins.str]] = None,
-            permissions: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None) -> 'Authorization':
+            authorizable_id: pulumi.Input[Optional[_builtins.str]] = None,
+            authorizable_type: pulumi.Input[Optional[_builtins.str]] = None,
+            authorization_id: pulumi.Input[Optional[_builtins.str]] = None,
+            grantee_id: pulumi.Input[Optional[_builtins.str]] = None,
+            grantee_type: pulumi.Input[Optional[_builtins.str]] = None,
+            permissions: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None) -> 'Authorization':
         """
         Get an existing Authorization resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -318,7 +318,7 @@ class Authorization(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] authorizable_type: The type of resource being accessed.. Value must be one of `Dashboard`.
         :param pulumi.Input[_builtins.str] grantee_id: The resource id granted access.
         :param pulumi.Input[_builtins.str] grantee_type: The type of resource granted access.. Value must be one of `User`, `Team`.
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] permissions: Value must be one of <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`">`read`</span>, <span pulumi-lang-nodejs="`update`" pulumi-lang-dotnet="`Update`" pulumi-lang-go="`update`" pulumi-lang-python="`update`" pulumi-lang-yaml="`update`" pulumi-lang-java="`update`">`update`</span>, <span pulumi-lang-nodejs="`authorize`" pulumi-lang-dotnet="`Authorize`" pulumi-lang-go="`authorize`" pulumi-lang-python="`authorize`" pulumi-lang-yaml="`authorize`" pulumi-lang-java="`authorize`">`authorize`</span>, <span pulumi-lang-nodejs="`destroy`" pulumi-lang-dotnet="`Destroy`" pulumi-lang-go="`destroy`" pulumi-lang-python="`destroy`" pulumi-lang-yaml="`destroy`" pulumi-lang-java="`destroy`">`destroy`</span>.
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] permissions: Value must be one of <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`" pulumi-lang-hcl="`read`">`read`</span>, <span pulumi-lang-nodejs="`update`" pulumi-lang-dotnet="`Update`" pulumi-lang-go="`update`" pulumi-lang-python="`update`" pulumi-lang-yaml="`update`" pulumi-lang-java="`update`" pulumi-lang-hcl="`update`">`update`</span>, <span pulumi-lang-nodejs="`authorize`" pulumi-lang-dotnet="`Authorize`" pulumi-lang-go="`authorize`" pulumi-lang-python="`authorize`" pulumi-lang-yaml="`authorize`" pulumi-lang-java="`authorize`" pulumi-lang-hcl="`authorize`">`authorize`</span>, <span pulumi-lang-nodejs="`destroy`" pulumi-lang-dotnet="`Destroy`" pulumi-lang-go="`destroy`" pulumi-lang-python="`destroy`" pulumi-lang-yaml="`destroy`" pulumi-lang-java="`destroy`" pulumi-lang-hcl="`destroy`">`destroy`</span>.
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
@@ -373,6 +373,7 @@ class Authorization(pulumi.CustomResource):
     @pulumi.getter
     def permissions(self) -> pulumi.Output[Sequence[_builtins.str]]:
         """
-        Value must be one of <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`">`read`</span>, <span pulumi-lang-nodejs="`update`" pulumi-lang-dotnet="`Update`" pulumi-lang-go="`update`" pulumi-lang-python="`update`" pulumi-lang-yaml="`update`" pulumi-lang-java="`update`">`update`</span>, <span pulumi-lang-nodejs="`authorize`" pulumi-lang-dotnet="`Authorize`" pulumi-lang-go="`authorize`" pulumi-lang-python="`authorize`" pulumi-lang-yaml="`authorize`" pulumi-lang-java="`authorize`">`authorize`</span>, <span pulumi-lang-nodejs="`destroy`" pulumi-lang-dotnet="`Destroy`" pulumi-lang-go="`destroy`" pulumi-lang-python="`destroy`" pulumi-lang-yaml="`destroy`" pulumi-lang-java="`destroy`">`destroy`</span>.
+        Value must be one of <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`" pulumi-lang-hcl="`read`">`read`</span>, <span pulumi-lang-nodejs="`update`" pulumi-lang-dotnet="`Update`" pulumi-lang-go="`update`" pulumi-lang-python="`update`" pulumi-lang-yaml="`update`" pulumi-lang-java="`update`" pulumi-lang-hcl="`update`">`update`</span>, <span pulumi-lang-nodejs="`authorize`" pulumi-lang-dotnet="`Authorize`" pulumi-lang-go="`authorize`" pulumi-lang-python="`authorize`" pulumi-lang-yaml="`authorize`" pulumi-lang-java="`authorize`" pulumi-lang-hcl="`authorize`">`authorize`</span>, <span pulumi-lang-nodejs="`destroy`" pulumi-lang-dotnet="`Destroy`" pulumi-lang-go="`destroy`" pulumi-lang-python="`destroy`" pulumi-lang-yaml="`destroy`" pulumi-lang-java="`destroy`" pulumi-lang-hcl="`destroy`">`destroy`</span>.
         """
         return pulumi.get(self, "permissions")
+

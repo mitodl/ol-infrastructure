@@ -21,29 +21,29 @@ __all__ = ['FunctionalityArgs', 'Functionality']
 @pulumi.input_type
 class FunctionalityArgs:
     def __init__(__self__, *,
-                 backstage_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 color: Optional[pulumi.Input[_builtins.str]] = None,
-                 cortex_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 external_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 functionality_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 notify_emails: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 opsgenie_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 opsgenie_team_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 owner_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 owner_user_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-                 pagerduty_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 properties: Optional[pulumi.Input[Sequence[pulumi.Input['FunctionalityPropertyArgs']]]] = None,
-                 public_description: Optional[pulumi.Input[_builtins.str]] = None,
-                 service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 service_now_ci_sys_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 slack_aliases: Optional[pulumi.Input[Sequence[pulumi.Input['FunctionalitySlackAliasArgs']]]] = None,
-                 slack_channels: Optional[pulumi.Input[Sequence[pulumi.Input['FunctionalitySlackChannelArgs']]]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None):
+                 backstage_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 cortex_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 environment_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 external_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 functionality_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 notify_emails: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 opsgenie_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 opsgenie_team_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 owner_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 owner_user_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 pagerduty_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 properties: pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalityPropertyArgs']]]] = None,
+                 public_description: pulumi.Input[Optional[_builtins.str]] = None,
+                 service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 service_now_ci_sys_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalitySlackAliasArgs']]]] = None,
+                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalitySlackChannelArgs']]]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a Functionality resource.
 
@@ -119,304 +119,304 @@ class FunctionalityArgs:
 
     @_builtins.property
     @pulumi.getter(name="backstageId")
-    def backstage_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def backstage_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Backstage entity id associated to this functionality. eg: :namespace/:kind/:entity_name
         """
         return pulumi.get(self, "backstage_id")
 
     @backstage_id.setter
-    def backstage_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def backstage_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "backstage_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def color(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def color(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The hex color of the functionality
         """
         return pulumi.get(self, "color")
 
     @color.setter
-    def color(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def color(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "color", value)
 
     @_builtins.property
     @pulumi.getter(name="cortexId")
-    def cortex_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def cortex_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Cortex group id associated to this functionality
         """
         return pulumi.get(self, "cortex_id")
 
     @cortex_id.setter
-    def cortex_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def cortex_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "cortex_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the functionality
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="environmentIds")
-    def environment_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def environment_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Environments associated with this functionality
         """
         return pulumi.get(self, "environment_ids")
 
     @environment_ids.setter
-    def environment_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def environment_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "environment_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="escalationPolicyId")
-    def escalation_policy_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def escalation_policy_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The escalation policy id of the functionality
         """
         return pulumi.get(self, "escalation_policy_id")
 
     @escalation_policy_id.setter
-    def escalation_policy_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def escalation_policy_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "escalation_policy_id", value)
 
     @_builtins.property
     @pulumi.getter(name="externalId")
-    def external_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def external_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The external id associated to this functionality
         """
         return pulumi.get(self, "external_id")
 
     @external_id.setter
-    def external_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def external_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "external_id", value)
 
     @_builtins.property
     @pulumi.getter(name="functionalityId")
-    def functionality_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def functionality_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "functionality_id")
 
     @functionality_id.setter
-    def functionality_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def functionality_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "functionality_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the functionality
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="notifyEmails")
-    def notify_emails(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def notify_emails(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Emails attached to the functionality
         """
         return pulumi.get(self, "notify_emails")
 
     @notify_emails.setter
-    def notify_emails(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def notify_emails(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "notify_emails", value)
 
     @_builtins.property
     @pulumi.getter(name="opsgenieId")
-    def opsgenie_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def opsgenie_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Opsgenie service id associated to this functionality
         """
         return pulumi.get(self, "opsgenie_id")
 
     @opsgenie_id.setter
-    def opsgenie_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def opsgenie_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "opsgenie_id", value)
 
     @_builtins.property
     @pulumi.getter(name="opsgenieTeamId")
-    def opsgenie_team_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def opsgenie_team_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Opsgenie team id associated to this functionality
         """
         return pulumi.get(self, "opsgenie_team_id")
 
     @opsgenie_team_id.setter
-    def opsgenie_team_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def opsgenie_team_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "opsgenie_team_id", value)
 
     @_builtins.property
     @pulumi.getter(name="ownerGroupIds")
-    def owner_group_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def owner_group_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Owner Teams associated with this functionality
         """
         return pulumi.get(self, "owner_group_ids")
 
     @owner_group_ids.setter
-    def owner_group_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def owner_group_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "owner_group_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="ownerUserIds")
-    def owner_user_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]]:
+    def owner_user_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]:
         """
         Owner Users associated with this functionality
         """
         return pulumi.get(self, "owner_user_ids")
 
     @owner_user_ids.setter
-    def owner_user_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]]):
+    def owner_user_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]):
         pulumi.set(self, "owner_user_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="pagerdutyId")
-    def pagerduty_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def pagerduty_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The PagerDuty service id associated to this functionality
         """
         return pulumi.get(self, "pagerduty_id")
 
     @pagerduty_id.setter
-    def pagerduty_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def pagerduty_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "pagerduty_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Position of the functionality
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter
-    def properties(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['FunctionalityPropertyArgs']]]]:
+    def properties(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalityPropertyArgs']]]]:
         """
         Array of property values for this functionality.
         """
         return pulumi.get(self, "properties")
 
     @properties.setter
-    def properties(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['FunctionalityPropertyArgs']]]]):
+    def properties(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalityPropertyArgs']]]]):
         pulumi.set(self, "properties", value)
 
     @_builtins.property
     @pulumi.getter(name="publicDescription")
-    def public_description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def public_description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The public description of the functionality
         """
         return pulumi.get(self, "public_description")
 
     @public_description.setter
-    def public_description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def public_description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "public_description", value)
 
     @_builtins.property
     @pulumi.getter(name="serviceIds")
-    def service_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def service_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Services associated with this functionality
         """
         return pulumi.get(self, "service_ids")
 
     @service_ids.setter
-    def service_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def service_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "service_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="serviceNowCiSysId")
-    def service_now_ci_sys_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def service_now_ci_sys_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Service Now CI sys id associated to this functionality
         """
         return pulumi.get(self, "service_now_ci_sys_id")
 
     @service_now_ci_sys_id.setter
-    def service_now_ci_sys_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def service_now_ci_sys_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "service_now_ci_sys_id", value)
 
     @_builtins.property
     @pulumi.getter(name="slackAliases")
-    def slack_aliases(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['FunctionalitySlackAliasArgs']]]]:
+    def slack_aliases(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalitySlackAliasArgs']]]]:
         """
         Slack Aliases associated with this functionality
         """
         return pulumi.get(self, "slack_aliases")
 
     @slack_aliases.setter
-    def slack_aliases(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['FunctionalitySlackAliasArgs']]]]):
+    def slack_aliases(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalitySlackAliasArgs']]]]):
         pulumi.set(self, "slack_aliases", value)
 
     @_builtins.property
     @pulumi.getter(name="slackChannels")
-    def slack_channels(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['FunctionalitySlackChannelArgs']]]]:
+    def slack_channels(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalitySlackChannelArgs']]]]:
         """
         Slack Channels associated with this functionality
         """
         return pulumi.get(self, "slack_channels")
 
     @slack_channels.setter
-    def slack_channels(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['FunctionalitySlackChannelArgs']]]]):
+    def slack_channels(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalitySlackChannelArgs']]]]):
         pulumi.set(self, "slack_channels", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The slug of the functionality
         """
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
 
 @pulumi.input_type
 class _FunctionalityState:
     def __init__(__self__, *,
-                 backstage_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 color: Optional[pulumi.Input[_builtins.str]] = None,
-                 cortex_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 external_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 functionality_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 notify_emails: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 opsgenie_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 opsgenie_team_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 owner_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 owner_user_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-                 pagerduty_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 properties: Optional[pulumi.Input[Sequence[pulumi.Input['FunctionalityPropertyArgs']]]] = None,
-                 public_description: Optional[pulumi.Input[_builtins.str]] = None,
-                 service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 service_now_ci_sys_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 slack_aliases: Optional[pulumi.Input[Sequence[pulumi.Input['FunctionalitySlackAliasArgs']]]] = None,
-                 slack_channels: Optional[pulumi.Input[Sequence[pulumi.Input['FunctionalitySlackChannelArgs']]]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None):
+                 backstage_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 cortex_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 environment_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 external_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 functionality_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 notify_emails: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 opsgenie_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 opsgenie_team_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 owner_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 owner_user_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 pagerduty_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 properties: pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalityPropertyArgs']]]] = None,
+                 public_description: pulumi.Input[Optional[_builtins.str]] = None,
+                 service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 service_now_ci_sys_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalitySlackAliasArgs']]]] = None,
+                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalitySlackChannelArgs']]]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering Functionality resources.
 
@@ -492,275 +492,275 @@ class _FunctionalityState:
 
     @_builtins.property
     @pulumi.getter(name="backstageId")
-    def backstage_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def backstage_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Backstage entity id associated to this functionality. eg: :namespace/:kind/:entity_name
         """
         return pulumi.get(self, "backstage_id")
 
     @backstage_id.setter
-    def backstage_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def backstage_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "backstage_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def color(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def color(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The hex color of the functionality
         """
         return pulumi.get(self, "color")
 
     @color.setter
-    def color(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def color(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "color", value)
 
     @_builtins.property
     @pulumi.getter(name="cortexId")
-    def cortex_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def cortex_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Cortex group id associated to this functionality
         """
         return pulumi.get(self, "cortex_id")
 
     @cortex_id.setter
-    def cortex_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def cortex_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "cortex_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the functionality
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="environmentIds")
-    def environment_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def environment_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Environments associated with this functionality
         """
         return pulumi.get(self, "environment_ids")
 
     @environment_ids.setter
-    def environment_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def environment_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "environment_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="escalationPolicyId")
-    def escalation_policy_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def escalation_policy_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The escalation policy id of the functionality
         """
         return pulumi.get(self, "escalation_policy_id")
 
     @escalation_policy_id.setter
-    def escalation_policy_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def escalation_policy_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "escalation_policy_id", value)
 
     @_builtins.property
     @pulumi.getter(name="externalId")
-    def external_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def external_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The external id associated to this functionality
         """
         return pulumi.get(self, "external_id")
 
     @external_id.setter
-    def external_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def external_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "external_id", value)
 
     @_builtins.property
     @pulumi.getter(name="functionalityId")
-    def functionality_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def functionality_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "functionality_id")
 
     @functionality_id.setter
-    def functionality_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def functionality_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "functionality_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the functionality
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="notifyEmails")
-    def notify_emails(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def notify_emails(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Emails attached to the functionality
         """
         return pulumi.get(self, "notify_emails")
 
     @notify_emails.setter
-    def notify_emails(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def notify_emails(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "notify_emails", value)
 
     @_builtins.property
     @pulumi.getter(name="opsgenieId")
-    def opsgenie_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def opsgenie_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Opsgenie service id associated to this functionality
         """
         return pulumi.get(self, "opsgenie_id")
 
     @opsgenie_id.setter
-    def opsgenie_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def opsgenie_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "opsgenie_id", value)
 
     @_builtins.property
     @pulumi.getter(name="opsgenieTeamId")
-    def opsgenie_team_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def opsgenie_team_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Opsgenie team id associated to this functionality
         """
         return pulumi.get(self, "opsgenie_team_id")
 
     @opsgenie_team_id.setter
-    def opsgenie_team_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def opsgenie_team_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "opsgenie_team_id", value)
 
     @_builtins.property
     @pulumi.getter(name="ownerGroupIds")
-    def owner_group_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def owner_group_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Owner Teams associated with this functionality
         """
         return pulumi.get(self, "owner_group_ids")
 
     @owner_group_ids.setter
-    def owner_group_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def owner_group_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "owner_group_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="ownerUserIds")
-    def owner_user_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]]:
+    def owner_user_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]:
         """
         Owner Users associated with this functionality
         """
         return pulumi.get(self, "owner_user_ids")
 
     @owner_user_ids.setter
-    def owner_user_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]]):
+    def owner_user_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]):
         pulumi.set(self, "owner_user_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="pagerdutyId")
-    def pagerduty_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def pagerduty_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The PagerDuty service id associated to this functionality
         """
         return pulumi.get(self, "pagerduty_id")
 
     @pagerduty_id.setter
-    def pagerduty_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def pagerduty_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "pagerduty_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Position of the functionality
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter
-    def properties(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['FunctionalityPropertyArgs']]]]:
+    def properties(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalityPropertyArgs']]]]:
         """
         Array of property values for this functionality.
         """
         return pulumi.get(self, "properties")
 
     @properties.setter
-    def properties(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['FunctionalityPropertyArgs']]]]):
+    def properties(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalityPropertyArgs']]]]):
         pulumi.set(self, "properties", value)
 
     @_builtins.property
     @pulumi.getter(name="publicDescription")
-    def public_description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def public_description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The public description of the functionality
         """
         return pulumi.get(self, "public_description")
 
     @public_description.setter
-    def public_description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def public_description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "public_description", value)
 
     @_builtins.property
     @pulumi.getter(name="serviceIds")
-    def service_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def service_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
         Services associated with this functionality
         """
         return pulumi.get(self, "service_ids")
 
     @service_ids.setter
-    def service_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def service_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "service_ids", value)
 
     @_builtins.property
     @pulumi.getter(name="serviceNowCiSysId")
-    def service_now_ci_sys_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def service_now_ci_sys_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The Service Now CI sys id associated to this functionality
         """
         return pulumi.get(self, "service_now_ci_sys_id")
 
     @service_now_ci_sys_id.setter
-    def service_now_ci_sys_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def service_now_ci_sys_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "service_now_ci_sys_id", value)
 
     @_builtins.property
     @pulumi.getter(name="slackAliases")
-    def slack_aliases(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['FunctionalitySlackAliasArgs']]]]:
+    def slack_aliases(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalitySlackAliasArgs']]]]:
         """
         Slack Aliases associated with this functionality
         """
         return pulumi.get(self, "slack_aliases")
 
     @slack_aliases.setter
-    def slack_aliases(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['FunctionalitySlackAliasArgs']]]]):
+    def slack_aliases(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalitySlackAliasArgs']]]]):
         pulumi.set(self, "slack_aliases", value)
 
     @_builtins.property
     @pulumi.getter(name="slackChannels")
-    def slack_channels(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['FunctionalitySlackChannelArgs']]]]:
+    def slack_channels(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalitySlackChannelArgs']]]]:
         """
         Slack Channels associated with this functionality
         """
         return pulumi.get(self, "slack_channels")
 
     @slack_channels.setter
-    def slack_channels(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['FunctionalitySlackChannelArgs']]]]):
+    def slack_channels(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalitySlackChannelArgs']]]]):
         pulumi.set(self, "slack_channels", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The slug of the functionality
         """
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
 
@@ -770,29 +770,29 @@ class Functionality(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 backstage_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 color: Optional[pulumi.Input[_builtins.str]] = None,
-                 cortex_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 external_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 functionality_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 notify_emails: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 opsgenie_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 opsgenie_team_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 owner_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 owner_user_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-                 pagerduty_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 properties: Optional[pulumi.Input[Sequence[pulumi.Input[Union['FunctionalityPropertyArgs', 'FunctionalityPropertyArgsDict']]]]] = None,
-                 public_description: Optional[pulumi.Input[_builtins.str]] = None,
-                 service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 service_now_ci_sys_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 slack_aliases: Optional[pulumi.Input[Sequence[pulumi.Input[Union['FunctionalitySlackAliasArgs', 'FunctionalitySlackAliasArgsDict']]]]] = None,
-                 slack_channels: Optional[pulumi.Input[Sequence[pulumi.Input[Union['FunctionalitySlackChannelArgs', 'FunctionalitySlackChannelArgsDict']]]]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
+                 backstage_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 cortex_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 environment_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 external_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 functionality_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 notify_emails: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 opsgenie_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 opsgenie_team_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 owner_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 owner_user_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 pagerduty_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 properties: pulumi.Input[Optional[Sequence[pulumi.Input[Union['FunctionalityPropertyArgs', 'FunctionalityPropertyArgsDict']]]]] = None,
+                 public_description: pulumi.Input[Optional[_builtins.str]] = None,
+                 service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 service_now_ci_sys_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input[Union['FunctionalitySlackAliasArgs', 'FunctionalitySlackAliasArgsDict']]]]] = None,
+                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input[Union['FunctionalitySlackChannelArgs', 'FunctionalitySlackChannelArgsDict']]]]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a Functionality resource with the given unique name, props, and options.
@@ -846,29 +846,29 @@ class Functionality(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 backstage_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 color: Optional[pulumi.Input[_builtins.str]] = None,
-                 cortex_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 external_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 functionality_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 notify_emails: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 opsgenie_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 opsgenie_team_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 owner_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 owner_user_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-                 pagerduty_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 properties: Optional[pulumi.Input[Sequence[pulumi.Input[Union['FunctionalityPropertyArgs', 'FunctionalityPropertyArgsDict']]]]] = None,
-                 public_description: Optional[pulumi.Input[_builtins.str]] = None,
-                 service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 service_now_ci_sys_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 slack_aliases: Optional[pulumi.Input[Sequence[pulumi.Input[Union['FunctionalitySlackAliasArgs', 'FunctionalitySlackAliasArgsDict']]]]] = None,
-                 slack_channels: Optional[pulumi.Input[Sequence[pulumi.Input[Union['FunctionalitySlackChannelArgs', 'FunctionalitySlackChannelArgsDict']]]]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
+                 backstage_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 cortex_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 environment_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 external_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 functionality_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 notify_emails: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 opsgenie_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 opsgenie_team_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 owner_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 owner_user_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 pagerduty_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 properties: pulumi.Input[Optional[Sequence[pulumi.Input[Union['FunctionalityPropertyArgs', 'FunctionalityPropertyArgsDict']]]]] = None,
+                 public_description: pulumi.Input[Optional[_builtins.str]] = None,
+                 service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 service_now_ci_sys_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input[Union['FunctionalitySlackAliasArgs', 'FunctionalitySlackAliasArgsDict']]]]] = None,
+                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input[Union['FunctionalitySlackChannelArgs', 'FunctionalitySlackChannelArgsDict']]]]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -912,29 +912,29 @@ class Functionality(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            backstage_id: Optional[pulumi.Input[_builtins.str]] = None,
-            color: Optional[pulumi.Input[_builtins.str]] = None,
-            cortex_id: Optional[pulumi.Input[_builtins.str]] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            environment_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            escalation_policy_id: Optional[pulumi.Input[_builtins.str]] = None,
-            external_id: Optional[pulumi.Input[_builtins.str]] = None,
-            functionality_id: Optional[pulumi.Input[_builtins.str]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            notify_emails: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            opsgenie_id: Optional[pulumi.Input[_builtins.str]] = None,
-            opsgenie_team_id: Optional[pulumi.Input[_builtins.str]] = None,
-            owner_group_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            owner_user_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.float]]]] = None,
-            pagerduty_id: Optional[pulumi.Input[_builtins.str]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None,
-            properties: Optional[pulumi.Input[Sequence[pulumi.Input[Union['FunctionalityPropertyArgs', 'FunctionalityPropertyArgsDict']]]]] = None,
-            public_description: Optional[pulumi.Input[_builtins.str]] = None,
-            service_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            service_now_ci_sys_id: Optional[pulumi.Input[_builtins.str]] = None,
-            slack_aliases: Optional[pulumi.Input[Sequence[pulumi.Input[Union['FunctionalitySlackAliasArgs', 'FunctionalitySlackAliasArgsDict']]]]] = None,
-            slack_channels: Optional[pulumi.Input[Sequence[pulumi.Input[Union['FunctionalitySlackChannelArgs', 'FunctionalitySlackChannelArgsDict']]]]] = None,
-            slug: Optional[pulumi.Input[_builtins.str]] = None) -> 'Functionality':
+            backstage_id: pulumi.Input[Optional[_builtins.str]] = None,
+            color: pulumi.Input[Optional[_builtins.str]] = None,
+            cortex_id: pulumi.Input[Optional[_builtins.str]] = None,
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            environment_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
+            external_id: pulumi.Input[Optional[_builtins.str]] = None,
+            functionality_id: pulumi.Input[Optional[_builtins.str]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            notify_emails: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            opsgenie_id: pulumi.Input[Optional[_builtins.str]] = None,
+            opsgenie_team_id: pulumi.Input[Optional[_builtins.str]] = None,
+            owner_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            owner_user_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+            pagerduty_id: pulumi.Input[Optional[_builtins.str]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None,
+            properties: pulumi.Input[Optional[Sequence[pulumi.Input[Union['FunctionalityPropertyArgs', 'FunctionalityPropertyArgsDict']]]]] = None,
+            public_description: pulumi.Input[Optional[_builtins.str]] = None,
+            service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            service_now_ci_sys_id: pulumi.Input[Optional[_builtins.str]] = None,
+            slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input[Union['FunctionalitySlackAliasArgs', 'FunctionalitySlackAliasArgsDict']]]]] = None,
+            slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input[Union['FunctionalitySlackChannelArgs', 'FunctionalitySlackChannelArgsDict']]]]] = None,
+            slug: pulumi.Input[Optional[_builtins.str]] = None) -> 'Functionality':
         """
         Get an existing Functionality resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -1028,7 +1028,7 @@ class Functionality(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter(name="environmentIds")
-    def environment_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
+    def environment_ids(self) -> pulumi.Output[Sequence[_builtins.str]]:
         """
         Environments associated with this functionality
         """
@@ -1089,7 +1089,7 @@ class Functionality(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter(name="ownerGroupIds")
-    def owner_group_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
+    def owner_group_ids(self) -> pulumi.Output[Sequence[_builtins.str]]:
         """
         Owner Teams associated with this functionality
         """
@@ -1097,7 +1097,7 @@ class Functionality(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter(name="ownerUserIds")
-    def owner_user_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.float]]]:
+    def owner_user_ids(self) -> pulumi.Output[Sequence[_builtins.float]]:
         """
         Owner Users associated with this functionality
         """
@@ -1137,7 +1137,7 @@ class Functionality(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter(name="serviceIds")
-    def service_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
+    def service_ids(self) -> pulumi.Output[Sequence[_builtins.str]]:
         """
         Services associated with this functionality
         """
@@ -1174,3 +1174,4 @@ class Functionality(pulumi.CustomResource):
         The slug of the functionality
         """
         return pulumi.get(self, "slug")
+

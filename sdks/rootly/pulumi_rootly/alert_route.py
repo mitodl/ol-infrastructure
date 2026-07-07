@@ -22,11 +22,11 @@ __all__ = ['AlertRouteArgs', 'AlertRoute']
 class AlertRouteArgs:
     def __init__(__self__, *,
                  alerts_source_ids: pulumi.Input[Sequence[pulumi.Input[_builtins.str]]],
-                 alert_route_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 owning_team_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 rules: Optional[pulumi.Input[Sequence[pulumi.Input['AlertRouteRuleArgs']]]] = None):
+                 alert_route_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 owning_team_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 rules: pulumi.Input[Optional[Sequence[pulumi.Input['AlertRouteRuleArgs']]]] = None):
         """
         The set of arguments for constructing a AlertRoute resource.
 
@@ -55,62 +55,62 @@ class AlertRouteArgs:
 
     @_builtins.property
     @pulumi.getter(name="alertRouteId")
-    def alert_route_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alert_route_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "alert_route_id")
 
     @alert_route_id.setter
-    def alert_route_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alert_route_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alert_route_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         return pulumi.get(self, "enabled")
 
     @enabled.setter
-    def enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "enabled", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the alert route
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="owningTeamIds")
-    def owning_team_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def owning_team_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "owning_team_ids")
 
     @owning_team_ids.setter
-    def owning_team_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def owning_team_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "owning_team_ids", value)
 
     @_builtins.property
     @pulumi.getter
-    def rules(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['AlertRouteRuleArgs']]]]:
+    def rules(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['AlertRouteRuleArgs']]]]:
         return pulumi.get(self, "rules")
 
     @rules.setter
-    def rules(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['AlertRouteRuleArgs']]]]):
+    def rules(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['AlertRouteRuleArgs']]]]):
         pulumi.set(self, "rules", value)
 
 
 @pulumi.input_type
 class _AlertRouteState:
     def __init__(__self__, *,
-                 alert_route_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 alerts_source_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 owning_team_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 rules: Optional[pulumi.Input[Sequence[pulumi.Input['AlertRouteRuleArgs']]]] = None):
+                 alert_route_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 alerts_source_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 owning_team_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 rules: pulumi.Input[Optional[Sequence[pulumi.Input['AlertRouteRuleArgs']]]] = None):
         """
         Input properties used for looking up and filtering AlertRoute resources.
 
@@ -131,59 +131,59 @@ class _AlertRouteState:
 
     @_builtins.property
     @pulumi.getter(name="alertRouteId")
-    def alert_route_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alert_route_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "alert_route_id")
 
     @alert_route_id.setter
-    def alert_route_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alert_route_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alert_route_id", value)
 
     @_builtins.property
     @pulumi.getter(name="alertsSourceIds")
-    def alerts_source_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def alerts_source_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "alerts_source_ids")
 
     @alerts_source_ids.setter
-    def alerts_source_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def alerts_source_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "alerts_source_ids", value)
 
     @_builtins.property
     @pulumi.getter
-    def enabled(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         return pulumi.get(self, "enabled")
 
     @enabled.setter
-    def enabled(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "enabled", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the alert route
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter(name="owningTeamIds")
-    def owning_team_ids(self) -> Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]:
+    def owning_team_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         return pulumi.get(self, "owning_team_ids")
 
     @owning_team_ids.setter
-    def owning_team_ids(self, value: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]]):
+    def owning_team_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "owning_team_ids", value)
 
     @_builtins.property
     @pulumi.getter
-    def rules(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['AlertRouteRuleArgs']]]]:
+    def rules(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['AlertRouteRuleArgs']]]]:
         return pulumi.get(self, "rules")
 
     @rules.setter
-    def rules(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['AlertRouteRuleArgs']]]]):
+    def rules(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['AlertRouteRuleArgs']]]]):
         pulumi.set(self, "rules", value)
 
 
@@ -193,12 +193,12 @@ class AlertRoute(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 alert_route_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 alerts_source_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 owning_team_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 rules: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertRouteRuleArgs', 'AlertRouteRuleArgsDict']]]]] = None,
+                 alert_route_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 alerts_source_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 owning_team_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 rules: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertRouteRuleArgs', 'AlertRouteRuleArgsDict']]]]] = None,
                  __props__=None):
         """
         Create a AlertRoute resource with the given unique name, props, and options.
@@ -231,12 +231,12 @@ class AlertRoute(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 alert_route_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 alerts_source_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 owning_team_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 rules: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertRouteRuleArgs', 'AlertRouteRuleArgsDict']]]]] = None,
+                 alert_route_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 alerts_source_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 owning_team_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 rules: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertRouteRuleArgs', 'AlertRouteRuleArgsDict']]]]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -265,12 +265,12 @@ class AlertRoute(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            alert_route_id: Optional[pulumi.Input[_builtins.str]] = None,
-            alerts_source_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            enabled: Optional[pulumi.Input[_builtins.bool]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            owning_team_ids: Optional[pulumi.Input[Sequence[pulumi.Input[_builtins.str]]]] = None,
-            rules: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertRouteRuleArgs', 'AlertRouteRuleArgsDict']]]]] = None) -> 'AlertRoute':
+            alert_route_id: pulumi.Input[Optional[_builtins.str]] = None,
+            alerts_source_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            owning_team_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            rules: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertRouteRuleArgs', 'AlertRouteRuleArgsDict']]]]] = None) -> 'AlertRoute':
         """
         Get an existing AlertRoute resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -324,3 +324,4 @@ class AlertRoute(pulumi.CustomResource):
     @pulumi.getter
     def rules(self) -> pulumi.Output[Optional[Sequence['outputs.AlertRouteRule']]]:
         return pulumi.get(self, "rules")
+

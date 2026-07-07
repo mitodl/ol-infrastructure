@@ -21,13 +21,13 @@ class IncidentSubStatusArgs:
     def __init__(__self__, *,
                  assigned_at: pulumi.Input[_builtins.str],
                  sub_status_id: pulumi.Input[_builtins.str],
-                 assigned_by_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 incident_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_sub_status_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 assigned_by_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 incident_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_sub_status_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a IncidentSubStatus resource.
 
-        :param pulumi.Input[_builtins.str] sub_status_id: Note: To change an incident's sub-status, use the PATCH /incidents/:id endpoint and set the<span pulumi-lang-nodejs=" subStatusId " pulumi-lang-dotnet=" SubStatusId " pulumi-lang-go=" subStatusId " pulumi-lang-python=" sub_status_id " pulumi-lang-yaml=" subStatusId " pulumi-lang-java=" subStatusId "> sub_status_id </span>attribute. This endpoint is for modifying the timestamp of when an incident's sub-status was assigned.
+        :param pulumi.Input[_builtins.str] sub_status_id: Note: To change an incident's sub-status, use the PATCH /incidents/:id endpoint and set the<span pulumi-lang-nodejs=" subStatusId " pulumi-lang-dotnet=" SubStatusId " pulumi-lang-go=" subStatusId " pulumi-lang-python=" sub_status_id " pulumi-lang-yaml=" subStatusId " pulumi-lang-java=" subStatusId " pulumi-lang-hcl=" sub_status_id "> subStatusId </span>attribute. This endpoint is for modifying the timestamp of when an incident's sub-status was assigned.
         """
         pulumi.set(__self__, "assigned_at", assigned_at)
         pulumi.set(__self__, "sub_status_id", sub_status_id)
@@ -51,7 +51,7 @@ class IncidentSubStatusArgs:
     @pulumi.getter(name="subStatusId")
     def sub_status_id(self) -> pulumi.Input[_builtins.str]:
         """
-        Note: To change an incident's sub-status, use the PATCH /incidents/:id endpoint and set the<span pulumi-lang-nodejs=" subStatusId " pulumi-lang-dotnet=" SubStatusId " pulumi-lang-go=" subStatusId " pulumi-lang-python=" sub_status_id " pulumi-lang-yaml=" subStatusId " pulumi-lang-java=" subStatusId "> sub_status_id </span>attribute. This endpoint is for modifying the timestamp of when an incident's sub-status was assigned.
+        Note: To change an incident's sub-status, use the PATCH /incidents/:id endpoint and set the<span pulumi-lang-nodejs=" subStatusId " pulumi-lang-dotnet=" SubStatusId " pulumi-lang-go=" subStatusId " pulumi-lang-python=" sub_status_id " pulumi-lang-yaml=" subStatusId " pulumi-lang-java=" subStatusId " pulumi-lang-hcl=" sub_status_id "> subStatusId </span>attribute. This endpoint is for modifying the timestamp of when an incident's sub-status was assigned.
         """
         return pulumi.get(self, "sub_status_id")
 
@@ -61,44 +61,44 @@ class IncidentSubStatusArgs:
 
     @_builtins.property
     @pulumi.getter(name="assignedByUserId")
-    def assigned_by_user_id(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def assigned_by_user_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         return pulumi.get(self, "assigned_by_user_id")
 
     @assigned_by_user_id.setter
-    def assigned_by_user_id(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def assigned_by_user_id(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "assigned_by_user_id", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentId")
-    def incident_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def incident_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "incident_id")
 
     @incident_id.setter
-    def incident_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def incident_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "incident_id", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentSubStatusId")
-    def incident_sub_status_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def incident_sub_status_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "incident_sub_status_id")
 
     @incident_sub_status_id.setter
-    def incident_sub_status_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def incident_sub_status_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "incident_sub_status_id", value)
 
 
 @pulumi.input_type
 class _IncidentSubStatusState:
     def __init__(__self__, *,
-                 assigned_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 assigned_by_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 incident_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_sub_status_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 sub_status_id: Optional[pulumi.Input[_builtins.str]] = None):
+                 assigned_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 assigned_by_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 incident_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_sub_status_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 sub_status_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering IncidentSubStatus resources.
 
-        :param pulumi.Input[_builtins.str] sub_status_id: Note: To change an incident's sub-status, use the PATCH /incidents/:id endpoint and set the<span pulumi-lang-nodejs=" subStatusId " pulumi-lang-dotnet=" SubStatusId " pulumi-lang-go=" subStatusId " pulumi-lang-python=" sub_status_id " pulumi-lang-yaml=" subStatusId " pulumi-lang-java=" subStatusId "> sub_status_id </span>attribute. This endpoint is for modifying the timestamp of when an incident's sub-status was assigned.
+        :param pulumi.Input[_builtins.str] sub_status_id: Note: To change an incident's sub-status, use the PATCH /incidents/:id endpoint and set the<span pulumi-lang-nodejs=" subStatusId " pulumi-lang-dotnet=" SubStatusId " pulumi-lang-go=" subStatusId " pulumi-lang-python=" sub_status_id " pulumi-lang-yaml=" subStatusId " pulumi-lang-java=" subStatusId " pulumi-lang-hcl=" sub_status_id "> subStatusId </span>attribute. This endpoint is for modifying the timestamp of when an incident's sub-status was assigned.
         """
         if assigned_at is not None:
             pulumi.set(__self__, "assigned_at", assigned_at)
@@ -113,50 +113,50 @@ class _IncidentSubStatusState:
 
     @_builtins.property
     @pulumi.getter(name="assignedAt")
-    def assigned_at(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def assigned_at(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "assigned_at")
 
     @assigned_at.setter
-    def assigned_at(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def assigned_at(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "assigned_at", value)
 
     @_builtins.property
     @pulumi.getter(name="assignedByUserId")
-    def assigned_by_user_id(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def assigned_by_user_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         return pulumi.get(self, "assigned_by_user_id")
 
     @assigned_by_user_id.setter
-    def assigned_by_user_id(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def assigned_by_user_id(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "assigned_by_user_id", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentId")
-    def incident_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def incident_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "incident_id")
 
     @incident_id.setter
-    def incident_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def incident_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "incident_id", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentSubStatusId")
-    def incident_sub_status_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def incident_sub_status_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "incident_sub_status_id")
 
     @incident_sub_status_id.setter
-    def incident_sub_status_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def incident_sub_status_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "incident_sub_status_id", value)
 
     @_builtins.property
     @pulumi.getter(name="subStatusId")
-    def sub_status_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def sub_status_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Note: To change an incident's sub-status, use the PATCH /incidents/:id endpoint and set the<span pulumi-lang-nodejs=" subStatusId " pulumi-lang-dotnet=" SubStatusId " pulumi-lang-go=" subStatusId " pulumi-lang-python=" sub_status_id " pulumi-lang-yaml=" subStatusId " pulumi-lang-java=" subStatusId "> sub_status_id </span>attribute. This endpoint is for modifying the timestamp of when an incident's sub-status was assigned.
+        Note: To change an incident's sub-status, use the PATCH /incidents/:id endpoint and set the<span pulumi-lang-nodejs=" subStatusId " pulumi-lang-dotnet=" SubStatusId " pulumi-lang-go=" subStatusId " pulumi-lang-python=" sub_status_id " pulumi-lang-yaml=" subStatusId " pulumi-lang-java=" subStatusId " pulumi-lang-hcl=" sub_status_id "> subStatusId </span>attribute. This endpoint is for modifying the timestamp of when an incident's sub-status was assigned.
         """
         return pulumi.get(self, "sub_status_id")
 
     @sub_status_id.setter
-    def sub_status_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def sub_status_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "sub_status_id", value)
 
 
@@ -166,18 +166,18 @@ class IncidentSubStatus(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 assigned_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 assigned_by_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 incident_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_sub_status_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 sub_status_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 assigned_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 assigned_by_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 incident_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_sub_status_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 sub_status_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a IncidentSubStatus resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] sub_status_id: Note: To change an incident's sub-status, use the PATCH /incidents/:id endpoint and set the<span pulumi-lang-nodejs=" subStatusId " pulumi-lang-dotnet=" SubStatusId " pulumi-lang-go=" subStatusId " pulumi-lang-python=" sub_status_id " pulumi-lang-yaml=" subStatusId " pulumi-lang-java=" subStatusId "> sub_status_id </span>attribute. This endpoint is for modifying the timestamp of when an incident's sub-status was assigned.
+        :param pulumi.Input[_builtins.str] sub_status_id: Note: To change an incident's sub-status, use the PATCH /incidents/:id endpoint and set the<span pulumi-lang-nodejs=" subStatusId " pulumi-lang-dotnet=" SubStatusId " pulumi-lang-go=" subStatusId " pulumi-lang-python=" sub_status_id " pulumi-lang-yaml=" subStatusId " pulumi-lang-java=" subStatusId " pulumi-lang-hcl=" sub_status_id "> subStatusId </span>attribute. This endpoint is for modifying the timestamp of when an incident's sub-status was assigned.
         """
         ...
     @overload
@@ -203,11 +203,11 @@ class IncidentSubStatus(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 assigned_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 assigned_by_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-                 incident_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 incident_sub_status_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 sub_status_id: Optional[pulumi.Input[_builtins.str]] = None,
+                 assigned_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 assigned_by_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 incident_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_sub_status_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 sub_status_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -237,11 +237,11 @@ class IncidentSubStatus(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            assigned_at: Optional[pulumi.Input[_builtins.str]] = None,
-            assigned_by_user_id: Optional[pulumi.Input[_builtins.float]] = None,
-            incident_id: Optional[pulumi.Input[_builtins.str]] = None,
-            incident_sub_status_id: Optional[pulumi.Input[_builtins.str]] = None,
-            sub_status_id: Optional[pulumi.Input[_builtins.str]] = None) -> 'IncidentSubStatus':
+            assigned_at: pulumi.Input[Optional[_builtins.str]] = None,
+            assigned_by_user_id: pulumi.Input[Optional[_builtins.float]] = None,
+            incident_id: pulumi.Input[Optional[_builtins.str]] = None,
+            incident_sub_status_id: pulumi.Input[Optional[_builtins.str]] = None,
+            sub_status_id: pulumi.Input[Optional[_builtins.str]] = None) -> 'IncidentSubStatus':
         """
         Get an existing IncidentSubStatus resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -249,7 +249,7 @@ class IncidentSubStatus(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] sub_status_id: Note: To change an incident's sub-status, use the PATCH /incidents/:id endpoint and set the<span pulumi-lang-nodejs=" subStatusId " pulumi-lang-dotnet=" SubStatusId " pulumi-lang-go=" subStatusId " pulumi-lang-python=" sub_status_id " pulumi-lang-yaml=" subStatusId " pulumi-lang-java=" subStatusId "> sub_status_id </span>attribute. This endpoint is for modifying the timestamp of when an incident's sub-status was assigned.
+        :param pulumi.Input[_builtins.str] sub_status_id: Note: To change an incident's sub-status, use the PATCH /incidents/:id endpoint and set the<span pulumi-lang-nodejs=" subStatusId " pulumi-lang-dotnet=" SubStatusId " pulumi-lang-go=" subStatusId " pulumi-lang-python=" sub_status_id " pulumi-lang-yaml=" subStatusId " pulumi-lang-java=" subStatusId " pulumi-lang-hcl=" sub_status_id "> subStatusId </span>attribute. This endpoint is for modifying the timestamp of when an incident's sub-status was assigned.
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
@@ -286,6 +286,7 @@ class IncidentSubStatus(pulumi.CustomResource):
     @pulumi.getter(name="subStatusId")
     def sub_status_id(self) -> pulumi.Output[_builtins.str]:
         """
-        Note: To change an incident's sub-status, use the PATCH /incidents/:id endpoint and set the<span pulumi-lang-nodejs=" subStatusId " pulumi-lang-dotnet=" SubStatusId " pulumi-lang-go=" subStatusId " pulumi-lang-python=" sub_status_id " pulumi-lang-yaml=" subStatusId " pulumi-lang-java=" subStatusId "> sub_status_id </span>attribute. This endpoint is for modifying the timestamp of when an incident's sub-status was assigned.
+        Note: To change an incident's sub-status, use the PATCH /incidents/:id endpoint and set the<span pulumi-lang-nodejs=" subStatusId " pulumi-lang-dotnet=" SubStatusId " pulumi-lang-go=" subStatusId " pulumi-lang-python=" sub_status_id " pulumi-lang-yaml=" subStatusId " pulumi-lang-java=" subStatusId " pulumi-lang-hcl=" sub_status_id "> subStatusId </span>attribute. This endpoint is for modifying the timestamp of when an incident's sub-status was assigned.
         """
         return pulumi.get(self, "sub_status_id")
+

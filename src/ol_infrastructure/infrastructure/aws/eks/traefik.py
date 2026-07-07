@@ -187,14 +187,12 @@ def setup_traefik(
                         },
                     },
                 },
-                "logs": {
-                    "general": {
-                        "level": "INFO",
-                    },
-                    "access": {
-                        "enabled": True,
-                        "format": "json",
-                    },
+                "log": {
+                    "level": "INFO",
+                },
+                "accessLog": {
+                    "enabled": True,
+                    "format": "json",
                 },
                 "resources": {
                     "requests": {

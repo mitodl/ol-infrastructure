@@ -1,0 +1,277 @@
+---
+# mitxonline webapp Deployment (granian + nginx sidecar)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mitxonline-webapp
+  namespace: mitxonline
+  labels:
+    app: mitxonline-webapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mitxonline-webapp
+  template:
+    metadata:
+      labels:
+        app: mitxonline-webapp
+    spec:
+      initContainers:
+        # Merge the image's system CA bundle with the mkcert root so pods trust
+        # both public HTTPS endpoints and local-dev TLS.
+      - name: ca-bundle-merge
+        image: mitodl/mitxonline-app:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+        - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /mkcert
+          readOnly: true
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+      - name: bootstrap
+        image: mitodl/mitxonline-app:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/sh
+        - -c
+        - |
+          python manage.py collectstatic --noinput --clear
+          python manage.py migrate --noinput
+          python manage.py createcachetable
+          python manage.py configure_wagtail
+        envFrom:
+        - configMapRef:
+            name: mitxonline-env
+        - secretRef:
+            name: mitxonline-secrets
+        volumeMounts:
+        - name: static-files
+          mountPath: /src/staticfiles
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      containers:
+      - name: app
+        image: mitodl/mitxonline-app:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        # Auto-reload on Tilt live-update syncs, but only when the image has
+        # watchfiles (the Tilt-built local-dev target does; the prebuilt
+        # DockerHub image used without a sibling checkout doesn't). Watches the
+        # working dir (/src); ignore dirs that churn without affecting Python.
+        - |
+          if python -c 'import watchfiles' 2>/dev/null; then
+            # --workers-kill-timeout: force-kill workers whose app threads
+            # keep them from stopping gracefully, so reloads don't hang.
+            # Every reload pays this full timeout, so keep it short.
+            RELOAD_ARGS="--reload --reload-ignore-dirs frontend --reload-ignore-dirs static --reload-ignore-dirs staticfiles --workers-kill-timeout 1"
+          fi
+          exec granian --interface wsgi --host 0.0.0.0 --port 8011 --workers 2 $RELOAD_ARGS main.wsgi:application
+        ports:
+        - containerPort: 8011
+          name: http-wsgi
+        envFrom:
+        - configMapRef:
+            name: mitxonline-env
+        - secretRef:
+            name: mitxonline-secrets
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            memory: 1Gi
+        readinessProbe:
+          httpGet:
+            path: /health/readiness
+            port: 8011
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: static-files
+          mountPath: /src/staticfiles
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      - name: nginx
+        image: nginx:1.25-alpine
+        ports:
+        - containerPort: 8010
+          name: http
+        volumeMounts:
+        - name: nginx-conf
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: default.conf
+        - name: static-files
+          mountPath: /src/staticfiles
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 128Mi
+      volumes:
+      - name: nginx-conf
+        configMap:
+          name: mitxonline-nginx-conf
+      - name: static-files
+        emptyDir: {}
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
+      - name: combined-ca
+        emptyDir: {}
+---
+# Celery worker (mitxonline uses a single default queue)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mitxonline-celery
+  namespace: mitxonline
+  labels:
+    app: mitxonline-celery
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mitxonline-celery
+  template:
+    metadata:
+      labels:
+        app: mitxonline-celery
+    spec:
+      initContainers:
+      - name: ca-bundle-merge
+        image: mitodl/mitxonline-app:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+        - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /mkcert
+          readOnly: true
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+      containers:
+      - name: celery
+        image: mitodl/mitxonline-app:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - celery
+        - -A
+        - main.celery:app
+        - worker
+        - -Q
+        - default
+        - -c
+        - "2"
+        envFrom:
+        - configMapRef:
+            name: mitxonline-env
+        - secretRef:
+            name: mitxonline-secrets
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 1Gi
+        volumeMounts:
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
+      - name: combined-ca
+        emptyDir: {}
+---
+# Celery beat scheduler
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mitxonline-celery-beat
+  namespace: mitxonline
+  labels:
+    app: mitxonline-celery-beat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mitxonline-celery-beat
+  template:
+    metadata:
+      labels:
+        app: mitxonline-celery-beat
+    spec:
+      initContainers:
+      - name: ca-bundle-merge
+        image: mitodl/mitxonline-app:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+        - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /mkcert
+          readOnly: true
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+      containers:
+      - name: celery-beat
+        image: mitodl/mitxonline-app:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - celery
+        - -A
+        - main.celery:app
+        - beat
+        - --schedule
+        - /tmp/celerybeat-schedule
+        envFrom:
+        - configMapRef:
+            name: mitxonline-env
+        - secretRef:
+            name: mitxonline-secrets
+        # beat loads the full Django app like the worker, so give it comparable
+        # memory headroom — it OOMs with less.
+        resources:
+          requests:
+            cpu: 50m
+            memory: 256Mi
+          limits:
+            memory: 1Gi
+        volumeMounts:
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
+      - name: combined-ca
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mitxonline-webapp
+  namespace: mitxonline
+  labels:
+    app: mitxonline-webapp
+spec:
+  selector:
+    app: mitxonline-webapp
+  ports:
+  - name: http
+    port: 8010
+    targetPort: http

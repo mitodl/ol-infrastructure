@@ -19,15 +19,15 @@ __all__ = ['CatalogArgs', 'Catalog']
 @pulumi.input_type
 class CatalogArgs:
     def __init__(__self__, *,
-                 catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 icon: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None):
+                 catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 icon: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None):
         """
         The set of arguments for constructing a Catalog resource.
 
-        :param pulumi.Input[_builtins.str] icon: Value must be one of `globe-alt`, `server-stack`, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`">`users`</span>, `user-group`, `chart-bar`, <span pulumi-lang-nodejs="`shapes`" pulumi-lang-dotnet="`Shapes`" pulumi-lang-go="`shapes`" pulumi-lang-python="`shapes`" pulumi-lang-yaml="`shapes`" pulumi-lang-java="`shapes`">`shapes`</span>, `light-bulb`, `cursor-arrow-ripple`.
+        :param pulumi.Input[_builtins.str] icon: Value must be one of `globe-alt`, `server-stack`, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`" pulumi-lang-hcl="`users`">`users`</span>, `user-group`, `chart-bar`, <span pulumi-lang-nodejs="`shapes`" pulumi-lang-dotnet="`Shapes`" pulumi-lang-go="`shapes`" pulumi-lang-python="`shapes`" pulumi-lang-yaml="`shapes`" pulumi-lang-java="`shapes`" pulumi-lang-hcl="`shapes`">`shapes`</span>, `light-bulb`, `cursor-arrow-ripple`.
         :param pulumi.Input[_builtins.float] position: Default position of the catalog when displayed in a list.
         """
         if catalog_id is not None:
@@ -43,68 +43,68 @@ class CatalogArgs:
 
     @_builtins.property
     @pulumi.getter(name="catalogId")
-    def catalog_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def catalog_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "catalog_id")
 
     @catalog_id.setter
-    def catalog_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def catalog_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "catalog_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter
-    def icon(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def icon(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Value must be one of `globe-alt`, `server-stack`, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`">`users`</span>, `user-group`, `chart-bar`, <span pulumi-lang-nodejs="`shapes`" pulumi-lang-dotnet="`Shapes`" pulumi-lang-go="`shapes`" pulumi-lang-python="`shapes`" pulumi-lang-yaml="`shapes`" pulumi-lang-java="`shapes`">`shapes`</span>, `light-bulb`, `cursor-arrow-ripple`.
+        Value must be one of `globe-alt`, `server-stack`, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`" pulumi-lang-hcl="`users`">`users`</span>, `user-group`, `chart-bar`, <span pulumi-lang-nodejs="`shapes`" pulumi-lang-dotnet="`Shapes`" pulumi-lang-go="`shapes`" pulumi-lang-python="`shapes`" pulumi-lang-yaml="`shapes`" pulumi-lang-java="`shapes`" pulumi-lang-hcl="`shapes`">`shapes`</span>, `light-bulb`, `cursor-arrow-ripple`.
         """
         return pulumi.get(self, "icon")
 
     @icon.setter
-    def icon(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def icon(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "icon", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Default position of the catalog when displayed in a list.
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
 
 @pulumi.input_type
 class _CatalogState:
     def __init__(__self__, *,
-                 catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 icon: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None):
+                 catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 icon: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None):
         """
         Input properties used for looking up and filtering Catalog resources.
 
-        :param pulumi.Input[_builtins.str] icon: Value must be one of `globe-alt`, `server-stack`, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`">`users`</span>, `user-group`, `chart-bar`, <span pulumi-lang-nodejs="`shapes`" pulumi-lang-dotnet="`Shapes`" pulumi-lang-go="`shapes`" pulumi-lang-python="`shapes`" pulumi-lang-yaml="`shapes`" pulumi-lang-java="`shapes`">`shapes`</span>, `light-bulb`, `cursor-arrow-ripple`.
+        :param pulumi.Input[_builtins.str] icon: Value must be one of `globe-alt`, `server-stack`, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`" pulumi-lang-hcl="`users`">`users`</span>, `user-group`, `chart-bar`, <span pulumi-lang-nodejs="`shapes`" pulumi-lang-dotnet="`Shapes`" pulumi-lang-go="`shapes`" pulumi-lang-python="`shapes`" pulumi-lang-yaml="`shapes`" pulumi-lang-java="`shapes`" pulumi-lang-hcl="`shapes`">`shapes`</span>, `light-bulb`, `cursor-arrow-ripple`.
         :param pulumi.Input[_builtins.float] position: Default position of the catalog when displayed in a list.
         """
         if catalog_id is not None:
@@ -120,53 +120,53 @@ class _CatalogState:
 
     @_builtins.property
     @pulumi.getter(name="catalogId")
-    def catalog_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def catalog_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "catalog_id")
 
     @catalog_id.setter
-    def catalog_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def catalog_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "catalog_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter
-    def icon(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def icon(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Value must be one of `globe-alt`, `server-stack`, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`">`users`</span>, `user-group`, `chart-bar`, <span pulumi-lang-nodejs="`shapes`" pulumi-lang-dotnet="`Shapes`" pulumi-lang-go="`shapes`" pulumi-lang-python="`shapes`" pulumi-lang-yaml="`shapes`" pulumi-lang-java="`shapes`">`shapes`</span>, `light-bulb`, `cursor-arrow-ripple`.
+        Value must be one of `globe-alt`, `server-stack`, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`" pulumi-lang-hcl="`users`">`users`</span>, `user-group`, `chart-bar`, <span pulumi-lang-nodejs="`shapes`" pulumi-lang-dotnet="`Shapes`" pulumi-lang-go="`shapes`" pulumi-lang-python="`shapes`" pulumi-lang-yaml="`shapes`" pulumi-lang-java="`shapes`" pulumi-lang-hcl="`shapes`">`shapes`</span>, `light-bulb`, `cursor-arrow-ripple`.
         """
         return pulumi.get(self, "icon")
 
     @icon.setter
-    def icon(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def icon(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "icon", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Default position of the catalog when displayed in a list.
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
 
@@ -176,18 +176,18 @@ class Catalog(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 icon: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
+                 catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 icon: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         """
         Create a Catalog resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] icon: Value must be one of `globe-alt`, `server-stack`, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`">`users`</span>, `user-group`, `chart-bar`, <span pulumi-lang-nodejs="`shapes`" pulumi-lang-dotnet="`Shapes`" pulumi-lang-go="`shapes`" pulumi-lang-python="`shapes`" pulumi-lang-yaml="`shapes`" pulumi-lang-java="`shapes`">`shapes`</span>, `light-bulb`, `cursor-arrow-ripple`.
+        :param pulumi.Input[_builtins.str] icon: Value must be one of `globe-alt`, `server-stack`, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`" pulumi-lang-hcl="`users`">`users`</span>, `user-group`, `chart-bar`, <span pulumi-lang-nodejs="`shapes`" pulumi-lang-dotnet="`Shapes`" pulumi-lang-go="`shapes`" pulumi-lang-python="`shapes`" pulumi-lang-yaml="`shapes`" pulumi-lang-java="`shapes`" pulumi-lang-hcl="`shapes`">`shapes`</span>, `light-bulb`, `cursor-arrow-ripple`.
         :param pulumi.Input[_builtins.float] position: Default position of the catalog when displayed in a list.
         """
         ...
@@ -214,11 +214,11 @@ class Catalog(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 icon: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
+                 catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 icon: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -244,11 +244,11 @@ class Catalog(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            catalog_id: Optional[pulumi.Input[_builtins.str]] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            icon: Optional[pulumi.Input[_builtins.str]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None) -> 'Catalog':
+            catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            icon: pulumi.Input[Optional[_builtins.str]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None) -> 'Catalog':
         """
         Get an existing Catalog resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -256,7 +256,7 @@ class Catalog(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] icon: Value must be one of `globe-alt`, `server-stack`, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`">`users`</span>, `user-group`, `chart-bar`, <span pulumi-lang-nodejs="`shapes`" pulumi-lang-dotnet="`Shapes`" pulumi-lang-go="`shapes`" pulumi-lang-python="`shapes`" pulumi-lang-yaml="`shapes`" pulumi-lang-java="`shapes`">`shapes`</span>, `light-bulb`, `cursor-arrow-ripple`.
+        :param pulumi.Input[_builtins.str] icon: Value must be one of `globe-alt`, `server-stack`, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`" pulumi-lang-hcl="`users`">`users`</span>, `user-group`, `chart-bar`, <span pulumi-lang-nodejs="`shapes`" pulumi-lang-dotnet="`Shapes`" pulumi-lang-go="`shapes`" pulumi-lang-python="`shapes`" pulumi-lang-yaml="`shapes`" pulumi-lang-java="`shapes`" pulumi-lang-hcl="`shapes`">`shapes`</span>, `light-bulb`, `cursor-arrow-ripple`.
         :param pulumi.Input[_builtins.float] position: Default position of the catalog when displayed in a list.
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
@@ -284,7 +284,7 @@ class Catalog(pulumi.CustomResource):
     @pulumi.getter
     def icon(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Value must be one of `globe-alt`, `server-stack`, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`">`users`</span>, `user-group`, `chart-bar`, <span pulumi-lang-nodejs="`shapes`" pulumi-lang-dotnet="`Shapes`" pulumi-lang-go="`shapes`" pulumi-lang-python="`shapes`" pulumi-lang-yaml="`shapes`" pulumi-lang-java="`shapes`">`shapes`</span>, `light-bulb`, `cursor-arrow-ripple`.
+        Value must be one of `globe-alt`, `server-stack`, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`" pulumi-lang-hcl="`users`">`users`</span>, `user-group`, `chart-bar`, <span pulumi-lang-nodejs="`shapes`" pulumi-lang-dotnet="`Shapes`" pulumi-lang-go="`shapes`" pulumi-lang-python="`shapes`" pulumi-lang-yaml="`shapes`" pulumi-lang-java="`shapes`" pulumi-lang-hcl="`shapes`">`shapes`</span>, `light-bulb`, `cursor-arrow-ripple`.
         """
         return pulumi.get(self, "icon")
 
@@ -300,3 +300,4 @@ class Catalog(pulumi.CustomResource):
         Default position of the catalog when displayed in a list.
         """
         return pulumi.get(self, "position")
+

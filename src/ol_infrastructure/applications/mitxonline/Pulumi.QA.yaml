@@ -63,7 +63,7 @@ config:
     OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT: "128"
     SENTRY_LOG_LEVEL: "ERROR"
     SENTRY_PROFILES_SAMPLE_RATE: "0.1"
-    SENTRY_TRACES_SAMPLE_RATE: "0.1"
+    SENTRY_TRACES_SAMPLE_RATE: "0.001"
     SESSION_COOKIE_NAME: "session_mitxonline_rc"
     MIT_LEARN_FROM_EMAIL: "MIT Learn <odl-learn-rc-support@mit.edu>"
     MIT_LEARN_DASHBOARD_URL: "https://rc.learn.mit.edu/dashboard"

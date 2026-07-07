@@ -92,9 +92,9 @@ def get_alert_field(created_at: Optional[Mapping[str, _builtins.str]] = None,
         id=pulumi.get(__ret__, 'id'),
         kind=pulumi.get(__ret__, 'kind'),
         name=pulumi.get(__ret__, 'name'))
-def get_alert_field_output(created_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
-                           kind: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                           name: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_alert_field_output(created_at: pulumi.Input[Optional[Optional[Mapping[str, _builtins.str]]]] = None,
+                           kind: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                           name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                            opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetAlertFieldResult]:
     """
     Use this data source to access information about an existing resource.

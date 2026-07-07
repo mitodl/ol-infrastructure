@@ -117,11 +117,11 @@ def get_functionalities(id: Optional[_builtins.str] = None,
         opsgenie_id=pulumi.get(__ret__, 'opsgenie_id'),
         pagerduty_id=pulumi.get(__ret__, 'pagerduty_id'),
         slug=pulumi.get(__ret__, 'slug'))
-def get_functionalities_output(id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                               name: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                               opsgenie_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                               pagerduty_id: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                               slug: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_functionalities_output(id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                               name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                               opsgenie_id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                               pagerduty_id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                               slug: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                                opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetFunctionalitiesResult]:
     """
     Use this data source to access information about an existing resource.

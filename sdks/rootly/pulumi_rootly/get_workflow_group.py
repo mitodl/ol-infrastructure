@@ -116,11 +116,11 @@ def get_workflow_group(expanded: Optional[_builtins.bool] = None,
         name=pulumi.get(__ret__, 'name'),
         position=pulumi.get(__ret__, 'position'),
         slug=pulumi.get(__ret__, 'slug'))
-def get_workflow_group_output(expanded: Optional[pulumi.Input[Optional[_builtins.bool]]] = None,
-                              kind: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                              name: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                              position: Optional[pulumi.Input[Optional[_builtins.float]]] = None,
-                              slug: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_workflow_group_output(expanded: pulumi.Input[Optional[Optional[_builtins.bool]]] = None,
+                              kind: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                              name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                              position: pulumi.Input[Optional[Optional[_builtins.float]]] = None,
+                              slug: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                               opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetWorkflowGroupResult]:
     """
     Use this data source to access information about an existing resource.

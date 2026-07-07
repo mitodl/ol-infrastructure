@@ -19,10 +19,10 @@ __all__ = ['DashboardArgs', 'Dashboard']
 @pulumi.input_type
 class DashboardArgs:
     def __init__(__self__, *,
-                 dashboard_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 owner: Optional[pulumi.Input[_builtins.str]] = None,
-                 public: Optional[pulumi.Input[_builtins.bool]] = None):
+                 dashboard_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 owner: pulumi.Input[Optional[_builtins.str]] = None,
+                 public: pulumi.Input[Optional[_builtins.bool]] = None):
         """
         The set of arguments for constructing a Dashboard resource.
 
@@ -41,59 +41,59 @@ class DashboardArgs:
 
     @_builtins.property
     @pulumi.getter(name="dashboardId")
-    def dashboard_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def dashboard_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "dashboard_id")
 
     @dashboard_id.setter
-    def dashboard_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def dashboard_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "dashboard_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the dashboard
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def owner(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def owner(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Whether the dashboard is owned by organization or user.
         """
         return pulumi.get(self, "owner")
 
     @owner.setter
-    def owner(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def owner(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "owner", value)
 
     @_builtins.property
     @pulumi.getter
-    def public(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def public(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Whether the dashboard is public
         """
         return pulumi.get(self, "public")
 
     @public.setter
-    def public(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def public(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "public", value)
 
 
 @pulumi.input_type
 class _DashboardState:
     def __init__(__self__, *,
-                 dashboard_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 owner: Optional[pulumi.Input[_builtins.str]] = None,
-                 public: Optional[pulumi.Input[_builtins.bool]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 user_id: Optional[pulumi.Input[_builtins.float]] = None):
+                 dashboard_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 owner: pulumi.Input[Optional[_builtins.str]] = None,
+                 public: pulumi.Input[Optional[_builtins.bool]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 user_id: pulumi.Input[Optional[_builtins.float]] = None):
         """
         Input properties used for looking up and filtering Dashboard resources.
 
@@ -101,7 +101,7 @@ class _DashboardState:
         :param pulumi.Input[_builtins.str] owner: Whether the dashboard is owned by organization or user.
         :param pulumi.Input[_builtins.bool] public: Whether the dashboard is public
         :param pulumi.Input[_builtins.str] slug: The slug of the dashboard
-        :param pulumi.Input[_builtins.float] user_id: The<span pulumi-lang-nodejs=" userId " pulumi-lang-dotnet=" UserId " pulumi-lang-go=" userId " pulumi-lang-python=" user_id " pulumi-lang-yaml=" userId " pulumi-lang-java=" userId "> user_id </span>of the dashboard, for dashboards with owner == user
+        :param pulumi.Input[_builtins.float] user_id: The<span pulumi-lang-nodejs=" userId " pulumi-lang-dotnet=" UserId " pulumi-lang-go=" userId " pulumi-lang-python=" user_id " pulumi-lang-yaml=" userId " pulumi-lang-java=" userId " pulumi-lang-hcl=" user_id "> userId </span>of the dashboard, for dashboards with owner == user
         """
         if dashboard_id is not None:
             pulumi.set(__self__, "dashboard_id", dashboard_id)
@@ -118,71 +118,71 @@ class _DashboardState:
 
     @_builtins.property
     @pulumi.getter(name="dashboardId")
-    def dashboard_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def dashboard_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "dashboard_id")
 
     @dashboard_id.setter
-    def dashboard_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def dashboard_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "dashboard_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the dashboard
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def owner(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def owner(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Whether the dashboard is owned by organization or user.
         """
         return pulumi.get(self, "owner")
 
     @owner.setter
-    def owner(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def owner(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "owner", value)
 
     @_builtins.property
     @pulumi.getter
-    def public(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def public(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Whether the dashboard is public
         """
         return pulumi.get(self, "public")
 
     @public.setter
-    def public(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def public(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "public", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The slug of the dashboard
         """
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
     @_builtins.property
     @pulumi.getter(name="userId")
-    def user_id(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def user_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        The<span pulumi-lang-nodejs=" userId " pulumi-lang-dotnet=" UserId " pulumi-lang-go=" userId " pulumi-lang-python=" user_id " pulumi-lang-yaml=" userId " pulumi-lang-java=" userId "> user_id </span>of the dashboard, for dashboards with owner == user
+        The<span pulumi-lang-nodejs=" userId " pulumi-lang-dotnet=" UserId " pulumi-lang-go=" userId " pulumi-lang-python=" user_id " pulumi-lang-yaml=" userId " pulumi-lang-java=" userId " pulumi-lang-hcl=" user_id "> userId </span>of the dashboard, for dashboards with owner == user
         """
         return pulumi.get(self, "user_id")
 
     @user_id.setter
-    def user_id(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def user_id(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "user_id", value)
 
 
@@ -192,10 +192,10 @@ class Dashboard(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 dashboard_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 owner: Optional[pulumi.Input[_builtins.str]] = None,
-                 public: Optional[pulumi.Input[_builtins.bool]] = None,
+                 dashboard_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 owner: pulumi.Input[Optional[_builtins.str]] = None,
+                 public: pulumi.Input[Optional[_builtins.bool]] = None,
                  __props__=None):
         """
         Create a Dashboard resource with the given unique name, props, and options.
@@ -230,10 +230,10 @@ class Dashboard(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 dashboard_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 owner: Optional[pulumi.Input[_builtins.str]] = None,
-                 public: Optional[pulumi.Input[_builtins.bool]] = None,
+                 dashboard_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 owner: pulumi.Input[Optional[_builtins.str]] = None,
+                 public: pulumi.Input[Optional[_builtins.bool]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -260,12 +260,12 @@ class Dashboard(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            dashboard_id: Optional[pulumi.Input[_builtins.str]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            owner: Optional[pulumi.Input[_builtins.str]] = None,
-            public: Optional[pulumi.Input[_builtins.bool]] = None,
-            slug: Optional[pulumi.Input[_builtins.str]] = None,
-            user_id: Optional[pulumi.Input[_builtins.float]] = None) -> 'Dashboard':
+            dashboard_id: pulumi.Input[Optional[_builtins.str]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            owner: pulumi.Input[Optional[_builtins.str]] = None,
+            public: pulumi.Input[Optional[_builtins.bool]] = None,
+            slug: pulumi.Input[Optional[_builtins.str]] = None,
+            user_id: pulumi.Input[Optional[_builtins.float]] = None) -> 'Dashboard':
         """
         Get an existing Dashboard resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -277,7 +277,7 @@ class Dashboard(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] owner: Whether the dashboard is owned by organization or user.
         :param pulumi.Input[_builtins.bool] public: Whether the dashboard is public
         :param pulumi.Input[_builtins.str] slug: The slug of the dashboard
-        :param pulumi.Input[_builtins.float] user_id: The<span pulumi-lang-nodejs=" userId " pulumi-lang-dotnet=" UserId " pulumi-lang-go=" userId " pulumi-lang-python=" user_id " pulumi-lang-yaml=" userId " pulumi-lang-java=" userId "> user_id </span>of the dashboard, for dashboards with owner == user
+        :param pulumi.Input[_builtins.float] user_id: The<span pulumi-lang-nodejs=" userId " pulumi-lang-dotnet=" UserId " pulumi-lang-go=" userId " pulumi-lang-python=" user_id " pulumi-lang-yaml=" userId " pulumi-lang-java=" userId " pulumi-lang-hcl=" user_id "> userId </span>of the dashboard, for dashboards with owner == user
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
@@ -332,6 +332,7 @@ class Dashboard(pulumi.CustomResource):
     @pulumi.getter(name="userId")
     def user_id(self) -> pulumi.Output[_builtins.float]:
         """
-        The<span pulumi-lang-nodejs=" userId " pulumi-lang-dotnet=" UserId " pulumi-lang-go=" userId " pulumi-lang-python=" user_id " pulumi-lang-yaml=" userId " pulumi-lang-java=" userId "> user_id </span>of the dashboard, for dashboards with owner == user
+        The<span pulumi-lang-nodejs=" userId " pulumi-lang-dotnet=" UserId " pulumi-lang-go=" userId " pulumi-lang-python=" user_id " pulumi-lang-yaml=" userId " pulumi-lang-java=" userId " pulumi-lang-hcl=" user_id "> userId </span>of the dashboard, for dashboards with owner == user
         """
         return pulumi.get(self, "user_id")
+

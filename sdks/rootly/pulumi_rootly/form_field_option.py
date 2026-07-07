@@ -21,10 +21,10 @@ class FormFieldOptionArgs:
     def __init__(__self__, *,
                  form_field_id: pulumi.Input[_builtins.str],
                  value: pulumi.Input[_builtins.str],
-                 color: Optional[pulumi.Input[_builtins.str]] = None,
-                 default: Optional[pulumi.Input[_builtins.bool]] = None,
-                 form_field_option_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None):
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 default: pulumi.Input[Optional[_builtins.bool]] = None,
+                 form_field_option_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None):
         """
         The set of arguments for constructing a FormFieldOption resource.
 
@@ -72,62 +72,62 @@ class FormFieldOptionArgs:
 
     @_builtins.property
     @pulumi.getter
-    def color(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def color(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The hex color of the form field option
         """
         return pulumi.get(self, "color")
 
     @color.setter
-    def color(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def color(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "color", value)
 
     @_builtins.property
     @pulumi.getter
-    def default(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def default(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Value must be one of true or false
         """
         return pulumi.get(self, "default")
 
     @default.setter
-    def default(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def default(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "default", value)
 
     @_builtins.property
     @pulumi.getter(name="formFieldOptionId")
-    def form_field_option_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def form_field_option_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Unique ID of the form field option
         """
         return pulumi.get(self, "form_field_option_id")
 
     @form_field_option_id.setter
-    def form_field_option_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def form_field_option_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form_field_option_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The position of the form field option
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
 
 @pulumi.input_type
 class _FormFieldOptionState:
     def __init__(__self__, *,
-                 color: Optional[pulumi.Input[_builtins.str]] = None,
-                 default: Optional[pulumi.Input[_builtins.bool]] = None,
-                 form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_option_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 value: Optional[pulumi.Input[_builtins.str]] = None):
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 default: pulumi.Input[Optional[_builtins.bool]] = None,
+                 form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_option_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 value: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering FormFieldOption resources.
 
@@ -153,74 +153,74 @@ class _FormFieldOptionState:
 
     @_builtins.property
     @pulumi.getter
-    def color(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def color(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The hex color of the form field option
         """
         return pulumi.get(self, "color")
 
     @color.setter
-    def color(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def color(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "color", value)
 
     @_builtins.property
     @pulumi.getter
-    def default(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def default(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
         Value must be one of true or false
         """
         return pulumi.get(self, "default")
 
     @default.setter
-    def default(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def default(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "default", value)
 
     @_builtins.property
     @pulumi.getter(name="formFieldId")
-    def form_field_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def form_field_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The ID of the parent custom field
         """
         return pulumi.get(self, "form_field_id")
 
     @form_field_id.setter
-    def form_field_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def form_field_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form_field_id", value)
 
     @_builtins.property
     @pulumi.getter(name="formFieldOptionId")
-    def form_field_option_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def form_field_option_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Unique ID of the form field option
         """
         return pulumi.get(self, "form_field_option_id")
 
     @form_field_option_id.setter
-    def form_field_option_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def form_field_option_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form_field_option_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def position(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         The position of the form field option
         """
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
     @_builtins.property
     @pulumi.getter
-    def value(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def value(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The value of the form field option
         """
         return pulumi.get(self, "value")
 
     @value.setter
-    def value(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def value(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "value", value)
 
 
@@ -230,12 +230,12 @@ class FormFieldOption(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 color: Optional[pulumi.Input[_builtins.str]] = None,
-                 default: Optional[pulumi.Input[_builtins.bool]] = None,
-                 form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_option_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 value: Optional[pulumi.Input[_builtins.str]] = None,
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 default: pulumi.Input[Optional[_builtins.bool]] = None,
+                 form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_option_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 value: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a FormFieldOption resource with the given unique name, props, and options.
@@ -273,12 +273,12 @@ class FormFieldOption(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 color: Optional[pulumi.Input[_builtins.str]] = None,
-                 default: Optional[pulumi.Input[_builtins.bool]] = None,
-                 form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 form_field_option_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input[_builtins.float]] = None,
-                 value: Optional[pulumi.Input[_builtins.str]] = None,
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 default: pulumi.Input[Optional[_builtins.bool]] = None,
+                 form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 form_field_option_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 value: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -309,12 +309,12 @@ class FormFieldOption(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            color: Optional[pulumi.Input[_builtins.str]] = None,
-            default: Optional[pulumi.Input[_builtins.bool]] = None,
-            form_field_id: Optional[pulumi.Input[_builtins.str]] = None,
-            form_field_option_id: Optional[pulumi.Input[_builtins.str]] = None,
-            position: Optional[pulumi.Input[_builtins.float]] = None,
-            value: Optional[pulumi.Input[_builtins.str]] = None) -> 'FormFieldOption':
+            color: pulumi.Input[Optional[_builtins.str]] = None,
+            default: pulumi.Input[Optional[_builtins.bool]] = None,
+            form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
+            form_field_option_id: pulumi.Input[Optional[_builtins.str]] = None,
+            position: pulumi.Input[Optional[_builtins.float]] = None,
+            value: pulumi.Input[Optional[_builtins.str]] = None) -> 'FormFieldOption':
         """
         Get an existing FormFieldOption resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -388,3 +388,4 @@ class FormFieldOption(pulumi.CustomResource):
         The value of the form field option
         """
         return pulumi.get(self, "value")
+

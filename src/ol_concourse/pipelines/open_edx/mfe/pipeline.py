@@ -1,5 +1,16 @@
-"""Concourse pipeline for building and deploying Open edX Micro-Frontends (MFEs)."""
+"""Concourse pipeline for building and deploying Open edX Micro-Frontends (MFEs).
 
+Builds are run via lehrer's Dagger module
+(``dagger call mfe build-legacy-configured``) inside a privileged
+Docker-in-Docker container.  Slot configuration files and the per-deployment
+build config (``build_config.yaml``) come from
+``deployments/mit-ol/mfe_slot_config/legacy/`` in the lehrer repo.
+
+Promotion through CI → QA → Production is gated by GitHub Issues (same as the
+OEP-65 site pipeline).
+"""
+
+import shlex
 import sys
 import textwrap
 from collections import defaultdict
@@ -19,11 +30,16 @@ from ol_concourse.lib.models.pipeline import (
     Platform,
     PutStep,
     Resource,
+    Step,
     TaskConfig,
     TaskStep,
 )
-from ol_concourse.lib.resource_types import github_issues_resource, rclone
-from ol_concourse.lib.resources import git_repo, github_issues
+from ol_concourse.lib.resource_types import (
+    fastly_resource_type,
+    github_issues_resource,
+    rclone,
+)
+from ol_concourse.lib.resources import fastly_service, git_repo, github_issues
 from pydantic import BaseModel
 
 from bridge.settings.github.team_members import DEVOPS_MIT
@@ -38,10 +54,11 @@ from bridge.settings.openedx.types import (
 )
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_concourse.pipelines.constants import (
-    ECR_REGION,
     GH_ISSUES_DEFAULT_REPOSITORY,
-    dockerhub_ecr_image_uri,
 )
+
+LEHRER_URI = "https://github.com/mitodl/lehrer"
+LEHRER_LEGACY_SLOT_CONFIG = "./deployments/mit-ol/mfe_slot_config/legacy"
 
 
 class OpenEdxVars(BaseModel):
@@ -65,7 +82,6 @@ class OpenEdxVars(BaseModel):
     mit_open_learning_site_link: str | None = None
     mit_base_url: str | None = None
     mit_learn_base_url: str | None = None
-    plugin_slot_config_file_map: dict[str, str] | None = None
     privacy_policy_url: str | None = None
     schedule_email_section: str | None = None
     site_name: str
@@ -83,6 +99,7 @@ class OpenEdxVars(BaseModel):
     enable_auto_language_selection: Literal["true", "false"] | None = None
     enable_tagging_taxonomy_pages: Literal["true", "false"] | None = None
     enable_course_import_in_library: Literal["true", "false"] | None = None
+    purge_fastly_cache: bool = True
 
     @property
     def release_name(self) -> OpenEdxSupportedRelease:
@@ -106,7 +123,11 @@ def mfe_params(
             f"{open_edx.environment}-edx-jwt-cookie-header-payload"
         ),
         "ACCOUNT_SETTINGS_URL": open_edx.account_settings_url,
-        "BASE_URL": f"https://{open_edx.lms_domain}/{mfe.application.path}",
+        "BASE_URL": (
+            f"https://{open_edx.studio_domain}/{mfe.application.path}"
+            if mfe.application == OpenEdxMicroFrontend.course_authoring
+            else f"https://{open_edx.lms_domain}/{mfe.application.path}"
+        ),
         "CONTACT_URL": open_edx.contact_url,
         "CSRF_TOKEN_API_PATH": "/csrf/api/v1/token",
         "DISPLAY_FEEDBACK_WIDGET": open_edx.display_feedback_widget,
@@ -141,6 +162,8 @@ def mfe_params(
         "SEARCH_CATALOG_URL": f"https://{open_edx.lms_domain}/courses",
         "SESSION_COOKIE_DOMAIN": open_edx.lms_domain,
         "SITE_NAME": open_edx.site_name,
+        "ADMIN_CONSOLE_URL": f"https://{open_edx.lms_domain}/{OpenEdxMicroFrontend.admin_console.path}",
+        "COURSE_AUTHORING_MICROFRONTEND_URL": f"https://{open_edx.studio_domain}/authoring",
         "STUDIO_BASE_URL": f"https://{open_edx.studio_domain}",
         "SUPPORT_URL": open_edx.support_url,
         "TERMS_OF_SERVICE_URL": open_edx.terms_of_service_url,
@@ -159,7 +182,58 @@ def mfe_params(
     }
 
 
-def mfe_job(  # noqa: C901, PLR0915
+def _build_dagger_legacy_cmd(
+    lehrer_input: str,
+    mfe_name: str,
+    mfe: OpenEdxApplicationVersion,
+    open_edx: OpenEdxVars,
+    open_edx_deployment: DeploymentEnvRelease,
+) -> str:
+    """Return a bash script that runs build-legacy-configured and exports dist."""
+    # Build from the pinned MFE checkout (a sibling Concourse input) rather than
+    # re-cloning, so the exact revision that passed CI is what gets promoted.
+    args: list[str] = [
+        "dagger",
+        "call",
+        "mfe",
+        "build-legacy-configured",
+        "--progress",
+        "plain",
+        "--mfe-name",
+        mfe_name,
+        "--mfe-source",
+        f"../mfe-app-{mfe_name}",
+        "--node-version",
+        str(mfe.runtime_version),
+        "--deployment-name",
+        open_edx_deployment.deployment_name,
+        "--release-name",
+        open_edx.release_name,
+        "--slot-config",
+        LEHRER_LEGACY_SLOT_CONFIG,
+    ]
+
+    for key, val in mfe_params(open_edx, mfe).items():
+        if val is not None:
+            args.extend(["--env-vars", f"{key}={val}"])
+
+    for cmd in mfe.translation_overrides or []:
+        args.extend(["--pre-build-commands", cmd])
+
+    args.extend(["export", "--path", "../compiled-mfe/"])
+
+    dagger_cmd = shlex.join(args)
+    return textwrap.dedent(
+        f"""\
+        source /docker-lib.sh
+        start_docker
+        cd {lehrer_input}
+        {dagger_cmd}
+        """
+    )
+
+
+def mfe_job(
     open_edx: OpenEdxVars,
     mfe: OpenEdxApplicationVersion,
     open_edx_deployment: DeploymentEnvRelease,
@@ -168,214 +242,81 @@ def mfe_job(  # noqa: C901, PLR0915
 ) -> PipelineFragment:
     """Generate a Concourse job for building and deploying a single MFE."""
     mfe_name = mfe.application.value
+
+    # mfe_repo is kept as a trigger-only resource so CI jobs fire on upstream changes.
     mfe_repo = git_repo(
         name=Identifier(f"mfe-app-{mfe_name}"),
         uri=mfe.git_origin,
         branch=mfe.release_branch,
     )
-    mfe_configs = git_repo(
-        name=Identifier("mfe-slots-config"),
-        uri="https://github.com/mitodl/ol-infrastructure",
-        paths=["src/bridge/settings/openedx/mfe/slot_config/"],
+    lehrer = git_repo(
+        name=Identifier("lehrer"),
+        uri=LEHRER_URI,
         branch="main",
+        paths=[
+            "deployments/mit-ol/mfe_slot_config/legacy/",
+            "src/lehrer/core/mfe.py",
+        ],
     )
 
-    clone_mfe_repo = GetStep(
-        get=mfe_repo.name,
-        trigger=previous_job is None and open_edx.environment_stage != "production",
-    )
-    clone_mfe_configs = GetStep(
-        get=mfe_configs.name,
-        trigger=previous_job is None and open_edx.environment_stage != "production",
-    )
+    is_ci = previous_job is None and open_edx.environment_stage != "Production"
+    clone_lehrer = GetStep(get=lehrer.name, trigger=is_ci)
+    clone_mfe_repo = GetStep(get=mfe_repo.name, trigger=is_ci)
 
-    translation_overrides = "\n".join(cmd for cmd in mfe.translation_overrides or [])
     if previous_job:
+        clone_lehrer.passed = [previous_job.name]
         clone_mfe_repo.passed = [previous_job.name]
-        clone_mfe_configs.passed = [previous_job.name]
 
-    mfe_setup_plan = [clone_mfe_repo, clone_mfe_configs]
+    plan: list[Step] = [clone_lehrer, clone_mfe_repo]
 
-    # Add GitHub issue trigger if provided
     if github_issue_resource_name_for_trigger:
-        gh_issue_trigger_step = GetStep(
-            get=github_issue_resource_name_for_trigger,
-            trigger=True,
-        )
-        mfe_setup_plan.append(gh_issue_trigger_step)
+        plan.append(GetStep(get=github_issue_resource_name_for_trigger, trigger=True))
 
-    mfe_build_dir = Output(name=Identifier("mfe-build"))
-
-    slot_config_file = f"{open_edx_deployment.deployment_name}/common-mfe-config"
-    copy_common_config = ""
-    mfe_smoot_design_overrides = ""
-    copy_ai_drawer_components = []
-    copy_responsive_course_tabs = ""
-
-    if mfe.application == OpenEdxMicroFrontend.learn:
-        mfe_smoot_design_overrides = """
-        npm pack @mitodl/smoot-design@^6.12.0
-        tar -xvzf mitodl-smoot-design*.tgz
-        mkdir -p public/static/smoot-design
-        cp package/dist/bundles/* public/static/smoot-design
-        """
-        slot_config_file = "learning-mfe-config"
-        copy_common_config = (
-            f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
-            f"{open_edx_deployment.deployment_name}/common-mfe-config.env.jsx "
-            f"{mfe_build_dir.name}/common-mfe-config.env.jsx"
-        )
-        coordinator_source = (
-            "SidebarAIDrawerCoordinator.ulmo.jsx"
-            if open_edx.release_name == OpenEdxSupportedRelease.ulmo
-            else "SidebarAIDrawerCoordinator.jsx"
-        )
-        copy_ai_drawer_components = [
-            (
-                f"echo 'Copying AIDrawerManagerSidebar.jsx...' && "
-                f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
-                f"AIDrawerManagerSidebar.jsx "
-                f"{mfe_build_dir.name}/AIDrawerManagerSidebar.jsx"
-            ),
-            (
-                f"echo 'Copying {coordinator_source} "
-                f"as SidebarAIDrawerCoordinator.jsx...' && "
-                f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
-                f"{coordinator_source} "
-                f"{mfe_build_dir.name}/SidebarAIDrawerCoordinator.jsx"
-            ),
-        ]
-        copy_responsive_course_tabs = (
-            f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
-            f"ResponsiveCourseTabs.jsx "
-            f"{mfe_build_dir.name}/ResponsiveCourseTabs.jsx"
-        )
-
-    is_learning_mfe = mfe.application == OpenEdxMicroFrontend.learn
-    mfe_setup_steps = [
-        f"echo 'Starting MFE setup for {mfe_name}...'",
-        f"echo 'Learning MFE detected: {is_learning_mfe}'",
-        f"cp -r {mfe_repo.name}/* {mfe_build_dir.name}",
-        (
-            f"echo 'Copying Footer.jsx...' && "
-            f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
-            f"Footer.jsx {mfe_build_dir.name}/Footer.jsx"
-        ),
-        (
-            f"echo 'Copying env.config from {slot_config_file}.env.jsx...' && "
-            f"cp -v {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
-            f"{slot_config_file}.env.jsx "
-            f"{mfe_build_dir.name}/env.config.jsx"
-        ),
-    ]
-    if copy_common_config:
-        mfe_setup_steps.append(
-            f"echo 'Copying common-mfe-config.env.jsx...' && {copy_common_config}"
-        )
-    if copy_responsive_course_tabs:
-        mfe_setup_steps.append(
-            f"echo 'Copying ResponsiveCourseTabs.jsx...' && "
-            f"{copy_responsive_course_tabs}"
-        )
-    if copy_ai_drawer_components:
-        mfe_setup_steps.append("echo 'Copying AI drawer components...'")
-        mfe_setup_steps.extend(copy_ai_drawer_components)
-        mfe_setup_steps.append(
-            f"echo 'Listing files in {mfe_build_dir.name}:' && "
-            f"ls -la {mfe_build_dir.name}/ | "
-            f"grep -E '(env\\.config|Sidebar|AIDrawer)' || "
-            f"echo 'No AI drawer files found!'"
-        )
-    else:
-        mfe_setup_steps.append(
-            "echo 'AI drawer components NOT being copied "
-            "(not learning MFE or condition failed)'"
-        )
-
-    # Add styles.scss copy for Residential deployments
-    if open_edx_deployment.deployment_name in ["mitx", "mitx-staging"]:
-        mfe_setup_steps.append(
-            f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
-            f"mitx-styles.scss {mfe_build_dir.name}/mitx-styles.scss"
-        )
-
-    # Add styles.scss copy for MITx Online deployment
-    if open_edx_deployment.deployment_name == "mitxonline":
-        mfe_setup_steps.append(
-            f"cp {mfe_configs.name}/src/bridge/settings/openedx/mfe/slot_config/"
-            f"mitxonline-styles.scss {mfe_build_dir.name}/mitxonline-styles.scss"
-        )
-
-    # Join all commands with newlines
-    mfe_setup_command = textwrap.dedent("\n".join(mfe_setup_steps))
-
-    mfe_setup_plan.append(
-        TaskStep(
-            task=Identifier("merge-mfe-and-configs"),
-            config=TaskConfig(
-                platform=Platform.linux,
-                image_resource=AnonymousResource(
-                    type="registry-image",
-                    source={
-                        "repository": dockerhub_ecr_image_uri("debian"),
-                        "tag": "trixie-slim",
-                        "aws_region": ECR_REGION,
-                    },
-                ),
-                inputs=[Input(name=mfe_repo.name), Input(name=mfe_configs.name)],
-                outputs=[mfe_build_dir],
-                run=Command(
-                    path="sh",
-                    args=["-exc", mfe_setup_command],
-                ),
-            ),
-        ),
+    lehrer_input = str(lehrer.name)
+    build_script = _build_dagger_legacy_cmd(
+        lehrer_input, mfe_name, mfe, open_edx, open_edx_deployment
     )
 
-    mfe_build_plan = [
+    plan.append(
         TaskStep(
             attempts=3,
-            task=Identifier("compile-and-deploy-mfe"),
+            task=Identifier(f"build-mfe-{mfe_name}-{open_edx.environment}"),
+            privileged=True,
             config=TaskConfig(
                 platform=Platform.linux,
                 image_resource=AnonymousResource(
                     type="registry-image",
                     source={
-                        "repository": dockerhub_ecr_image_uri("node"),
-                        "tag": f"{mfe.runtime_version}-trixie-slim",
-                        "aws_region": ECR_REGION,
+                        "repository": "mitodl/dcind",
+                        "tag": "latest",
                     },
                 ),
-                inputs=[Input(name=mfe_build_dir.name)],
-                outputs=[
-                    Output(
-                        name=Identifier("compiled-mfe"),
-                        path=f"{mfe_build_dir.name}/dist",
-                    )
-                ],
-                params=mfe_params(open_edx, mfe),
+                inputs=[Input(name=lehrer.name), Input(name=mfe_repo.name)],
+                outputs=[Output(name=Identifier("compiled-mfe"))],
                 run=Command(
-                    path="sh",
-                    dir=mfe_build_dir.name,
-                    args=[
-                        "-exc",
-                        # Ensure that webpack is installed (TMM 2023-06-27)
-                        textwrap.dedent(
-                            f"""\
-                            apt-get update
-                            apt-get install -q -y python3 python-is-python3 build-essential git
-                            npm install
-                            npm install -g @edx/openedx-atlas
-                            {translation_overrides}
-                            {mfe_smoot_design_overrides}
-                            npm install webpack
-                            NODE_ENV=production npm run build
-                            """  # noqa: E501
-                        ),
-                    ],
+                    path="bash",
+                    args=["-c", build_script],
                 ),
             ),
-        ),
+        )
+    )
+
+    mfe_serving_domain = (
+        open_edx.studio_domain
+        if mfe.application == OpenEdxMicroFrontend.course_authoring
+        else open_edx.lms_domain
+    )
+    fastly_resource = (
+        fastly_service(
+            name=Identifier(f"fastly-{open_edx.environment}"),
+            domain=mfe_serving_domain,
+            check_every="never",
+        )
+        if open_edx.purge_fastly_cache
+        else None
+    )
+
+    plan.append(
         PutStep(
             put="mfe-app-bucket",
             params={
@@ -390,10 +331,21 @@ def mfe_job(  # noqa: C901, PLR0915
                     }
                 ],
             },
-        ),
-    ]
+        )
+    )
 
-    # GitHub Issue resource for success notification
+    if fastly_resource is not None:
+        plan.append(
+            PutStep(
+                put=fastly_resource.name,
+                params={
+                    "mode": "url",
+                    "url": f"https://{mfe_serving_domain}/{mfe.application.path}/",
+                },
+                no_get=True,
+            )
+        )
+
     gh_issues_post = github_issues(
         auth_method="token",
         name=Identifier(
@@ -422,22 +374,24 @@ def mfe_job(  # noqa: C901, PLR0915
         default_github_issue_labels.append("promotion-to-production")
     elif open_edx.environment_stage.lower() == "production":
         default_github_issue_labels.append("finalized-deployment")
-    # PutStep to create the GitHub issue on success
-    create_gh_issue = PutStep(
-        put=gh_issues_post.name,
-        params={
-            "labels": default_github_issue_labels,
-            "assignees": DEVOPS_MIT,
-        },
-    )
 
     mfe_job_definition = Job(
         name=Identifier(f"compile-and-deploy-mfe-{mfe_name}-to-{open_edx.environment}"),
-        plan=mfe_setup_plan + mfe_build_plan,
-        on_success=create_gh_issue,
+        plan=plan,
+        on_success=PutStep(
+            put=gh_issues_post.name,
+            params={
+                "labels": default_github_issue_labels,
+                "assignees": DEVOPS_MIT,
+            },
+        ),
     )
+
+    fragment_resources = [lehrer, mfe_repo, gh_issues_post]
+    if fastly_resource is not None:
+        fragment_resources.append(fastly_resource)
     return PipelineFragment(
-        resources=[mfe_repo, mfe_configs, gh_issues_post],
+        resources=fragment_resources,
         jobs=[mfe_job_definition],
     )
 
@@ -456,8 +410,6 @@ def mfe_pipeline(
         if edx_var.environment_stage in deploy_envs
     ]
 
-    # Sort edx_vars by environment_stage to ensure correct chaining order
-    # (e.g., dev -> qa -> prod)
     sorted_edx_vars = sorted(
         edx_vars, key=lambda x: deploy_envs.index(x.environment_stage)
     )
@@ -484,7 +436,6 @@ def mfe_pipeline(
                 prev_job,
                 github_issue_resource_name_for_trigger=github_issue_trigger_name,
             )
-            # The trigger resource for the next stage of the deployment pipeline.
             if index < len(sorted_edx_vars) - 1:
                 issue_title = (
                     f"[bot] MFE {mfe_app_name} deployed to {edx_var.environment_stage} "
@@ -501,8 +452,6 @@ def mfe_pipeline(
                     issue_state="closed",
                 )
                 mfe_fragment.resources.append(gh_issues_trigger)
-                # Update the last GitHub issue resource name for this MFE for the next
-                # environment
                 last_gh_issue_resource_name_per_mfe[mfe_app_name] = (
                     gh_issues_trigger.name
                 )
@@ -515,6 +464,7 @@ def mfe_pipeline(
         resource_types=[
             rclone(),
             github_issues_resource(),
+            fastly_resource_type(),
             *combined_fragments.resource_types,
         ],
         resources=[

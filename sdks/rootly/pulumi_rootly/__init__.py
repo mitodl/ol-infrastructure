@@ -65,6 +65,7 @@ from .get_custom_fields import *
 from .get_custom_form import *
 from .get_environment import *
 from .get_environments import *
+from .get_escalation_path import *
 from .get_escalation_policy import *
 from .get_form_field import *
 from .get_form_field_option import *

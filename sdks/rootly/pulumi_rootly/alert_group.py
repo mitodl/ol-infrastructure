@@ -21,28 +21,28 @@ __all__ = ['AlertGroupArgs', 'AlertGroup']
 @pulumi.input_type
 class AlertGroupArgs:
     def __init__(__self__, *,
-                 alert_group_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 attributes: Optional[pulumi.Input[Sequence[pulumi.Input['AlertGroupAttributeArgs']]]] = None,
-                 condition_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 conditions: Optional[pulumi.Input[Sequence[pulumi.Input['AlertGroupConditionArgs']]]] = None,
-                 deleted_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 group_by_alert_title: Optional[pulumi.Input[_builtins.bool]] = None,
-                 group_by_alert_urgency: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 targets: Optional[pulumi.Input[Sequence[pulumi.Input['AlertGroupTargetArgs']]]] = None,
-                 time_window: Optional[pulumi.Input[_builtins.float]] = None):
+                 alert_group_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 attributes: pulumi.Input[Optional[Sequence[pulumi.Input['AlertGroupAttributeArgs']]]] = None,
+                 condition_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 conditions: pulumi.Input[Optional[Sequence[pulumi.Input['AlertGroupConditionArgs']]]] = None,
+                 deleted_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 group_by_alert_title: pulumi.Input[Optional[_builtins.bool]] = None,
+                 group_by_alert_urgency: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 targets: pulumi.Input[Optional[Sequence[pulumi.Input['AlertGroupTargetArgs']]]] = None,
+                 time_window: pulumi.Input[Optional[_builtins.float]] = None):
         """
         The set of arguments for constructing a AlertGroup resource.
 
-        :param pulumi.Input[Sequence[pulumi.Input['AlertGroupAttributeArgs']]] attributes: This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field instead, <span pulumi-lang-nodejs="`attributes`" pulumi-lang-dotnet="`Attributes`" pulumi-lang-go="`attributes`" pulumi-lang-python="`attributes`" pulumi-lang-yaml="`attributes`" pulumi-lang-java="`attributes`">`attributes`</span> will be removed in the future.
+        :param pulumi.Input[Sequence[pulumi.Input['AlertGroupAttributeArgs']]] attributes: This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field instead, <span pulumi-lang-nodejs="`attributes`" pulumi-lang-dotnet="`Attributes`" pulumi-lang-go="`attributes`" pulumi-lang-python="`attributes`" pulumi-lang-yaml="`attributes`" pulumi-lang-java="`attributes`" pulumi-lang-hcl="`attributes`">`attributes`</span> will be removed in the future.
         :param pulumi.Input[_builtins.str] condition_type: Grouping condition for the alert group
         :param pulumi.Input[Sequence[pulumi.Input['AlertGroupConditionArgs']]] conditions: The conditions for the alert group
         :param pulumi.Input[_builtins.str] deleted_at: Date or deletion
         :param pulumi.Input[_builtins.str] description: The description of the alert group
-        :param pulumi.Input[_builtins.bool] group_by_alert_title: [DEPRECATED] Whether the alerts are grouped by title or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
-        :param pulumi.Input[_builtins.bool] group_by_alert_urgency: [DEPRECATED] Whether the alerts are grouped by urgency or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] group_by_alert_title: [DEPRECATED] Whether the alerts are grouped by title or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] group_by_alert_urgency: [DEPRECATED] Whether the alerts are grouped by urgency or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
         :param pulumi.Input[_builtins.str] name: The name of the alert group
         :param pulumi.Input[_builtins.str] slug: The slug of the alert group
         :param pulumi.Input[_builtins.float] time_window: Time window for the alert grouping
@@ -80,170 +80,170 @@ class AlertGroupArgs:
 
     @_builtins.property
     @pulumi.getter(name="alertGroupId")
-    def alert_group_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alert_group_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "alert_group_id")
 
     @alert_group_id.setter
-    def alert_group_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alert_group_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alert_group_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def attributes(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['AlertGroupAttributeArgs']]]]:
+    def attributes(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['AlertGroupAttributeArgs']]]]:
         """
-        This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field instead, <span pulumi-lang-nodejs="`attributes`" pulumi-lang-dotnet="`Attributes`" pulumi-lang-go="`attributes`" pulumi-lang-python="`attributes`" pulumi-lang-yaml="`attributes`" pulumi-lang-java="`attributes`">`attributes`</span> will be removed in the future.
+        This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field instead, <span pulumi-lang-nodejs="`attributes`" pulumi-lang-dotnet="`Attributes`" pulumi-lang-go="`attributes`" pulumi-lang-python="`attributes`" pulumi-lang-yaml="`attributes`" pulumi-lang-java="`attributes`" pulumi-lang-hcl="`attributes`">`attributes`</span> will be removed in the future.
         """
         return pulumi.get(self, "attributes")
 
     @attributes.setter
-    def attributes(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['AlertGroupAttributeArgs']]]]):
+    def attributes(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['AlertGroupAttributeArgs']]]]):
         pulumi.set(self, "attributes", value)
 
     @_builtins.property
     @pulumi.getter(name="conditionType")
-    def condition_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def condition_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Grouping condition for the alert group
         """
         return pulumi.get(self, "condition_type")
 
     @condition_type.setter
-    def condition_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def condition_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "condition_type", value)
 
     @_builtins.property
     @pulumi.getter
-    def conditions(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['AlertGroupConditionArgs']]]]:
+    def conditions(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['AlertGroupConditionArgs']]]]:
         """
         The conditions for the alert group
         """
         return pulumi.get(self, "conditions")
 
     @conditions.setter
-    def conditions(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['AlertGroupConditionArgs']]]]):
+    def conditions(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['AlertGroupConditionArgs']]]]):
         pulumi.set(self, "conditions", value)
 
     @_builtins.property
     @pulumi.getter(name="deletedAt")
-    def deleted_at(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def deleted_at(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Date or deletion
         """
         return pulumi.get(self, "deleted_at")
 
     @deleted_at.setter
-    def deleted_at(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def deleted_at(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "deleted_at", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the alert group
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="groupByAlertTitle")
     @_utilities.deprecated("""Deprecated""")
-    def group_by_alert_title(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def group_by_alert_title(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        [DEPRECATED] Whether the alerts are grouped by title or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
+        [DEPRECATED] Whether the alerts are grouped by title or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
         """
         return pulumi.get(self, "group_by_alert_title")
 
     @group_by_alert_title.setter
-    def group_by_alert_title(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def group_by_alert_title(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "group_by_alert_title", value)
 
     @_builtins.property
     @pulumi.getter(name="groupByAlertUrgency")
     @_utilities.deprecated("""Deprecated""")
-    def group_by_alert_urgency(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def group_by_alert_urgency(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        [DEPRECATED] Whether the alerts are grouped by urgency or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
+        [DEPRECATED] Whether the alerts are grouped by urgency or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
         """
         return pulumi.get(self, "group_by_alert_urgency")
 
     @group_by_alert_urgency.setter
-    def group_by_alert_urgency(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def group_by_alert_urgency(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "group_by_alert_urgency", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the alert group
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The slug of the alert group
         """
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
     @_builtins.property
     @pulumi.getter
-    def targets(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['AlertGroupTargetArgs']]]]:
+    def targets(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['AlertGroupTargetArgs']]]]:
         return pulumi.get(self, "targets")
 
     @targets.setter
-    def targets(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['AlertGroupTargetArgs']]]]):
+    def targets(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['AlertGroupTargetArgs']]]]):
         pulumi.set(self, "targets", value)
 
     @_builtins.property
     @pulumi.getter(name="timeWindow")
-    def time_window(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def time_window(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Time window for the alert grouping
         """
         return pulumi.get(self, "time_window")
 
     @time_window.setter
-    def time_window(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def time_window(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "time_window", value)
 
 
 @pulumi.input_type
 class _AlertGroupState:
     def __init__(__self__, *,
-                 alert_group_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 attributes: Optional[pulumi.Input[Sequence[pulumi.Input['AlertGroupAttributeArgs']]]] = None,
-                 condition_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 conditions: Optional[pulumi.Input[Sequence[pulumi.Input['AlertGroupConditionArgs']]]] = None,
-                 deleted_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 group_by_alert_title: Optional[pulumi.Input[_builtins.bool]] = None,
-                 group_by_alert_urgency: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 targets: Optional[pulumi.Input[Sequence[pulumi.Input['AlertGroupTargetArgs']]]] = None,
-                 time_window: Optional[pulumi.Input[_builtins.float]] = None):
+                 alert_group_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 attributes: pulumi.Input[Optional[Sequence[pulumi.Input['AlertGroupAttributeArgs']]]] = None,
+                 condition_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 conditions: pulumi.Input[Optional[Sequence[pulumi.Input['AlertGroupConditionArgs']]]] = None,
+                 deleted_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 group_by_alert_title: pulumi.Input[Optional[_builtins.bool]] = None,
+                 group_by_alert_urgency: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 targets: pulumi.Input[Optional[Sequence[pulumi.Input['AlertGroupTargetArgs']]]] = None,
+                 time_window: pulumi.Input[Optional[_builtins.float]] = None):
         """
         Input properties used for looking up and filtering AlertGroup resources.
 
-        :param pulumi.Input[Sequence[pulumi.Input['AlertGroupAttributeArgs']]] attributes: This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field instead, <span pulumi-lang-nodejs="`attributes`" pulumi-lang-dotnet="`Attributes`" pulumi-lang-go="`attributes`" pulumi-lang-python="`attributes`" pulumi-lang-yaml="`attributes`" pulumi-lang-java="`attributes`">`attributes`</span> will be removed in the future.
+        :param pulumi.Input[Sequence[pulumi.Input['AlertGroupAttributeArgs']]] attributes: This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field instead, <span pulumi-lang-nodejs="`attributes`" pulumi-lang-dotnet="`Attributes`" pulumi-lang-go="`attributes`" pulumi-lang-python="`attributes`" pulumi-lang-yaml="`attributes`" pulumi-lang-java="`attributes`" pulumi-lang-hcl="`attributes`">`attributes`</span> will be removed in the future.
         :param pulumi.Input[_builtins.str] condition_type: Grouping condition for the alert group
         :param pulumi.Input[Sequence[pulumi.Input['AlertGroupConditionArgs']]] conditions: The conditions for the alert group
         :param pulumi.Input[_builtins.str] deleted_at: Date or deletion
         :param pulumi.Input[_builtins.str] description: The description of the alert group
-        :param pulumi.Input[_builtins.bool] group_by_alert_title: [DEPRECATED] Whether the alerts are grouped by title or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
-        :param pulumi.Input[_builtins.bool] group_by_alert_urgency: [DEPRECATED] Whether the alerts are grouped by urgency or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] group_by_alert_title: [DEPRECATED] Whether the alerts are grouped by title or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] group_by_alert_urgency: [DEPRECATED] Whether the alerts are grouped by urgency or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
         :param pulumi.Input[_builtins.str] name: The name of the alert group
         :param pulumi.Input[_builtins.str] slug: The slug of the alert group
         :param pulumi.Input[_builtins.float] time_window: Time window for the alert grouping
@@ -281,142 +281,142 @@ class _AlertGroupState:
 
     @_builtins.property
     @pulumi.getter(name="alertGroupId")
-    def alert_group_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def alert_group_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "alert_group_id")
 
     @alert_group_id.setter
-    def alert_group_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def alert_group_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alert_group_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def attributes(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['AlertGroupAttributeArgs']]]]:
+    def attributes(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['AlertGroupAttributeArgs']]]]:
         """
-        This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field instead, <span pulumi-lang-nodejs="`attributes`" pulumi-lang-dotnet="`Attributes`" pulumi-lang-go="`attributes`" pulumi-lang-python="`attributes`" pulumi-lang-yaml="`attributes`" pulumi-lang-java="`attributes`">`attributes`</span> will be removed in the future.
+        This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field instead, <span pulumi-lang-nodejs="`attributes`" pulumi-lang-dotnet="`Attributes`" pulumi-lang-go="`attributes`" pulumi-lang-python="`attributes`" pulumi-lang-yaml="`attributes`" pulumi-lang-java="`attributes`" pulumi-lang-hcl="`attributes`">`attributes`</span> will be removed in the future.
         """
         return pulumi.get(self, "attributes")
 
     @attributes.setter
-    def attributes(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['AlertGroupAttributeArgs']]]]):
+    def attributes(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['AlertGroupAttributeArgs']]]]):
         pulumi.set(self, "attributes", value)
 
     @_builtins.property
     @pulumi.getter(name="conditionType")
-    def condition_type(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def condition_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Grouping condition for the alert group
         """
         return pulumi.get(self, "condition_type")
 
     @condition_type.setter
-    def condition_type(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def condition_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "condition_type", value)
 
     @_builtins.property
     @pulumi.getter
-    def conditions(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['AlertGroupConditionArgs']]]]:
+    def conditions(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['AlertGroupConditionArgs']]]]:
         """
         The conditions for the alert group
         """
         return pulumi.get(self, "conditions")
 
     @conditions.setter
-    def conditions(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['AlertGroupConditionArgs']]]]):
+    def conditions(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['AlertGroupConditionArgs']]]]):
         pulumi.set(self, "conditions", value)
 
     @_builtins.property
     @pulumi.getter(name="deletedAt")
-    def deleted_at(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def deleted_at(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         Date or deletion
         """
         return pulumi.get(self, "deleted_at")
 
     @deleted_at.setter
-    def deleted_at(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def deleted_at(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "deleted_at", value)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The description of the alert group
         """
         return pulumi.get(self, "description")
 
     @description.setter
-    def description(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
 
     @_builtins.property
     @pulumi.getter(name="groupByAlertTitle")
     @_utilities.deprecated("""Deprecated""")
-    def group_by_alert_title(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def group_by_alert_title(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        [DEPRECATED] Whether the alerts are grouped by title or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
+        [DEPRECATED] Whether the alerts are grouped by title or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
         """
         return pulumi.get(self, "group_by_alert_title")
 
     @group_by_alert_title.setter
-    def group_by_alert_title(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def group_by_alert_title(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "group_by_alert_title", value)
 
     @_builtins.property
     @pulumi.getter(name="groupByAlertUrgency")
     @_utilities.deprecated("""Deprecated""")
-    def group_by_alert_urgency(self) -> Optional[pulumi.Input[_builtins.bool]]:
+    def group_by_alert_urgency(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        [DEPRECATED] Whether the alerts are grouped by urgency or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
+        [DEPRECATED] Whether the alerts are grouped by urgency or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
         """
         return pulumi.get(self, "group_by_alert_urgency")
 
     @group_by_alert_urgency.setter
-    def group_by_alert_urgency(self, value: Optional[pulumi.Input[_builtins.bool]]):
+    def group_by_alert_urgency(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "group_by_alert_urgency", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the alert group
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def slug(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The slug of the alert group
         """
         return pulumi.get(self, "slug")
 
     @slug.setter
-    def slug(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "slug", value)
 
     @_builtins.property
     @pulumi.getter
-    def targets(self) -> Optional[pulumi.Input[Sequence[pulumi.Input['AlertGroupTargetArgs']]]]:
+    def targets(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['AlertGroupTargetArgs']]]]:
         return pulumi.get(self, "targets")
 
     @targets.setter
-    def targets(self, value: Optional[pulumi.Input[Sequence[pulumi.Input['AlertGroupTargetArgs']]]]):
+    def targets(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['AlertGroupTargetArgs']]]]):
         pulumi.set(self, "targets", value)
 
     @_builtins.property
     @pulumi.getter(name="timeWindow")
-    def time_window(self) -> Optional[pulumi.Input[_builtins.float]]:
+    def time_window(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
         Time window for the alert grouping
         """
         return pulumi.get(self, "time_window")
 
     @time_window.setter
-    def time_window(self, value: Optional[pulumi.Input[_builtins.float]]):
+    def time_window(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "time_window", value)
 
 
@@ -426,31 +426,31 @@ class AlertGroup(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 alert_group_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 attributes: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertGroupAttributeArgs', 'AlertGroupAttributeArgsDict']]]]] = None,
-                 condition_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 conditions: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertGroupConditionArgs', 'AlertGroupConditionArgsDict']]]]] = None,
-                 deleted_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 group_by_alert_title: Optional[pulumi.Input[_builtins.bool]] = None,
-                 group_by_alert_urgency: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 targets: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertGroupTargetArgs', 'AlertGroupTargetArgsDict']]]]] = None,
-                 time_window: Optional[pulumi.Input[_builtins.float]] = None,
+                 alert_group_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 attributes: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertGroupAttributeArgs', 'AlertGroupAttributeArgsDict']]]]] = None,
+                 condition_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 conditions: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertGroupConditionArgs', 'AlertGroupConditionArgsDict']]]]] = None,
+                 deleted_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 group_by_alert_title: pulumi.Input[Optional[_builtins.bool]] = None,
+                 group_by_alert_urgency: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 targets: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertGroupTargetArgs', 'AlertGroupTargetArgsDict']]]]] = None,
+                 time_window: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         """
         Create a AlertGroup resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[Sequence[pulumi.Input[Union['AlertGroupAttributeArgs', 'AlertGroupAttributeArgsDict']]]] attributes: This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field instead, <span pulumi-lang-nodejs="`attributes`" pulumi-lang-dotnet="`Attributes`" pulumi-lang-go="`attributes`" pulumi-lang-python="`attributes`" pulumi-lang-yaml="`attributes`" pulumi-lang-java="`attributes`">`attributes`</span> will be removed in the future.
+        :param pulumi.Input[Sequence[pulumi.Input[Union['AlertGroupAttributeArgs', 'AlertGroupAttributeArgsDict']]]] attributes: This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field instead, <span pulumi-lang-nodejs="`attributes`" pulumi-lang-dotnet="`Attributes`" pulumi-lang-go="`attributes`" pulumi-lang-python="`attributes`" pulumi-lang-yaml="`attributes`" pulumi-lang-java="`attributes`" pulumi-lang-hcl="`attributes`">`attributes`</span> will be removed in the future.
         :param pulumi.Input[_builtins.str] condition_type: Grouping condition for the alert group
         :param pulumi.Input[Sequence[pulumi.Input[Union['AlertGroupConditionArgs', 'AlertGroupConditionArgsDict']]]] conditions: The conditions for the alert group
         :param pulumi.Input[_builtins.str] deleted_at: Date or deletion
         :param pulumi.Input[_builtins.str] description: The description of the alert group
-        :param pulumi.Input[_builtins.bool] group_by_alert_title: [DEPRECATED] Whether the alerts are grouped by title or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
-        :param pulumi.Input[_builtins.bool] group_by_alert_urgency: [DEPRECATED] Whether the alerts are grouped by urgency or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] group_by_alert_title: [DEPRECATED] Whether the alerts are grouped by title or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] group_by_alert_urgency: [DEPRECATED] Whether the alerts are grouped by urgency or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
         :param pulumi.Input[_builtins.str] name: The name of the alert group
         :param pulumi.Input[_builtins.str] slug: The slug of the alert group
         :param pulumi.Input[_builtins.float] time_window: Time window for the alert grouping
@@ -479,18 +479,18 @@ class AlertGroup(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 alert_group_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 attributes: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertGroupAttributeArgs', 'AlertGroupAttributeArgsDict']]]]] = None,
-                 condition_type: Optional[pulumi.Input[_builtins.str]] = None,
-                 conditions: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertGroupConditionArgs', 'AlertGroupConditionArgsDict']]]]] = None,
-                 deleted_at: Optional[pulumi.Input[_builtins.str]] = None,
-                 description: Optional[pulumi.Input[_builtins.str]] = None,
-                 group_by_alert_title: Optional[pulumi.Input[_builtins.bool]] = None,
-                 group_by_alert_urgency: Optional[pulumi.Input[_builtins.bool]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 slug: Optional[pulumi.Input[_builtins.str]] = None,
-                 targets: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertGroupTargetArgs', 'AlertGroupTargetArgsDict']]]]] = None,
-                 time_window: Optional[pulumi.Input[_builtins.float]] = None,
+                 alert_group_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 attributes: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertGroupAttributeArgs', 'AlertGroupAttributeArgsDict']]]]] = None,
+                 condition_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 conditions: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertGroupConditionArgs', 'AlertGroupConditionArgsDict']]]]] = None,
+                 deleted_at: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 group_by_alert_title: pulumi.Input[Optional[_builtins.bool]] = None,
+                 group_by_alert_urgency: pulumi.Input[Optional[_builtins.bool]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 slug: pulumi.Input[Optional[_builtins.str]] = None,
+                 targets: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertGroupTargetArgs', 'AlertGroupTargetArgsDict']]]]] = None,
+                 time_window: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -523,18 +523,18 @@ class AlertGroup(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            alert_group_id: Optional[pulumi.Input[_builtins.str]] = None,
-            attributes: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertGroupAttributeArgs', 'AlertGroupAttributeArgsDict']]]]] = None,
-            condition_type: Optional[pulumi.Input[_builtins.str]] = None,
-            conditions: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertGroupConditionArgs', 'AlertGroupConditionArgsDict']]]]] = None,
-            deleted_at: Optional[pulumi.Input[_builtins.str]] = None,
-            description: Optional[pulumi.Input[_builtins.str]] = None,
-            group_by_alert_title: Optional[pulumi.Input[_builtins.bool]] = None,
-            group_by_alert_urgency: Optional[pulumi.Input[_builtins.bool]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            slug: Optional[pulumi.Input[_builtins.str]] = None,
-            targets: Optional[pulumi.Input[Sequence[pulumi.Input[Union['AlertGroupTargetArgs', 'AlertGroupTargetArgsDict']]]]] = None,
-            time_window: Optional[pulumi.Input[_builtins.float]] = None) -> 'AlertGroup':
+            alert_group_id: pulumi.Input[Optional[_builtins.str]] = None,
+            attributes: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertGroupAttributeArgs', 'AlertGroupAttributeArgsDict']]]]] = None,
+            condition_type: pulumi.Input[Optional[_builtins.str]] = None,
+            conditions: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertGroupConditionArgs', 'AlertGroupConditionArgsDict']]]]] = None,
+            deleted_at: pulumi.Input[Optional[_builtins.str]] = None,
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            group_by_alert_title: pulumi.Input[Optional[_builtins.bool]] = None,
+            group_by_alert_urgency: pulumi.Input[Optional[_builtins.bool]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            slug: pulumi.Input[Optional[_builtins.str]] = None,
+            targets: pulumi.Input[Optional[Sequence[pulumi.Input[Union['AlertGroupTargetArgs', 'AlertGroupTargetArgsDict']]]]] = None,
+            time_window: pulumi.Input[Optional[_builtins.float]] = None) -> 'AlertGroup':
         """
         Get an existing AlertGroup resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -542,13 +542,13 @@ class AlertGroup(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[Sequence[pulumi.Input[Union['AlertGroupAttributeArgs', 'AlertGroupAttributeArgsDict']]]] attributes: This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field instead, <span pulumi-lang-nodejs="`attributes`" pulumi-lang-dotnet="`Attributes`" pulumi-lang-go="`attributes`" pulumi-lang-python="`attributes`" pulumi-lang-yaml="`attributes`" pulumi-lang-java="`attributes`">`attributes`</span> will be removed in the future.
+        :param pulumi.Input[Sequence[pulumi.Input[Union['AlertGroupAttributeArgs', 'AlertGroupAttributeArgsDict']]]] attributes: This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field instead, <span pulumi-lang-nodejs="`attributes`" pulumi-lang-dotnet="`Attributes`" pulumi-lang-go="`attributes`" pulumi-lang-python="`attributes`" pulumi-lang-yaml="`attributes`" pulumi-lang-java="`attributes`" pulumi-lang-hcl="`attributes`">`attributes`</span> will be removed in the future.
         :param pulumi.Input[_builtins.str] condition_type: Grouping condition for the alert group
         :param pulumi.Input[Sequence[pulumi.Input[Union['AlertGroupConditionArgs', 'AlertGroupConditionArgsDict']]]] conditions: The conditions for the alert group
         :param pulumi.Input[_builtins.str] deleted_at: Date or deletion
         :param pulumi.Input[_builtins.str] description: The description of the alert group
-        :param pulumi.Input[_builtins.bool] group_by_alert_title: [DEPRECATED] Whether the alerts are grouped by title or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
-        :param pulumi.Input[_builtins.bool] group_by_alert_urgency: [DEPRECATED] Whether the alerts are grouped by urgency or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] group_by_alert_title: [DEPRECATED] Whether the alerts are grouped by title or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] group_by_alert_urgency: [DEPRECATED] Whether the alerts are grouped by urgency or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
         :param pulumi.Input[_builtins.str] name: The name of the alert group
         :param pulumi.Input[_builtins.str] slug: The slug of the alert group
         :param pulumi.Input[_builtins.float] time_window: Time window for the alert grouping
@@ -580,7 +580,7 @@ class AlertGroup(pulumi.CustomResource):
     @pulumi.getter
     def attributes(self) -> pulumi.Output[Optional[Sequence['outputs.AlertGroupAttribute']]]:
         """
-        This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field instead, <span pulumi-lang-nodejs="`attributes`" pulumi-lang-dotnet="`Attributes`" pulumi-lang-go="`attributes`" pulumi-lang-python="`attributes`" pulumi-lang-yaml="`attributes`" pulumi-lang-java="`attributes`">`attributes`</span> will be removed in the future.
+        This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field instead, <span pulumi-lang-nodejs="`attributes`" pulumi-lang-dotnet="`Attributes`" pulumi-lang-go="`attributes`" pulumi-lang-python="`attributes`" pulumi-lang-yaml="`attributes`" pulumi-lang-java="`attributes`" pulumi-lang-hcl="`attributes`">`attributes`</span> will be removed in the future.
         """
         return pulumi.get(self, "attributes")
 
@@ -621,7 +621,7 @@ class AlertGroup(pulumi.CustomResource):
     @_utilities.deprecated("""Deprecated""")
     def group_by_alert_title(self) -> pulumi.Output[_builtins.bool]:
         """
-        [DEPRECATED] Whether the alerts are grouped by title or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
+        [DEPRECATED] Whether the alerts are grouped by title or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
         """
         return pulumi.get(self, "group_by_alert_title")
 
@@ -630,7 +630,7 @@ class AlertGroup(pulumi.CustomResource):
     @_utilities.deprecated("""Deprecated""")
     def group_by_alert_urgency(self) -> pulumi.Output[_builtins.bool]:
         """
-        [DEPRECATED] Whether the alerts are grouped by urgency or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
+        [DEPRECATED] Whether the alerts are grouped by urgency or not. This field is deprecated. Please use the <span pulumi-lang-nodejs="`conditions`" pulumi-lang-dotnet="`Conditions`" pulumi-lang-go="`conditions`" pulumi-lang-python="`conditions`" pulumi-lang-yaml="`conditions`" pulumi-lang-java="`conditions`" pulumi-lang-hcl="`conditions`">`conditions`</span> field with advanced alert grouping instead.. Value must be one of true or false
         """
         return pulumi.get(self, "group_by_alert_urgency")
 
@@ -662,3 +662,4 @@ class AlertGroup(pulumi.CustomResource):
         Time window for the alert grouping
         """
         return pulumi.get(self, "time_window")
+

@@ -104,9 +104,10 @@ config:
     POSTHOG_EVENT_S3_PREFIX: "thirdparty/posthog/learn/events/"
     POSTHOG_PROJECT_ID: "63497"
     POSTHOG_TIMEOUT_MS: 1000
+    QDRANT_CHUNK_SIZE: 8
     SEE_API_ENABLED: "true"
     SENTRY_PROFILES_SAMPLE_RATE: "0.1"
-    SENTRY_TRACES_SAMPLE_RATE: "0.1"
+    SENTRY_TRACES_SAMPLE_RATE: "0.001"
     SESSION_COOKIE_NAME: "session_mitlearn"
     SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT: "https://sso.ol.mit.edu/realms/olapps"
     TIKA_SERVER_ENDPOINT: "https://tika-production.ol.mit.edu"
@@ -114,6 +115,7 @@ config:
     UWSGI_WORKERS: 3
     YOUTUBE_CONFIG_URL: "https://raw.githubusercontent.com/mitodl/open-video-data/main/youtube/channels.yaml"
   mitlearn:zendesk_help_url: "mitlearn.zendesk.com"
+  redis:instance_type: "cache.r7g.xlarge"
   redis:password:
     secure: v1:xdJFi6D7NpeVwYrg:C0GQl3mctDO1+ehHcFAPdeJDuhk9PbuNdNGtghRNMlzP6GC/GCOyGS1V0ViUXwiO7JhAFD6zrstWmhg0X/yHQLnK8KA=
   vault:address: https://vault-production.odl.mit.edu

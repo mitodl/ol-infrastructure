@@ -23,9 +23,9 @@ class DashboardPanelArgs:
     def __init__(__self__, *,
                  dashboard_id: pulumi.Input[_builtins.str],
                  params: pulumi.Input['DashboardPanelParamsArgs'],
-                 dashboard_panel_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 position: Optional[pulumi.Input['DashboardPanelPositionArgs']] = None):
+                 dashboard_panel_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 position: pulumi.Input[Optional['DashboardPanelPositionArgs']] = None):
         """
         The set of arguments for constructing a DashboardPanel resource.
 
@@ -64,43 +64,43 @@ class DashboardPanelArgs:
 
     @_builtins.property
     @pulumi.getter(name="dashboardPanelId")
-    def dashboard_panel_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def dashboard_panel_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "dashboard_panel_id")
 
     @dashboard_panel_id.setter
-    def dashboard_panel_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def dashboard_panel_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "dashboard_panel_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the dashboard_panel
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input['DashboardPanelPositionArgs']]:
+    def position(self) -> pulumi.Input[Optional['DashboardPanelPositionArgs']]:
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input['DashboardPanelPositionArgs']]):
+    def position(self, value: pulumi.Input[Optional['DashboardPanelPositionArgs']]):
         pulumi.set(self, "position", value)
 
 
 @pulumi.input_type
 class _DashboardPanelState:
     def __init__(__self__, *,
-                 dashboard_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 dashboard_panel_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 params: Optional[pulumi.Input['DashboardPanelParamsArgs']] = None,
-                 position: Optional[pulumi.Input['DashboardPanelPositionArgs']] = None):
+                 dashboard_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 dashboard_panel_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 params: pulumi.Input[Optional['DashboardPanelParamsArgs']] = None,
+                 position: pulumi.Input[Optional['DashboardPanelPositionArgs']] = None):
         """
         Input properties used for looking up and filtering DashboardPanel resources.
 
@@ -120,53 +120,53 @@ class _DashboardPanelState:
 
     @_builtins.property
     @pulumi.getter(name="dashboardId")
-    def dashboard_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def dashboard_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The panel dashboard
         """
         return pulumi.get(self, "dashboard_id")
 
     @dashboard_id.setter
-    def dashboard_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def dashboard_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "dashboard_id", value)
 
     @_builtins.property
     @pulumi.getter(name="dashboardPanelId")
-    def dashboard_panel_id(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def dashboard_panel_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "dashboard_panel_id")
 
     @dashboard_panel_id.setter
-    def dashboard_panel_id(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def dashboard_panel_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "dashboard_panel_id", value)
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> Optional[pulumi.Input[_builtins.str]]:
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the dashboard_panel
         """
         return pulumi.get(self, "name")
 
     @name.setter
-    def name(self, value: Optional[pulumi.Input[_builtins.str]]):
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
     @_builtins.property
     @pulumi.getter
-    def params(self) -> Optional[pulumi.Input['DashboardPanelParamsArgs']]:
+    def params(self) -> pulumi.Input[Optional['DashboardPanelParamsArgs']]:
         return pulumi.get(self, "params")
 
     @params.setter
-    def params(self, value: Optional[pulumi.Input['DashboardPanelParamsArgs']]):
+    def params(self, value: pulumi.Input[Optional['DashboardPanelParamsArgs']]):
         pulumi.set(self, "params", value)
 
     @_builtins.property
     @pulumi.getter
-    def position(self) -> Optional[pulumi.Input['DashboardPanelPositionArgs']]:
+    def position(self) -> pulumi.Input[Optional['DashboardPanelPositionArgs']]:
         return pulumi.get(self, "position")
 
     @position.setter
-    def position(self, value: Optional[pulumi.Input['DashboardPanelPositionArgs']]):
+    def position(self, value: pulumi.Input[Optional['DashboardPanelPositionArgs']]):
         pulumi.set(self, "position", value)
 
 
@@ -176,11 +176,11 @@ class DashboardPanel(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 dashboard_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 dashboard_panel_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 params: Optional[pulumi.Input[Union['DashboardPanelParamsArgs', 'DashboardPanelParamsArgsDict']]] = None,
-                 position: Optional[pulumi.Input[Union['DashboardPanelPositionArgs', 'DashboardPanelPositionArgsDict']]] = None,
+                 dashboard_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 dashboard_panel_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 params: pulumi.Input[Optional[Union['DashboardPanelParamsArgs', 'DashboardPanelParamsArgsDict']]] = None,
+                 position: pulumi.Input[Optional[Union['DashboardPanelPositionArgs', 'DashboardPanelPositionArgsDict']]] = None,
                  __props__=None):
         """
         Create a DashboardPanel resource with the given unique name, props, and options.
@@ -214,11 +214,11 @@ class DashboardPanel(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 dashboard_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 dashboard_panel_id: Optional[pulumi.Input[_builtins.str]] = None,
-                 name: Optional[pulumi.Input[_builtins.str]] = None,
-                 params: Optional[pulumi.Input[Union['DashboardPanelParamsArgs', 'DashboardPanelParamsArgsDict']]] = None,
-                 position: Optional[pulumi.Input[Union['DashboardPanelPositionArgs', 'DashboardPanelPositionArgsDict']]] = None,
+                 dashboard_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 dashboard_panel_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 params: pulumi.Input[Optional[Union['DashboardPanelParamsArgs', 'DashboardPanelParamsArgsDict']]] = None,
+                 position: pulumi.Input[Optional[Union['DashboardPanelPositionArgs', 'DashboardPanelPositionArgsDict']]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -248,11 +248,11 @@ class DashboardPanel(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            dashboard_id: Optional[pulumi.Input[_builtins.str]] = None,
-            dashboard_panel_id: Optional[pulumi.Input[_builtins.str]] = None,
-            name: Optional[pulumi.Input[_builtins.str]] = None,
-            params: Optional[pulumi.Input[Union['DashboardPanelParamsArgs', 'DashboardPanelParamsArgsDict']]] = None,
-            position: Optional[pulumi.Input[Union['DashboardPanelPositionArgs', 'DashboardPanelPositionArgsDict']]] = None) -> 'DashboardPanel':
+            dashboard_id: pulumi.Input[Optional[_builtins.str]] = None,
+            dashboard_panel_id: pulumi.Input[Optional[_builtins.str]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            params: pulumi.Input[Optional[Union['DashboardPanelParamsArgs', 'DashboardPanelParamsArgsDict']]] = None,
+            position: pulumi.Input[Optional[Union['DashboardPanelPositionArgs', 'DashboardPanelPositionArgsDict']]] = None) -> 'DashboardPanel':
         """
         Get an existing DashboardPanel resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -304,3 +304,4 @@ class DashboardPanel(pulumi.CustomResource):
     @pulumi.getter
     def position(self) -> pulumi.Output[Optional['outputs.DashboardPanelPosition']]:
         return pulumi.get(self, "position")
+

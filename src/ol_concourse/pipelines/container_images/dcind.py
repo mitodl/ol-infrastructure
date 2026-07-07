@@ -1,6 +1,6 @@
 import sys
 
-from ol_concourse.lib.containers import container_build_task
+from ol_concourse.lib.containers import container_build_task, ensure_ecr_task
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
@@ -16,7 +16,7 @@ from ol_concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from ol_concourse.lib.resources import git_repo, github_release
+from ol_concourse.lib.resources import git_repo, github_release, registry_image
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
 
@@ -47,9 +47,16 @@ dcind_release_image = Resource(
     },
 )
 
+dcind_ecr_image = registry_image(
+    name=Identifier("dcind-release-resource-image-ecr"),
+    image_repository="mitodl/dcind",
+    image_tag="latest",
+    ecr_region=ECR_REGION,
+)
+
 
 docker_pipeline = Pipeline(
-    resources=[ol_inf_repo, dagger_release, dcind_release_image],
+    resources=[ol_inf_repo, dagger_release, dcind_release_image, dcind_ecr_image],
     jobs=[
         Job(
             name=Identifier("build-and-publish-container"),
@@ -93,8 +100,17 @@ docker_pipeline = Pipeline(
                         "BUILD_ARGS_FILE": "dagger-version/args_file",
                     },
                 ),
+                ensure_ecr_task("mitodl/dcind"),
                 PutStep(
                     put=dcind_release_image.name,
+                    inputs="detect",
+                    params={
+                        "image": "image/image.tar",
+                        "additional_tags": ("./dagger-version/tag_file"),
+                    },
+                ),
+                PutStep(
+                    put=dcind_ecr_image.name,
                     inputs="detect",
                     params={
                         "image": "image/image.tar",

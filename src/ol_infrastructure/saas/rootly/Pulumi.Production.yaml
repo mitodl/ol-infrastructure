@@ -1,0 +1,6 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwHSuvs0ZV1OyK/Ysy7Lf2MrAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM9fpmBKzOuZsq0Uz3AgEQgDuP4moP0LREFaddWpzmmlQTufGZwe+1gSR66DYTI1D+Klw80iBaUshki28gHFvYKgUAzjNabxL57bscdA==
+config:
+  rootly:apiToken:
+    secure: v1:r0L9d/mdgL/jz81c:ShkuphvNuwbUMG6ypiOnQtrM4E1MqNKNmzXa7Rma+aWppS2cBKvF8Zpmd02wRqSivTK/+35nbv0fUn6sCtZfc821yE7zzdxnkeTPmhNxqZVbLBMmINuK

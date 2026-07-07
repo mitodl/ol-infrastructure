@@ -1,6 +1,6 @@
 import sys
 
-from ol_concourse.lib.containers import container_build_task
+from ol_concourse.lib.containers import container_build_task, ensure_ecr_task
 from ol_concourse.lib.models.pipeline import (
     GetStep,
     Identifier,
@@ -10,12 +10,14 @@ from ol_concourse.lib.models.pipeline import (
     PutStep,
     Resource,
 )
-from ol_concourse.lib.resources import git_repo
+from ol_concourse.lib.resources import git_repo, registry_image
+
+from ol_concourse.pipelines.constants import ECR_REGION
 
 ad_opt_repository = git_repo(
     name=Identifier("ad-opt-resource"),
-    uri="https://github.com/josephine-situ/ad_opt",
-    branch="main",
+    uri="https://github.com/josephine-situ/ad_opt_v2",
+    branch="master",
     check_every="24h",
 )
 
@@ -31,21 +33,38 @@ ad_opt_release_image = Resource(
     },
 )
 
+ad_opt_ecr_image = registry_image(
+    name=Identifier("ad-opt-image-ecr"),
+    image_repository="mitodl/ad-opt",
+    image_tag="latest",
+    ecr_region=ECR_REGION,
+)
+
 build_task = container_build_task(
     inputs=[Input(name=ad_opt_repository.name)],
     build_parameters={"CONTEXT": ad_opt_repository.name},
 )
 
 docker_pipeline = Pipeline(
-    resources=[ad_opt_repository, ad_opt_release_image],
+    resources=[ad_opt_repository, ad_opt_release_image, ad_opt_ecr_image],
     jobs=[
         Job(
             name=Identifier("build-and-publish-container"),
             plan=[
                 GetStep(get=ad_opt_repository.name, trigger=True),
                 build_task,
+                ensure_ecr_task("mitodl/ad-opt"),
                 PutStep(
                     put=ad_opt_release_image.name,
+                    params={
+                        "image": "image/image.tar",
+                        "additional_tags": (
+                            f"./{ad_opt_repository.name}/.git/describe_ref"
+                        ),
+                    },
+                ),
+                PutStep(
+                    put=ad_opt_ecr_image.name,
                     params={
                         "image": "image/image.tar",
                         "additional_tags": (

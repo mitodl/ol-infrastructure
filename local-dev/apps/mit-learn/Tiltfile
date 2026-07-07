@@ -1,0 +1,97 @@
+# mit-learn Tiltfile
+# Manages docker build, k8s resources, and live-update for the mit-learn application.
+# Loaded by the root Tiltfile via include().
+# When the sibling mit-learn repo is not checked out, Tilt uses the prebuilt
+# DockerHub image (mitodl/mit-learn-app:latest) without attempting a local build.
+
+load("../../tiltlib.star", "k8s_yaml_with_domain")
+
+NAMESPACE = "mit-learn"
+IMAGE = "mitodl/mit-learn-app"
+MIT_LEARN_DIR = os.path.join(config.main_dir, "../mit-learn")
+_MIT_LEARN_APP_DIR = os.path.join(config.main_dir, "local-dev/apps/mit-learn")
+_rd = os.environ.get("LOCAL_DEV_ROOT_DOMAIN", "mit.dev")
+
+# ─────────────────────────────────────────────────────────────
+# Docker Build
+# ─────────────────────────────────────────────────────────────
+
+if os.path.exists(os.path.join(MIT_LEARN_DIR, ".git")):
+    docker_build(
+        IMAGE,
+        context=MIT_LEARN_DIR,
+        dockerfile=os.path.join(MIT_LEARN_DIR, "Dockerfile"),
+        # local-dev target = development (dev deps included) + a mitodl-owned
+        # /src so live-update syncs can write into the container.
+        target="local-dev",
+        # Live update: sync source changes into the container; granian runs
+        # with --reload (see deployment.yaml) and restarts workers on change.
+        live_update=[
+            sync(
+                os.path.join(MIT_LEARN_DIR),
+                "/src",
+            ),
+            # Reinstall Python deps if pyproject.toml or uv.lock changes.
+            run(
+                "cd /src && uv sync --frozen",
+                trigger=[
+                    os.path.join(MIT_LEARN_DIR, "pyproject.toml"),
+                    os.path.join(MIT_LEARN_DIR, "uv.lock"),
+                ],
+            ),
+        ],
+    )
+
+# ─────────────────────────────────────────────────────────────
+# Kubernetes Resources
+# ─────────────────────────────────────────────────────────────
+
+# Apply all manifests in order.
+k8s_yaml_with_domain([
+    os.path.join(config.main_dir, "local-dev/apps/mit-learn/configmaps/nginx.yaml"),
+    os.path.join(config.main_dir, "local-dev/apps/mit-learn/configmaps/app-env.yaml"),
+    os.path.join(config.main_dir, "local-dev/apps/mit-learn/secrets.yaml"),
+    os.path.join(config.main_dir, "local-dev/apps/mit-learn/deployment.yaml"),
+    os.path.join(config.main_dir, "local-dev/apps/mit-learn/apisix-routes.yaml"),
+])
+
+# ─────────────────────────────────────────────────────────────
+# Resource grouping + dependency declarations
+# ─────────────────────────────────────────────────────────────
+
+k8s_resource(
+    "mitlearn-webapp",
+    labels=["mit-learn"],
+    resource_deps=["local-infra-apps"],
+    port_forwards=[
+        "18061:8060",  # nginx → host port 18061
+    ],
+    links=[
+        link("https://api.learn.mit.dev", "MIT Learn API"),
+        link("https://learn.mit.dev", "MIT Learn Frontend"),
+    ],
+)
+
+k8s_resource(
+    "mitlearn-worker-default",
+    labels=["mit-learn"],
+    resource_deps=["local-infra-apps"],
+)
+
+k8s_resource(
+    "mitlearn-worker-edx-content",
+    labels=["mit-learn"],
+    resource_deps=["local-infra-apps"],
+)
+
+k8s_resource(
+    "mitlearn-worker-embeddings",
+    labels=["mit-learn"],
+    resource_deps=["local-infra-apps"],
+)
+
+k8s_resource(
+    "mitlearn-beat",
+    labels=["mit-learn"],
+    resource_deps=["local-infra-apps"],
+)

@@ -92,9 +92,9 @@ def get_form_set(created_at: Optional[Mapping[str, _builtins.str]] = None,
         id=pulumi.get(__ret__, 'id'),
         is_default=pulumi.get(__ret__, 'is_default'),
         slug=pulumi.get(__ret__, 'slug'))
-def get_form_set_output(created_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
-                        is_default: Optional[pulumi.Input[Optional[_builtins.bool]]] = None,
-                        slug: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_form_set_output(created_at: pulumi.Input[Optional[Optional[Mapping[str, _builtins.str]]]] = None,
+                        is_default: pulumi.Input[Optional[Optional[_builtins.bool]]] = None,
+                        slug: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                         opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetFormSetResult]:
     """
     Use this data source to access information about an existing resource.

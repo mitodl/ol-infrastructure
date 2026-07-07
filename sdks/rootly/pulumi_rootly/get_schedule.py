@@ -26,16 +26,40 @@ class GetScheduleResult:
     """
     A collection of values returned by getSchedule.
     """
-    def __init__(__self__, created_at=None, id=None, name=None):
+    def __init__(__self__, created_at=None, id=None, include_shadows_in_slack_notifications=None, name=None, shift_report_day_of_week=None, shift_report_enabled=None, shift_report_time_of_day=None, shift_report_time_zone=None, shift_start_notifications_enabled=None, shift_update_notifications_enabled=None, sync_linear_enabled=None):
         if created_at and not isinstance(created_at, dict):
             raise TypeError("Expected argument 'created_at' to be a dict")
         pulumi.set(__self__, "created_at", created_at)
         if id and not isinstance(id, str):
             raise TypeError("Expected argument 'id' to be a str")
         pulumi.set(__self__, "id", id)
+        if include_shadows_in_slack_notifications and not isinstance(include_shadows_in_slack_notifications, bool):
+            raise TypeError("Expected argument 'include_shadows_in_slack_notifications' to be a bool")
+        pulumi.set(__self__, "include_shadows_in_slack_notifications", include_shadows_in_slack_notifications)
         if name and not isinstance(name, str):
             raise TypeError("Expected argument 'name' to be a str")
         pulumi.set(__self__, "name", name)
+        if shift_report_day_of_week and not isinstance(shift_report_day_of_week, str):
+            raise TypeError("Expected argument 'shift_report_day_of_week' to be a str")
+        pulumi.set(__self__, "shift_report_day_of_week", shift_report_day_of_week)
+        if shift_report_enabled and not isinstance(shift_report_enabled, bool):
+            raise TypeError("Expected argument 'shift_report_enabled' to be a bool")
+        pulumi.set(__self__, "shift_report_enabled", shift_report_enabled)
+        if shift_report_time_of_day and not isinstance(shift_report_time_of_day, str):
+            raise TypeError("Expected argument 'shift_report_time_of_day' to be a str")
+        pulumi.set(__self__, "shift_report_time_of_day", shift_report_time_of_day)
+        if shift_report_time_zone and not isinstance(shift_report_time_zone, str):
+            raise TypeError("Expected argument 'shift_report_time_zone' to be a str")
+        pulumi.set(__self__, "shift_report_time_zone", shift_report_time_zone)
+        if shift_start_notifications_enabled and not isinstance(shift_start_notifications_enabled, bool):
+            raise TypeError("Expected argument 'shift_start_notifications_enabled' to be a bool")
+        pulumi.set(__self__, "shift_start_notifications_enabled", shift_start_notifications_enabled)
+        if shift_update_notifications_enabled and not isinstance(shift_update_notifications_enabled, bool):
+            raise TypeError("Expected argument 'shift_update_notifications_enabled' to be a bool")
+        pulumi.set(__self__, "shift_update_notifications_enabled", shift_update_notifications_enabled)
+        if sync_linear_enabled and not isinstance(sync_linear_enabled, bool):
+            raise TypeError("Expected argument 'sync_linear_enabled' to be a bool")
+        pulumi.set(__self__, "sync_linear_enabled", sync_linear_enabled)
 
     @_builtins.property
     @pulumi.getter(name="createdAt")
@@ -48,9 +72,49 @@ class GetScheduleResult:
         return pulumi.get(self, "id")
 
     @_builtins.property
+    @pulumi.getter(name="includeShadowsInSlackNotifications")
+    def include_shadows_in_slack_notifications(self) -> _builtins.bool:
+        return pulumi.get(self, "include_shadows_in_slack_notifications")
+
+    @_builtins.property
     @pulumi.getter
     def name(self) -> _builtins.str:
         return pulumi.get(self, "name")
+
+    @_builtins.property
+    @pulumi.getter(name="shiftReportDayOfWeek")
+    def shift_report_day_of_week(self) -> _builtins.str:
+        return pulumi.get(self, "shift_report_day_of_week")
+
+    @_builtins.property
+    @pulumi.getter(name="shiftReportEnabled")
+    def shift_report_enabled(self) -> _builtins.bool:
+        return pulumi.get(self, "shift_report_enabled")
+
+    @_builtins.property
+    @pulumi.getter(name="shiftReportTimeOfDay")
+    def shift_report_time_of_day(self) -> _builtins.str:
+        return pulumi.get(self, "shift_report_time_of_day")
+
+    @_builtins.property
+    @pulumi.getter(name="shiftReportTimeZone")
+    def shift_report_time_zone(self) -> _builtins.str:
+        return pulumi.get(self, "shift_report_time_zone")
+
+    @_builtins.property
+    @pulumi.getter(name="shiftStartNotificationsEnabled")
+    def shift_start_notifications_enabled(self) -> _builtins.bool:
+        return pulumi.get(self, "shift_start_notifications_enabled")
+
+    @_builtins.property
+    @pulumi.getter(name="shiftUpdateNotificationsEnabled")
+    def shift_update_notifications_enabled(self) -> _builtins.bool:
+        return pulumi.get(self, "shift_update_notifications_enabled")
+
+    @_builtins.property
+    @pulumi.getter(name="syncLinearEnabled")
+    def sync_linear_enabled(self) -> _builtins.bool:
+        return pulumi.get(self, "sync_linear_enabled")
 
 
 class AwaitableGetScheduleResult(GetScheduleResult):
@@ -61,7 +125,15 @@ class AwaitableGetScheduleResult(GetScheduleResult):
         return GetScheduleResult(
             created_at=self.created_at,
             id=self.id,
-            name=self.name)
+            include_shadows_in_slack_notifications=self.include_shadows_in_slack_notifications,
+            name=self.name,
+            shift_report_day_of_week=self.shift_report_day_of_week,
+            shift_report_enabled=self.shift_report_enabled,
+            shift_report_time_of_day=self.shift_report_time_of_day,
+            shift_report_time_zone=self.shift_report_time_zone,
+            shift_start_notifications_enabled=self.shift_start_notifications_enabled,
+            shift_update_notifications_enabled=self.shift_update_notifications_enabled,
+            sync_linear_enabled=self.sync_linear_enabled)
 
 
 def get_schedule(created_at: Optional[Mapping[str, _builtins.str]] = None,
@@ -79,9 +151,17 @@ def get_schedule(created_at: Optional[Mapping[str, _builtins.str]] = None,
     return AwaitableGetScheduleResult(
         created_at=pulumi.get(__ret__, 'created_at'),
         id=pulumi.get(__ret__, 'id'),
-        name=pulumi.get(__ret__, 'name'))
-def get_schedule_output(created_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
-                        name: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+        include_shadows_in_slack_notifications=pulumi.get(__ret__, 'include_shadows_in_slack_notifications'),
+        name=pulumi.get(__ret__, 'name'),
+        shift_report_day_of_week=pulumi.get(__ret__, 'shift_report_day_of_week'),
+        shift_report_enabled=pulumi.get(__ret__, 'shift_report_enabled'),
+        shift_report_time_of_day=pulumi.get(__ret__, 'shift_report_time_of_day'),
+        shift_report_time_zone=pulumi.get(__ret__, 'shift_report_time_zone'),
+        shift_start_notifications_enabled=pulumi.get(__ret__, 'shift_start_notifications_enabled'),
+        shift_update_notifications_enabled=pulumi.get(__ret__, 'shift_update_notifications_enabled'),
+        sync_linear_enabled=pulumi.get(__ret__, 'sync_linear_enabled'))
+def get_schedule_output(created_at: pulumi.Input[Optional[Optional[Mapping[str, _builtins.str]]]] = None,
+                        name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                         opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetScheduleResult]:
     """
     Use this data source to access information about an existing resource.
@@ -94,4 +174,12 @@ def get_schedule_output(created_at: Optional[pulumi.Input[Optional[Mapping[str, 
     return __ret__.apply(lambda __response__: GetScheduleResult(
         created_at=pulumi.get(__response__, 'created_at'),
         id=pulumi.get(__response__, 'id'),
-        name=pulumi.get(__response__, 'name')))
+        include_shadows_in_slack_notifications=pulumi.get(__response__, 'include_shadows_in_slack_notifications'),
+        name=pulumi.get(__response__, 'name'),
+        shift_report_day_of_week=pulumi.get(__response__, 'shift_report_day_of_week'),
+        shift_report_enabled=pulumi.get(__response__, 'shift_report_enabled'),
+        shift_report_time_of_day=pulumi.get(__response__, 'shift_report_time_of_day'),
+        shift_report_time_zone=pulumi.get(__response__, 'shift_report_time_zone'),
+        shift_start_notifications_enabled=pulumi.get(__response__, 'shift_start_notifications_enabled'),
+        shift_update_notifications_enabled=pulumi.get(__response__, 'shift_update_notifications_enabled'),
+        sync_linear_enabled=pulumi.get(__response__, 'sync_linear_enabled')))

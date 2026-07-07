@@ -80,8 +80,8 @@ def get_status_page(created_at: Optional[Mapping[str, _builtins.str]] = None,
         created_at=pulumi.get(__ret__, 'created_at'),
         id=pulumi.get(__ret__, 'id'),
         slug=pulumi.get(__ret__, 'slug'))
-def get_status_page_output(created_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
-                           slug: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_status_page_output(created_at: pulumi.Input[Optional[Optional[Mapping[str, _builtins.str]]]] = None,
+                           slug: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                            opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetStatusPageResult]:
     """
     Use this data source to access information about an existing resource.

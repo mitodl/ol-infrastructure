@@ -80,6 +80,7 @@ config:
     XPRO_COURSES_API_URL: "https://rc.xpro.mit.edu/api/courses/"
     MITPE_API_ENABLED: "true"
     OCW_ITERATOR_CHUNK_SIZE: 300
+    QDRANT_CHUNK_SIZE: 8
     OCW_LIVE_BUCKET: "ocw-content-live-production"
     OIDC_ENDPOINT: "https://sso-qa.ol.mit.edu/realms/olapps"
     OPENTELEMETRY_ENABLED: "true"
@@ -91,6 +92,7 @@ config:
     OTEL_PROPAGATORS: "tracecontext,baggage"
     OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
     OTEL_LOGS_EXPORTER: "otlp"
+    HYBRID_VECTOR_SEARCH_MIN_SCORE: 0.07
     OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/logs"
     OTEL_METRIC_EXPORT_INTERVAL: "60000"
     OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT: "128"
@@ -107,13 +109,15 @@ config:
     REDIS_VIEW_CACHE_DURATION: 0
     SEE_API_ENABLED: "true"
     SENTRY_PROFILES_SAMPLE_RATE: "0.1"
-    SENTRY_TRACES_SAMPLE_RATE: "0.1"
+    SENTRY_TRACES_SAMPLE_RATE: "0.001"
     SESSION_COOKIE_NAME: "session_mitlearn_rc"
     SHOW_OCW_LECTURE_VIDEOS: "true"
     SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT:
     TIKA_SERVER_ENDPOINT: "https://tika-qa.ol.mit.edu"
     UWSGI_THREADS: 15
     UWSGI_WORKERS: 3
+    VECTOR_HYBRID_SEARCH_PREFETCH_MULTIPLIER: 3
+    VECTOR_HYBRID_SEARCH_PREFETCH_MAX_LIMIT: 300
     YOUTUBE_CONFIG_URL: "https://raw.githubusercontent.com/mitodl/open-video-data/main/youtube/channels.yaml"
   mitlearn:zendesk_help_url: "mitlearn.zendesk.com"
   redis:password:

@@ -104,10 +104,10 @@ def get_sub_status(created_at: Optional[Mapping[str, _builtins.str]] = None,
         name=pulumi.get(__ret__, 'name'),
         parent_status=pulumi.get(__ret__, 'parent_status'),
         slug=pulumi.get(__ret__, 'slug'))
-def get_sub_status_output(created_at: Optional[pulumi.Input[Optional[Mapping[str, _builtins.str]]]] = None,
-                          name: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                          parent_status: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
-                          slug: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_sub_status_output(created_at: pulumi.Input[Optional[Optional[Mapping[str, _builtins.str]]]] = None,
+                          name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                          parent_status: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                          slug: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                           opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetSubStatusResult]:
     """
     Use this data source to access information about an existing resource.

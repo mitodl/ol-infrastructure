@@ -1,0 +1,101 @@
+---
+# mit-learn Next.js frontend Deployment
+# With a local checkout, Tilt builds the `local-dev` stage of Dockerfile.web
+# (`next dev`, hot reload); otherwise the prebuilt DockerHub image runs the
+# production standalone server. Both listen on port 3000.
+# NEXT_PUBLIC_* env vars are injected at runtime (PublicEnvScript) and
+# validated at server startup. NODE_ENV is deliberately NOT set here — each
+# image's own ENV (dev: development, runner: production) must win.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mitlearn-nextjs
+  namespace: mit-learn
+  labels:
+    app: mitlearn-nextjs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mitlearn-nextjs
+  template:
+    metadata:
+      labels:
+        app: mitlearn-nextjs
+    spec:
+      containers:
+      - name: nextjs
+        image: mitodl/mit-learn-nextjs-app:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: PORT
+          value: "3000"
+        - name: HOSTNAME
+          value: "0.0.0.0"
+        - name: NODE_EXTRA_CA_CERTS
+          value: /etc/ssl/local-dev/rootCA.pem
+            # Required by validateEnv at server startup.
+        - name: NEXT_PUBLIC_ORIGIN
+          value: "https://learn.mit.dev"
+        - name: NEXT_PUBLIC_MITOL_API_BASE_URL
+          value: "https://api.learn.mit.dev"
+        - name: NEXT_PUBLIC_SITE_NAME
+          value: "MIT Learn"
+        - name: NEXT_PUBLIC_MITOL_SUPPORT_EMAIL
+          value: "mitlearn-support@mit.edu"
+        - name: NEXT_PUBLIC_CSRF_COOKIE_NAME
+          value: "csrftoken"
+        - name: NEXT_PUBLIC_MITOL_AXIOS_WITH_CREDENTIALS
+          value: "true"
+        - name: NEXT_PUBLIC_MITX_ONLINE_BASE_URL
+          value: "https://mitxonline.mit.dev"
+        - name: NEXT_PUBLIC_MITX_ONLINE_LEGACY_BASE_URL
+          value: "https://mitxonline.mit.dev"
+        - name: NEXT_PUBLIC_MITX_ONLINE_CSRF_COOKIE_NAME
+          value: "csrf_mitxonline"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            # next dev (turbopack) needs far more headroom than the
+            # production standalone server.
+            memory: 4Gi
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          # First request to `next dev` triggers an on-demand compile that
+          # can take tens of seconds; readiness failures are benign and
+          # just delay traffic until the compile finishes.
+          timeoutSeconds: 60
+          failureThreshold: 20
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mitlearn-nextjs
+  namespace: mit-learn
+  labels:
+    app: mitlearn-nextjs
+spec:
+  selector:
+    app: mitlearn-nextjs
+  ports:
+  - name: http
+    port: 3000
+    targetPort: http

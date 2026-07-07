@@ -68,7 +68,7 @@ def get_alert_route(name: Optional[_builtins.str] = None,
     return AwaitableGetAlertRouteResult(
         id=pulumi.get(__ret__, 'id'),
         name=pulumi.get(__ret__, 'name'))
-def get_alert_route_output(name: Optional[pulumi.Input[Optional[_builtins.str]]] = None,
+def get_alert_route_output(name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                            opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetAlertRouteResult]:
     """
     Use this data source to access information about an existing resource.

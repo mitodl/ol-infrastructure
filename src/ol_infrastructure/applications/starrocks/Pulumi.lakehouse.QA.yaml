@@ -7,14 +7,17 @@ config:
   vault_server:env_namespace: operations.qa
   starrocks:root_password:
     secure: v1:IBmxL0ibUx/t/yPf:rgmpR1MHcJ95I8exxEk0VBQGw1PrZqM+HHuBpLPcv4kzErS53rmyjgO1JQPt6xhK7wXzM6DiB53hx1O0u6Xdiz+3RQ5fKdOiXNu/SnA+fUI=
-  starrocks:oidc_enabled: "false"
+  starrocks:oidc_enabled: "true"
   starrocks:fe_config:
     replicas: 3
-    cpu_request: 2000m
-    memory_request: 6Gi
-    memory_limit: 6Gi
-    # 87.5% of 6Gi container limit; leaves ~768Mi headroom for JVM off-heap memory.
-    jvm_heap_mb: 5376
+    cpu_request: 8000m
+    memory_request: 24Gi
+    memory_limit: 24Gi
+    # 75% of 24Gi container limit = 18Gi heap, leaving ~6Gi for JVM non-heap.
+    # 16Gi / 12Gi heap was insufficient — live heap set reached 10Gi causing
+    # constant G1GC mark cycles that stole CPU and timed out the 1s liveness
+    # probe. Ref: https://docs.starrocks.io/docs/faq/fe_mem_faq/
+    jvm_heap_mb: 18432
     # Raise optimizer timeout to tolerate slow AWS Glue metadata responses.
     # StarRocks default is 3000 ms.
     planner_optimize_timeout_ms: 30000

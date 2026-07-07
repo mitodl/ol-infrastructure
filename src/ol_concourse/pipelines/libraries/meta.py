@@ -62,7 +62,7 @@ def build_meta_job(variant: str) -> Job:
                         path="sh",
                         args=[
                             "-exc",
-                            f"python {ol_concourse_repo.name}/src/ol_concourse/pipelines/libraries/api_clients_pipeline.py --variant {variant} > {definition_path}",  # noqa: E501
+                            f"PYTHONPATH={ol_concourse_repo.name}/src python {ol_concourse_repo.name}/src/ol_concourse/pipelines/libraries/api_clients_pipeline.py --variant {variant} > {definition_path}",  # noqa: E501
                         ],
                     ),
                 ),
@@ -94,7 +94,7 @@ def set_self_job() -> Job:
                         path="sh",
                         args=[
                             "-exc",
-                            f"python {ol_concourse_repo.name}/src/ol_concourse/pipelines/libraries/meta.py > {definition_path}",  # noqa: E501
+                            f"PYTHONPATH={ol_concourse_repo.name}/src python {ol_concourse_repo.name}/src/ol_concourse/pipelines/libraries/meta.py > {definition_path}",  # noqa: E501
                         ],
                     ),
                 ),
