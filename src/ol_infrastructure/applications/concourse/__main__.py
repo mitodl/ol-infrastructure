@@ -730,6 +730,10 @@ for worker_def in concourse_config.get_object("workers") or []:
             instance_interruption_behavior=spot_config.get(
                 "instance_interruption_behavior", "terminate"
             ),
+            instance_type_overrides=spot_config.get("instance_type_overrides"),
+            spot_allocation_strategy=spot_config.get(
+                "spot_allocation_strategy", "price-capacity-optimized"
+            ),
         )
 
     ol_worker_launch_config = OLLaunchTemplateConfig(

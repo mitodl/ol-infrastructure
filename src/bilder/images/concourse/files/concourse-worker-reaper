@@ -84,30 +84,33 @@ ADMIN_PASS=${LOCAL_USER_LINE#*:}
 # in ~/.flyrc, so the steady-state cost across the 3-minute timer is one cheap
 # `workers` probe rather than a full login round-trip each run.
 if ! "${FLY_BIN}" -t "${FLY_TARGET}" workers >/dev/null 2>&1; then
-    if ! "${FLY_BIN}" -t "${FLY_TARGET}" login \
-            -c "${ATC_URL}" -u "${ADMIN_USER}" -p "${ADMIN_PASS}" -n main >/dev/null 2>&1; then
-        fail "fly login to ${ATC_URL} failed; aborting (fail-closed)"
-    fi
+    login_err=$("${FLY_BIN}" -t "${FLY_TARGET}" login \
+            -c "${ATC_URL}" -u "${ADMIN_USER}" -p "${ADMIN_PASS}" -n main 2>&1 >/dev/null) \
+        || fail "fly login to ${ATC_URL} failed; aborting (fail-closed): ${login_err}"
 fi
 
-# --- Gather ground truth: private IPs of all live worker instances --------
-# Worker names default to the EC2 hostname (e.g. "ip-10-1-2-3"), which encodes
-# the private IPv4 address. We compare each stalled worker's name against the
-# set of live worker instance IPs.
+# --- Gather ground truth: live worker instance IDs and IPs ----------------
+# CONCOURSE_NAME is pinned to the EC2 instance ID (see cloud-init runcmd in
+# ol_infrastructure/applications/concourse/__main__.py), so a stalled worker's
+# name should already be an instance ID -- match it directly against live
+# instances instead of parsing an IP out of it. Older workers that registered
+# before that change (or that fell back to the default IP-derived hostname
+# because the boot-time IMDS call failed) are still matched by IP as a
+# fallback.
 #
 # Only "pending" and "running" count as live: an instance in stopping/
 # shutting-down is on its way out and will never host a recovering worker, so a
 # stalled worker pinned to it should be pruned, not preserved.
-LIVE_IPS=$(aws ec2 describe-instances \
+LIVE_INSTANCES=$(aws ec2 describe-instances \
     --region "${AWS_REGION}" \
     --filters "Name=tag:Name,Values=${WORKER_NAME_TAG}" \
               "Name=instance-state-name,Values=pending,running" \
-    --query 'Reservations[].Instances[].PrivateIpAddress' \
+    --query 'Reservations[].Instances[].[InstanceId,PrivateIpAddress]' \
     --output text 2>/dev/null) || fail "describe-instances failed; aborting (fail-closed)"
 
-# Normalize whitespace into a newline-delimited set for matching.
-LIVE_IP_SET=$(echo "${LIVE_IPS}" | tr '[:space:]' '\n' | grep -v '^$' || true)
-LIVE_COUNT=$(echo "${LIVE_IP_SET}" | grep -c . || true)
+LIVE_ID_SET=$(echo "${LIVE_INSTANCES}" | awk '{print $1}' | grep -v '^$' || true)
+LIVE_IP_SET=$(echo "${LIVE_INSTANCES}" | awk '{print $2}' | grep -v '^$' || true)
+LIVE_COUNT=$(echo "${LIVE_ID_SET}" | grep -c . || true)
 log "Found ${LIVE_COUNT} live worker instance(s) in ${AWS_REGION}"
 
 # --- Identify stalled workers and prune the orphans -----------------------
@@ -124,25 +127,30 @@ skipped=0
 while IFS= read -r worker_name; do
     [ -n "${worker_name}" ] || continue
 
-    # Derive the private IP encoded in the hostname-style worker name.
-    # "ip-10-1-2-3" -> "10.1.2.3". Names that don't match are left alone.
-    if [[ "${worker_name}" =~ ^ip-([0-9]+)-([0-9]+)-([0-9]+)-([0-9]+) ]]; then
+    if [[ "${worker_name}" =~ ^i-[0-9a-f]+$ ]]; then
+        # Instance-ID-style name (current format): check membership directly.
+        if echo "${LIVE_ID_SET}" | grep -qxF "${worker_name}"; then
+            log "Worker '${worker_name}' instance still live; leaving stalled worker to recover"
+            skipped=$((skipped + 1))
+            continue
+        fi
+        log "Worker '${worker_name}' has no live instance; pruning"
+    elif [[ "${worker_name}" =~ ^ip-([0-9]+)-([0-9]+)-([0-9]+)-([0-9]+) ]]; then
+        # Legacy IP-derived hostname (pre-CONCOURSE_NAME-pin, or IMDS lookup
+        # failed at boot): derive the private IP and check that instead.
         worker_ip="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}.${BASH_REMATCH[4]}"
+        if echo "${LIVE_IP_SET}" | grep -qxF "${worker_ip}"; then
+            log "Worker '${worker_name}' (${worker_ip}) instance still live; leaving stalled worker to recover"
+            skipped=$((skipped + 1))
+            continue
+        fi
+        log "Worker '${worker_name}' (${worker_ip}) has no live instance; pruning"
     else
-        log "Worker '${worker_name}' name is not IP-derived; skipping (cannot verify instance)"
+        log "Worker '${worker_name}' name is neither an instance ID nor IP-derived; skipping (cannot verify instance)"
         skipped=$((skipped + 1))
         continue
     fi
 
-    if echo "${LIVE_IP_SET}" | grep -qxF "${worker_ip}"; then
-        # Instance still exists -> worker is partitioned, not dead. Leave it;
-        # it will reconnect and recover its cache for free.
-        log "Worker '${worker_name}' (${worker_ip}) instance still live; leaving stalled worker to recover"
-        skipped=$((skipped + 1))
-        continue
-    fi
-
-    log "Worker '${worker_name}' (${worker_ip}) has no live instance; pruning"
     if "${FLY_BIN}" -t "${FLY_TARGET}" prune-worker -w "${worker_name}" >/dev/null 2>&1; then
         pruned=$((pruned + 1))
     elif ! "${FLY_BIN}" -t "${FLY_TARGET}" workers --json \
