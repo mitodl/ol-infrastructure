@@ -1,6 +1,6 @@
 # 0009. Deploy witan as a Shared, Multi-Tenant MCP Service
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-07-07
 **Deciders:** Tobias Macey (agent-assisted scoping session)
 **Technical Story:** Scoping effort to move `witan` (agent-kit repo) from a per-developer local tool to a shared, deployed, multi-tenant service, spanning the `agent-kit` and `ol-infrastructure` repositories.
@@ -223,5 +223,6 @@ spanning both repos.
 | Date | Reviewer | Decision | Notes |
 |------|----------|----------|-------|
 | 2026-07-07 | _Pending_ | _Pending_ | Created during agentic scoping session |
+| 2026-07-07 | Tobias Macey | Approved | Accepted after Copilot automated review feedback addressed (RFC citation, ADR index, self-containment) |
 
 **Last Updated:** 2026-07-07
