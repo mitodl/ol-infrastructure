@@ -339,6 +339,17 @@ edxapp_grades_bucket_config = S3BucketConfig(
     block_public_policy=False,
     ignore_public_acls=False,
     restrict_public_buckets=False,
+    # The instructor dashboard MFE fetches report files from this bucket via
+    # XHR, which requires the bucket to allow cross-origin requests from the
+    # edxapp domains.
+    cors_rules=[
+        s3.BucketCorsConfigurationCorsRuleArgs(
+            allowed_headers=["*"],
+            allowed_methods=["GET", "HEAD"],
+            allowed_origins=[f"https://{domain}" for domain in edxapp_domains.values()],
+            max_age_seconds=3000,
+        )
+    ],
 )
 edxapp_grades_bucket = OLBucket(
     "edxapp-grades-s3-bucket",
