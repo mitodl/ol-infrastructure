@@ -57,7 +57,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         display_name="MIT Learn",
         display_name_html="<b>MIT Learn</b>",
         enabled=True,
-        email_theme="ol",
+        email_theme="ol-learn",
         login_theme="ol-learn",
         duplicate_emails_allowed=False,
         otp_policy=keycloak.RealmOtpPolicyArgs(
