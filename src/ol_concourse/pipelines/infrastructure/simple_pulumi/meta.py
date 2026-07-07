@@ -209,6 +209,10 @@ if __name__ == "__main__":
         "starrocks-substructure",
         "starburst",
         "tika",
+        "toolhive-apps",
+        "toolhive-data",
+        "toolhive-operator",
+        "toolhive-swe",
         "vector-log-proxy",
         "xpro-partner-dns",
     ]
