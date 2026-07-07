@@ -75,7 +75,9 @@ APPS = [
             {
                 "label": "seed-mit-learn-opensearch",
                 "description": "Recreate OpenSearch index from scratch",
-                "cmd": "python manage.py recreate_index",
+                # --all is required: without an index selector the command just
+                # prints "Must select at least one index to update" and no-ops.
+                "cmd": "python manage.py recreate_index --all",
             },
             {
                 "label": "seed-mit-learn-ocw",
@@ -86,6 +88,14 @@ APPS = [
                 "label": "seed-mit-learn-mitxonline",
                 "description": "Backpopulate MITx Online resources",
                 "cmd": "python manage.py backpopulate_mitxonline_data",
+            },
+            {
+                "label": "seed-mit-learn-featured-lists",
+                # dev/rc-only command. Prereqs: offeror channels
+                # (backpopulate_resource_channels), published courses per
+                # offeror, and at least one user (author of the learning path).
+                "description": "Create dev-only featured lists per offeror channel",
+                "cmd": "python manage.py populate_featured_lists",
             },
         ],
     },

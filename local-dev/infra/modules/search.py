@@ -88,9 +88,13 @@ def create_search(
             values={
                 "singleNode": True,
                 "replicas": 1,
-                "opensearchJavaOpts": "-Xms256m -Xmx256m",
+                # Heap matches the known-good mit-learn docker-compose value
+                # (-Xmx1024m). 256m tripped the parent circuit breaker at baseline
+                # and made `recreate_index` fail. Keep heap ~50% of the container
+                # limit so the JVM has room for off-heap/direct memory + OS.
+                "opensearchJavaOpts": "-Xms1024m -Xmx1024m",
                 "resources": {
-                    "limits": {"memory": "1Gi"},
+                    "limits": {"memory": "2Gi"},
                 },
                 "persistence": {"size": "5Gi"},
                 "config": {"opensearch.yml": "plugins.security.disabled: true\n"},
