@@ -9,7 +9,7 @@
 # concourse.service via [Unit] Requires=/After= (worker units only).
 set -uo pipefail
 
-RETRY_BUDGET_SECONDS=${RETRY_BUDGET_SECONDS:-180}
+RETRY_BUDGET_SECONDS=${RETRY_BUDGET_SECONDS:-600}
 RETRY_INTERVAL_SECONDS=${RETRY_INTERVAL_SECONDS:-10}
 METADATA_BASE="http://169.254.169.254/latest/meta-data"
 TOKEN_URL="http://169.254.169.254/latest/api/token"
