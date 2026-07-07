@@ -28,14 +28,20 @@ config:
   - courses-backend.learn.mit.edu
   - courses-backend.xpro.mit.edu
   - dcc.learn.mit.edu
+  - meilisearch-staging.mitx.mit.edu
+  - meilisearch.courses.learn.mit.edu
+  - meilisearch.mitx.mit.edu
+  - meilisearch.xpro.mit.eduA
   - micromasters-backend.odl.mit.edu
   - nb.learn.mit.edu
+  - ocw-studio.odl.mit.edu
   - preview-backend.learn.mit.edu
   - preview.xpro.mit.edu
   - studio-backend.learn.mit.edu
   - studio-backend.xpro.mit.edu
   - tika-production.ol.mit.edu
   - video.odl.mit.edu
+  - xpro-web.odl.mit.edu
   eks:apisix_min_replicas: '5'
   eks:apisix_max_replicas: '10'
   eks:apisix_memory: 1500Mi
