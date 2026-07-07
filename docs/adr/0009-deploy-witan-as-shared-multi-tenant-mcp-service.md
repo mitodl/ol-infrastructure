@@ -3,7 +3,7 @@
 **Status:** Proposed
 **Date:** 2026-07-07
 **Deciders:** Tobias Macey (agent-assisted scoping session)
-**Technical Story:** `wp-witan-multi-user-service-deployment-dcf6ee` (agent-kit + ol-infrastructure), `tk-scope-witan-multi-user-service-deployment-cedar--9e9a32`
+**Technical Story:** Scoping effort to move `witan` (agent-kit repo) from a per-developer local tool to a shared, deployed, multi-tenant service, spanning the `agent-kit` and `ol-infrastructure` repositories.
 
 ## Context
 
@@ -112,8 +112,9 @@ operator infrastructure:**
    identity to the bearer token **server-side** for remote access — dynamic
    per-user actor switching (`--as <ACTOR>`) only works for local/direct-engine
    access. Per-individual identity via a ToolHive OIDC→omnigraph token-exchange
-   bridge is a real future capability (ToolHive documents RFC 9728 token
-   exchange support) but is explicitly deferred past v1.
+   bridge is a real future capability (ToolHive documents support for
+   [RFC 8693 OAuth 2.0 Token Exchange](https://datatracker.ietf.org/doc/html/rfc8693))
+   but is explicitly deferred past v1.
 4. **Code-graph branching** (per-user/per-branch WIP isolation) is already
    implemented in `witan-code` — no new mechanism needed. The remaining work
    is a Cedar policy restricting writes to `main` to the `svc-witan-ci`
@@ -128,12 +129,10 @@ bounded set of internal teams. The only genuinely new infrastructure is the
 data tier, and an S3-backed design keeps even that to a plain stateless
 Deployment rather than a StatefulSet+PVC.
 
-Full technical detail (Cedar policy shape, migration runbook, remaining open
-questions) is intentionally not duplicated here — it's recorded in agent-kit's
-shared memory graph (`pf-witan-multi-user-service-deployment-rfc-split-da-c48753`)
-and tracked as a prioritized task backlog under the `wp-witan-multi-user-service-deployment-dcf6ee`
-workflow project, since that detail belongs to implementation, not the
-architectural decision itself.
+Full technical detail (Cedar policy bundle contents, migration runbook,
+remaining open questions) is intentionally not duplicated here and is tracked
+as follow-up implementation work in the `agent-kit` repository, since that
+detail belongs to implementation, not the architectural decision itself.
 
 ## Consequences
 
@@ -160,9 +159,9 @@ architectural decision itself.
   remote writers is unverified; if it doesn't serialize as assumed, the
   storage design (S3-backed, no server-side lock demonstrated in this
   environment) needs rework before launch.
-- Depends on a separate CAS/atomic-task-claim fix
-  (`tk-atomic-task-claims-113c26`) landing before the task-coordination graph
-  is safe for concurrent multi-agent use.
+- Depends on a separate fix to witan's task-claim mechanism (today's
+  claim/release is read-check-write, not an atomic compare-and-swap) landing
+  before the task-coordination graph is safe for concurrent multi-agent use.
 
 ### Neutral Consequences
 
@@ -180,7 +179,7 @@ architectural decision itself.
 - **Risk Level:** Medium — no single piece is exotic, but the
   write-serialization assumption and the coarse-authorization tradeoff above
   are real open risks, not resolved by this ADR.
-- **Dependencies:** `tk-atomic-task-claims-113c26` (CAS task claims), a
+- **Dependencies:** atomic (compare-and-swap) task claims landing in witan, a
   completed remote-write serialization spike, streamable-http transport
   support landing in witan.
 - **Migration Path:** existing local `.omni` stores move to the shared graph
@@ -200,10 +199,9 @@ architectural decision itself.
 - `toolhive_operator` / `toolhive_swe` (existing infra, predates this ADR
   series' coverage of ToolHive) — the operator/ingress/OIDC-broker pattern
   this decision reuses wholesale.
-- Full technical scoping, Cedar policy shape, and the prioritized task
-  backlog: agent-kit shared memory
-  `pf-witan-multi-user-service-deployment-rfc-split-da-c48753`, WorkflowProject
-  `wp-witan-multi-user-service-deployment-dcf6ee`.
+- Full technical scoping, the Cedar policy bundle design, and the prioritized
+  implementation backlog are tracked separately in the `agent-kit` repository
+  as follow-up engineering work, not duplicated here.
 
 ## References
 
@@ -212,9 +210,8 @@ architectural decision itself.
 
 ## Notes
 
-Produced during an agentic scoping session
-(`tk-scope-witan-multi-user-service-deployment-cedar--9e9a32`). Originally
-drafted as a standalone RFC in agent-kit's `docs/design/`; converted to this
+Produced during an agentic scoping session. Originally drafted as a
+standalone RFC in agent-kit's `docs/design/`; converted to this
 ADR to match ol-infrastructure's established decision-record process, since
 the core decision here is fundamentally an infrastructure/deployment one
 spanning both repos.

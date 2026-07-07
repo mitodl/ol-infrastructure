@@ -164,6 +164,9 @@ graph LR
 | [0004](0004-keep-oleksgateway-olapisixhttproute-separate.md) | Keep OLEKSGateway and OLApisixHTTPRoute Separate | Accepted | 2025-11-13 |
 | [0005](0005-high-performance-stateful-applications-eks.md) | High Performance Stateful Applications on EKS | Proposed | 2025-11-20 |
 | [0006](0006-label-based-slack-channel-routing-for-kubewatch.md) | Label-Based Slack Channel Routing for Kubewatch | Proposed | 2025-11-20 |
+| [0007](0007-clickhouse-llmops-multi-tenant.md) | Multi-Tenant ClickHouse Cluster for LLMOps on Data EKS | Accepted | 2026-02-25 |
+| [0008](0008-concourse-spot-worker-graceful-drain-no-ephemeral.md) | Concourse Spot Worker Graceful Drain Without Ephemeral Mode | Accepted | 2026-04-08 |
+| [0009](0009-deploy-witan-as-shared-multi-tenant-mcp-service.md) | Deploy witan as a Shared, Multi-Tenant MCP Service | Proposed | 2026-07-07 |
 
 ## Creating a New ADR
 
