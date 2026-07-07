@@ -14,9 +14,8 @@ DEPLOY_NAME = 'mitxonline-webapp'
 if os.path.exists(os.path.join(APP_DIR, '.git')):
     # Build the `local-dev` target: `production` (the only target that bakes in
     # the compiled webpack frontend, which checkout needs since that flow still
-    # runs through mitxonline.mit.dev) plus watchfiles so granian can --reload
-    # (see deployment.yaml). No dev deps, so DEBUG must be False (see
-    # app-env.yaml) or the app crashes importing debug_toolbar.
+    # runs through mitxonline.mit.dev) plus dev deps (pytest, ipdb, ...) and
+    # watchfiles so granian can --reload (see deployment.yaml).
     docker_build(
         IMAGE,
         context=APP_DIR,
@@ -28,10 +27,10 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         live_update=[
             sync(APP_DIR, '/src'),
             # Reinstall deps on pyproject.toml/uv.lock change (uv, not pip;
-            # --no-dev matches the production image; --inexact keeps the
-            # image's extra watchfiles install).
+            # dev deps included, matching the local-dev image; --inexact keeps
+            # the image's extra watchfiles install).
             run(
-                'cd /src && uv sync --frozen --no-dev --inexact',
+                'cd /src && uv sync --frozen --inexact',
                 trigger=[APP_DIR + '/pyproject.toml', APP_DIR + '/uv.lock'],
             ),
         ],
