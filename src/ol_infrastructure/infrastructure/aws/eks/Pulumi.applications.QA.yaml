@@ -13,6 +13,8 @@ config:
   - .mitxonline.mit.edu
   - xpro.mit.edu
   - .xpro.mit.edu
+  - mitx.mit.edu
+  - .mitx.mit.edu
   eks:apisix_memory: 1500Mi
   eks:backup: false
   eks:apisix_admin_key:
