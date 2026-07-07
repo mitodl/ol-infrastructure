@@ -118,7 +118,7 @@ def create_mcp_servers(
                 "grafana_service_account_token"
             ),
         },
-        opts=ResourceOptions(delete_before_replace=True),
+        opts=ResourceOptions(),
     )
     grafana_mcpserver = kubernetes.apiextensions.CustomResource(
         f"toolhive-swe-grafana-mcpserver-{stack_info.env_suffix}",
