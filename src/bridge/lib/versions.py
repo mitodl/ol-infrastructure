@@ -121,3 +121,5 @@ VPA_CHART_VERSION = "0.10.0"
 TOOLHIVE_OPERATOR_CRDS_CHART_VERSION = "0.31.0"
 # renovate: datasource=docker depName=toolhive-operator packageName=ghcr.io/stacklok/toolhive/toolhive-operator
 TOOLHIVE_OPERATOR_CHART_VERSION = "0.31.0"
+# renovate: datasource=docker depName=mcp-grafana packageName=grafana/mcp-grafana
+MCP_GRAFANA_VERSION = "0.17.0"

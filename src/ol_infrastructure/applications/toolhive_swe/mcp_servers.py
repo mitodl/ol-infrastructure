@@ -16,6 +16,7 @@ from typing import NamedTuple
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, ResourceOptions, StackReference
 
+from bridge.lib.versions import MCP_GRAFANA_VERSION
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 # Name shared by the MCPGroup and every backend/virtual server that references it.
@@ -130,7 +131,7 @@ def create_mcp_servers(
             labels=k8s_global_labels,
         ),
         spec={
-            "image": "docker.io/grafana/mcp-grafana:0.17.0",
+            "image": f"docker.io/grafana/mcp-grafana:{MCP_GRAFANA_VERSION}",
             "transport": "streamable-http",
             # The image ENTRYPOINT hardcodes ``--transport sse --address
             # 0.0.0.0:8000``; these args are appended after it and Go stdlib flag
