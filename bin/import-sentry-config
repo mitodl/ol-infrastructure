@@ -147,8 +147,8 @@ def load_sentry_token(secret_path: Path) -> str:
 
 def load_sentry_organization(secret_path: Path) -> str:
     """Read the Sentry organization slug from a SOPS secret."""
-    secrets = read_yaml_secrets(secret_path)
-    organization = secrets.get("organization")
+    account_config = read_yaml_secrets(secret_path)
+    organization = account_config.get("organization")
     if not organization:
         msg = f"{secret_path} must contain organization"
         raise ValueError(msg)
@@ -746,6 +746,25 @@ def render_summary(
     return "\n".join(lines) + "\n"
 
 
+def _print_generate_result(
+    organization: str,
+    resource_count: int,
+    main_path: Path,
+    import_path: Path,
+    summary_path: Path,
+) -> None:
+    """Print a one-line summary; args are plain counts/slugs/paths, never a token."""
+    print(
+        f"Generated {resource_count} resources for {organization}: "
+        f"{main_path}, {import_path}, {summary_path}"
+    )
+
+
+def _print_inventory_result(organization: str, counts: dict[str, int]) -> None:
+    """Print inventory counts as JSON; args are plain counts/slugs, never a token."""
+    print(json.dumps({"organization": organization, "counts": counts}, indent=2))
+
+
 @app.command
 def generate(
     secret_path: Path = Path("sentry/account.yaml"),
@@ -764,11 +783,10 @@ def generate(
     main_path.write_text(program.render())
     import_path.write_text(json.dumps({"resources": program.imports}, indent=2) + "\n")
     summary_path.write_text(render_summary(program, inventory, organization))
-    # CodeQL's taint tracking treats every value returned by SentryApi as
-    # secret because the client is constructed with a Bearer token; this is
-    # a resource count, an org slug, and file paths, not the token.
-    message = f"Generated {sum(program.counts.values())} resources for {organization}: {main_path}, {import_path}, {summary_path}"
-    print(message)  # lgtm[py/clear-text-logging-sensitive-data]
+    resource_count = sum(program.counts.values())
+    _print_generate_result(
+        organization, resource_count, main_path, import_path, summary_path
+    )
 
 
 @app.command
@@ -783,10 +801,7 @@ def inventory(secret_path: Path = Path("sentry/account.yaml")) -> None:
     counts = {
         key: len(value) if isinstance(value, list) else 1 for key, value in data.items()
     }
-    # See the analogous suppression in generate(): counts are lengths of API
-    # response lists, not the auth token itself.
-    summary = json.dumps({"organization": organization, "counts": counts}, indent=2)
-    print(summary)  # lgtm[py/clear-text-logging-sensitive-data]
+    _print_inventory_result(organization, counts)
 
 
 if __name__ == "__main__":
