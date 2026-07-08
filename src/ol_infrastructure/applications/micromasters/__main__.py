@@ -27,7 +27,6 @@ from pulumi_aws import ec2, iam, route53, s3
 
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
-    DEFAULT_NGINX_PORT,
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
     ONE_MEGABYTE_BYTE,
@@ -910,38 +909,6 @@ micromasters_k8s_app = OLApplicationK8s(
             resource_requests={"cpu": "10m", "memory": "384Mi"},
             resource_limits={"memory": "384Mi"},
         ),
-        probe_configs={
-            "liveness_probe": kubernetes.core.v1.ProbeArgs(
-                http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                    path="/nginx-health", port=DEFAULT_NGINX_PORT
-                ),
-                initial_delay_seconds=30,
-                period_seconds=30,
-                failure_threshold=3,
-                timeout_seconds=3,
-            ),
-            "readiness_probe": kubernetes.core.v1.ProbeArgs(
-                http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                    path="/nginx-health",
-                    port=DEFAULT_NGINX_PORT,
-                ),
-                initial_delay_seconds=15,
-                period_seconds=15,
-                failure_threshold=3,
-                timeout_seconds=3,
-            ),
-            "startup_probe": kubernetes.core.v1.ProbeArgs(
-                http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                    path="/nginx-health",
-                    port=DEFAULT_NGINX_PORT,
-                ),
-                initial_delay_seconds=10,
-                period_seconds=10,
-                failure_threshold=6,
-                success_threshold=1,
-                timeout_seconds=5,
-            ),
-        },
     ),
     opts=ResourceOptions(
         depends_on=[micromasters_app_security_group, *k8s_secret_resources]

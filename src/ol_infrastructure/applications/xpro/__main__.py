@@ -10,7 +10,6 @@ import json
 from pathlib import Path
 
 import pulumi_fastly as fastly
-import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import (
     ROOT_STACK_RESOURCE,
@@ -23,7 +22,6 @@ from pulumi import (
 from pulumi_aws import ec2, iam, route53
 
 from bridge.lib.magic_numbers import (
-    DEFAULT_NGINX_PORT,
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
     ONE_MEGABYTE_BYTE,
@@ -563,39 +561,6 @@ if k8s_deploy:
             ),
             resource_requests={"cpu": "250m", "memory": "2Gi"},
             resource_limits={"memory": "2Gi"},
-            probe_configs={
-                "liveness_probe": kubernetes.core.v1.ProbeArgs(
-                    http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                        path="/nginx-health",
-                        port=DEFAULT_NGINX_PORT,
-                    ),
-                    initial_delay_seconds=30,
-                    period_seconds=30,
-                    failure_threshold=3,
-                    timeout_seconds=3,
-                ),
-                "readiness_probe": kubernetes.core.v1.ProbeArgs(
-                    http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                        path="/nginx-health",
-                        port=DEFAULT_NGINX_PORT,
-                    ),
-                    initial_delay_seconds=15,
-                    period_seconds=15,
-                    failure_threshold=3,
-                    timeout_seconds=3,
-                ),
-                "startup_probe": kubernetes.core.v1.ProbeArgs(
-                    http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                        path="/nginx-health",
-                        port=DEFAULT_NGINX_PORT,
-                    ),
-                    initial_delay_seconds=10,
-                    period_seconds=10,
-                    failure_threshold=6,
-                    success_threshold=1,
-                    timeout_seconds=5,
-                ),
-            },
         ),
         opts=ResourceOptions(depends_on=[xpro_app_security_group, *secret_resources]),
     )

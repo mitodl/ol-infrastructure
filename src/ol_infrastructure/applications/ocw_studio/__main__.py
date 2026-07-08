@@ -10,7 +10,6 @@ import json
 from pathlib import Path
 
 import pulumi_github as github
-import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import (
     ROOT_STACK_RESOURCE,
@@ -23,7 +22,6 @@ from pulumi import (
 from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import (
-    DEFAULT_NGINX_PORT,
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
 )
@@ -646,40 +644,6 @@ ocw_studio_k8s_app = OLApplicationK8s(
         ),
         resource_requests={"cpu": "100m", "memory": "1Gi"},
         resource_limits={"memory": "3Gi"},
-        # App lacks health check endpoints so we use nginx's
-        probe_configs={
-            "liveness_probe": kubernetes.core.v1.ProbeArgs(
-                http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                    path="/nginx-health",
-                    port=DEFAULT_NGINX_PORT,
-                ),
-                initial_delay_seconds=30,
-                period_seconds=30,
-                failure_threshold=3,
-                timeout_seconds=3,
-            ),
-            "readiness_probe": kubernetes.core.v1.ProbeArgs(
-                http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                    path="/nginx-health",
-                    port=DEFAULT_NGINX_PORT,
-                ),
-                initial_delay_seconds=15,
-                period_seconds=15,
-                failure_threshold=3,
-                timeout_seconds=3,
-            ),
-            "startup_probe": kubernetes.core.v1.ProbeArgs(
-                http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                    path="/nginx-health",
-                    port=DEFAULT_NGINX_PORT,
-                ),
-                initial_delay_seconds=10,
-                period_seconds=10,
-                failure_threshold=6,
-                success_threshold=1,
-                timeout_seconds=5,
-            ),
-        },
     ),
     opts=ResourceOptions(depends_on=[ocw_studio_app_security_group, *secret_resources]),
 )
