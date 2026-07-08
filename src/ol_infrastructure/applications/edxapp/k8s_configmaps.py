@@ -533,6 +533,17 @@ def create_k8s_configmaps(  # noqa: PLR0915
         )
         cms_general_config_content["SEGMENT_IO"] = False
 
+    # TEMPORARY (mitx-qa testing): speed up Canvas due-date sync from the
+    # plugin's hourly default to every 5 minutes so Canvas changes appear
+    # quickly in Studio. Revert once Canvas due-date testing is complete.
+    if stack_info.env_prefix == "mitx" and stack_info.env_suffix == "qa":
+        cms_general_config_content["CELERYBEAT_SCHEDULE"] = {
+            "sync_canvas_due_dates": {
+                "task": "ol_openedx_canvas_integration.cms_tasks.sync_canvas_due_dates_for_all_courses",
+                "schedule": 300,  # seconds; 5 minutes (plugin default is hourly)
+            },
+        }
+
     cms_general_config_content["FEATURES"] = cms_features
 
     cms_general_config_map = kubernetes.core.v1.ConfigMap(
