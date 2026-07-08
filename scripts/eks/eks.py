@@ -114,6 +114,9 @@ class AwsCredentialsCache:
 class OidcHttpServer(HTTPServer):
     """HTTP server that stores the Vault OIDC callback code."""
 
+    # Allow quick rebinds after prior login attempts so OIDC setup does not fail
+    # on sockets lingering in TIME_WAIT.
+    allow_reuse_address = True
     token: str | None = None
 
 
@@ -485,7 +488,17 @@ def build_kubeconfig(
 
 def login_oidc_get_token() -> str:
     """Wait for the Vault OIDC callback and return the authorization code."""
-    httpd = OidcHttpServer(("", OIDC_CALLBACK_PORT), OidcCallbackHandler)
+    try:
+        httpd = OidcHttpServer(("", OIDC_CALLBACK_PORT), OidcCallbackHandler)
+    except OSError as exc:
+        if exc.errno == 48:
+            msg = (
+                f"OIDC callback port {OIDC_CALLBACK_PORT} is already in use. "
+                "Close the process using that port and retry. "
+                "Tip: run `lsof -nP -iTCP:8250 -sTCP:LISTEN` to identify it."
+            )
+            raise RuntimeError(msg) from exc
+        raise
     httpd.handle_request()
     if not httpd.token:
         msg = "Vault OIDC callback did not return an authorization code"

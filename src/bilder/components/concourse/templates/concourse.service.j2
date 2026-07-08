@@ -3,6 +3,10 @@ Description=Concourse service for managing continuous deployment pipelines
 After=network.target vault.service
 Wants=vault.service
 Documentation=https://concourse-ci.org/
+{% if concourse_config._node_type == "worker" %}
+Requires=concourse-worker-preflight.service
+After=concourse-worker-preflight.service
+{% endif %}
 
 [Service]
 User={{ concourse_config.user }}
@@ -18,6 +22,7 @@ ExecReload=/bin/kill -HUP $MAINPID
 {% if concourse_config._node_type == "worker" %}
 EnvironmentFile=-/etc/default/concourse-team
 EnvironmentFile=-/etc/default/concourse-tags
+EnvironmentFile=-/etc/default/concourse-name
 Delegate=true  {# Allow the Concourse worker to manage its own cgroups for container execution #}
 KillSignal=SIGUSR2
 KillMode=process

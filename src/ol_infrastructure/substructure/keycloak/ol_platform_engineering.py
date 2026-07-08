@@ -7,7 +7,7 @@ import pulumi_vault as vault
 from pulumi import Alias, Config, Output, ResourceOptions
 
 
-def create_ol_platform_engineering_realm(  # noqa: PLR0913
+def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     env_name: str,
@@ -224,6 +224,65 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913
         ),
     )
     # OPIK [END] # noqa: ERA001
+
+    # TOOLHIVE [START] # noqa: ERA001
+    # Authentication for the ToolHive SWE VirtualMCPServer is handled by ToolHive's
+    # embedded OAuth authorization server (spec.authServerConfig — see the
+    # ol-application-toolhive-swe stack). That embedded auth server is the OAuth
+    # provider MCP clients talk to; it BROKERS interactive login to this realm as an
+    # upstream OIDC provider. So from Keycloak's perspective the vMCP is a single
+    # ordinary CONFIDENTIAL web-app client: it runs the authorization-code flow and
+    # Keycloak redirects back to the vMCP's ``/oauth/callback``. MCP clients register
+    # dynamically against the vMCP (DCR), so no per-client Keycloak config is needed.
+    #
+    # The client secret is published to Vault so the Vault Secrets Operator can sync
+    # it into the toolhive-swe namespace, where ToolHive references it as the
+    # upstream provider's ``clientSecretRef``.
+    if stack_info.env_suffix == "production":
+        toolhive_swe_resource_url = "https://toolhive-swe.ol.mit.edu"
+    else:
+        toolhive_swe_resource_url = (
+            f"https://toolhive-swe.{stack_info.env_suffix}.ol.mit.edu"
+        )
+    ol_platform_engineering_toolhive_client = keycloak.openid.Client(
+        "ol-platform-engineering-toolhive-client",
+        name="ol-platform-engineering-toolhive-client",
+        realm_id="ol-platform-engineering",
+        client_id="ol-toolhive-client",
+        client_secret=keycloak_realm_config.get(
+            "ol-platform-engineering-toolhive-client-secret"
+        ),
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        service_accounts_enabled=False,
+        direct_access_grants_enabled=False,
+        # ToolHive's embedded auth server is the only OAuth client of this realm;
+        # Keycloak redirects back to the vMCP broker's callback after login.
+        valid_redirect_uris=[f"{toolhive_swe_resource_url}/oauth/callback"],
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    vault.generic.Secret(
+        "ol-platform-engineering-toolhive-client-vault-oidc-credentials",
+        path="secret-operations/sso/toolhive",
+        data_json=Output.all(
+            url=ol_platform_engineering_toolhive_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+            ),
+            client_id=ol_platform_engineering_toolhive_client.client_id,
+            client_secret=ol_platform_engineering_toolhive_client.client_secret,
+            # Independent random value carried for parity with other SSO entries;
+            # not used by ToolHive's upstream provider config.
+            secret=session_secret,
+            realm_id=ol_platform_engineering_toolhive_client.realm_id,
+            realm_name="ol-platform-engineering",
+            realm_public_key=ol_platform_engineering_toolhive_client.realm_id.apply(
+                fetch_realm_public_key_partial
+            ),
+        ).apply(json.dumps),
+    )
+    # TOOLHIVE [END] # noqa: ERA001
 
     # OPENLIT [START] # noqa: ERA001
     # OpenLIT (LLM/GenAI observability) has no native auth in its open-source

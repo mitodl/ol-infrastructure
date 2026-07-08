@@ -26,6 +26,7 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import cached_image_uri, setup_k8s_provider
+from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import AWSBase, K8sGlobalLabels, Services
 from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
@@ -765,6 +766,18 @@ vector_gateway = OLEKSGateway(
     opts=ResourceOptions(
         delete_before_replace=True,
     ),
+)
+
+make_vpa(
+    name=f"{application_name}-vpa",
+    namespace=namespace,
+    target_kind="Deployment",
+    target_name=application_name,
+    controlled_resources=["cpu", "memory"],
+    container_name="vector",
+    min_allowed={"cpu": "10m", "memory": "64Mi"},
+    max_allowed={"cpu": "2000m", "memory": "4Gi"},
+    opts=ResourceOptions(depends_on=[vector_deployment]),
 )
 
 ##################################

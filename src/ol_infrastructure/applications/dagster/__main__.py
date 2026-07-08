@@ -236,6 +236,7 @@ athena_permissions: list[dict[str, str | list[str]]] = [
             "glue:BatchDeletePartition",
             "glue:BatchDeleteTable",
             "glue:BatchGetPartition",
+            "glue:CreateDatabase",
             "glue:CreateTable",
             "glue:CreatePartition",
             "glue:DeletePartition",

@@ -11,8 +11,6 @@ config:
   ovs:default_domain: video.odl.mit.edu
   ovs:domains:
   - video.odl.mit.edu
-  - techtv.mit.edu
-  - ttv.mit.edu
   ovs:edx_base_url: https://courses.xpro.mit.edu
   ovs:feature_annotations: "False"
   ovs:log_level: INFO

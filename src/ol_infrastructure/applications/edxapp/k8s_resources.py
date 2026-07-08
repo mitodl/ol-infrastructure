@@ -60,6 +60,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
     default_psg_egress_args,
     get_default_psg_ingress_args,
 )
+from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
@@ -391,9 +392,16 @@ def create_k8s_resources(  # noqa: C901
                     value=stack_info.env_suffix,
                 ),
             ],
+            ports=[
+                kubernetes.core.v1.ContainerPortArgs(
+                    name="vector-metrics",
+                    container_port=9598,
+                    protocol="TCP",
+                ),
+            ],
             resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                requests={"cpu": "100m", "memory": "512Mi"},
-                limits={"memory": "512Mi"},
+                requests={"cpu": "10m", "memory": "96Mi"},
+                limits={"memory": "128Mi"},
             ),
             volume_mounts=[
                 kubernetes.core.v1.VolumeMountArgs(
@@ -409,6 +417,47 @@ def create_k8s_resources(  # noqa: C901
             ],
             args=["--config", "/etc/vector/vector.yaml"],
         )
+
+    # PodMonitor for Vector sidecar metrics — separate from the OLApplicationK8s-managed
+    # PodMonitor that covers the granian metrics port. Selects Open edX pods in the
+    # namespace via the shared service label; relabeling below keeps only Vector targets.
+    vector_pod_monitor_name = f"{env_name}-edxapp-vector-monitor"
+    kubernetes.apiextensions.CustomResource(
+        f"ol-{stack_info.env_prefix}-edxapp-vector-pod-monitor-{stack_info.env_suffix}",
+        api_version="monitoring.coreos.com/v1",
+        kind="PodMonitor",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=vector_pod_monitor_name,
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+        spec={
+            "selector": {
+                "matchLabels": {
+                    "ol.mit.edu/service": k8s_global_labels.get(
+                        "ol.mit.edu/service", "openedx"
+                    ),
+                }
+            },
+            "podMetricsEndpoints": [
+                {
+                    "port": "vector-metrics",
+                    "path": "/metrics",
+                    "scheme": "http",
+                    "interval": "30s",
+                    "relabelings": [
+                        {
+                            "sourceLabels": ["__meta_kubernetes_pod_container_name"],
+                            "action": "keep",
+                            "regex": "vector",
+                        }
+                    ],
+                }
+            ],
+            "namespaceSelector": {"matchNames": [namespace]},
+        },
+        opts=pulumi.ResourceOptions(depends_on=[vector_configmap]),
+    )
 
     pod_security_context = kubernetes.core.v1.PodSecurityContextArgs(
         run_as_user=1000,
@@ -1629,6 +1678,74 @@ def create_k8s_resources(  # noqa: C901
                 backend_service_port="http",
             ),
         ],
+    )
+
+    # VPA objects.
+    # Webapp scaling is managed by a KEDA ScaledObject (Prometheus request-rate)
+    # with a cpu trigger retained as a backstop (autoscaling_lms/cms_cpu_threshold)
+    # -- that cpu trigger becomes a Resource-type HPA metric under the hood, so
+    # VPA must not also control cpu there or the two autoscalers fight over the
+    # same signal. Memory has no competing scaler, so VPA controls it alone.
+    # Celery workers are scaled purely on Redis queue depth (an external metric),
+    # so VPA may control both cpu and memory there.
+    _webapp_vpa_bounds = {
+        "min_allowed": {"memory": "256Mi"},
+        "max_allowed": {"memory": "4Gi"},
+    }
+    _worker_vpa_min_allowed = {"cpu": "25m", "memory": "128Mi"}
+
+    make_vpa(
+        name=f"{env_name}-edxapp-lms-webapp-vpa",
+        namespace=namespace,
+        target_kind="Deployment",
+        target_name=lms_app.webapp_deployment_name,
+        controlled_resources=["memory"],
+        container_name="lms-edxapp-app",
+        **_webapp_vpa_bounds,
+        opts=ResourceOptions(depends_on=[lms_app]),
+    )
+    make_vpa(
+        name=f"{env_name}-edxapp-cms-webapp-vpa",
+        namespace=namespace,
+        target_kind="Deployment",
+        target_name=cms_app.webapp_deployment_name,
+        controlled_resources=["memory"],
+        container_name="cms-edxapp-app",
+        **_webapp_vpa_bounds,
+        opts=ResourceOptions(depends_on=[cms_app]),
+    )
+    make_vpa(
+        name=f"{env_name}-edxapp-lms-celery-vpa",
+        namespace=namespace,
+        target_kind="Deployment",
+        target_name=lms_celery_deployment_name,
+        controlled_resources=["cpu", "memory"],
+        container_name="lms-edxapp",
+        min_allowed=_worker_vpa_min_allowed,
+        # max_allowed.memory tracks this instance's configured celery memory_limit
+        # rather than a fixed value -- limits vary widely across edxapp instances
+        # (e.g. mitx LMS celery is provisioned at 10Gi for occasional heavy async
+        # tasks), and a shared low ceiling would let VPA forcibly shrink workers
+        # below what they're known to need.
+        max_allowed={
+            "cpu": "1000m",
+            "memory": resources_dict["celery"]["lms"]["memory_limit"],
+        },
+        opts=ResourceOptions(depends_on=[lms_celery_deployment]),
+    )
+    make_vpa(
+        name=f"{env_name}-edxapp-cms-celery-vpa",
+        namespace=namespace,
+        target_kind="Deployment",
+        target_name=cms_celery_deployment_name,
+        controlled_resources=["cpu", "memory"],
+        container_name="cms-edxapp",
+        min_allowed=_worker_vpa_min_allowed,
+        max_allowed={
+            "cpu": "1000m",
+            "memory": resources_dict["celery"]["cms"]["memory_limit"],
+        },
+        opts=ResourceOptions(depends_on=[cms_celery_deployment]),
     )
 
     return {

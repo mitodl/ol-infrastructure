@@ -1,0 +1,49 @@
+server {
+    listen 8071 default_server;  # DEFAULT_NGINX_PORT
+    server_name _;
+
+    # Propagate the real client-facing scheme from APISix (which terminates TLS upstream).
+    # Falls back to $scheme (the nginx connection scheme) when the header is absent.
+    set $my_scheme $http_x_forwarded_proto;
+    if ($my_scheme = "") { set $my_scheme $scheme; }
+
+    location = /nginx-health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+    }
+
+    location / {
+        proxy_set_header X-Forwarded-Proto $my_scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host $host;
+        proxy_pass http://127.0.0.1:8073;  # DEFAULT_WSGI_PORT (Granian)
+        proxy_pass_request_headers on;
+        proxy_pass_request_body on;
+        client_max_body_size 500M;
+    }
+
+    location /collections/letterlocking {
+        return 301 https://www.youtube.com/c/Letterlocking/videos;
+    }
+
+    location /collections/letterlocking/videos {
+        return 301 https://www.youtube.com/c/Letterlocking/videos;
+    }
+
+    location /collections/letterlocking/videos/30213-iron-gall-ink-a-quick-and-easy-method {
+        return 301 https://www.youtube.com/playlist?list=PL2uZTM-xaHP4tFQT7eTTK3sWRoJMcDWwB;
+    }
+
+    location /collections/letterlocking/videos/30215-elizabeth-stuart-s-deciphering-sir-thomas-roe-s-letter-cryptography-1626 {
+        return 301 https://www.youtube.com/watch?v=6X_ZXrLs8I8&list=PL2uZTM-xaHP4tFQT7eTTK3sWRoJMcDWwB&index=3&t=0s;
+    }
+
+    location /collections/letterlocking/videos/30209-a-tiny-spy-letter-constantijn-huygens-to-amalia-von-solms-1635 {
+        return 301 https://www.youtube.com/watch?v=PePWd-h679c&list=PL2uZTM-xaHP4tFQT7eTTK3sWRoJMcDWwB&index=7&t=0s;
+    }
+
+    location /collections/c8c5179c7596408fa0f09f6b76082331 {
+        return 301 https://www.youtube.com/c/MITEnergyInitiative;
+    }
+}

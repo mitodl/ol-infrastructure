@@ -36,8 +36,15 @@ config:
     iam_policies:
     - base
     - ocw
+    - pulumi_state
     instance_type: m7a.2xlarge
     name: ocw
+    spot_options:
+      instance_type_overrides:
+      - m7i.2xlarge
+      - m6a.2xlarge
+      - m5a.2xlarge
+      - m5.2xlarge
     use_spot_instances: true
   - auto_scale:
       desired: 4
@@ -55,8 +62,15 @@ config:
     - infra
     - operations
     - cloud_custodian
+    - pulumi_state
     instance_type: m7a.4xlarge
     name: infra
+    spot_options:
+      instance_type_overrides:
+      - m7i.4xlarge
+      - m6a.4xlarge
+      - m5a.4xlarge
+      - m5.4xlarge
     use_spot_instances: true
   - auto_scale:
       desired: 4
@@ -70,8 +84,15 @@ config:
     - base
     - ecr_push
     - operations
+    - pulumi_state
     instance_type: m7a.xlarge
     name: generic
+    spot_options:
+      instance_type_overrides:
+      - m7i.xlarge
+      - m6a.xlarge
+      - m5a.xlarge
+      - m5.xlarge
     use_spot_instances: true
   consul:address: https://consul-operations-production.odl.mit.edu
   vault:address: https://vault-production.odl.mit.edu

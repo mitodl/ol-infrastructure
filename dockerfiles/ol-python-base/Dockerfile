@@ -9,6 +9,11 @@
 #
 # Build:
 #   docker build --build-arg PYTHON_VERSION=3.12 -t mitodl/ol-python-base:3.12 .
+# Multi-arch build (published for both amd64 and arm64/Apple Silicon; --push
+# is required since a multi-platform result can't be loaded into the local
+# docker engine):
+#   docker buildx build --platform linux/amd64,linux/arm64 --push \
+#     --build-arg PYTHON_VERSION=3.12 -t mitodl/ol-python-base:3.12 .
 ARG PYTHON_VERSION=3.12
 FROM python:${PYTHON_VERSION}-slim
 
@@ -35,7 +40,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install uv (pinned via the upstream tag; bump deliberately).
-COPY --from=ghcr.io/astral-sh/uv:0.11.23@sha256:d0a0a753ab981624b49c97abc98821c1c09f4ca69d1ef5cee69c501be3d88479 /uv /uvx /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11.28@sha256:0f36cb9361a3346885ca3677e3767016687b5a170c1a6b88465ec14aefec90aa /uv /uvx /usr/local/bin/
 
 # Non-root runtime user and the directories the apps expect to own.
 RUN adduser --disabled-password --gecos "" mitodl && \

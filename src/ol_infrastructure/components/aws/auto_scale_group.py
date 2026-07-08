@@ -7,6 +7,11 @@ from pulumi_aws.autoscaling import (
     GroupInstanceRefreshArgs,
     GroupInstanceRefreshPreferencesArgs,
     GroupLaunchTemplateArgs,
+    GroupMixedInstancesPolicyArgs,
+    GroupMixedInstancesPolicyInstancesDistributionArgs,
+    GroupMixedInstancesPolicyLaunchTemplateArgs,
+    GroupMixedInstancesPolicyLaunchTemplateLaunchTemplateSpecificationArgs,
+    GroupMixedInstancesPolicyLaunchTemplateOverrideArgs,
     GroupTagArgs,
 )
 from pulumi_aws.ec2 import (
@@ -79,6 +84,19 @@ class SpotInstanceOptions(BaseModel):
     instance_interruption_behavior: Literal["hibernate", "stop", "terminate"] = (
         "terminate"
     )
+    # Additional instance types (same rough vCPU/memory class as the launch
+    # template's primary instance_type) that the ASG may substitute in when the
+    # primary type has no spot capacity in a given AZ. When set, the ASG uses a
+    # MixedInstancesPolicy instead of a flat single-type spot request, so a
+    # capacity shortfall in one instance type/family no longer stalls capacity
+    # or drives repeated failed-launch retries.
+    instance_type_overrides: list[str] | None = None
+    spot_allocation_strategy: Literal[
+        "lowest-price",
+        "capacity-optimized",
+        "capacity-optimized-prioritized",
+        "price-capacity-optimized",
+    ] = "price-capacity-optimized"
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("spot_instance_type")
@@ -98,6 +116,22 @@ class SpotInstanceOptions(BaseModel):
             msg = f"instance_interruption_behavior: {behavior} is not valid. Only 'hibernate', 'stop', or 'terminate' are accepted."  # noqa: E501
             raise ValueError(msg)
         return behavior
+
+    @field_validator("instance_type_overrides")
+    @classmethod
+    def is_valid_instance_type_overrides(
+        cls, instance_type_overrides: list[str] | None
+    ) -> list[str] | None:
+        """Validate that each override is a real, launchable instance type."""
+        for instance_type in instance_type_overrides or []:
+            if not is_valid_instance_type(instance_type):
+                msg = (
+                    f"instance_type_overrides: {instance_type} is not a valid "
+                    "specifier. Refer to https://instances.vantage.sh/ to find a "
+                    "supported instance type."
+                )
+                raise ValueError(msg)
+        return instance_type_overrides
 
 
 class OLTargetGroupConfig(AWSBase):
@@ -451,8 +485,17 @@ class OLAutoScaling(pulumi.ComponentResource):
             "opts": resource_options,
         }
 
-        # Configure spot instances if requested
-        if lt_config.use_spot_instances:
+        # Configure spot instances if requested. Diversifying across instance
+        # types (instance_type_overrides) requires a MixedInstancesPolicy on the
+        # Group instead of a flat spot request on the launch template itself --
+        # the two are mutually exclusive, so the spot market options only get
+        # set here for the single-instance-type case.
+        use_mixed_instances_policy = bool(
+            lt_config.use_spot_instances
+            and lt_config.spot_options
+            and lt_config.spot_options.instance_type_overrides
+        )
+        if lt_config.use_spot_instances and not use_mixed_instances_policy:
             spot_options_config = lt_config.spot_options or SpotInstanceOptions()
             spot_options_kwargs: dict[str, str] = {
                 "spot_instance_type": spot_options_config.spot_instance_type,
@@ -493,15 +536,47 @@ class OLAutoScaling(pulumi.ComponentResource):
         auto_scale_group_kwargs = {}
         if self.target_group:
             auto_scale_group_kwargs["target_group_arns"] = [self.target_group.arn]
+
+        if use_mixed_instances_policy:
+            mixed_spot_options = lt_config.spot_options
+            assert mixed_spot_options is not None  # noqa: S101
+            assert mixed_spot_options.instance_type_overrides is not None  # noqa: S101
+            overrides = [
+                GroupMixedInstancesPolicyLaunchTemplateOverrideArgs(
+                    instance_type=instance_type
+                )
+                for instance_type in [
+                    lt_config.instance_type,
+                    *mixed_spot_options.instance_type_overrides,
+                ]
+            ]
+            auto_scale_group_kwargs["mixed_instances_policy"] = (
+                GroupMixedInstancesPolicyArgs(
+                    launch_template=GroupMixedInstancesPolicyLaunchTemplateArgs(
+                        launch_template_specification=GroupMixedInstancesPolicyLaunchTemplateLaunchTemplateSpecificationArgs(
+                            launch_template_id=self.launch_template.id,
+                            version="$Latest",
+                        ),
+                        overrides=overrides,
+                    ),
+                    instances_distribution=GroupMixedInstancesPolicyInstancesDistributionArgs(
+                        on_demand_percentage_above_base_capacity=0,
+                        spot_allocation_strategy=mixed_spot_options.spot_allocation_strategy,
+                        spot_max_price=mixed_spot_options.max_price,
+                    ),
+                )
+            )
+        else:
+            auto_scale_group_kwargs["launch_template"] = GroupLaunchTemplateArgs(
+                id=self.launch_template.id,
+                version="$Latest",
+            )
+
         self.auto_scale_group = Group(
             f"{resource_name_prefix}auto-scale-group",
             desired_capacity=asg_config.desired_size,
             health_check_type=asg_config.health_check_type,
             instance_refresh=instance_refresh_policy,
-            launch_template=GroupLaunchTemplateArgs(
-                id=self.launch_template.id,
-                version="$Latest",
-            ),
             max_size=asg_config.max_size,
             min_size=asg_config.min_size,
             max_instance_lifetime=asg_config.max_instance_lifetime_seconds,

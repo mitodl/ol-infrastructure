@@ -82,6 +82,11 @@ data:
   # ── Valkey / Celery ────────────────────────────────────────────────────────
   # CELERY_BROKER_URL and REDISCACHE_URL are set in secrets.
   CELERY_TASK_ALWAYS_EAGER: "False"
+  # Disable the Celery beat scheduler by default in local dev so backpopulate/
+  # news ETL and search reindex tasks run on demand (via the Tilt seed buttons),
+  # not automatically on a schedule. Set to "False" to re-enable scheduled
+  # background population.
+  CELERY_BEAT_DISABLED: "True"
 
   # ── OpenSearch ─────────────────────────────────────────────────────────────
   OPENSEARCH_INDEX: "mitlearn-local"

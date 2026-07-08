@@ -75,6 +75,10 @@ def create_database(
                     "owner": "app",
                     "secret": {"name": "pg-app-credentials"},
                     "postInitSQL": [
+                        # Django test runners (and pytest-django) create and
+                        # drop a throwaway test database, which requires the
+                        # app role to have the CREATEDB privilege.
+                        "ALTER ROLE app CREATEDB;",
                         "CREATE DATABASE mitlearn OWNER app;",
                         "CREATE DATABASE learnai OWNER app;",
                         "CREATE DATABASE mitxonline OWNER app;",

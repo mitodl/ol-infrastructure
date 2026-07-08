@@ -53,6 +53,7 @@ config:
   edxapp:web_instance_type: r7a.large
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
+    admin_console: admin-console
     authoring: authoring
     communications: communications
     discussions: discuss

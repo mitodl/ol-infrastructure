@@ -1,0 +1,14 @@
+[Unit]
+Description=Validate network reachability before the Concourse worker registers with the TSA
+Before=concourse.service
+# Needs its own network path up, but must not block on the (later) worker
+# identity/registration -- only on the box being able to reach the internet.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=no
+ExecStart=/usr/local/bin/concourse-worker-preflight
+# Bounded by the script's own internal retry budget; leave headroom above it.
+TimeoutStartSec=660

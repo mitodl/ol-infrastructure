@@ -78,6 +78,7 @@ from ol_infrastructure.lib.aws.route53_helper import (
     lookup_zone_id_from_domain,
 )
 from ol_infrastructure.lib.fastly import get_fastly_provider
+from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
@@ -1034,6 +1035,39 @@ route53.Record(
     zone_id=lookup_zone_id_from_domain(frontend_domain),
     allow_overwrite=True,
 )
+
+# VPA objects for mitxonline workloads.
+# No webapp VPA: the webapp's native HPA scales on both cpu (60%) and memory
+# (80%) Resource metrics (see hpa_scaling_metrics default in
+# OLApplicationK8sConfig), so there's no resource axis left for VPA to safely
+# control without fighting the HPA's utilization signal.
+# Celery workers and beat are scaled via KEDA (Redis queue depth), so CPU+memory VPA is safe.
+_worker_vpa_bounds = {
+    "min_allowed": {"cpu": "25m", "memory": "128Mi"},
+    "max_allowed": {"cpu": "1000m", "memory": "3Gi"},
+}
+for _celery_name in mitxonline_k8s_app.celery_deployment_names:
+    make_vpa(
+        name=f"{_celery_name}-vpa",
+        namespace=mitxonline_namespace,
+        target_kind="Deployment",
+        target_name=_celery_name,
+        controlled_resources=["cpu", "memory"],
+        container_name="celery-worker",
+        **_worker_vpa_bounds,
+        opts=ResourceOptions(depends_on=[mitxonline_k8s_app]),
+    )
+if mitxonline_k8s_app.beat_deployment_name:
+    make_vpa(
+        name=f"{mitxonline_k8s_app.beat_deployment_name}-vpa",
+        namespace=mitxonline_namespace,
+        target_kind="Deployment",
+        target_name=mitxonline_k8s_app.beat_deployment_name,
+        controlled_resources=["cpu", "memory"],
+        container_name="celery-beat",
+        **_worker_vpa_bounds,
+        opts=ResourceOptions(depends_on=[mitxonline_k8s_app]),
+    )
 
 export(
     "mitxonline",

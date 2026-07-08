@@ -35,6 +35,7 @@ config:
     iam_policies:
     - base
     - ocw
+    - pulumi_state
     instance_type: t3a.medium
     name: ocw
   - auto_scale:
@@ -51,6 +52,7 @@ config:
     - operations
     - cloud_custodian
     - infra
+    - pulumi_state
     instance_type: t3a.medium
     name: infra
   - auto_scale:
@@ -65,6 +67,7 @@ config:
     iam_policies:
     - base
     - operations
+    - pulumi_state
     instance_type: t3a.medium
     name: generic
   consul:address: https://consul-operations-ci.odl.mit.edu

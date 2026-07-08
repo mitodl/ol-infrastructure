@@ -53,6 +53,10 @@ def _build_interpolated_config_dict(
     """
     domains = edxapp_config.require_object("domains")
     enabled_mfes: dict[str, str] = edxapp_config.get_object("enabled_mfes") or {}
+    site_project_config = edxapp_config.get_object("site_project")
+    site_project_mfe_apps: list[str] = (
+        list(site_project_config.get("mfe_apps", [])) if site_project_config else []
+    )
 
     # Determine marketing domain based on deployment type
     marketing_domain = (
@@ -170,7 +174,7 @@ def _build_interpolated_config_dict(
         "COURSE_AUTHORING_MICROFRONTEND_URL": f"https://{domains['studio']}/authoring",
         "INSTRUCTOR_MICROFRONTEND_URL": (
             f"https://{domains['lms']}/apps/instructor-dashboard"
-            if "instructor" in enabled_mfes
+            if "instructor-dashboard" in site_project_mfe_apps
             else None
         ),
         "LEARNING_MICROFRONTEND_URL": f"https://{domains['lms']}/learn",
@@ -528,6 +532,17 @@ def create_k8s_configmaps(  # noqa: PLR0915
             }
         )
         cms_general_config_content["SEGMENT_IO"] = False
+
+    # TEMPORARY (mitx-qa testing): speed up Canvas due-date sync from the
+    # plugin's hourly default to every 5 minutes so Canvas changes appear
+    # quickly in Studio. Revert once Canvas due-date testing is complete.
+    if stack_info.env_prefix == "mitx" and stack_info.env_suffix == "qa":
+        cms_general_config_content["CELERYBEAT_SCHEDULE"] = {
+            "sync_canvas_due_dates": {
+                "task": "ol_openedx_canvas_integration.cms_tasks.sync_canvas_due_dates_for_all_courses",
+                "schedule": 300,  # seconds; 5 minutes (plugin default is hourly)
+            },
+        }
 
     cms_general_config_content["FEATURES"] = cms_features
 

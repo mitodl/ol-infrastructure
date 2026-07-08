@@ -6,8 +6,12 @@ Mirrors the production olapps.py structure but:
   - Skips production SAML/OIDC org federation (real MIT Touchstone, B2B orgs)
   - Disables verify_email (Mailpit is available but we want frictionless login)
   - Includes fake-touchstone and okta-test IdPs (same as CI/QA branch)
-  - Adds test users: admin@odl.local, student@odl.local, prof@odl.local
   - Skips all Vault-dependent resources
+
+Test users (admin / student / prof, password localdev123) are NOT created
+here — the Keycloak provider does not manage individual users. They are
+seeded by local-dev/scripts/kc-seed-users.sh, which the root Tiltfile runs
+automatically (the "kc-seed-users" resource) after this realm is applied.
 """
 
 import json
@@ -53,6 +57,8 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         display_name="MIT Learn",
         display_name_html="<b>MIT Learn</b>",
         enabled=True,
+        email_theme="ol-learn",
+        login_theme="ol-learn",
         duplicate_emails_allowed=False,
         otp_policy=keycloak.RealmOtpPolicyArgs(
             algorithm="HmacSHA256",
@@ -315,10 +321,13 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         "acr",
         "email",
         "profile",
-        "role_list",
         "roles",
         "web-origins",
         "ol-profile",
+        # "role_list" is intentionally omitted: it is a SAML-protocol client
+        # scope, and keycloak.openid.ClientDefaultScopes only accepts
+        # openid-connect scopes — including it fails with
+        # "validation error: scope role_list does not exist".
         # KC 26 auto-attaches "organization" as an optional scope when
         # organizations_enabled=True — adding it as default causes 409 Conflict.
     ]
@@ -595,3 +604,35 @@ def create_olapps_dev_realm(  # noqa: PLR0913
             extra_config={"syncMode": "INHERIT"},
             opts=kc_opts,
         )
+
+    # -------------------------------------------------------------------------
+    # Organization seeding for local dev
+    #
+    # The realm's browser flow is the organization-aware "Organization
+    # Identity-First Login" flow (mirrors production). That authenticator only
+    # renders the email-first login screen when the realm has at least one
+    # organization; with zero organizations it falls through to the self-service
+    # registration form, sending every login attempt to "Register" instead of
+    # "Sign in". Production has real organizations so it works there; local dev
+    # had none, which is why login landed on registration.
+    #
+    # Seed one placeholder organization so identity-first login renders
+    # correctly. It owns a fake, non-routable domain (org.local): all outbound
+    # mail is captured by Mailpit regardless, but a fake domain keeps real
+    # addresses out of the picture. The org is intentionally NOT wired to the
+    # fake-touchstone IdP (that IdP is a local stub), so members fall through to
+    # the username/password screen like the seeded @odl.local test users.
+    # -------------------------------------------------------------------------
+    keycloak.organization.Organization(
+        "olapps-local-dev-org",
+        realm=realm.realm,
+        name="Local Dev",
+        alias="local-dev",
+        enabled=True,
+        domains=[
+            keycloak.organization.OrganizationDomainArgs(
+                name="org.local", verified=True
+            ),
+        ],
+        opts=kc_opts,
+    )

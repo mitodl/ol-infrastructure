@@ -7,6 +7,10 @@ sources:
     - /opt/data/cms/logs/tracking_logs.log*
     - /opt/data/lms/logs/tracking_logs.log*
 
+  internal_metrics:
+    type: internal_metrics
+    scrape_interval_secs: 15
+
 transforms:
   # Maintaining a copy of the logs with nested objects for MIT IRx (TMM 2023-07-05)
   parse_edx_tracking_logs_legacy:
@@ -107,3 +111,8 @@ sinks:
       timeout_secs: 3600
       max_bytes: 67108864
     healthcheck: false
+  prometheus_exporter:
+    inputs:
+    - 'internal_metrics'
+    type: prometheus_exporter
+    address: "0.0.0.0:9598"

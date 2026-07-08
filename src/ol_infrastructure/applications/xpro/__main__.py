@@ -10,7 +10,6 @@ import json
 from pathlib import Path
 
 import pulumi_fastly as fastly
-import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import (
     ROOT_STACK_RESOURCE,
@@ -23,7 +22,6 @@ from pulumi import (
 from pulumi_aws import ec2, iam, route53
 
 from bridge.lib.magic_numbers import (
-    DEFAULT_NGINX_PORT,
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
     ONE_MEGABYTE_BYTE,
@@ -44,6 +42,7 @@ from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.k8s import (
+    GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryBeatConfig,
     OLApplicationK8sCeleryWorkerConfig,
@@ -71,6 +70,7 @@ from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
 )
+from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
@@ -530,13 +530,15 @@ if k8s_deploy:
             application_security_group_name=xpro_app_security_group.name,
             application_image_repository="mitodl/xpro-app",
             **docker_image_config_kwargs("XPRO"),
-            application_cmd_array=["uwsgi"],
-            application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
+            granian_config=GranianConfig(
+                application_module="mitxpro.wsgi:application",
+                workers=2,
+                blocking_threads_idle_timeout=120,
+                enable_metrics=True,
+            ),
             vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
             registry="dockerhub",
             import_nginx_config=True,
-            import_nginx_config_path="files/web.conf",
-            import_uwsgi_config=True,
             init_migrations=True,
             init_collectstatic=True,
             pre_deploy_commands=[
@@ -559,39 +561,6 @@ if k8s_deploy:
             ),
             resource_requests={"cpu": "250m", "memory": "2Gi"},
             resource_limits={"memory": "2Gi"},
-            probe_configs={
-                "liveness_probe": kubernetes.core.v1.ProbeArgs(
-                    http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                        path="/nginx-health",
-                        port=DEFAULT_NGINX_PORT,
-                    ),
-                    initial_delay_seconds=30,
-                    period_seconds=30,
-                    failure_threshold=3,
-                    timeout_seconds=3,
-                ),
-                "readiness_probe": kubernetes.core.v1.ProbeArgs(
-                    http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                        path="/nginx-health",
-                        port=DEFAULT_NGINX_PORT,
-                    ),
-                    initial_delay_seconds=15,
-                    period_seconds=15,
-                    failure_threshold=3,
-                    timeout_seconds=3,
-                ),
-                "startup_probe": kubernetes.core.v1.ProbeArgs(
-                    http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                        path="/nginx-health",
-                        port=DEFAULT_NGINX_PORT,
-                    ),
-                    initial_delay_seconds=10,
-                    period_seconds=10,
-                    failure_threshold=6,
-                    success_threshold=1,
-                    timeout_seconds=5,
-                ),
-            },
         ),
         opts=ResourceOptions(depends_on=[xpro_app_security_group, *secret_resources]),
     )
@@ -627,6 +596,41 @@ if k8s_deploy:
         k8s_namespace=xpro_namespace,
         k8s_labels=k8s_app_labels,
     )
+
+    # VPA objects for xpro workloads.
+    # No webapp VPA: xpro doesn't set webapp_keda_config or override
+    # hpa_scaling_metrics, so it gets OLApplicationK8sConfig's default native HPA,
+    # which scales on both cpu (60%) and memory (80%) Resource metrics -- there's
+    # no resource axis left for VPA to safely control without fighting the HPA's
+    # utilization signal.
+    # Celery workers and beat are scaled via KEDA (Redis queue depth), so
+    # CPU+memory VPA is safe for those.
+    _worker_vpa_bounds = {
+        "min_allowed": {"cpu": "25m", "memory": "128Mi"},
+        "max_allowed": {"cpu": "1000m", "memory": "2Gi"},
+    }
+    for _celery_name in xpro_k8s_app.celery_deployment_names:
+        make_vpa(
+            name=f"{_celery_name}-vpa",
+            namespace=xpro_namespace,
+            target_kind="Deployment",
+            target_name=_celery_name,
+            controlled_resources=["cpu", "memory"],
+            container_name="celery-worker",
+            **_worker_vpa_bounds,
+            opts=ResourceOptions(depends_on=[xpro_k8s_app]),
+        )
+    if xpro_k8s_app.beat_deployment_name:
+        make_vpa(
+            name=f"{xpro_k8s_app.beat_deployment_name}-vpa",
+            namespace=xpro_namespace,
+            target_kind="Deployment",
+            target_name=xpro_k8s_app.beat_deployment_name,
+            controlled_resources=["cpu", "memory"],
+            container_name="celery-beat",
+            **_worker_vpa_bounds,
+            opts=ResourceOptions(depends_on=[xpro_k8s_app]),
+        )
 
 vector_log_proxy_secrets = read_yaml_secrets(
     Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")

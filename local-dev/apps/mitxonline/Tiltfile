@@ -12,17 +12,26 @@ NAMESPACE = 'mitxonline'
 DEPLOY_NAME = 'mitxonline-webapp'
 
 if os.path.exists(os.path.join(APP_DIR, '.git')):
+    # Build the `local-dev` target: `production` (the only target that bakes in
+    # the compiled webpack frontend, which checkout needs since that flow still
+    # runs through mitxonline.mit.dev) plus dev deps (pytest, ipdb, ...) and
+    # watchfiles so granian can --reload (see deployment.yaml).
     docker_build(
         IMAGE,
         context=APP_DIR,
-        target='production',
+        target='local-dev',
         dockerfile=APP_DIR + '/Dockerfile',
+        # Sync the whole repo: Django apps are top-level dirs (courses,
+        # ecommerce, cms, ...). granian's --reload-ignore-dirs filters the
+        # non-Python churn.
         live_update=[
-            sync(APP_DIR + '/mitxonline', '/src/mitxonline'),
-            sync(APP_DIR + '/main', '/src/main'),
+            sync(APP_DIR, '/src'),
+            # Reinstall deps on pyproject.toml/uv.lock change (uv, not pip;
+            # dev deps included, matching the local-dev image; --inexact keeps
+            # the image's extra watchfiles install).
             run(
-                'cd /src && pip install -r requirements.txt',
-                trigger=[APP_DIR + '/requirements.txt'],
+                'cd /src && uv sync --frozen --inexact',
+                trigger=[APP_DIR + '/pyproject.toml', APP_DIR + '/uv.lock'],
             ),
         ],
     )

@@ -632,6 +632,24 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         opts=resource_options,
     )
 
+    # StarRocks 4.x rejects '@' in usernames.  Expose the Kerberos short username
+    # stored in the "saml_uid" user attribute (populated by the Touchstone SAML
+    # uid mapper above) as the "starrocks_username" JWT claim so that the
+    # StarRocks security integration principal_field can reference it.
+    keycloak.openid.UserAttributeProtocolMapper(
+        "ol-data-platform-starrocks-client-username-mapper",
+        name="starrocks-username",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_starrocks_client.id,
+        user_attribute="saml_uid",
+        claim_name="starrocks_username",
+        claim_value_type="String",
+        add_to_id_token=True,
+        add_to_access_token=True,
+        add_to_userinfo=True,
+        opts=resource_options,
+    )
+
     # Public client for CLI / developer PKCE flows (no client secret required).
     # Used by the starrocks-auth helper script to obtain access tokens for
     # interactive dbt runs and direct mysql connections without exposing the
@@ -667,6 +685,19 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             "roles",
             "web-origins",
         ],
+        opts=resource_options,
+    )
+    keycloak.openid.UserAttributeProtocolMapper(
+        "ol-data-platform-starrocks-cli-client-username-mapper",
+        name="starrocks-username",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_starrocks_cli_client.id,
+        user_attribute="saml_uid",
+        claim_name="starrocks_username",
+        claim_value_type="String",
+        add_to_id_token=True,
+        add_to_access_token=True,
+        add_to_userinfo=True,
         opts=resource_options,
     )
     # STARROCKS [END] # noqa: ERA001
@@ -984,6 +1015,22 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         attribute_name="displayName",
         identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
         user_attribute="fullName",
+        extra_config={
+            "syncMode": "INHERIT",
+        },
+        opts=resource_options,
+    )
+    # MIT Touchstone sends the Kerberos short username (e.g. "tmacey") in the
+    # SAML "uid" attribute.  Store it as the "saml_uid" Keycloak user attribute
+    # so that protocol mappers on StarRocks clients can expose it as the
+    # "starrocks_username" claim (StarRocks 4.x rejects "@" in usernames).
+    keycloak.AttributeImporterIdentityProviderMapper(
+        "ol-data-platform-touchstone-saml-uid-attribute",
+        name="ol-data-platform-touchstone-saml-uid-attribute",
+        realm=ol_data_platform_realm.id,
+        attribute_name="uid",
+        identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
+        user_attribute="saml_uid",
         extra_config={
             "syncMode": "INHERIT",
         },

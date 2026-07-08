@@ -59,16 +59,20 @@ spec:
         image: mitodl/mitxonline-app:latest
         imagePullPolicy: IfNotPresent
         command:
-        - granian
-        - --interface
-        - wsgi
-        - --host
-        - 0.0.0.0
-        - --port
-        - "8011"
-        - --workers
-        - "2"
-        - main.wsgi:application
+        - sh
+        - -c
+        # Auto-reload on Tilt live-update syncs, but only when the image has
+        # watchfiles (the Tilt-built local-dev target does; the prebuilt
+        # DockerHub image used without a sibling checkout doesn't). Watches the
+        # working dir (/src); ignore dirs that churn without affecting Python.
+        - |
+          if python -c 'import watchfiles' 2>/dev/null; then
+            # --workers-kill-timeout: force-kill workers whose app threads
+            # keep them from stopping gracefully, so reloads don't hang.
+            # Every reload pays this full timeout, so keep it short.
+            RELOAD_ARGS="--reload --reload-ignore-dirs frontend --reload-ignore-dirs static --reload-ignore-dirs staticfiles --workers-kill-timeout 1"
+          fi
+          exec granian --interface wsgi --host 0.0.0.0 --port 8011 --workers 2 $RELOAD_ARGS main.wsgi:application
         ports:
         - containerPort: 8011
           name: http-wsgi
@@ -238,12 +242,14 @@ spec:
             name: mitxonline-env
         - secretRef:
             name: mitxonline-secrets
+        # beat loads the full Django app like the worker, so give it comparable
+        # memory headroom — it OOMs with less.
         resources:
           requests:
             cpu: 50m
-            memory: 128Mi
-          limits:
             memory: 256Mi
+          limits:
+            memory: 1Gi
         volumeMounts:
         - name: combined-ca
           mountPath: /etc/ssl/local-dev

@@ -9,7 +9,6 @@ from string import Template
 
 import pulumi_fastly as fastly
 import pulumi_github as github
-import pulumi_kubernetes as kubernetes
 import pulumi_qdrant_cloud as qdrant_cloud
 import pulumi_vault as vault
 from pulumi import (
@@ -31,6 +30,10 @@ from bridge.lib.magic_numbers import (
     ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.applications.mit_learn.k8s_autoscaling import (
+    build_webapp_keda_config,
+    create_webapp_trigger_auth,
+)
 from ol_infrastructure.applications.mit_learn.k8s_secrets import (
     create_mitlearn_k8s_secrets,
 )
@@ -78,6 +81,7 @@ from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
 )
+from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
@@ -1472,6 +1476,21 @@ secret_names, secret_resources = create_mitlearn_k8s_secrets(
     redis_cache=redis_cache,
 )
 
+# KEDA webapp autoscaling: scale on APISIX request-rate + p95 latency
+# (CPU backstop) instead of CPU/memory alone, since search blocks on I/O.
+webapp_trigger_auth, webapp_trigger_auth_name = create_webapp_trigger_auth(
+    env_name=stack_info.env_suffix,
+    namespace=learn_namespace,
+    k8s_global_labels=k8s_app_labels,
+    stack_info=stack_info,
+    vault_k8s_resources=vault_k8s_resources,
+)
+webapp_keda_config = build_webapp_keda_config(
+    trigger_auth_name=webapp_trigger_auth_name,
+    stack_info=stack_info,
+    mitlearn_config=mitlearn_config,
+)
+
 # Configure and deploy the mitlearn application using OLApplicationK8s
 mitlearn_k8s_app = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
@@ -1493,7 +1512,11 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_cmd_array=["uwsgi"],
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
         granian_config=GranianConfig(
-            workers=1,
+            workers=2,
+            # Pin per-worker RSS so it doesn't auto-scale with the memory limit
+            # (floor(limit/workers*0.9)); 2*1080Mi leaves ~1GiB headroom under
+            # the 3200Mi limit for the master process and transient overshoot.
+            workers_max_rss=1080,
             enable_metrics=True,
             interface="asginl",
             backlog=None,
@@ -1539,35 +1562,14 @@ mitlearn_k8s_app = OLApplicationK8s(
             resource_requests={"cpu": "100m", "memory": "2048Mi"},
             resource_limits={"memory": "2048Mi"},
         ),
-        resource_requests={"cpu": "250m", "memory": "2400Mi"},
-        resource_limits={"memory": "2400Mi"},
-        hpa_scaling_metrics=[
-            kubernetes.autoscaling.v2.MetricSpecArgs(
-                type="Resource",
-                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
-                    name="cpu",
-                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
-                        type="Utilization",
-                        average_utilization=60,  # Target CPU utilization (60%)
-                    ),
-                ),
-            ),
-            # Scale up when avg usage exceeds: 1800 * 0.8 = 1440 Mi
-            kubernetes.autoscaling.v2.MetricSpecArgs(
-                type="Resource",
-                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
-                    name="memory",
-                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
-                        type="Utilization",
-                        average_utilization=80,  # Target memory utilization (80%)
-                    ),
-                ),
-            ),
-        ],
+        resource_requests={"cpu": "500m", "memory": "3200Mi"},
+        resource_limits={"memory": "3200Mi"},
+        webapp_keda_config=webapp_keda_config,
     ),
     opts=ResourceOptions(
         depends_on=[
             mitlearn_app_security_group,
+            webapp_trigger_auth,
             *secret_resources,
         ]
     ),
@@ -1730,6 +1732,47 @@ learn_external_service_apisix_route = OLApisixRoute(
     ),
 )
 
+
+# VPA objects for mit-learn workloads.
+# Webapp has a CPU-based HPA, so VPA must not control CPU (would distort HPA utilization signals).
+# Celery workers and beat are scaled via KEDA (Redis queue depth), so CPU+memory VPA is safe.
+_worker_vpa_bounds = {
+    "min_allowed": {"cpu": "25m", "memory": "128Mi"},
+    "max_allowed": {"cpu": "1000m", "memory": "3Gi"},
+}
+make_vpa(
+    name="mitlearn-webapp-vpa",
+    namespace=learn_namespace,
+    target_kind="Deployment",
+    target_name=mitlearn_k8s_app.webapp_deployment_name,
+    controlled_resources=["memory"],
+    container_name="mitlearn-app",
+    min_allowed={"memory": "256Mi"},
+    max_allowed={"memory": "4Gi"},
+    opts=ResourceOptions(depends_on=[mitlearn_k8s_app]),
+)
+for _celery_name in mitlearn_k8s_app.celery_deployment_names:
+    make_vpa(
+        name=f"{_celery_name}-vpa",
+        namespace=learn_namespace,
+        target_kind="Deployment",
+        target_name=_celery_name,
+        controlled_resources=["cpu", "memory"],
+        container_name="celery-worker",
+        **_worker_vpa_bounds,
+        opts=ResourceOptions(depends_on=[mitlearn_k8s_app]),
+    )
+if mitlearn_k8s_app.beat_deployment_name:
+    make_vpa(
+        name=f"{mitlearn_k8s_app.beat_deployment_name}-vpa",
+        namespace=learn_namespace,
+        target_kind="Deployment",
+        target_name=mitlearn_k8s_app.beat_deployment_name,
+        controlled_resources=["cpu", "memory"],
+        container_name="celery-beat",
+        **_worker_vpa_bounds,
+        opts=ResourceOptions(depends_on=[mitlearn_k8s_app]),
+    )
 
 export(
     "mit_learn",

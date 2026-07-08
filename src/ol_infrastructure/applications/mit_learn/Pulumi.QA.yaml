@@ -80,6 +80,7 @@ config:
     XPRO_COURSES_API_URL: "https://rc.xpro.mit.edu/api/courses/"
     MITPE_API_ENABLED: "true"
     OCW_ITERATOR_CHUNK_SIZE: 300
+    QDRANT_CHUNK_SIZE: 8
     OCW_LIVE_BUCKET: "ocw-content-live-production"
     OIDC_ENDPOINT: "https://sso-qa.ol.mit.edu/realms/olapps"
     OPENTELEMETRY_ENABLED: "true"
@@ -91,6 +92,7 @@ config:
     OTEL_PROPAGATORS: "tracecontext,baggage"
     OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
     OTEL_LOGS_EXPORTER: "otlp"
+    HYBRID_VECTOR_SEARCH_MIN_SCORE: 0.07
     OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/logs"
     OTEL_METRIC_EXPORT_INTERVAL: "60000"
     OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT: "128"
