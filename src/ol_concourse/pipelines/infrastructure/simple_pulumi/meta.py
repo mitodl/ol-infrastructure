@@ -1,3 +1,4 @@
+# pyright: reportCallIssue=false
 """Meta pipeline for managing simple Pulumi-only deployment pipelines.
 
 This meta pipeline automatically generates and updates individual pipelines for
@@ -205,6 +206,7 @@ if __name__ == "__main__":
         "opensearch",
         "qdrant-cloud",
         "rootly",
+        "sentry",
         "starrocks",
         "starrocks-substructure",
         "starburst",
@@ -233,8 +235,12 @@ if __name__ == "__main__":
     pipeline_json = meta_pipeline(app_names, extra_args=extra_args).model_dump_json(
         indent=2
     )
-    with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(pipeline_json)
+    try:
+        with open("definition.json", "w") as definition:  # noqa: PTH123
+            definition.write(pipeline_json)
+    except OSError as exc:
+        msg = "Failed to write simple-pulumi meta pipeline definition.json"
+        raise RuntimeError(msg) from exc
     sys.stdout.write(pipeline_json)
     print()  # noqa: T201
     print(  # noqa: T201

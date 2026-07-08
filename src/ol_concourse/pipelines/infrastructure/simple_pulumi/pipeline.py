@@ -1,4 +1,5 @@
 # ruff: noqa: PLR0915, PLR0912, C901
+# pyright: reportCallIssue=false, reportMissingImports=false
 """Generate Concourse pipeline definitions for simple Pulumi-only deployments.
 
 This template is for applications/services that only need Pulumi infrastructure
@@ -271,6 +272,16 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="rootly",
         pulumi_project_path="saas/rootly/",
         pulumi_project_name="ol-saas-rootly",
+        stages=["Production"],
+    ),
+    "sentry": SimplePulumiParams(
+        app_name="sentry",
+        pulumi_project_path="infrastructure/sentry/",
+        pulumi_project_name="ol-infrastructure-sentry",
+        additional_watched_paths=[
+            "src/bridge/secrets/sentry/",
+            "src/bridge/lib/versions.py",
+        ],
         stages=["Production"],
     ),
     "starrocks": SimplePulumiParams(
