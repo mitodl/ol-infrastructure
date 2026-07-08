@@ -62,8 +62,10 @@ spec:
             memory: 512Mi
           limits:
             # next dev (turbopack) needs far more headroom than the
-            # production standalone server.
-            memory: 4Gi
+            # production standalone server. 4Gi OOM-killed the pod during
+            # on-demand page compiles; measured peak over ~21h of use is
+            # ~4.3Gi (avg ~3.6Gi), so 6Gi clears the transient spikes.
+            memory: 6Gi
         readinessProbe:
           httpGet:
             path: /
