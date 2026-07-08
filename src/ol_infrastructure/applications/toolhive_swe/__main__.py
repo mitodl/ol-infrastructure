@@ -70,9 +70,9 @@ Incoming auth (browser login via Keycloak, brokered by ToolHive):
         requirepass; the CRD requires a password (aclUserConfig.passwordSecretRef).
 
 The ``VirtualMCPServer`` is exposed to the internet through the shared APISIX gateway
-on the operations cluster at ``toolhive-swe.ci.ol.mit.edu`` using the hybrid HTTPRoute
-+ ApisixTls pattern (ADR-0003). The hostname is added to the operations EKS stack's
-``eks:apisix_domains`` so external-dns points it at the APISIX NLB.
+on the operations cluster at ``toolhive-swe[.<env>].ol.mit.edu`` using the hybrid
+HTTPRoute + ApisixTls pattern (ADR-0003). The hostname is added to the operations EKS
+stack's ``eks:apisix_domains`` so external-dns points it at the APISIX NLB.
 """
 
 from pathlib import Path
@@ -166,7 +166,11 @@ k8s_global_labels = k8s_labels.model_dump()
 
 # Public hostname the vMCP is served on. This is also the embedded auth server's
 # issuer and the OAuth resource identifier ToolHive advertises + validates.
-VMCP_DOMAIN = "toolhive-swe.ci.ol.mit.edu"
+# Follows the per-environment convention toolhive-swe[.<env>].ol.mit.edu.
+if stack_info.env_suffix == "production":
+    VMCP_DOMAIN = "toolhive-swe.ol.mit.edu"
+else:
+    VMCP_DOMAIN = f"toolhive-swe.{stack_info.env_suffix}.ol.mit.edu"
 VMCP_RESOURCE_URL = f"https://{VMCP_DOMAIN}"
 # RFC 8707 resource identifier / token audience. MCP clients (e.g. Claude Code)
 # canonicalize a bare origin with a trailing slash per WHATWG URL rules and send
