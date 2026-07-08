@@ -27,6 +27,7 @@ from pulumi_aws import ec2, iam, route53, s3
 
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
+    DEFAULT_NGINX_PORT,
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
     ONE_MEGABYTE_BYTE,
@@ -824,6 +825,7 @@ k8s_env_vars.update(micromasters_config.get_object("vars") or {})
 # the backend receives plain HTTP. SECURE_PROXY_SSL_HEADER lets Django
 # honour the X-Forwarded-Proto header set by Fastly.
 _frontend_domain = micromasters_config.require("frontend_domain")
+backend_domain = micromasters_config.require("backend_domain")
 csrf_trusted_origins: list[str] = [f"https://{_frontend_domain}"]
 if stack_info.env_suffix == "production":
     csrf_trusted_origins.append("https://micromasters.mit.edu")
@@ -909,13 +911,68 @@ micromasters_k8s_app = OLApplicationK8s(
             resource_requests={"cpu": "10m", "memory": "384Mi"},
             resource_limits={"memory": "384Mi"},
         ),
+        # django-health-check probes (#4874) 400 with DisallowedHost because
+        # kube-probe sends the raw pod IP as the Host header, which isn't in
+        # ALLOWED_HOSTS. Pin the probe's Host header to backend_domain
+        # (already in ALLOWED_HOSTS) instead of the pod IP; this only
+        # overrides the header kubelet sends, not the connection target.
+        probe_configs={
+            "liveness_probe": kubernetes.core.v1.ProbeArgs(
+                http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                    path="/health/liveness/",
+                    port=DEFAULT_NGINX_PORT,
+                    http_headers=[
+                        kubernetes.core.v1.HTTPHeaderArgs(
+                            name="Host",
+                            value=backend_domain,
+                        )
+                    ],
+                ),
+                initial_delay_seconds=30,
+                period_seconds=30,
+                failure_threshold=3,
+                timeout_seconds=3,
+            ),
+            "readiness_probe": kubernetes.core.v1.ProbeArgs(
+                http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                    path="/health/readiness/",
+                    port=DEFAULT_NGINX_PORT,
+                    http_headers=[
+                        kubernetes.core.v1.HTTPHeaderArgs(
+                            name="Host",
+                            value=backend_domain,
+                        )
+                    ],
+                ),
+                initial_delay_seconds=15,
+                period_seconds=15,
+                failure_threshold=3,
+                timeout_seconds=3,
+            ),
+            "startup_probe": kubernetes.core.v1.ProbeArgs(
+                http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                    path="/health/startup/",
+                    port=DEFAULT_NGINX_PORT,
+                    http_headers=[
+                        kubernetes.core.v1.HTTPHeaderArgs(
+                            name="Host",
+                            value=backend_domain,
+                        )
+                    ],
+                ),
+                initial_delay_seconds=10,
+                period_seconds=10,
+                failure_threshold=12,
+                success_threshold=1,
+                timeout_seconds=5,
+            ),
+        },
     ),
     opts=ResourceOptions(
         depends_on=[micromasters_app_security_group, *k8s_secret_resources]
     ),
 )
 # APISIX routing (pass-through, no OIDC)
-backend_domain = micromasters_config.require("backend_domain")
 frontend_domain = micromasters_config.require("frontend_domain")
 fastly_domains = [frontend_domain]
 if stack_info.env_suffix == "production":
