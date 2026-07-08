@@ -34,13 +34,13 @@ repos:
   - id: yamlfmt
     args:
     - --mapping
-    - '2'
+    - "2"
     - --sequence
-    - '2'
+    - "2"
     - --offset
-    - '0'
+    - "0"
     - --width
-    - '80'
+    - "80"
     - --preserve-quotes
     exclude: |
       (?x)(
@@ -63,7 +63,7 @@ repos:
   - id: detect-secrets
     args:
     - --exclude-lines
-    - '(^encryptedkey:|^secure:|^secretsprovider:)'
+    - "(^encryptedkey:|^secure:|^secretsprovider:)"
     - --exclude-files
     - src/bridge/secrets/
     - --exclude-files
@@ -76,9 +76,11 @@ repos:
     - sdks/
     - --exclude-files
     - skills-lock.json
+    - --exclude-files
+    - src/ol_infrastructure/infrastructure/sentry/sentry_imports.json
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  # Ruff version.
-  rev: 'v0.15.20'
+    # Ruff version.
+  rev: "v0.15.20"
   hooks:
   - id: ruff-format
   - id: ruff-check
@@ -91,6 +93,7 @@ repos:
     args:
     - --explicit-package-bases
     - --namespace-packages
+    - --scripts-are-modules
     - --config-file=pyproject.toml
     - --warn-unused-configs
     additional_dependencies:
