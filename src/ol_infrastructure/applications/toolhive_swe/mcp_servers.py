@@ -16,7 +16,7 @@ from typing import NamedTuple
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, ResourceOptions, StackReference
 
-from bridge.lib.versions import MCP_GRAFANA_VERSION
+from bridge.lib.versions import MCP_GRAFANA_VERSION, MCP_SENTRY_VERSION
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 # Name shared by the MCPGroup and every backend/virtual server that references it.
@@ -27,6 +27,11 @@ MCP_GROUP_NAME = "swe-tools"
 # ``spec.secrets`` -> ``targetEnvName`` mechanism.
 GRAFANA_TOKEN_SECRET_NAME = "toolhive-swe-grafana-token"  # noqa: S105  # pragma: allowlist secret
 GRAFANA_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
+
+# K8s Secret holding the Sentry user auth token, materialised from encrypted stack
+# config and injected into the sentry MCPServer the same way as the Grafana token.
+SENTRY_TOKEN_SECRET_NAME = "toolhive-swe-sentry-token"  # noqa: S105  # pragma: allowlist secret
+SENTRY_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 
 
 class ToolhiveSWEMCPServers(NamedTuple):
@@ -171,7 +176,88 @@ def create_mcp_servers(
         opts=ResourceOptions(depends_on=[swe_mcpgroup, grafana_token_secret]),
     )
 
+    servers = [fetch_mcpserver, grafana_mcpserver]
+
+    # Sentry MCP server (https://github.com/getsentry/sentry-mcp) running in its
+    # self-hosted ``stdio`` mode via ToolHive's prebuilt npx wrapper image; the
+    # operator's proxy exposes it over streamable-http like the other backends.
+    # Every user acts as the one Sentry user auth token, so scope that token's
+    # permissions accordingly (least privilege) — see the grafana note above.
+    #
+    # Gated behind a per-stack boolean so it only runs where explicitly enabled
+    # (currently Production only). When disabled neither the token Secret nor the
+    # MCPServer is created, so lower stacks don't need a ``sentry_access_token``:
+    #   pulumi config set toolhive_swe:sentry_enabled true
+    #   pulumi config set --secret toolhive_swe:sentry_access_token -- <token>
+    # ``SENTRY_HOST`` is only needed for self-hosted Sentry; left unset we default
+    # to the SaaS host (sentry.io). Set it via config to point at a self-hosted
+    # install:
+    #   pulumi config set toolhive_swe:sentry_host sentry.example.com
+    if toolhive_swe_config.get_bool("sentry_enabled") or False:
+        sentry_token_secret = kubernetes.core.v1.Secret(
+            f"toolhive-swe-sentry-token-secret-{stack_info.env_suffix}",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name=SENTRY_TOKEN_SECRET_NAME,
+                namespace=namespace,
+                labels=k8s_global_labels,
+            ),
+            type="Opaque",
+            string_data={
+                SENTRY_TOKEN_SECRET_KEY: toolhive_swe_config.require_secret(
+                    "sentry_access_token"
+                ),
+            },
+            opts=ResourceOptions(),
+        )
+        sentry_env = []
+        sentry_host = toolhive_swe_config.get("sentry_host")
+        if sentry_host:
+            sentry_env.append({"name": "SENTRY_HOST", "value": sentry_host})
+        sentry_mcpserver = kubernetes.apiextensions.CustomResource(
+            f"toolhive-swe-sentry-mcpserver-{stack_info.env_suffix}",
+            api_version="toolhive.stacklok.dev/v1beta1",
+            kind="MCPServer",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name="sentry",
+                namespace=namespace,
+                labels=k8s_global_labels,
+            ),
+            spec={
+                "image": (
+                    "ghcr.io/stacklok/dockyard/npx/sentry-mcp-server:"
+                    f"{MCP_SENTRY_VERSION}"
+                ),
+                # Self-hosted sentry-mcp only speaks stdio; the ToolHive proxy wraps
+                # it and fronts it with streamable-http on proxyPort (no mcpPort for
+                # stdio).
+                "transport": "stdio",
+                "proxyPort": 8080,
+                "groupRef": {"name": MCP_GROUP_NAME},
+                "env": sentry_env,
+                "secrets": [
+                    {
+                        "name": SENTRY_TOKEN_SECRET_NAME,
+                        "key": SENTRY_TOKEN_SECRET_KEY,
+                        "targetEnvName": "SENTRY_ACCESS_TOKEN",
+                    }
+                ],
+                # Needs outbound access to the Sentry API. Tighten to an allow-list
+                # profile (sentry.io + .sentry.io, port 443) once the builtin
+                # profile proves out.
+                "permissionProfile": {
+                    "type": "builtin",
+                    "name": "network",
+                },
+                "resources": {
+                    "requests": {"cpu": "50m", "memory": "128Mi"},
+                    "limits": {"cpu": "200m", "memory": "256Mi"},
+                },
+            },
+            opts=ResourceOptions(depends_on=[swe_mcpgroup, sentry_token_secret]),
+        )
+        servers.append(sentry_mcpserver)
+
     return ToolhiveSWEMCPServers(
         group=swe_mcpgroup,
-        servers=[fetch_mcpserver, grafana_mcpserver],
+        servers=servers,
     )

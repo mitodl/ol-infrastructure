@@ -14,3 +14,6 @@ config:
   toolhive_swe:grafana_url: https://mitolproduction.grafana.net
   toolhive_swe:grafana_service_account_token:
     secure: v1:qzYhhpp9dkOXST4d:nFgCTwLveiwghgDBAraaLsba+iqjsBJJbGhLKTdssBQF4LYsDVN/muwUfyg7UlyzAsyi+XeLv1X071pg4bw=
+  toolhive_swe:sentry_access_token:
+    secure: v1:8DW5qflxWxj4BQzn:GEH2+DWnOZeI6RIVQ4Ay4+8pwq8kFSEvFopN4OX2XdRx4oDIF/3MUTexIHwUpRMbOWDeZdaXvFYeTN0NcZzELDW079XoEfDvz1KoGJ1LlkM1dSwrigkz
+  toolhive_swe:sentry_enabled: "true"
