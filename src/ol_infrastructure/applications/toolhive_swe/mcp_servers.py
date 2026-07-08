@@ -193,7 +193,7 @@ def create_mcp_servers(
     # to the SaaS host (sentry.io). Set it via config to point at a self-hosted
     # install:
     #   pulumi config set toolhive_swe:sentry_host sentry.example.com
-    if toolhive_swe_config.get_bool("sentry_enabled") or False:
+    if toolhive_swe_config.get_bool("sentry_enabled"):
         sentry_token_secret = kubernetes.core.v1.Secret(
             f"toolhive-swe-sentry-token-secret-{stack_info.env_suffix}",
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
