@@ -135,15 +135,24 @@ class SentryApi:
         return items
 
 
-def load_sentry_credentials(secret_path: Path) -> tuple[str, str]:
-    """Read the Sentry auth token and organization slug from a SOPS secret."""
+def load_sentry_token(secret_path: Path) -> str:
+    """Read the Sentry auth token from a SOPS secret. Never log this value."""
     secrets = read_yaml_secrets(secret_path)
     token = secrets.get("auth_token")
-    organization = secrets.get("organization")
-    if not token or not organization:
-        msg = f"{secret_path} must contain auth_token and organization"
+    if not token:
+        msg = f"{secret_path} must contain auth_token"
         raise ValueError(msg)
-    return str(token), str(organization)
+    return str(token)
+
+
+def load_sentry_organization(secret_path: Path) -> str:
+    """Read the Sentry organization slug from a SOPS secret."""
+    secrets = read_yaml_secrets(secret_path)
+    organization = secrets.get("organization")
+    if not organization:
+        msg = f"{secret_path} must contain organization"
+        raise ValueError(msg)
+    return str(organization)
 
 
 def safe_name(*parts: object, max_length: int = 90) -> str:
@@ -745,8 +754,8 @@ def generate(
     summary_path: Path = DEFAULT_SUMMARY_PATH,
 ) -> None:
     """Inventory Sentry and regenerate Pulumi code/import data."""
-    token, organization = load_sentry_credentials(secret_path)
-    api = SentryApi(token)
+    organization = load_sentry_organization(secret_path)
+    api = SentryApi(load_sentry_token(secret_path))
     try:
         inventory = collect_inventory(api, organization)
     finally:
@@ -765,8 +774,8 @@ def generate(
 @app.command
 def inventory(secret_path: Path = Path("sentry/account.yaml")) -> None:
     """Print sanitized live inventory counts without writing files."""
-    token, organization = load_sentry_credentials(secret_path)
-    api = SentryApi(token)
+    organization = load_sentry_organization(secret_path)
+    api = SentryApi(load_sentry_token(secret_path))
     try:
         data = collect_inventory(api, organization)
     finally:
