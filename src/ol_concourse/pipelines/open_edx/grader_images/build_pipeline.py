@@ -12,12 +12,14 @@ Triggers:
   - New digest of the Docker Hub grader base image (base image rebuilt /
     security patch applied).
 
-The base image digest is resolved at build time by reading the ``repository``
-and ``digest`` files that Concourse's ``registry-image`` resource writes for
-every fetched image.  The resolved ``repo@sha256:…`` reference is injected
-into the Docker build as ``GRADER_BASE_IMAGE`` via a shell wrapper around the
-``oci-build-task``'s ``build`` script so that the build layer cache is
-correctly invalidated and the published image records the exact base used.
+The base image is fetched by Concourse's ``registry-image`` resource (using its
+own IAM-based ECR auth) in ``oci`` format, producing a local ``image.tar``.
+That tarball is preloaded into the build via ``oci-build-task``'s
+``IMAGE_ARG_GRADER_BASE_IMAGE`` parameter, so buildkit resolves the
+Dockerfile's ``FROM ${GRADER_BASE_IMAGE}`` from local disk instead of pulling
+it from ECR itself.  buildkit has no ECR credentials of its own, so a live
+pull returns 401 Unauthorized even though the ``registry-image`` get step,
+which authenticates via the worker's IAM role, succeeds.
 """
 
 import dataclasses
@@ -86,12 +88,12 @@ def grader_image_pipeline(config: GraderPipelineConfig) -> Pipeline:
 
     The pipeline contains a single build job that:
       1. Watches the grader repo for new commits (trigger).
-      2. Watches the grader base image on DockerHub for updates (trigger).
-      3. Builds the Dockerfile in the root of the grader repo.  A shell
-         wrapper reads the ``repository`` and ``digest`` files written by the
-         ``registry-image`` resource and sets ``BUILD_ARG_GRADER_BASE_IMAGE``
-         to the immutable ``repo@sha256:…`` reference before invoking the
-         ``oci-build-task``'s ``build`` script.
+      2. Watches the grader base image on DockerHub for updates (trigger),
+         fetching it in ``oci`` format so it lands on disk as ``image.tar``.
+      3. Builds the Dockerfile in the root of the grader repo, preloading the
+         fetched ``image.tar`` via ``oci-build-task``'s
+         ``IMAGE_ARG_GRADER_BASE_IMAGE`` parameter so buildkit never needs to
+         pull the base image (or authenticate to ECR) itself.
       4. Pushes the resulting image to private ECR.
 
     Args:
@@ -125,22 +127,23 @@ def grader_image_pipeline(config: GraderPipelineConfig) -> Pipeline:
         ecr_region=config.aws_region,
     )
 
-    # The registry-image resource writes `repository` and `digest` files into
-    # the fetched directory.  We read them inside the task via a shell wrapper
-    # that sets BUILD_ARG_GRADER_BASE_IMAGE=repo@sha256:… before exec-ing the
-    # oci-build-task `build` script.  This pins the base image to the exact
-    # digest that triggered the pipeline run, ensuring reproducibility and
-    # correct Docker layer-cache invalidation.
-    #
-    # Note: oci-build-task `params` are env vars injected verbatim — shell
-    # expressions like $(cat …) are NOT evaluated there.  The `run.args` shell
-    # wrapper is the only way to dynamically set a BUILD_ARG from a file.
+    # buildkit (running inside oci-build-task) resolves Dockerfile `FROM`
+    # references itself and has no ECR credentials of its own — a live pull of
+    # a private ECR pull-through-cache repo 401s even though the
+    # registry-image get step above (which uses the worker's IAM role) can
+    # fetch it fine. Fetching in `oci` format writes an `image.tar` that we
+    # preload via IMAGE_ARG_GRADER_BASE_IMAGE, so buildkit resolves the base
+    # image from local disk instead of pulling it over the network.
     base_ref = grader_base_image.name
     build_job = Job(
         name=Identifier(f"build-{config.pipeline_name}-image"),
         plan=[
             GetStep(get=grader_repo.name, trigger=True),
-            GetStep(get=grader_base_image.name, trigger=True),
+            GetStep(
+                get=grader_base_image.name,
+                trigger=True,
+                params={"format": "oci"},
+            ),
             TaskStep(
                 task=Identifier("build-container-image"),
                 privileged=True,
@@ -158,6 +161,7 @@ def grader_image_pipeline(config: GraderPipelineConfig) -> Pipeline:
                     params={
                         "CONTEXT": str(grader_repo.name),
                         "DOCKERFILE": f"{grader_repo.name}/Dockerfile",
+                        "IMAGE_ARG_GRADER_BASE_IMAGE": f"{base_ref}/image.tar",
                     },
                     caches=[Cache(path="cache")],
                     inputs=[
@@ -165,20 +169,7 @@ def grader_image_pipeline(config: GraderPipelineConfig) -> Pipeline:
                         Input(name=grader_base_image.name),
                     ],
                     outputs=[Output(name=Identifier("image"))],
-                    # Read the base image digest file at runtime and export it
-                    # as BUILD_ARG_GRADER_BASE_IMAGE before running `build`.
-                    run=Command(
-                        path="sh",
-                        args=[
-                            "-euc",
-                            (
-                                f"export BUILD_ARG_GRADER_BASE_IMAGE="
-                                f'"$(cat {base_ref}/repository)'
-                                f'@$(cat {base_ref}/digest)"'
-                                " && exec build"
-                            ),
-                        ],
-                    ),
+                    run=Command(path="build"),
                 ),
             ),
             ensure_ecr_task(config.ecr_repo_name),
