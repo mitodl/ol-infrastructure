@@ -764,7 +764,10 @@ def generate(
     main_path.write_text(program.render())
     import_path.write_text(json.dumps({"resources": program.imports}, indent=2) + "\n")
     summary_path.write_text(render_summary(program, inventory, organization))
-    print(
+    # CodeQL's taint tracking treats every value returned by SentryApi as
+    # secret because the client is constructed with a Bearer token; these are
+    # plain resource counts, an org slug, and file paths, not the token.
+    print(  # lgtm[py/clear-text-logging-sensitive-data]
         "Generated "
         f"{sum(program.counts.values())} resources for {organization}: "
         f"{main_path}, {import_path}, {summary_path}"
@@ -783,7 +786,11 @@ def inventory(secret_path: Path = Path("sentry/account.yaml")) -> None:
     counts = {
         key: len(value) if isinstance(value, list) else 1 for key, value in data.items()
     }
-    print(json.dumps({"organization": organization, "counts": counts}, indent=2))
+    # See the analogous suppression in generate(): counts are lengths of API
+    # response lists, not the auth token itself.
+    print(  # lgtm[py/clear-text-logging-sensitive-data]
+        json.dumps({"organization": organization, "counts": counts}, indent=2)
+    )
 
 
 if __name__ == "__main__":
