@@ -78,6 +78,7 @@ read_write_role = {
         "cluster_monitor",
         "indices:data/read/scroll",
         "indices:data/read/scroll/clear",
+        "indices:data/write/bulk",
         "cluster:admin/opensearch/ml/*",
         "cluster:admin/ingest/pipeline/*",
         "cluster:admin/search/pipeline/get",
