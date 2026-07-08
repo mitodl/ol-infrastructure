@@ -14,3 +14,4 @@ config:
     secure: v1:DT4oahHPicgz9/25:K2N/xob7w5ON8IZwsikDgZSKMk4rmIUKCxhT9PzIFbUYD/lBKEt6xCXVQJox5VcUUXd7ewMp0RCpFWks
   toolhive_swe:redis_password:
     secure: v1:iAmaEthWNJkVv4v5:7ZrIcEmmxyAyRkotl3aJ0Xe8XO1uEJ/79ZyN3HtfgB4AZXuSEFi4jt2iKYSfgIhomXnc1iNlTVChxKp2
+  toolhive_swe:sentry_enabled: "false"
