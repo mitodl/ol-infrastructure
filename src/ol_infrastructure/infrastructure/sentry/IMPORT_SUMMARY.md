@@ -9,7 +9,6 @@ Organization: `mit-office-of-digital-learning`
 - `github_repository`: 176
 - `issue_alert`: 4
 - `key`: 20
-- `member`: 44
 - `organization`: 1
 - `project`: 19
 - `team`: 15
@@ -29,6 +28,7 @@ Organization: `mit-office-of-digital-learning`
 
 ## Warnings and provider caveats
 
+- Skipped 44 organization members: membership is intentionally left out of Pulumi management and continues to be administered directly in Sentry.
 - Skipped non-GitHub repository mitodl/mit-open-bk with provider unknown.
 - Skipped non-GitHub repository mitodl/realistic-mm-users with provider unknown.
 - Skipped non-GitHub repository mitodl/redash with provider unknown.

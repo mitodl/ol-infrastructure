@@ -35,7 +35,6 @@ RESOURCE_TOKENS = {
     "issue_alert": "sentry:index/sentryIssueAlert:SentryIssueAlert",
     "metric_alert": "sentry:index/sentryMetricAlert:SentryMetricAlert",
     "dashboard": "sentry:index/sentryDashboard:SentryDashboard",
-    "member": "sentry:index/sentryOrganizationMember:SentryOrganizationMember",
     "github_repository": (
         "sentry:index/sentryOrganizationRepositoryGithub:"
         "SentryOrganizationRepositoryGithub"
@@ -375,10 +374,6 @@ def collect_inventory(api: SentryApi, organization: str) -> dict[str, Any]:
         api.get(f"/projects/{organization}/{p['slug']}/") for p in projects
     ]
     members = api.list(f"/organizations/{organization}/members/")
-    member_details = [
-        api.get(f"/organizations/{organization}/members/{member['id']}/")
-        for member in members
-    ]
     repositories = api.list(f"/organizations/{organization}/repos/")
     code_mappings = api.list(f"/organizations/{organization}/code-mappings/")
     dashboards = [
@@ -418,7 +413,7 @@ def collect_inventory(api: SentryApi, organization: str) -> dict[str, Any]:
         "organization": org,
         "teams": teams,
         "projects": project_details,
-        "members": member_details,
+        "members": members,
         "repositories": repositories,
         "code_mappings": code_mappings,
         "dashboards": dashboards,
@@ -479,22 +474,11 @@ def build_program(inventory: dict[str, Any], organization: str) -> PulumiProgram
             ),
         )
 
-    for member in sorted(
-        inventory["members"], key=lambda item: item.get("email") or item["id"]
-    ):
-        program.add_resource(
-            "member",
-            "SentryOrganizationMember",
-            safe_name("member", member.get("email") or member.get("id")),
-            f"{organization}/{member['id']}",
-            compact(
-                {
-                    "organization": ORGANIZATION_REF,
-                    "email": member.get("email"),
-                    "role": member.get("role") or member.get("orgRole"),
-                    "teams": sorted(member.get("teams") or []) or None,
-                }
-            ),
+    if inventory["members"]:
+        program.warnings.append(
+            f"Skipped {len(inventory['members'])} organization members: "
+            "membership is intentionally left out of Pulumi management and "
+            "continues to be administered directly in Sentry."
         )
 
     for repo in sorted(

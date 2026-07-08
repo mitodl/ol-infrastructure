@@ -93,6 +93,7 @@ repos:
     args:
     - --explicit-package-bases
     - --namespace-packages
+    - --scripts-are-modules
     - --config-file=pyproject.toml
     - --warn-unused-configs
     additional_dependencies:
