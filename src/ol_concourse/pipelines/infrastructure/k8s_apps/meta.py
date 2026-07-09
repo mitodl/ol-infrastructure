@@ -128,6 +128,7 @@ if __name__ == "__main__":
         "mitxonline",
         "ocw-studio",
         "odl-video-service",
+        "ol-analytics-api",
         "xpro",
     ]
 

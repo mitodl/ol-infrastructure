@@ -75,6 +75,7 @@ class Services(StrEnum):
     kubewatch = "kubewatch"
     micromasters = "micromasters"
     notebooks = "notebooks"
+    ol_analytics_api = "ol-analytics-api"
     opik = "opik"
     open_edx = "open-edx"
     learn_ai = ("learn-ai",)
