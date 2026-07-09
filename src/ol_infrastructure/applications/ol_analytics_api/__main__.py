@@ -13,9 +13,17 @@ Keycloak OIDC.
 Key wiring decisions (see also ``k8s/README.md`` in the app repo):
 
 * **Data cluster, not the applications cluster.**  The service talks to
-  StarRocks over in-cluster DNS and authenticates to Vault via the data
-  cluster's Kubernetes auth mount, so every stack reference points at
-  ``data.{stack}``.
+  StarRocks over in-cluster DNS, so every stack reference points at
+  ``data.{stack}``.  Vault itself is **not** per-cluster: there is a single
+  Vault deployment per environment tier (``vault-qa.odl.mit.edu``,
+  ``vault-production.odl.mit.edu``) shared by every EKS cluster, exactly like
+  every other app in this repo (``vault:address`` below is the same value
+  dagster/mit_learn/etc. use).  What *is* cluster-specific is the Kubernetes
+  auth **mount** under that one shared Vault server — Vault's kubernetes auth
+  method needs each cluster's own API endpoint/CA/JWT issuer, so every EKS
+  cluster gets its own ``auth/k8s-<prefix>`` mount path (``k8s-data`` here,
+  read from the data cluster stack's ``vault_auth_endpoint`` output below,
+  not hardcoded or assumed to be a separate Vault instance).
 
 * **The app fetches its own StarRocks credentials.**  Unlike superset (which
   has the vault-secrets-operator sync a static-ish StarRocks credential into a
@@ -272,9 +280,14 @@ env_vars["OL_ANALYTICS_API_VAULT_ADDR"] = vault_config.require("address")
 # The Vault k8s auth role name == the OLEKSAuthBinding application_name.
 env_vars["OL_ANALYTICS_API_VAULT_ROLE"] = APPLICATION_NAME
 env_vars["OL_ANALYTICS_API_VAULT_STARROCKS_MOUNT"] = starrocks_vault_mount_path
-# The data cluster's Vault Kubernetes auth mount is `k8s-data` (env_prefix
-# based, NOT `k8s-data-{env}`); read it from the cluster stack rather than
-# hardcoding.  This corrects the placeholder in the app repo's k8s/deployment.yaml.
+# Vault itself (OL_ANALYTICS_API_VAULT_ADDR above) is the single shared
+# per-env-tier Vault server, same as every other app -- there is no separate
+# "data cluster Vault". What differs per cluster is which Kubernetes auth
+# *mount* on that shared server the pod logs into, since Vault's kubernetes
+# auth method needs each cluster's own API endpoint/CA/JWT issuer configured
+# per mount. The data cluster's mount is `k8s-data` (env_prefix based, NOT
+# `k8s-data-{env}`); read it from the cluster stack rather than hardcoding.
+# This corrects the placeholder in the app repo's k8s/deployment.yaml.
 env_vars["OL_ANALYTICS_API_VAULT_K8S_MOUNT"] = cluster_stack.require_output(
     "vault_auth_endpoint"
 )
