@@ -16,6 +16,7 @@ from pulumi import Config, Output, ResourceOptions, StackReference
 
 from ol_infrastructure.applications.edxapp.config_builder import (
     build_general_config,
+    partition_config,
     render_yaml,
 )
 from ol_infrastructure.components.aws.cache import OLAmazonCache
@@ -392,8 +393,15 @@ def _build_interpolated_config_dict(
 
 @dataclass
 class EdxappConfigMaps:
-    """Container for all EDXApp configuration maps."""
+    """Container for all EDXApp configuration maps.
 
+    Each logical config section produces two ConfigMaps:
+    * ``*_env``  — flat scalar key/value pairs, injected via ``envFrom: configMapRef``.
+    * The original (e.g. ``general``, ``interpolated``) — YAML file with complex
+      types (lists, nested dicts) mounted and read by YamlConfigSettingsSource.
+    """
+
+    # YAML-file ConfigMaps (complex types)
     general: kubernetes.core.v1.ConfigMap
     interpolated: Output
     cms_general: kubernetes.core.v1.ConfigMap
@@ -404,6 +412,15 @@ class EdxappConfigMaps:
     waffle_flags_yaml: kubernetes.core.v1.ConfigMap
     ssh_known_hosts: kubernetes.core.v1.ConfigMap
 
+    # Flat env ConfigMaps (scalar types → envFrom)
+    general_env: kubernetes.core.v1.ConfigMap
+    interpolated_env: Output
+    cms_general_env: kubernetes.core.v1.ConfigMap
+    cms_interpolated_env: kubernetes.core.v1.ConfigMap
+    lms_general_env: kubernetes.core.v1.ConfigMap
+    lms_interpolated_env: kubernetes.core.v1.ConfigMap
+
+    # YAML ConfigMap names (for volume mounts)
     general_config_name: str
     interpolated_config_name: str
     cms_general_config_name: str
@@ -413,6 +430,14 @@ class EdxappConfigMaps:
     uwsgi_ini_config_name: str
     waffle_flags_yaml_config_name: str
     ssh_known_hosts_config_name: str
+
+    # Flat env ConfigMap names (for envFrom refs)
+    general_env_config_name: str
+    interpolated_env_config_name: str
+    cms_general_env_config_name: str
+    cms_interpolated_env_config_name: str
+    lms_general_env_config_name: str
+    lms_interpolated_env_config_name: str
 
 
 def create_k8s_configmaps(  # noqa: PLR0915
@@ -439,10 +464,11 @@ def create_k8s_configmaps(  # noqa: PLR0915
         EdxappConfigMaps dataclass containing all ConfigMap resources
     """
     general_config_name = "50-general-config-yaml"
+    general_env_config_name = "50-general-config-env"
 
     # Build general config from dictionary (replaces YAML file)
     general_config_dict = build_general_config(stack_info.env_prefix)
-    general_config_yaml = render_yaml(general_config_dict)
+    general_flat, general_complex = partition_config(general_config_dict)
 
     general_config_map = kubernetes.core.v1.ConfigMap(
         f"ol-{stack_info.env_prefix}-edxapp-general-config-{stack_info.env_suffix}",
@@ -452,8 +478,18 @@ def create_k8s_configmaps(  # noqa: PLR0915
             "labels": k8s_global_labels,
         },
         data={
-            "50-general-config.yaml": general_config_yaml,
+            "50-general-config.yaml": render_yaml(general_complex),
         },
+    )
+
+    general_env_config_map = kubernetes.core.v1.ConfigMap(
+        f"ol-{stack_info.env_prefix}-edxapp-general-env-config-{stack_info.env_suffix}",
+        metadata={
+            "name": general_env_config_name,
+            "namespace": namespace,
+            "labels": k8s_global_labels,
+        },
+        data=general_flat,
     )
 
     # Misc values needed for the next step
@@ -468,38 +504,56 @@ def create_k8s_configmaps(  # noqa: PLR0915
 
     # Load interpolated configuration from dictionary
     interpolated_config_name = "60-interpolated-config-yaml"
-    interpolated_config_map = Output.all(
-        redis_hostname=edxapp_cache.address,
-        opensearch_hostname=opensearch_hostname,
-        notes_domain=notes_stack.require_output("notes_domain"),
-    ).apply(
-        lambda runtime_config: kubernetes.core.v1.ConfigMap(
+    interpolated_env_config_name = "60-interpolated-config-env"
+
+    def _make_interpolated_configmaps(
+        runtime_config: dict[str, Any],
+    ) -> tuple[kubernetes.core.v1.ConfigMap, kubernetes.core.v1.ConfigMap]:
+        """Build both interpolated ConfigMaps from a single dict construction."""
+        full_dict = _build_interpolated_config_dict(
+            stack_info=stack_info,
+            edxapp_config=edxapp_config,
+            runtime_config=runtime_config,
+            storage_bucket_name=storage_bucket_name,
+            course_bucket_name=course_bucket_name,
+            grades_bucket_name=grades_bucket_name,
+            ses_configuration_set=ses_configuration_set,
+            env_name=env_name,
+        )
+        flat, complex_ = partition_config(full_dict)
+        yaml_cm = kubernetes.core.v1.ConfigMap(
             f"ol-{stack_info.env_prefix}-edxapp-interpolated-config-{stack_info.env_suffix}",
             metadata={
                 "name": interpolated_config_name,
                 "namespace": namespace,
                 "labels": k8s_global_labels,
             },
-            data={
-                "60-interpolated-config.yaml": render_yaml(
-                    _build_interpolated_config_dict(
-                        stack_info=stack_info,
-                        edxapp_config=edxapp_config,
-                        runtime_config=runtime_config,
-                        storage_bucket_name=storage_bucket_name,
-                        course_bucket_name=course_bucket_name,
-                        grades_bucket_name=grades_bucket_name,
-                        ses_configuration_set=ses_configuration_set,
-                        env_name=env_name,
-                    )
-                ),
-            },
+            data={"60-interpolated-config.yaml": render_yaml(complex_)},
             opts=ResourceOptions(delete_before_replace=True),
         )
-    )
+        env_cm = kubernetes.core.v1.ConfigMap(
+            f"ol-{stack_info.env_prefix}-edxapp-interpolated-env-config-{stack_info.env_suffix}",
+            metadata={
+                "name": interpolated_env_config_name,
+                "namespace": namespace,
+                "labels": k8s_global_labels,
+            },
+            data=flat,
+            opts=ResourceOptions(delete_before_replace=True),
+        )
+        return yaml_cm, env_cm
+
+    _interpolated_both = Output.all(
+        redis_hostname=edxapp_cache.address,
+        opensearch_hostname=opensearch_hostname,
+        notes_domain=notes_stack.require_output("notes_domain"),
+    ).apply(_make_interpolated_configmaps)
+    interpolated_config_map = _interpolated_both.apply(lambda pair: pair[0])
+    interpolated_env_config_map = _interpolated_both.apply(lambda pair: pair[1])
 
     # CMS general configuration
     cms_general_config_name = "71-cms-general-config-yaml"
+    cms_general_env_config_name = "71-cms-general-config-env"
     cms_general_config_content: dict[str, Any] = {
         "DISCUSSIONS_INCONTEXT_LEARNMORE_URL": "https://openedx.atlassian.net/wiki/spaces/COMM/pages/3470655498/Discussions+upgrade+Sidebar+and+new+topic+structure",
         "GIT_REPO_EXPORT_DIR": "/openedx/data/export_course_repos",
@@ -546,6 +600,14 @@ def create_k8s_configmaps(  # noqa: PLR0915
 
     cms_general_config_content["FEATURES"] = cms_features
 
+    cms_flat, cms_complex = partition_config(cms_general_config_content)
+    # BULK_EMAIL settings are LMS-only in edx-platform base settings and not
+    # available in the CMS settings context. Inject them directly into the YAML
+    # config (not env vars) so Django picks them up when CMS Celery workers
+    # import LMS modules that access these settings at module level.
+    cms_complex["BULK_EMAIL_DEFAULT_RETRY_DELAY"] = 30
+    cms_complex["BULK_EMAIL_MAX_RETRIES"] = 5
+
     cms_general_config_map = kubernetes.core.v1.ConfigMap(
         f"ol-{stack_info.env_prefix}-edxapp-cms-general-config-{stack_info.env_suffix}",
         metadata={
@@ -554,12 +616,23 @@ def create_k8s_configmaps(  # noqa: PLR0915
             "labels": k8s_global_labels,
         },
         data={
-            "71-cms-general-config.yaml": render_yaml(cms_general_config_content),
+            "71-cms-general-config.yaml": render_yaml(cms_complex),
         },
+    )
+
+    cms_general_env_config_map = kubernetes.core.v1.ConfigMap(
+        f"ol-{stack_info.env_prefix}-edxapp-cms-general-env-config-{stack_info.env_suffix}",
+        metadata={
+            "name": cms_general_env_config_name,
+            "namespace": namespace,
+            "labels": k8s_global_labels,
+        },
+        data=cms_flat,
     )
 
     # CMS interpolated configuration
     cms_interpolated_config_name = "72-cms-interpolated-config-yaml"
+    cms_interpolated_env_config_name = "72-cms-interpolated-config-env"
     cms_interpolated_config = {
         "SITE_NAME": edxapp_config.require_object("domains")["studio"],
         "SOCIAL_AUTH_EDX_OAUTH2_URL_ROOT": f"https://{edxapp_config.require_object('domains')['lms']}",
@@ -580,6 +653,8 @@ def create_k8s_configmaps(  # noqa: PLR0915
             f"https://{meilisearch_config.require('domain')}"
         )
 
+    cms_interp_flat, cms_interp_complex = partition_config(cms_interpolated_config)
+
     cms_interpolated_config_map = kubernetes.core.v1.ConfigMap(
         f"ol-{stack_info.env_prefix}-edxapp-cms-interpolated-config-{stack_info.env_suffix}",
         metadata={
@@ -587,12 +662,24 @@ def create_k8s_configmaps(  # noqa: PLR0915
             "namespace": namespace,
             "labels": k8s_global_labels,
         },
-        data={"72-cms-interpolated-config.yaml": render_yaml(cms_interpolated_config)},
+        data={"72-cms-interpolated-config.yaml": render_yaml(cms_interp_complex)},
+        opts=ResourceOptions(delete_before_replace=True),
+    )
+
+    cms_interpolated_env_config_map = kubernetes.core.v1.ConfigMap(
+        f"ol-{stack_info.env_prefix}-edxapp-cms-interpolated-env-config-{stack_info.env_suffix}",
+        metadata={
+            "name": cms_interpolated_env_config_name,
+            "namespace": namespace,
+            "labels": k8s_global_labels,
+        },
+        data=cms_interp_flat,
         opts=ResourceOptions(delete_before_replace=True),
     )
 
     # LMS general configuration
     lms_general_config_name = "81-lms-general-config-yaml"
+    lms_general_env_config_name = "81-lms-general-config-env"
     lms_general_config_content = {
         "ACCOUNT_MICROFRONTEND_URL": None,
         "ACE_CHANNEL_DEFAULT_EMAIL": "django_email",
@@ -606,6 +693,8 @@ def create_k8s_configmaps(  # noqa: PLR0915
         "API_DOCUMENTATION_URL": "http://course-catalog-api-guide.readthedocs.io/en/latest/",
         "AUDIT_CERT_CUTOFF_DATE": None,
         "AUTH_DOCUMENTATION_URL": "http://course-catalog-api-guide.readthedocs.io/en/latest/authentication/index.html",
+        "BULK_EMAIL_DEFAULT_RETRY_DELAY": 30,
+        "BULK_EMAIL_MAX_RETRIES": 5,
         "BULK_EMAIL_ROUTING_KEY_SMALL_JOBS": "edx.lms.core.default",
         "COMMUNICATIONS_MICROFRONTEND_URL": "/communications",
         "CONTACT_MAILING_ADDRESS": "SET-ME-PLEASE",
@@ -727,6 +816,8 @@ def create_k8s_configmaps(  # noqa: PLR0915
     # Assign the deployment-specific FEATURES (already enriched with base config)
     lms_general_config_content["FEATURES"] = deployment_features
 
+    lms_flat, lms_complex = partition_config(lms_general_config_content)
+
     lms_general_config_map = kubernetes.core.v1.ConfigMap(
         f"ol-{stack_info.env_prefix}-edxapp-lms-general-config-{stack_info.env_suffix}",
         metadata={
@@ -735,18 +826,31 @@ def create_k8s_configmaps(  # noqa: PLR0915
             "labels": k8s_global_labels,
         },
         data={
-            "81-lms-general-config.yaml": render_yaml(lms_general_config_content),
+            "81-lms-general-config.yaml": render_yaml(lms_complex),
         },
+    )
+
+    lms_general_env_config_map = kubernetes.core.v1.ConfigMap(
+        f"ol-{stack_info.env_prefix}-edxapp-lms-general-env-config-{stack_info.env_suffix}",
+        metadata={
+            "name": lms_general_env_config_name,
+            "namespace": namespace,
+            "labels": k8s_global_labels,
+        },
+        data=lms_flat,
     )
 
     # LMS interpolated configuration
     lms_interpolated_config_name = "82-lms-interpolated-config-yaml"
+    lms_interpolated_env_config_name = "82-lms-interpolated-config-env"
     lms_interpolated_config = {
         "APPZI_URL": edxapp_config.get("appzi_url", ""),
         "SITE_NAME": edxapp_config.require_object("domains")["lms"],
         "SESSION_COOKIE_NAME": f"{env_name}-edx-lms-sessionid",
         "MIT_LEARN_SUPPORT_SITE_LINK": "https://support.learn.mit.edu/",
     }
+
+    lms_interp_flat, lms_interp_complex = partition_config(lms_interpolated_config)
 
     lms_interpolated_config_map = kubernetes.core.v1.ConfigMap(
         f"ol-{stack_info.env_prefix}-edxapp-lms-interpolated-config-{stack_info.env_suffix}",
@@ -756,8 +860,19 @@ def create_k8s_configmaps(  # noqa: PLR0915
             "labels": k8s_global_labels,
         },
         data={
-            "82-lms-interpolated-config.yaml": render_yaml(lms_interpolated_config),
+            "82-lms-interpolated-config.yaml": render_yaml(lms_interp_complex),
         },
+        opts=ResourceOptions(delete_before_replace=True),
+    )
+
+    lms_interpolated_env_config_map = kubernetes.core.v1.ConfigMap(
+        f"ol-{stack_info.env_prefix}-edxapp-lms-interpolated-env-config-{stack_info.env_suffix}",
+        metadata={
+            "name": lms_interpolated_env_config_name,
+            "namespace": namespace,
+            "labels": k8s_global_labels,
+        },
+        data=lms_interp_flat,
         opts=ResourceOptions(delete_before_replace=True),
     )
 
@@ -820,6 +935,12 @@ def create_k8s_configmaps(  # noqa: PLR0915
         uwsgi_ini=uwsgi_ini_config_map,
         waffle_flags_yaml=waffle_flags_yaml_config_map,
         ssh_known_hosts=ssh_known_hosts_config_map,
+        general_env=general_env_config_map,
+        interpolated_env=interpolated_env_config_map,
+        cms_general_env=cms_general_env_config_map,
+        cms_interpolated_env=cms_interpolated_env_config_map,
+        lms_general_env=lms_general_env_config_map,
+        lms_interpolated_env=lms_interpolated_env_config_map,
         general_config_name=general_config_name,
         interpolated_config_name=interpolated_config_name,
         cms_general_config_name=cms_general_config_name,
@@ -829,4 +950,10 @@ def create_k8s_configmaps(  # noqa: PLR0915
         uwsgi_ini_config_name=uwsgi_ini_config_name,
         waffle_flags_yaml_config_name=waffle_flags_yaml_config_name,
         ssh_known_hosts_config_name=ssh_known_hosts_config_name,
+        general_env_config_name=general_env_config_name,
+        interpolated_env_config_name=interpolated_env_config_name,
+        cms_general_env_config_name=cms_general_env_config_name,
+        cms_interpolated_env_config_name=cms_interpolated_env_config_name,
+        lms_general_env_config_name=lms_general_env_config_name,
+        lms_interpolated_env_config_name=lms_interpolated_env_config_name,
     )

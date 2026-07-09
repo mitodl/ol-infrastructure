@@ -89,6 +89,8 @@ class TestBuildBaseGeneralSecretsDict:
         jwt_auth = secrets["JWT_AUTH"]
         assert jwt_auth["JWT_ALGORITHM"] == "HS256"
         assert jwt_auth["JWT_AUDIENCE"] == "mitx"
+        assert jwt_auth["JWT_IN_COOKIE_EXPIRATION"] == 60 * 60
+        assert jwt_auth["JWT_SUPPORTED_VERSION"] == "1.2.0"
         assert jwt_auth["JWT_SIGNING_ALGORITHM"] == "RS512"
         assert "JWT_ISSUERS" in jwt_auth
         assert len(jwt_auth["JWT_ISSUERS"]) == 1
