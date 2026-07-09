@@ -1213,6 +1213,9 @@ class OLApplicationK8s(ComponentResource):
             ),
             opts=deployment_options,
         )
+        self.application_deployment: kubernetes.apps.v1.Deployment = (
+            _application_deployment
+        )
 
         if (
             ol_app_k8s_config.granian_config is not None
