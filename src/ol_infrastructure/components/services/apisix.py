@@ -209,11 +209,11 @@ class OLApisixOIDCConfig(BaseModel):
         "user": True,
     }
     oidc_session_cookie_domain: str | None = None
-    oidc_session_cookie_lifetime: NonNegativeInt = 0
+    oidc_session_absolute_timeout: NonNegativeInt = 0
     # None leaves lua-resty-session's compiled-in defaults (900s idling /
     # 3600s rolling) untouched for callers that haven't opted in. 0
     # explicitly disables that check, deferring to absolute_timeout (see
-    # oidc_session_cookie_lifetime) and the upstream Keycloak SSO session.
+    # oidc_session_absolute_timeout) and the upstream Keycloak SSO session.
     oidc_session_idling_timeout: NonNegativeInt | None = None
     oidc_session_rolling_timeout: NonNegativeInt | None = None
     oidc_ssl_verify: bool = True
@@ -272,16 +272,16 @@ class OLApisixOIDCResources(ComponentResource):
             opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
         )
 
-        session_cookie_config: dict[str, Any] = {}
+        session_config: dict[str, Any] = {}
         if oidc_config.oidc_session_cookie_domain:
-            session_cookie_config.setdefault("session", {}).setdefault("cookie", {})[
+            session_config.setdefault("session", {}).setdefault("cookie", {})[
                 "domain"
             ] = oidc_config.oidc_session_cookie_domain
 
-        if oidc_config.oidc_session_cookie_lifetime:
-            session_cookie_config.setdefault("session", {}).setdefault("cookie", {})[
-                "lifetime"
-            ] = oidc_config.oidc_session_cookie_lifetime
+        if oidc_config.oidc_session_absolute_timeout:
+            session_config.setdefault("session", {})["absolute_timeout"] = (
+                oidc_config.oidc_session_absolute_timeout
+            )
 
         # Flat session.* keys, per the openid-connect plugin's lua-resty-session
         # 4.x schema (session.cookie.lifetime above is a deprecated 3.x alias
@@ -289,12 +289,12 @@ class OLApisixOIDCResources(ComponentResource):
         # 0 is a meaningful explicit value here (disables that timeout check),
         # so these are only emitted when the caller actually set them.
         if oidc_config.oidc_session_idling_timeout is not None:
-            session_cookie_config.setdefault("session", {})["idling_timeout"] = (
+            session_config.setdefault("session", {})["idling_timeout"] = (
                 oidc_config.oidc_session_idling_timeout
             )
 
         if oidc_config.oidc_session_rolling_timeout is not None:
-            session_cookie_config.setdefault("session", {})["rolling_timeout"] = (
+            session_config.setdefault("session", {})["rolling_timeout"] = (
                 oidc_config.oidc_session_rolling_timeout
             )
 
@@ -306,7 +306,7 @@ class OLApisixOIDCResources(ComponentResource):
             "renew_access_token_on_expiry": oidc_config.oidc_renew_access_token_on_expiry,
             "logout_path": oidc_config.oidc_logout_path,
             "post_logout_redirect_uri": oidc_config.oidc_post_logout_redirect_uri,
-            **session_cookie_config,
+            **session_config,
         }
 
         if oidc_config.oidc_session_contents:

@@ -204,7 +204,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
             k8s_namespace=namespace,
             oidc_logout_path="hub/logout",
             oidc_post_logout_redirect_uri=f"https://{domain_name}/hub/login",
-            oidc_session_cookie_lifetime=60 * 20160,
+            oidc_session_absolute_timeout=60 * 20160,
             oidc_session_idling_timeout=0,
             oidc_session_rolling_timeout=0,
             oidc_use_session_secret=True,
