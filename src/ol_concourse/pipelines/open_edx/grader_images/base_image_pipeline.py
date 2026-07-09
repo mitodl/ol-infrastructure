@@ -15,9 +15,10 @@ course-specific grader images.  Publishing it to both registries allows:
 Dockerfile.base exposes ``ARG PYTHON_VERSION=3.12``, so one build job per
 supported interpreter is run, each tagging its image with the Python version
 (e.g. ``3.14``).  The default version's job additionally publishes a
-``:latest`` tag so existing per-grader pipelines (build_pipeline.py), which
-still trigger off ``grader_base_dockerhub_repo``'s default ``latest`` tag,
-keep working unchanged.
+``:latest`` tag for legacy/manual consumers that still pull the floating
+tag; build_pipeline.py itself now pins to an explicit Python-version tag
+(``GraderPipelineConfig.grader_base_image_tag``, default
+``DEFAULT_PYTHON_VERSION``) rather than ``:latest``.
 
 Triggers:
   - Push to the xqueue-watcher repo on paths under grader_support/.
@@ -25,15 +26,23 @@ Triggers:
 
 import sys
 
+from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.containers import container_build_task, ensure_ecr_task
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
+    AnonymousResource,
+    Command,
     GetStep,
     Identifier,
     Input,
     Job,
+    Output,
     Pipeline,
+    Platform,
     PutStep,
+    RegistryImage,
+    TaskConfig,
+    TaskStep,
 )
 from ol_concourse.lib.resources import git_repo, registry_image
 
@@ -45,6 +54,40 @@ DEFAULT_PYTHON_VERSION = "3.12"  # matches Dockerfile.base's ARG default
 
 def _version_slug(python_version: str) -> str:
     return python_version.replace(".", "")
+
+
+def _version_tag_task(xqwatcher_repo_name: str, python_version: str) -> TaskStep:
+    """Write a Python-version-suffixed additional-tags file.
+
+    Every job in the matrix builds from the same commit, so they'd all
+    derive the same tag from ``.git/describe_ref`` and race to push it —
+    whichever job finishes last would silently overwrite the others'
+    version-specific image at that tag. Suffixing with the Python version
+    keeps each job's additional tag distinct.
+    """
+    slug = _version_slug(python_version)
+    return TaskStep(
+        task=Identifier(f"collect-tags-py{slug}"),
+        config=TaskConfig(
+            platform=Platform.linux,
+            inputs=[Input(name=Identifier(xqwatcher_repo_name))],
+            outputs=[Output(name=Identifier("tags"))],
+            image_resource=AnonymousResource(
+                type=REGISTRY_IMAGE,
+                source=RegistryImage(repository="busybox"),
+            ),
+            run=Command(
+                path="sh",
+                args=[
+                    "-exc",
+                    (
+                        f'echo "$(cat ./{xqwatcher_repo_name}/.git/describe_ref)'
+                        f'-py{slug}" > tags/additional_tags'
+                    ),
+                ],
+            ),
+        ),
+    )
 
 
 def grader_base_image_pipeline() -> Pipeline:
@@ -111,20 +154,23 @@ def grader_base_image_pipeline() -> Pipeline:
                 },
             ),
             ensure_ecr_task(_BASE_IMAGE_REPO),
+            _version_tag_task(str(xqwatcher_repo.name), python_version),
             # Push to DockerHub first — fail fast if credentials are wrong
             # before consuming the ECR push quota.
             PutStep(
                 put=dockerhub_base_images[python_version].name,
+                inputs="all",
                 params={
                     "image": "image/image.tar",
-                    "additional_tags": f"./{xqwatcher_repo.name}/.git/describe_ref",
+                    "additional_tags": "tags/additional_tags",
                 },
             ),
             PutStep(
                 put=ecr_base_images[python_version].name,
+                inputs="all",
                 params={
                     "image": "image/image.tar",
-                    "additional_tags": f"./{xqwatcher_repo.name}/.git/describe_ref",
+                    "additional_tags": "tags/additional_tags",
                 },
             ),
         ]
