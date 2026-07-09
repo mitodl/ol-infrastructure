@@ -369,58 +369,65 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     # b2b_dashboard tenant auth checks require the "organization" claim in
     # X-Userinfo, and only olapps has create_organization_scope() wired up
     # (see org_flows.py). Follows the olapps-learn-ai-client pattern.
-    olapps_ol_analytics_api_client = keycloak.openid.Client(
-        "olapps-ol-analytics-api-client",
-        name="ol-analytics-api-client",
-        realm_id="olapps",
-        client_id="ol-analytics-api-client",
-        client_secret=keycloak_realm_config.get(
-            "olapps-ol-analytics-api-client-secret"
-        ),
-        enabled=True,
-        access_type="CONFIDENTIAL",
-        standard_flow_enabled=True,
-        implicit_flow_enabled=False,
-        service_accounts_enabled=False,
-        valid_redirect_uris=keycloak_realm_config.get_object(
-            "olapps-ol-analytics-api-redirect-uris"
-        ),
-        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
-    )
-    keycloak.openid.ClientDefaultScopes(
-        "olapps-ol-analytics-api-client-default-scopes",
-        realm_id="olapps",
-        client_id=olapps_ol_analytics_api_client.id,
-        default_scopes=[
-            "acr",
-            "email",
-            "profile",
-            "roles",
-            "web-origins",
-            "ol-profile",
-            "organization",
-        ],
-    )
-    vault.generic.Secret(
-        "olapps-ol-analytics-api-client-vault-oidc-credentials",
-        path="secret-operations/sso/ol-analytics-api",
-        data_json=Output.all(
-            url=olapps_ol_analytics_api_client.realm_id.apply(
-                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+    #
+    # Guarded like MIT LEARN below: ol-analytics-api has no CI deployment (see
+    # applications/ol_analytics_api/__main__.py), so Pulumi.CI.yaml never
+    # defines olapps-ol-analytics-api-client-secret/-redirect-uris. Without
+    # this guard, `pulumi up` against the CI keycloak stack would create a
+    # CONFIDENTIAL client with a null secret and null valid_redirect_uris.
+    if keycloak_realm_config.get("olapps-ol-analytics-api-client-secret"):
+        olapps_ol_analytics_api_client = keycloak.openid.Client(
+            "olapps-ol-analytics-api-client",
+            name="ol-analytics-api-client",
+            realm_id="olapps",
+            client_id="ol-analytics-api-client",
+            client_secret=keycloak_realm_config.get(
+                "olapps-ol-analytics-api-client-secret"
             ),
-            client_id=olapps_ol_analytics_api_client.client_id,
-            client_secret=olapps_ol_analytics_api_client.client_secret,
-            # This is included for the case where we are using traefik-forward-auth.
-            # It requires a random secret value to be present which is independent
-            # of the OAuth credentials.
-            secret=session_secret,
-            realm_id=olapps_ol_analytics_api_client.realm_id,
-            realm_name="olapps",
-            realm_public_key=olapps_ol_analytics_api_client.realm_id.apply(
-                fetch_realm_public_key_partial
+            enabled=True,
+            access_type="CONFIDENTIAL",
+            standard_flow_enabled=True,
+            implicit_flow_enabled=False,
+            service_accounts_enabled=False,
+            valid_redirect_uris=keycloak_realm_config.get_object(
+                "olapps-ol-analytics-api-redirect-uris"
             ),
-        ).apply(json.dumps),
-    )
+            opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+        )
+        keycloak.openid.ClientDefaultScopes(
+            "olapps-ol-analytics-api-client-default-scopes",
+            realm_id="olapps",
+            client_id=olapps_ol_analytics_api_client.id,
+            default_scopes=[
+                "acr",
+                "email",
+                "profile",
+                "roles",
+                "web-origins",
+                "ol-profile",
+                "organization",
+            ],
+        )
+        vault.generic.Secret(
+            "olapps-ol-analytics-api-client-vault-oidc-credentials",
+            path="secret-operations/sso/ol-analytics-api",
+            data_json=Output.all(
+                url=olapps_ol_analytics_api_client.realm_id.apply(
+                    lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+                ),
+                client_id=olapps_ol_analytics_api_client.client_id,
+                client_secret=olapps_ol_analytics_api_client.client_secret,
+                # This is included for the case where we are using traefik-forward-auth.
+                # It requires a random secret value to be present which is independent
+                # of the OAuth credentials.
+                secret=session_secret,
+                realm_id=olapps_ol_analytics_api_client.realm_id,
+                realm_name="olapps",
+                realm_public_key=olapps_ol_analytics_api_client.realm_id.apply(
+                    fetch_realm_public_key_partial
+                ),
+            ).apply(json.dumps),
+        )
     # OL ANALYTICS API [END]
 
     # MIT LEARN [START]

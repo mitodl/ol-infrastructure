@@ -21,7 +21,13 @@ path "secret-operations/sso/ol-analytics-api" {
 
 # Static application secrets (SENTRY_DSN, ...) synced via the
 # vault-secrets-operator into the ol-analytics-api-static-secrets K8s Secret.
+# secret-ol-analytics-api is a kv-v2 mount, so reads go through the /data/
+# sub-path the KV-v2 backend exposes (see superset_server_policy.hcl) -- the
+# bare path below does not cover it.
 path "secret-ol-analytics-api/*" {
+  capabilities = ["read"]
+}
+path "secret-ol-analytics-api/data/*" {
   capabilities = ["read"]
 }
 path "secret-ol-analytics-api" {
