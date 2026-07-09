@@ -11,10 +11,13 @@ This module verifies:
    - application_port == metrics_port
 
 Note:
-    These tests operate at the configuration/model level and do not instantiate
-    OLApplicationK8s or assert on full Kubernetes pod specs (e.g., sidecars,
-    init containers, volumes, or pod_security_context), nor do they assert on
-    autoscaling resources such as HPAs or KEDA ScaledObjects.
+    Most of these tests operate at the configuration/model level and do not
+    instantiate OLApplicationK8s or assert on full Kubernetes pod specs (e.g.,
+    sidecars, init containers, volumes, or pod_security_context), nor do they
+    assert on autoscaling resources such as HPAs or KEDA ScaledObjects. The
+    exception is test_default_container_annotation_set_to_app_container, which
+    instantiates OLApplicationK8s under Pulumi mocks to verify the Deployment's
+    pod template annotations.
 """
 
 from __future__ import annotations
@@ -46,6 +49,7 @@ from pydantic import ValidationError  # noqa: E402
 
 from ol_infrastructure.components.services.k8s import (  # noqa: E402
     GranianConfig,
+    OLApplicationK8s,
     OLApplicationK8sCeleryBeatConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
@@ -387,6 +391,21 @@ def test_celery_beat_uses_custom_application_name():
     # is sufficient for unit testing this path.
     assert beat_cfg.application_name == "lms.celery:app"
     assert beat_cfg.application_name != "main.celery:app"
+
+
+# ─── Deployment pod template annotations ──────────────────────────────────────
+
+
+@pulumi.runtime.test
+def test_default_container_annotation_set_to_app_container():
+    """Deployment pod template must point kubectl exec/logs at the app container."""
+    cfg = _base_config(application_name="myapp")
+    app = OLApplicationK8s(cfg)
+
+    def check(annotations):
+        assert annotations["kubectl.kubernetes.io/default-container"] == "myapp-app"
+
+    return app.application_deployment.spec.template.metadata.annotations.apply(check)
 
 
 # ─── validate_no_duplicate_metrics_port ────────────────────────────────────────
