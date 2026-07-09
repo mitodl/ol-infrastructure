@@ -46,6 +46,7 @@ Key wiring decisions (see also ``k8s/README.md`` in the app repo):
   pattern.
 """
 
+import json
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
@@ -117,6 +118,11 @@ vault_config = Config("vault")
 # Stack references -- data cluster, mirroring applications/dagster/__main__.py.
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
+# Sentry is a single SaaS org, not per-env infrastructure -- one Production
+# stack backs every ol_analytics_api env (QA and Production both read the
+# same project/DSN; Sentry environments are distinguished by the
+# deployment.environment OTel/Sentry tag, not by separate Sentry projects).
+sentry_stack = make_stack_reference(projects.SENTRY, "Production")
 
 data_vpc = network_stack.require_output("data_vpc")
 k8s_pod_subnet_cidrs = data_vpc["k8s_pod_subnet_cidrs"]
@@ -208,11 +214,10 @@ ol_analytics_api_auth_binding = OLEKSAuthBinding(
 # secrets: a dedicated kv-v2 mount whose contents the vault-secrets-operator
 # syncs into a Kubernetes Secret consumed via envFrom.
 #
-# The DSN value is intentionally NOT managed by Pulumi -- the placeholder secret
-# below is created once (empty SENTRY_DSN => Sentry disabled, a safe default)
-# and then left alone (ignore_changes on data_json), so an operator can write
-# the real DSN into Vault without every `pulumi up` reverting it.  See the
-# follow-up task for populating it.
+# The DSN comes from the ol_analytics_api_sentry_dsn output of the
+# ol-infrastructure-sentry Pulumi stack (infrastructure/sentry/__main__.py),
+# which owns the actual Sentry project + client key -- Pulumi manages the real
+# value end-to-end, no manual Vault write required.
 ol_analytics_api_secrets_mount = vault.Mount(
     f"ol-analytics-api-secrets-mount-{stack_info.env_suffix}",
     path="secret-ol-analytics-api",
@@ -225,13 +230,10 @@ ol_analytics_api_secrets_mount = vault.Mount(
 ol_analytics_api_static_vault_secrets = vault.generic.Secret(
     f"ol-analytics-api-secrets-{stack_info.env_suffix}",
     path=ol_analytics_api_secrets_mount.path.apply("{}/secrets".format),
-    # pragma: allowlist secret
-    data_json='{"SENTRY_DSN": ""}',
-    opts=ResourceOptions(
-        delete_before_replace=True,
-        # Let operators set the real DSN in Vault without Pulumi clobbering it.
-        ignore_changes=["data_json"],
+    data_json=sentry_stack.require_output("ol_analytics_api_sentry_dsn").apply(
+        lambda dsn: json.dumps({"SENTRY_DSN": dsn})
     ),
+    opts=ResourceOptions(delete_before_replace=True),
 )
 
 static_secrets_name = "ol-analytics-api-static-secrets"  # pragma: allowlist secret
