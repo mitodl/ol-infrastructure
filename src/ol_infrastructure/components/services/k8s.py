@@ -1192,6 +1192,11 @@ class OLApplicationK8s(ComponentResource):
                 template=kubernetes.core.v1.PodTemplateSpecArgs(
                     metadata=kubernetes.meta.v1.ObjectMetaArgs(
                         labels=application_labels,
+                        annotations={
+                            "kubectl.kubernetes.io/default-container": (
+                                f"{ol_app_k8s_config.application_name}-app"
+                            ),
+                        },
                     ),
                     spec=kubernetes.core.v1.PodSpecArgs(
                         volumes=volumes,
