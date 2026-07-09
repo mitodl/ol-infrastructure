@@ -59,6 +59,10 @@ class AppPipelineParams(BaseModel):
             that key via POST /purge/{surrogate_key}.  Use a scoped key when some cached assets
             (e.g. content-addressed static files) must survive a deployment.
         repo_name (Optional[str]): The name of the git repository. Defaults to app_name if not provided.
+        enable_ci_deploy (bool): Whether to deploy the main-branch image to a CI Pulumi
+            stack. Defaults to True. Set False for apps with no CI stack (e.g. a
+            dependency like StarRocks is unavailable on the CI cluster) -- the
+            main-branch image is still built and published, just not deployed.
     """
 
     app_name: str
@@ -76,6 +80,7 @@ class AppPipelineParams(BaseModel):
     version_file: str | None = (
         None  # Repo-relative path to a standalone VERSION file (e.g. "VERSION"); if set, overrides Django settings grep
     )
+    enable_ci_deploy: bool = True
 
     @model_validator(mode="after")
     def set_repo_name(self) -> "AppPipelineParams":
@@ -153,6 +158,13 @@ pipeline_params = {
         repo_main_branch="master",
         build_target="production",
         settings_dir="odl_video",
+    ),
+    "ol-analytics-api": AppPipelineParams(
+        app_name="ol-analytics-api",
+        # No CI Pulumi stack: StarRocks (a hard runtime dependency) does not
+        # exist on the CI data cluster. The main-branch image still builds and
+        # publishes below; only the CI deploy job is skipped.
+        enable_ci_deploy=False,
     ),
 }
 
@@ -401,6 +413,10 @@ def _build_image_job(
                     "CONTEXT": git_repo_resource.name,
                     "DOCKERFILE": f"{git_repo_resource.name}/{dockerfile_path}",
                     "BUILD_ARG_GIT_REF": "((.:git_ref))",
+                    # Some Dockerfiles (e.g. ol-analytics-api) declare ARG GIT_SHA
+                    # instead of the GIT_REF convention above; pass both so either
+                    # naming picks up the git ref. Docker ignores unused build args.
+                    "BUILD_ARG_GIT_SHA": "((.:git_ref))",
                     **version_args,
                     **additional_build_params,
                 },
@@ -535,33 +551,39 @@ def build_app_pipeline(app_name: str) -> Pipeline:
             )
         )
 
-    # CI Deployment
-    ci_fragment = pulumi_job(
-        pulumi_code=ol_infra_repo,
-        stack_name="CI",
-        refresh_stack=True,
-        project_name=f"ol-application-{app_name}",
-        project_source_path=(
-            f"src/ol_infrastructure/applications/{app_name.replace('-', '_')}"
-        ),
-        dependencies=[
-            GetStep(
-                get=app_ci_image.name,
-                trigger=True,
-                passed=[main_image_build_job.name],
-                params={"skip_download": True},
+    # CI Deployment -- skipped entirely for apps with no CI Pulumi stack (e.g. a
+    # hard runtime dependency like StarRocks is unavailable on the CI cluster).
+    # The main-branch image is still built and published above regardless.
+    ci_fragment = (
+        pulumi_job(
+            pulumi_code=ol_infra_repo,
+            stack_name="CI",
+            refresh_stack=True,
+            project_name=f"ol-application-{app_name}",
+            project_source_path=(
+                f"src/ol_infrastructure/applications/{app_name.replace('-', '_')}"
             ),
-            LoadVarStep(
-                load_var="image_digest",
-                file=f"{app_ci_image.name}/digest",
-                reveal=True,
-            ),
-        ],
-        additional_post_steps=ci_post_steps,
-        additional_env_vars={
-            f"{app_name.replace('-', '_').upper()}_DOCKER_SHA": "((.:image_digest))",
-        },
-        slack_url_path="eks.slack_url",
+            dependencies=[
+                GetStep(
+                    get=app_ci_image.name,
+                    trigger=True,
+                    passed=[main_image_build_job.name],
+                    params={"skip_download": True},
+                ),
+                LoadVarStep(
+                    load_var="image_digest",
+                    file=f"{app_ci_image.name}/digest",
+                    reveal=True,
+                ),
+            ],
+            additional_post_steps=ci_post_steps,
+            additional_env_vars={
+                f"{app_name.replace('-', '_').upper()}_DOCKER_SHA": "((.:image_digest))",
+            },
+            slack_url_path="eks.slack_url",
+        )
+        if pipeline_parameters.enable_ci_deploy
+        else PipelineFragment(resource_types=[], resources=[], jobs=[])
     )
 
     additional_post_steps: dict[int, list[GetStep | PutStep | TaskStep]] = {}

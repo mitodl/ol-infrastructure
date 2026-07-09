@@ -131,3 +131,4 @@ MCP_SENTRY_VERSION = "0.33.0"
 # stdio mode). Tag tracks the dockyard build, not the upstream npm pkg.
 # renovate: datasource=docker depName=context7 packageName=ghcr.io/stacklok/dockyard/npx/context7
 MCP_CONTEXT7_VERSION = "2.2.4"
+

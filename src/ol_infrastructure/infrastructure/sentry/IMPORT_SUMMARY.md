@@ -57,3 +57,20 @@ pulumi preview --refresh --diff
 ```
 
 The import file contains resource IDs only, not Sentry token values or DSNs.
+
+## Hand-authored exceptions
+
+- `project_ol_analytics_api` / `key_ol_analytics_api`: added by hand (not
+  produced by `bin/import-sentry-config`) because the ol-analytics-api Sentry
+  project does not exist live yet -- there is nothing to import. `pulumi up`
+  creates both directly; this is an ordinary new-resource create, not an
+  import. Named to match the generator's convention (`project_<slug>`,
+  `key_<project_slug>`, sans the live numeric key id the generator normally
+  suffixes onto key names) so that once this project is live, a future
+  `bin/import-sentry-config` run converges onto the same resource names
+  instead of creating parallel ones -- confirm the regenerated key name still
+  matches before accepting that diff (it will include the live key id, e.g.
+  `key_ol_analytics_api_default_<id>`, so this hand-picked name may need a
+  matching `pulumi state rename` at that point). The `ol_analytics_api_sentry_dsn`
+  stack output is also hand-added and not part of the generator's output
+  template.

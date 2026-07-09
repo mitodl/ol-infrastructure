@@ -3850,3 +3850,39 @@ issue_alert_xpro_xpro_slack_notifications_15045794 = sentry.SentryIssueAlert(
     ),
     opts=sentry_issue_alert_opts,
 )
+
+# Hand-authored addition (not yet live in Sentry, so bin/import-sentry-config
+# has never seen it) -- see IMPORT_SUMMARY.md. Follows the generator's naming
+# convention (project_<slug>, key_<project_slug>) so a future regeneration,
+# once this project exists live, converges onto these same resource names
+# instead of creating parallel ones.
+project_ol_analytics_api = sentry.SentryProject(
+    "project_ol_analytics_api",
+    organization=ORGANIZATION,
+    name="ol-analytics-api",
+    slug="ol-analytics-api",
+    platform="python-fastapi",
+    # Same team set as project_learn_ai -- the closest analog: also a small
+    # standalone service (not a Django monolith) serving the MIT Learn product.
+    teams=[
+        "arbisoft",
+        "mit-learn",
+        "mit-office-of-digital-learning",
+        "devops",
+        "applications",
+    ],
+    digests_min_delay=300,
+    digests_max_delay=1800,
+    resolve_age=0,
+    opts=sentry_opts,
+)
+
+key_ol_analytics_api = sentry.SentryKey(
+    "key_ol_analytics_api",  # pragma: allowlist secret
+    organization=ORGANIZATION,
+    project=project_ol_analytics_api.slug,
+    name="Default",
+    opts=sentry_opts,
+)
+
+pulumi.export("ol_analytics_api_sentry_dsn", key_ol_analytics_api.dsn_public)
