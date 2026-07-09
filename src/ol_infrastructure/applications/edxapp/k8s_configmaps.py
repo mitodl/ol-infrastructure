@@ -607,7 +607,7 @@ def create_k8s_configmaps(  # noqa: PLR0915
         "AUDIT_CERT_CUTOFF_DATE": None,
         "AUTH_DOCUMENTATION_URL": "http://course-catalog-api-guide.readthedocs.io/en/latest/authentication/index.html",
         "BULK_EMAIL_ROUTING_KEY_SMALL_JOBS": "edx.lms.core.default",
-        "COMMUNICATIONS_MICROFRONTEND_URL": "/communications",
+        "COMMUNICATIONS_MICROFRONTEND_URL": f"https://{edxapp_config.require_object('domains')['lms']}/communications",
         "CONTACT_MAILING_ADDRESS": "SET-ME-PLEASE",
         "CREDIT_HELP_LINK_URL": "",
         "DCS_SESSION_COOKIE_SAMESITE": "None",
