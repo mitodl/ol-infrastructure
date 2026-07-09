@@ -181,13 +181,13 @@ overstates the platform's actual capability, though it's an accurate read
 of `toolhive_swe`'s specific configuration:
 
 - ToolHive ships a pluggable authorization framework today, including a
-  Cedar-based authorizer (`docs/authz.md`, `cedarv1`) wired into `MCPServer`
+  Cedar-based authorizer (`stacklok/toolhive/docs/authz.md`, `cedarv1`) wired into `MCPServer`
   via `MCPAuthzConfig`/`AuthzConfigRef` — not a future capability.
-- ToolHive's RFC 8693 Token Exchange support (`pkg/oauthproto/tokenexchange/`)
+- ToolHive's RFC 8693 Token Exchange support (`stacklok/toolhive/pkg/oauthproto/tokenexchange/`)
   is real, tested code wired into the vMCP auth pipeline — this ADR's
   characterization of it as "a real future capability... explicitly deferred
   past v1" undersells how implemented it already is.
-- `docs/middleware.md` documents an "External OIDC provider" auth scenario
+- `stacklok/toolhive/docs/middleware.md` documents an "External OIDC provider" auth scenario
   where the client's JWT is forwarded to the backend MCP container
   **unmodified** — i.e. per-user identity propagation to a backend
   `MCPServer` is achievable today via a ToolHive configuration choice, not
