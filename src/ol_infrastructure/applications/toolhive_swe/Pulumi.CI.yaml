@@ -28,3 +28,4 @@ config:
   toolhive_swe:grafana_service_account_token:
     secure: v1:6nOO1ObT6BhUYNC1:OETprMCV7BkNd72WQoV/wRuGLf/CtJUQXEfJvtsMzJL6HXoQPJPhM7K1/pRuYurI6f5h33cqWqp8ZikkxNs=
   toolhive_swe:sentry_enabled: "false"
+  toolhive_swe:context7_enabled: "false"

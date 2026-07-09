@@ -127,4 +127,7 @@ MCP_GRAFANA_VERSION = "0.17.1"
 # self-hosted stdio mode). Tag tracks the dockyard build, not the upstream npm pkg.
 # renovate: datasource=docker depName=sentry-mcp-server packageName=ghcr.io/stacklok/dockyard/npx/sentry-mcp-server
 MCP_SENTRY_VERSION = "0.33.0"
-
+# ToolHive-built npx wrapper image for the Context7 MCP server (upstash/context7
+# stdio mode). Tag tracks the dockyard build, not the upstream npm pkg.
+# renovate: datasource=docker depName=context7 packageName=ghcr.io/stacklok/dockyard/npx/context7
+MCP_CONTEXT7_VERSION = "2.2.4"

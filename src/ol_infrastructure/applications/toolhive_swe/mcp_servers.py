@@ -16,7 +16,11 @@ from typing import NamedTuple
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, ResourceOptions, StackReference
 
-from bridge.lib.versions import MCP_GRAFANA_VERSION, MCP_SENTRY_VERSION
+from bridge.lib.versions import (
+    MCP_CONTEXT7_VERSION,
+    MCP_GRAFANA_VERSION,
+    MCP_SENTRY_VERSION,
+)
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 # Name shared by the MCPGroup and every backend/virtual server that references it.
@@ -32,6 +36,11 @@ GRAFANA_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 # config and injected into the sentry MCPServer the same way as the Grafana token.
 SENTRY_TOKEN_SECRET_NAME = "toolhive-swe-sentry-token"  # noqa: S105  # pragma: allowlist secret
 SENTRY_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
+
+# K8s Secret holding the Context7 API key, materialised from encrypted stack config
+# and injected into the context7 MCPServer the same way as the Grafana token.
+CONTEXT7_TOKEN_SECRET_NAME = "toolhive-swe-context7-token"  # noqa: S105  # pragma: allowlist secret
+CONTEXT7_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 
 
 class ToolhiveSWEMCPServers(NamedTuple):
@@ -144,11 +153,23 @@ def create_mcp_servers(
             # container serves legacy SSE and the vMCP's streamable-http
             # ``initialize`` POST fails with a 4xx. ``--endpoint-path`` defaults
             # to ``/`` but the ToolHive proxy forwards ``/mcp`` verbatim.
+            #
+            # ``--allowed-hosts *`` disables the Host-header (DNS-rebind) check
+            # added in mcp-grafana 0.17.1 (upstream PR #957). That check defaults
+            # to loopback-only (localhost/127.0.0.1 : 8000), so the ToolHive proxy
+            # and vMCP health checks — which reach the workload via cluster-DNS
+            # names — get 403 "host not allowed", the vMCP marks grafana
+            # unavailable, and every grafana tool drops out of the aggregate.
+            # ``*`` is safe here: the workload is a ClusterIP reachable only
+            # through the ToolHive proxy (which enforces auth), never exposed
+            # externally.
             "args": [
                 "--transport",
                 "streamable-http",
                 "--endpoint-path",
                 "/mcp",
+                "--allowed-hosts",
+                "*",
             ],
             "proxyPort": 8080,
             "mcpPort": 8000,
@@ -177,6 +198,76 @@ def create_mcp_servers(
     )
 
     servers = [fetch_mcpserver, grafana_mcpserver]
+
+    # Context7 MCP server (https://github.com/upstash/context7) running in its
+    # ``stdio`` mode via ToolHive's prebuilt npx wrapper image; the operator's proxy
+    # exposes it over streamable-http like the other backends. Provides version-
+    # accurate, up-to-date library/framework documentation to reduce hallucinated
+    # APIs. Context7 works unauthenticated for basic usage, but an API key raises
+    # rate limits and improves performance; every user shares the one key, which is
+    # fine here since the key only governs quota, not per-user data access.
+    #
+    # Gated behind a per-stack boolean so it only runs where explicitly enabled
+    # (currently Production only). When disabled neither the token Secret nor the
+    # MCPServer is created, so lower stacks don't need a ``context7_api_key``:
+    #   pulumi config set toolhive_swe:context7_enabled true
+    #   pulumi config set --secret toolhive_swe:context7_api_key -- <key>
+    if toolhive_swe_config.get_bool("context7_enabled"):
+        context7_token_secret = kubernetes.core.v1.Secret(
+            f"toolhive-swe-context7-token-secret-{stack_info.env_suffix}",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name=CONTEXT7_TOKEN_SECRET_NAME,
+                namespace=namespace,
+                labels=k8s_global_labels,
+            ),
+            type="Opaque",
+            string_data={
+                CONTEXT7_TOKEN_SECRET_KEY: toolhive_swe_config.require_secret(
+                    "context7_api_key"
+                ),
+            },
+            opts=ResourceOptions(),
+        )
+        context7_mcpserver = kubernetes.apiextensions.CustomResource(
+            f"toolhive-swe-context7-mcpserver-{stack_info.env_suffix}",
+            api_version="toolhive.stacklok.dev/v1beta1",
+            kind="MCPServer",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name="context7",
+                namespace=namespace,
+                labels=k8s_global_labels,
+            ),
+            spec={
+                "image": (
+                    f"ghcr.io/stacklok/dockyard/npx/context7:{MCP_CONTEXT7_VERSION}"
+                ),
+                # context7 only speaks stdio; the ToolHive proxy wraps it and fronts
+                # it with streamable-http on proxyPort (no mcpPort for stdio).
+                "transport": "stdio",
+                "proxyPort": 8080,
+                "groupRef": {"name": MCP_GROUP_NAME},
+                "secrets": [
+                    {
+                        "name": CONTEXT7_TOKEN_SECRET_NAME,
+                        "key": CONTEXT7_TOKEN_SECRET_KEY,
+                        "targetEnvName": "CONTEXT7_API_KEY",
+                    }
+                ],
+                # Needs outbound access to the Context7 API. Tighten to an allow-list
+                # profile (context7.com, port 443) once the builtin profile proves
+                # out.
+                "permissionProfile": {
+                    "type": "builtin",
+                    "name": "network",
+                },
+                "resources": {
+                    "requests": {"cpu": "50m", "memory": "128Mi"},
+                    "limits": {"cpu": "200m", "memory": "256Mi"},
+                },
+            },
+            opts=ResourceOptions(depends_on=[swe_mcpgroup, context7_token_secret]),
+        )
+        servers.append(context7_mcpserver)
 
     # Sentry MCP server (https://github.com/getsentry/sentry-mcp) running in its
     # self-hosted ``stdio`` mode via ToolHive's prebuilt npx wrapper image; the
