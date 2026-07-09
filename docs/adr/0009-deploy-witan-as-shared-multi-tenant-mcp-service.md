@@ -171,7 +171,7 @@ detail belongs to implementation, not the architectural decision itself.
 - Observability for this class of service doesn't exist yet in either repo —
   greenfield follow-up work, not a blocker for a first internal pilot.
 
-### Addendum (2026-07-08) — point 3's "authentication-only" framing needs revisiting
+## Addendum (2026-07-08) — point 3's "authentication-only" framing needs revisiting
 
 A capability audit of upstream `stacklok/toolhive` at git tag `v0.33.0` —
 the exact version already pinned as `TOOLHIVE_OPERATOR_CHART_VERSION` /
