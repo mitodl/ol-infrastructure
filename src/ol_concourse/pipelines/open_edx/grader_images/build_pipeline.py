@@ -44,6 +44,9 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import registry_image, ssh_git_repo
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+from ol_concourse.pipelines.open_edx.grader_images.base_image_pipeline import (
+    DEFAULT_PYTHON_VERSION,
+)
 
 _AWS_ACCOUNT_ID = "610119931565"
 _AWS_REGION = "us-east-1"
@@ -66,6 +69,9 @@ class GraderPipelineConfig:
         grader_base_dockerhub_repo: DockerHub repository name for the grader
             base image used as the build trigger, e.g.
             ``"mitodl/xqueue-watcher-grader-base"``.
+        grader_base_image_tag: Tag of the grader base image to build from,
+            e.g. ``"3.12"``. Matches one of the Python-version tags produced
+            by the base image's build matrix (base_image_pipeline.py).
         github_private_key: Vault path for the SSH private key used to clone
             the (private) grader repository.  Defaults to the odlbot SSH key
             stored at ``infrastructure/open_api_clients`` in Vault.
@@ -78,6 +84,7 @@ class GraderPipelineConfig:
     grader_repo_branch: str
     ecr_repo_name: str
     grader_base_dockerhub_repo: str = "mitodl/xqueue-watcher-grader-base"
+    grader_base_image_tag: str = DEFAULT_PYTHON_VERSION
     github_private_key: str = "((open_api_clients.odlbot_private_ssh_key))"
     aws_account_id: str = _AWS_ACCOUNT_ID
     aws_region: str = _AWS_REGION
@@ -115,7 +122,7 @@ def grader_image_pipeline(config: GraderPipelineConfig) -> Pipeline:
     grader_base_image = registry_image(
         name=Identifier("grader-base-image"),
         image_repository=dockerhub_ecr_image_uri(config.grader_base_dockerhub_repo),
-        image_tag="latest",
+        image_tag=config.grader_base_image_tag,
         ecr_region=config.aws_region,
     )
 
