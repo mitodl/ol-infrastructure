@@ -36,6 +36,7 @@ DATA_WAREHOUSE = "ol-infrastructure-data-warehouse"
 MONGODB_ATLAS = "ol-infrastructure-mongodb-atlas"
 QDRANT_CLOUD = "ol-infrastructure-qdrant-cloud"
 GRAFANA_CLOUD = "ol-infrastructure-grafana-cloud"
+SENTRY = "ol-infrastructure-sentry"
 SFTP = "ol-infrastructure-aws-sftp"
 S3_SITES = "ol-infrastructure-aws-s3"
 GEMINI_API = "ol-infrastructure-gemini-api"
@@ -145,6 +146,7 @@ LEGACY_STACK_REF_PREFIXES: dict[str, str] = {
     MONGODB_ATLAS: "infrastructure.mongodb_atlas",
     QDRANT_CLOUD: "infrastructure.qdrant_cloud",
     GRAFANA_CLOUD: "infrastructure.grafana_cloud",
+    SENTRY: "infrastructure.sentry",
     SFTP: "infrastructure.aws.sftp_servers",
     S3_SITES: "infrastructure.aws.s3_sites",
     # substructure/

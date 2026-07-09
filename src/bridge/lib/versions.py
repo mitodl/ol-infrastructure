@@ -3,7 +3,7 @@ CONCOURSE_VERSION = "8.2.4"  # (TMM 2026-03-06) - Pin to <8.1.0 because of some 
 # renovate: datasource=github-releases depName=consul-template packageName=hashicorp/consul-template
 CONSUL_TEMPLATE_VERSION = "0.42.0"
 # renovate: datasource=github-releases depName=consul packageName=hashicorp/consul
-CONSUL_VERSION = "2.0.1"
+CONSUL_VERSION = "2.0.2"
 # renovate: datasource=pypi depName=jupyterhub packageName=jupyterhub
 JUPYTERHUB_VERSION = "5.5.0"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
@@ -38,13 +38,13 @@ OPENLIT_CHART_VERSION = "1.20.0"
 # renovate: datasource=helm depName=apisix packageName=apisix registryUrl=https://apache.github.io/apisix-helm-chart
 APISIX_CHART_VERSION = "2.15.0"
 # renovate: datasource=helm depName=aws-load-balancer-controller packageName=aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts
-AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION = "3.4.0"
+AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION = "3.4.1"
 # renovate: datasource=helm depName=aws-node-termination-handler packageName=aws-node-termination-handler registryUrl=https://aws.github.io/eks-charts
 AWS_NODE_TERMINATION_HANDLER_CHART_VERSION = "0.27.2"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager
 CERT_MANAGER_CHART_VERSION = "v1.16.1"
 # renovate: datasource=helm depName=dagster packageName=dagster registryUrl=https://dagster-io.github.io/helm
-DAGSTER_CHART_VERSION = "1.13.11"
+DAGSTER_CHART_VERSION = "1.13.12"
 # renovate: datasource=aws-eks-addon depName=ebs-csi-driver
 EBS_CSI_DRIVER_VERSION = "v1.40.1-eksbuild.1"
 # renovate: datasource=aws-eks-addon depName=efs-csi-driver
@@ -64,7 +64,7 @@ KUBEWATCH_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=meilisearch packageName=meilisearch registryUrl=https://meilisearch.github.io/meilisearch-kubernetes
 MEILISEARCH_CHART_VERSION = "0.33.0"
 # renovate: datasource=helm depName=opik packageName=opik registryUrl=https://comet-ml.github.io/opik
-OPIK_CHART_VERSION = "2.1.18"
+OPIK_CHART_VERSION = "2.1.20"
 # renovate: datasource=helm depName=operator packageName=operator registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
 STARROCKS_OPERATOR_CHART_VERSION = "1.11.5"
 # renovate: datasource=helm depName=operator packageName=starrocks registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
@@ -123,3 +123,8 @@ TOOLHIVE_OPERATOR_CRDS_CHART_VERSION = "0.33.0"
 TOOLHIVE_OPERATOR_CHART_VERSION = "0.33.0"
 # renovate: datasource=docker depName=mcp-grafana packageName=grafana/mcp-grafana
 MCP_GRAFANA_VERSION = "0.17.1"
+# ToolHive-built npx wrapper image for the Sentry MCP server (getsentry/sentry-mcp
+# self-hosted stdio mode). Tag tracks the dockyard build, not the upstream npm pkg.
+# renovate: datasource=docker depName=sentry-mcp-server packageName=ghcr.io/stacklok/dockyard/npx/sentry-mcp-server
+MCP_SENTRY_VERSION = "0.33.0"
+
