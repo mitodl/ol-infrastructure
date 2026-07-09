@@ -20,3 +20,8 @@ config:
     SENTRY_LOG_LEVEL: ERROR
     SENTRY_TRACES_SAMPLE_RATE: "0.001"
     SENTRY_PROFILES_SAMPLE_RATE: "0.1"
+    # The b2b_dashboard tenant's built-in default (https://mitxonline.mit.edu) is
+    # MITx Online's *frontend* domain, not its API host -- set explicitly to the
+    # real backend API domain, matching mitxonline's own Pulumi.Production.yaml
+    # backend_domain.
+    OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_API_BASE_URL: https://api.mitxonline.mit.edu
