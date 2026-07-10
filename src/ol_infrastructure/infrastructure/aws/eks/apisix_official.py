@@ -20,8 +20,8 @@ from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 # APISIX's default enabled-plugins list for the version shipped by the pinned
-# chart (chart 2.12.x => APISIX 3.14.x), extracted verbatim from
-# https://github.com/apache/apisix/blob/3.14.0/apisix/cli/config.lua
+# chart (chart 2.16.x => APISIX 3.17.x), extracted verbatim from
+# https://github.com/apache/apisix/blob/3.17.0/apisix/cli/config.lua
 #
 # Setting ``apisix.plugins`` in the Helm values REPLACES this default list
 # rather than extending it, so the full list must be reproduced here.  We do
@@ -31,10 +31,11 @@ from ol_infrastructure.lib.pulumi_helper import StackInfo
 # IMPORTANT: revisit this list on every APISIX major/minor upgrade.  If it
 # drifts from the APISIX default for the running version, plugins omitted here
 # will stop loading.  ``opentelemetry`` is appended at the end below.
-APISIX_DEFAULT_PLUGINS_3_14: list[str] = [
+APISIX_DEFAULT_PLUGINS_3_17: list[str] = [
     "real-ip",
     "ai",
     "client-control",
+    "proxy-buffering",
     "proxy-control",
     "request-id",
     "zipkin",
@@ -52,6 +53,7 @@ APISIX_DEFAULT_PLUGINS_3_14: list[str] = [
     "chaitin-waf",
     "multi-auth",
     "openid-connect",
+    "saml-auth",
     "cas-auth",
     "authz-casbin",
     "authz-casdoor",
@@ -62,11 +64,15 @@ APISIX_DEFAULT_PLUGINS_3_14: list[str] = [
     "jwt-auth",
     "jwe-decrypt",
     "key-auth",
+    "dingtalk-auth",
+    "feishu-auth",
+    "acl",
     "consumer-restriction",
     "attach-consumer-label",
     "forward-auth",
     "opa",
     "authz-keycloak",
+    "data-mask",
     "proxy-cache",
     "body-transformer",
     "ai-prompt-template",
@@ -79,16 +85,20 @@ APISIX_DEFAULT_PLUGINS_3_14: list[str] = [
     "ai-aws-content-moderation",
     "ai-aliyun-content-moderation",
     "proxy-mirror",
+    "graphql-proxy-cache",
     "proxy-rewrite",
     "workflow",
     "api-breaker",
+    "graphql-limit-count",
     "limit-conn",
     "limit-count",
     "limit-req",
     "gzip",
+    "traffic-label",
     "traffic-split",
     "redirect",
     "response-rewrite",
+    "oas-validator",
     "mcp-bridge",
     "degraphql",
     "kafka-proxy",
@@ -131,7 +141,7 @@ APISIX_DEFAULT_PLUGINS_3_14: list[str] = [
 # Full enabled-plugins list applied via the Helm chart: APISIX defaults plus the
 # opentelemetry plugin, which emits OTLP traces (not metrics) for every request.
 APISIX_ENABLED_PLUGINS: list[str] = [
-    *APISIX_DEFAULT_PLUGINS_3_14,
+    *APISIX_DEFAULT_PLUGINS_3_17,
     "opentelemetry",
 ]
 
@@ -187,7 +197,7 @@ def setup_apisix(
     ).strip("_")
 
     # APISIX chart uses a different chart version scheme
-    # Chart version 2.12.x contains APISIX 3.14.x
+    # Chart version 2.16.x contains APISIX 3.17.x
     apisix_chart_version = versions["APISIX_CHART"]
 
     # OpenTelemetry tracing is exported to the in-cluster Grafana Alloy receiver,
@@ -465,6 +475,11 @@ def setup_apisix(
                         else {}
                     ),
                     "trustedAddresses": fastly_ips,
+                    # Enable comprehensive per-phase request lifecycle tracing
+                    # (SSL/SNI, rewrite, access, header_filter, body_filter, log).
+                    # Available since chart 2.16.0; without it OpenTelemetry only
+                    # emits a single span per request instead of one per phase.
+                    "tracing": otel_tracing_enabled,
                     "admin": {
                         "enabled": True,
                         "type": "ClusterIP",
