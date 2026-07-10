@@ -295,35 +295,40 @@ query_engine_iam_policy = iam.Policy(
 
 export("data_lake_query_engine_iam_policy_arn", query_engine_iam_policy.arn)
 
-query_engine_aws_account_id = data_lake_query_engine_config.require("aws-account-id")
-query_engine_aws_external_id = data_lake_query_engine_config.require("aws-external-id")
+# The external query engine (Starburst Galaxy) cross-account trust role is only
+# configured for environments that actually connect an external query engine to
+# this data lake. CI has no such connection, so its aws-account-id/aws-external-id
+# config is intentionally absent and this role is skipped there.
+query_engine_aws_account_id = data_lake_query_engine_config.get("aws-account-id")
+query_engine_aws_external_id = data_lake_query_engine_config.get("aws-external-id")
 
-query_engine_role = iam.Role(
-    "data-lake-query-engine-role",
-    assume_role_policy=json.dumps(
-        {
-            "Version": "2012-10-17",
-            "Statement": {
-                "Effect": "Allow",
-                "Action": "sts:AssumeRole",
-                "Principal": {
-                    "AWS": f"arn:aws:iam::{query_engine_aws_account_id}:root"
+if query_engine_aws_account_id and query_engine_aws_external_id:
+    query_engine_role = iam.Role(
+        "data-lake-query-engine-role",
+        assume_role_policy=json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": {
+                    "Effect": "Allow",
+                    "Action": "sts:AssumeRole",
+                    "Principal": {
+                        "AWS": f"arn:aws:iam::{query_engine_aws_account_id}:root"
+                    },
+                    "Condition": {
+                        "StringEquals": {"sts:ExternalId": query_engine_aws_external_id}
+                    },
                 },
-                "Condition": {
-                    "StringEquals": {"sts:ExternalId": query_engine_aws_external_id}
-                },
-            },
-        }
-    ),
-    name=f"data-lake-query-engine-role-{stack_info.env_suffix}",
-    path="/ol-data/etl-role/",
-    tags=aws_config.tags,
-)
+            }
+        ),
+        name=f"data-lake-query-engine-role-{stack_info.env_suffix}",
+        path="/ol-data/etl-role/",
+        tags=aws_config.tags,
+    )
 
-iam.RolePolicyAttachment(
-    f"data-lake-query-engine-role-policy-{stack_info.env_suffix}",
-    policy_arn=query_engine_iam_policy.arn,
-    role=query_engine_role.name,
-)
+    iam.RolePolicyAttachment(
+        f"data-lake-query-engine-role-policy-{stack_info.env_suffix}",
+        policy_arn=query_engine_iam_policy.arn,
+        role=query_engine_role.name,
+    )
 
-export("sql_engine_role_arn", query_engine_role.arn)
+    export("sql_engine_role_arn", query_engine_role.arn)

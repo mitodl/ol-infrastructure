@@ -320,8 +320,8 @@ setup_nvidia(
     nvidia_k8s_device_plugin_version=VERSIONS["NVIDIA_K8S_DEVICE_PLUGIN_VERSION"],
 )
 
-# Setup StarRocks operator
-if stack_info.env_suffix != "ci" and stack_info.env_prefix == "data":
+# Setup StarRocks operator (data cluster, all environments)
+if stack_info.env_prefix == "data":
     setup_starrocks(
         cluster_name=cluster_name,
         cluster_stack=cluster_stack,

@@ -181,7 +181,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="data_warehouse",
         pulumi_project_path="infrastructure/aws/data_warehouse/",
         pulumi_project_name="ol-infrastructure-data-warehouse",
-        stages=["QA", "Production"],
+        stages=["CI", "QA", "Production"],
     ),
     "digital-credentials": SimplePulumiParams(
         app_name="digital-credentials",
@@ -291,12 +291,12 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         deployment_groups=[
             "lakehouse",
         ],
-        stages=["QA", "Production"],
+        stages=["CI", "QA", "Production"],
     ),
     # The substructure stack makes direct TCP connections to the StarRocks NLB, which
     # is internal to the data VPC.  Each ops VPC is only peered with its same-env data
-    # VPC, so the QA stage must run in QA Concourse and Production in prod Concourse.
-    # See starrocks-substructure-qa below for the QA-Concourse entry.
+    # VPC, so each stage must run on the Concourse instance living in that same env.
+    # See starrocks-substructure-{qa,ci} below for the QA/CI-Concourse entries.
     "starrocks-substructure": SimplePulumiParams(
         app_name="starrocks_substructure",
         pulumi_project_path="substructure/starrocks/",
@@ -315,6 +315,15 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             "lakehouse",
         ],
         stages=["QA"],
+    ),
+    "starrocks-substructure-ci": SimplePulumiParams(
+        app_name="starrocks_substructure",
+        pulumi_project_path="substructure/starrocks/",
+        pulumi_project_name="ol-substructure-starrocks",
+        deployment_groups=[
+            "lakehouse",
+        ],
+        stages=["CI"],
     ),
     "tika": SimplePulumiParams(
         app_name="tika",

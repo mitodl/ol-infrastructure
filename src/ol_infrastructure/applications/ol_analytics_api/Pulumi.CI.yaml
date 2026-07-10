@@ -1,0 +1,28 @@
+---
+secretsprovider: awskms://alias/PulumiSecrets
+config:
+  aws:region: us-east-1
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
+  ol_analytics_api:domain: analytics-ci.odl.mit.edu
+  ol_analytics_api:env_vars:
+    OL_ANALYTICS_API_ENVIRONMENT: ci
+    LOG_LEVEL: INFO
+    DEBUG: "false"
+    OPENTELEMETRY_SERVICE_NAME: ol-analytics-api
+    OPENTELEMETRY_ENDPOINT: http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces
+    OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+    OTEL_TRACES_SAMPLER: parentbased_traceidratio
+    OTEL_TRACES_SAMPLER_ARG: "0.25"
+    OTEL_PROPAGATORS: tracecontext,baggage
+    OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT: "128"
+    OTEL_RESOURCE_ATTRIBUTES: deployment.environment=ci,service.namespace=ol-analytics
+    SENTRY_LOG_LEVEL: ERROR
+    SENTRY_TRACES_SAMPLE_RATE: "0.001"
+    SENTRY_PROFILES_SAMPLE_RATE: "0.1"
+    # The b2b_dashboard tenant's default (https://mitxonline.mit.edu) is MITx
+    # Online's *production* frontend domain, not even an API host -- every env
+    # must set this explicitly. CI points at its own mitxonline stack, matching
+    # mitxonline's own Pulumi.CI.yaml backend_domain.
+    OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_API_BASE_URL: https://api.ci.mitxonline.mit.edu
+encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQH73CeoAeclZR7G4qarBe1fAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMrp/B8G6rKWoYLDVSAgEQgDuWfJURhr3q6Jv/E3yOYWvyDlOgB/rrukkVfo3sXxAtvEoFlDWiQIMt9yRmi0N/Eziijfau+MQfuOuKmg==

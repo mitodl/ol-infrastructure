@@ -1,0 +1,14 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+config:
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
+  starrocks:applications_stack_name: lakehouse.CI
+  starrocks:db_admin_username: root
+  starrocks:verify_connection: "false"
+  starrocks:ssl_enabled: "false"
+  starrocks:enable_data_lake_integration: "false"
+  starrocks:aws_region: us-east-1
+  starrocks:domain: lakehouse.ci.starrocks.ol.mit.edu
+  starrocks:oidc_enabled: "false"
+encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagFB11h4B3FQE7hoWhywGrWpAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMgTNzzQdNSj66KAuGAgEQgDs4LT64aAHWAR8c27W7fsR3Vg/texyUKynpD8PQ+h3JzEm+a844+kL5bPPYDh3t1t6zTr5DBEvo9iCEIQ==
