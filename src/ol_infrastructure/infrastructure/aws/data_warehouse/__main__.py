@@ -302,6 +302,17 @@ export("data_lake_query_engine_iam_policy_arn", query_engine_iam_policy.arn)
 query_engine_aws_account_id = data_lake_query_engine_config.get("aws-account-id")
 query_engine_aws_external_id = data_lake_query_engine_config.get("aws-external-id")
 
+_has_account_id = bool(query_engine_aws_account_id)
+_has_external_id = bool(query_engine_aws_external_id)
+if _has_account_id != _has_external_id:
+    msg = (
+        "data-lake-query-engine:aws-account-id and aws-external-id must both be set "
+        "or both be absent -- partial configuration would silently skip creating "
+        f"the cross-account trust role. Got account_id={_has_account_id}, "
+        f"external_id={_has_external_id}."
+    )
+    raise ValueError(msg)
+
 if query_engine_aws_account_id and query_engine_aws_external_id:
     query_engine_role = iam.Role(
         "data-lake-query-engine-role",

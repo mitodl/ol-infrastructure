@@ -929,6 +929,19 @@ def _build_release_image_job(
             file=f"{release_res.name}/version",
             reveal=True,
         ),
+        # The release resource's "create" out-action tags the pre-bumpver HEAD SHA
+        # as the release (see ol-concourse resources/release/README.md): it records
+        # main_repo's current HEAD *before* running bump_version_task, then commits
+        # the version bump separately. Capture git_ref from main_repo here -- before
+        # bump_version_task mutates the checkout -- so the built image is stamped
+        # with the exact commit the release tag points to. The release resource
+        # itself never writes a .git/ref file (only version/commits.json/
+        # checklist.md/changelog_entry.md), so loading it from there would fail.
+        LoadVarStep(
+            load_var="git_ref",
+            file=f"{main_repo.name}/.git/ref",
+            reveal=True,
+        ),
         bump_version_task(
             version_file=f"{release_res.name}/version",
             repository=str(main_repo.name),
@@ -940,13 +953,6 @@ def _build_release_image_job(
                 "repo_dir": str(main_repo.name),
                 "version_file": f"{release_res.name}/version",
             },
-        ),
-        # Load git_ref from the release resource AFTER the release commit is created,
-        # so the image is stamped with the correct post-release commit SHA.
-        LoadVarStep(
-            load_var="git_ref",
-            file=f"{release_res.name}/.git/ref",
-            reveal=True,
         ),
         container_build_task(
             inputs=[Input(name=main_repo.name)],
@@ -1198,6 +1204,12 @@ def _build_release_resource_app_pipeline(
                     put=deployment_rc.name,
                     params={"action": "start", "ref": "((.:image_tag))"},
                 ),
+                # The github-deployments resource's "finish" out-action reads
+                # deployment.json written by a `get`, not by the prior `put` itself
+                # (see ol-concourse resources/github-deployments/README.md's
+                # documented put-start -> get -> ... -> put-finish flow). Without
+                # this, the QA post-step's action=finish put fails to find the file.
+                GetStep(get=deployment_rc.name, trigger=False),
             ],
             1: [
                 GetStep(get=release_gate.name, trigger=True, version="every"),
@@ -1211,6 +1223,9 @@ def _build_release_resource_app_pipeline(
                     put=deployment_prod.name,
                     params={"action": "start", "ref": "((.:image_tag))"},
                 ),
+                # See the deployment_rc comment above: action=finish needs
+                # deployment.json from an explicit `get`, not just the prior `put`.
+                GetStep(get=deployment_prod.name, trigger=False),
             ],
         },
         additional_env_vars={
