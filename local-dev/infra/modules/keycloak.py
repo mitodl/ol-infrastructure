@@ -473,6 +473,14 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         mitlearn_client,
         mitlearn_client_secret,
     )
+    # Same mitlearn creds, for mitxonline-learn-proxy-route's secretRef.
+    _make_oidc_secret(
+        "oidc-secret-mitlearn-in-mitxonline",
+        "mitxonline",
+        "ol-mitlearn-oidc",
+        mitlearn_client,
+        mitlearn_client_secret,
+    )
 
     # --- MITx Online ---
     mitxonline_client = keycloak.openid.Client(

@@ -232,11 +232,10 @@ spec:
         - "/$1"
     - name: openid-connect
       enable: true
+      # Same mitlearn client as the learn route (must match for session/token
+      # refresh); secretRef avoids a second inlined copy of the secret.
+      secretRef: ol-mitlearn-oidc     # pragma: allowlist secret
       config:
-        # mitlearn OIDC client — MUST match the learn route so the shared session
-        # cookie can be read and its tokens refreshed (see mit-learn secrets.yaml).
-        client_id: "ol-mitlearn-client"
-        client_secret: "local-dev-mitlearn-secret"     # pragma: allowlist secret
         discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
         realm: olapps
         use_jwks: true
