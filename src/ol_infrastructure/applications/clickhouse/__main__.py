@@ -553,16 +553,16 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                     "podTemplates": [
                         {
                             "name": "clickhouse-pod-template",
-                            # Karpenter must not evict ClickHouse during
-                            # consolidation: with replicas=1 (CI/QA) a voluntary
-                            # drain takes down the shared installation — and every
-                            # dependent app (opik, openlit) — for the minutes the
-                            # pod and its EBS volume need to move to a new node.
-                            "metadata": {
-                                "annotations": {
-                                    "karpenter.sh/do-not-disrupt": "true",
-                                },
-                            },
+                            # Prevent Karpenter consolidation from disrupting single-replica ClickHouse.
+                            **(
+                                {
+                                    "metadata": {
+                                        "annotations": {"karpenter.sh/do-not-disrupt": "true"},
+                                    },
+                                }
+                                if ch_replicas == 1
+                                else {}
+                            ),
                             "spec": {
                                 "serviceAccountName": "clickhouse",
                                 "tolerations": ch_tolerations,
