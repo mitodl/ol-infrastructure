@@ -278,15 +278,16 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
                     "podTemplates": [
                         {
                             "name": "keeper-pod",
-                            # Karpenter must not evict Keeper during consolidation:
-                            # with keeper_replicas=1 (CI/QA) a voluntary drain
-                            # stalls all replicated-table writes until the pod and
-                            # its EBS volume finish moving to a new node.
-                            "metadata": {
-                                "annotations": {
-                                    "karpenter.sh/do-not-disrupt": "true",
-                                },
-                            },
+                            # Prevent Karpenter consolidation from disrupting single-replica Keeper.
+                            **(
+                                {
+                                    "metadata": {
+                                        "annotations": {"karpenter.sh/do-not-disrupt": "true"},
+                                    },
+                                }
+                                if replicas == 1
+                                else {}
+                            ),
                             "spec": {
                                 "securityContext": {"fsGroup": 101},
                                 "tolerations": tolerations,
