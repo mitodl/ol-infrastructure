@@ -6,10 +6,10 @@ This module defines functions to create Kubernetes secrets required by the mitle
 application by fetching data from various Vault secret backends (static KV and dynamic).
 """
 
-from typing import Any
+from typing import Any, Literal
 
 import pulumi_kubernetes as kubernetes
-from pulumi import ResourceOptions
+from pulumi import Output, ResourceOptions
 from pulumi_vault import Mount
 
 from bridge.lib.magic_numbers import DEFAULT_REDIS_PORT
@@ -29,11 +29,11 @@ def _create_static_secret(
     secret_base_name: str,
     namespace: str,
     labels: dict[str, str],
-    mount: str,
+    mount: str | Output[str],
     path: str,
-    templates: dict[str, str],
+    templates: dict[str, str | Output[str]],
     vaultauth: str,
-    mount_type: str = "kv-v1",
+    mount_type: Literal["kv-v1", "kv-v2"] = "kv-v1",
     opts: ResourceOptions | None = None,
 ) -> tuple[str, OLVaultK8SSecret]:
     """
@@ -81,9 +81,9 @@ def _create_dynamic_secret(
     secret_base_name: str,
     namespace: str,
     labels: dict[str, str],
-    mount: str,
+    mount: str | Output[str],
     path: str,
-    templates: dict[str, str],
+    templates: dict[str, str | Output[str]],
     vaultauth: str,
     opts: ResourceOptions | None = None,
 ) -> tuple[str, OLVaultK8SSecret]:
@@ -191,6 +191,7 @@ def create_mitlearn_k8s_secrets(
             "SEE_API_CLIENT_SECRET": '{{ index .Secrets "see_api_client" "secret" }}',
             # Top-level keys can use `get .Secrets "key"`
             "MITOL_JWT_SECRET": '{{ get .Secrets "jwt_secret" }}',
+            "MITX_ONLINE_ETL_API_KEY": '{{ index .Secrets "mitxonline" "etl_api_key" }}',
             "SECRET_KEY": '{{ get .Secrets "django_secret_key" }}',
             "SENTRY_DSN": '{{ get .Secrets "sentry_dsn" }}',
             "STATUS_TOKEN": '{{ get .Secrets "django_status_token" }}',
