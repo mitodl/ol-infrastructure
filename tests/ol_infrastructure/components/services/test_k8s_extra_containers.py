@@ -408,6 +408,60 @@ def test_default_container_annotation_set_to_app_container():
     return app.application_deployment.spec.template.metadata.annotations.apply(check)
 
 
+@pulumi.runtime.test
+def test_config_hash_annotation_absent_without_sources():
+    """No config-hash annotation when there's nothing to hash."""
+    cfg = _base_config(application_name="myapp")
+    app = OLApplicationK8s(cfg)
+
+    def check(annotations):
+        assert "ol.mit.edu/config-hash" not in annotations
+
+    return app.application_deployment.spec.template.metadata.annotations.apply(check)
+
+
+@pulumi.runtime.test
+def test_config_hash_annotation_present_with_config_hash_inputs():
+    """config_hash_inputs produces a config-hash annotation on the webapp pod template."""
+    cfg = _base_config(
+        application_name="myapp", config_hash_inputs={"secret-version": "1"}
+    )
+    app = OLApplicationK8s(cfg)
+
+    def check(annotations):
+        assert "ol.mit.edu/config-hash" in annotations
+        assert len(annotations["ol.mit.edu/config-hash"]) == 64  # sha256 hex digest
+
+    return app.application_deployment.spec.template.metadata.annotations.apply(check)
+
+
+@pulumi.runtime.test
+def test_config_hash_annotation_changes_with_input():
+    """Changing a config_hash_inputs value must change the resulting hash."""
+    app_a = OLApplicationK8s(
+        _base_config(
+            application_name="myapp-a", config_hash_inputs={"secret-version": "1"}
+        )
+    )
+    app_b = OLApplicationK8s(
+        _base_config(
+            application_name="myapp-b", config_hash_inputs={"secret-version": "2"}
+        )
+    )
+
+    def check(hashes):
+        assert hashes[0] != hashes[1]
+
+    return pulumi.Output.all(
+        app_a.application_deployment.spec.template.metadata.annotations.apply(
+            lambda a: a["ol.mit.edu/config-hash"]
+        ),
+        app_b.application_deployment.spec.template.metadata.annotations.apply(
+            lambda a: a["ol.mit.edu/config-hash"]
+        ),
+    ).apply(check)
+
+
 # ─── validate_no_duplicate_metrics_port ────────────────────────────────────────
 # Gap 1: extra_container_ports conflicts
 
