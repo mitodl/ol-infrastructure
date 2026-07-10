@@ -128,7 +128,7 @@ class _PingdomCheck(Resource):
         url: str,
         resolution: int,
         probe_filters: list[str],
-        tags: str,
+        tags: list[str],
         integrationids: list[int],
         paused: bool = False,
         opts: ResourceOptions | None = None,
@@ -517,7 +517,7 @@ def create(api_token: Input[str], integration_ids: list[int]) -> None:
                 if check.alert_sensitivity == "high"
                 else _NON_PROD_PROBE_FILTERS
             ),
-            tags=",".join(v for v in check.labels.values() if v),
+            tags=[v for v in check.labels.values() if v],
             integrationids=integration_ids,
             paused=check.paused,
         )
