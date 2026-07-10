@@ -104,12 +104,14 @@ class _PingdomCheckProvider(ResourceProvider):
         return UpdateResult(outs={**news, "check_id": id_})
 
     def delete(self, id_: str, props: dict[str, Any]) -> None:
-        """Delete the Pingdom check."""
+        """Delete the Pingdom check. A 404 means it is already gone."""
         r = requests.delete(
             f"{_API_BASE}/checks/{id_}",
             headers=self._auth(props),
             timeout=_REQUEST_TIMEOUT,
         )
+        if r.status_code == _HTTP_NOT_FOUND:
+            return
         r.raise_for_status()
 
 
