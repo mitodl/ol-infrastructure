@@ -23,11 +23,20 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
     # Contact points
     # -------------------------------------------------------------------------
 
-    # Drop sink — empty contact point with no integrations.
-    # Used as the default receiver and to explicitly silence matched routes.
+    # Drop sink — used as the default receiver and to explicitly silence
+    # matched routes. Grafana-managed contact points require at least one
+    # integration (the old Mimir Alertmanager allowed an empty receiver), so
+    # point a webhook at a blackhole address: delivery fails immediately and
+    # the alert goes nowhere, which is the intent.
     alerting.ContactPoint(
         "oblivion",
         name="oblivion",
+        webhooks=[
+            alerting.ContactPointWebhookArgs(
+                url="http://127.0.0.1:9/oblivion",
+                disable_resolve_message=True,
+            )
+        ],
         opts=resource_opts,
     )
 
