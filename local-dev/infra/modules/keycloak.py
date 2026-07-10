@@ -4,7 +4,6 @@ Keycloak olapps realm for local development.
 Mirrors the production olapps.py structure but:
   - Skips Vault secrets (stores OIDC credentials as plain k8s Secrets instead)
   - Skips production SAML/OIDC org federation (real MIT Touchstone, B2B orgs)
-  - Disables verify_email (Mailpit is available but we want frictionless login)
   - Includes fake-touchstone and okta-test IdPs (same as CI/QA branch)
   - Skips all Vault-dependent resources
 
@@ -34,6 +33,8 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     learn_ai_client_secret: Output,
     mitxonline_client_secret: Output,
     unified_ecommerce_client_secret: Output,
+    *,
+    verify_email: bool = True,
 ) -> None:
     """
     Create the olapps Keycloak realm for local development.
@@ -73,8 +74,9 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         reset_password_allowed=True,
         login_with_email_allowed=True,
         registration_email_as_username=True,
-        # Disabled for local dev — avoids email verification friction.
-        verify_email=False,
+        # Mirrors production; Mailpit captures the verification email locally.
+        # Override locally via the verify_email Pulumi config (see __main__.py).
+        verify_email=verify_email,
         password_policy=(  # pragma: allowlist secret  # noqa: S106
             "length(8) and notUsername and notEmail"
         ),
@@ -131,7 +133,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
 
     for alias, default in [
         ("CONFIGURE_TOTP", False),
-        ("VERIFY_EMAIL", False),  # disabled for local dev
+        ("VERIFY_EMAIL", verify_email),
         # UPDATE_EMAIL was removed in Keycloak 26 — omit to avoid validation error.
         ("UPDATE_PASSWORD", False),
     ]:
