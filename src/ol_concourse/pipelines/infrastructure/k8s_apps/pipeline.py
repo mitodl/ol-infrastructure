@@ -165,6 +165,9 @@ pipeline_params = {
         build_target="production",
         settings_dir="odl_video",
     ),
+    "ol-analytics-api": AppPipelineParams(
+        app_name="ol-analytics-api",
+    ),
 }
 
 
@@ -391,6 +394,10 @@ def _build_image_job(
                 "CONTEXT": git_repo_resource.name,
                 "DOCKERFILE": f"{git_repo_resource.name}/{dockerfile_path}",
                 "BUILD_ARG_GIT_REF": "((.:git_ref))",
+                # Some Dockerfiles (e.g. ol-analytics-api) declare ARG GIT_SHA
+                # instead of the GIT_REF convention above; pass both so either
+                # naming picks up the git ref. Docker ignores unused build args.
+                "BUILD_ARG_GIT_SHA": "((.:git_ref))",
                 "PROGRESS": "plain",
                 **additional_build_params,
             },
@@ -506,6 +513,10 @@ def _build_release_image_job(
                 "CONTEXT": main_repo.name,
                 "DOCKERFILE": f"{main_repo.name}/{dockerfile_path}",
                 "BUILD_ARG_GIT_REF": "((.:git_ref))",
+                # Some Dockerfiles (e.g. ol-analytics-api) declare ARG GIT_SHA
+                # instead of the GIT_REF convention above; pass both so either
+                # naming picks up the git ref. Docker ignores unused build args.
+                "BUILD_ARG_GIT_SHA": "((.:git_ref))",
                 "BUILD_ARG_RELEASE_VERSION": "((.:release_version))",
                 "PROGRESS": "plain",
                 **additional_build_params,
