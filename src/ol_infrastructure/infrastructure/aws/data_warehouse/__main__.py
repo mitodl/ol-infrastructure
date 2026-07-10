@@ -111,9 +111,13 @@ data_landing_zone_bucket = OLBucket(
         sse_algorithm="aws:kms",
         bucket_key_enabled=True,
         tags=aws_config.tags,
-        # Data landing zone is write-heavy ingest storage: safe for archive tiers.
-        intelligent_tiering_archive_access_days=90,
-        intelligent_tiering_deep_archive_access_days=180,
+        # Archive/deep-archive tiers disabled: Airbyte's source-s3 connector
+        # full-scans and re-opens every historical object in this bucket on
+        # every sync, and archived objects raise InvalidObjectState until
+        # explicitly restored. Revisit once sources here move to incremental
+        # (dlt) extraction that doesn't re-read old files.
+        intelligent_tiering_archive_access_days=None,
+        intelligent_tiering_deep_archive_access_days=None,
     ),
     opts=ResourceOptions(
         aliases=[
