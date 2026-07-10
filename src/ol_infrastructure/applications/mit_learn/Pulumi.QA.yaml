@@ -74,7 +74,7 @@ config:
     MITOL_NEW_USER_LOGIN_URL: "https://rc.learn.mit.edu/onboarding"
     MITOL_SUPPORT_EMAIL: "odl-learn-rc-support@mit.edu" # Need to verify
     MITX_ONLINE_BASE_URL: "https://rc.mitxonline.mit.edu/"
-    MITX_ONLINE_COURSES_API_URL: "https://rc.mitxonline.mit.edu/api/v2/courses/"
+    MITX_ONLINE_COURSES_API_URL: "https://rc.mitxonline.mit.edu/api/internal/courses/"
     MITX_ONLINE_PROGRAMS_API_URL: "https://rc.mitxonline.mit.edu/api/v2/programs/"
     XPRO_CATALOG_API_URL: "https://rc.xpro.mit.edu/api/programs/"
     XPRO_COURSES_API_URL: "https://rc.xpro.mit.edu/api/courses/"
@@ -96,6 +96,7 @@ config:
     OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/logs"
     OTEL_METRIC_EXPORT_INTERVAL: "60000"
     OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT: "128"
+    
     OPENSEARCH_INDEX: "mitlearn-rc"
     OPENSEARCH_SHARD_COUNT: 2
     OPENSEARCH_URL: "https://search-opensearch-mitlearn-qa-254ozvoip3e2ywfx5lsch5w2uu.us-east-1.es.amazonaws.com"
