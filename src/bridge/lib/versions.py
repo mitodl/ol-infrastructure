@@ -36,7 +36,7 @@ TIKA_CHART_VERSION = "3.2.2"
 # renovate: datasource=helm depName=openlit packageName=openlit registryUrl=https://openlit.github.io/helm
 OPENLIT_CHART_VERSION = "1.20.0"
 # renovate: datasource=helm depName=apisix packageName=apisix registryUrl=https://apache.github.io/apisix-helm-chart
-APISIX_CHART_VERSION = "2.15.0"
+APISIX_CHART_VERSION = "2.16.0"
 # renovate: datasource=helm depName=aws-load-balancer-controller packageName=aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts
 AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION = "3.4.1"
 # renovate: datasource=helm depName=aws-node-termination-handler packageName=aws-node-termination-handler registryUrl=https://aws.github.io/eks-charts
@@ -102,7 +102,7 @@ MARIMO_OPERATOR_VERSION = "v0.3.0"
 # Renovate is configured above to bump this automatically on the first tagged release.
 MARIMO_JUPYTERLAB_VERSION = "latest"
 # renovate: datasource=helm depName=k8s-monitoring packageName=k8s-monitoring registryUrl=https://grafana.github.io/helm-charts
-GRAFANA_K8S_MONITORING_CHART_VERSION = "4.2.0"
+GRAFANA_K8S_MONITORING_CHART_VERSION = "4.2.1"
 # renovate: datasource=helm depName=dcgm-exporter packageName=dcgm-exporter registryUrl=https://nvidia.github.io/dcgm-exporter/helm-charts
 NVIDIA_DCGM_EXPORTER_CHART_VERSION = "4.8.2"
 # renovate: datasource=helm depName=nvidia-device-plugin packageName=nvidia-device-plugin registryUrl=https://nvidia.github.io/k8s-device-plugin
@@ -118,12 +118,16 @@ TYPESENSE_OPERATOR_CHART_VERSION = "0.4.1"
 # renovate: datasource=helm depName=vertical-pod-autoscaler packageName=vertical-pod-autoscaler registryUrl=https://kubernetes.github.io/autoscaler
 VPA_CHART_VERSION = "0.10.0"
 # renovate: datasource=docker depName=toolhive-operator-crds packageName=ghcr.io/stacklok/toolhive/toolhive-operator-crds
-TOOLHIVE_OPERATOR_CRDS_CHART_VERSION = "0.33.0"
+TOOLHIVE_OPERATOR_CRDS_CHART_VERSION = "0.34.0"
 # renovate: datasource=docker depName=toolhive-operator packageName=ghcr.io/stacklok/toolhive/toolhive-operator
-TOOLHIVE_OPERATOR_CHART_VERSION = "0.33.0"
+TOOLHIVE_OPERATOR_CHART_VERSION = "0.34.0"
 # renovate: datasource=docker depName=mcp-grafana packageName=grafana/mcp-grafana
-MCP_GRAFANA_VERSION = "0.17.0"
+MCP_GRAFANA_VERSION = "0.17.1"
 # ToolHive-built npx wrapper image for the Sentry MCP server (getsentry/sentry-mcp
 # self-hosted stdio mode). Tag tracks the dockyard build, not the upstream npm pkg.
 # renovate: datasource=docker depName=sentry-mcp-server packageName=ghcr.io/stacklok/dockyard/npx/sentry-mcp-server
 MCP_SENTRY_VERSION = "0.33.0"
+# ToolHive-built npx wrapper image for the Context7 MCP server (upstash/context7
+# stdio mode). Tag tracks the dockyard build, not the upstream npm pkg.
+# renovate: datasource=docker depName=context7 packageName=ghcr.io/stacklok/dockyard/npx/context7
+MCP_CONTEXT7_VERSION = "2.2.4"

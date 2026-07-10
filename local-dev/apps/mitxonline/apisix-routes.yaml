@@ -76,7 +76,7 @@ spec:
     plugins:
     - name: openid-connect
       enable: true
-      secretRef: ol-mitxonline-oidc  # pragma: allowlist secret
+      secretRef: ol-mitxonline-oidc     # pragma: allowlist secret
       config:
         discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
         use_jwks: true
@@ -88,7 +88,7 @@ spec:
         logout_path: "/logout/oidc"
         post_logout_redirect_uri: "https://mitxonline.mit.dev/logout/"
         session:
-          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+          secret: "local-dev-oidc-session-secret-32chars!"     # pragma: allowlist secret
           cookie:
             domain: ".mitxonline.mit.dev"
             lifetime: 1209600
@@ -135,7 +135,7 @@ spec:
     plugins:
     - name: openid-connect
       enable: true
-      secretRef: ol-mitxonline-oidc  # pragma: allowlist secret
+      secretRef: ol-mitxonline-oidc     # pragma: allowlist secret
       config:
         discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
         use_jwks: true
@@ -147,7 +147,7 @@ spec:
         logout_path: "/logout/oidc"
         post_logout_redirect_uri: "https://mitxonline.mit.dev/logout/"
         session:
-          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+          secret: "local-dev-oidc-session-secret-32chars!"     # pragma: allowlist secret
           cookie:
             domain: ".mitxonline.mit.dev"
             lifetime: 1209600
@@ -175,7 +175,7 @@ spec:
     plugins:
     - name: openid-connect
       enable: true
-      secretRef: ol-mitxonline-oidc  # pragma: allowlist secret
+      secretRef: ol-mitxonline-oidc     # pragma: allowlist secret
       config:
         discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
         use_jwks: true
@@ -187,7 +187,7 @@ spec:
         logout_path: "/logout/oidc"
         post_logout_redirect_uri: "https://mitxonline.mit.dev/logout/"
         session:
-          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+          secret: "local-dev-oidc-session-secret-32chars!"     # pragma: allowlist secret
           cookie:
             domain: ".mitxonline.mit.dev"
             lifetime: 1209600
@@ -197,3 +197,55 @@ spec:
           id_token: true
           user: true
         unauth_action: auth
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Learn → mitxonline API proxy (mirrors production).
+# In production this is
+# mitxonline_apisix_route_prefix in
+# src/ol_infrastructure/applications/mitxonline/__main__.py.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: mitxonline-learn-proxy-route
+  namespace: mitxonline
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: passauth
+    priority: 0
+    match:
+      hosts:
+      - api.learn.mit.dev
+      paths:
+      - "/mitxonline/*"
+    backends:
+    - serviceName: mitxonline-webapp
+      servicePort: 8010
+    plugin_config_name: mitxonline-shared-plugins
+    plugins:
+    - name: proxy-rewrite
+      enable: true
+      config:
+        regex_uri:
+        - "^/mitxonline/(.*)"
+        - "/$1"
+    - name: openid-connect
+      enable: true
+      # Same mitlearn client as the learn route (must match for session/token
+      # refresh); secretRef avoids a second inlined copy of the secret.
+      secretRef: ol-mitlearn-oidc     # pragma: allowlist secret
+      config:
+        discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
+        realm: olapps
+        use_jwks: true
+        bearer_only: false
+        introspection_endpoint_auth_method: client_secret_post
+        scope: "openid profile email ol-profile"
+        ssl_verify: false
+        renew_access_token_on_expiry: true
+        # No cookie name/domain override → default name "session" on host
+        # api.learn.mit.dev, matching the learn route that issued the cookie.
+        session:
+          secret: "local-dev-oidc-session-secret-32chars!"     # pragma: allowlist secret
+        unauth_action: pass

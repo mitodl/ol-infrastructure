@@ -51,7 +51,7 @@ spec:
         - name: NEXT_PUBLIC_MITOL_AXIOS_WITH_CREDENTIALS
           value: "true"
         - name: NEXT_PUBLIC_MITX_ONLINE_BASE_URL
-          value: "https://mitxonline.mit.dev"
+          value: "https://api.learn.mit.dev/mitxonline"
         - name: NEXT_PUBLIC_MITX_ONLINE_LEGACY_BASE_URL
           value: "https://mitxonline.mit.dev"
         - name: NEXT_PUBLIC_MITX_ONLINE_CSRF_COOKIE_NAME

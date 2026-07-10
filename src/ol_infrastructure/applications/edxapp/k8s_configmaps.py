@@ -533,17 +533,6 @@ def create_k8s_configmaps(  # noqa: PLR0915
         )
         cms_general_config_content["SEGMENT_IO"] = False
 
-    # TEMPORARY (mitx-qa testing): speed up Canvas due-date sync from the
-    # plugin's hourly default to every 5 minutes so Canvas changes appear
-    # quickly in Studio. Revert once Canvas due-date testing is complete.
-    if stack_info.env_prefix == "mitx" and stack_info.env_suffix == "qa":
-        cms_general_config_content["CELERYBEAT_SCHEDULE"] = {
-            "sync_canvas_due_dates": {
-                "task": "ol_openedx_canvas_integration.cms_tasks.sync_canvas_due_dates_for_all_courses",
-                "schedule": 300,  # seconds; 5 minutes (plugin default is hourly)
-            },
-        }
-
     cms_general_config_content["FEATURES"] = cms_features
 
     cms_general_config_map = kubernetes.core.v1.ConfigMap(
@@ -593,7 +582,7 @@ def create_k8s_configmaps(  # noqa: PLR0915
 
     # LMS general configuration
     lms_general_config_name = "81-lms-general-config-yaml"
-    lms_general_config_content = {
+    lms_general_config_content: dict[str, Any] = {
         "ACCOUNT_MICROFRONTEND_URL": None,
         "ACE_CHANNEL_DEFAULT_EMAIL": "django_email",
         "ACE_CHANNEL_TRANSACTIONAL_EMAIL": "django_email",
@@ -607,7 +596,7 @@ def create_k8s_configmaps(  # noqa: PLR0915
         "AUDIT_CERT_CUTOFF_DATE": None,
         "AUTH_DOCUMENTATION_URL": "http://course-catalog-api-guide.readthedocs.io/en/latest/authentication/index.html",
         "BULK_EMAIL_ROUTING_KEY_SMALL_JOBS": "edx.lms.core.default",
-        "COMMUNICATIONS_MICROFRONTEND_URL": "/communications",
+        "COMMUNICATIONS_MICROFRONTEND_URL": f"https://{edxapp_config.require_object('domains')['lms']}/communications",
         "CONTACT_MAILING_ADDRESS": "SET-ME-PLEASE",
         "CREDIT_HELP_LINK_URL": "",
         "DCS_SESSION_COOKIE_SAMESITE": "None",
@@ -723,6 +712,21 @@ def create_k8s_configmaps(  # noqa: PLR0915
             "common.djangoapps.third_party_auth.lti.LTIAuthBackend",
         ]
         # mitxonline has no LEARNER_HOME_MICROFRONTEND_URL
+
+    # Schedule the Canvas due-date sync every 15 minutes (plugin default is
+    # hourly). The ol_openedx_canvas_integration plugin registers this beat
+    # schedule only in CMS settings, but the sole celery beat scheduler runs
+    # with the LMS settings, so the entry must live in the LMS config and
+    # route explicitly to the CMS worker queue. Excludes mitx-staging, which
+    # has no CANVAS_ACCESS_TOKEN wired.
+    if stack_info.env_prefix == "mitx":
+        lms_general_config_content["CELERYBEAT_SCHEDULE"] = {
+            "sync_canvas_due_dates": {
+                "task": "ol_openedx_canvas_integration.cms_tasks.sync_canvas_due_dates_for_all_courses",
+                "schedule": 900,  # seconds; 15 minutes
+                "options": {"queue": "edx.cms.core.default"},
+            },
+        }
 
     # Assign the deployment-specific FEATURES (already enriched with base config)
     lms_general_config_content["FEATURES"] = deployment_features

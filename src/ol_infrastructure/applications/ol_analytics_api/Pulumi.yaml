@@ -1,0 +1,6 @@
+---
+name: ol-application-ol-analytics-api
+runtime: python
+description: MIT OL Analytics API - B2B multi-tenant analytics gateway over StarRocks
+backend:
+  url: s3://mitol-pulumi-state/

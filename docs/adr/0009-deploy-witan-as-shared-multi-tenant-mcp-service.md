@@ -171,6 +171,39 @@ detail belongs to implementation, not the architectural decision itself.
 - Observability for this class of service doesn't exist yet in either repo —
   greenfield follow-up work, not a blocker for a first internal pilot.
 
+## Addendum (2026-07-08) — point 3's "authentication-only" framing needs revisiting
+
+A capability audit of upstream `stacklok/toolhive` at git tag `v0.33.0` —
+the exact version already pinned as `TOOLHIVE_OPERATOR_CHART_VERSION` /
+`TOOLHIVE_OPERATOR_CRDS_CHART_VERSION` in `src/bridge/lib/versions.py` —
+found that decision point 3's "ToolHive... is authentication-only today"
+overstates the platform's actual capability, though it's an accurate read
+of `toolhive_swe`'s specific configuration:
+
+- ToolHive ships a pluggable authorization framework today, including a
+  Cedar-based authorizer (`stacklok/toolhive/docs/authz.md`, `cedarv1`) wired into `MCPServer`
+  via `MCPAuthzConfig`/`AuthzConfigRef` — not a future capability.
+- ToolHive's RFC 8693 Token Exchange support (`stacklok/toolhive/pkg/oauthproto/tokenexchange/`)
+  is real, tested code wired into the vMCP auth pipeline — this ADR's
+  characterization of it as "a real future capability... explicitly deferred
+  past v1" undersells how implemented it already is.
+- `stacklok/toolhive/docs/middleware.md` documents an "External OIDC provider" auth scenario
+  where the client's JWT is forwarded to the backend MCP container
+  **unmodified** — i.e. per-user identity propagation to a backend
+  `MCPServer` is achievable today via a ToolHive configuration choice, not
+  something requiring a future ToolHive release. `toolhive_swe` simply uses
+  a *different* scenario ("Embedded auth server" → upstream-token-swap,
+  vMCP-scoped JWT only) suited to its own needs.
+
+This doesn't necessarily change the v1 decision (splitting authz between
+ToolHive and omnigraph's own Cedar bundle instead of consolidating on one
+could still be the wrong tradeoff for other reasons — e.g. keeping omnigraph
+as the single authz source of truth). Tracked as an open decision, not
+resolved here: `tk-revisit-adr-0004-adr-0009-per-user-identity-desi-e9005a`
+(agent-kit repo, project `wp-witan-multi-user-service-deployment-dcf6ee`).
+Point 3 above and ADR-0004 (agent-kit) should both be updated once that
+task resolves.
+
 ## Implementation Notes
 
 - **Effort Estimate:** Multi-week — spans a concurrency-behavior spike, witan

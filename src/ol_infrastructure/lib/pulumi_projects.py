@@ -37,6 +37,7 @@ MONGODB_ATLAS = "ol-infrastructure-mongodb-atlas"
 QDRANT_CLOUD = "ol-infrastructure-qdrant-cloud"
 GRAFANA_CLOUD = "ol-infrastructure-grafana-cloud"
 GRAFANA_ALERTING = "ol-infrastructure-grafana-alerting"
+SENTRY = "ol-infrastructure-sentry"
 SFTP = "ol-infrastructure-aws-sftp"
 S3_SITES = "ol-infrastructure-aws-s3"
 GEMINI_API = "ol-infrastructure-gemini-api"
@@ -85,6 +86,7 @@ CELERY_MONITORING = "ol-application-celery-monitoring"
 REDASH = "ol-application-redash"
 LEARN_AI = "ol-application-learn-ai"
 MICROMASTERS = "ol-application-micromasters"
+OL_ANALYTICS_API = "ol-application-ol-analytics-api"
 MITXONLINE = "ol-application-mitxonline"
 B2B_STORAGE = "ol-application-b2b-partners-storage"
 DIGITAL_CREDENTIALS = "ol-application-digital-credentials"
@@ -146,6 +148,7 @@ LEGACY_STACK_REF_PREFIXES: dict[str, str] = {
     MONGODB_ATLAS: "infrastructure.mongodb_atlas",
     QDRANT_CLOUD: "infrastructure.qdrant_cloud",
     GRAFANA_CLOUD: "infrastructure.grafana_cloud",
+    SENTRY: "infrastructure.sentry",
     SFTP: "infrastructure.aws.sftp_servers",
     S3_SITES: "infrastructure.aws.s3_sites",
     # substructure/

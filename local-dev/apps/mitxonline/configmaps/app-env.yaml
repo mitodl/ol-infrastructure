@@ -10,8 +10,6 @@ data:
   MITXONLINE_DOCKER_BASE_URL: "https://mitxonline.mit.dev"
   MITX_ONLINE_DB_DISABLE_SSL: "True"
   MITX_ONLINE_USE_S3: "False"
-  # Must stay False: the production image (see Tiltfile) has no dev deps, so
-  # DEBUG=True would import debug_toolbar → boot crash.
   DEBUG: "False"
   ALLOWED_HOSTS: "*"
   USE_X_FORWARDED_HOST: "True"
@@ -60,8 +58,12 @@ data:
   MAILGUN_SENDER_DOMAIN: "local.dev"
   MAILGUN_KEY: "local-dev-stub-mailgun-key"
   # Required OpenEdX API credentials (stub — OpenEdX integration degraded locally)
-  OPENEDX_API_CLIENT_ID: "local-dev-openedx-client-id"  # pragma: allowlist secret
-  OPENEDX_API_CLIENT_SECRET: "local-dev-openedx-client-secret"  # pragma: allowlist secret
+  OPENEDX_API_CLIENT_ID: "local-dev-openedx-client-id" # pragma: allowlist secret
+  OPENEDX_API_CLIENT_SECRET: "local-dev-openedx-client-secret" # pragma: allowlist secret
 
   # Unified Ecommerce (optional — disable if not running)
   UNIFIED_ECOMMERCE_URL: ""
+
+  # CyberSource sandbox endpoint (paired with the stub creds in secrets.yaml —
+  # see the comment there for why these are needed at all).
+  MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"

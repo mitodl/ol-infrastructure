@@ -31,6 +31,7 @@ config:
   - "https://learn-ai.ol.mit.edu/*"
   - "https://api-learn-ai.ol.mit.edu/*"
   keycloak_realm:olapps-learn-ai-client-roles: ["https://api-learn-ai.ol.mit.edu/*"]
+  keycloak_realm:olapps-ol-analytics-api-redirect-uris: ["https://analytics.odl.mit.edu/*"]
   keycloak_realm:olapps-mitlearn-client-redirect-uris:
   - "https://api.learn.mit.edu/*"
   - "https://learn.mit.edu/*"
@@ -135,3 +136,5 @@ config:
   - https://openlit.ol.mit.edu/*
   keycloak_realm:ol-mit-ldap-bind-password:
     secure: v1:xuY2YgyBZnGNLTMy:ZnmyEmcaAOFd8EsiQX+7uG4rBcyP5QmVbI2HI39kkDllxf2TFRovQA==
+  keycloak_realm:olapps-ol-analytics-api-client-secret:
+    secure: v1:iFYB4lyZL2yEzN9/:zVNvb12vZLSLJBS6rNfuCS0yUnhsexlw4SXM9D1v59Ox2MBtks4WYu/9IdHi7xDuLMcWcTGS7Ds=

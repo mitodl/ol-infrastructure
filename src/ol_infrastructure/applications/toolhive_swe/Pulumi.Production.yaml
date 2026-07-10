@@ -17,3 +17,6 @@ config:
   toolhive_swe:sentry_access_token:
     secure: v1:8DW5qflxWxj4BQzn:GEH2+DWnOZeI6RIVQ4Ay4+8pwq8kFSEvFopN4OX2XdRx4oDIF/3MUTexIHwUpRMbOWDeZdaXvFYeTN0NcZzELDW079XoEfDvz1KoGJ1LlkM1dSwrigkz
   toolhive_swe:sentry_enabled: "true"
+  toolhive_swe:context7_enabled: "true"
+  toolhive_swe:context7_api_key:
+    secure: v1:+EHQSAypsSet/IkB:wNtFOo5pAO1dUtlJFZqWOo93F0r4EOgUA8kV1whv66c0Y54Sbeczbv2W97eek2JphIhJilcRLl4P78g=
