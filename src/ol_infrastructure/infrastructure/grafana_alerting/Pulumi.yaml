@@ -1,0 +1,6 @@
+---
+name: ol-infrastructure-grafana-alerting
+runtime: python
+description: Manage Grafana Cloud alerting and Pingdom uptime checks
+backend:
+  url: s3://mitol-pulumi-state/

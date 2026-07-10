@@ -1,3 +1,5 @@
+"""Concourse pipeline for syncing Grafana alert rules and dashboards."""
+
 from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
@@ -49,16 +51,6 @@ cortex_alert_rules = ssh_git_repo(
     paths=[
         "ci/*",
         "cortex-rules/*",
-    ],
-)
-
-alertmanager_config = ssh_git_repo(
-    Identifier("alertmanager-config"),
-    uri="git@github.com:mitodl/grafana-alerts.git",
-    private_key="((grizzly.ssh_key))",
-    paths=[
-        "ci/*",
-        "alertmanager.yaml",
     ],
 )
 
@@ -283,7 +275,7 @@ dashboards_combined_fragment = PipelineFragment(
 )
 
 alerting_jobs = []
-for tool in ["loki", "cortex", "alertmanager"]:
+for tool in ["loki", "cortex"]:
     # Add a linter step for loki and cortex configurations
     if tool in ["loki", "cortex"]:
         resource_name = f"{tool}-alert-rules"
@@ -361,8 +353,6 @@ for tool in ["loki", "cortex", "alertmanager"]:
             ),
         )
         alerting_jobs.append(linter_job)
-    else:
-        resource_name = f"{tool}-config"
     for stage in ["ci", "qa", "production"]:
         params = {
             "CORTEX_API_KEY": f"((cortextool.cortex-api-key-{stage}))",
@@ -375,33 +365,17 @@ for tool in ["loki", "cortex", "alertmanager"]:
             "ENVIRONMENT_NAME": stage.upper(),
             "RESOURCE_NAME": resource_name,
         }
-        if tool in ["cortex", "loki"]:
-            job_name = f"sync-managed-{tool}-rules-{stage}"
-            interpolate_command = "$RESOURCE_NAME/ci/interpolate_rules_yaml.sh"
-            command = (
-                "cortextool rules sync $RESOURCE_NAME/$RULE_DIRECTORY/*"
-                if tool == "cortex"
-                else "cortextool rules sync --backend=loki $RESOURCE_NAME/$RULE_DIRECTORY/*"  # noqa: E501
-            )
-            directory = f"{tool}-rules"
-            params["CORTEX_ADDRESS"] = f"((cortextool.{tool}-rules-api-address))"
-        else:
-            job_name = f"sync-managed-{tool}-config-{stage}"
-            interpolate_command = "$RESOURCE_NAME/ci/interpolate_alertmanager_yaml.sh"
-            command = "cortextool alertmanager load $RESOURCE_NAME/alertmanager.yaml"
-            directory = ""
-            params["CORTEX_ADDRESS"] = "((cortextool.cortex-amconfig-api-address))"
-            params["CORTEX_API_USER"] = (
-                f"((cortextool.cortex-amconfig-api-user-{stage}))"
-            )
-            params["CORTEX_TENANT_ID"] = (
-                f"((cortextool.cortex-amconfig-api-user-{stage}))"
-            )
-            params["ENVIRONMENT_NAME"] = stage
+        job_name = f"sync-managed-{tool}-rules-{stage}"
+        interpolate_command = "$RESOURCE_NAME/ci/interpolate_rules_yaml.sh"
+        command = (
+            "cortextool rules sync $RESOURCE_NAME/$RULE_DIRECTORY/*"
+            if tool == "cortex"
+            else "cortextool rules sync --backend=loki $RESOURCE_NAME/$RULE_DIRECTORY/*"
+        )
+        directory = f"{tool}-rules"
+        params["CORTEX_ADDRESS"] = f"((cortextool.{tool}-rules-api-address))"
         params["RULE_DIRECTORY"] = directory
         passed_value = [alerting_jobs[-1].name]
-        if tool == "alertmanager" and stage == "ci":
-            passed_value = []
         sync_job = Job(
             name=job_name,
             plan=[
@@ -456,7 +430,6 @@ alerting_combined_fragment = PipelineFragment(
     resources=[
         cortex_alert_rules,
         loki_alert_rules,
-        alertmanager_config,
         slack_notification_resource,
     ],
     jobs=alerting_jobs,
