@@ -10,8 +10,6 @@ data:
   MITXONLINE_DOCKER_BASE_URL: "https://mitxonline.mit.dev"
   MITX_ONLINE_DB_DISABLE_SSL: "True"
   MITX_ONLINE_USE_S3: "False"
-  # Must stay False: the production image (see Tiltfile) has no dev deps, so
-  # DEBUG=True would import debug_toolbar → boot crash.
   DEBUG: "False"
   ALLOWED_HOSTS: "*"
   USE_X_FORWARDED_HOST: "True"
@@ -37,6 +35,14 @@ data:
   KEYCLOAK_REALM_NAME: "olapps"
   KEYCLOAK_DISCOVERY_URL: "https://sso.ol.mit.dev/realms/olapps/.well-known/openid-configuration"
 
+  # Enable the APISIX user middleware: it reads the X-Userinfo header APISIX
+  # injects and authenticates (and auto-creates) the Django user. Defaults to
+  # True (disabled), which leaves every request anonymous. Production sets this.
+  MITOL_APIGATEWAY_DISABLE_MIDDLEWARE: "false"
+  # Required for Django's CSRF origin check on POSTs behind HTTPS (e.g. the
+  # admin login form); defaults to empty, which rejects them with DEBUG=False.
+  CSRF_TRUSTED_ORIGINS: "https://mitxonline.mit.dev,https://learn.mit.dev"
+
   # Valkey
   REDIS_URL: "redis://valkey.local-infra.svc.cluster.local:6379/0"
   CELERY_BROKER_URL: "redis://valkey.local-infra.svc.cluster.local:6379/1"
@@ -52,8 +58,12 @@ data:
   MAILGUN_SENDER_DOMAIN: "local.dev"
   MAILGUN_KEY: "local-dev-stub-mailgun-key"
   # Required OpenEdX API credentials (stub — OpenEdX integration degraded locally)
-  OPENEDX_API_CLIENT_ID: "local-dev-openedx-client-id"  # pragma: allowlist secret
-  OPENEDX_API_CLIENT_SECRET: "local-dev-openedx-client-secret"  # pragma: allowlist secret
+  OPENEDX_API_CLIENT_ID: "local-dev-openedx-client-id" # pragma: allowlist secret
+  OPENEDX_API_CLIENT_SECRET: "local-dev-openedx-client-secret" # pragma: allowlist secret
 
   # Unified Ecommerce (optional — disable if not running)
   UNIFIED_ECOMMERCE_URL: ""
+
+  # CyberSource sandbox endpoint (paired with the stub creds in secrets.yaml —
+  # see the comment there for why these are needed at all).
+  MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"

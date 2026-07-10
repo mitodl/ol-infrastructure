@@ -1,0 +1,5 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgGT9vIHmhnJQOAucs9E443gAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMoE5tOO80MHjF946PAgEQgDvGQKu/IFzuzv3TeTF2PLbXe991bmfd0isGdcs9xPGthKkWsY+uT+9r0s+Rn5HnlAzxGdqdGQDMsXGd0g==
+config:
+  aws:region: us-east-1

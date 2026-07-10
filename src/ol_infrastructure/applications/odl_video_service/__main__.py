@@ -857,7 +857,7 @@ ovs_k8s_app = OLApplicationK8s(
         probe_configs={
             "liveness_probe": kubernetes.core.v1.ProbeArgs(
                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                    path="/nginx-health",
+                    path="/health/liveness/",
                     port=DEFAULT_NGINX_PORT,
                 ),
                 initial_delay_seconds=30,
@@ -867,7 +867,7 @@ ovs_k8s_app = OLApplicationK8s(
             ),
             "readiness_probe": kubernetes.core.v1.ProbeArgs(
                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                    path="/nginx-health",
+                    path="/health/readiness/",
                     port=DEFAULT_NGINX_PORT,
                 ),
                 initial_delay_seconds=15,
@@ -877,7 +877,7 @@ ovs_k8s_app = OLApplicationK8s(
             ),
             "startup_probe": kubernetes.core.v1.ProbeArgs(
                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                    path="/nginx-health",
+                    path="/health/startup/",
                     port=DEFAULT_NGINX_PORT,
                 ),
                 initial_delay_seconds=10,

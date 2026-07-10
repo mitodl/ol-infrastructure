@@ -129,7 +129,13 @@ spec:
       - name: combined-ca
         emptyDir: {}
 ---
-# Celery worker (mitxonline uses a single default queue)
+# Celery worker. Listens on "celery" (Celery's actual default routing key —
+# main/celery.py sets no task_default_queue override) plus "hubspot_sync"
+# (routed there explicitly in main/celery.py), matching production's two
+# celery_worker_configs in mitxonline/__main__.py. A prior version listened on
+# "-Q default" instead, a queue name nothing ever routes to — every task
+# queued via .delay() (e.g. openedx.tasks.create_user_from_id) piled up
+# unconsumed forever.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -170,7 +176,7 @@ spec:
         - main.celery:app
         - worker
         - -Q
-        - default
+        - celery,hubspot_sync
         - -c
         - "2"
         envFrom:

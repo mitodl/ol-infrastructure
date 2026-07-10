@@ -163,7 +163,10 @@ def create_ingress(
                         },
                     },
                     "resources": {
-                        "limits": {"memory": "512Mi"},
+                        # 512Mi OOM-kills APISIX under active OIDC load (JWKS
+                        # cache + sessions), crash-looping the gateway and
+                        # dropping all app auth. 1Gi gives headroom.
+                        "limits": {"memory": "1Gi"},
                     },
                     "autoscaling": {"enabled": False},
                     "replicaCount": 1,

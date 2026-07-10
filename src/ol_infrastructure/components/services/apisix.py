@@ -210,6 +210,12 @@ class OLApisixOIDCConfig(BaseModel):
     }
     oidc_session_cookie_domain: str | None = None
     oidc_session_cookie_lifetime: NonNegativeInt = 0
+    # None leaves lua-resty-session's compiled-in defaults (900s idling /
+    # 3600s rolling) untouched for callers that haven't opted in. 0
+    # explicitly disables that check, deferring to absolute_timeout (see
+    # oidc_session_cookie_lifetime) and the upstream Keycloak SSO session.
+    oidc_session_idling_timeout: NonNegativeInt | None = None
+    oidc_session_rolling_timeout: NonNegativeInt | None = None
     oidc_ssl_verify: bool = True
     oidc_use_session_secret: bool = True
 
@@ -276,6 +282,21 @@ class OLApisixOIDCResources(ComponentResource):
             session_cookie_config.setdefault("session", {}).setdefault("cookie", {})[
                 "lifetime"
             ] = oidc_config.oidc_session_cookie_lifetime
+
+        # Flat session.* keys, per the openid-connect plugin's lua-resty-session
+        # 4.x schema (session.cookie.lifetime above is a deprecated 3.x alias
+        # APISIX maps to absolute_timeout at runtime). Unlike cookie_lifetime,
+        # 0 is a meaningful explicit value here (disables that timeout check),
+        # so these are only emitted when the caller actually set them.
+        if oidc_config.oidc_session_idling_timeout is not None:
+            session_cookie_config.setdefault("session", {})["idling_timeout"] = (
+                oidc_config.oidc_session_idling_timeout
+            )
+
+        if oidc_config.oidc_session_rolling_timeout is not None:
+            session_cookie_config.setdefault("session", {})["rolling_timeout"] = (
+                oidc_config.oidc_session_rolling_timeout
+            )
 
         self.base_oidc_config = {
             "scope": oidc_config.oidc_scope,

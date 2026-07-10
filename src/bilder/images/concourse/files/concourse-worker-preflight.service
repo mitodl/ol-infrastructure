@@ -11,4 +11,4 @@ Type=oneshot
 RemainAfterExit=no
 ExecStart=/usr/local/bin/concourse-worker-preflight
 # Bounded by the script's own internal retry budget; leave headroom above it.
-TimeoutStartSec=240
+TimeoutStartSec=660

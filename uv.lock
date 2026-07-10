@@ -1439,6 +1439,7 @@ dependencies = [
     { name = "pulumi-tls" },
     { name = "pulumi-vault" },
     { name = "pulumiverse-heroku" },
+    { name = "pulumiverse-sentry" },
     { name = "pulumiverse-time" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
@@ -1492,6 +1493,7 @@ requires-dist = [
     { name = "pulumi-tls", specifier = ">=5.0.0,<6" },
     { name = "pulumi-vault", specifier = ">=7,<8" },
     { name = "pulumiverse-heroku", specifier = ">=1.0.3,<2" },
+    { name = "pulumiverse-sentry", specifier = "==0.0.9" },
     { name = "pulumiverse-time", specifier = ">=0.1.1" },
     { name = "pydantic", specifier = ">=2,<3" },
     { name = "pydantic-settings", specifier = ">=2.0.1,<3" },
@@ -2120,6 +2122,20 @@ dependencies = [
     { name = "semver" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f6/eb/1ab9951beee42cb1af9b7164b5d9c60c9348d838c6f229dc49eb62656f86/pulumiverse_heroku-1.0.4.tar.gz", hash = "sha256:6ecc7ea57238e4ec9f9373401a8464a6d712a4f1cebb963c5e65c9ce6c89c501", size = 55873, upload-time = "2025-04-08T10:55:58.355Z" }
+
+[[package]]
+name = "pulumiverse-sentry"
+version = "0.0.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "parver" },
+    { name = "pulumi" },
+    { name = "semver" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6e/72/9f15791e623a757aa319ca0979dbb53a90f2026d243a2ca39f0d0905496a/pulumiverse_sentry-0.0.9.tar.gz", hash = "sha256:a4f0fd2e5248e1fee903af2b5abc61e9073ab621badc935ce0555bfb45303a5e", size = 40228, upload-time = "2024-11-15T11:56:56.375Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/00/cb/0ebafe1922b94924a0998b319824f2b6db7a61e0f63400ffd254ad35fce5/pulumiverse_sentry-0.0.9-py3-none-any.whl", hash = "sha256:259ac657e0b77ce790ebd349b2c622115a8dfa3a55007718c05d766f00a16718", size = 64874, upload-time = "2024-11-15T11:56:54.69Z" },
+]
 
 [[package]]
 name = "pulumiverse-time"

@@ -7,6 +7,7 @@ sources:
     - concourse-worker-spot-watch
     - concourse-worker-lifecycle-hook
     - concourse-worker-reaper
+    - concourse-worker-preflight
 
 transforms:
   parse_concourse_logs:

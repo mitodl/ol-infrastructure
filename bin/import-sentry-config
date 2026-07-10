@@ -1,0 +1,808 @@
+#!/usr/bin/env python
+"""Generate Pulumi code and import data for the MIT Open Learning Sentry org."""
+
+# ruff: noqa: C901, E501, PERF401, PLR0912, PLR0913, S101, SLOT000, T201
+
+from __future__ import annotations
+
+import json
+import re
+from collections import Counter
+from pathlib import Path
+from pprint import pformat
+from time import sleep
+from typing import Any
+from urllib.parse import urlsplit
+
+import cyclopts
+import httpx
+
+from bridge.secrets.sops import read_yaml_secrets
+
+app = cyclopts.App(help=__doc__)
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SENTRY_PROJECT_DIR = REPO_ROOT / "src/ol_infrastructure/infrastructure/sentry"
+DEFAULT_MAIN_PATH = SENTRY_PROJECT_DIR / "__main__.py"
+DEFAULT_IMPORT_PATH = SENTRY_PROJECT_DIR / "sentry_imports.json"
+DEFAULT_SUMMARY_PATH = SENTRY_PROJECT_DIR / "IMPORT_SUMMARY.md"
+SENTRY_API_BASE_URL = "https://sentry.io/api/0"
+RESOURCE_TOKENS = {
+    "organization": "sentry:index/sentryOrganization:SentryOrganization",
+    "team": "sentry:index/sentryTeam:SentryTeam",
+    "project": "sentry:index/sentryProject:SentryProject",
+    "key": "sentry:index/sentryKey:SentryKey",
+    "issue_alert": "sentry:index/sentryIssueAlert:SentryIssueAlert",
+    "metric_alert": "sentry:index/sentryMetricAlert:SentryMetricAlert",
+    "dashboard": "sentry:index/sentryDashboard:SentryDashboard",
+    "github_repository": (
+        "sentry:index/sentryOrganizationRepositoryGithub:"
+        "SentryOrganizationRepositoryGithub"
+    ),
+    "code_mapping": (
+        "sentry:index/sentryOrganizationCodeMapping:SentryOrganizationCodeMapping"
+    ),
+    "plugin": "sentry:index/sentryPlugin:SentryPlugin",
+}
+
+
+class PyExpr(str):
+    """Python expression marker for generated code values."""
+
+    def __repr__(self) -> str:
+        """Render as the bare Python expression, not a quoted string."""
+        return str(self)
+
+
+ORGANIZATION_REF = PyExpr("ORGANIZATION")
+
+
+class SentryApi:
+    """Small Sentry API client with cursor pagination support."""
+
+    def __init__(self, token: str, base_url: str = SENTRY_API_BASE_URL) -> None:
+        """Configure an authenticated HTTP client for the Sentry API."""
+        self.base_url = base_url.rstrip("/")
+        self.client = httpx.Client(
+            headers={"Authorization": f"Bearer {token}"},
+            follow_redirects=True,
+            timeout=60,
+        )
+
+    def close(self) -> None:
+        """Close the underlying HTTP client."""
+        self.client.close()
+
+    def _request(
+        self, path: str, params: dict[str, Any] | None = None
+    ) -> httpx.Response:
+        last_error: httpx.HTTPError | None = None
+        for attempt in range(4):
+            try:
+                url = path if path.startswith("http") else f"{self.base_url}{path}"
+                if params:
+                    return self.client.get(url, params=params)
+                return self.client.get(url)
+            except (
+                httpx.ReadTimeout,
+                httpx.ConnectTimeout,
+                httpx.RemoteProtocolError,
+            ) as err:
+                last_error = err
+                sleep(2**attempt)
+        assert last_error is not None
+        raise last_error
+
+    def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
+        """Fetch a single JSON resource, raising FileNotFoundError on 404."""
+        response = self._request(path, params=params)
+        if response.status_code == httpx.codes.NOT_FOUND:
+            raise FileNotFoundError(path)
+        response.raise_for_status()
+        return response.json()
+
+    def list(self, path: str, params: dict[str, Any] | None = None) -> list[Any]:
+        """Fetch every page of a cursor-paginated Sentry list endpoint."""
+        items: list[Any] = []
+        next_path: str | None = path
+        next_params = dict(params or {})
+        while next_path:
+            response = self._request(next_path, params=next_params)
+            if response.status_code == httpx.codes.NOT_FOUND:
+                return []
+            response.raise_for_status()
+            page = response.json()
+            if not isinstance(page, list):
+                msg = f"Expected list response from {next_path}, got {type(page).__name__}"
+                raise TypeError(msg)
+            items.extend(page)
+            next_path = None
+            next_params = {}
+            for link in response.headers.get("link", "").split(","):
+                if 'rel="next"' in link and 'results="true"' in link:
+                    match = re.search(r"<([^>]+)>", link)
+                    if match:
+                        next_url = match.group(1)
+                        if next_url.startswith("http"):
+                            parsed = urlsplit(next_url)
+                            next_path = parsed.path
+                            if next_path.startswith("/api/0/"):
+                                next_path = next_path.removeprefix("/api/0")
+                            if parsed.query:
+                                next_path = f"{next_path}?{parsed.query}"
+                        else:
+                            next_path = next_url
+        return items
+
+
+def load_sentry_token(secret_path: Path) -> str:
+    """Read the Sentry auth token from a SOPS secret. Never log this value."""
+    secrets = read_yaml_secrets(secret_path)
+    token = secrets.get("auth_token")
+    if not token:
+        msg = f"{secret_path} must contain auth_token"
+        raise ValueError(msg)
+    return str(token)
+
+
+def load_sentry_organization(secret_path: Path) -> str:
+    """Read the Sentry organization slug from a SOPS secret."""
+    account_config = read_yaml_secrets(secret_path)
+    organization = account_config.get("organization")
+    if not organization:
+        msg = f"{secret_path} must contain organization"
+        raise ValueError(msg)
+    return str(organization)
+
+
+def safe_name(*parts: object, max_length: int = 90) -> str:
+    """Join parts into a lowercase, Pulumi-safe resource identifier."""
+    raw = "_".join(str(part) for part in parts if part not in (None, ""))
+    normalized = re.sub(r"[^0-9A-Za-z]+", "_", raw).strip("_").lower()
+    if not normalized:
+        normalized = "resource"
+    if normalized[0].isdigit():
+        normalized = f"r_{normalized}"
+    return normalized[:max_length].rstrip("_")
+
+
+def unique_name(base: str, seen: set[str]) -> str:
+    """Return base, or base suffixed with a counter, guaranteed unique in seen."""
+    candidate = base
+    index = 2
+    while candidate in seen:
+        suffix = f"_{index}"
+        candidate = f"{base[: 90 - len(suffix)]}{suffix}"
+        index += 1
+    seen.add(candidate)
+    return candidate
+
+
+def compact(value: dict[str, Any]) -> dict[str, Any]:
+    """Drop None-valued keys so Pulumi resource args omit unset fields."""
+    return {key: val for key, val in value.items() if val is not None}
+
+
+def issue_alert_rule_items(items: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Normalize Sentry issue-alert rule maps for the provider schema.
+
+    Sentry returns nested settings for some actions, but pulumiverse-sentry 0.0.9
+    models rule items as ``list[map[string]string]``. Stringify every non-string
+    value so Pulumi serialization and provider refresh both succeed.
+    """
+    cleaned: list[dict[str, str]] = []
+    for item in items:
+        cleaned_item: dict[str, str] = {}
+        for key, value in item.items():
+            if key == "name" or value is None:
+                continue
+            if isinstance(value, str):
+                cleaned_item[key] = value
+            else:
+                cleaned_item[key] = json.dumps(value, sort_keys=True)
+        cleaned.append(cleaned_item)
+    return cleaned
+
+
+def metric_trigger_args(triggers: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Convert live Sentry metric-alert triggers into provider trigger args."""
+    trigger_args: list[dict[str, Any]] = []
+    for trigger in triggers:
+        actions = []
+        for action in trigger.get("actions") or []:
+            actions.append(
+                compact(
+                    {
+                        "type": action.get("type"),
+                        "target_type": action.get("targetType"),
+                        "target_identifier": (
+                            str(action.get("targetIdentifier"))
+                            if action.get("targetIdentifier") is not None
+                            else None
+                        ),
+                        "integration_id": action.get("integrationId"),
+                    }
+                )
+            )
+        trigger_args.append(
+            compact(
+                {
+                    "label": trigger.get("label"),
+                    "threshold_type": trigger.get("thresholdType"),
+                    "alert_threshold": trigger.get("alertThreshold"),
+                    "resolve_threshold": trigger.get("resolveThreshold"),
+                    "actions": actions,
+                }
+            )
+        )
+    return trigger_args
+
+
+def dashboard_widgets(widgets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Convert provider-supported dashboard widgets into resource args."""
+    supported_widget_types = {"discover", "issue", "metrics"}
+    widget_args: list[dict[str, Any]] = []
+    for widget in widgets:
+        if widget.get("widgetType") not in supported_widget_types:
+            continue
+        layout = widget.get("layout") or {}
+        queries = []
+        for query in widget.get("queries") or []:
+            queries.append(
+                compact(
+                    {
+                        "name": query.get("name"),
+                        "fields": query.get("fields"),
+                        "columns": query.get("columns"),
+                        "aggregates": query.get("aggregates"),
+                        "conditions": query.get("conditions"),
+                        "field_aliases": query.get("fieldAliases"),
+                        "order_by": query.get("orderby") or query.get("orderBy"),
+                    }
+                )
+            )
+        widget_args.append(
+            compact(
+                {
+                    "title": widget.get("title"),
+                    "display_type": widget.get("displayType"),
+                    "interval": widget.get("interval"),
+                    "widget_type": widget.get("widgetType"),
+                    "limit": widget.get("limit"),
+                    "queries": queries,
+                    "layout": compact(
+                        {
+                            "x": layout.get("x"),
+                            "y": layout.get("y"),
+                            "w": layout.get("w"),
+                            "h": layout.get("h"),
+                            "min_h": layout.get("minH"),
+                        }
+                    )
+                    if layout
+                    else None,
+                }
+            )
+        )
+    return widget_args
+
+
+class PulumiProgram:
+    """Accumulates generated Pulumi resource blocks and their import entries."""
+
+    def __init__(self) -> None:
+        """Start with an empty program, ready to accumulate resource blocks."""
+        self.seen_names: set[str] = set()
+        self.blocks: list[str] = []
+        self.imports: list[dict[str, str]] = []
+        self.counts: Counter[str] = Counter()
+        self.warnings: list[str] = []
+
+    def add_resource(
+        self,
+        kind: str,
+        class_name: str,
+        base_name: str,
+        import_id: str,
+        args: dict[str, Any],
+        opts_name: str = "sentry_opts",
+    ) -> None:
+        """Append a Pulumi resource declaration and its matching import entry."""
+        name = unique_name(base_name, self.seen_names)
+        formatted_items = []
+        for key, value in args.items():
+            value_expr = pformat(value, width=88, sort_dicts=False)
+            if class_name == "SentryIssueAlert" and key in {
+                "actions",
+                "conditions",
+                "filters",
+            }:
+                value_expr = f"cast(Any, {value_expr})"
+            formatted_items.append(f"    {key}={value_expr},")
+        formatted_args = "\n".join(formatted_items)
+        name_comment = "  # pragma: allowlist secret" if kind == "key" else ""
+        block = (
+            f"{name} = sentry.{class_name}(\n"
+            f"    {name!r},{name_comment}\n"
+            f"{formatted_args}\n"
+            f"    opts={opts_name},\n"
+            f")\n"
+        )
+        self.blocks.append(block)
+        self.imports.append(
+            {"type": RESOURCE_TOKENS[kind], "name": name, "id": import_id}
+        )
+        self.counts[kind] += 1
+
+    def render(self) -> str:
+        """Render the full generated __main__.py source as a single string."""
+        header = '''"""Management of Sentry SaaS resources.
+
+This file is generated by ``bin/import-sentry-config`` from live Sentry
+configuration. Do not hand-edit generated resource declarations unless the
+provider cannot model a live Sentry object correctly; document exceptions in
+``IMPORT_SUMMARY.md``.
+"""
+
+# ruff: noqa: E501
+
+from pathlib import Path
+from typing import Any, cast
+
+import pulumi
+import pulumiverse_sentry as sentry
+from pulumi import ResourceOptions
+
+from bridge.secrets.sops import read_yaml_secrets
+
+sentry_secrets = read_yaml_secrets(Path("sentry/account.yaml"))
+ORGANIZATION = sentry_secrets["organization"]
+
+sentry_provider = sentry.Provider(
+    "sentry-provider",
+    token=pulumi.Output.secret(sentry_secrets["auth_token"]),
+)
+sentry_opts = ResourceOptions(provider=sentry_provider, protect=True)
+sentry_issue_alert_opts = ResourceOptions(
+    provider=sentry_provider,
+    protect=True,
+    ignore_changes=["actions", "conditions", "filters"],
+)
+
+# Resource declarations generated from live Sentry configuration.
+'''
+        return header + "\n".join(self.blocks) + "\n"
+
+
+def collect_inventory(api: SentryApi, organization: str) -> dict[str, Any]:
+    """Fetch the full live Sentry inventory for organization from the API."""
+    org = api.get(f"/organizations/{organization}/")
+    teams = api.list(f"/organizations/{organization}/teams/")
+    projects = api.list(f"/organizations/{organization}/projects/")
+    project_details = [
+        api.get(f"/projects/{organization}/{p['slug']}/") for p in projects
+    ]
+    members = api.list(f"/organizations/{organization}/members/")
+    repositories = api.list(f"/organizations/{organization}/repos/")
+    code_mappings = api.list(f"/organizations/{organization}/code-mappings/")
+    dashboards = [
+        api.get(f"/organizations/{organization}/dashboards/{dashboard['id']}/")
+        for dashboard in api.list(f"/organizations/{organization}/dashboards/")
+    ]
+
+    keys: list[dict[str, Any]] = []
+    issue_alerts: list[dict[str, Any]] = []
+    metric_alerts: list[dict[str, Any]] = []
+    plugins: list[dict[str, Any]] = []
+    for project in project_details:
+        slug = project["slug"]
+        project_id = project["id"]
+        for key in api.list(f"/projects/{organization}/{slug}/keys/"):
+            key["projectSlug"] = slug
+            keys.append(key)
+        for rule in api.list(f"/projects/{organization}/{slug}/rules/"):
+            rule["projectSlug"] = slug
+            issue_alerts.append(rule)
+        for alert in api.list(
+            f"/organizations/{organization}/alert-rules/", {"project": project_id}
+        ):
+            # The list payload is usually complete, but fetch detail to avoid losing
+            # trigger/action fields on future Sentry API changes.
+            detail = api.get(
+                f"/organizations/{organization}/alert-rules/{alert['id']}/"
+            )
+            detail["projectSlug"] = slug
+            metric_alerts.append(detail)
+        project_plugins = api.list(f"/projects/{organization}/{slug}/plugins/")
+        for plugin in project_plugins:
+            plugin["projectSlug"] = slug
+            plugins.append(plugin)
+
+    return {
+        "organization": org,
+        "teams": teams,
+        "projects": project_details,
+        "members": members,
+        "repositories": repositories,
+        "code_mappings": code_mappings,
+        "dashboards": dashboards,
+        "keys": keys,
+        "issue_alerts": issue_alerts,
+        "metric_alerts": metric_alerts,
+        "plugins": plugins,
+    }
+
+
+def build_program(inventory: dict[str, Any], organization: str) -> PulumiProgram:
+    """Turn a live Sentry inventory into a generated Pulumi program."""
+    program = PulumiProgram()
+    org = inventory["organization"]
+    program.add_resource(
+        "organization",
+        "SentryOrganization",
+        safe_name("organization", org.get("slug")),
+        organization,
+        compact(
+            {"agree_terms": True, "name": org.get("name"), "slug": org.get("slug")}
+        ),
+    )
+
+    for team in sorted(inventory["teams"], key=lambda item: item["slug"]):
+        program.add_resource(
+            "team",
+            "SentryTeam",
+            safe_name("team", team.get("slug")),
+            f"{organization}/{team['slug']}",
+            compact(
+                {
+                    "organization": ORGANIZATION_REF,
+                    "name": team.get("name"),
+                    "slug": team.get("slug"),
+                }
+            ),
+        )
+
+    for project in sorted(inventory["projects"], key=lambda item: item["slug"]):
+        teams = [team["slug"] for team in project.get("teams", [])]
+        program.add_resource(
+            "project",
+            "SentryProject",
+            safe_name("project", project.get("slug")),
+            f"{organization}/{project['slug']}",
+            compact(
+                {
+                    "organization": ORGANIZATION_REF,
+                    "name": project.get("name"),
+                    "slug": project.get("slug"),
+                    "platform": project.get("platform"),
+                    "teams": teams or None,
+                    "digests_min_delay": project.get("digestsMinDelay"),
+                    "digests_max_delay": project.get("digestsMaxDelay"),
+                    "resolve_age": project.get("resolveAge"),
+                }
+            ),
+        )
+
+    if inventory["members"]:
+        program.warnings.append(
+            f"Skipped {len(inventory['members'])} organization members: "
+            "membership is intentionally left out of Pulumi management and "
+            "continues to be administered directly in Sentry."
+        )
+
+    for repo in sorted(
+        inventory["repositories"], key=lambda item: item.get("name", "")
+    ):
+        provider = (repo.get("provider") or {}).get("id") or repo.get(
+            "provider", {}
+        ).get("key")
+        if provider and "github" not in provider:
+            program.warnings.append(
+                f"Skipped non-GitHub repository {repo.get('name')} with provider {provider}."
+            )
+            continue
+        identifier = repo.get("name") or repo.get("externalSlug")
+        integration_id = repo.get("integrationId")
+        if not identifier or not integration_id:
+            program.warnings.append(
+                f"Skipped repository {repo.get('name') or repo.get('id')} without identifier/integrationId."
+            )
+            continue
+        program.add_resource(
+            "github_repository",
+            "SentryOrganizationRepositoryGithub",
+            safe_name("github_repository", identifier),
+            f"{organization}/{identifier}",
+            compact(
+                {
+                    "organization": ORGANIZATION_REF,
+                    "identifier": identifier,
+                    "integration_id": str(integration_id),
+                }
+            ),
+        )
+
+    for mapping in sorted(inventory["code_mappings"], key=lambda item: item["id"]):
+        program.add_resource(
+            "code_mapping",
+            "SentryOrganizationCodeMapping",
+            safe_name(
+                "code_mapping",
+                mapping.get("projectSlug"),
+                mapping.get("repoName"),
+                mapping.get("id"),
+            ),
+            f"{organization}/{mapping['id']}",
+            compact(
+                {
+                    "organization": ORGANIZATION_REF,
+                    "project_id": str(mapping.get("projectId")),
+                    "repository_id": str(mapping.get("repoId")),
+                    "integration_id": str(mapping.get("integrationId")),
+                    "default_branch": mapping.get("defaultBranch"),
+                    "stack_root": mapping.get("stackRoot"),
+                    "source_root": mapping.get("sourceRoot"),
+                }
+            ),
+        )
+
+    supported_dashboard_widget_types = {"discover", "issue", "metrics"}
+    for dashboard in sorted(inventory["dashboards"], key=lambda item: item["id"]):
+        widgets = dashboard.get("widgets") or []
+        unsupported_widget_types = sorted(
+            {
+                widget.get("widgetType")
+                for widget in widgets
+                if widget.get("widgetType") not in supported_dashboard_widget_types
+            }
+        )
+        if unsupported_widget_types:
+            program.warnings.append(
+                f"Skipped dashboard {dashboard.get('title')} ({dashboard.get('id')}): "
+                "pulumiverse-sentry 0.0.9 only supports dashboard widget types "
+                f"{sorted(supported_dashboard_widget_types)}, found "
+                f"{unsupported_widget_types}."
+            )
+            continue
+        program.add_resource(
+            "dashboard",
+            "SentryDashboard",
+            safe_name("dashboard", dashboard.get("title"), dashboard.get("id")),
+            f"{organization}/{dashboard['id']}",
+            compact(
+                {
+                    "organization": ORGANIZATION_REF,
+                    "title": dashboard.get("title"),
+                    "widgets": dashboard_widgets(widgets),
+                }
+            ),
+        )
+
+    for key in sorted(
+        inventory["keys"], key=lambda item: (item["projectSlug"], item["id"])
+    ):
+        rate_limit = key.get("rateLimit") or {}
+        program.add_resource(
+            "key",
+            "SentryKey",
+            safe_name(
+                "key",
+                key.get("projectSlug"),
+                key.get("label") or key.get("name"),
+                key.get("id"),
+            ),
+            f"{organization}/{key['projectSlug']}/{key['id']}",
+            compact(
+                {
+                    "organization": ORGANIZATION_REF,
+                    "project": key.get("projectSlug"),
+                    "name": key.get("label") or key.get("name"),
+                    "rate_limit_count": rate_limit.get("count"),
+                    "rate_limit_window": rate_limit.get("window"),
+                }
+            ),
+        )
+
+    sentry_app_only_action = (
+        "sentry.rules.actions.notify_event_sentry_app.NotifyEventSentryAppAction"
+    )
+    for alert in sorted(
+        inventory["issue_alerts"], key=lambda item: (item["projectSlug"], item["id"])
+    ):
+        alert_actions = alert.get("actions") or []
+        if alert_actions and all(
+            action.get("id") == sentry_app_only_action for action in alert_actions
+        ):
+            program.warnings.append(
+                f"Skipped issue alert {alert['projectSlug']}/{alert['id']} "
+                f"({alert.get('name')}): rule is driven exclusively by a Sentry-app "
+                "integration action (NotifyEventSentryAppAction) with actionMatch=null. "
+                "Sentry's classic Rules API accepts GET but rejects PUT with 404 for "
+                "these rules, so pulumiverse-sentry 0.0.9 cannot manage them."
+            )
+            continue
+        if alert.get("actionMatch") is None:
+            program.warnings.append(
+                f"Issue alert {alert['projectSlug']}/{alert['id']} has null actionMatch; generated 'any'."
+            )
+        program.add_resource(
+            "issue_alert",
+            "SentryIssueAlert",
+            safe_name(
+                "issue_alert",
+                alert.get("projectSlug"),
+                alert.get("name"),
+                alert.get("id"),
+            ),
+            f"{organization}/{alert['projectSlug']}/{alert['id']}",
+            compact(
+                {
+                    "organization": ORGANIZATION_REF,
+                    "project": alert.get("projectSlug"),
+                    "name": alert.get("name"),
+                    "action_match": alert.get("actionMatch") or "any",
+                    "filter_match": alert.get("filterMatch") or "any",
+                    "frequency": alert.get("frequency"),
+                    "environment": alert.get("environment"),
+                    "conditions": issue_alert_rule_items(alert.get("conditions") or []),
+                    "filters": issue_alert_rule_items(alert.get("filters") or []),
+                    "actions": issue_alert_rule_items(alert.get("actions") or []),
+                }
+            ),
+            opts_name="sentry_issue_alert_opts",
+        )
+
+    if inventory["metric_alerts"]:
+        program.warnings.append(
+            "Skipped metric alerts: pulumiverse-sentry 0.0.9 cannot refresh live "
+            "Sentry metric alerts whose actions contain numeric targetIdentifier "
+            "values (provider JSON unmarshal error)."
+        )
+
+    for plugin in sorted(
+        inventory["plugins"], key=lambda item: (item["projectSlug"], item.get("id", ""))
+    ):
+        plugin_id = plugin.get("id") or plugin.get("slug") or plugin.get("shortName")
+        if not plugin_id:
+            program.warnings.append(
+                f"Skipped plugin without id in project {plugin['projectSlug']}."
+            )
+            continue
+        program.add_resource(
+            "plugin",
+            "SentryPlugin",
+            safe_name("plugin", plugin.get("projectSlug"), plugin_id),
+            f"{organization}/{plugin['projectSlug']}/{plugin_id}",
+            compact(
+                {
+                    "organization": ORGANIZATION_REF,
+                    "project": plugin.get("projectSlug"),
+                    "plugin": plugin_id,
+                    "config": plugin.get("config") or None,
+                }
+            ),
+        )
+
+    return program
+
+
+def render_summary(
+    program: PulumiProgram, inventory: dict[str, Any], organization: str
+) -> str:
+    """Render IMPORT_SUMMARY.md content covering counts, warnings, and usage."""
+    lines = [
+        "# Sentry import summary",
+        "",
+        f"Organization: `{organization}`",
+        "",
+        "## Generated Pulumi resources",
+        "",
+    ]
+    for kind, count in sorted(program.counts.items()):
+        lines.append(f"- `{kind}`: {count}")
+    lines.extend(
+        [
+            "",
+            "## Live inventory counts",
+            "",
+            f"- teams: {len(inventory['teams'])}",
+            f"- projects: {len(inventory['projects'])}",
+            f"- members: {len(inventory['members'])}",
+            f"- repositories: {len(inventory['repositories'])}",
+            f"- code mappings: {len(inventory['code_mappings'])}",
+            f"- dashboards: {len(inventory['dashboards'])}",
+            f"- keys: {len(inventory['keys'])}",
+            f"- issue alerts: {len(inventory['issue_alerts'])}",
+            f"- metric alerts: {len(inventory['metric_alerts'])}",
+            f"- plugins: {len(inventory['plugins'])}",
+            "",
+            "## Warnings and provider caveats",
+            "",
+        ]
+    )
+    if program.warnings:
+        lines.extend(f"- {warning}" for warning in program.warnings)
+    else:
+        lines.append("- None from generation.")
+    lines.extend(
+        [
+            "- Dashboard widget IDs and query IDs are computed-only in the provider and are omitted from generated code.",
+            "- Issue alert action/filter/condition maps are ignored after import because Sentry's issue-alert API/provider refresh currently normalizes imported rule body lists in a way that would otherwise cause destructive drift. `actionMatch` is still managed and null live values are generated as `any`.",
+            "",
+            "## Import command",
+            "",
+            "From `src/ol_infrastructure/infrastructure/sentry`:",
+            "",
+            "```bash",
+            "pulumi stack select Production",
+            "pulumi import --file sentry_imports.json --preview-only",
+            "pulumi import --file sentry_imports.json",
+            "pulumi preview --refresh --diff",
+            "```",
+            "",
+            "The import file contains resource IDs only, not Sentry token values or DSNs.",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
+def _print_generate_result(
+    organization: str,
+    resource_count: int,
+    main_path: Path,
+    import_path: Path,
+    summary_path: Path,
+) -> None:
+    """Print a one-line summary; args are plain counts/slugs/paths, never a token."""
+    print(
+        f"Generated {resource_count} resources for {organization}: "
+        f"{main_path}, {import_path}, {summary_path}"
+    )
+
+
+def _print_inventory_result(organization: str, counts: dict[str, int]) -> None:
+    """Print inventory counts as JSON; args are plain counts/slugs, never a token."""
+    print(json.dumps({"organization": organization, "counts": counts}, indent=2))
+
+
+@app.command
+def generate(
+    secret_path: Path = Path("sentry/account.yaml"),
+    main_path: Path = DEFAULT_MAIN_PATH,
+    import_path: Path = DEFAULT_IMPORT_PATH,
+    summary_path: Path = DEFAULT_SUMMARY_PATH,
+) -> None:
+    """Inventory Sentry and regenerate Pulumi code/import data."""
+    organization = load_sentry_organization(secret_path)
+    api = SentryApi(load_sentry_token(secret_path))
+    try:
+        inventory = collect_inventory(api, organization)
+    finally:
+        api.close()
+    program = build_program(inventory, organization)
+    main_path.write_text(program.render())
+    import_path.write_text(json.dumps({"resources": program.imports}, indent=2) + "\n")
+    summary_path.write_text(render_summary(program, inventory, organization))
+    resource_count = sum(program.counts.values())
+    _print_generate_result(
+        organization, resource_count, main_path, import_path, summary_path
+    )
+
+
+@app.command
+def inventory(secret_path: Path = Path("sentry/account.yaml")) -> None:
+    """Print sanitized live inventory counts without writing files."""
+    organization = load_sentry_organization(secret_path)
+    api = SentryApi(load_sentry_token(secret_path))
+    try:
+        data = collect_inventory(api, organization)
+    finally:
+        api.close()
+    counts = {
+        key: len(value) if isinstance(value, list) else 1 for key, value in data.items()
+    }
+    _print_inventory_result(organization, counts)
+
+
+if __name__ == "__main__":
+    app()

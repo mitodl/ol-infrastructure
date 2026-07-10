@@ -4,6 +4,7 @@ encryptedkey: AQICAHgQalNS7T35ZlcFdhF0QuKeiJAbXMUbm01pjGwHEsjRCgGPbSz7qllaLKSxEZ
 config:
   aws:region: us-east-1
   ocw_site:enable_fastly_shielding: "true"
+  ocw_site:enable_fastly_image_optimization: "true"
   ocw_site:domains:
     draft:
     - draft.ocw.mit.edu

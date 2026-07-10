@@ -13,10 +13,10 @@ Resources:
     149 unchanged
 ```
 
-## Required local workaround
+## Upstream bug and required workaround (now fixed in CI and locally)
 
-Until upstream fixes land, Pulumi operations for this stack require a patched
-`pulumi-resource-terraform-provider` bridge and this environment variable:
+Pulumi operations for this stack require a patched `pulumi-resource-terraform-provider`
+bridge and this environment variable:
 
 ```bash
 export PULUMI_TERRAFORM_VERSION=1.5.0
@@ -31,48 +31,58 @@ The Rootly provider parses that field as semantic version text with
 error calling ConfigureProvider: rpc error: code = Unavailable desc = error reading from server: EOF
 ```
 
-Tracking issues:
+Upstream tracking issues (still open as of this writing — neither project has
+released a fix):
 
 - Rootly provider: <https://github.com/rootlyhq/terraform-provider-rootly/issues/379>
 - Pulumi bridge: <https://github.com/pulumi/pulumi-terraform-bridge/issues/3514>
-- Internal follow-up (blocked by the two issues above): <https://github.com/mitodl/ol-infrastructure/issues/4906>
+- Internal follow-up: <https://github.com/mitodl/ol-infrastructure/issues/4906> (closed —
+  superseded by the CI-side fix below; reopen if the workaround needs revisiting)
 
-## Concourse pipeline is currently non-functional
+**The team decided to patch our own tooling instead of waiting on upstream.** Two
+places now carry the fix:
+
+1. **Local developer machines:** manually patch the `pulumi-resource-terraform-provider`
+   bridge binary (built from a pinned `pulumi-terraform-bridge` commit with a small
+   patch that reads `PULUMI_TERRAFORM_VERSION` instead of hardcoding the bad string),
+   install it at `~/.pulumi/plugins/resource-terraform-provider-v1.1.4/`, and set
+   `PULUMI_TERRAFORM_VERSION=1.5.0`.
+2. **Concourse CI:** [mitodl/ol-concourse#53](https://github.com/mitodl/ol-concourse/pull/53)
+   (merged) adds the same patch to `resources/pulumi/Dockerfile.provisioner` — the
+   actual, current source for the `mitodl/concourse-pulumi-resource-provisioner`
+   image used by every `pulumi-provisioner` Concourse resource in the fleet. (The
+   `mitodl/concourse-pulumi-resource` repo referenced in earlier investigation is
+   archived and only points to `mitodl/ol-concourse` now.) A Renovate custom manager
+   tracks the pinned bridge commit so a human is nudged to revisit this once upstream
+   ships a fix — see that PR for details on why `automerge` is disabled for it.
+
+## Concourse pipeline is now working
 
 The `pulumi-rootly` Concourse pipeline (added in
-[#4905](https://github.com/mitodl/ol-infrastructure/pull/4905)) exists and is wired
-up correctly, but the `deploy-ol-saas-rootly-production` job cannot currently
-complete a `pulumi up`. Triggering it reproduces the exact same upstream bug
-described above:
+[#4905](https://github.com/mitodl/ol-infrastructure/pull/4905)) runs successfully.
+Confirmed via a real production run of `deploy-ol-saas-rootly-production` against
+the patched provisioner image (`mitodl/concourse-pulumi-resource-provisioner:latest`,
+rebuilt from ol-concourse#53):
 
 ```text
-pulumi:pulumi:Stack ol-saas-rootly-Production  warning: refresh operation is using an older version of package 'rootly' than the specified program version: 1.1.4 < 5.16.1
-...
-error: error calling ConfigureProvider: rpc error: code = Unavailable desc = error reading from server: EOF
-(repeated for every rootly:index resource in the stack)
-
 Resources:
-    2 unchanged
-    148 errored
+    ~ 1 updated
+    148 unchanged
 
-Duration: 1s
+Duration: 39s
 ```
 
-The shared `pulumi-provisioner` Concourse resource type (image
-`mitodl/concourse-pulumi-resource-provisioner`, source repo
-`mitodl/concourse-pulumi-resource`, currently **archived**) downloads the stock,
-unpatched Terraform bridge plugin at runtime and does not set
-`PULUMI_TERRAFORM_VERSION`. The local workaround above only exists on individual
-developer machines, not in the CI environment.
+No `ConfigureProvider` errors. The single update was a legitimate, unrelated Rootly-side
+drift (Pingdom's display name), not a provider bug.
 
-**Decision:** we are intentionally not patching the shared
-`mitodl/concourse-pulumi-resource-provisioner` image, since it is used by every
-Pulumi pipeline in the fleet and its source repo is archived. Instead, this stack
-will remain manual-only (`pulumi up` from a developer machine with the patched
-bridge and `PULUMI_TERRAFORM_VERSION=1.5.0`) until the upstream issues are fixed.
-Follow-up tracked in
-[mitodl/ol-infrastructure#4906](https://github.com/mitodl/ol-infrastructure/issues/4906),
-which is blocked by the two upstream issues linked above.
+Getting to this point required an unrelated fix first: the shared Concourse worker
+fleet was flapping (EC2 Spot capacity exhaustion plus a self-terminating preflight
+health check bug), which blocked the `build-ol-concourse-images` pipeline from
+publishing the patched provisioner image at all. That was root-caused and fixed in
+[mitodl/ol-infrastructure#4923](https://github.com/mitodl/ol-infrastructure/pull/4923)
+(worker AMI fix + Auto Scaling Group instance-type diversification). Once the worker
+fleet stabilized, `build-ol-concourse-images/build-and-publish-pulumi-image` was
+re-run successfully and the Rootly pipeline was retried and confirmed working.
 
 ## Imported resources
 

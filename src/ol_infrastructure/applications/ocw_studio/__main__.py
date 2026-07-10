@@ -646,7 +646,11 @@ ocw_studio_k8s_app = OLApplicationK8s(
         ),
         resource_requests={"cpu": "100m", "memory": "1Gi"},
         resource_limits={"memory": "3Gi"},
-        # App lacks health check endpoints so we use nginx's
+        # Reverted from django-health-check probes (#4874): app-side
+        # django-health-check's redis contrib check raises
+        # AttributeError('Redis' object has no attribute 'aclose') against
+        # the app's sync redis client. Revert to /nginx-health until the
+        # app-side fix lands.
         probe_configs={
             "liveness_probe": kubernetes.core.v1.ProbeArgs(
                 http_get=kubernetes.core.v1.HTTPGetActionArgs(

@@ -19,3 +19,13 @@ config:
     secure: v1:W1s0nYDBkpEV40JM:QymgcXBgClBYLifIRSlUjN+eXuMj+7ED2G5VtBakljNtrNgmfkxn+h3kLTFgZo3w7V5UGioKURB8bVCh
   toolhive_swe:redis_password:
     secure: v1:7sgeIumZWARHhmzb:GmKV0tIyXpm7k5d3CcvDGKdd1LSYWLSXUqAAV2XbHEXOYQ8AEIe3yDMAOBuATG3ky6Yl8lS0KHtZn+o6
+  # Grafana Cloud connection for the ``grafana`` MCP backend. Replace the URL with
+  # the Grafana Cloud stack URL and the token placeholder with a real service
+  # account token (scope it least-privilege) by running:
+  #   pulumi config set toolhive_swe:grafana_url -- https://<stack>.grafana.net
+  #   pulumi config set --secret toolhive_swe:grafana_service_account_token -- <token>
+  toolhive_swe:grafana_url: https://mitolci.grafana.net
+  toolhive_swe:grafana_service_account_token:
+    secure: v1:6nOO1ObT6BhUYNC1:OETprMCV7BkNd72WQoV/wRuGLf/CtJUQXEfJvtsMzJL6HXoQPJPhM7K1/pRuYurI6f5h33cqWqp8ZikkxNs=
+  toolhive_swe:sentry_enabled: "false"
+  toolhive_swe:context7_enabled: "false"

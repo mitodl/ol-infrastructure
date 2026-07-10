@@ -81,6 +81,7 @@ from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
 )
+from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
@@ -1583,6 +1584,12 @@ mitlearn_k8s_app_oidc_resources_no_prefix = OLApisixOIDCResources(
         oidc_logout_path="/logout/oidc",
         oidc_post_logout_redirect_uri=f"https://{mitlearn_config.get('api_domain')}/logout/",
         oidc_session_cookie_lifetime=60 * 20160,
+        # Disable APISIX's own idling/rolling checks (which otherwise default
+        # to 15min/60min) so the session envelope lasts the full 14-day
+        # absolute_timeout above, matching the Keycloak SSO session and
+        # browser cookie lifetime instead of expiring early (hq#8416).
+        oidc_session_idling_timeout=0,
+        oidc_session_rolling_timeout=0,
         oidc_use_session_secret=True,
         vault_mount="secret-operations",
         vault_mount_type="kv-v1",
@@ -1599,6 +1606,9 @@ mitlearn_k8s_app_oidc_resources = OLApisixOIDCResources(
         oidc_logout_path="/learn/logout/oidc",
         oidc_post_logout_redirect_uri=f"https://{mitlearn_config.get('api_domain')}/learn/logout/",
         oidc_session_cookie_lifetime=60 * 20160,
+        # See the mitlearn-k8s-no-prefix resources above for why these are 0.
+        oidc_session_idling_timeout=0,
+        oidc_session_rolling_timeout=0,
         oidc_use_session_secret=True,
         vault_mount="secret-operations",
         vault_mount_type="kv-v1",
@@ -1731,6 +1741,47 @@ learn_external_service_apisix_route = OLApisixRoute(
     ),
 )
 
+
+# VPA objects for mit-learn workloads.
+# Webapp has a CPU-based HPA, so VPA must not control CPU (would distort HPA utilization signals).
+# Celery workers and beat are scaled via KEDA (Redis queue depth), so CPU+memory VPA is safe.
+_worker_vpa_bounds = {
+    "min_allowed": {"cpu": "25m", "memory": "128Mi"},
+    "max_allowed": {"cpu": "1000m", "memory": "3Gi"},
+}
+make_vpa(
+    name="mitlearn-webapp-vpa",
+    namespace=learn_namespace,
+    target_kind="Deployment",
+    target_name=mitlearn_k8s_app.webapp_deployment_name,
+    controlled_resources=["memory"],
+    container_name="mitlearn-app",
+    min_allowed={"memory": "256Mi"},
+    max_allowed={"memory": "4Gi"},
+    opts=ResourceOptions(depends_on=[mitlearn_k8s_app]),
+)
+for _celery_name in mitlearn_k8s_app.celery_deployment_names:
+    make_vpa(
+        name=f"{_celery_name}-vpa",
+        namespace=learn_namespace,
+        target_kind="Deployment",
+        target_name=_celery_name,
+        controlled_resources=["cpu", "memory"],
+        container_name="celery-worker",
+        **_worker_vpa_bounds,
+        opts=ResourceOptions(depends_on=[mitlearn_k8s_app]),
+    )
+if mitlearn_k8s_app.beat_deployment_name:
+    make_vpa(
+        name=f"{mitlearn_k8s_app.beat_deployment_name}-vpa",
+        namespace=learn_namespace,
+        target_kind="Deployment",
+        target_name=mitlearn_k8s_app.beat_deployment_name,
+        controlled_resources=["cpu", "memory"],
+        container_name="celery-beat",
+        **_worker_vpa_bounds,
+        opts=ResourceOptions(depends_on=[mitlearn_k8s_app]),
+    )
 
 export(
     "mit_learn",
