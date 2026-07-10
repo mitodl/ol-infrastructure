@@ -422,7 +422,7 @@ def test_config_hash_annotation_absent_without_sources():
 
 @pulumi.runtime.test
 def test_config_hash_annotation_present_with_config_hash_inputs():
-    """config_hash_inputs produces a config-hash annotation on the webapp pod template."""
+    """config_hash_inputs must produce a config-hash annotation."""
     cfg = _base_config(
         application_name="myapp", config_hash_inputs={"secret-version": "1"}
     )
