@@ -204,6 +204,47 @@ resolved here: `tk-revisit-adr-0004-adr-0009-per-user-identity-desi-e9005a`
 Point 3 above and ADR-0004 (agent-kit) should both be updated once that
 task resolves.
 
+## Resolution (2026-07-10) — configure `toolhive_witan` for JWT-forward; keep authz split as-is
+
+`tk-revisit-adr-0004-adr-0009-per-user-identity-desi-e9005a` is resolved as:
+**`toolhive_witan`'s `MCPServer`/`VirtualMCPServer` should be configured with
+ToolHive's "External OIDC provider" auth scenario, not `toolhive_swe`'s
+"Embedded auth server" scenario. ToolHive's Cedar authorizer and RFC 8693
+token exchange are not adopted.**
+
+- **Why JWT-forward, not token-swap.** `toolhive_swe` uses the embedded
+  broker because its backends (fetch/grafana/sentry) are third-party
+  `MCPServer`s that only accept static injected config — there's nothing on
+  the backend side that could consume a forwarded per-user JWT anyway, so a
+  vMCP-scoped swap token is the right (and only) fit there. `toolhive_witan`
+  is different: witan's own FastMCP process already validates a per-request
+  JWT and derives an actor id from `sub` (agent-kit ADR-0004 D1/D2, PR #84).
+  Configuring `toolhive_witan` with the "External OIDC provider" scenario
+  means ToolHive forwards the client's genuine Keycloak JWT unmodified —
+  which is precisely the input D1's `JWTVerifier` expects. This is a
+  `toolhive_witan` Pulumi-stack config choice (which auth scenario /
+  `MCPAuthzConfig` to set), not new code in either repo.
+- **Why not RFC 8693 token exchange.** Exchange re-mints a token signed by
+  ToolHive's own exchange service, making ToolHive the identity boundary
+  witan trusts instead of Keycloak directly — contradicts ADR-0004 D1's
+  explicit choice to validate against Keycloak's own JWKS. Exchange is the
+  better tool for `toolhive_swe`-style scope-narrowing across third-party
+  backends, not for witan.
+- **Why not ToolHive's Cedar authorizer.** It authorizes MCP tool calls using
+  JWT claims with no knowledge of witan's own domain model (repo/team/
+  node-type scoping). Splitting authz across ToolHive's `cedarv1` and
+  omnigraph's own Cedar bundle (ADR-0002, agent-kit) would mean keeping two
+  policy surfaces in sync for a benefit nobody has identified yet — omnigraph
+  stays the single authz source of truth for v1. Revisit only if a concrete
+  need for transport-layer pre-filtering (e.g. rejecting a tool call before
+  it reaches witan at all) shows up.
+- **Follow-up.** `tk-ol-infrastructure-toolhive-witan-pulumi-stack-e843b3`
+  (this repo) is updated to specify the "External OIDC provider" scenario
+  explicitly, replacing its prior "fall back to direct OIDC validation if the
+  broker proves limiting" hedge — the broker was confirmed closed for
+  `toolhive_swe`'s scenario, but `toolhive_witan` isn't stuck with that
+  scenario. See agent-kit ADR-0004's matching Resolution addendum.
+
 ## Implementation Notes
 
 - **Effort Estimate:** Multi-week — spans a concurrency-behavior spike, witan
