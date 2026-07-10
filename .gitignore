@@ -27,3 +27,6 @@ pyinfra-debug.log
 .pulumi
 local-dev/certs/
 tilt_config.json
+
+# Generated Concourse pipeline JSON emitted by pipeline.py/meta.py __main__ blocks
+definition.json
