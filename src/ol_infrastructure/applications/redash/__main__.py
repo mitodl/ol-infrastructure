@@ -10,7 +10,6 @@
 - Provision a set of EC2 instances from a pre-built AMI with the configuration
   and code for Redash
 - Provision an AWS load balancer and connect the deployed EC2 instances
-- Create a DNS record for the deployed load balancer
 """
 
 import base64
@@ -24,7 +23,7 @@ import pulumi_vault as vault
 import yaml
 from pulumi import Config, export
 from pulumi.config import get_config
-from pulumi_aws import ec2, get_caller_identity, iam, route53
+from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT, DEFAULT_POSTGRES_PORT
 from bridge.secrets.sops import read_yaml_secrets
@@ -58,9 +57,7 @@ redash_config = Config("redash")
 stack_info = parse_stack()
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 consul_stack = make_stack_reference(projects.CONSUL_INFRA, f"data.{stack_info.name}")
-dns_stack = make_stack_reference(projects.DNS, "default")
 policy_stack = make_stack_reference(projects.POLICIES, "default")
-mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
 redash_environment = f"data-{stack_info.env_suffix}"
@@ -602,16 +599,6 @@ worker_as_setup = OLAutoScaling(
     lt_config=worker_lt_config,
     tg_config=None,
     lb_config=None,
-)
-
-fifteen_minutes = 60 * 15
-redash_domain = route53.Record(
-    f"redash-{stack_info.env_suffix}-service-domain",
-    name=redash_config.require("domain"),
-    type="CNAME",
-    ttl=fifteen_minutes,
-    records=[web_as_setup.load_balancer.dns_name],
-    zone_id=mitodl_zone_id,
 )
 
 export(
