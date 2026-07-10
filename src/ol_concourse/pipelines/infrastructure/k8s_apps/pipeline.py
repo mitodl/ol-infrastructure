@@ -15,6 +15,7 @@ from ol_concourse.lib.models.pipeline import (
     Input,
     Job,
     LoadVarStep,
+    Output,
     Pipeline,
     Platform,
     PutStep,
@@ -71,8 +72,20 @@ class AppPipelineParams(BaseModel):
             that key via POST /purge/{surrogate_key}.  Use a scoped key when some cached assets
             (e.g. content-addressed static files) must survive a deployment.
         repo_name (Optional[str]): The name of the git repository. Defaults to app_name if not provided.
-        github_repo (Optional[str]): The GitHub repository in ``owner/repo`` form used for release resources
-            and GitHub Deployments. Defaults to ``mitodl/{repo_name}``.
+        version_file (Optional[str]): Repo-relative path to a standalone VERSION file (e.g.
+            "VERSION"); if set, overrides the Django settings grep. Only used by the legacy
+            (release-candidate/release branch) workflow.
+        enable_ci_deploy (bool): Whether to deploy the main-branch image to a CI Pulumi
+            stack. Defaults to True. Set False for apps with no CI stack (e.g. a
+            dependency is unavailable on the CI cluster) -- the main-branch image is
+            still built and published, just not deployed. Only used by the legacy workflow.
+        github_repo (Optional[str]): The GitHub repository in ``owner/repo`` form used for release
+            resources and GitHub Deployments. Defaults to ``mitodl/{repo_name}``. Only used by the
+            release-resource workflow.
+        use_release_resource_workflow (bool): Opt an app into the modernized GitHub
+            Release/Deployment-based pipeline shape instead of the legacy release-candidate/
+            release git-branch pattern. Defaults to False so existing apps are unaffected;
+            flip per-app once each has been validated on the new shape.
     """
 
     app_name: str
@@ -83,9 +96,14 @@ class AppPipelineParams(BaseModel):
     fastly_purge_scope: str = "purge_all"
     repo_name: str | None = None
     repo_main_branch: str = "main"
+    repo_rc_branch: str = "release-candidate"
+    repo_release_branch: str = "release"
     ol_infra_branch: str = "main"
     settings_dir: str = "main"
+    version_file: str | None = None
+    enable_ci_deploy: bool = True
     github_repo: str | None = None
+    use_release_resource_workflow: bool = False
 
     @model_validator(mode="after")
     def set_repo_name(self) -> "AppPipelineParams":
@@ -130,6 +148,7 @@ pipeline_params = {
         build_target="production",
         repo_main_branch="master",
         settings_dir="micromasters",
+        version_file="VERSION",
     ),
     "mitxonline": AppPipelineParams(app_name="mitxonline", build_target="production"),
     "mit-learn-nextjs": AppPipelineParams(
@@ -167,8 +186,524 @@ pipeline_params = {
     ),
     "ol-analytics-api": AppPipelineParams(
         app_name="ol-analytics-api",
+        use_release_resource_workflow=True,
     ),
 }
+
+
+def _define_pulumi_resources(
+    app_name: str, ol_infra_repo_name: str
+) -> tuple[ResourceType, str]:
+    """Define the Pulumi resource type and resource."""
+    pulumi_resource_type = pulumi_provisioner_resource()
+    pulumi_resource = pulumi_provisioner(
+        name=Identifier(f"pulumi-ol-application-{app_name}"),
+        project_name=f"ol-application-{app_name}",
+        project_path=(
+            f"{ol_infra_repo_name}/src/ol_infrastructure/applications/"
+            f"{app_name.replace('-', '_')}"
+        ),
+    )
+    return pulumi_resource_type, pulumi_resource
+
+
+def _define_fastly_resources(
+    app_name: str,
+    fastly_domains: dict[str, str],
+) -> tuple[ResourceType, Resource, Resource, Resource]:
+    """Define the Fastly resource type and per-environment cache-purge resources.
+
+    :param app_name: The application name; used as a prefix for resource identifiers.
+    :param fastly_domains: Mapping of environment name to the hostname served by the
+        Fastly service for that environment (e.g.
+        ``{"ci": "next.ci.learn.mit.edu", "qa": "next.rc.learn.mit.edu",
+        "production": "next.learn.mit.edu"}``).  The Fastly resource resolves the
+        service ID automatically from the domain at pipeline runtime — no opaque
+        service IDs need to be stored in Vault.
+    :returns: A 4-tuple of
+        ``(resource_type, ci_resource, qa_resource, production_resource)``.
+    """
+    fastly_resource_type = ResourceType(
+        name=Identifier("fastly"),
+        type=REGISTRY_IMAGE,
+        source=RegistryImage(repository="mitodl/concourse-fastly-resource"),
+    )
+
+    def _env_resource(env: str) -> Resource:
+        return Resource(
+            name=Identifier(f"{app_name}-fastly-{env}"),
+            type="fastly",
+            check_every="never",
+            source={
+                "api_token": "((fastly.fastly_api_token))",
+                "domain": fastly_domains[env],
+            },
+        )
+
+    return (
+        fastly_resource_type,
+        _env_resource("ci"),
+        _env_resource("qa"),
+        _env_resource("production"),
+    )
+
+
+def _fastly_purge_params(purge_scope: str) -> dict[str, str]:
+    """Return ``put`` params for a Fastly purge step.
+
+    :param purge_scope: Either ``"purge_all"`` to purge the entire service cache
+        (``mode: purge_all``), or a surrogate-key string (e.g. ``"html-pages"``)
+        to purge only objects tagged with that key (``mode: surrogate_key``).
+    :returns: A ``params`` dict suitable for a Concourse :class:`PutStep`.
+    """
+    if purge_scope == "purge_all":
+        return {"mode": "purge_all"}
+    return {"mode": "surrogate_key", "surrogate_key": purge_scope}
+
+
+def _ensure_ecr_repository_step(ecr_registry_image_resource: Resource) -> TaskStep:
+    """Return the shared 'create the ECR repo if it does not exist yet' step."""
+    return TaskStep(
+        task=Identifier("ensure-ecr-repository"),
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=AnonymousResource(
+                type="registry-image",
+                source={
+                    "repository": dockerhub_ecr_image_uri("amazon/aws-cli"),
+                    "tag": "latest",
+                    "aws_region": ECR_REGION,
+                },
+            ),
+            params={
+                "REPO_NAME": ecr_registry_image_resource.source["repository"],
+                "AWS_PAGER": "cat",
+            },
+            run=Command(
+                path="sh",
+                args=[
+                    "-exc",
+                    "aws ecr describe-repositories --repository-names ${REPO_NAME} || aws ecr create-repository --repository-name ${REPO_NAME}",
+                ],
+            ),
+        ),
+    )
+
+
+# ============================================================================
+# Legacy workflow: release-candidate/release git-branch pattern.
+# Used by every app except those with use_release_resource_workflow=True.
+# ============================================================================
+
+
+def _define_git_resources_legacy(
+    app_name: str,
+    repo_name: str | None,
+    repo_main_branch: str,
+    repo_rc_branch: str,
+    repo_release_branch: str,
+    ol_infra_branch: str,
+) -> tuple[Resource, Resource, Resource, Resource]:
+    """Define the git resources needed for the legacy pipeline."""
+    main_repo = git_repo(
+        name=Identifier(f"{app_name}-{repo_main_branch}"),
+        uri=f"https://github.com/mitodl/{repo_name}",
+        branch=repo_main_branch,
+    )
+
+    release_candidate_repo = git_repo(
+        name=Identifier(f"{app_name}-{repo_rc_branch}"),
+        uri=f"https://github.com/mitodl/{repo_name}",
+        branch=repo_rc_branch,
+        fetch_tags=True,
+    )
+
+    release_repo = git_repo(
+        name=Identifier(f"{app_name}-{repo_release_branch}"),
+        uri=f"http://github.com/mitodl/{repo_name}",
+        branch=repo_release_branch,
+        fetch_tags=True,
+        tag_regex=r"v[0-9]+\.[0-9]+\.[0-9]+",  # examples v0.24.0, v0.26.3
+    )
+
+    ol_infra_repo = git_repo(
+        Identifier(f"ol-infra-{app_name}"),
+        uri="https://github.com/mitodl/ol-infrastructure",
+        branch=ol_infra_branch,
+        paths=[
+            f"src/ol_infrastructure/applications/{app_name.replace('-', '_')}",
+            *PULUMI_WATCHED_PATHS,
+        ],
+    )
+    return (
+        main_repo,
+        release_candidate_repo,
+        release_repo,
+        ol_infra_repo,
+    )
+
+
+def _define_registry_image_resources_legacy(
+    app_name: str,
+) -> tuple[Resource, Resource, Resource, Resource]:
+    """Define the registry image resources needed for the legacy pipeline."""
+    dockerhub_kwargs = {
+        "username": "((dockerhub.username))",
+        "password": "((dockerhub.password))",
+    }
+    ecr_kwargs = {"ecr_region": "us-east-1"}
+    # CI image resource - tagged 'latest' and git short ref, pushed by main build
+    docker_ci_image = registry_image(
+        name=Identifier(f"{app_name}-app-ci-image"),
+        image_repository=f"mitodl/{app_name}-app",
+        check_every="never",  # Only updated via put step from main build job
+        **dockerhub_kwargs,
+    )
+    # RC/Production image resource - tagged with version, pushed by RC build
+    docker_rc_image = registry_image(
+        name=Identifier(f"{app_name}-app-release-image"),
+        image_repository=f"mitodl/{app_name}-app",
+        check_every="never",  # Only updated via put step from rc build job
+        image_tag=None,
+        # While check_every=never, defining tag_regex helps Concourse UI understand
+        # resource versions
+        tag_regex=r"[0-9]+\.[0-9]+\.[0-9]+",  # examples 0.24.0, 0.26.3
+        sort_by_creation=True,
+        **dockerhub_kwargs,
+    )
+
+    ecr_ci_image = registry_image(
+        name=Identifier(f"{app_name}-app-ci-ecr-image"),
+        image_repository=f"mitodl/{app_name}-app",
+        check_every="never",  # Only updated via put step from main build job
+        **ecr_kwargs,
+    )
+    ecr_rc_image = registry_image(
+        name=Identifier(f"{app_name}-app-release-ecr-image"),
+        image_repository=f"mitodl/{app_name}-app",
+        check_every="never",  # Only updated via put step from rc build job
+        image_tag=None,
+        # While check_every=never, defining tag_regex helps Concourse UI understand
+        # resource versions
+        tag_regex=r"[0-9]+\.[0-9]+\.[0-9]+",  # examples 0.24.0, 0.26.3
+        sort_by_creation=True,
+        **ecr_kwargs,
+    )
+    return docker_ci_image, docker_rc_image, ecr_ci_image, ecr_rc_image
+
+
+def _build_image_job_legacy(
+    app_name: str,
+    branch_type: str,
+    dockerfile_path: str,
+    git_repo_resource: Resource,
+    dockerhub_registry_image_resource: Resource,
+    ecr_registry_image_resource: Resource,
+    build_target: str | None = None,
+    django_settings_dir: str = "main",
+    repo_version_file: str | None = None,
+) -> Job:
+    """Generate an image build job for a specific branch type (main or rc)."""
+    job_name = f"build-{app_name}-image-from-{branch_type}"
+    version_var = f"{branch_type}_version"
+    version_output_dir = f"{branch_type}_version"
+    version_file = f"{version_output_dir}/version"
+
+    plan = [
+        GetStep(get=git_repo_resource.name, trigger=True),
+    ]
+
+    # Add version extraction steps only for release_candidate
+    version_args = {}
+    additional_build_params = {}
+    if build_target:
+        additional_build_params = {
+            "TARGET": build_target,
+        }
+    if branch_type == "release_candidate":
+        plan.extend(
+            [
+                TaskStep(
+                    task=Identifier("fetch-rc-version"),
+                    config=TaskConfig(
+                        platform=Platform.linux,
+                        image_resource=AnonymousResource(
+                            type=REGISTRY_IMAGE,
+                            source={
+                                "repository": dockerhub_ecr_image_uri("alpine"),
+                                "tag": "latest",
+                                "aws_region": ECR_REGION,
+                            },
+                        ),
+                        inputs=[Input(name=git_repo_resource.name)],
+                        outputs=[Output(name=Identifier(version_output_dir))],
+                        run=Command(
+                            path="sh",
+                            args=[
+                                "-c",
+                                rf"""cat {git_repo_resource.name}/{repo_version_file} > {version_file}"""
+                                if repo_version_file
+                                else rf"""grep -E -o '^VERSION = "[0-9]+\.[0-9]+\.[0-9]+"$' {git_repo_resource.name}/{django_settings_dir}/settings.py | cut -d\" -f2 > {version_file}""",
+                            ],
+                        ),
+                    ),
+                ),
+                LoadVarStep(
+                    load_var=version_var,
+                    file=version_file,
+                    reveal=True,
+                ),
+            ]
+        )
+        version_args = {"BUILD_ARG_RELEASE_VERSION": f"((.:{version_var}))"}
+
+    plan.extend(
+        [
+            LoadVarStep(
+                load_var="git_ref",
+                file=f"{git_repo_resource.name}/.git/ref",
+                reveal=True,
+            ),
+            container_build_task(
+                inputs=[Input(name=git_repo_resource.name)],
+                build_parameters={
+                    "CONTEXT": git_repo_resource.name,
+                    "DOCKERFILE": f"{git_repo_resource.name}/{dockerfile_path}",
+                    "BUILD_ARG_GIT_REF": "((.:git_ref))",
+                    # Some Dockerfiles (e.g. ol-analytics-api) declare ARG GIT_SHA
+                    # instead of the GIT_REF convention above; pass both so either
+                    # naming picks up the git ref. Docker ignores unused build args.
+                    "BUILD_ARG_GIT_SHA": "((.:git_ref))",
+                    **version_args,
+                    **additional_build_params,
+                },
+                build_args=[],
+            ),
+        ]
+    )
+
+    put_params: dict[str, Any] = {
+        "image": "image/image.tar",
+        "additional_tags": f"./{git_repo_resource.name}/.git/short_ref",
+    }
+    if branch_type != "main":
+        put_params["version"] = f"((.:{version_var}))"
+        put_params["bump_aliases"] = True
+
+    plan.append(_ensure_ecr_repository_step(ecr_registry_image_resource))
+    plan.append(PutStep(put=dockerhub_registry_image_resource.name, params=put_params))
+    plan.append(PutStep(put=ecr_registry_image_resource.name, params=put_params))
+
+    return Job(name=Identifier(job_name), build_log_retention={"builds": 10}, plan=plan)
+
+
+def _build_legacy_app_pipeline(
+    app_name: str, pipeline_parameters: AppPipelineParams
+) -> Pipeline:
+    """Generate the legacy release-candidate/release-branch pipeline for an app."""
+    (
+        main_repo,
+        release_candidate_repo,
+        release_repo,
+        ol_infra_repo,
+    ) = _define_git_resources_legacy(
+        app_name=app_name,
+        repo_name=pipeline_parameters.repo_name,
+        repo_main_branch=pipeline_parameters.repo_main_branch,
+        repo_rc_branch=pipeline_parameters.repo_rc_branch,
+        repo_release_branch=pipeline_parameters.repo_release_branch,
+        ol_infra_branch=pipeline_parameters.ol_infra_branch,
+    )
+    (
+        docker_ci_image,
+        docker_rc_image,
+        app_ci_image,
+        app_rc_image,
+    ) = _define_registry_image_resources_legacy(app_name)
+    pulumi_resource_type, pulumi_resource = _define_pulumi_resources(
+        app_name, ol_infra_repo.name
+    )
+
+    fastly_rtype: ResourceType | None = None
+    fastly_ci: Resource | None = None
+    fastly_qa: Resource | None = None
+    fastly_prod: Resource | None = None
+
+    if pipeline_parameters.purge_fastly_cache and pipeline_parameters.fastly_domains:
+        fastly_rtype, fastly_ci, fastly_qa, fastly_prod = _define_fastly_resources(
+            app_name=app_name,
+            fastly_domains=pipeline_parameters.fastly_domains,
+        )
+
+    main_image_build_job = _build_image_job_legacy(
+        app_name=app_name,
+        branch_type="main",
+        dockerfile_path=pipeline_parameters.dockerfile_path,
+        git_repo_resource=main_repo,
+        dockerhub_registry_image_resource=docker_ci_image,
+        ecr_registry_image_resource=app_ci_image,
+        build_target=pipeline_parameters.build_target,
+        django_settings_dir=pipeline_parameters.settings_dir or "main",
+        repo_version_file=pipeline_parameters.version_file,
+    )
+    rc_image_build_job = _build_image_job_legacy(
+        app_name=app_name,
+        branch_type="release_candidate",
+        dockerfile_path=pipeline_parameters.dockerfile_path,
+        git_repo_resource=release_candidate_repo,
+        dockerhub_registry_image_resource=docker_rc_image,
+        ecr_registry_image_resource=app_rc_image,
+        build_target=pipeline_parameters.build_target,
+        django_settings_dir=pipeline_parameters.settings_dir or "main",
+        repo_version_file=pipeline_parameters.version_file,
+    )
+
+    ci_post_steps: list[GetStep | PutStep | TaskStep] = []
+    if fastly_ci is not None:
+        ci_post_steps.append(
+            PutStep(
+                put=fastly_ci.name,
+                params=_fastly_purge_params(pipeline_parameters.fastly_purge_scope),
+                no_get=True,
+            )
+        )
+
+    # CI Deployment -- skipped entirely for apps with no CI Pulumi stack (e.g. a
+    # hard runtime dependency is unavailable on the CI cluster). The main-branch
+    # image is still built and published above regardless.
+    ci_fragment = (
+        pulumi_job(
+            pulumi_code=ol_infra_repo,
+            stack_name="CI",
+            refresh_stack=True,
+            project_name=f"ol-application-{app_name}",
+            project_source_path=(
+                f"src/ol_infrastructure/applications/{app_name.replace('-', '_')}"
+            ),
+            dependencies=[
+                GetStep(
+                    get=app_ci_image.name,
+                    trigger=True,
+                    passed=[main_image_build_job.name],
+                    params={"skip_download": True},
+                ),
+                LoadVarStep(
+                    load_var="image_digest",
+                    file=f"{app_ci_image.name}/digest",
+                    reveal=True,
+                ),
+            ],
+            additional_post_steps=ci_post_steps,
+            additional_env_vars={
+                f"{app_name.replace('-', '_').upper()}_DOCKER_SHA": "((.:image_digest))",
+            },
+            slack_url_path="eks.slack_url",
+        )
+        if pipeline_parameters.enable_ci_deploy
+        else PipelineFragment(resource_types=[], resources=[], jobs=[])
+    )
+
+    additional_post_steps: dict[int, list[GetStep | PutStep | TaskStep]] = {}
+    if fastly_qa is not None and fastly_prod is not None:
+        purge_params = _fastly_purge_params(pipeline_parameters.fastly_purge_scope)
+        qa_purge_steps: list[GetStep | PutStep | TaskStep] = []
+        qa_purge_steps.append(
+            PutStep(put=fastly_qa.name, params=purge_params, no_get=True)
+        )
+        prod_purge_steps: list[GetStep | PutStep | TaskStep] = []
+        prod_purge_steps.append(
+            PutStep(put=fastly_prod.name, params=purge_params, no_get=True)
+        )
+        additional_post_steps = {0: qa_purge_steps, 1: prod_purge_steps}
+
+    qa_and_production_fragment = pulumi_jobs_chain(
+        refresh_stack=True,
+        pulumi_code=ol_infra_repo,
+        stack_names=["QA", "Production"],
+        project_name=f"ol-application-{app_name}",
+        project_source_path=(
+            f"src/ol_infrastructure/applications/{app_name.replace('-', '_')}"
+        ),
+        additional_post_steps=additional_post_steps,
+        dependencies=[
+            GetStep(
+                get=app_rc_image.name,
+                trigger=True,
+                passed=[rc_image_build_job.name],
+                params={"skip_download": True},
+            ),
+            LoadVarStep(
+                load_var="image_tag", file=f"{app_rc_image.name}/tag", reveal=True
+            ),
+        ],
+        additional_env_vars={
+            f"{app_name.replace('-', '_').upper()}_DOCKER_TAG": "((.:image_tag))",
+        },
+        enable_github_issue_resource=False,
+        slack_url_path="eks.slack_url",
+    )
+
+    # Trigger a production deploy when the release branch is updated
+    qa_and_production_fragment.jobs[-1].plan.insert(
+        0, GetStep(get=release_repo.name, trigger=True)
+    )
+
+    # Make the release-candidate branch code available to the RC
+    # pulumi deployment job similar to how it is available to production
+    qa_and_production_fragment.jobs[0].plan.insert(
+        0, GetStep(get=release_candidate_repo.name, trigger=False)
+    )
+
+    main_branch_container_fragement = PipelineFragment(
+        resources=[main_repo, app_ci_image, docker_ci_image],
+        jobs=[main_image_build_job],
+    )
+
+    release_candidate_container_fragment = PipelineFragment(
+        resources=[release_candidate_repo, app_rc_image, docker_rc_image],
+        jobs=[rc_image_build_job],
+    )
+
+    deployment_resources = [
+        ol_infra_repo,
+        pulumi_resource,
+        release_repo,
+        app_ci_image,  # Needed for CI deployment trigger
+        app_rc_image,  # Needed for QA/Prod deployment trigger
+        docker_ci_image,
+        docker_rc_image,
+        *(
+            [fastly_ci, fastly_qa, fastly_prod]
+            if fastly_ci is not None
+            and fastly_qa is not None
+            and fastly_prod is not None
+            else []
+        ),
+    ]
+
+    ci_deployment_fragment = PipelineFragment(
+        resource_types=[
+            pulumi_resource_type,
+            *ci_fragment.resource_types,
+            *([fastly_rtype] if fastly_rtype else []),
+        ],
+        resources=[*deployment_resources, *ci_fragment.resources],
+        jobs=ci_fragment.jobs,
+    )
+
+    combined_fragment = PipelineFragment.combine_fragments(
+        ci_deployment_fragment,
+        qa_and_production_fragment,
+        main_branch_container_fragement,
+        release_candidate_container_fragment,
+    )
+    return combined_fragment.to_pipeline()
+
+
+# ============================================================================
+# Modernized workflow: GitHub Release resource + GitHub Deployments.
+# Opt in per-app via AppPipelineParams.use_release_resource_workflow.
+# ============================================================================
 
 
 def _define_git_resources(
@@ -177,7 +712,7 @@ def _define_git_resources(
     repo_main_branch: str,
     ol_infra_branch: str,
 ) -> tuple[Resource, Resource]:
-    """Define the git resources needed for the pipeline."""
+    """Define the git resources needed for the release-resource pipeline."""
     main_repo = git_repo(
         name=Identifier(f"{app_name}-{repo_main_branch}"),
         uri=f"https://github.com/mitodl/{repo_name}",
@@ -250,7 +785,7 @@ def _define_release_resources(
 def _define_registry_image_resources(
     app_name: str,
 ) -> tuple[Resource, Resource, Resource, Resource]:
-    """Define the registry image resources needed for the pipeline."""
+    """Define the registry image resources needed for the release-resource pipeline."""
     dockerhub_kwargs = {
         "username": "((dockerhub.username))",
         "password": "((dockerhub.password))",
@@ -296,76 +831,6 @@ def _define_registry_image_resources(
     return docker_ci_image, docker_rc_image, ecr_ci_image, ecr_rc_image
 
 
-def _define_fastly_resources(
-    app_name: str,
-    fastly_domains: dict[str, str],
-) -> tuple[ResourceType, Resource, Resource, Resource]:
-    """Define the Fastly resource type and per-environment cache-purge resources.
-
-    :param app_name: The application name; used as a prefix for resource identifiers.
-    :param fastly_domains: Mapping of environment name to the hostname served by the
-        Fastly service for that environment (e.g.
-        ``{"ci": "next.ci.learn.mit.edu", "qa": "next.rc.learn.mit.edu",
-        "production": "next.learn.mit.edu"}``).  The Fastly resource resolves the
-        service ID automatically from the domain at pipeline runtime — no opaque
-        service IDs need to be stored in Vault.
-    :returns: A 4-tuple of
-        ``(resource_type, ci_resource, qa_resource, production_resource)``.
-    """
-    fastly_resource_type = ResourceType(
-        name=Identifier("fastly"),
-        type=REGISTRY_IMAGE,
-        source=RegistryImage(repository="mitodl/concourse-fastly-resource"),
-    )
-
-    def _env_resource(env: str) -> Resource:
-        return Resource(
-            name=Identifier(f"{app_name}-fastly-{env}"),
-            type="fastly",
-            check_every="never",
-            source={
-                "api_token": "((fastly.fastly_api_token))",
-                "domain": fastly_domains[env],
-            },
-        )
-
-    return (
-        fastly_resource_type,
-        _env_resource("ci"),
-        _env_resource("qa"),
-        _env_resource("production"),
-    )
-
-
-def _fastly_purge_params(purge_scope: str) -> dict[str, str]:
-    """Return ``put`` params for a Fastly purge step.
-
-    :param purge_scope: Either ``"purge_all"`` to purge the entire service cache
-        (``mode: purge_all``), or a surrogate-key string (e.g. ``"html-pages"``)
-        to purge only objects tagged with that key (``mode: surrogate_key``).
-    :returns: A ``params`` dict suitable for a Concourse :class:`PutStep`.
-    """
-    if purge_scope == "purge_all":
-        return {"mode": "purge_all"}
-    return {"mode": "surrogate_key", "surrogate_key": purge_scope}
-
-
-def _define_pulumi_resources(
-    app_name: str, ol_infra_repo_name: str
-) -> tuple[ResourceType, str]:
-    """Define the Pulumi resource type and resource."""
-    pulumi_resource_type = pulumi_provisioner_resource()
-    pulumi_resource = pulumi_provisioner(
-        name=Identifier(f"pulumi-ol-application-{app_name}"),
-        project_name=f"ol-application-{app_name}",
-        project_path=(
-            f"{ol_infra_repo_name}/src/ol_infrastructure/applications/"
-            f"{app_name.replace('-', '_')}"
-        ),
-    )
-    return pulumi_resource_type, pulumi_resource
-
-
 def _build_image_job(
     app_name: str,
     dockerfile_path: str,
@@ -403,31 +868,7 @@ def _build_image_job(
             },
             build_args=[],
         ),
-        TaskStep(
-            task=Identifier("ensure-ecr-repository"),
-            config=TaskConfig(
-                platform=Platform.linux,
-                image_resource=AnonymousResource(
-                    type="registry-image",
-                    source={
-                        "repository": dockerhub_ecr_image_uri("amazon/aws-cli"),
-                        "tag": "latest",
-                        "aws_region": ECR_REGION,
-                    },
-                ),
-                params={
-                    "REPO_NAME": ecr_registry_image_resource.source["repository"],
-                    "AWS_PAGER": "cat",
-                },
-                run=Command(
-                    path="sh",
-                    args=[
-                        "-exc",
-                        "aws ecr describe-repositories --repository-names ${REPO_NAME} || aws ecr create-repository --repository-name ${REPO_NAME}",
-                    ],
-                ),
-            ),
-        ),
+        _ensure_ecr_repository_step(ecr_registry_image_resource),
         PutStep(
             put=dockerhub_registry_image_resource.name,
             params={
@@ -523,31 +964,7 @@ def _build_release_image_job(
             },
             build_args=[],
         ),
-        TaskStep(
-            task=Identifier("ensure-ecr-repository"),
-            config=TaskConfig(
-                platform=Platform.linux,
-                image_resource=AnonymousResource(
-                    type="registry-image",
-                    source={
-                        "repository": dockerhub_ecr_image_uri("amazon/aws-cli"),
-                        "tag": "latest",
-                        "aws_region": ECR_REGION,
-                    },
-                ),
-                params={
-                    "REPO_NAME": ecr_registry_image_resource.source["repository"],
-                    "AWS_PAGER": "cat",
-                },
-                run=Command(
-                    path="sh",
-                    args=[
-                        "-exc",
-                        "aws ecr describe-repositories --repository-names ${REPO_NAME} || aws ecr create-repository --repository-name ${REPO_NAME}",
-                    ],
-                ),
-            ),
-        ),
+        _ensure_ecr_repository_step(ecr_registry_image_resource),
         PutStep(put=dockerhub_registry_image_resource.name, params=put_params),
         PutStep(put=ecr_registry_image_resource.name, params=put_params),
     ]
@@ -585,16 +1002,10 @@ def _build_abandon_release_job(
     )
 
 
-def build_app_pipeline(app_name: str) -> Pipeline:
-    """Generate the full Concourse pipeline for a given application.
-
-    This function orchestrates all the resources and jobs required to build, test,
-    and deploy a dockerized application to Kubernetes.
-    """
-    pipeline_parameters = pipeline_params.get(app_name) or AppPipelineParams(
-        app_name=app_name
-    )
-    # Define Resources
+def _build_release_resource_app_pipeline(
+    app_name: str, pipeline_parameters: AppPipelineParams
+) -> Pipeline:
+    """Generate the modernized GitHub Release/Deployment-based pipeline for an app."""
     main_repo, ol_infra_repo = _define_git_resources(
         app_name=app_name,
         repo_name=pipeline_parameters.repo_name,
@@ -611,7 +1022,6 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         app_name, ol_infra_repo.name
     )
 
-    # Optionally define Fastly resources for post-deployment cache purging
     fastly_rtype: ResourceType | None = None
     fastly_ci: Resource | None = None
     fastly_qa: Resource | None = None
@@ -635,7 +1045,6 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         repo_main_branch=pipeline_parameters.repo_main_branch,
     )
 
-    # Define Build Jobs
     main_image_build_job = _build_image_job(
         app_name=app_name,
         dockerfile_path=pipeline_parameters.dockerfile_path,
@@ -659,9 +1068,6 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         release_res=release_res,
     )
 
-    # Define Deployment Jobs
-
-    # Build CI post-steps list with the correct union type so Pyright is satisfied
     ci_post_steps: list[GetStep | PutStep | TaskStep] = []
     if fastly_ci is not None:
         ci_post_steps.append(
@@ -814,8 +1220,6 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         slack_url_path="eks.slack_url",
     )
 
-    # Group into Fragments
-
     main_branch_container_fragement = PipelineFragment(
         resources=[main_repo, app_ci_image, docker_ci_image],
         jobs=[main_image_build_job],
@@ -835,7 +1239,6 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         jobs=[release_image_build_job, abandon_release_job],
     )
 
-    # Consolidate resources for deployment fragments
     deployment_resources = [
         ol_infra_repo,
         pulumi_resource,
@@ -862,7 +1265,6 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         jobs=ci_fragment.jobs,
     )
 
-    # Combine all fragments
     combined_fragment = PipelineFragment.combine_fragments(
         ci_deployment_fragment,
         qa_and_production_fragment,
@@ -870,6 +1272,21 @@ def build_app_pipeline(app_name: str) -> Pipeline:
         release_container_fragment,
     )
     return combined_fragment.to_pipeline()
+
+
+def build_app_pipeline(app_name: str) -> Pipeline:
+    """Generate the full Concourse pipeline for a given application.
+
+    Dispatches to the modernized release-resource pipeline shape for apps that
+    have opted in via ``AppPipelineParams.use_release_resource_workflow``, and
+    to the legacy release-candidate/release-branch shape for everyone else.
+    """
+    pipeline_parameters = pipeline_params.get(app_name) or AppPipelineParams(
+        app_name=app_name
+    )
+    if pipeline_parameters.use_release_resource_workflow:
+        return _build_release_resource_app_pipeline(app_name, pipeline_parameters)
+    return _build_legacy_app_pipeline(app_name, pipeline_parameters)
 
 
 if __name__ == "__main__":
