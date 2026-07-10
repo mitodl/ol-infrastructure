@@ -39,8 +39,8 @@ grafana_provider = grafana.Provider(
 resource_opts = ResourceOptions(provider=grafana_provider)
 
 alertmanager.create(grafana_secrets, resource_opts)
-metric_rules.create(stack_info, resource_opts)
-log_rules.create(stack_info, resource_opts)
+metric_rules.create(resource_opts)
+log_rules.create(resource_opts)
 
 # Pingdom checks are account-wide — only create from the production stack.
 if is_production:

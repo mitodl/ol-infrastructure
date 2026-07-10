@@ -36,13 +36,11 @@ from ol_infrastructure.infrastructure.grafana_alerting.metric_rules import (
     eks_general,
     linux_host,
 )
-from ol_infrastructure.lib.pulumi_helper import StackInfo
 
-_MIMIR_DATASOURCE_UID: dict[str, str] = {
-    "ci": "grafanacloud-mitolci-prom",
-    "qa": "grafanacloud-mitolqa-prom",
-    "production": "grafanacloud-mitolproduction-prom",
-}
+# Every Grafana Cloud stack provisions its own Mimir datasource with this same
+# generic UID. The per-stack slug (e.g. grafanacloud-mitolci-prom) is only the
+# datasource *name*; referencing it as a UID fails with "data source not found".
+_MIMIR_DATASOURCE_UID = "grafanacloud-prom"
 
 
 def _rule_data(expr: str, mimir_uid: str) -> list[alerting.RuleGroupRuleDataArgs]:
@@ -93,9 +91,9 @@ def _rule_data(expr: str, mimir_uid: str) -> list[alerting.RuleGroupRuleDataArgs
     ]
 
 
-def create(stack_info: StackInfo, resource_opts: ResourceOptions) -> None:
+def create(resource_opts: ResourceOptions) -> None:
     """Create all Grafana metric alert rule groups."""
-    mimir_uid = _MIMIR_DATASOURCE_UID[stack_info.env_suffix]
+    mimir_uid = _MIMIR_DATASOURCE_UID
 
     alerts_folder = Folder(
         "infrastructure-alerts-folder",

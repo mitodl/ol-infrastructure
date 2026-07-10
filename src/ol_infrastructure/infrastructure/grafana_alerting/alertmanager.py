@@ -97,7 +97,9 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
         "grafana-notification-policy",
         contact_point="oblivion",
         group_bies=["alertname", "environment"],
-        group_wait="60s",
+        # "1m", not "60s" — Grafana normalizes durations to the largest unit and
+        # a mismatched spelling shows as a perpetual diff on every preview.
+        group_wait="1m",
         group_interval="5m",
         repeat_interval="4h",
         policies=[
