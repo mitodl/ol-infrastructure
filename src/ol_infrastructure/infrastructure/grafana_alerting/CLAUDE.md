@@ -14,11 +14,17 @@ ruled out due to cost (~$3,200/month at 4 probe regions × 1-minute polling cade
 
 There are three separate Grafana Cloud stacks, one per environment:
 
-| Stack | Secrets file | Mimir (metrics) UID | Loki (logs) UID |
-|---|---|---|---|
-| CI | `src/bridge/secrets/grafana_cloud/api.ci.yaml` | `grafanacloud-mitolci-prom` | `grafanacloud-mitolci-logs` |
-| QA | `src/bridge/secrets/grafana_cloud/api.qa.yaml` | `grafanacloud-mitolqa-prom` | `grafanacloud-mitolqa-logs` |
-| Production | `src/bridge/secrets/grafana_cloud/api.production.yaml` | `grafanacloud-mitolproduction-prom` | `grafanacloud-mitolproduction-logs` |
+| Stack | Secrets file |
+|---|---|
+| CI | `src/bridge/secrets/grafana_cloud/api.ci.yaml` |
+| QA | `src/bridge/secrets/grafana_cloud/api.qa.yaml` |
+| Production | `src/bridge/secrets/grafana_cloud/api.production.yaml` |
+
+Every stack provisions its own Mimir and Loki datasources under the same
+generic UIDs: `grafanacloud-prom` (Mimir) and `grafanacloud-logs` (Loki).
+The per-stack slugs shown in the UI (e.g. `grafanacloud-mitolci-prom`) are
+datasource *names*, not UIDs — using them as UIDs fails with
+"data source not found".
 
 Each stack has its own Mimir metrics backend, its own Alertmanager, and its own
 set of Grafana-managed alert rules. The Pulumi stacks (CI, QA, Production) map
@@ -94,8 +100,8 @@ needed is passed as a parameter.
 
 ```python
 alertmanager.create(grafana_secrets: dict, resource_opts: ResourceOptions)
-metric_rules.create(stack_info: StackInfo, resource_opts: ResourceOptions)
-log_rules.create(stack_info: StackInfo, resource_opts: ResourceOptions)
+metric_rules.create(resource_opts: ResourceOptions)
+log_rules.create(resource_opts: ResourceOptions)
 pingdom_checks.create(api_token: Input[str], integration_ids: list[int])
 ```
 

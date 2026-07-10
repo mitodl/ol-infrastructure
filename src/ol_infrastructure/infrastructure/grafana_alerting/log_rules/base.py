@@ -48,13 +48,11 @@ from ol_infrastructure.infrastructure.grafana_alerting.log_rules import (
     mit_learn,
     vault,
 )
-from ol_infrastructure.lib.pulumi_helper import StackInfo
 
-_LOKI_DATASOURCE_UID: dict[str, str] = {
-    "ci": "grafanacloud-mitolci-logs",
-    "qa": "grafanacloud-mitolqa-logs",
-    "production": "grafanacloud-mitolproduction-logs",
-}
+# Every Grafana Cloud stack provisions its own Loki datasource with this same
+# generic UID. The per-stack slug (e.g. grafanacloud-mitolci-logs) is only the
+# datasource *name*; referencing it as a UID fails with "data source not found".
+_LOKI_DATASOURCE_UID = "grafanacloud-logs"
 
 
 def _rule_data(expr: str, loki_uid: str) -> list[alerting.RuleGroupRuleDataArgs]:
@@ -64,6 +62,9 @@ def _rule_data(expr: str, loki_uid: str) -> list[alerting.RuleGroupRuleDataArgs]
         alerting.RuleGroupRuleDataArgs(
             ref_id="A",
             datasource_uid=loki_uid,
+            # Grafana copies queryType from the model up to the data envelope;
+            # omitting it here shows as a perpetual diff on every preview.
+            query_type="range",
             relative_time_range=alerting.RuleGroupRuleDataRelativeTimeRangeArgs(
                 from_=600, to=0
             ),
@@ -105,9 +106,9 @@ def _rule_data(expr: str, loki_uid: str) -> list[alerting.RuleGroupRuleDataArgs]
     ]
 
 
-def create(stack_info: StackInfo, resource_opts: ResourceOptions) -> None:
+def create(resource_opts: ResourceOptions) -> None:
     """Create all Grafana log-based alert rule groups."""
-    loki_uid = _LOKI_DATASOURCE_UID[stack_info.env_suffix]
+    loki_uid = _LOKI_DATASOURCE_UID
 
     log_alerts_folder = Folder(
         "log-alerts-folder",
