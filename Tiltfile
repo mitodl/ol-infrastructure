@@ -225,6 +225,18 @@ local_resource(
     resource_deps=["local-infra-apps"],
 )
 
+# Re-assert the realm's browser/first-broker-login flow bindings. The Keycloak
+# provider resets them to built-in defaults whenever the keycloak.Realm resource
+# is updated for an unrelated reason (see script comment) — Pulumi never
+# reapplies the Bindings resource to fix it since its own inputs didn't change.
+local_resource(
+    "kc-fix-flow-bindings",
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} {script}".format(rd=root_domain, script="{}/local-dev/scripts/kc-fix-flow-bindings.sh".format(config.main_dir)),
+    deps=["./local-dev/scripts/kc-fix-flow-bindings.sh"],
+    labels=["infra"],
+    resource_deps=["local-infra-apps"],
+)
+
 # ---------------------------------------------------------------------------
 # Per-app deployment + manual seed resources
 # ---------------------------------------------------------------------------
