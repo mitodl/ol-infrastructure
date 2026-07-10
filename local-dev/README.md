@@ -58,6 +58,7 @@ Install these tools before running setup:
 | Helm | ≥ 3.14 | `brew install helm` |
 | mkcert | ≥ 1.4 | `brew install mkcert` |
 | Pulumi CLI | ≥ 3.x | `brew install pulumi` |
+| uv | ≥ 0.11.x | `brew install uv` |
 
 > **Docker memory:** The cluster runs PostgreSQL, Valkey, APISIX, Keycloak, Qdrant, and up to four Django apps. Allocate at least 8 GB to Docker Desktop (Settings → Resources).
 
