@@ -86,6 +86,11 @@ default_repos_config = {
         "repo": "mitodl/odl-video-service",
         "branch": "master",
     },
+    "ol-analytics-api": {
+        "pipeline": "ol-analytics-api-pipeline",
+        "repo": "mitodl/ol-analytics-api",
+        "branch": "main",
+    },
     "xpro": {
         "pipeline": "xpro-pipeline",
         "repo": "mitodl/mitxpro",
