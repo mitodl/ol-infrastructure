@@ -218,7 +218,7 @@ token exchange are not adopted.**
   the backend side that could consume a forwarded per-user JWT anyway, so a
   vMCP-scoped swap token is the right (and only) fit there. `toolhive_witan`
   is different: witan's own FastMCP process already validates a per-request
-  JWT and derives an actor id from `sub` (agent-kit ADR-0004 D1/D2, PR #84).
+  JWT and derives an actor id from `sub` (agent-kit ADR-0004 D1/D2, [mitodl/agent-kit#84](https://github.com/mitodl/agent-kit/pull/84)).
   Configuring `toolhive_witan` with the "External OIDC provider" scenario
   means ToolHive forwards the client's genuine Keycloak JWT unmodified —
   which is precisely the input D1's `JWTVerifier` expects. This is a
