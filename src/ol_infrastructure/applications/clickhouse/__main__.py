@@ -282,7 +282,9 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
                             **(
                                 {
                                     "metadata": {
-                                        "annotations": {"karpenter.sh/do-not-disrupt": "true"},
+                                        "annotations": {
+                                            "karpenter.sh/do-not-disrupt": "true"
+                                        },
                                     },
                                 }
                                 if replicas == 1
@@ -557,7 +559,9 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                             **(
                                 {
                                     "metadata": {
-                                        "annotations": {"karpenter.sh/do-not-disrupt": "true"},
+                                        "annotations": {
+                                            "karpenter.sh/do-not-disrupt": "true"
+                                        },
                                     },
                                 }
                                 if ch_replicas == 1
