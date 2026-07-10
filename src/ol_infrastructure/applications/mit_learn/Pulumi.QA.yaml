@@ -96,7 +96,7 @@ config:
     OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/logs"
     OTEL_METRIC_EXPORT_INTERVAL: "60000"
     OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT: "128"
-    
+
     OPENSEARCH_INDEX: "mitlearn-rc"
     OPENSEARCH_SHARD_COUNT: 2
     OPENSEARCH_URL: "https://search-opensearch-mitlearn-qa-254ozvoip3e2ywfx5lsch5w2uu.us-east-1.es.amazonaws.com"
