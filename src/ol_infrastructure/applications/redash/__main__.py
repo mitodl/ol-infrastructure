@@ -358,7 +358,7 @@ if redash_config.get_bool("manage_datasources"):
         datasource_config_consul_keys.append(
             consul.KeysKeyArgs(
                 path="redash/datasource_configs/ocw-studio-production/db_host",
-                value=ocw_studio_stack.require_output("ocw_studio_app")["rds_host"],
+                value=ocw_studio_stack.require_output("ocw_studio")["rds_host"],
             )
         )
         datasource_config_consul_keys.append(
@@ -377,7 +377,7 @@ if redash_config.get_bool("manage_datasources"):
         datasource_config_consul_keys.append(
             consul.KeysKeyArgs(
                 path="redash/datasource_configs/micromasters-pg-production/db_host",
-                value=micromasters_stack.require_output("micromasters_app")["rds_host"],
+                value=micromasters_stack.require_output("micromasters")["rds_host"],
             )
         )
     consul.Keys(
