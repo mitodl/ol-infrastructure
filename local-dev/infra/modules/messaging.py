@@ -16,11 +16,14 @@ class MessagingResources:
 def create_messaging(
     _k8s: Callable[..., ResourceOptions],
     local_infra_ns: k8s.core.v1.Namespace,
+    apisix_release: k8s.helm.v3.Release,
+    tls_secret: k8s.core.v1.Secret,
+    mail_hostname: str,
 ) -> MessagingResources:
     """Deploy Mailpit to capture outbound email in local dev.
 
     Prevents broken Keycloak email-verification flows during development.
-    Web UI is accessible at http://mailpit.local-infra.svc.cluster.local:8025.
+    Web UI is exposed at https://{mail_hostname}.
     """
     deployment = k8s.apps.v1.Deployment(
         "mailpit",
@@ -61,6 +64,40 @@ def create_messaging(
             ],
         },
         opts=_k8s(parent=deployment),
+    )
+
+    k8s.apiextensions.CustomResource(
+        "mailpit-apisix-route",
+        api_version="apisix.apache.org/v2",
+        kind="ApisixRoute",
+        metadata={"name": "mailpit-route", "namespace": "local-infra"},
+        spec={
+            "ingressClassName": "apache-apisix",
+            "http": [
+                {
+                    "name": "mailpit",
+                    "match": {
+                        "hosts": [mail_hostname],
+                        "paths": ["/*"],
+                    },
+                    "backends": [{"serviceName": "mailpit", "servicePort": 8025}],
+                }
+            ],
+        },
+        opts=_k8s(parent=local_infra_ns, depends_on=[apisix_release, service]),
+    )
+
+    k8s.apiextensions.CustomResource(
+        "mailpit-apisix-tls",
+        api_version="apisix.apache.org/v2",
+        kind="ApisixTls",
+        metadata={"name": "mailpit-tls", "namespace": "local-infra"},
+        spec={
+            "ingressClassName": "apache-apisix",
+            "hosts": [mail_hostname],
+            "secret": {"name": "local-dev-tls", "namespace": "local-infra"},
+        },
+        opts=_k8s(parent=local_infra_ns, depends_on=[apisix_release, tls_secret]),
     )
 
     return MessagingResources(deployment=deployment, service=service)
