@@ -1,5 +1,6 @@
 """Concourse REST API client for the release bot."""
 
+import asyncio
 import os
 import time
 
@@ -12,6 +13,7 @@ CONCOURSE_PASS = os.environ.get("CONCOURSE_PASSWORD", "")
 
 _token: str | None = None
 _token_expiry: float = 0.0
+_token_lock = asyncio.Lock()
 
 
 async def _get_token() -> str:
@@ -19,24 +21,30 @@ async def _get_token() -> str:
     if _token and time.time() < _token_expiry:
         return _token
 
-    url = f"{CONCOURSE_URL}/sky/issuer/token"
-    data = {
-        "grant_type": "password",
-        "username": CONCOURSE_USER,
-        "password": CONCOURSE_PASS,
-        "scope": "openid profile email federated:id groups",
-    }
-    async with (
-        aiohttp.ClientSession() as session,
-        session.post(url, data=data) as resp,
-    ):
-        resp.raise_for_status()
-        body = await resp.json()
+    async with _token_lock:
+        # Re-check after acquiring the lock: another concurrent caller may
+        # have already refreshed the token while we were waiting.
+        if _token and time.time() < _token_expiry:
+            return _token
 
-    _token = body["access_token"]
-    expires_in = body.get("expires_in", 86400)
-    _token_expiry = time.time() + expires_in - 60  # refresh 60s before expiry
-    return _token
+        url = f"{CONCOURSE_URL}/sky/issuer/token"
+        data = {
+            "grant_type": "password",
+            "username": CONCOURSE_USER,
+            "password": CONCOURSE_PASS,
+            "scope": "openid profile email federated:id groups",
+        }
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(url, data=data) as resp,
+        ):
+            resp.raise_for_status()
+            body = await resp.json()
+
+        _token = body["access_token"]
+        expires_in = body.get("expires_in", 86400)
+        _token_expiry = time.time() + expires_in - 60  # refresh 60s before expiry
+        return _token
 
 
 async def trigger_job(pipeline: str, job: str) -> str:

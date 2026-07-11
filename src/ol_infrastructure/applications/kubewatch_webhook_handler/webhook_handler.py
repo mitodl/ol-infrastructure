@@ -348,9 +348,16 @@ def get_deployment_details(namespace: str, name: str) -> dict[str, Any] | None:
 
 
 def format_slack_message(  # noqa: C901
-    event_data: dict[str, Any], deployment_details: dict[str, Any] | None
+    event_data: dict[str, Any],
+    deployment_details: dict[str, Any] | None,
+    notification_type: str = "",
 ) -> dict[str, Any]:
-    """Format a rich Slack message with deployment details."""
+    """Format a rich Slack message with deployment details.
+
+    notification_type ("start"/"finish"/"") gates the "Promote to Production"
+    button so it only appears on a successful *completion* notification, not
+    on the rollout-started notification or a failed rollout.
+    """
 
     event_type = event_data.get("eventType", "unknown")
     namespace = event_data.get("namespace", "unknown")
@@ -494,7 +501,12 @@ def format_slack_message(  # noqa: C901
     app_name = labels.get("ol.mit.edu/application") or (
         name[:-4] if name.endswith("-app") else name
     )
-    if _is_release_image(image_tag):
+    deployment_succeeded = deployment_details.get("rollout_status", "").startswith("✅")
+    if (
+        notification_type == "finish"
+        and deployment_succeeded
+        and _is_release_image(image_tag)
+    ):
         blocks.append(
             {
                 "type": "actions",
@@ -668,7 +680,9 @@ def webhook_handler():  # noqa: C901, PLR0912, PLR0915, PLR0911
         }
 
         # Format the Slack message
-        slack_message = format_slack_message(formatted_event_data, deployment_details)
+        slack_message = format_slack_message(
+            formatted_event_data, deployment_details, notification_type
+        )
 
         # Log the message being sent for debugging
         message_preview = json.dumps(slack_message, default=str)[:500]
