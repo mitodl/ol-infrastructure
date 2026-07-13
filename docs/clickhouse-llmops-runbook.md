@@ -72,17 +72,24 @@ b. Add to the `vault.kv.SecretV2` data_json:
 .apply(json.dumps)  # add langfuse=langfuse_password to the Output.all()
 ```
 
-c. Add the user block to `USERS_XML_TEMPLATE`:
-```xml
-<langfuse>
-  <password_sha256_hex>{{ get .Secrets "langfuse" | sha256sum }}</password_sha256_hex>
-  <profile>llmops_profile</profile>
-  <quota>llmops_quota</quota>
-  <allow_databases>
-    <database>langfuse_db</database>
-  </allow_databases>
-</langfuse>
+c. Add the user block to the operator-native `ch_users` map:
+```python
+"langfuse/password_sha256_hex": _secret_ref("langfuse_sha256"),
+"langfuse/profile": "llmops_profile",
+"langfuse/quota": "llmops_quota",
+"langfuse/networks/ip": ["::/0", "0.0.0.0/0"],
+"langfuse/grants/query": [
+    "GRANT ALL ON langfuse_db.*",
+],
 ```
+
+Prefer explicit `grants/query` entries over the legacy `allow_databases/database`
+whitelist. `allow_databases` restricts the user's RBAC grants to *only* the listed
+application databases, which denies access to any `system.*` table. If the tool
+queries `system.parts` (or other system tables) — as opik does for storage
+metrics — add a targeted `"GRANT SELECT ON system.parts"` rather than exposing the
+whole `system` database, so cross-tenant isolation (e.g. `system.query_log`) is
+preserved.
 
 d. Add `"langfuse"` to the `LLMOPS_NAMESPACES` list for NetworkPolicy.
 
