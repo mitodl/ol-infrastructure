@@ -41,7 +41,8 @@ def create_olapps_dev_realm(  # noqa: PLR0913
 
     Provisions all clients and stores OIDC credentials as plain k8s Secrets
     (no Vault dependency). The realm mirrors production configuration but omits
-    production-only IdPs and disables email verification.
+    production-only IdPs. Email verification is configurable via the
+    ``verify_email`` argument (defaults to enabled, mirroring production).
     """
     kc_opts = ResourceOptions(provider=keycloak_provider)
     k8s_opts = ResourceOptions(provider=k8s_provider)

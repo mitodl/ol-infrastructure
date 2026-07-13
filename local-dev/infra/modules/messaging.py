@@ -22,7 +22,7 @@ def create_messaging(
 ) -> MessagingResources:
     """Deploy Mailpit to capture outbound email in local dev.
 
-    Prevents broken Keycloak email-verification flows during development.
+    Captures the verification email so email-verification flows work locally.
     Web UI is exposed at https://{mail_hostname}.
     """
     deployment = k8s.apps.v1.Deployment(
