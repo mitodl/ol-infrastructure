@@ -329,12 +329,7 @@ kubectl exec -n local-infra local-pg-1 -- psql -U app -d mitlearn
 
 ### Inspect emails (Mailpit)
 
-All outbound email is captured by Mailpit. Access the web UI:
-
-```bash
-kubectl port-forward -n local-infra svc/mailpit 8025:8025
-open http://localhost:8025
-```
+All outbound email is captured by Mailpit. Access the web UI at `https://mail.mit.dev`.
 
 ---
 
