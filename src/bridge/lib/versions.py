@@ -130,4 +130,4 @@ MCP_SENTRY_VERSION = "0.33.0"
 # ToolHive-built npx wrapper image for the Context7 MCP server (upstash/context7
 # stdio mode). Tag tracks the dockyard build, not the upstream npm pkg.
 # renovate: datasource=docker depName=context7 packageName=ghcr.io/stacklok/dockyard/npx/context7
-MCP_CONTEXT7_VERSION = "2.2.4"
+MCP_CONTEXT7_VERSION = "3.2.3"
