@@ -287,11 +287,12 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
     # OPENLIT [START] # noqa: ERA001
     # OpenLIT (LLM/GenAI observability) has no native auth in its open-source
     # edition, so authentication is enforced by APISIX in front of it. This
-    # CONFIDENTIAL client backs the interactive UI login (standard flow); unlike
-    # Opik there is no service-account / client-credentials flow because no
-    # bearer-token ingestion path is exposed through this ingress. Credentials
-    # are published to Vault for the APISIX openid-connect plugin to consume via
-    # the Vault Secrets Operator.
+    # CONFIDENTIAL client backs both the interactive UI login (standard flow)
+    # and the service-account / client-credentials flow that instrumented
+    # applications use to mint bearer tokens for the OTLP ingestion path
+    # (``/v1/traces|metrics|logs`` — see the openlit application stack).
+    # Credentials are published to Vault for the APISIX openid-connect plugin
+    # to consume via the Vault Secrets Operator.
     ol_platform_engineering_openlit_client = keycloak.openid.Client(
         "ol-platform-engineering-openlit-client",
         name="ol-platform-engineering-openlit-client",
@@ -304,7 +305,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
         implicit_flow_enabled=False,
-        service_accounts_enabled=False,
+        service_accounts_enabled=True,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-platform-engineering-openlit-redirect-uris"
         ),
