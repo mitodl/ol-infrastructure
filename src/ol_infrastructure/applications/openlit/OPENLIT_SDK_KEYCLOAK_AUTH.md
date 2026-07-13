@@ -7,7 +7,7 @@ exposes two route rules against the same `openlit` backend service:
 
 | Route | Match | Backend | Behavior |
 |-------|-------|---------|----------|
-| `openlit-otlp-ingest` | `/v1/traces`, `/v1/metrics`, `/v1/logs` | embedded OTel collector (4318) | APISIX validates a `Authorization: Bearer …` Keycloak token, returns `401` if missing/invalid (no redirect) |
+| `openlit-otlp-ingest` | `/v1/traces`, `/v1/metrics`, `/v1/logs` | embedded OTel collector (4318) | APISIX validates an `Authorization: Bearer …` Keycloak token, returns `401` if missing/invalid (no redirect) |
 | `openlit-ui` | everything else | platform UI (3000) | interactive OIDC redirect (humans) |
 
 Only OTLP over **HTTP/protobuf** is exposed — the collector's gRPC port (4317) is
