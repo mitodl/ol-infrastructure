@@ -327,6 +327,11 @@ openlit_bearer_oidc_plugin = openlit_oidc.get_full_oidc_plugin_config(
     unauth_action="deny"
 )
 openlit_bearer_oidc_plugin["config"]["bearer_only"] = True
+# Verify the JWT signature locally against Keycloak's JWKS. Without this the
+# plugin falls back to token introspection, and Keycloak reports active: false
+# for client-credentials service-account tokens (transient sessions), so every
+# OTLP export would 401 even with a freshly-issued valid token.
+openlit_bearer_oidc_plugin["config"]["use_jwks"] = True
 
 openlit_apisix_route = OLApisixRoute(
     f"openlit-{stack_info.env_suffix}-apisix-route",
