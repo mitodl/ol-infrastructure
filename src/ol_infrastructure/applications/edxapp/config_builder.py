@@ -197,11 +197,6 @@ def build_base_general_config() -> ConfigDict:
         "MEDIA_ROOT": "media/",
         "MEDIA_URL": "/media/",
         "MICROSITE_CONFIGURATION": {},
-        "MKTG_URL_LINK_MAP": {
-            "TOS": "tos",
-            "ABOUT": "about",
-            "ACCESSIBILITY": "accessibility",
-        },
         "MOBILE_STORE_URLS": {},
         "NOTIFICATION_TYPE_ICONS": {},
         "DEFAULT_NOTIFICATION_ICON_URL": "",
@@ -331,7 +326,6 @@ def build_base_general_config() -> ConfigDict:
         "ENABLE_DISCUSSION_SERVICE": True,
         "ENABLE_EDXNOTES": True,
         "ENABLE_HELP_LINK": True,
-        "ENABLE_MKTG_SITE": False,
         "ENABLE_MOBILE_REST_API": True,
         "ENABLE_OAUTH2_PROVIDER": True,
         "ENABLE_PUBLISHER": False,
@@ -447,7 +441,6 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
         ],
         # Module-level settings overrides for residential
         "DISABLE_START_DATES": False,
-        "ENABLE_MKTG_SITE": False,  # Extracted to module-level
         # FEATURES overrides for residential (only non-module-level flags)
         "FEATURES": {
             "ALLOW_PUBLIC_ACCOUNT_CREATION": True,
@@ -524,7 +517,6 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
                 "COMPLETE",
             ],
             # Module-level settings overrides for xpro
-            "ENABLE_MKTG_SITE": True,  # Extracted to module-level
             "LICENSING": True,  # Extracted to module-level
             # FEATURES overrides for xpro (only non-module-level flags)
             "FEATURES": {
@@ -594,7 +586,6 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
                 },
             },
             # Module-level settings overrides for mitxonline
-            "ENABLE_MKTG_SITE": True,  # Extracted to module-level
             "LICENSING": True,  # Extracted to module-level
             "MILESTONES_APP": True,  # Extracted to module-level
             # FEATURES overrides for mitxonline (only non-module-level flags)
