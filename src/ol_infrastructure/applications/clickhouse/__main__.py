@@ -278,15 +278,18 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
                     "podTemplates": [
                         {
                             "name": "keeper-pod",
-                            # Karpenter must not evict Keeper during consolidation:
-                            # with keeper_replicas=1 (CI/QA) a voluntary drain
-                            # stalls all replicated-table writes until the pod and
-                            # its EBS volume finish moving to a new node.
-                            "metadata": {
-                                "annotations": {
-                                    "karpenter.sh/do-not-disrupt": "true",
-                                },
-                            },
+                            # Prevent Karpenter consolidation from disrupting single-replica Keeper.
+                            **(
+                                {
+                                    "metadata": {
+                                        "annotations": {
+                                            "karpenter.sh/do-not-disrupt": "true"
+                                        },
+                                    },
+                                }
+                                if replicas == 1
+                                else {}
+                            ),
                             "spec": {
                                 "securityContext": {"fsGroup": 101},
                                 "tolerations": tolerations,
@@ -565,16 +568,18 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                     "podTemplates": [
                         {
                             "name": "clickhouse-pod-template",
-                            # Karpenter must not evict ClickHouse during
-                            # consolidation: with replicas=1 (CI/QA) a voluntary
-                            # drain takes down the shared installation — and every
-                            # dependent app (opik, openlit) — for the minutes the
-                            # pod and its EBS volume need to move to a new node.
-                            "metadata": {
-                                "annotations": {
-                                    "karpenter.sh/do-not-disrupt": "true",
-                                },
-                            },
+                            # Prevent Karpenter consolidation from disrupting single-replica ClickHouse.
+                            **(
+                                {
+                                    "metadata": {
+                                        "annotations": {
+                                            "karpenter.sh/do-not-disrupt": "true"
+                                        },
+                                    },
+                                }
+                                if ch_replicas == 1
+                                else {}
+                            ),
                             "spec": {
                                 "serviceAccountName": "clickhouse",
                                 "tolerations": ch_tolerations,
