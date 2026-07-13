@@ -103,6 +103,9 @@ raw_env_vars = {
     "NEXT_PUBLIC_MITOL_SUPPORT_EMAIL": "mitlearn-support@mit.edu",
     "NEXT_PUBLIC_ORIGIN": nextjs_config.require("origin"),
     "NEXT_PUBLIC_POSTHOG_API_HOST": nextjs_config.require("posthog_api_host"),
+    "NEXT_PUBLIC_PODCASTS_FEATURED_LIST_LEARNINGPATH_ID": (
+        nextjs_config.get("podcasts_featured_list_learningpath_id") or ""
+    ),
     "NEXT_PUBLIC_POSTHOG_API_KEY": nextjs_config.require("posthog_api_key"),
     "NEXT_PUBLIC_POSTHOG_PROJECT_ID": nextjs_config.require("posthog_project_id"),
     "NEXT_PUBLIC_POSTHOG_UI_HOST": "https://us.posthog.com",
