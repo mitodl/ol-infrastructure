@@ -484,13 +484,26 @@ def _create_clickhouse_installation(  # noqa: PLR0913
         "opik/profile": "llmops_profile",
         "opik/quota": "llmops_quota",
         "opik/networks/ip": ["::/0", "0.0.0.0/0"],
-        # ``default`` is required in addition to ``opik_db``: opik's Liquibase
+        # Explicit RBAC grants (rendered as <grants><query>…</query></grants> in
+        # the user's XML) instead of the legacy <allow_databases> whitelist.
+        # ``allow_databases`` restricts the user's grants to *only* the listed
+        # application databases, which denies opik the SELECT on ``system.parts``
+        # it needs to compute per-workspace/table storage metrics (Code: 497
+        # ACCESS_DENIED SELECT(...) ON system.parts). Enumerating grants lets us
+        # add that one system-table read without opening the whole ``system``
+        # database (preserving cross-tenant isolation vs. e.g. system.query_log).
+        #
+        # ``default`` is granted in addition to ``opik_db``: opik's Liquibase
         # migrations hard-code the DATABASECHANGELOG / DATABASECHANGELOGLOCK
         # bookkeeping tables (and the replicated ``...1`` shadow tables from
         # 000017_change_tables_to_replicated) into the ``default`` database,
         # while application tables live in ``opik_db``. ``default`` is otherwise
         # an unused scratch database in this cluster.
-        "opik/allow_databases/database": ["opik_db", "default"],
+        "opik/grants/query": [
+            "GRANT ALL ON opik_db.*",
+            "GRANT ALL ON default.*",
+            "GRANT SELECT ON system.parts",
+        ],
     }
 
     return Output.all(
