@@ -219,6 +219,7 @@ if __name__ == "__main__":
         "toolhive-data",
         "toolhive-operator",
         "toolhive-swe",
+        "toolhive-witan",
         "vector-log-proxy",
         "xpro-partner-dns",
     ]

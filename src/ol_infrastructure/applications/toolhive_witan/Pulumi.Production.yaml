@@ -1,0 +1,7 @@
+---
+# See Pulumi.CI.yaml for why `secretsprovider`/`encryptedkey` are omitted.
+config:
+  aws:region: us-east-1
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production
+  # toolhive_witan:oidc_audience: witan

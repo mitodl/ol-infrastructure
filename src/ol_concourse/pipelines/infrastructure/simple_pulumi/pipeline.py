@@ -477,6 +477,11 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_path="applications/toolhive_swe/",
         pulumi_project_name="ol-application-toolhive-swe",
     ),
+    "toolhive-witan": SimplePulumiParams(
+        app_name="toolhive-witan",
+        pulumi_project_path="applications/toolhive_witan/",
+        pulumi_project_name="ol-application-toolhive-witan",
+    ),
     "vector-log-proxy": SimplePulumiParams(
         app_name="vector-log-proxy",
         pulumi_project_path="infrastructure/vector_log_proxy/",

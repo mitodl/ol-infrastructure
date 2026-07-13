@@ -1,0 +1,15 @@
+---
+name: ol-application-toolhive-witan
+runtime: python
+description: >
+  Deploy witan (agent-kit repo) as a shared, multi-tenant MCP service on the
+  operations EKS cluster. This stack owns the toolhive-witan namespace: the
+  witan MCPServer/MCPGroup/VirtualMCPServer resources (fronted by ToolHive's
+  "External OIDC provider" JWT-forward auth scenario, per ADR-0009's
+  Resolution addendum and agent-kit ADR-0004), plus a separate stateless
+  omnigraph-server Deployment backed by an S3 bucket via IRSA (the shared
+  Layer-1 memory/task/workflow graph and per-repo code graphs). The ToolHive
+  operator and CRDs that reconcile these resources are installed by the
+  ol-application-toolhive-operator stack.
+backend:
+  url: s3://mitol-pulumi-state/

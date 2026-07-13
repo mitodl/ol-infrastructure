@@ -108,6 +108,7 @@ TOOLHIVE_OPERATOR = "ol-application-toolhive-operator"
 TOOLHIVE_SWE = "ol-application-toolhive-swe"
 TOOLHIVE_APPS = "ol-application-toolhive-apps"
 TOOLHIVE_DATA = "ol-application-toolhive-data"
+TOOLHIVE_WITAN = "ol-application-toolhive-witan"
 
 # ---------------------------------------------------------------------------
 # LEGACY_STACK_REF_PREFIXES — alias shim for post-migration state reconciliation
