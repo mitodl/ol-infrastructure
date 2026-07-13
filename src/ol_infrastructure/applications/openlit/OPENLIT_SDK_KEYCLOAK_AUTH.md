@@ -166,7 +166,7 @@ def configure_openlit_keycloak_auth() -> None:
     """Install OTel SDK providers whose OTLP exporters carry Keycloak auth.
 
     Because the providers exist before ``openlit.init()`` runs, OpenLIT reuses
-    them for traces, metrics, and events instead of building its own
+    them for traces, metrics, and logs instead of building its own
     (unauthenticated) exporters.
 
     Idempotency: call this exactly once at startup. The OTel SDK logs and
