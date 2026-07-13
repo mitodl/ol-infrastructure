@@ -43,6 +43,8 @@ HOSTS=(
     "video.odl.${ROOT_DOMAIN}"
     # Keycloak SSO
     "sso.ol.${ROOT_DOMAIN}"
+    # Mailpit (captured outbound email)
+    "mail.${ROOT_DOMAIN}"
 )
 
 # mkcert wildcard SANs — one wildcard per subdomain level needed.

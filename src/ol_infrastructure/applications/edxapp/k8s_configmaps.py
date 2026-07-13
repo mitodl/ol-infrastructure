@@ -224,6 +224,9 @@ def _build_interpolated_config_dict(
                 },
             },
         },
+        "MFE_CONFIG": {
+            "STUDIO_BASE_URL": f"https://{domains['studio']}/authoring",
+        },
     }
 
     # Ref: https://docs.openedx.org/en/latest/site_ops/how-tos/use_typesense_search_backend.html
