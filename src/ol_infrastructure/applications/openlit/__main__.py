@@ -21,6 +21,16 @@ The platform UI listens on port 3000 and is exposed via the data cluster's
 APISIX gateway, which terminates TLS (cert-manager issued certificate) and
 enforces Keycloak OIDC authentication in front of OpenLIT (which has no native
 auth in its open-source edition).
+
+Telemetry ingestion: the OpenLIT pod embeds an OpenTelemetry collector whose
+OTLP receivers (4317 gRPC / 4318 HTTP) have NO authentication of their own —
+anything that can reach the service can write telemetry straight to ClickHouse.
+The OTLP/HTTP signal paths (``/v1/traces``, ``/v1/metrics``, ``/v1/logs``) are
+therefore exposed through the same APISIX gateway behind a bearer-only OIDC
+rule: instrumented applications mint Keycloak access tokens via the
+client-credentials flow (``ol-openlit-client`` service account, published by
+the keycloak substructure) and present them as ``Authorization: Bearer …``
+headers on their OTLP exports.
 """
 
 import pulumi_kubernetes as kubernetes
@@ -100,9 +110,11 @@ k8s_global_labels = K8sAppLabels(
 openlit_domain = openlit_config.require("domain")
 
 # OpenLIT platform UI service name and port, sourced from the helm chart
-# (service name == release name, port defaults to 3000).
+# (service name == release name, port defaults to 3000). The same service also
+# exposes the embedded OTel collector's OTLP/HTTP receiver on 4318.
 openlit_service_name = "openlit"
 openlit_service_port = 3000
+openlit_otlp_http_port = 4318
 
 ##########################################################
 #   Vault: sync the shared ClickHouse `openlit` creds    #
@@ -242,13 +254,18 @@ openlit_helm_release = kubernetes.helm.v3.Release(
 #
 # Authentication is enforced at the APISIX gateway (data cluster Gateway
 # ``apisix`` in the ``operations`` namespace) rather than by OpenLIT itself,
-# which has no native auth in its open-source edition. A single route applies
-# interactive OIDC to everything: unauthenticated browsers are redirected to
-# Keycloak for the authorization-code flow, and the OpenLIT SPA's same-origin
-# ``/api`` calls ride the APISIX session cookie established at login. Unlike
-# Opik, there is no separate bearer-token ``/api/*`` rule — external exposure
-# here is the dashboard UI, and programmatic telemetry ingestion does not flow
-# through this ingress.
+# which has no native auth in its open-source edition. Two route rules share
+# the same ``openlit`` backend service but apply different auth:
+#
+#   * the OTLP/HTTP signal paths (``/v1/traces|metrics|logs`` -> port 4318,
+#     the embedded OTel collector) — bearer-token only. Instrumented
+#     applications present a Keycloak access token (client-credentials via the
+#     ``ol-openlit-client`` service account); APISIX validates the token and
+#     rejects unauthenticated requests with a 401 rather than redirecting.
+#   * everything else (-> port 3000, the platform UI) — interactive OIDC.
+#     Unauthenticated browsers are redirected to Keycloak for the
+#     authorization-code flow, and the OpenLIT SPA's same-origin ``/api``
+#     calls ride the APISIX session cookie established at login.
 #
 # The OIDC client_id/client_secret/discovery URL are synced from Vault
 # (``secret-operations/sso/openlit``, published by the keycloak substructure)
@@ -303,13 +320,36 @@ openlit_oidc = OLApisixOIDCResources(
     opts=ResourceOptions(depends_on=[openlit_vault_k8s_resources]),
 )
 
-# Single interactive OIDC route: redirect unauthenticated browsers to Keycloak
-# (authorization-code flow) and proxy authenticated traffic to the OpenLIT UI.
+# Bearer auth for telemetry ingestion: validate a Keycloak access token from
+# the Authorization header and reject (rather than redirect) unauthenticated
+# requests, so OTLP exporters get a clean 401 instead of an HTML login page.
+openlit_bearer_oidc_plugin = openlit_oidc.get_full_oidc_plugin_config(
+    unauth_action="deny"
+)
+openlit_bearer_oidc_plugin["config"]["bearer_only"] = True
+
 openlit_apisix_route = OLApisixRoute(
     f"openlit-{stack_info.env_suffix}-apisix-route",
     k8s_namespace=openlit_namespace,
     k8s_labels=k8s_global_labels,
     route_configs=[
+        # OTLP/HTTP ingestion -> the embedded OTel collector on 4318,
+        # bearer-token only. The signal paths are fixed by the OTLP/HTTP spec
+        # and do not collide with the Next.js UI's routes, but the rule is
+        # kept at a higher priority than the catch-all UI rule regardless.
+        OLApisixRouteConfig(
+            route_name="openlit-otlp-ingest",
+            priority=10,
+            hosts=[openlit_domain],
+            paths=["/v1/traces", "/v1/metrics", "/v1/logs"],
+            backend_service_name=openlit_service_name,
+            backend_service_port=openlit_otlp_http_port,
+            shared_plugin_config_name=openlit_shared_plugins.resource_name,
+            plugins=[OLApisixPluginConfig(**openlit_bearer_oidc_plugin)],
+        ),
+        # Everything else -> interactive OIDC for human browsers: redirect
+        # unauthenticated browsers to Keycloak (authorization-code flow) and
+        # proxy authenticated traffic to the OpenLIT UI.
         OLApisixRouteConfig(
             route_name="openlit-ui",
             priority=0,
