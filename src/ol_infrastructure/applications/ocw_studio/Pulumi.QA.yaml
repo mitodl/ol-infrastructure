@@ -42,6 +42,7 @@ config:
     OCW_STUDIO_LOG_LEVEL: INFO
     OCW_STUDIO_SUPPORT_EMAIL: 'ocw-studio-rc-support@mit.edu'
     OPEN_CATALOG_URLS: 'https://discussions-rc.odl.mit.edu/api/v0/ocw_next_webhook/,https://api.rc.learn.mit.edu/api/v1/ocw_next_webhook/'
+    # Legacy PostHog integration is disabled in favor of the Course v3 integration below.
     PUBLISH_POSTHOG_ENABLED: 'false'
     PUBLISH_POSTHOG_API_HOST: https://ph.ol.mit.edu
     PUBLISH_POSTHOG_UI_HOST: https://us.posthog.com
