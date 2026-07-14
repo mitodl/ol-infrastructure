@@ -24,6 +24,7 @@ from ol_concourse.lib.models.pipeline import (
     ResourceType,
     TaskConfig,
     TaskStep,
+    TryStep,
 )
 from ol_concourse.lib.resource_types import (
     github_deployments_resource,
@@ -47,6 +48,27 @@ from ol_concourse.pipelines.constants import (
     dockerhub_ecr_image_uri,
 )
 from ol_concourse.pipelines.jobs import pulumi_job, pulumi_jobs_chain
+
+
+class SentrySourcemapsConfig(BaseModel):
+    """Config for uploading an app's source maps to Sentry after the image build.
+
+    Attributes:
+        org: Sentry organization slug (e.g. ``"mit-office-of-digital-learning"``).
+        project: Sentry project slug (e.g. ``"open-next"``).
+        auth_token_vault_key: Concourse credential reference for the Sentry auth
+            token (e.g. ``"((sentry.mitlearn_auth_token))"``). The token needs the
+            ``org:read`` and ``project:releases`` scopes.
+        rootfs_asset_path: Path, relative to the unpacked image rootfs, to the
+            directory holding the built JS and ``.map`` files (with debug IDs
+            already injected at build time). e.g. ``"app/frontends/main/.next"``
+            for the Next.js ``output: "standalone"`` runner image.
+    """
+
+    org: str
+    project: str
+    auth_token_vault_key: str
+    rootfs_asset_path: str
 
 
 class AppPipelineParams(BaseModel):
@@ -86,6 +108,11 @@ class AppPipelineParams(BaseModel):
             Release/Deployment-based pipeline shape instead of the legacy release-candidate/
             release git-branch pattern. Defaults to False so existing apps are unaffected;
             flip per-app once each has been validated on the new shape.
+        sentry_sourcemaps (Optional[SentrySourcemapsConfig]): When set, the app's
+            image build unpacks its rootfs and a decoupled task uploads the built
+            source maps to Sentry with an auth token -- the token never enters the
+            image build. See :class:`SentrySourcemapsConfig`. Left unset, no source
+            maps are uploaded.
     """
 
     app_name: str
@@ -104,6 +131,7 @@ class AppPipelineParams(BaseModel):
     enable_ci_deploy: bool = True
     github_repo: str | None = None
     use_release_resource_workflow: bool = False
+    sentry_sourcemaps: SentrySourcemapsConfig | None = None
 
     @model_validator(mode="after")
     def set_repo_name(self) -> "AppPipelineParams":
@@ -165,6 +193,12 @@ pipeline_params = {
             "production": "learn.mit.edu",
         },
         fastly_purge_scope="html-pages",
+        sentry_sourcemaps=SentrySourcemapsConfig(
+            org="mit-office-of-digital-learning",
+            project="open-next",
+            auth_token_vault_key="((sentry.mitlearn_auth_token))",  # noqa: S106  # pragma: allowlist secret
+            rootfs_asset_path="app/frontends/main/.next",
+        ),
     ),
     "xpro": AppPipelineParams(
         app_name="xpro",
@@ -392,6 +426,51 @@ def _define_registry_image_resources_legacy(
     return docker_ci_image, docker_rc_image, ecr_ci_image, ecr_rc_image
 
 
+def _sentry_js_sourcemaps_upload_step(
+    sentry_config: SentrySourcemapsConfig,
+    release_var: str | None = None,
+) -> TryStep:
+    """Upload injected source maps to Sentry from the built image's rootfs.
+
+    Runs after the image build. Sentry ties errors to source maps by Debug ID (not
+    release name); this step expects those already injected in the build output.
+
+    Wrapped in a ``try`` so a failed upload never blocks the release.
+    """
+    upload_args = [
+        "sourcemaps",
+        "upload",
+        "--org",
+        sentry_config.org,
+        "--project",
+        sentry_config.project,
+    ]
+    if release_var:
+        upload_args.extend(["--release", release_var])
+    upload_args.append(f"image/rootfs/{sentry_config.rootfs_asset_path}")
+
+    upload_task = TaskStep(
+        task=Identifier("upload-sentry-sourcemaps"),
+        attempts=3,
+        # sentry-cli auto-reads the SENTRY_AUTH_TOKEN param; Concourse redacts it.
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=AnonymousResource(
+                type=REGISTRY_IMAGE,
+                source={
+                    "repository": dockerhub_ecr_image_uri("getsentry/sentry-cli"),
+                    "tag": "latest",
+                    "aws_region": ECR_REGION,
+                },
+            ),
+            inputs=[Input(name=Identifier("image"))],
+            params={"SENTRY_AUTH_TOKEN": sentry_config.auth_token_vault_key},
+            run=Command(path="sentry-cli", args=upload_args),
+        ),
+    )
+    return TryStep(try_=upload_task)
+
+
 def _build_image_job_legacy(
     app_name: str,
     branch_type: str,
@@ -402,6 +481,7 @@ def _build_image_job_legacy(
     build_target: str | None = None,
     django_settings_dir: str = "main",
     repo_version_file: str | None = None,
+    sentry_sourcemaps: SentrySourcemapsConfig | None = None,
 ) -> Job:
     """Generate an image build job for a specific branch type (main or rc)."""
     job_name = f"build-{app_name}-image-from-{branch_type}"
@@ -457,6 +537,18 @@ def _build_image_job_legacy(
         )
         version_args = {"BUILD_ARG_RELEASE_VERSION": f"((.:{version_var}))"}
 
+    # Skip the main build: its image only serves CI. QA and Production both run the
+    # RC image, so the RC upload already covers production.
+    sourcemap_build_params: dict[str, str] = {}
+    sourcemap_upload_step: TryStep | None = None
+    if sentry_sourcemaps is not None and branch_type != "main":
+        # UNPACK_ROOTFS lets the upload step read the maps out of the built image.
+        sourcemap_build_params = {"UNPACK_ROOTFS": "true"}
+        # Tag the artifacts with this build's version (== runtime NEXT_PUBLIC_VERSION).
+        sourcemap_upload_step = _sentry_js_sourcemaps_upload_step(
+            sentry_sourcemaps, release_var=f"((.:{version_var}))"
+        )
+
     plan.extend(
         [
             LoadVarStep(
@@ -476,6 +568,7 @@ def _build_image_job_legacy(
                     "BUILD_ARG_GIT_SHA": "((.:git_ref))",
                     **version_args,
                     **additional_build_params,
+                    **sourcemap_build_params,
                 },
                 build_args=[],
             ),
@@ -493,6 +586,9 @@ def _build_image_job_legacy(
     plan.append(_ensure_ecr_repository_step(ecr_registry_image_resource))
     plan.append(PutStep(put=dockerhub_registry_image_resource.name, params=put_params))
     plan.append(PutStep(put=ecr_registry_image_resource.name, params=put_params))
+
+    if sourcemap_upload_step is not None:
+        plan.append(sourcemap_upload_step)
 
     return Job(name=Identifier(job_name), build_log_retention={"builds": 10}, plan=plan)
 
@@ -545,6 +641,7 @@ def _build_legacy_app_pipeline(
         build_target=pipeline_parameters.build_target,
         django_settings_dir=pipeline_parameters.settings_dir or "main",
         repo_version_file=pipeline_parameters.version_file,
+        sentry_sourcemaps=pipeline_parameters.sentry_sourcemaps,
     )
     rc_image_build_job = _build_image_job_legacy(
         app_name=app_name,
@@ -556,6 +653,7 @@ def _build_legacy_app_pipeline(
         build_target=pipeline_parameters.build_target,
         django_settings_dir=pipeline_parameters.settings_dir or "main",
         repo_version_file=pipeline_parameters.version_file,
+        sentry_sourcemaps=pipeline_parameters.sentry_sourcemaps,
     )
 
     ci_post_steps: list[GetStep | PutStep | TaskStep] = []
@@ -839,7 +937,11 @@ def _build_image_job(
     ecr_registry_image_resource: Resource,
     build_target: str | None = None,
 ) -> Job:
-    """Generate an image build job triggered by the configured git resource."""
+    """Generate an image build job triggered by the configured git resource.
+
+    This is the main-branch/CI build; its image only serves CI, so it uploads no
+    source maps (see _build_release_image_job, whose image serves QA/Production).
+    """
     job_name = f"build-{app_name}-image-from-{git_repo_resource.source['branch']}"
 
     additional_build_params = {}
@@ -896,6 +998,7 @@ def _build_release_image_job(
     dockerhub_registry_image_resource: Resource,
     ecr_registry_image_resource: Resource,
     build_target: str | None = None,
+    sentry_sourcemaps: SentrySourcemapsConfig | None = None,
 ) -> Job:
     """Generate an image build job triggered by the release resource.
 
@@ -910,6 +1013,9 @@ def _build_release_image_job(
     additional_build_params = {}
     if build_target:
         additional_build_params = {"TARGET": build_target}
+
+    # UNPACK_ROOTFS lets the upload step read the maps out of the built image.
+    sourcemap_build_params = {"UNPACK_ROOTFS": "true"} if sentry_sourcemaps else {}
 
     put_params: dict[str, Any] = {
         "image": "image/image.tar",
@@ -967,6 +1073,7 @@ def _build_release_image_job(
                 "BUILD_ARG_RELEASE_VERSION": "((.:release_version))",
                 "PROGRESS": "plain",
                 **additional_build_params,
+                **sourcemap_build_params,
             },
             build_args=[],
         ),
@@ -974,6 +1081,14 @@ def _build_release_image_job(
         PutStep(put=dockerhub_registry_image_resource.name, params=put_params),
         PutStep(put=ecr_registry_image_resource.name, params=put_params),
     ]
+
+    if sentry_sourcemaps:
+        # Tag the artifacts with the release being built.
+        plan.append(
+            _sentry_js_sourcemaps_upload_step(
+                sentry_sourcemaps, release_var="((.:release_version))"
+            )
+        )
 
     return Job(name=Identifier(job_name), build_log_retention={"builds": 10}, plan=plan)
 
@@ -1067,6 +1182,7 @@ def _build_release_resource_app_pipeline(
         dockerhub_registry_image_resource=docker_rc_image,
         ecr_registry_image_resource=app_rc_image,
         build_target=pipeline_parameters.build_target,
+        sentry_sourcemaps=pipeline_parameters.sentry_sourcemaps,
     )
     abandon_release_job = _build_abandon_release_job(
         app_name=app_name,
