@@ -14,3 +14,4 @@ config:
     preview.mitxonline.mit.edu: https://preview.courses.learn.mit.edu
     starcellbio.mit.edu: https://github.com/starteam/starcellbio_html
     studio.mitxonline.mit.edu: https://studio.courses.learn.mit.edu
+    pe.ol.mit.edu: https://engineering.ol.mit.edu
