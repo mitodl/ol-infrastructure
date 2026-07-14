@@ -1,6 +1,8 @@
 # ruff: noqa: ERA001, E501
 """K8s application deployment components."""
 
+import hashlib
+import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -488,6 +490,20 @@ class OLApplicationK8sConfig(BaseModel):
             "Not added to main application or celery containers."
         ),
     )
+    config_hash_inputs: dict[str, str | Output[str]] = Field(
+        default_factory=dict,
+        description=(
+            "Named strings/Outputs folded into a config-hash annotation applied to "
+            "the webapp, celery worker, and celery beat pod templates. Kubernetes "
+            "only rolls pods when their pod template changes, so ConfigMaps/Secrets "
+            "referenced by name elsewhere (e.g. via env_from_secret_names, or a "
+            "volume in extra_volumes) don't trigger a restart when their contents "
+            "change out-of-band. Pass a value here (e.g. a Secret's resourceVersion, "
+            "or a hash of externally-managed config) for anything whose changes "
+            "should trigger a rolling restart. The content of the nginx/uwsgi "
+            "ConfigMaps this component manages is folded in automatically."
+        ),
+    )
     webapp_deployment_aliases: list[Any] = Field(
         default_factory=list,
         description=(
@@ -800,8 +816,20 @@ class OLApplicationK8s(ComponentResource):
             effective_cmd_array = ol_app_k8s_config.application_cmd_array
             effective_arg_array = ol_app_k8s_config.application_arg_array
 
+        # Config/secret content folded into a rolling-restart annotation on the
+        # webapp/celery/beat pod templates. Kubernetes only restarts pods when their
+        # pod template changes, so this catches config that's referenced by name
+        # (and therefore wouldn't otherwise show up in the pod spec diff).
+        config_hash_sources: dict[str, str | Output[str]] = dict(
+            ol_app_k8s_config.config_hash_inputs
+        )
+
         # Import nginx configuration as a configmap
         if ol_app_k8s_config.import_nginx_config:
+            _nginx_conf_text = ol_app_k8s_config.project_root.joinpath(
+                effective_nginx_config_path
+            ).read_text()
+            config_hash_sources["nginx.conf"] = _nginx_conf_text
             application_nginx_configmap = kubernetes.core.v1.ConfigMap(
                 f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-nginx-configmap",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -809,11 +837,7 @@ class OLApplicationK8s(ComponentResource):
                     namespace=ol_app_k8s_config.application_namespace,
                     labels=ol_app_k8s_config.k8s_global_labels,
                 ),
-                data={
-                    "web.conf": ol_app_k8s_config.project_root.joinpath(
-                        effective_nginx_config_path
-                    ).read_text(),
-                },
+                data={"web.conf": _nginx_conf_text},
                 opts=resource_options,
             )
             volumes.append(
@@ -858,6 +882,10 @@ class OLApplicationK8s(ComponentResource):
 
         # Import uwsgi configuration as a configmap
         if ol_app_k8s_config.import_uwsgi_config:
+            _uwsgi_ini_text = ol_app_k8s_config.project_root.joinpath(
+                "files/uwsgi.ini"
+            ).read_text()
+            config_hash_sources["uwsgi.ini"] = _uwsgi_ini_text
             application_uwsgi_configmap = kubernetes.core.v1.ConfigMap(
                 f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-uwsgi-configmap",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -865,11 +893,7 @@ class OLApplicationK8s(ComponentResource):
                     namespace=ol_app_k8s_config.application_namespace,
                     labels=ol_app_k8s_config.k8s_global_labels,
                 ),
-                data={
-                    "uwsgi.ini": ol_app_k8s_config.project_root.joinpath(
-                        "files/uwsgi.ini"
-                    ).read_text(),
-                },
+                data={"uwsgi.ini": _uwsgi_ini_text},
                 opts=resource_options,
             )
             volumes.append(
@@ -1028,6 +1052,20 @@ class OLApplicationK8s(ComponentResource):
         if ol_app_k8s_config.pod_security_context is not None:
             worker_pod_spec_args["security_context"] = (
                 ol_app_k8s_config.pod_security_context
+            )
+
+        # Annotation applied to every pod template so that changes to config/secret
+        # content named in config_hash_sources (nginx/uwsgi config managed by this
+        # component, plus anything the caller adds via config_hash_inputs) trigger a
+        # rolling restart even though the pod spec itself is otherwise unchanged.
+        pod_config_hash_annotations: dict[str, Output[str]] = {}
+        if config_hash_sources:
+            pod_config_hash_annotations["ol.mit.edu/config-hash"] = Output.all(
+                **config_hash_sources
+            ).apply(
+                lambda values: hashlib.sha256(
+                    json.dumps(values, sort_keys=True).encode()
+                ).hexdigest()
             )
 
         _application_deployment_name = truncate_k8s_metanames(
@@ -1196,6 +1234,7 @@ class OLApplicationK8s(ComponentResource):
                             "kubectl.kubernetes.io/default-container": (
                                 f"{ol_app_k8s_config.application_name}-app"
                             ),
+                            **pod_config_hash_annotations,
                         },
                     ),
                     spec=kubernetes.core.v1.PodSpecArgs(
@@ -1624,6 +1663,7 @@ class OLApplicationK8s(ComponentResource):
                     template=kubernetes.core.v1.PodTemplateSpecArgs(
                         metadata=kubernetes.meta.v1.ObjectMetaArgs(
                             labels=celery_labels,
+                            annotations=pod_config_hash_annotations or None,
                         ),
                         # Ref: https://docs.celeryq.dev/en/stable/reference/cli.html#celery-worker
                         spec=kubernetes.core.v1.PodSpecArgs(
@@ -1806,6 +1846,7 @@ class OLApplicationK8s(ComponentResource):
                     template=kubernetes.core.v1.PodTemplateSpecArgs(
                         metadata=kubernetes.meta.v1.ObjectMetaArgs(
                             labels=beat_labels,
+                            annotations=pod_config_hash_annotations or None,
                         ),
                         spec=kubernetes.core.v1.PodSpecArgs(
                             service_account_name=ol_app_k8s_config.application_service_account_name,
