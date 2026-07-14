@@ -226,7 +226,9 @@ def _build_interpolated_config_dict(
             "apps": [
                 {
                     "appId": "org.openedx.frontend.app.instructorDashboard",
-                    "config": { "SUPPORT_URL": "https://odl.zendesk.com/hc/en-us/requests/new" }
+                    "config": {
+                        "SUPPORT_URL": "https://odl.zendesk.com/hc/en-us/requests/new"
+                    },
                 }
             ],
         },
