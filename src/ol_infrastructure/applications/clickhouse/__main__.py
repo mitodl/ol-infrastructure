@@ -154,7 +154,7 @@ _LLMOPS_PROFILES = {
 }
 _LLMOPS_QUOTAS = {
     "llmops_quota/interval/duration": "3600",
-    "llmops_quota/interval/queries": "1000",
+    "llmops_quota/interval/queries": "20000",
     "llmops_quota/interval/errors": "100",
     "llmops_quota/interval/result_rows": "1000000000",
     "llmops_quota/interval/read_rows": "10000000000",
