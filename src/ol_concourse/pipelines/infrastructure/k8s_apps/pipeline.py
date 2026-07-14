@@ -459,8 +459,12 @@ def _sentry_js_sourcemaps_upload_step(
                 type=REGISTRY_IMAGE,
                 source={
                     "repository": dockerhub_ecr_image_uri("getsentry/sentry-cli"),
-                    "tag": "latest",
+                    "tag": "3.6.0",
                     "aws_region": ECR_REGION,
+                },
+                # Pin the exact image by digest; the tag above is for humans.
+                version={
+                    "digest": "sha256:dd7ad57b7d1609d5dc76705bb9a2b2a7009ea0a1e74089202df8c20cfd8389c4"  # pragma: allowlist secret
                 },
             ),
             inputs=[Input(name=Identifier("image"))],
