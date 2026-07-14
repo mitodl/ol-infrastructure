@@ -116,9 +116,13 @@ while IFS= read -r n; do
 done < <(kubectl --context "$CONTEXT" get nodes \
 	-o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
 
+# Detect with probe_retry, not a single probe: a node that is merely slow to
+# rebind :10250 right after wake would otherwise be misread as wedged and
+# needlessly restarted (an expensive full node bounce). probe_retry returns on
+# the first success, so a healthy node still costs just one probe.
 wedged=()
 for node in "${NODES[@]}"; do
-	if probe "$node"; then
+	if probe_retry "$node"; then
 		ok "exec streaming healthy: $node"
 	else
 		warn "exec streaming wedged: $node"
@@ -138,8 +142,10 @@ for node in "${wedged[@]}"; do
 		failed+=("$node")
 		continue
 	fi
-	kubectl --context "$CONTEXT" wait --for=condition=Ready "node/$node" \
-		--timeout="$READY_TIMEOUT" >/dev/null 2>&1 || true
+	if ! kubectl --context "$CONTEXT" wait --for=condition=Ready "node/$node" \
+		--timeout="$READY_TIMEOUT" >/dev/null 2>&1; then
+		warn "Node '$node' not Ready within $READY_TIMEOUT after restart; re-probing anyway."
+	fi
 	if probe_retry "$node"; then
 		ok "Healed: $node"
 	else

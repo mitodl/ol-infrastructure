@@ -26,6 +26,8 @@
 #   KUBECONFIG here.
 # - Output is appended to ~/Library/Logs/local-dev-heal.log for debugging.
 
+set -euo pipefail
+
 export PATH="$HOME/.orbstack/bin:$HOME/.docker/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 REPO="$HOME/dev/ol-infrastructure"

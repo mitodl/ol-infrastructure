@@ -78,9 +78,7 @@ ok "TLS certificates found."
 # can come back wedged, so `kubectl exec` 502s even though the node is Ready.
 # This is a no-op when everything is healthy. Best-effort: never block startup.
 log "Checking kubelet exec/streaming health..."
-if "${SCRIPT_DIR}/heal-exec.sh"; then
-	ok "Exec streaming healthy."
-else
+if ! "${SCRIPT_DIR}/heal-exec.sh"; then
 	warn "Exec heal reported problems; continuing to start Tilt anyway."
 fi
 
