@@ -122,7 +122,7 @@ TOOLHIVE_OPERATOR_CRDS_CHART_VERSION = "0.34.0"
 # renovate: datasource=docker depName=toolhive-operator packageName=ghcr.io/stacklok/toolhive/toolhive-operator
 TOOLHIVE_OPERATOR_CHART_VERSION = "0.34.0"
 # renovate: datasource=docker depName=mcp-grafana packageName=grafana/mcp-grafana
-MCP_GRAFANA_VERSION = "0.17.1"
+MCP_GRAFANA_VERSION = "0.17.2"
 # ToolHive-built npx wrapper image for the Sentry MCP server (getsentry/sentry-mcp
 # self-hosted stdio mode). Tag tracks the dockyard build, not the upstream npm pkg.
 # renovate: datasource=docker depName=sentry-mcp-server packageName=ghcr.io/stacklok/dockyard/npx/sentry-mcp-server
