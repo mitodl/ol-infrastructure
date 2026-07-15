@@ -2,6 +2,7 @@
 
 This Pulumi program manages alerting and uptime monitoring for MIT Open Learning.
 It replaces two legacy systems:
+
 - **Pingdom (manual)** → Pingdom checks managed via a Pulumi dynamic provider (`pingdom_checks.py`)
 - **grafana-alerts repo + cortextool** → Grafana-managed alert rules and Alertmanager config
 
@@ -31,6 +32,7 @@ set of Grafana-managed alert rules. The Pulumi stacks (CI, QA, Production) map
 1:1 to the Grafana Cloud stacks.
 
 Secrets files must be encrypted with SOPS before committing:
+
 ```
 sops --encrypt --in-place src/bridge/secrets/grafana_cloud/api.<env>.yaml
 ```
@@ -183,11 +185,22 @@ The notification policy in `alertmanager.py` mirrors the original
 1. `channel=notifications-ocw-misc` → Slack by severity (warning/critical),
    anything else with that label is silenced.
 2. `alertname=~Kube.*` → silenced (built-in k8s noise, not actionable).
-3. `severity=warning` → Rootly.
-4. `severity=critical` → Rootly.
+3. `severity=warning`:
+   - daytime (09:00–17:00 `America/New_York`) → Rootly (pages).
+   - overnight (17:00–09:00) → `#notifications-oncall` Slack only (no page).
+4. `severity=critical` → Rootly, 24/7.
 5. Default (catch-all) → `oblivion` (empty contact point, acts as drop sink).
 
 OpsGenie is no longer active. All actionable alerts route to Rootly.
+
+The warning day/night split is driven by two `MuteTiming` resources
+(`overnight-17-to-09-eastern`, `daytime-09-to-17-eastern`). The daytime Rootly
+route sets `continue_=True` so a warning is offered to both the Rootly route and
+the overnight Slack route; the route muted for the current time drops out,
+leaving one active destination. Time ranges are `America/New_York`-local so the
+window tracks EST/EDT. Only Grafana-pipeline alerts (source `grafana` and
+`alertmanager`) pass through this policy; CloudWatch and Sentry webhook Rootly
+directly and are not yet time-gated (planned fast-follow).
 
 ---
 
@@ -201,6 +214,7 @@ grafana_url: https://<stack>.grafana.net
 grafana_api_token: <service-account-token>
 rootly_bearer_token: <rootly-webhook-bearer-token>
 slack_notifications_ocw_misc_api_url: <slack-webhook-url>
+slack_oncall_overnight_api_url: <slack-webhook-url>  # #notifications-oncall channel; receives overnight warning alerts
 
 # Production only (Pingdom checks run from production stack only):
 pingdom_api_token: <pingdom-api-token>

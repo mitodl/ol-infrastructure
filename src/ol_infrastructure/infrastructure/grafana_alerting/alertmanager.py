@@ -6,9 +6,18 @@ Routing logic (mirrors the original alertmanager.yaml route tree):
   1. Alerts labelled channel=notifications-ocw-misc go to dedicated Slack
      channels by severity; anything else with that channel label is silenced.
   2. Alerts whose name matches Kube.* are silenced (built-in k8s noise).
-  3. All remaining warning-severity alerts → Rootly.
-  4. All remaining critical-severity alerts → Rootly.
+  3. Warning-severity alerts:
+       - during the day (09:00-17:00 America/New_York) → Rootly (pages).
+       - overnight (17:00-09:00) → Slack only, so transient warnings that
+         self-resolve do not page a human in the middle of the night while
+         still surfacing the spike for awareness.
+  4. All critical-severity alerts → Rootly, 24/7 (unchanged).
   5. Everything else → oblivion (default receiver, acts as a drop sink).
+
+The overnight/daytime split is implemented with two complementary mute timings
+and a continue=True on the daytime Rootly route: a warning is matched by both
+the Rootly route and the Slack route, and whichever one is muted for the
+current time drops out, leaving exactly one active destination.
 """
 
 from typing import Any
@@ -90,6 +99,61 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
         opts=resource_opts,
     )
 
+    # On-call overnight Slack — warning-severity alerts that fire outside
+    # business hours land here instead of paging Rootly. Preserves awareness of
+    # a spike without waking someone for something that usually self-resolves.
+    alerting.ContactPoint(
+        "slack-oncall-overnight-warning",
+        name="slack-oncall-overnight-warning",
+        slacks=[
+            alerting.ContactPointSlackArgs(
+                url=grafana_secrets["slack_oncall_overnight_api_url"],
+                recipient="#notifications-oncall",
+                color="warning",
+                icon_emoji=":goose_warning:",
+                title=':goose_warning: [OVERNIGHT] [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{- end }}] - {{ .CommonLabels.alertname }}',
+                text="{{ range .Alerts }}\n  {{- if .Annotations.message }}\n      Message - {{ .Annotations.message }}\n  {{- end }}\n  {{- if .Annotations.description }}\n      Description - {{ .Annotations.description }}\n  {{- end }}\n  {{- if .Annotations.summary }}\n      Summary - {{ .Annotations.summary }}\n  {{- end }}\n{{- end }}",
+                disable_resolve_message=False,
+            )
+        ],
+        opts=resource_opts,
+    )
+
+    # -------------------------------------------------------------------------
+    # Mute timings — the overnight/daytime split for warning-severity routing.
+    # Times are local to America/New_York, so the window tracks EST/EDT
+    # automatically. Alertmanager time ranges cannot span midnight, so the
+    # overnight window is expressed as two ranges (00:00-09:00 and 17:00-24:00).
+    # -------------------------------------------------------------------------
+    mute_overnight = alerting.MuteTiming(
+        "mute-overnight",
+        name="overnight-17-to-09-eastern",
+        intervals=[
+            alerting.MuteTimingIntervalArgs(
+                location="America/New_York",
+                times=[
+                    alerting.MuteTimingIntervalTimeArgs(start="00:00", end="09:00"),
+                    alerting.MuteTimingIntervalTimeArgs(start="17:00", end="24:00"),
+                ],
+            )
+        ],
+        opts=resource_opts,
+    )
+
+    mute_daytime = alerting.MuteTiming(
+        "mute-daytime",
+        name="daytime-09-to-17-eastern",
+        intervals=[
+            alerting.MuteTimingIntervalArgs(
+                location="America/New_York",
+                times=[
+                    alerting.MuteTimingIntervalTimeArgs(start="09:00", end="17:00"),
+                ],
+            )
+        ],
+        opts=resource_opts,
+    )
+
     # -------------------------------------------------------------------------
     # Notification policy (route tree)
     # -------------------------------------------------------------------------
@@ -153,7 +217,10 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
                 contact_point="oblivion",
                 continue_=False,
             ),
-            # All warning-severity alerts → Rootly.
+            # Warning-severity alerts, daytime (09:00-17:00 Eastern) → Rootly.
+            # Muted overnight so it does not page. continue_=True lets the same
+            # alert also reach the overnight Slack route below; whichever route
+            # is muted for the current time simply produces no notification.
             alerting.NotificationPolicyPolicyArgs(
                 matchers=[
                     alerting.NotificationPolicyPolicyMatcherArgs(
@@ -163,6 +230,21 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
                     )
                 ],
                 contact_point="rootly",
+                mute_timings=[mute_overnight.name],
+                continue_=True,
+            ),
+            # Warning-severity alerts, overnight (17:00-09:00 Eastern) → Slack
+            # only. Muted during the day, when the Rootly route above pages.
+            alerting.NotificationPolicyPolicyArgs(
+                matchers=[
+                    alerting.NotificationPolicyPolicyMatcherArgs(
+                        label="severity",
+                        match="=",
+                        value="warning",
+                    )
+                ],
+                contact_point="slack-oncall-overnight-warning",
+                mute_timings=[mute_daytime.name],
                 continue_=False,
             ),
             # All critical-severity alerts → Rootly.
