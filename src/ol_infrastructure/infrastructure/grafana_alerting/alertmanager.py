@@ -103,12 +103,12 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
     # business hours land here instead of paging Rootly. Preserves awareness of
     # a spike without waking someone for something that usually self-resolves.
     alerting.ContactPoint(
-        "slack-oncall-overnight-warning",
-        name="slack-oncall-overnight-warning",
+        "slack-devops-alerts-overnight-warning",
+        name="slack-devops-alerts-overnight-warning",
         slacks=[
             alerting.ContactPointSlackArgs(
-                url=grafana_secrets["slack_oncall_overnight_api_url"],
-                recipient="#notifications-oncall",
+                url=grafana_secrets["slack_devops_alerts_overnight_api_url"],
+                recipient="#devops-alerts",
                 color="warning",
                 icon_emoji=":goose_warning:",
                 title=':goose_warning: [OVERNIGHT] [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{- end }}] - {{ .CommonLabels.alertname }}',
@@ -243,7 +243,7 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
                         value="warning",
                     )
                 ],
-                contact_point="slack-oncall-overnight-warning",
+                contact_point="slack-devops-alerts-overnight-warning",
                 mute_timings=[mute_daytime.name],
                 continue_=False,
             ),

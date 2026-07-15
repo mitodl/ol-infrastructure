@@ -187,7 +187,7 @@ The notification policy in `alertmanager.py` mirrors the original
 2. `alertname=~Kube.*` → silenced (built-in k8s noise, not actionable).
 3. `severity=warning`:
    - daytime (09:00–17:00 `America/New_York`) → Rootly (pages).
-   - overnight (17:00–09:00) → `#notifications-oncall` Slack only (no page).
+   - overnight (17:00–09:00) → `#devops-alerts` Slack only (no page).
 4. `severity=critical` → Rootly, 24/7.
 5. Default (catch-all) → `oblivion` (empty contact point, acts as drop sink).
 
@@ -214,7 +214,7 @@ grafana_url: https://<stack>.grafana.net
 grafana_api_token: <service-account-token>
 rootly_bearer_token: <rootly-webhook-bearer-token>
 slack_notifications_ocw_misc_api_url: <slack-webhook-url>
-slack_oncall_overnight_api_url: <slack-webhook-url>  # #notifications-oncall channel; receives overnight warning alerts
+slack_devops_alerts_overnight_api_url: <slack-webhook-url>  # #devops-alerts channel; receives overnight warning alerts
 
 # Production only (Pingdom checks run from production stack only):
 pingdom_api_token: <pingdom-api-token>
