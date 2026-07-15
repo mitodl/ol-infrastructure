@@ -7,7 +7,7 @@ CONSUL_VERSION = "2.0.2"
 # renovate: datasource=pypi depName=jupyterhub packageName=jupyterhub
 JUPYTERHUB_VERSION = "5.5.0"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
-KEYCLOAK_VERSION = "26.6.4"
+KEYCLOAK_VERSION = "26.7.0"
 # renovate: datasource=docker depName=leek packageName=kodhive/leek
 LEEK_VERSION = "0.7.7"
 MEILISEARCH_VERSION = (
