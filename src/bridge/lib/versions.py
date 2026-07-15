@@ -66,9 +66,9 @@ MEILISEARCH_CHART_VERSION = "0.33.0"
 # renovate: datasource=helm depName=opik packageName=opik registryUrl=https://comet-ml.github.io/opik
 OPIK_CHART_VERSION = "2.1.23"
 # renovate: datasource=helm depName=operator packageName=operator registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
-STARROCKS_OPERATOR_CHART_VERSION = "1.11.5"
+STARROCKS_OPERATOR_CHART_VERSION = "1.11.6"
 # renovate: datasource=helm depName=operator packageName=starrocks registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
-STARROCKS_CHART_VERSION = "1.11.5"
+STARROCKS_CHART_VERSION = "1.11.6"
 # renovate: datasource=docker depName=starrocks packageName=starrocks/fe-ubuntu
 STARROCKS_VERSION = "4.1.1"
 # renovate: datasource=github-releases depName=starrocks-vault-plugin packageName=mitodl/vault-plugin-database-starrocks
