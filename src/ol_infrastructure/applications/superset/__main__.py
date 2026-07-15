@@ -672,16 +672,19 @@ superset_chart = kubernetes.helm.v3.Release(
                 ]
                 if secret_name is not None
             ],
-            # Connections (non-secret parts)
+            # Connections (non-secret parts). `database`/`cache` supersede the
+            # chart's deprecated `supersetNode.connections.*` keys as of 0.20.0.
+            "database": {
+                "host": superset_db.db_instance.address,
+                "port": str(DEFAULT_POSTGRES_PORT),
+                "name": superset_db_config.db_name,
+            },
+            "cache": {
+                "host": superset_redis_cache.address,
+                "port": str(DEFAULT_REDIS_PORT),
+            },
             "supersetNode": {
                 "podLabels": k8s_global_labels,
-                "connections": {
-                    "redis_host": superset_redis_cache.address,
-                    "redis_port": str(DEFAULT_REDIS_PORT),
-                    "db_name": superset_db_config.db_name,
-                    "db_port": str(DEFAULT_POSTGRES_PORT),
-                    "db_host": superset_db.db_instance.address,
-                },
                 "replicas": {"enabled": False},
                 "autoscaling": {
                     "enabled": True,
