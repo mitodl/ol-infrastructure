@@ -615,19 +615,19 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
             },
             "SENTRY_IGNORED_EXCEPTION_MESSAGES": [
                 (
-                    "Tried to inspect an unsupported, broken, or",
-                    "missing downstream->upstream link:",
+                    "Tried to inspect an unsupported, broken, or "
+                    "missing downstream->upstream link:"
                 ),
                 (
-                    "Invalid HTTP_HOST header: 'vqbjqfz3ldd42z6qff3t2h5cr62c5rok._domainkey.huggingface.co'.",
-                    "The domain name provided is not valid according to RFC 1034/1035.",
+                    "Invalid HTTP_HOST header: 'vqbjqfz3ldd42z6qff3t2h5cr62c5rok._domainkey.huggingface.co'. "
+                    "The domain name provided is not valid according to RFC 1034/1035."
                 ),
                 (
-                    "A label was requested for language code `ht` but",
-                    "the code is completely unknown",
+                    "A label was requested for language code `ht` but "
+                    "the code is completely unknown"
                 ),
-                ("Failed async course content export to git",),
-                ("Failed to pull git repository",),
+                "Failed async course content export to git",
+                "Failed to pull git repository",
             ],
         },
     }
