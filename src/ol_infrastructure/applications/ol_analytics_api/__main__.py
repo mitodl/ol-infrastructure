@@ -371,8 +371,7 @@ ol_analytics_api_k8s = OLApplicationK8s(
         application_security_group_name=Output.from_input(APPLICATION_NAME),
         application_service_account_name=APPLICATION_NAME,
         vault_k8s_resource_auth_name=ol_analytics_api_auth_binding.vault_k8s_resources.auth_name,
-        application_image_repository="mitodl/ol-analytics-api",
-        registry="dockerhub",
+        application_image_repository="mitodl/ol-analytics-api-app",
         **docker_image_config_kwargs("OL_ANALYTICS_API"),
         application_min_replicas=ol_analytics_api_config.get_int("min_replicas") or 2,
         # The image's own CMD runs uvicorn on port 8000 -- no command override.
