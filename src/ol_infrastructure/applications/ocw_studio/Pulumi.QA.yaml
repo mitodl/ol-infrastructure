@@ -46,7 +46,7 @@ config:
     PUBLISH_POSTHOG_API_HOST: https://ph.ol.mit.edu
     PUBLISH_POSTHOG_UI_HOST: https://us.posthog.com
     PUBLISH_POSTHOG_COURSE_V3_ENABLED: 'true'
-    PUBLISH_POSTHOG_COURSE_V3_PROJECT_API_KEY: 'phc_Ci6X3XFSc1mj8chO0BO0qfSnJ5cJEVUGT0cyQ5CIE6x' # pragma: allowlist secret
+    PUBLISH_POSTHOG_PROJECT_API_KEY: 'phc_Ci6X3XFSc1mj8chO0BO0qfSnJ5cJEVUGT0cyQ5CIE6x' # pragma: allowlist secret
     SEARCH_API_URL: 'https://discussions-rc.odl.mit.edu/api/v0/search/'
     SENTRY_LOG_LEVEL: 'WARN'
     SITEMAP_DOMAIN: 'live-qa.ocw.mit.edu'
