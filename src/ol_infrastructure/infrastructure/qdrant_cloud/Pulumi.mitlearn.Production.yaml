@@ -8,4 +8,4 @@ config:
   qdrant-cloud:enable_high_availability: "true"
   qdrant-cloud:desired_package_name: mx2
   qdrant-cloud:desired_disk_gib: "200"
-  qdrant-cloud:desired_ram_gib: "16"
+  qdrant-cloud:desired_ram_gib: "32"
