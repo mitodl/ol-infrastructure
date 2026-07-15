@@ -1,4 +1,4 @@
-# ruff: noqa: PLR0915, PLR0912, C901
+# ruff: noqa: PLR0915, PLR0912, C901, E501
 # pyright: reportCallIssue=false, reportMissingImports=false
 """Generate Concourse pipeline definitions for simple Pulumi-only deployments.
 
@@ -10,8 +10,23 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from ol_concourse.lib.containers import container_build_task
 from ol_concourse.lib.models.fragment import PipelineFragment
-from ol_concourse.lib.models.pipeline import Duration, GetStep, Identifier, Pipeline
+from ol_concourse.lib.models.pipeline import (
+    AnonymousResource,
+    Command,
+    Duration,
+    GetStep,
+    Identifier,
+    Input,
+    Job,
+    LoadVarStep,
+    Pipeline,
+    Platform,
+    PutStep,
+    TaskConfig,
+    TaskStep,
+)
 from ol_concourse.lib.resources import git_repo, github_issues, registry_image
 from pydantic import BaseModel, model_validator
 
@@ -49,6 +64,26 @@ class DockerImageConfig(BaseModel):
     env_var_for_tag: str | None = None
 
 
+class BuildConfig(BaseModel):
+    """Configuration for building and pushing this app's own Docker image.
+
+    Set alongside ``docker_image`` for apps that are not just deploy-only
+    Pulumi projects but also need their own image built from a Dockerfile
+    inside ``pulumi_project_path`` and pushed to the repository ``docker_image``
+    watches. The resulting build job runs ahead of the Pulumi deploy chain,
+    and the deploy chain's docker_image GetStep only triggers off images
+    built by that job (via ``passed``), not just any push to the same repo.
+
+    Attributes:
+        dockerfile_path: Path to the Dockerfile, relative to the app's
+                        checked-out source root (default: "./Dockerfile").
+        build_target: Optional Dockerfile build target/stage.
+    """
+
+    dockerfile_path: str = "./Dockerfile"
+    build_target: str | None = None
+
+
 class SimplePulumiParams(BaseModel):
     """Parameters for simple Pulumi-only pipeline.
 
@@ -71,7 +106,10 @@ class SimplePulumiParams(BaseModel):
         additional_watched_paths: Additional paths to watch beyond PULUMI_WATCHED_PATHS.
         branch: Git branch to watch (default: "main").
         docker_image: Optional Docker image configuration for apps that depend on
-                     external Docker images.
+                     external Docker images, or (with ``build`` set) their own image.
+        build: Optional build configuration. When set, requires ``docker_image``
+              to also be set -- the build job pushes to the repository
+              ``docker_image`` watches.
         prior_stage_stack: Short stack name of the preceding stage that runs in a
                           different Concourse environment (e.g. "lakehouse.QA" when
                           this pipeline only runs the Production stage in prod
@@ -91,6 +129,7 @@ class SimplePulumiParams(BaseModel):
     additional_watched_paths: list[str] = []
     branch: str = "main"
     docker_image: DockerImageConfig | None = None
+    build: BuildConfig | None = None
     prior_stage_stack: str | None = None
 
     @model_validator(mode="before")
@@ -101,6 +140,17 @@ class SimplePulumiParams(BaseModel):
         if data.get("deployment_groups") and not data.get("auto_discover_stacks"):
             data["auto_discover_stacks"] = True
         return data
+
+    @model_validator(mode="after")
+    def validate_build_requires_docker_image(self) -> "SimplePulumiParams":
+        """Enforce that build is only set alongside docker_image."""
+        if self.build and not self.docker_image:
+            msg = (
+                f"{self.app_name}: build requires docker_image to also be set "
+                "-- the build job pushes to the repository docker_image watches."
+            )
+            raise ValueError(msg)
+        return self
 
 
 def discover_pulumi_stacks(
@@ -149,6 +199,82 @@ def discover_pulumi_stacks(
         # No deployment groups - return simple list sorted by stage
         stacks.sort(key=get_stage_priority)
         return stacks
+
+
+def _ensure_ecr_repository_step(ecr_registry_image_resource: Any) -> TaskStep:
+    """Return the 'create the ECR repo if it does not exist yet' step."""
+    return TaskStep(
+        task=Identifier("ensure-ecr-repository"),
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=AnonymousResource(
+                type="registry-image",
+                source={
+                    "repository": dockerhub_ecr_image_uri("amazon/aws-cli"),
+                    "tag": "latest",
+                    "aws_region": ECR_REGION,
+                },
+            ),
+            params={
+                "REPO_NAME": ecr_registry_image_resource.source["repository"],
+                "AWS_PAGER": "cat",
+            },
+            run=Command(
+                path="sh",
+                args=[
+                    "-exc",
+                    "aws ecr describe-repositories --repository-names ${REPO_NAME} || aws ecr create-repository --repository-name ${REPO_NAME}",
+                ],
+            ),
+        ),
+    )
+
+
+def _build_docker_image_job(
+    app_name: str,
+    pulumi_code: Any,
+    docker_image_resource: Any,
+    build_config: BuildConfig,
+) -> Job:
+    """Generate a job that builds this app's own image and pushes it to ECR.
+
+    Runs ahead of the Pulumi deploy chain; the deploy chain's docker_image
+    GetStep gates on this job via `passed` so it only redeploys images this
+    pipeline itself built, not an arbitrary push to the same ECR repository.
+    """
+    job_name = f"build-{app_name}-image"
+    additional_build_params = {}
+    if build_config.build_target:
+        additional_build_params = {"TARGET": build_config.build_target}
+
+    plan = [
+        GetStep(get=pulumi_code.name, trigger=True),
+        LoadVarStep(
+            load_var="git_ref",
+            file=f"{pulumi_code.name}/.git/ref",
+            reveal=True,
+        ),
+        container_build_task(
+            inputs=[Input(name=pulumi_code.name)],
+            build_parameters={
+                "CONTEXT": pulumi_code.name,
+                "DOCKERFILE": f"{pulumi_code.name}/{build_config.dockerfile_path}",
+                "BUILD_ARG_GIT_REF": "((.:git_ref))",
+                "PROGRESS": "plain",
+                **additional_build_params,
+            },
+            build_args=[],
+        ),
+        _ensure_ecr_repository_step(docker_image_resource),
+        PutStep(
+            put=docker_image_resource.name,
+            params={
+                "image": "image/image.tar",
+                "additional_tags": f"./{pulumi_code.name}/.git/short_ref",
+            },
+        ),
+    ]
+    return Job(name=Identifier(job_name), build_log_retention={"builds": 10}, plan=plan)
 
 
 pipeline_params: dict[str, SimplePulumiParams] = {
@@ -395,6 +521,23 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_name="ol-substructure-xpro-partner-dns",
         stages=["default"],
     ),
+    "release-bot": SimplePulumiParams(
+        app_name="release-bot",
+        pulumi_project_path="applications/release_bot/",
+        pulumi_project_name="ol-infrastructure-release-bot",
+        stack_prefix="applications.release_bot.applications",
+        stages=["Production"],
+        additional_watched_paths=["src/bridge/secrets/release_bot/"],
+        # Matches the ECR repository __main__.py actually creates:
+        # f"release-bot-{stack_info.env_suffix.lower()}" for the single
+        # Production stage -- "release-bot-ci" (a leftover from when this
+        # app had CI/QA/Production stages) never received any pushed image.
+        docker_image=DockerImageConfig(
+            image_repository="release-bot-production",
+            ecr_region=ECR_REGION,
+        ),
+        build=BuildConfig(dockerfile_path="./Dockerfile"),
+    ),
 }
 
 
@@ -436,6 +579,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
     docker_image_resource = None
     docker_dependencies = []
     docker_env_vars_from_files = {}
+    build_job: Job | None = None
 
     if params.docker_image:
         docker_image_resource = registry_image(
@@ -446,8 +590,23 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             password=params.docker_image.password,
             ecr_region=params.docker_image.ecr_region,
         )
+
+        # When this app builds and pushes its own image (rather than depending on
+        # an externally-published one), add that build job ahead of the deploy
+        # chain and gate the deploy chain's GetStep on it via `passed` -- so a
+        # redeploy only fires off images this pipeline itself built.
+        get_params: dict[str, Any] = {}
+        if params.build:
+            build_job = _build_docker_image_job(
+                app_name=app_name,
+                pulumi_code=pulumi_code,
+                docker_image_resource=docker_image_resource,
+                build_config=params.build,
+            )
+            get_params["passed"] = [build_job.name]
+
         docker_dependencies.append(
-            GetStep(get=docker_image_resource.name, trigger=True)
+            GetStep(get=docker_image_resource.name, trigger=True, **get_params)
         )
 
         # Set up environment variables from docker image files if configured
@@ -574,7 +733,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             combined_fragment = PipelineFragment(
                 resource_types=all_resource_types,
                 resources=all_pipeline_resources,
-                jobs=all_jobs,
+                jobs=[*([build_job] if build_job else []), *all_jobs],
             )
         else:
             # Single chain for simple discovered stacks
@@ -602,7 +761,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             combined_fragment = PipelineFragment(
                 resource_types=pulumi_fragment.resource_types,
                 resources=all_pipeline_resources,
-                jobs=pulumi_fragment.jobs,
+                jobs=[*([build_job] if build_job else []), *pulumi_fragment.jobs],
             )
     else:
         # Use explicitly configured stages - single chain.
@@ -635,7 +794,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
         combined_fragment = PipelineFragment(
             resource_types=pulumi_fragment.resource_types,
             resources=all_pipeline_resources,
-            jobs=pulumi_fragment.jobs,
+            jobs=[*([build_job] if build_job else []), *pulumi_fragment.jobs],
         )
 
     return combined_fragment.to_pipeline()

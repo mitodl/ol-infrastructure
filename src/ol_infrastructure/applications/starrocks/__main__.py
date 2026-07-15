@@ -360,13 +360,9 @@ starrocks_values: dict[str, Any] = {
         # BDB/BDBJE catalog replay and starmgr loadMeta (the second only runs on
         # the leader). Either can block the HTTP server for 30-120+ seconds.
         # 120s liveness tolerance prevents spurious kills during these phases.
-        # 600s startup tolerance covers the initial JVM + Raft bootstrap before
-        # the HTTP server opens at all.
+        # See startupProbeFailureSeconds below for the startup-phase tolerance.
         "livenessProbeFailureSeconds": fe_config.get(
             "liveness_probe_failure_seconds", 120
-        ),
-        "startupProbeFailureSeconds": fe_config.get(
-            "startup_probe_failure_seconds", 600
         ),
         "resources": {
             "requests": {
@@ -388,6 +384,13 @@ starrocks_values: dict[str, Any] = {
             "storageSize": fe_config.get("storage", "100Gi"),
             "logStorageSize": fe_config.get("log_storage", "100Gi"),
         },
+        # After extended downtime, FE must replay accumulated starmgr BDB journals
+        # before it can serve traffic. The default 300s startup probe is too short
+        # when replaying several days of journals. 7200s (2 hours) is sufficient
+        # headroom for even multi-day recovery scenarios.
+        "startupProbeFailureSeconds": fe_config.get(
+            "startup_probe_failure_seconds", 7200
+        ),
         **(
             {"feEnvVars": [{"name": "JAVA_TOOL_OPTIONS", "value": irsa_jvm_opts}]}
             if irsa_jvm_opts is not None
@@ -503,6 +506,14 @@ if starrocks_config.get_bool("use_cn"):
                 ],
             },
         },
+        # CN registration requires the starmgr to have a stable leader after FE
+        # recovery. With extended FE downtime, starmgr journal replay takes time,
+        # during which ADD COMPUTE NODE commands fail. 7200s gives CN enough
+        # time to succeed once the starmgr settles. Configurable via
+        # cn_config:startup_probe_failure_seconds.
+        "startupProbeFailureSeconds": cn_config.get(
+            "startup_probe_failure_seconds", 7200
+        ),
         **(
             {"cnEnvVars": [{"name": "JAVA_TOOL_OPTIONS", "value": irsa_jvm_opts}]}
             if irsa_jvm_opts is not None
