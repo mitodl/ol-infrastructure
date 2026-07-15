@@ -41,9 +41,8 @@ config:
     OPEN_CATALOG_URLS: 'https://open.mit.edu/api/v0/ocw_next_webhook/,https://api.learn.mit.edu/api/v1/ocw_next_webhook/'
     POST_TRANSCODE_ACTIONS: 'videos.api.update_video_job'
     PUBLISH_POSTHOG_API_HOST: https://ph.ol.mit.edu
-    PUBLISH_POSTHOG_ENABLED: 'false'
+    PUBLISH_POSTHOG_ENABLED: 'true'
     PUBLISH_POSTHOG_UI_HOST: https://us.posthog.com
-    PUBLISH_POSTHOG_COURSE_V3_ENABLED: 'true'
     PUBLISH_POSTHOG_PROJECT_API_KEY: 'phc_juxh91cHLBpfaiw9zaOBSqniiY8fZXhBCSu7TAsCe5e' # pragma: allowlist secret
     SEARCH_API_URL: 'https://open.mit.edu/api/v0/search/'
     SENTRY_LOG_LEVEL: 'WARN'
