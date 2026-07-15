@@ -425,6 +425,11 @@ app_env_vars = {
     "SOCIAL_AUTH_SAML_IDP_ENTITY_ID": "https://idp.mit.edu/shibboleth",
     "SOCIAL_AUTH_SAML_IDP_URL": "https://idp.mit.edu/idp/profile/SAML2/Redirect/SSO",
     "SOCIAL_AUTH_SAML_LOGIN_URL": "https://idp.mit.edu/idp/profile/SAML2/Redirect/SSO",
+    "SESSION_COOKIE_NAME": (
+        "session_ocwstudio"
+        if stack_info.name == "Production"
+        else f"session_ocwstudio_{env_name}"
+    ),
     "SOCIAL_AUTH_SAML_ORG_DISPLAYNAME": "MIT Open Learning",
     "SOCIAL_AUTH_SAML_SECURITY_ENCRYPTED": "True",
     "USE_X_FORWARDED_PORT": "True",
