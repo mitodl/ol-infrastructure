@@ -10,7 +10,7 @@ Last verified preview state for this branch:
 ```text
 PULUMI_TERRAFORM_VERSION=1.5.0 pulumi preview --diff
 Resources:
-    149 unchanged
+    145 unchanged
 ```
 
 ## Upstream bug and required workaround (now fixed in CI and locally)
@@ -96,7 +96,8 @@ Imported categories include:
 - Severities, roles, environments, incident causes, incident types, and incident role
 - Platform Engineering team
 - Rootly services, excluding the empty-state `christest` service
-- On-call schedule, schedule rotation, rotation users, escalation policies, and escalation levels
+- On-call schedule, schedule rotation, and rotation members (via `schedule_rotation_members`),
+  escalation policies, and escalation levels
 - Dashboards and dashboard panels
 - Incident permission sets and resource-scoped incident permissions
 - Alert sources and alert routes, excluding the empty-state Chris Test route
@@ -170,6 +171,27 @@ under `alert_source_secrets` and passed with `Output.secret(...)`.
 
 The SOPS secret file is currently KMS-encrypted. Add Vault transit recipients with
 `sops updatekeys` when suitable Vault access is available.
+
+### Legacy `ScheduleRotationUser` resources removed
+
+The provider deprecates `rootly_schedule_rotation_user` in favor of the
+`schedule_rotation_members` attribute on `rootly_schedule_rotation` (removal
+planned for the next provider major version). The primary rotation's
+`ScheduleRotation` resource already declared `schedule_rotation_members` with
+the same 4 people/positions as 4 separately-managed `ScheduleRotationUser`
+resources — Rootly was carrying two parallel membership record sets for the
+same rotation (legacy `schedule_rotation_users`, created 2025-05-09, alongside
+newer `schedule_rotation_members`, created 2025-10-09).
+
+Verified via the live Shifts API (`GET /v1/schedules/{id}/shifts`) that actual
+on-call computation already used the `schedule_rotation_members` set (one
+person per week, no duplication), so the legacy records were inert. Removed
+the 4 `ScheduleRotationUser` resources from Pulumi state with
+`pulumi state delete --force` (state-only; no Rootly API calls, so the live
+schedule was unaffected) and deleted the corresponding code. The 4 legacy
+`schedule_rotation_users` API records themselves still exist in Rootly,
+unmanaged and orphaned — deleting them via the Rootly UI/API is optional
+future cleanup, not urgent since they're inert.
 
 ## Validation commands
 
