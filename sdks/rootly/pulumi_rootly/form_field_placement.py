@@ -20,8 +20,8 @@ __all__ = ['FormFieldPlacementArgs', 'FormFieldPlacement']
 class FormFieldPlacementArgs:
     def __init__(__self__, *,
                  form: pulumi.Input[_builtins.str],
+                 form_field_id: pulumi.Input[_builtins.str],
                  form_set_id: pulumi.Input[_builtins.str],
-                 form_field_id: pulumi.Input[Optional[_builtins.str]] = None,
                  form_field_placement_id: pulumi.Input[Optional[_builtins.str]] = None,
                  non_editable: pulumi.Input[Optional[_builtins.bool]] = None,
                  placement_operator: pulumi.Input[Optional[_builtins.str]] = None,
@@ -32,8 +32,8 @@ class FormFieldPlacementArgs:
         The set of arguments for constructing a FormFieldPlacement resource.
 
         :param pulumi.Input[_builtins.str] form: The form this field is placed on.
-        :param pulumi.Input[_builtins.str] form_set_id: The form set this field is placed in.
         :param pulumi.Input[_builtins.str] form_field_id: The form field that is placed.
+        :param pulumi.Input[_builtins.str] form_set_id: The form set this field is placed in.
         :param pulumi.Input[_builtins.bool] non_editable: Whether the field is read-only and cannot be edited by users.. Value must be one of true or false
         :param pulumi.Input[_builtins.str] placement_operator: Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions " pulumi-lang-hcl=" form_field_placement_conditions "> formFieldPlacementConditions </span>with conditioned=placement. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`" pulumi-lang-hcl="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`" pulumi-lang-hcl="`or`">`or`</span>.
         :param pulumi.Input[_builtins.float] position: The position of the field placement.
@@ -41,9 +41,8 @@ class FormFieldPlacementArgs:
         :param pulumi.Input[_builtins.str] required_operator: Logical operator when evaluating multiple<span pulumi-lang-nodejs=" formFieldPlacementConditions " pulumi-lang-dotnet=" FormFieldPlacementConditions " pulumi-lang-go=" formFieldPlacementConditions " pulumi-lang-python=" form_field_placement_conditions " pulumi-lang-yaml=" formFieldPlacementConditions " pulumi-lang-java=" formFieldPlacementConditions " pulumi-lang-hcl=" form_field_placement_conditions "> formFieldPlacementConditions </span>with conditioned=required. Value must be one of <span pulumi-lang-nodejs="`and`" pulumi-lang-dotnet="`And`" pulumi-lang-go="`and`" pulumi-lang-python="`and`" pulumi-lang-yaml="`and`" pulumi-lang-java="`and`" pulumi-lang-hcl="`and`">`and`</span>, <span pulumi-lang-nodejs="`or`" pulumi-lang-dotnet="`Or`" pulumi-lang-go="`or`" pulumi-lang-python="`or`" pulumi-lang-yaml="`or`" pulumi-lang-java="`or`" pulumi-lang-hcl="`or`">`or`</span>.
         """
         pulumi.set(__self__, "form", form)
+        pulumi.set(__self__, "form_field_id", form_field_id)
         pulumi.set(__self__, "form_set_id", form_set_id)
-        if form_field_id is not None:
-            pulumi.set(__self__, "form_field_id", form_field_id)
         if form_field_placement_id is not None:
             pulumi.set(__self__, "form_field_placement_id", form_field_placement_id)
         if non_editable is not None:
@@ -70,6 +69,18 @@ class FormFieldPlacementArgs:
         pulumi.set(self, "form", value)
 
     @_builtins.property
+    @pulumi.getter(name="formFieldId")
+    def form_field_id(self) -> pulumi.Input[_builtins.str]:
+        """
+        The form field that is placed.
+        """
+        return pulumi.get(self, "form_field_id")
+
+    @form_field_id.setter
+    def form_field_id(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "form_field_id", value)
+
+    @_builtins.property
     @pulumi.getter(name="formSetId")
     def form_set_id(self) -> pulumi.Input[_builtins.str]:
         """
@@ -80,18 +91,6 @@ class FormFieldPlacementArgs:
     @form_set_id.setter
     def form_set_id(self, value: pulumi.Input[_builtins.str]):
         pulumi.set(self, "form_set_id", value)
-
-    @_builtins.property
-    @pulumi.getter(name="formFieldId")
-    def form_field_id(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The form field that is placed.
-        """
-        return pulumi.get(self, "form_field_id")
-
-    @form_field_id.setter
-    def form_field_id(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "form_field_id", value)
 
     @_builtins.property
     @pulumi.getter(name="formFieldPlacementId")
@@ -387,6 +386,8 @@ class FormFieldPlacement(pulumi.CustomResource):
             if form is None and not opts.urn:
                 raise TypeError("Missing required property 'form'")
             __props__.__dict__["form"] = form
+            if form_field_id is None and not opts.urn:
+                raise TypeError("Missing required property 'form_field_id'")
             __props__.__dict__["form_field_id"] = form_field_id
             __props__.__dict__["form_field_placement_id"] = form_field_placement_id
             if form_set_id is None and not opts.urn:

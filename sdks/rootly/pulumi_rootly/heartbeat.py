@@ -33,8 +33,7 @@ class HeartbeatArgs:
                  last_pinged_at: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  notification_target_type: pulumi.Input[Optional[_builtins.str]] = None,
-                 ping_url: pulumi.Input[Optional[_builtins.str]] = None,
-                 secret: pulumi.Input[Optional[_builtins.str]] = None,
+                 owner_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  status: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a Heartbeat resource.
@@ -49,8 +48,7 @@ class HeartbeatArgs:
         :param pulumi.Input[_builtins.str] last_pinged_at: When the heartbeat was last pinged.
         :param pulumi.Input[_builtins.str] name: The name of the heartbeat
         :param pulumi.Input[_builtins.str] notification_target_type: The type of the notification target. Please contact support if you encounter issues using `Functionality` as a target type.. Value must be one of `User`, `Group`, `Service`, `EscalationPolicy`, `Functionality`.
-        :param pulumi.Input[_builtins.str] ping_url: URL to receive heartbeat pings.
-        :param pulumi.Input[_builtins.str] secret: Secret used as bearer token when pinging heartbeat.
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] owner_group_ids: List of team IDs that own this heartbeat
         :param pulumi.Input[_builtins.str] status: Value must be one of <span pulumi-lang-nodejs="`waiting`" pulumi-lang-dotnet="`Waiting`" pulumi-lang-go="`waiting`" pulumi-lang-python="`waiting`" pulumi-lang-yaml="`waiting`" pulumi-lang-java="`waiting`" pulumi-lang-hcl="`waiting`">`waiting`</span>, <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`" pulumi-lang-hcl="`active`">`active`</span>, <span pulumi-lang-nodejs="`expired`" pulumi-lang-dotnet="`Expired`" pulumi-lang-go="`expired`" pulumi-lang-python="`expired`" pulumi-lang-yaml="`expired`" pulumi-lang-java="`expired`" pulumi-lang-hcl="`expired`">`expired`</span>.
         """
         pulumi.set(__self__, "alert_summary", alert_summary)
@@ -78,10 +76,8 @@ class HeartbeatArgs:
             pulumi.set(__self__, "name", name)
         if notification_target_type is not None:
             pulumi.set(__self__, "notification_target_type", notification_target_type)
-        if ping_url is not None:
-            pulumi.set(__self__, "ping_url", ping_url)
-        if secret is not None:
-            pulumi.set(__self__, "secret", secret)
+        if owner_group_ids is not None:
+            pulumi.set(__self__, "owner_group_ids", owner_group_ids)
         if status is not None:
             pulumi.set(__self__, "status", status)
 
@@ -242,28 +238,16 @@ class HeartbeatArgs:
         pulumi.set(self, "notification_target_type", value)
 
     @_builtins.property
-    @pulumi.getter(name="pingUrl")
-    def ping_url(self) -> pulumi.Input[Optional[_builtins.str]]:
+    @pulumi.getter(name="ownerGroupIds")
+    def owner_group_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
-        URL to receive heartbeat pings.
+        List of team IDs that own this heartbeat
         """
-        return pulumi.get(self, "ping_url")
+        return pulumi.get(self, "owner_group_ids")
 
-    @ping_url.setter
-    def ping_url(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "ping_url", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def secret(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Secret used as bearer token when pinging heartbeat.
-        """
-        return pulumi.get(self, "secret")
-
-    @secret.setter
-    def secret(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "secret", value)
+    @owner_group_ids.setter
+    def owner_group_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "owner_group_ids", value)
 
     @_builtins.property
     @pulumi.getter
@@ -295,6 +279,7 @@ class _HeartbeatState:
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  notification_target_id: pulumi.Input[Optional[_builtins.str]] = None,
                  notification_target_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 owner_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  ping_url: pulumi.Input[Optional[_builtins.str]] = None,
                  secret: pulumi.Input[Optional[_builtins.str]] = None,
                  status: pulumi.Input[Optional[_builtins.str]] = None):
@@ -311,6 +296,7 @@ class _HeartbeatState:
         :param pulumi.Input[_builtins.str] last_pinged_at: When the heartbeat was last pinged.
         :param pulumi.Input[_builtins.str] name: The name of the heartbeat
         :param pulumi.Input[_builtins.str] notification_target_type: The type of the notification target. Please contact support if you encounter issues using `Functionality` as a target type.. Value must be one of `User`, `Group`, `Service`, `EscalationPolicy`, `Functionality`.
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] owner_group_ids: List of team IDs that own this heartbeat
         :param pulumi.Input[_builtins.str] ping_url: URL to receive heartbeat pings.
         :param pulumi.Input[_builtins.str] secret: Secret used as bearer token when pinging heartbeat.
         :param pulumi.Input[_builtins.str] status: Value must be one of <span pulumi-lang-nodejs="`waiting`" pulumi-lang-dotnet="`Waiting`" pulumi-lang-go="`waiting`" pulumi-lang-python="`waiting`" pulumi-lang-yaml="`waiting`" pulumi-lang-java="`waiting`" pulumi-lang-hcl="`waiting`">`waiting`</span>, <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`" pulumi-lang-hcl="`active`">`active`</span>, <span pulumi-lang-nodejs="`expired`" pulumi-lang-dotnet="`Expired`" pulumi-lang-go="`expired`" pulumi-lang-python="`expired`" pulumi-lang-yaml="`expired`" pulumi-lang-java="`expired`" pulumi-lang-hcl="`expired`">`expired`</span>.
@@ -343,6 +329,8 @@ class _HeartbeatState:
             pulumi.set(__self__, "notification_target_id", notification_target_id)
         if notification_target_type is not None:
             pulumi.set(__self__, "notification_target_type", notification_target_type)
+        if owner_group_ids is not None:
+            pulumi.set(__self__, "owner_group_ids", owner_group_ids)
         if ping_url is not None:
             pulumi.set(__self__, "ping_url", ping_url)
         if secret is not None:
@@ -507,6 +495,18 @@ class _HeartbeatState:
         pulumi.set(self, "notification_target_type", value)
 
     @_builtins.property
+    @pulumi.getter(name="ownerGroupIds")
+    def owner_group_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
+        """
+        List of team IDs that own this heartbeat
+        """
+        return pulumi.get(self, "owner_group_ids")
+
+    @owner_group_ids.setter
+    def owner_group_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "owner_group_ids", value)
+
+    @_builtins.property
     @pulumi.getter(name="pingUrl")
     def ping_url(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
@@ -563,8 +563,7 @@ class Heartbeat(pulumi.CustomResource):
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  notification_target_id: pulumi.Input[Optional[_builtins.str]] = None,
                  notification_target_type: pulumi.Input[Optional[_builtins.str]] = None,
-                 ping_url: pulumi.Input[Optional[_builtins.str]] = None,
-                 secret: pulumi.Input[Optional[_builtins.str]] = None,
+                 owner_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  status: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
@@ -582,8 +581,7 @@ class Heartbeat(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] last_pinged_at: When the heartbeat was last pinged.
         :param pulumi.Input[_builtins.str] name: The name of the heartbeat
         :param pulumi.Input[_builtins.str] notification_target_type: The type of the notification target. Please contact support if you encounter issues using `Functionality` as a target type.. Value must be one of `User`, `Group`, `Service`, `EscalationPolicy`, `Functionality`.
-        :param pulumi.Input[_builtins.str] ping_url: URL to receive heartbeat pings.
-        :param pulumi.Input[_builtins.str] secret: Secret used as bearer token when pinging heartbeat.
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] owner_group_ids: List of team IDs that own this heartbeat
         :param pulumi.Input[_builtins.str] status: Value must be one of <span pulumi-lang-nodejs="`waiting`" pulumi-lang-dotnet="`Waiting`" pulumi-lang-go="`waiting`" pulumi-lang-python="`waiting`" pulumi-lang-yaml="`waiting`" pulumi-lang-java="`waiting`" pulumi-lang-hcl="`waiting`">`waiting`</span>, <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`" pulumi-lang-hcl="`active`">`active`</span>, <span pulumi-lang-nodejs="`expired`" pulumi-lang-dotnet="`Expired`" pulumi-lang-go="`expired`" pulumi-lang-python="`expired`" pulumi-lang-yaml="`expired`" pulumi-lang-java="`expired`" pulumi-lang-hcl="`expired`">`expired`</span>.
         """
         ...
@@ -624,8 +622,7 @@ class Heartbeat(pulumi.CustomResource):
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  notification_target_id: pulumi.Input[Optional[_builtins.str]] = None,
                  notification_target_type: pulumi.Input[Optional[_builtins.str]] = None,
-                 ping_url: pulumi.Input[Optional[_builtins.str]] = None,
-                 secret: pulumi.Input[Optional[_builtins.str]] = None,
+                 owner_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  status: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
@@ -656,9 +653,10 @@ class Heartbeat(pulumi.CustomResource):
                 raise TypeError("Missing required property 'notification_target_id'")
             __props__.__dict__["notification_target_id"] = notification_target_id
             __props__.__dict__["notification_target_type"] = notification_target_type
-            __props__.__dict__["ping_url"] = ping_url
-            __props__.__dict__["secret"] = secret
+            __props__.__dict__["owner_group_ids"] = owner_group_ids
             __props__.__dict__["status"] = status
+            __props__.__dict__["ping_url"] = None
+            __props__.__dict__["secret"] = None
         super(Heartbeat, __self__).__init__(
             'rootly:index/heartbeat:Heartbeat',
             resource_name,
@@ -684,6 +682,7 @@ class Heartbeat(pulumi.CustomResource):
             name: pulumi.Input[Optional[_builtins.str]] = None,
             notification_target_id: pulumi.Input[Optional[_builtins.str]] = None,
             notification_target_type: pulumi.Input[Optional[_builtins.str]] = None,
+            owner_group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
             ping_url: pulumi.Input[Optional[_builtins.str]] = None,
             secret: pulumi.Input[Optional[_builtins.str]] = None,
             status: pulumi.Input[Optional[_builtins.str]] = None) -> 'Heartbeat':
@@ -704,6 +703,7 @@ class Heartbeat(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] last_pinged_at: When the heartbeat was last pinged.
         :param pulumi.Input[_builtins.str] name: The name of the heartbeat
         :param pulumi.Input[_builtins.str] notification_target_type: The type of the notification target. Please contact support if you encounter issues using `Functionality` as a target type.. Value must be one of `User`, `Group`, `Service`, `EscalationPolicy`, `Functionality`.
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] owner_group_ids: List of team IDs that own this heartbeat
         :param pulumi.Input[_builtins.str] ping_url: URL to receive heartbeat pings.
         :param pulumi.Input[_builtins.str] secret: Secret used as bearer token when pinging heartbeat.
         :param pulumi.Input[_builtins.str] status: Value must be one of <span pulumi-lang-nodejs="`waiting`" pulumi-lang-dotnet="`Waiting`" pulumi-lang-go="`waiting`" pulumi-lang-python="`waiting`" pulumi-lang-yaml="`waiting`" pulumi-lang-java="`waiting`" pulumi-lang-hcl="`waiting`">`waiting`</span>, <span pulumi-lang-nodejs="`active`" pulumi-lang-dotnet="`Active`" pulumi-lang-go="`active`" pulumi-lang-python="`active`" pulumi-lang-yaml="`active`" pulumi-lang-java="`active`" pulumi-lang-hcl="`active`">`active`</span>, <span pulumi-lang-nodejs="`expired`" pulumi-lang-dotnet="`Expired`" pulumi-lang-go="`expired`" pulumi-lang-python="`expired`" pulumi-lang-yaml="`expired`" pulumi-lang-java="`expired`" pulumi-lang-hcl="`expired`">`expired`</span>.
@@ -726,6 +726,7 @@ class Heartbeat(pulumi.CustomResource):
         __props__.__dict__["name"] = name
         __props__.__dict__["notification_target_id"] = notification_target_id
         __props__.__dict__["notification_target_type"] = notification_target_type
+        __props__.__dict__["owner_group_ids"] = owner_group_ids
         __props__.__dict__["ping_url"] = ping_url
         __props__.__dict__["secret"] = secret
         __props__.__dict__["status"] = status
@@ -830,6 +831,14 @@ class Heartbeat(pulumi.CustomResource):
         The type of the notification target. Please contact support if you encounter issues using `Functionality` as a target type.. Value must be one of `User`, `Group`, `Service`, `EscalationPolicy`, `Functionality`.
         """
         return pulumi.get(self, "notification_target_type")
+
+    @_builtins.property
+    @pulumi.getter(name="ownerGroupIds")
+    def owner_group_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
+        """
+        List of team IDs that own this heartbeat
+        """
+        return pulumi.get(self, "owner_group_ids")
 
     @_builtins.property
     @pulumi.getter(name="pingUrl")

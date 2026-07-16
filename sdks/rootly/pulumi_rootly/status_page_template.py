@@ -20,12 +20,12 @@ __all__ = ['StatusPageTemplateArgs', 'StatusPageTemplate']
 class StatusPageTemplateArgs:
     def __init__(__self__, *,
                  body: pulumi.Input[_builtins.str],
+                 status_page_id: pulumi.Input[_builtins.str],
                  title: pulumi.Input[_builtins.str],
                  enabled: pulumi.Input[Optional[_builtins.bool]] = None,
                  kind: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
                  should_notify_subscribers: pulumi.Input[Optional[_builtins.bool]] = None,
-                 status_page_id: pulumi.Input[Optional[_builtins.str]] = None,
                  status_page_template_id: pulumi.Input[Optional[_builtins.str]] = None,
                  update_status: pulumi.Input[Optional[_builtins.str]] = None,
                  update_title: pulumi.Input[Optional[_builtins.str]] = None):
@@ -41,6 +41,7 @@ class StatusPageTemplateArgs:
         :param pulumi.Input[_builtins.str] update_title: Title that will be used for the status page update
         """
         pulumi.set(__self__, "body", body)
+        pulumi.set(__self__, "status_page_id", status_page_id)
         pulumi.set(__self__, "title", title)
         if enabled is not None:
             pulumi.set(__self__, "enabled", enabled)
@@ -50,8 +51,6 @@ class StatusPageTemplateArgs:
             pulumi.set(__self__, "position", position)
         if should_notify_subscribers is not None:
             pulumi.set(__self__, "should_notify_subscribers", should_notify_subscribers)
-        if status_page_id is not None:
-            pulumi.set(__self__, "status_page_id", status_page_id)
         if status_page_template_id is not None:
             pulumi.set(__self__, "status_page_template_id", status_page_template_id)
         if update_status is not None:
@@ -70,6 +69,15 @@ class StatusPageTemplateArgs:
     @body.setter
     def body(self, value: pulumi.Input[_builtins.str]):
         pulumi.set(self, "body", value)
+
+    @_builtins.property
+    @pulumi.getter(name="statusPageId")
+    def status_page_id(self) -> pulumi.Input[_builtins.str]:
+        return pulumi.get(self, "status_page_id")
+
+    @status_page_id.setter
+    def status_page_id(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "status_page_id", value)
 
     @_builtins.property
     @pulumi.getter
@@ -127,15 +135,6 @@ class StatusPageTemplateArgs:
     @should_notify_subscribers.setter
     def should_notify_subscribers(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "should_notify_subscribers", value)
-
-    @_builtins.property
-    @pulumi.getter(name="statusPageId")
-    def status_page_id(self) -> pulumi.Input[Optional[_builtins.str]]:
-        return pulumi.get(self, "status_page_id")
-
-    @status_page_id.setter
-    def status_page_id(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "status_page_id", value)
 
     @_builtins.property
     @pulumi.getter(name="statusPageTemplateId")
@@ -408,6 +407,8 @@ class StatusPageTemplate(pulumi.CustomResource):
             __props__.__dict__["kind"] = kind
             __props__.__dict__["position"] = position
             __props__.__dict__["should_notify_subscribers"] = should_notify_subscribers
+            if status_page_id is None and not opts.urn:
+                raise TypeError("Missing required property 'status_page_id'")
             __props__.__dict__["status_page_id"] = status_page_id
             __props__.__dict__["status_page_template_id"] = status_page_template_id
             if title is None and not opts.urn:

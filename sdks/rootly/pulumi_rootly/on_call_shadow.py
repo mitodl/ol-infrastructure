@@ -20,30 +20,29 @@ __all__ = ['OnCallShadowArgs', 'OnCallShadow']
 class OnCallShadowArgs:
     def __init__(__self__, *,
                  ends_at: pulumi.Input[_builtins.str],
+                 schedule_id: pulumi.Input[_builtins.str],
                  shadow_user_id: pulumi.Input[_builtins.float],
                  shadowable_id: pulumi.Input[_builtins.str],
                  starts_at: pulumi.Input[_builtins.str],
                  on_call_shadow_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
                  shadowable_type: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a OnCallShadow resource.
 
         :param pulumi.Input[_builtins.str] ends_at: End datetime for shadow shift
+        :param pulumi.Input[_builtins.str] schedule_id: ID of schedule the shadow shift belongs to
         :param pulumi.Input[_builtins.float] shadow_user_id: Which user the shadow shift belongs to.
         :param pulumi.Input[_builtins.str] shadowable_id: ID of schedule or user the shadow user is shadowing
         :param pulumi.Input[_builtins.str] starts_at: Start datetime of shadow shift
-        :param pulumi.Input[_builtins.str] schedule_id: ID of schedule the shadow shift belongs to
         :param pulumi.Input[_builtins.str] shadowable_type: Value must be one of `User`, `Schedule`.
         """
         pulumi.set(__self__, "ends_at", ends_at)
+        pulumi.set(__self__, "schedule_id", schedule_id)
         pulumi.set(__self__, "shadow_user_id", shadow_user_id)
         pulumi.set(__self__, "shadowable_id", shadowable_id)
         pulumi.set(__self__, "starts_at", starts_at)
         if on_call_shadow_id is not None:
             pulumi.set(__self__, "on_call_shadow_id", on_call_shadow_id)
-        if schedule_id is not None:
-            pulumi.set(__self__, "schedule_id", schedule_id)
         if shadowable_type is not None:
             pulumi.set(__self__, "shadowable_type", shadowable_type)
 
@@ -58,6 +57,18 @@ class OnCallShadowArgs:
     @ends_at.setter
     def ends_at(self, value: pulumi.Input[_builtins.str]):
         pulumi.set(self, "ends_at", value)
+
+    @_builtins.property
+    @pulumi.getter(name="scheduleId")
+    def schedule_id(self) -> pulumi.Input[_builtins.str]:
+        """
+        ID of schedule the shadow shift belongs to
+        """
+        return pulumi.get(self, "schedule_id")
+
+    @schedule_id.setter
+    def schedule_id(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "schedule_id", value)
 
     @_builtins.property
     @pulumi.getter(name="shadowUserId")
@@ -103,18 +114,6 @@ class OnCallShadowArgs:
     @on_call_shadow_id.setter
     def on_call_shadow_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "on_call_shadow_id", value)
-
-    @_builtins.property
-    @pulumi.getter(name="scheduleId")
-    def schedule_id(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        ID of schedule the shadow shift belongs to
-        """
-        return pulumi.get(self, "schedule_id")
-
-    @schedule_id.setter
-    def schedule_id(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "schedule_id", value)
 
     @_builtins.property
     @pulumi.getter(name="shadowableType")
@@ -316,6 +315,8 @@ class OnCallShadow(pulumi.CustomResource):
                 raise TypeError("Missing required property 'ends_at'")
             __props__.__dict__["ends_at"] = ends_at
             __props__.__dict__["on_call_shadow_id"] = on_call_shadow_id
+            if schedule_id is None and not opts.urn:
+                raise TypeError("Missing required property 'schedule_id'")
             __props__.__dict__["schedule_id"] = schedule_id
             if shadow_user_id is None and not opts.urn:
                 raise TypeError("Missing required property 'shadow_user_id'")

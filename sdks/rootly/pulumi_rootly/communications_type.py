@@ -23,8 +23,7 @@ class CommunicationsTypeArgs:
                  communications_type_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 position: pulumi.Input[Optional[_builtins.float]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None):
+                 position: pulumi.Input[Optional[_builtins.float]] = None):
         """
         The set of arguments for constructing a CommunicationsType resource.
 
@@ -32,7 +31,6 @@ class CommunicationsTypeArgs:
         :param pulumi.Input[_builtins.str] description: The description of the communications type
         :param pulumi.Input[_builtins.str] name: The name of the communications type
         :param pulumi.Input[_builtins.float] position: Position of the communications type
-        :param pulumi.Input[_builtins.str] slug: The slug of the communications type
         """
         pulumi.set(__self__, "color", color)
         if communications_type_id is not None:
@@ -43,8 +41,6 @@ class CommunicationsTypeArgs:
             pulumi.set(__self__, "name", name)
         if position is not None:
             pulumi.set(__self__, "position", position)
-        if slug is not None:
-            pulumi.set(__self__, "slug", slug)
 
     @_builtins.property
     @pulumi.getter
@@ -102,18 +98,6 @@ class CommunicationsTypeArgs:
     @position.setter
     def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The slug of the communications type
-        """
-        return pulumi.get(self, "slug")
-
-    @slug.setter
-    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "slug", value)
 
 
 @pulumi.input_type
@@ -228,7 +212,6 @@ class CommunicationsType(pulumi.CustomResource):
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a CommunicationsType resource with the given unique name, props, and options.
@@ -239,7 +222,6 @@ class CommunicationsType(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] description: The description of the communications type
         :param pulumi.Input[_builtins.str] name: The name of the communications type
         :param pulumi.Input[_builtins.float] position: Position of the communications type
-        :param pulumi.Input[_builtins.str] slug: The slug of the communications type
         """
         ...
     @overload
@@ -270,7 +252,6 @@ class CommunicationsType(pulumi.CustomResource):
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -287,7 +268,7 @@ class CommunicationsType(pulumi.CustomResource):
             __props__.__dict__["description"] = description
             __props__.__dict__["name"] = name
             __props__.__dict__["position"] = position
-            __props__.__dict__["slug"] = slug
+            __props__.__dict__["slug"] = None
         super(CommunicationsType, __self__).__init__(
             'rootly:index/communicationsType:CommunicationsType',
             resource_name,

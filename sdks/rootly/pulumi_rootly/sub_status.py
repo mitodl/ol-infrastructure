@@ -23,7 +23,6 @@ class SubStatusArgs:
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  parent_status: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  sub_status_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a SubStatus resource.
@@ -38,8 +37,6 @@ class SubStatusArgs:
             pulumi.set(__self__, "parent_status", parent_status)
         if position is not None:
             pulumi.set(__self__, "position", position)
-        if slug is not None:
-            pulumi.set(__self__, "slug", slug)
         if sub_status_id is not None:
             pulumi.set(__self__, "sub_status_id", sub_status_id)
 
@@ -81,15 +78,6 @@ class SubStatusArgs:
     @position.setter
     def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
-        return pulumi.get(self, "slug")
-
-    @slug.setter
-    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "slug", value)
 
     @_builtins.property
     @pulumi.getter(name="subStatusId")
@@ -196,7 +184,6 @@ class SubStatus(pulumi.CustomResource):
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  parent_status: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  sub_status_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
@@ -234,7 +221,6 @@ class SubStatus(pulumi.CustomResource):
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  parent_status: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  sub_status_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
@@ -249,8 +235,8 @@ class SubStatus(pulumi.CustomResource):
             __props__.__dict__["name"] = name
             __props__.__dict__["parent_status"] = parent_status
             __props__.__dict__["position"] = position
-            __props__.__dict__["slug"] = slug
             __props__.__dict__["sub_status_id"] = sub_status_id
+            __props__.__dict__["slug"] = None
         super(SubStatus, __self__).__init__(
             'rootly:index/subStatus:SubStatus',
             resource_name,

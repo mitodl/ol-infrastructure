@@ -25,8 +25,7 @@ class CauseArgs:
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
-                 properties: pulumi.Input[Optional[Sequence[pulumi.Input['CausePropertyArgs']]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None):
+                 properties: pulumi.Input[Optional[Sequence[pulumi.Input['CausePropertyArgs']]]] = None):
         """
         The set of arguments for constructing a Cause resource.
 
@@ -34,7 +33,6 @@ class CauseArgs:
         :param pulumi.Input[_builtins.str] name: The name of the cause
         :param pulumi.Input[_builtins.float] position: Position of the cause
         :param pulumi.Input[Sequence[pulumi.Input['CausePropertyArgs']]] properties: Array of property values for this cause.
-        :param pulumi.Input[_builtins.str] slug: The slug of the cause
         """
         if cause_id is not None:
             pulumi.set(__self__, "cause_id", cause_id)
@@ -46,8 +44,6 @@ class CauseArgs:
             pulumi.set(__self__, "position", position)
         if properties is not None:
             pulumi.set(__self__, "properties", properties)
-        if slug is not None:
-            pulumi.set(__self__, "slug", slug)
 
     @_builtins.property
     @pulumi.getter(name="causeId")
@@ -105,18 +101,6 @@ class CauseArgs:
     @properties.setter
     def properties(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['CausePropertyArgs']]]]):
         pulumi.set(self, "properties", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The slug of the cause
-        """
-        return pulumi.get(self, "slug")
-
-    @slug.setter
-    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "slug", value)
 
 
 @pulumi.input_type
@@ -231,7 +215,6 @@ class Cause(pulumi.CustomResource):
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
                  properties: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CausePropertyArgs', 'CausePropertyArgsDict']]]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a Cause resource with the given unique name, props, and options.
@@ -242,7 +225,6 @@ class Cause(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] name: The name of the cause
         :param pulumi.Input[_builtins.float] position: Position of the cause
         :param pulumi.Input[Sequence[pulumi.Input[Union['CausePropertyArgs', 'CausePropertyArgsDict']]]] properties: Array of property values for this cause.
-        :param pulumi.Input[_builtins.str] slug: The slug of the cause
         """
         ...
     @overload
@@ -273,7 +255,6 @@ class Cause(pulumi.CustomResource):
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
                  properties: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CausePropertyArgs', 'CausePropertyArgsDict']]]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -288,7 +269,7 @@ class Cause(pulumi.CustomResource):
             __props__.__dict__["name"] = name
             __props__.__dict__["position"] = position
             __props__.__dict__["properties"] = properties
-            __props__.__dict__["slug"] = slug
+            __props__.__dict__["slug"] = None
         super(Cause, __self__).__init__(
             'rootly:index/cause:Cause',
             resource_name,
