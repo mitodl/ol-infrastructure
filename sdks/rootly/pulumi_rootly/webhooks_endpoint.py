@@ -13,6 +13,8 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import NotRequired, TypedDict, TypeAlias
 from . import _utilities
+from . import outputs
+from ._inputs import *
 
 __all__ = ['WebhooksEndpointArgs', 'WebhooksEndpoint']
 
@@ -20,22 +22,24 @@ __all__ = ['WebhooksEndpointArgs', 'WebhooksEndpoint']
 class WebhooksEndpointArgs:
     def __init__(__self__, *,
                  url: pulumi.Input[_builtins.str],
+                 custom_headers: pulumi.Input[Optional[Sequence[pulumi.Input['WebhooksEndpointCustomHeaderArgs']]]] = None,
                  enabled: pulumi.Input[Optional[_builtins.bool]] = None,
                  event_types: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  secret: pulumi.Input[Optional[_builtins.str]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  webhooks_endpoint_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a WebhooksEndpoint resource.
 
         :param pulumi.Input[_builtins.str] url: The URL of the endpoint.
+        :param pulumi.Input[Sequence[pulumi.Input['WebhooksEndpointCustomHeaderArgs']]] custom_headers: Custom HTTP headers sent with each delivery. Max 10. Reserved names (Content-Type, X-Rootly-Signature, Host, etc.) are rejected.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] event_types: Value must be one of `incident.created`, `incident.updated`, `incident.in_triage`, `incident.mitigated`, `incident.resolved`, `incident.cancelled`, `incident.deleted`, `incident.scheduled.created`, `incident.scheduled.updated`, `incident.scheduled.in_progress`, `incident.scheduled.completed`, `incident.scheduled.deleted`, `incident_post_mortem.created`, `incident_post_mortem.updated`, `incident_post_mortem.published`, `incident_post_mortem.deleted`, `incident_status_page_event.created`, `incident_status_page_event.updated`, `incident_status_page_event.deleted`, `incident_event.created`, `incident_event.updated`, `incident_event.deleted`, `alert.created`, `pulse.created`, `shift.started`, `genius_workflow_run.queued`, `genius_workflow_run.started`, `genius_workflow_run.completed`, `genius_workflow_run.failed`, `genius_workflow_run.canceled`, `audit_log.created`.
         :param pulumi.Input[_builtins.str] name: The name of the endpoint
         :param pulumi.Input[_builtins.str] secret: The webhook signing secret used to verify webhook requests.
-        :param pulumi.Input[_builtins.str] slug: The slug of the endpoint
         """
         pulumi.set(__self__, "url", url)
+        if custom_headers is not None:
+            pulumi.set(__self__, "custom_headers", custom_headers)
         if enabled is not None:
             pulumi.set(__self__, "enabled", enabled)
         if event_types is not None:
@@ -44,8 +48,6 @@ class WebhooksEndpointArgs:
             pulumi.set(__self__, "name", name)
         if secret is not None:
             pulumi.set(__self__, "secret", secret)
-        if slug is not None:
-            pulumi.set(__self__, "slug", slug)
         if webhooks_endpoint_id is not None:
             pulumi.set(__self__, "webhooks_endpoint_id", webhooks_endpoint_id)
 
@@ -60,6 +62,18 @@ class WebhooksEndpointArgs:
     @url.setter
     def url(self, value: pulumi.Input[_builtins.str]):
         pulumi.set(self, "url", value)
+
+    @_builtins.property
+    @pulumi.getter(name="customHeaders")
+    def custom_headers(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['WebhooksEndpointCustomHeaderArgs']]]]:
+        """
+        Custom HTTP headers sent with each delivery. Max 10. Reserved names (Content-Type, X-Rootly-Signature, Host, etc.) are rejected.
+        """
+        return pulumi.get(self, "custom_headers")
+
+    @custom_headers.setter
+    def custom_headers(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['WebhooksEndpointCustomHeaderArgs']]]]):
+        pulumi.set(self, "custom_headers", value)
 
     @_builtins.property
     @pulumi.getter
@@ -107,18 +121,6 @@ class WebhooksEndpointArgs:
         pulumi.set(self, "secret", value)
 
     @_builtins.property
-    @pulumi.getter
-    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The slug of the endpoint
-        """
-        return pulumi.get(self, "slug")
-
-    @slug.setter
-    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "slug", value)
-
-    @_builtins.property
     @pulumi.getter(name="webhooksEndpointId")
     def webhooks_endpoint_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "webhooks_endpoint_id")
@@ -131,6 +133,7 @@ class WebhooksEndpointArgs:
 @pulumi.input_type
 class _WebhooksEndpointState:
     def __init__(__self__, *,
+                 custom_headers: pulumi.Input[Optional[Sequence[pulumi.Input['WebhooksEndpointCustomHeaderArgs']]]] = None,
                  enabled: pulumi.Input[Optional[_builtins.bool]] = None,
                  event_types: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
@@ -141,12 +144,15 @@ class _WebhooksEndpointState:
         """
         Input properties used for looking up and filtering WebhooksEndpoint resources.
 
+        :param pulumi.Input[Sequence[pulumi.Input['WebhooksEndpointCustomHeaderArgs']]] custom_headers: Custom HTTP headers sent with each delivery. Max 10. Reserved names (Content-Type, X-Rootly-Signature, Host, etc.) are rejected.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] event_types: Value must be one of `incident.created`, `incident.updated`, `incident.in_triage`, `incident.mitigated`, `incident.resolved`, `incident.cancelled`, `incident.deleted`, `incident.scheduled.created`, `incident.scheduled.updated`, `incident.scheduled.in_progress`, `incident.scheduled.completed`, `incident.scheduled.deleted`, `incident_post_mortem.created`, `incident_post_mortem.updated`, `incident_post_mortem.published`, `incident_post_mortem.deleted`, `incident_status_page_event.created`, `incident_status_page_event.updated`, `incident_status_page_event.deleted`, `incident_event.created`, `incident_event.updated`, `incident_event.deleted`, `alert.created`, `pulse.created`, `shift.started`, `genius_workflow_run.queued`, `genius_workflow_run.started`, `genius_workflow_run.completed`, `genius_workflow_run.failed`, `genius_workflow_run.canceled`, `audit_log.created`.
         :param pulumi.Input[_builtins.str] name: The name of the endpoint
         :param pulumi.Input[_builtins.str] secret: The webhook signing secret used to verify webhook requests.
         :param pulumi.Input[_builtins.str] slug: The slug of the endpoint
         :param pulumi.Input[_builtins.str] url: The URL of the endpoint.
         """
+        if custom_headers is not None:
+            pulumi.set(__self__, "custom_headers", custom_headers)
         if enabled is not None:
             pulumi.set(__self__, "enabled", enabled)
         if event_types is not None:
@@ -161,6 +167,18 @@ class _WebhooksEndpointState:
             pulumi.set(__self__, "url", url)
         if webhooks_endpoint_id is not None:
             pulumi.set(__self__, "webhooks_endpoint_id", webhooks_endpoint_id)
+
+    @_builtins.property
+    @pulumi.getter(name="customHeaders")
+    def custom_headers(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['WebhooksEndpointCustomHeaderArgs']]]]:
+        """
+        Custom HTTP headers sent with each delivery. Max 10. Reserved names (Content-Type, X-Rootly-Signature, Host, etc.) are rejected.
+        """
+        return pulumi.get(self, "custom_headers")
+
+    @custom_headers.setter
+    def custom_headers(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['WebhooksEndpointCustomHeaderArgs']]]]):
+        pulumi.set(self, "custom_headers", value)
 
     @_builtins.property
     @pulumi.getter
@@ -247,11 +265,11 @@ class WebhooksEndpoint(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
+                 custom_headers: pulumi.Input[Optional[Sequence[pulumi.Input[Union['WebhooksEndpointCustomHeaderArgs', 'WebhooksEndpointCustomHeaderArgsDict']]]]] = None,
                  enabled: pulumi.Input[Optional[_builtins.bool]] = None,
                  event_types: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  secret: pulumi.Input[Optional[_builtins.str]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  url: pulumi.Input[Optional[_builtins.str]] = None,
                  webhooks_endpoint_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
@@ -260,10 +278,10 @@ class WebhooksEndpoint(pulumi.CustomResource):
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
+        :param pulumi.Input[Sequence[pulumi.Input[Union['WebhooksEndpointCustomHeaderArgs', 'WebhooksEndpointCustomHeaderArgsDict']]]] custom_headers: Custom HTTP headers sent with each delivery. Max 10. Reserved names (Content-Type, X-Rootly-Signature, Host, etc.) are rejected.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] event_types: Value must be one of `incident.created`, `incident.updated`, `incident.in_triage`, `incident.mitigated`, `incident.resolved`, `incident.cancelled`, `incident.deleted`, `incident.scheduled.created`, `incident.scheduled.updated`, `incident.scheduled.in_progress`, `incident.scheduled.completed`, `incident.scheduled.deleted`, `incident_post_mortem.created`, `incident_post_mortem.updated`, `incident_post_mortem.published`, `incident_post_mortem.deleted`, `incident_status_page_event.created`, `incident_status_page_event.updated`, `incident_status_page_event.deleted`, `incident_event.created`, `incident_event.updated`, `incident_event.deleted`, `alert.created`, `pulse.created`, `shift.started`, `genius_workflow_run.queued`, `genius_workflow_run.started`, `genius_workflow_run.completed`, `genius_workflow_run.failed`, `genius_workflow_run.canceled`, `audit_log.created`.
         :param pulumi.Input[_builtins.str] name: The name of the endpoint
         :param pulumi.Input[_builtins.str] secret: The webhook signing secret used to verify webhook requests.
-        :param pulumi.Input[_builtins.str] slug: The slug of the endpoint
         :param pulumi.Input[_builtins.str] url: The URL of the endpoint.
         """
         ...
@@ -290,11 +308,11 @@ class WebhooksEndpoint(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
+                 custom_headers: pulumi.Input[Optional[Sequence[pulumi.Input[Union['WebhooksEndpointCustomHeaderArgs', 'WebhooksEndpointCustomHeaderArgsDict']]]]] = None,
                  enabled: pulumi.Input[Optional[_builtins.bool]] = None,
                  event_types: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  secret: pulumi.Input[Optional[_builtins.str]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  url: pulumi.Input[Optional[_builtins.str]] = None,
                  webhooks_endpoint_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
@@ -306,15 +324,16 @@ class WebhooksEndpoint(pulumi.CustomResource):
                 raise TypeError('__props__ is only valid when passed in combination with a valid opts.id to get an existing resource')
             __props__ = WebhooksEndpointArgs.__new__(WebhooksEndpointArgs)
 
+            __props__.__dict__["custom_headers"] = custom_headers
             __props__.__dict__["enabled"] = enabled
             __props__.__dict__["event_types"] = event_types
             __props__.__dict__["name"] = name
             __props__.__dict__["secret"] = secret
-            __props__.__dict__["slug"] = slug
             if url is None and not opts.urn:
                 raise TypeError("Missing required property 'url'")
             __props__.__dict__["url"] = url
             __props__.__dict__["webhooks_endpoint_id"] = webhooks_endpoint_id
+            __props__.__dict__["slug"] = None
         super(WebhooksEndpoint, __self__).__init__(
             'rootly:index/webhooksEndpoint:WebhooksEndpoint',
             resource_name,
@@ -326,6 +345,7 @@ class WebhooksEndpoint(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
+            custom_headers: pulumi.Input[Optional[Sequence[pulumi.Input[Union['WebhooksEndpointCustomHeaderArgs', 'WebhooksEndpointCustomHeaderArgsDict']]]]] = None,
             enabled: pulumi.Input[Optional[_builtins.bool]] = None,
             event_types: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
@@ -340,6 +360,7 @@ class WebhooksEndpoint(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
+        :param pulumi.Input[Sequence[pulumi.Input[Union['WebhooksEndpointCustomHeaderArgs', 'WebhooksEndpointCustomHeaderArgsDict']]]] custom_headers: Custom HTTP headers sent with each delivery. Max 10. Reserved names (Content-Type, X-Rootly-Signature, Host, etc.) are rejected.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] event_types: Value must be one of `incident.created`, `incident.updated`, `incident.in_triage`, `incident.mitigated`, `incident.resolved`, `incident.cancelled`, `incident.deleted`, `incident.scheduled.created`, `incident.scheduled.updated`, `incident.scheduled.in_progress`, `incident.scheduled.completed`, `incident.scheduled.deleted`, `incident_post_mortem.created`, `incident_post_mortem.updated`, `incident_post_mortem.published`, `incident_post_mortem.deleted`, `incident_status_page_event.created`, `incident_status_page_event.updated`, `incident_status_page_event.deleted`, `incident_event.created`, `incident_event.updated`, `incident_event.deleted`, `alert.created`, `pulse.created`, `shift.started`, `genius_workflow_run.queued`, `genius_workflow_run.started`, `genius_workflow_run.completed`, `genius_workflow_run.failed`, `genius_workflow_run.canceled`, `audit_log.created`.
         :param pulumi.Input[_builtins.str] name: The name of the endpoint
         :param pulumi.Input[_builtins.str] secret: The webhook signing secret used to verify webhook requests.
@@ -350,6 +371,7 @@ class WebhooksEndpoint(pulumi.CustomResource):
 
         __props__ = _WebhooksEndpointState.__new__(_WebhooksEndpointState)
 
+        __props__.__dict__["custom_headers"] = custom_headers
         __props__.__dict__["enabled"] = enabled
         __props__.__dict__["event_types"] = event_types
         __props__.__dict__["name"] = name
@@ -358,6 +380,14 @@ class WebhooksEndpoint(pulumi.CustomResource):
         __props__.__dict__["url"] = url
         __props__.__dict__["webhooks_endpoint_id"] = webhooks_endpoint_id
         return WebhooksEndpoint(resource_name, opts=opts, __props__=__props__)
+
+    @_builtins.property
+    @pulumi.getter(name="customHeaders")
+    def custom_headers(self) -> pulumi.Output[Optional[Sequence['outputs.WebhooksEndpointCustomHeader']]]:
+        """
+        Custom HTTP headers sent with each delivery. Max 10. Reserved names (Content-Type, X-Rootly-Signature, Host, etc.) are rejected.
+        """
+        return pulumi.get(self, "custom_headers")
 
     @_builtins.property
     @pulumi.getter

@@ -26,7 +26,6 @@ class IncidentRoleArgs:
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  optional: pulumi.Input[Optional[_builtins.bool]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  summary: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a IncidentRole resource.
@@ -36,7 +35,6 @@ class IncidentRoleArgs:
         :param pulumi.Input[_builtins.str] name: The name of the incident role
         :param pulumi.Input[_builtins.bool] optional: Value must be one of true or false
         :param pulumi.Input[_builtins.float] position: Position of the incident role
-        :param pulumi.Input[_builtins.str] slug: The slug of the incident role
         :param pulumi.Input[_builtins.str] summary: The summary of the incident role
         """
         if allow_multi_user_assignment is not None:
@@ -53,8 +51,6 @@ class IncidentRoleArgs:
             pulumi.set(__self__, "optional", optional)
         if position is not None:
             pulumi.set(__self__, "position", position)
-        if slug is not None:
-            pulumi.set(__self__, "slug", slug)
         if summary is not None:
             pulumi.set(__self__, "summary", summary)
 
@@ -135,18 +131,6 @@ class IncidentRoleArgs:
     @position.setter
     def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The slug of the incident role
-        """
-        return pulumi.get(self, "slug")
-
-    @slug.setter
-    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "slug", value)
 
     @_builtins.property
     @pulumi.getter
@@ -319,7 +303,6 @@ class IncidentRole(pulumi.CustomResource):
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  optional: pulumi.Input[Optional[_builtins.bool]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  summary: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
@@ -332,7 +315,6 @@ class IncidentRole(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] name: The name of the incident role
         :param pulumi.Input[_builtins.bool] optional: Value must be one of true or false
         :param pulumi.Input[_builtins.float] position: Position of the incident role
-        :param pulumi.Input[_builtins.str] slug: The slug of the incident role
         :param pulumi.Input[_builtins.str] summary: The summary of the incident role
         """
         ...
@@ -366,7 +348,6 @@ class IncidentRole(pulumi.CustomResource):
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  optional: pulumi.Input[Optional[_builtins.bool]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  summary: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
@@ -384,8 +365,8 @@ class IncidentRole(pulumi.CustomResource):
             __props__.__dict__["name"] = name
             __props__.__dict__["optional"] = optional
             __props__.__dict__["position"] = position
-            __props__.__dict__["slug"] = slug
             __props__.__dict__["summary"] = summary
+            __props__.__dict__["slug"] = None
         super(IncidentRole, __self__).__init__(
             'rootly:index/incidentRole:IncidentRole',
             resource_name,

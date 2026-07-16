@@ -21,12 +21,14 @@ class CatalogArgs:
     def __init__(__self__, *,
                  catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
+                 external_id: pulumi.Input[Optional[_builtins.str]] = None,
                  icon: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None):
         """
         The set of arguments for constructing a Catalog resource.
 
+        :param pulumi.Input[_builtins.str] external_id: An external identifier for this catalog. Must be unique within the team.
         :param pulumi.Input[_builtins.str] icon: Value must be one of `globe-alt`, `server-stack`, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`" pulumi-lang-hcl="`users`">`users`</span>, `user-group`, `chart-bar`, <span pulumi-lang-nodejs="`shapes`" pulumi-lang-dotnet="`Shapes`" pulumi-lang-go="`shapes`" pulumi-lang-python="`shapes`" pulumi-lang-yaml="`shapes`" pulumi-lang-java="`shapes`" pulumi-lang-hcl="`shapes`">`shapes`</span>, `light-bulb`, `cursor-arrow-ripple`.
         :param pulumi.Input[_builtins.float] position: Default position of the catalog when displayed in a list.
         """
@@ -34,6 +36,8 @@ class CatalogArgs:
             pulumi.set(__self__, "catalog_id", catalog_id)
         if description is not None:
             pulumi.set(__self__, "description", description)
+        if external_id is not None:
+            pulumi.set(__self__, "external_id", external_id)
         if icon is not None:
             pulumi.set(__self__, "icon", icon)
         if name is not None:
@@ -58,6 +62,18 @@ class CatalogArgs:
     @description.setter
     def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
+
+    @_builtins.property
+    @pulumi.getter(name="externalId")
+    def external_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        An external identifier for this catalog. Must be unique within the team.
+        """
+        return pulumi.get(self, "external_id")
+
+    @external_id.setter
+    def external_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "external_id", value)
 
     @_builtins.property
     @pulumi.getter
@@ -98,21 +114,29 @@ class _CatalogState:
     def __init__(__self__, *,
                  catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
+                 external_id: pulumi.Input[Optional[_builtins.str]] = None,
                  icon: pulumi.Input[Optional[_builtins.str]] = None,
+                 managed_by: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None):
         """
         Input properties used for looking up and filtering Catalog resources.
 
+        :param pulumi.Input[_builtins.str] external_id: An external identifier for this catalog. Must be unique within the team.
         :param pulumi.Input[_builtins.str] icon: Value must be one of `globe-alt`, `server-stack`, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`" pulumi-lang-hcl="`users`">`users`</span>, `user-group`, `chart-bar`, <span pulumi-lang-nodejs="`shapes`" pulumi-lang-dotnet="`Shapes`" pulumi-lang-go="`shapes`" pulumi-lang-python="`shapes`" pulumi-lang-yaml="`shapes`" pulumi-lang-java="`shapes`" pulumi-lang-hcl="`shapes`">`shapes`</span>, `light-bulb`, `cursor-arrow-ripple`.
+        :param pulumi.Input[_builtins.str] managed_by: Which source manages this resource (read-only).. Value must be one of <span pulumi-lang-nodejs="`web`" pulumi-lang-dotnet="`Web`" pulumi-lang-go="`web`" pulumi-lang-python="`web`" pulumi-lang-yaml="`web`" pulumi-lang-java="`web`" pulumi-lang-hcl="`web`">`web`</span>, <span pulumi-lang-nodejs="`adminWeb`" pulumi-lang-dotnet="`AdminWeb`" pulumi-lang-go="`adminWeb`" pulumi-lang-python="`admin_web`" pulumi-lang-yaml="`adminWeb`" pulumi-lang-java="`adminWeb`" pulumi-lang-hcl="`admin_web`">`adminWeb`</span>, <span pulumi-lang-nodejs="`api`" pulumi-lang-dotnet="`Api`" pulumi-lang-go="`api`" pulumi-lang-python="`api`" pulumi-lang-yaml="`api`" pulumi-lang-java="`api`" pulumi-lang-hcl="`api`">`api`</span>, <span pulumi-lang-nodejs="`terraform`" pulumi-lang-dotnet="`Terraform`" pulumi-lang-go="`terraform`" pulumi-lang-python="`terraform`" pulumi-lang-yaml="`terraform`" pulumi-lang-java="`terraform`" pulumi-lang-hcl="`terraform`">`terraform`</span>, <span pulumi-lang-nodejs="`pulumi`" pulumi-lang-dotnet="`Pulumi`" pulumi-lang-go="`pulumi`" pulumi-lang-python="`pulumi`" pulumi-lang-yaml="`pulumi`" pulumi-lang-java="`pulumi`" pulumi-lang-hcl="`pulumi`">`pulumi`</span>, <span pulumi-lang-nodejs="`backstage`" pulumi-lang-dotnet="`Backstage`" pulumi-lang-go="`backstage`" pulumi-lang-python="`backstage`" pulumi-lang-yaml="`backstage`" pulumi-lang-java="`backstage`" pulumi-lang-hcl="`backstage`">`backstage`</span>, <span pulumi-lang-nodejs="`catalogSync`" pulumi-lang-dotnet="`CatalogSync`" pulumi-lang-go="`catalogSync`" pulumi-lang-python="`catalog_sync`" pulumi-lang-yaml="`catalogSync`" pulumi-lang-java="`catalogSync`" pulumi-lang-hcl="`catalog_sync`">`catalogSync`</span>.
         :param pulumi.Input[_builtins.float] position: Default position of the catalog when displayed in a list.
         """
         if catalog_id is not None:
             pulumi.set(__self__, "catalog_id", catalog_id)
         if description is not None:
             pulumi.set(__self__, "description", description)
+        if external_id is not None:
+            pulumi.set(__self__, "external_id", external_id)
         if icon is not None:
             pulumi.set(__self__, "icon", icon)
+        if managed_by is not None:
+            pulumi.set(__self__, "managed_by", managed_by)
         if name is not None:
             pulumi.set(__self__, "name", name)
         if position is not None:
@@ -137,6 +161,18 @@ class _CatalogState:
         pulumi.set(self, "description", value)
 
     @_builtins.property
+    @pulumi.getter(name="externalId")
+    def external_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        An external identifier for this catalog. Must be unique within the team.
+        """
+        return pulumi.get(self, "external_id")
+
+    @external_id.setter
+    def external_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "external_id", value)
+
+    @_builtins.property
     @pulumi.getter
     def icon(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
@@ -147,6 +183,18 @@ class _CatalogState:
     @icon.setter
     def icon(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "icon", value)
+
+    @_builtins.property
+    @pulumi.getter(name="managedBy")
+    def managed_by(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Which source manages this resource (read-only).. Value must be one of <span pulumi-lang-nodejs="`web`" pulumi-lang-dotnet="`Web`" pulumi-lang-go="`web`" pulumi-lang-python="`web`" pulumi-lang-yaml="`web`" pulumi-lang-java="`web`" pulumi-lang-hcl="`web`">`web`</span>, <span pulumi-lang-nodejs="`adminWeb`" pulumi-lang-dotnet="`AdminWeb`" pulumi-lang-go="`adminWeb`" pulumi-lang-python="`admin_web`" pulumi-lang-yaml="`adminWeb`" pulumi-lang-java="`adminWeb`" pulumi-lang-hcl="`admin_web`">`adminWeb`</span>, <span pulumi-lang-nodejs="`api`" pulumi-lang-dotnet="`Api`" pulumi-lang-go="`api`" pulumi-lang-python="`api`" pulumi-lang-yaml="`api`" pulumi-lang-java="`api`" pulumi-lang-hcl="`api`">`api`</span>, <span pulumi-lang-nodejs="`terraform`" pulumi-lang-dotnet="`Terraform`" pulumi-lang-go="`terraform`" pulumi-lang-python="`terraform`" pulumi-lang-yaml="`terraform`" pulumi-lang-java="`terraform`" pulumi-lang-hcl="`terraform`">`terraform`</span>, <span pulumi-lang-nodejs="`pulumi`" pulumi-lang-dotnet="`Pulumi`" pulumi-lang-go="`pulumi`" pulumi-lang-python="`pulumi`" pulumi-lang-yaml="`pulumi`" pulumi-lang-java="`pulumi`" pulumi-lang-hcl="`pulumi`">`pulumi`</span>, <span pulumi-lang-nodejs="`backstage`" pulumi-lang-dotnet="`Backstage`" pulumi-lang-go="`backstage`" pulumi-lang-python="`backstage`" pulumi-lang-yaml="`backstage`" pulumi-lang-java="`backstage`" pulumi-lang-hcl="`backstage`">`backstage`</span>, <span pulumi-lang-nodejs="`catalogSync`" pulumi-lang-dotnet="`CatalogSync`" pulumi-lang-go="`catalogSync`" pulumi-lang-python="`catalog_sync`" pulumi-lang-yaml="`catalogSync`" pulumi-lang-java="`catalogSync`" pulumi-lang-hcl="`catalog_sync`">`catalogSync`</span>.
+        """
+        return pulumi.get(self, "managed_by")
+
+    @managed_by.setter
+    def managed_by(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "managed_by", value)
 
     @_builtins.property
     @pulumi.getter
@@ -178,6 +226,7 @@ class Catalog(pulumi.CustomResource):
                  opts: Optional[pulumi.ResourceOptions] = None,
                  catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
+                 external_id: pulumi.Input[Optional[_builtins.str]] = None,
                  icon: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
@@ -187,6 +236,7 @@ class Catalog(pulumi.CustomResource):
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
+        :param pulumi.Input[_builtins.str] external_id: An external identifier for this catalog. Must be unique within the team.
         :param pulumi.Input[_builtins.str] icon: Value must be one of `globe-alt`, `server-stack`, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`" pulumi-lang-hcl="`users`">`users`</span>, `user-group`, `chart-bar`, <span pulumi-lang-nodejs="`shapes`" pulumi-lang-dotnet="`Shapes`" pulumi-lang-go="`shapes`" pulumi-lang-python="`shapes`" pulumi-lang-yaml="`shapes`" pulumi-lang-java="`shapes`" pulumi-lang-hcl="`shapes`">`shapes`</span>, `light-bulb`, `cursor-arrow-ripple`.
         :param pulumi.Input[_builtins.float] position: Default position of the catalog when displayed in a list.
         """
@@ -216,6 +266,7 @@ class Catalog(pulumi.CustomResource):
                  opts: Optional[pulumi.ResourceOptions] = None,
                  catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
+                 external_id: pulumi.Input[Optional[_builtins.str]] = None,
                  icon: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
@@ -230,9 +281,11 @@ class Catalog(pulumi.CustomResource):
 
             __props__.__dict__["catalog_id"] = catalog_id
             __props__.__dict__["description"] = description
+            __props__.__dict__["external_id"] = external_id
             __props__.__dict__["icon"] = icon
             __props__.__dict__["name"] = name
             __props__.__dict__["position"] = position
+            __props__.__dict__["managed_by"] = None
         super(Catalog, __self__).__init__(
             'rootly:index/catalog:Catalog',
             resource_name,
@@ -246,7 +299,9 @@ class Catalog(pulumi.CustomResource):
             opts: Optional[pulumi.ResourceOptions] = None,
             catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
             description: pulumi.Input[Optional[_builtins.str]] = None,
+            external_id: pulumi.Input[Optional[_builtins.str]] = None,
             icon: pulumi.Input[Optional[_builtins.str]] = None,
+            managed_by: pulumi.Input[Optional[_builtins.str]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
             position: pulumi.Input[Optional[_builtins.float]] = None) -> 'Catalog':
         """
@@ -256,7 +311,9 @@ class Catalog(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
+        :param pulumi.Input[_builtins.str] external_id: An external identifier for this catalog. Must be unique within the team.
         :param pulumi.Input[_builtins.str] icon: Value must be one of `globe-alt`, `server-stack`, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`" pulumi-lang-hcl="`users`">`users`</span>, `user-group`, `chart-bar`, <span pulumi-lang-nodejs="`shapes`" pulumi-lang-dotnet="`Shapes`" pulumi-lang-go="`shapes`" pulumi-lang-python="`shapes`" pulumi-lang-yaml="`shapes`" pulumi-lang-java="`shapes`" pulumi-lang-hcl="`shapes`">`shapes`</span>, `light-bulb`, `cursor-arrow-ripple`.
+        :param pulumi.Input[_builtins.str] managed_by: Which source manages this resource (read-only).. Value must be one of <span pulumi-lang-nodejs="`web`" pulumi-lang-dotnet="`Web`" pulumi-lang-go="`web`" pulumi-lang-python="`web`" pulumi-lang-yaml="`web`" pulumi-lang-java="`web`" pulumi-lang-hcl="`web`">`web`</span>, <span pulumi-lang-nodejs="`adminWeb`" pulumi-lang-dotnet="`AdminWeb`" pulumi-lang-go="`adminWeb`" pulumi-lang-python="`admin_web`" pulumi-lang-yaml="`adminWeb`" pulumi-lang-java="`adminWeb`" pulumi-lang-hcl="`admin_web`">`adminWeb`</span>, <span pulumi-lang-nodejs="`api`" pulumi-lang-dotnet="`Api`" pulumi-lang-go="`api`" pulumi-lang-python="`api`" pulumi-lang-yaml="`api`" pulumi-lang-java="`api`" pulumi-lang-hcl="`api`">`api`</span>, <span pulumi-lang-nodejs="`terraform`" pulumi-lang-dotnet="`Terraform`" pulumi-lang-go="`terraform`" pulumi-lang-python="`terraform`" pulumi-lang-yaml="`terraform`" pulumi-lang-java="`terraform`" pulumi-lang-hcl="`terraform`">`terraform`</span>, <span pulumi-lang-nodejs="`pulumi`" pulumi-lang-dotnet="`Pulumi`" pulumi-lang-go="`pulumi`" pulumi-lang-python="`pulumi`" pulumi-lang-yaml="`pulumi`" pulumi-lang-java="`pulumi`" pulumi-lang-hcl="`pulumi`">`pulumi`</span>, <span pulumi-lang-nodejs="`backstage`" pulumi-lang-dotnet="`Backstage`" pulumi-lang-go="`backstage`" pulumi-lang-python="`backstage`" pulumi-lang-yaml="`backstage`" pulumi-lang-java="`backstage`" pulumi-lang-hcl="`backstage`">`backstage`</span>, <span pulumi-lang-nodejs="`catalogSync`" pulumi-lang-dotnet="`CatalogSync`" pulumi-lang-go="`catalogSync`" pulumi-lang-python="`catalog_sync`" pulumi-lang-yaml="`catalogSync`" pulumi-lang-java="`catalogSync`" pulumi-lang-hcl="`catalog_sync`">`catalogSync`</span>.
         :param pulumi.Input[_builtins.float] position: Default position of the catalog when displayed in a list.
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
@@ -265,7 +322,9 @@ class Catalog(pulumi.CustomResource):
 
         __props__.__dict__["catalog_id"] = catalog_id
         __props__.__dict__["description"] = description
+        __props__.__dict__["external_id"] = external_id
         __props__.__dict__["icon"] = icon
+        __props__.__dict__["managed_by"] = managed_by
         __props__.__dict__["name"] = name
         __props__.__dict__["position"] = position
         return Catalog(resource_name, opts=opts, __props__=__props__)
@@ -281,12 +340,28 @@ class Catalog(pulumi.CustomResource):
         return pulumi.get(self, "description")
 
     @_builtins.property
+    @pulumi.getter(name="externalId")
+    def external_id(self) -> pulumi.Output[_builtins.str]:
+        """
+        An external identifier for this catalog. Must be unique within the team.
+        """
+        return pulumi.get(self, "external_id")
+
+    @_builtins.property
     @pulumi.getter
     def icon(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
         Value must be one of `globe-alt`, `server-stack`, <span pulumi-lang-nodejs="`users`" pulumi-lang-dotnet="`Users`" pulumi-lang-go="`users`" pulumi-lang-python="`users`" pulumi-lang-yaml="`users`" pulumi-lang-java="`users`" pulumi-lang-hcl="`users`">`users`</span>, `user-group`, `chart-bar`, <span pulumi-lang-nodejs="`shapes`" pulumi-lang-dotnet="`Shapes`" pulumi-lang-go="`shapes`" pulumi-lang-python="`shapes`" pulumi-lang-yaml="`shapes`" pulumi-lang-java="`shapes`" pulumi-lang-hcl="`shapes`">`shapes`</span>, `light-bulb`, `cursor-arrow-ripple`.
         """
         return pulumi.get(self, "icon")
+
+    @_builtins.property
+    @pulumi.getter(name="managedBy")
+    def managed_by(self) -> pulumi.Output[_builtins.str]:
+        """
+        Which source manages this resource (read-only).. Value must be one of <span pulumi-lang-nodejs="`web`" pulumi-lang-dotnet="`Web`" pulumi-lang-go="`web`" pulumi-lang-python="`web`" pulumi-lang-yaml="`web`" pulumi-lang-java="`web`" pulumi-lang-hcl="`web`">`web`</span>, <span pulumi-lang-nodejs="`adminWeb`" pulumi-lang-dotnet="`AdminWeb`" pulumi-lang-go="`adminWeb`" pulumi-lang-python="`admin_web`" pulumi-lang-yaml="`adminWeb`" pulumi-lang-java="`adminWeb`" pulumi-lang-hcl="`admin_web`">`adminWeb`</span>, <span pulumi-lang-nodejs="`api`" pulumi-lang-dotnet="`Api`" pulumi-lang-go="`api`" pulumi-lang-python="`api`" pulumi-lang-yaml="`api`" pulumi-lang-java="`api`" pulumi-lang-hcl="`api`">`api`</span>, <span pulumi-lang-nodejs="`terraform`" pulumi-lang-dotnet="`Terraform`" pulumi-lang-go="`terraform`" pulumi-lang-python="`terraform`" pulumi-lang-yaml="`terraform`" pulumi-lang-java="`terraform`" pulumi-lang-hcl="`terraform`">`terraform`</span>, <span pulumi-lang-nodejs="`pulumi`" pulumi-lang-dotnet="`Pulumi`" pulumi-lang-go="`pulumi`" pulumi-lang-python="`pulumi`" pulumi-lang-yaml="`pulumi`" pulumi-lang-java="`pulumi`" pulumi-lang-hcl="`pulumi`">`pulumi`</span>, <span pulumi-lang-nodejs="`backstage`" pulumi-lang-dotnet="`Backstage`" pulumi-lang-go="`backstage`" pulumi-lang-python="`backstage`" pulumi-lang-yaml="`backstage`" pulumi-lang-java="`backstage`" pulumi-lang-hcl="`backstage`">`backstage`</span>, <span pulumi-lang-nodejs="`catalogSync`" pulumi-lang-dotnet="`CatalogSync`" pulumi-lang-go="`catalogSync`" pulumi-lang-python="`catalog_sync`" pulumi-lang-yaml="`catalogSync`" pulumi-lang-java="`catalogSync`" pulumi-lang-hcl="`catalog_sync`">`catalogSync`</span>.
+        """
+        return pulumi.get(self, "managed_by")
 
     @_builtins.property
     @pulumi.getter

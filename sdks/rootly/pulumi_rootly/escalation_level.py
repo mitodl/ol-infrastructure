@@ -21,39 +21,50 @@ __all__ = ['EscalationLevelArgs', 'EscalationLevel']
 @pulumi.input_type
 class EscalationLevelArgs:
     def __init__(__self__, *,
+                 escalation_policy_id: pulumi.Input[_builtins.str],
                  notification_target_params: pulumi.Input[Sequence[pulumi.Input['EscalationLevelNotificationTargetParamArgs']]],
                  position: pulumi.Input[_builtins.float],
                  delay: pulumi.Input[Optional[_builtins.float]] = None,
                  escalation_level_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 escalation_policy_id: pulumi.Input[Optional[_builtins.str]] = None,
                  escalation_policy_path_id: pulumi.Input[Optional[_builtins.str]] = None,
                  paging_strategy_configuration_schedule_strategy: pulumi.Input[Optional[_builtins.str]] = None,
                  paging_strategy_configuration_strategy: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a EscalationLevel resource.
 
+        :param pulumi.Input[_builtins.str] escalation_policy_id: The ID of the escalation policy
         :param pulumi.Input[Sequence[pulumi.Input['EscalationLevelNotificationTargetParamArgs']]] notification_target_params: Escalation level's notification targets
         :param pulumi.Input[_builtins.float] position: Position of the escalation policy level
         :param pulumi.Input[_builtins.float] delay: Delay before notifying targets in the next Escalation Level.
-        :param pulumi.Input[_builtins.str] escalation_policy_id: The ID of the escalation policy
         :param pulumi.Input[_builtins.str] escalation_policy_path_id: The ID of the dynamic escalation policy path the level will belong to. If nothing is specified it will add the level to your default path.
         :param pulumi.Input[_builtins.str] paging_strategy_configuration_schedule_strategy: Value must be one of <span pulumi-lang-nodejs="`onCallOnly`" pulumi-lang-dotnet="`OnCallOnly`" pulumi-lang-go="`onCallOnly`" pulumi-lang-python="`on_call_only`" pulumi-lang-yaml="`onCallOnly`" pulumi-lang-java="`onCallOnly`" pulumi-lang-hcl="`on_call_only`">`onCallOnly`</span>, <span pulumi-lang-nodejs="`everyone`" pulumi-lang-dotnet="`Everyone`" pulumi-lang-go="`everyone`" pulumi-lang-python="`everyone`" pulumi-lang-yaml="`everyone`" pulumi-lang-java="`everyone`" pulumi-lang-hcl="`everyone`">`everyone`</span>.
         :param pulumi.Input[_builtins.str] paging_strategy_configuration_strategy: Value must be one of <span pulumi-lang-nodejs="`default`" pulumi-lang-dotnet="`Default`" pulumi-lang-go="`default`" pulumi-lang-python="`default`" pulumi-lang-yaml="`default`" pulumi-lang-java="`default`" pulumi-lang-hcl="`default`">`default`</span>, <span pulumi-lang-nodejs="`random`" pulumi-lang-dotnet="`Random`" pulumi-lang-go="`random`" pulumi-lang-python="`random`" pulumi-lang-yaml="`random`" pulumi-lang-java="`random`" pulumi-lang-hcl="`random`">`random`</span>, <span pulumi-lang-nodejs="`cycle`" pulumi-lang-dotnet="`Cycle`" pulumi-lang-go="`cycle`" pulumi-lang-python="`cycle`" pulumi-lang-yaml="`cycle`" pulumi-lang-java="`cycle`" pulumi-lang-hcl="`cycle`">`cycle`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`" pulumi-lang-hcl="`alert`">`alert`</span>.
         """
+        pulumi.set(__self__, "escalation_policy_id", escalation_policy_id)
         pulumi.set(__self__, "notification_target_params", notification_target_params)
         pulumi.set(__self__, "position", position)
         if delay is not None:
             pulumi.set(__self__, "delay", delay)
         if escalation_level_id is not None:
             pulumi.set(__self__, "escalation_level_id", escalation_level_id)
-        if escalation_policy_id is not None:
-            pulumi.set(__self__, "escalation_policy_id", escalation_policy_id)
         if escalation_policy_path_id is not None:
             pulumi.set(__self__, "escalation_policy_path_id", escalation_policy_path_id)
         if paging_strategy_configuration_schedule_strategy is not None:
             pulumi.set(__self__, "paging_strategy_configuration_schedule_strategy", paging_strategy_configuration_schedule_strategy)
         if paging_strategy_configuration_strategy is not None:
             pulumi.set(__self__, "paging_strategy_configuration_strategy", paging_strategy_configuration_strategy)
+
+    @_builtins.property
+    @pulumi.getter(name="escalationPolicyId")
+    def escalation_policy_id(self) -> pulumi.Input[_builtins.str]:
+        """
+        The ID of the escalation policy
+        """
+        return pulumi.get(self, "escalation_policy_id")
+
+    @escalation_policy_id.setter
+    def escalation_policy_id(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "escalation_policy_id", value)
 
     @_builtins.property
     @pulumi.getter(name="notificationTargetParams")
@@ -99,18 +110,6 @@ class EscalationLevelArgs:
     @escalation_level_id.setter
     def escalation_level_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "escalation_level_id", value)
-
-    @_builtins.property
-    @pulumi.getter(name="escalationPolicyId")
-    def escalation_policy_id(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The ID of the escalation policy
-        """
-        return pulumi.get(self, "escalation_policy_id")
-
-    @escalation_policy_id.setter
-    def escalation_policy_id(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "escalation_policy_id", value)
 
     @_builtins.property
     @pulumi.getter(name="escalationPolicyPathId")
@@ -353,6 +352,8 @@ class EscalationLevel(pulumi.CustomResource):
 
             __props__.__dict__["delay"] = delay
             __props__.__dict__["escalation_level_id"] = escalation_level_id
+            if escalation_policy_id is None and not opts.urn:
+                raise TypeError("Missing required property 'escalation_policy_id'")
             __props__.__dict__["escalation_policy_id"] = escalation_policy_id
             __props__.__dict__["escalation_policy_path_id"] = escalation_policy_path_id
             if notification_target_params is None and not opts.urn:

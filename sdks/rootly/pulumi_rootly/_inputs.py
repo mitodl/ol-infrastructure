@@ -157,6 +157,8 @@ __all__ = [
     'TeamSlackAliasArgsDict',
     'TeamSlackChannelArgs',
     'TeamSlackChannelArgsDict',
+    'WebhooksEndpointCustomHeaderArgs',
+    'WebhooksEndpointCustomHeaderArgsDict',
     'WorkflowActionItemTriggerParamsArgs',
     'WorkflowActionItemTriggerParamsArgsDict',
     'WorkflowAlertTriggerParamsArgs',
@@ -193,6 +195,10 @@ __all__ = [
     'WorkflowTaskAddToTimelineTaskParamsArgsDict',
     'WorkflowTaskAddToTimelineTaskParamsPostToSlackChannelArgs',
     'WorkflowTaskAddToTimelineTaskParamsPostToSlackChannelArgsDict',
+    'WorkflowTaskArchiveGoogleChatSpacesTaskParamsArgs',
+    'WorkflowTaskArchiveGoogleChatSpacesTaskParamsArgsDict',
+    'WorkflowTaskArchiveGoogleChatSpacesTaskParamsSpaceArgs',
+    'WorkflowTaskArchiveGoogleChatSpacesTaskParamsSpaceArgsDict',
     'WorkflowTaskArchiveMicrosoftTeamsChannelsTaskParamsArgs',
     'WorkflowTaskArchiveMicrosoftTeamsChannelsTaskParamsArgsDict',
     'WorkflowTaskArchiveMicrosoftTeamsChannelsTaskParamsChannelArgs',
@@ -217,6 +223,8 @@ __all__ = [
     'WorkflowTaskAutoAssignRoleVictorOpsTaskParamsArgsDict',
     'WorkflowTaskCallPeopleTaskParamsArgs',
     'WorkflowTaskCallPeopleTaskParamsArgsDict',
+    'WorkflowTaskChangeGoogleChatSpacePrivacyTaskParamsArgs',
+    'WorkflowTaskChangeGoogleChatSpacePrivacyTaskParamsArgsDict',
     'WorkflowTaskChangeSlackChannelPrivacyTaskParamsArgs',
     'WorkflowTaskChangeSlackChannelPrivacyTaskParamsArgsDict',
     'WorkflowTaskCreateAirtableTableRecordTaskParamsArgs',
@@ -253,6 +261,8 @@ __all__ = [
     'WorkflowTaskCreateGoogleCalendarEventTaskParamsArgsDict',
     'WorkflowTaskCreateGoogleCalendarEventTaskParamsPostToSlackChannelArgs',
     'WorkflowTaskCreateGoogleCalendarEventTaskParamsPostToSlackChannelArgsDict',
+    'WorkflowTaskCreateGoogleChatSpaceTaskParamsArgs',
+    'WorkflowTaskCreateGoogleChatSpaceTaskParamsArgsDict',
     'WorkflowTaskCreateGoogleDocsPageTaskParamsArgs',
     'WorkflowTaskCreateGoogleDocsPageTaskParamsArgsDict',
     'WorkflowTaskCreateGoogleDocsPermissionsTaskParamsArgs',
@@ -383,6 +393,10 @@ __all__ = [
     'WorkflowTaskHttpClientTaskParamsArgsDict',
     'WorkflowTaskHttpClientTaskParamsPostToSlackChannelArgs',
     'WorkflowTaskHttpClientTaskParamsPostToSlackChannelArgsDict',
+    'WorkflowTaskInviteToGoogleChatSpaceTaskParamsArgs',
+    'WorkflowTaskInviteToGoogleChatSpaceTaskParamsArgsDict',
+    'WorkflowTaskInviteToMicrosoftTeamsChannelRootlyTaskParamsArgs',
+    'WorkflowTaskInviteToMicrosoftTeamsChannelRootlyTaskParamsArgsDict',
     'WorkflowTaskInviteToMicrosoftTeamsChannelTaskParamsArgs',
     'WorkflowTaskInviteToMicrosoftTeamsChannelTaskParamsArgsDict',
     'WorkflowTaskInviteToSlackChannelOpsgenieTaskParamsArgs',
@@ -443,6 +457,8 @@ __all__ = [
     'WorkflowTaskRedisClientTaskParamsPostToSlackChannelArgsDict',
     'WorkflowTaskRemoveGoogleDocsPermissionsTaskParamsArgs',
     'WorkflowTaskRemoveGoogleDocsPermissionsTaskParamsArgsDict',
+    'WorkflowTaskRenameGoogleChatSpaceTaskParamsArgs',
+    'WorkflowTaskRenameGoogleChatSpaceTaskParamsArgsDict',
     'WorkflowTaskRenameMicrosoftTeamsChannelTaskParamsArgs',
     'WorkflowTaskRenameMicrosoftTeamsChannelTaskParamsArgsDict',
     'WorkflowTaskRenameSlackChannelTaskParamsArgs',
@@ -455,8 +471,18 @@ __all__ = [
     'WorkflowTaskSendDashboardReportTaskParamsArgsDict',
     'WorkflowTaskSendEmailTaskParamsArgs',
     'WorkflowTaskSendEmailTaskParamsArgsDict',
+    'WorkflowTaskSendGoogleChatAttachmentsTaskParamsArgs',
+    'WorkflowTaskSendGoogleChatAttachmentsTaskParamsArgsDict',
+    'WorkflowTaskSendGoogleChatAttachmentsTaskParamsSpaceArgs',
+    'WorkflowTaskSendGoogleChatAttachmentsTaskParamsSpaceArgsDict',
+    'WorkflowTaskSendGoogleChatMessageTaskParamsArgs',
+    'WorkflowTaskSendGoogleChatMessageTaskParamsArgsDict',
+    'WorkflowTaskSendGoogleChatMessageTaskParamsSpaceArgs',
+    'WorkflowTaskSendGoogleChatMessageTaskParamsSpaceArgsDict',
     'WorkflowTaskSendMicrosoftTeamsBlocksTaskParamsArgs',
     'WorkflowTaskSendMicrosoftTeamsBlocksTaskParamsArgsDict',
+    'WorkflowTaskSendMicrosoftTeamsBlocksTaskParamsChannelArgs',
+    'WorkflowTaskSendMicrosoftTeamsBlocksTaskParamsChannelArgsDict',
     'WorkflowTaskSendMicrosoftTeamsChatMessageTaskParamsArgs',
     'WorkflowTaskSendMicrosoftTeamsChatMessageTaskParamsArgsDict',
     'WorkflowTaskSendMicrosoftTeamsChatMessageTaskParamsChatArgs',
@@ -539,6 +565,8 @@ __all__ = [
     'WorkflowTaskUpdateGoogleCalendarEventTaskParamsArgsDict',
     'WorkflowTaskUpdateGoogleCalendarEventTaskParamsPostToSlackChannelArgs',
     'WorkflowTaskUpdateGoogleCalendarEventTaskParamsPostToSlackChannelArgsDict',
+    'WorkflowTaskUpdateGoogleChatSpaceDescriptionTaskParamsArgs',
+    'WorkflowTaskUpdateGoogleChatSpaceDescriptionTaskParamsArgsDict',
     'WorkflowTaskUpdateGoogleDocsPageTaskParamsArgs',
     'WorkflowTaskUpdateGoogleDocsPageTaskParamsArgsDict',
     'WorkflowTaskUpdateIncidentPostmortemTaskParamsArgs',
@@ -5946,6 +5974,39 @@ class TeamSlackChannelArgs:
         pulumi.set(self, "name", value)
 
 
+class WebhooksEndpointCustomHeaderArgsDict(TypedDict):
+    name: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    value: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+
+@pulumi.input_type
+class WebhooksEndpointCustomHeaderArgs:
+    def __init__(__self__, *,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 value: pulumi.Input[Optional[_builtins.str]] = None):
+        if name is not None:
+            pulumi.set(__self__, "name", name)
+        if value is not None:
+            pulumi.set(__self__, "value", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "name")
+
+    @name.setter
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "name", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def value(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "value")
+
+    @value.setter
+    def value(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "value", value)
+
+
 class WorkflowActionItemTriggerParamsArgsDict(TypedDict):
     incident_action_item_condition: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
@@ -6016,6 +6077,14 @@ class WorkflowActionItemTriggerParamsArgsDict(TypedDict):
     """
     Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
     """
+    incident_condition_label: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    """
+    Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+    """
+    incident_condition_label_use_regexp: NotRequired[pulumi.Input[Optional[_builtins.bool]]]
+    """
+    Value must be one of true or false
+    """
     incident_condition_mitigated_at: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     Value must be one of `SET`, `UNSET`.
@@ -6064,6 +6133,7 @@ class WorkflowActionItemTriggerParamsArgsDict(TypedDict):
     """
     Value must be one of <span pulumi-lang-nodejs="`test`" pulumi-lang-dotnet="`Test`" pulumi-lang-go="`test`" pulumi-lang-python="`test`" pulumi-lang-yaml="`test`" pulumi-lang-java="`test`" pulumi-lang-hcl="`test`">`test`</span>, <span pulumi-lang-nodejs="`testSub`" pulumi-lang-dotnet="`TestSub`" pulumi-lang-go="`testSub`" pulumi-lang-python="`test_sub`" pulumi-lang-yaml="`testSub`" pulumi-lang-java="`testSub`" pulumi-lang-hcl="`test_sub`">`testSub`</span>, <span pulumi-lang-nodejs="`example`" pulumi-lang-dotnet="`Example`" pulumi-lang-go="`example`" pulumi-lang-python="`example`" pulumi-lang-yaml="`example`" pulumi-lang-java="`example`" pulumi-lang-hcl="`example`">`example`</span>, <span pulumi-lang-nodejs="`exampleSub`" pulumi-lang-dotnet="`ExampleSub`" pulumi-lang-go="`exampleSub`" pulumi-lang-python="`example_sub`" pulumi-lang-yaml="`exampleSub`" pulumi-lang-java="`exampleSub`" pulumi-lang-hcl="`example_sub`">`exampleSub`</span>, <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`" pulumi-lang-hcl="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`normalSub`" pulumi-lang-dotnet="`NormalSub`" pulumi-lang-go="`normalSub`" pulumi-lang-python="`normal_sub`" pulumi-lang-yaml="`normalSub`" pulumi-lang-java="`normalSub`" pulumi-lang-hcl="`normal_sub`">`normalSub`</span>, <span pulumi-lang-nodejs="`backfilled`" pulumi-lang-dotnet="`Backfilled`" pulumi-lang-go="`backfilled`" pulumi-lang-python="`backfilled`" pulumi-lang-yaml="`backfilled`" pulumi-lang-java="`backfilled`" pulumi-lang-hcl="`backfilled`">`backfilled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`scheduledSub`" pulumi-lang-dotnet="`ScheduledSub`" pulumi-lang-go="`scheduledSub`" pulumi-lang-python="`scheduled_sub`" pulumi-lang-yaml="`scheduledSub`" pulumi-lang-java="`scheduledSub`" pulumi-lang-hcl="`scheduled_sub`">`scheduledSub`</span>.
     """
+    incident_labels: NotRequired[pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]]
     incident_statuses: NotRequired[pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]]
     """
     Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`" pulumi-lang-hcl="`in_triage`">`inTriage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`detected`" pulumi-lang-dotnet="`Detected`" pulumi-lang-go="`detected`" pulumi-lang-python="`detected`" pulumi-lang-yaml="`detected`" pulumi-lang-java="`detected`" pulumi-lang-hcl="`detected`">`detected`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`" pulumi-lang-hcl="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`" pulumi-lang-hcl="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`" pulumi-lang-hcl="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`" pulumi-lang-hcl="`completed`">`completed`</span>.
@@ -6099,6 +6169,8 @@ class WorkflowActionItemTriggerParamsArgs:
                  incident_condition_incident_roles: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_condition_incident_type: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_condition_kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_condition_label: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_condition_label_use_regexp: pulumi.Input[Optional[_builtins.bool]] = None,
                  incident_condition_mitigated_at: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_condition_resolved_at: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_condition_service: pulumi.Input[Optional[_builtins.str]] = None,
@@ -6111,6 +6183,7 @@ class WorkflowActionItemTriggerParamsArgs:
                  incident_conditional_inactivity: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_inactivity_duration: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_kinds: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 incident_labels: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  incident_statuses: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  incident_visibilities: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  trigger_type: pulumi.Input[Optional[_builtins.str]] = None,
@@ -6133,6 +6206,8 @@ class WorkflowActionItemTriggerParamsArgs:
         :param pulumi.Input[_builtins.str] incident_condition_incident_roles: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param pulumi.Input[_builtins.str] incident_condition_incident_type: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param pulumi.Input[_builtins.str] incident_condition_kind: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param pulumi.Input[_builtins.str] incident_condition_label: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param pulumi.Input[_builtins.bool] incident_condition_label_use_regexp: Value must be one of true or false
         :param pulumi.Input[_builtins.str] incident_condition_mitigated_at: Value must be one of `SET`, `UNSET`.
         :param pulumi.Input[_builtins.str] incident_condition_resolved_at: Value must be one of `SET`, `UNSET`.
         :param pulumi.Input[_builtins.str] incident_condition_service: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
@@ -6185,6 +6260,10 @@ class WorkflowActionItemTriggerParamsArgs:
             pulumi.set(__self__, "incident_condition_incident_type", incident_condition_incident_type)
         if incident_condition_kind is not None:
             pulumi.set(__self__, "incident_condition_kind", incident_condition_kind)
+        if incident_condition_label is not None:
+            pulumi.set(__self__, "incident_condition_label", incident_condition_label)
+        if incident_condition_label_use_regexp is not None:
+            pulumi.set(__self__, "incident_condition_label_use_regexp", incident_condition_label_use_regexp)
         if incident_condition_mitigated_at is not None:
             pulumi.set(__self__, "incident_condition_mitigated_at", incident_condition_mitigated_at)
         if incident_condition_resolved_at is not None:
@@ -6209,6 +6288,8 @@ class WorkflowActionItemTriggerParamsArgs:
             pulumi.set(__self__, "incident_inactivity_duration", incident_inactivity_duration)
         if incident_kinds is not None:
             pulumi.set(__self__, "incident_kinds", incident_kinds)
+        if incident_labels is not None:
+            pulumi.set(__self__, "incident_labels", incident_labels)
         if incident_statuses is not None:
             pulumi.set(__self__, "incident_statuses", incident_statuses)
         if incident_visibilities is not None:
@@ -6432,6 +6513,30 @@ class WorkflowActionItemTriggerParamsArgs:
         pulumi.set(self, "incident_condition_kind", value)
 
     @_builtins.property
+    @pulumi.getter(name="incidentConditionLabel")
+    def incident_condition_label(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        """
+        return pulumi.get(self, "incident_condition_label")
+
+    @incident_condition_label.setter
+    def incident_condition_label(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "incident_condition_label", value)
+
+    @_builtins.property
+    @pulumi.getter(name="incidentConditionLabelUseRegexp")
+    def incident_condition_label_use_regexp(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Value must be one of true or false
+        """
+        return pulumi.get(self, "incident_condition_label_use_regexp")
+
+    @incident_condition_label_use_regexp.setter
+    def incident_condition_label_use_regexp(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "incident_condition_label_use_regexp", value)
+
+    @_builtins.property
     @pulumi.getter(name="incidentConditionMitigatedAt")
     def incident_condition_mitigated_at(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
@@ -6574,6 +6679,15 @@ class WorkflowActionItemTriggerParamsArgs:
     @incident_kinds.setter
     def incident_kinds(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "incident_kinds", value)
+
+    @_builtins.property
+    @pulumi.getter(name="incidentLabels")
+    def incident_labels(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
+        return pulumi.get(self, "incident_labels")
+
+    @incident_labels.setter
+    def incident_labels(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "incident_labels", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentStatuses")
@@ -7167,6 +7281,14 @@ class WorkflowIncidentTriggerParamsArgsDict(TypedDict):
     """
     Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
     """
+    incident_condition_label: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    """
+    Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+    """
+    incident_condition_label_use_regexp: NotRequired[pulumi.Input[Optional[_builtins.bool]]]
+    """
+    Value must be one of true or false
+    """
     incident_condition_mitigated_at: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     Value must be one of `SET`, `UNSET`.
@@ -7215,6 +7337,7 @@ class WorkflowIncidentTriggerParamsArgsDict(TypedDict):
     """
     Value must be one of <span pulumi-lang-nodejs="`test`" pulumi-lang-dotnet="`Test`" pulumi-lang-go="`test`" pulumi-lang-python="`test`" pulumi-lang-yaml="`test`" pulumi-lang-java="`test`" pulumi-lang-hcl="`test`">`test`</span>, <span pulumi-lang-nodejs="`testSub`" pulumi-lang-dotnet="`TestSub`" pulumi-lang-go="`testSub`" pulumi-lang-python="`test_sub`" pulumi-lang-yaml="`testSub`" pulumi-lang-java="`testSub`" pulumi-lang-hcl="`test_sub`">`testSub`</span>, <span pulumi-lang-nodejs="`example`" pulumi-lang-dotnet="`Example`" pulumi-lang-go="`example`" pulumi-lang-python="`example`" pulumi-lang-yaml="`example`" pulumi-lang-java="`example`" pulumi-lang-hcl="`example`">`example`</span>, <span pulumi-lang-nodejs="`exampleSub`" pulumi-lang-dotnet="`ExampleSub`" pulumi-lang-go="`exampleSub`" pulumi-lang-python="`example_sub`" pulumi-lang-yaml="`exampleSub`" pulumi-lang-java="`exampleSub`" pulumi-lang-hcl="`example_sub`">`exampleSub`</span>, <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`" pulumi-lang-hcl="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`normalSub`" pulumi-lang-dotnet="`NormalSub`" pulumi-lang-go="`normalSub`" pulumi-lang-python="`normal_sub`" pulumi-lang-yaml="`normalSub`" pulumi-lang-java="`normalSub`" pulumi-lang-hcl="`normal_sub`">`normalSub`</span>, <span pulumi-lang-nodejs="`backfilled`" pulumi-lang-dotnet="`Backfilled`" pulumi-lang-go="`backfilled`" pulumi-lang-python="`backfilled`" pulumi-lang-yaml="`backfilled`" pulumi-lang-java="`backfilled`" pulumi-lang-hcl="`backfilled`">`backfilled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`scheduledSub`" pulumi-lang-dotnet="`ScheduledSub`" pulumi-lang-go="`scheduledSub`" pulumi-lang-python="`scheduled_sub`" pulumi-lang-yaml="`scheduledSub`" pulumi-lang-java="`scheduledSub`" pulumi-lang-hcl="`scheduled_sub`">`scheduledSub`</span>.
     """
+    incident_labels: NotRequired[pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]]
     incident_post_mortem_condition_cause: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     [DEPRECATED] Use<span pulumi-lang-nodejs=" incidentConditionCause " pulumi-lang-dotnet=" IncidentConditionCause " pulumi-lang-go=" incidentConditionCause " pulumi-lang-python=" incident_condition_cause " pulumi-lang-yaml=" incidentConditionCause " pulumi-lang-java=" incidentConditionCause " pulumi-lang-hcl=" incident_condition_cause "> incidentConditionCause </span>instead. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
@@ -7230,7 +7353,7 @@ class WorkflowIncidentTriggerParamsArgsDict(TypedDict):
     """
     triggers: NotRequired[pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]]
     """
-    Actions that trigger the workflow. One of custom_fields.<slug>.updated, incident_in_triage, incident_created, incident_started, incident_updated, title_updated, summary_updated, status_updated, severity_updated, environments_added, environments_removed, environments_updated, incident_types_added, incident_types_removed, incident_types_updated, services_added, services_removed, services_updated, visibility_updated, functionalities_added, functionalities_removed, functionalities_updated, teams_added, teams_removed, teams_updated, causes_added, causes_removed, causes_updated, timeline_updated, status_page_timeline_updated, role_assignments_updated, role_assignments_added, role_assignments_removed, slack_command, slack_channel_created, slack_channel_converted, microsoft_teams_channel_created, microsoft_teams_chat_created, subscribers_updated, subscribers_added, subscribers_removed, user_joined_slack_channel, user_left_slack_channel
+    Actions that trigger the workflow. One of custom_fields.<slug>.updated, incident_in_triage, incident_created, incident_started, incident_updated, title_updated, summary_updated, status_updated, severity_updated, environments_added, environments_removed, environments_updated, incident_types_added, incident_types_removed, incident_types_updated, services_added, services_removed, services_updated, visibility_updated, functionalities_added, functionalities_removed, functionalities_updated, teams_added, teams_removed, teams_updated, causes_added, causes_removed, causes_updated, timeline_updated, status_page_timeline_updated, role_assignments_updated, role_assignments_added, role_assignments_removed, slack_command, slack_channel_created, slack_channel_converted, microsoft_teams_channel_created, microsoft_teams_chat_created, google_chat_space_created, subscribers_updated, subscribers_added, subscribers_removed, user_joined_slack_channel, user_left_slack_channel, meeting_summary_created
     """
 
 @pulumi.input_type
@@ -7246,6 +7369,8 @@ class WorkflowIncidentTriggerParamsArgs:
                  incident_condition_incident_roles: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_condition_incident_type: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_condition_kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_condition_label: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_condition_label_use_regexp: pulumi.Input[Optional[_builtins.bool]] = None,
                  incident_condition_mitigated_at: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_condition_resolved_at: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_condition_service: pulumi.Input[Optional[_builtins.str]] = None,
@@ -7258,6 +7383,7 @@ class WorkflowIncidentTriggerParamsArgs:
                  incident_conditional_inactivity: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_inactivity_duration: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_kinds: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 incident_labels: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  incident_post_mortem_condition_cause: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_statuses: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  incident_visibilities: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
@@ -7274,6 +7400,8 @@ class WorkflowIncidentTriggerParamsArgs:
         :param pulumi.Input[_builtins.str] incident_condition_incident_roles: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param pulumi.Input[_builtins.str] incident_condition_incident_type: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param pulumi.Input[_builtins.str] incident_condition_kind: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param pulumi.Input[_builtins.str] incident_condition_label: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param pulumi.Input[_builtins.bool] incident_condition_label_use_regexp: Value must be one of true or false
         :param pulumi.Input[_builtins.str] incident_condition_mitigated_at: Value must be one of `SET`, `UNSET`.
         :param pulumi.Input[_builtins.str] incident_condition_resolved_at: Value must be one of `SET`, `UNSET`.
         :param pulumi.Input[_builtins.str] incident_condition_service: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
@@ -7289,7 +7417,7 @@ class WorkflowIncidentTriggerParamsArgs:
         :param pulumi.Input[_builtins.str] incident_post_mortem_condition_cause: [DEPRECATED] Use<span pulumi-lang-nodejs=" incidentConditionCause " pulumi-lang-dotnet=" IncidentConditionCause " pulumi-lang-go=" incidentConditionCause " pulumi-lang-python=" incident_condition_cause " pulumi-lang-yaml=" incidentConditionCause " pulumi-lang-java=" incidentConditionCause " pulumi-lang-hcl=" incident_condition_cause "> incidentConditionCause </span>instead. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] incident_statuses: Value must be one of <span pulumi-lang-nodejs="`inTriage`" pulumi-lang-dotnet="`InTriage`" pulumi-lang-go="`inTriage`" pulumi-lang-python="`in_triage`" pulumi-lang-yaml="`inTriage`" pulumi-lang-java="`inTriage`" pulumi-lang-hcl="`in_triage`">`inTriage`</span>, <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`detected`" pulumi-lang-dotnet="`Detected`" pulumi-lang-go="`detected`" pulumi-lang-python="`detected`" pulumi-lang-yaml="`detected`" pulumi-lang-java="`detected`" pulumi-lang-hcl="`detected`">`detected`</span>, <span pulumi-lang-nodejs="`acknowledged`" pulumi-lang-dotnet="`Acknowledged`" pulumi-lang-go="`acknowledged`" pulumi-lang-python="`acknowledged`" pulumi-lang-yaml="`acknowledged`" pulumi-lang-java="`acknowledged`" pulumi-lang-hcl="`acknowledged`">`acknowledged`</span>, <span pulumi-lang-nodejs="`mitigated`" pulumi-lang-dotnet="`Mitigated`" pulumi-lang-go="`mitigated`" pulumi-lang-python="`mitigated`" pulumi-lang-yaml="`mitigated`" pulumi-lang-java="`mitigated`" pulumi-lang-hcl="`mitigated`">`mitigated`</span>, <span pulumi-lang-nodejs="`resolved`" pulumi-lang-dotnet="`Resolved`" pulumi-lang-go="`resolved`" pulumi-lang-python="`resolved`" pulumi-lang-yaml="`resolved`" pulumi-lang-java="`resolved`" pulumi-lang-hcl="`resolved`">`resolved`</span>, <span pulumi-lang-nodejs="`closed`" pulumi-lang-dotnet="`Closed`" pulumi-lang-go="`closed`" pulumi-lang-python="`closed`" pulumi-lang-yaml="`closed`" pulumi-lang-java="`closed`" pulumi-lang-hcl="`closed`">`closed`</span>, <span pulumi-lang-nodejs="`cancelled`" pulumi-lang-dotnet="`Cancelled`" pulumi-lang-go="`cancelled`" pulumi-lang-python="`cancelled`" pulumi-lang-yaml="`cancelled`" pulumi-lang-java="`cancelled`" pulumi-lang-hcl="`cancelled`">`cancelled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`inProgress`" pulumi-lang-dotnet="`InProgress`" pulumi-lang-go="`inProgress`" pulumi-lang-python="`in_progress`" pulumi-lang-yaml="`inProgress`" pulumi-lang-java="`inProgress`" pulumi-lang-hcl="`in_progress`">`inProgress`</span>, <span pulumi-lang-nodejs="`completed`" pulumi-lang-dotnet="`Completed`" pulumi-lang-go="`completed`" pulumi-lang-python="`completed`" pulumi-lang-yaml="`completed`" pulumi-lang-java="`completed`" pulumi-lang-hcl="`completed`">`completed`</span>.
         :param pulumi.Input[_builtins.str] trigger_type: Value must be one of <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`" pulumi-lang-hcl="`incident`">`incident`</span>.
-        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] triggers: Actions that trigger the workflow. One of custom_fields.<slug>.updated, incident_in_triage, incident_created, incident_started, incident_updated, title_updated, summary_updated, status_updated, severity_updated, environments_added, environments_removed, environments_updated, incident_types_added, incident_types_removed, incident_types_updated, services_added, services_removed, services_updated, visibility_updated, functionalities_added, functionalities_removed, functionalities_updated, teams_added, teams_removed, teams_updated, causes_added, causes_removed, causes_updated, timeline_updated, status_page_timeline_updated, role_assignments_updated, role_assignments_added, role_assignments_removed, slack_command, slack_channel_created, slack_channel_converted, microsoft_teams_channel_created, microsoft_teams_chat_created, subscribers_updated, subscribers_added, subscribers_removed, user_joined_slack_channel, user_left_slack_channel
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] triggers: Actions that trigger the workflow. One of custom_fields.<slug>.updated, incident_in_triage, incident_created, incident_started, incident_updated, title_updated, summary_updated, status_updated, severity_updated, environments_added, environments_removed, environments_updated, incident_types_added, incident_types_removed, incident_types_updated, services_added, services_removed, services_updated, visibility_updated, functionalities_added, functionalities_removed, functionalities_updated, teams_added, teams_removed, teams_updated, causes_added, causes_removed, causes_updated, timeline_updated, status_page_timeline_updated, role_assignments_updated, role_assignments_added, role_assignments_removed, slack_command, slack_channel_created, slack_channel_converted, microsoft_teams_channel_created, microsoft_teams_chat_created, google_chat_space_created, subscribers_updated, subscribers_added, subscribers_removed, user_joined_slack_channel, user_left_slack_channel, meeting_summary_created
         """
         if incident_condition is not None:
             pulumi.set(__self__, "incident_condition", incident_condition)
@@ -7311,6 +7439,10 @@ class WorkflowIncidentTriggerParamsArgs:
             pulumi.set(__self__, "incident_condition_incident_type", incident_condition_incident_type)
         if incident_condition_kind is not None:
             pulumi.set(__self__, "incident_condition_kind", incident_condition_kind)
+        if incident_condition_label is not None:
+            pulumi.set(__self__, "incident_condition_label", incident_condition_label)
+        if incident_condition_label_use_regexp is not None:
+            pulumi.set(__self__, "incident_condition_label_use_regexp", incident_condition_label_use_regexp)
         if incident_condition_mitigated_at is not None:
             pulumi.set(__self__, "incident_condition_mitigated_at", incident_condition_mitigated_at)
         if incident_condition_resolved_at is not None:
@@ -7335,6 +7467,8 @@ class WorkflowIncidentTriggerParamsArgs:
             pulumi.set(__self__, "incident_inactivity_duration", incident_inactivity_duration)
         if incident_kinds is not None:
             pulumi.set(__self__, "incident_kinds", incident_kinds)
+        if incident_labels is not None:
+            pulumi.set(__self__, "incident_labels", incident_labels)
         if incident_post_mortem_condition_cause is not None:
             pulumi.set(__self__, "incident_post_mortem_condition_cause", incident_post_mortem_condition_cause)
         if incident_statuses is not None:
@@ -7465,6 +7599,30 @@ class WorkflowIncidentTriggerParamsArgs:
     @incident_condition_kind.setter
     def incident_condition_kind(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "incident_condition_kind", value)
+
+    @_builtins.property
+    @pulumi.getter(name="incidentConditionLabel")
+    def incident_condition_label(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        """
+        return pulumi.get(self, "incident_condition_label")
+
+    @incident_condition_label.setter
+    def incident_condition_label(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "incident_condition_label", value)
+
+    @_builtins.property
+    @pulumi.getter(name="incidentConditionLabelUseRegexp")
+    def incident_condition_label_use_regexp(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Value must be one of true or false
+        """
+        return pulumi.get(self, "incident_condition_label_use_regexp")
+
+    @incident_condition_label_use_regexp.setter
+    def incident_condition_label_use_regexp(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "incident_condition_label_use_regexp", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentConditionMitigatedAt")
@@ -7611,6 +7769,15 @@ class WorkflowIncidentTriggerParamsArgs:
         pulumi.set(self, "incident_kinds", value)
 
     @_builtins.property
+    @pulumi.getter(name="incidentLabels")
+    def incident_labels(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
+        return pulumi.get(self, "incident_labels")
+
+    @incident_labels.setter
+    def incident_labels(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "incident_labels", value)
+
+    @_builtins.property
     @pulumi.getter(name="incidentPostMortemConditionCause")
     def incident_post_mortem_condition_cause(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
@@ -7659,7 +7826,7 @@ class WorkflowIncidentTriggerParamsArgs:
     @pulumi.getter
     def triggers(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
         """
-        Actions that trigger the workflow. One of custom_fields.<slug>.updated, incident_in_triage, incident_created, incident_started, incident_updated, title_updated, summary_updated, status_updated, severity_updated, environments_added, environments_removed, environments_updated, incident_types_added, incident_types_removed, incident_types_updated, services_added, services_removed, services_updated, visibility_updated, functionalities_added, functionalities_removed, functionalities_updated, teams_added, teams_removed, teams_updated, causes_added, causes_removed, causes_updated, timeline_updated, status_page_timeline_updated, role_assignments_updated, role_assignments_added, role_assignments_removed, slack_command, slack_channel_created, slack_channel_converted, microsoft_teams_channel_created, microsoft_teams_chat_created, subscribers_updated, subscribers_added, subscribers_removed, user_joined_slack_channel, user_left_slack_channel
+        Actions that trigger the workflow. One of custom_fields.<slug>.updated, incident_in_triage, incident_created, incident_started, incident_updated, title_updated, summary_updated, status_updated, severity_updated, environments_added, environments_removed, environments_updated, incident_types_added, incident_types_removed, incident_types_updated, services_added, services_removed, services_updated, visibility_updated, functionalities_added, functionalities_removed, functionalities_updated, teams_added, teams_removed, teams_updated, causes_added, causes_removed, causes_updated, timeline_updated, status_page_timeline_updated, role_assignments_updated, role_assignments_added, role_assignments_removed, slack_command, slack_channel_created, slack_channel_converted, microsoft_teams_channel_created, microsoft_teams_chat_created, google_chat_space_created, subscribers_updated, subscribers_added, subscribers_removed, user_joined_slack_channel, user_left_slack_channel, meeting_summary_created
         """
         return pulumi.get(self, "triggers")
 
@@ -7709,6 +7876,14 @@ class WorkflowPostMortemTriggerParamsArgsDict(TypedDict):
     """
     Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
     """
+    incident_condition_label: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    """
+    Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+    """
+    incident_condition_label_use_regexp: NotRequired[pulumi.Input[Optional[_builtins.bool]]]
+    """
+    Value must be one of true or false
+    """
     incident_condition_mitigated_at: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     Value must be one of `SET`, `UNSET`.
@@ -7757,6 +7932,7 @@ class WorkflowPostMortemTriggerParamsArgsDict(TypedDict):
     """
     Value must be one of <span pulumi-lang-nodejs="`test`" pulumi-lang-dotnet="`Test`" pulumi-lang-go="`test`" pulumi-lang-python="`test`" pulumi-lang-yaml="`test`" pulumi-lang-java="`test`" pulumi-lang-hcl="`test`">`test`</span>, <span pulumi-lang-nodejs="`testSub`" pulumi-lang-dotnet="`TestSub`" pulumi-lang-go="`testSub`" pulumi-lang-python="`test_sub`" pulumi-lang-yaml="`testSub`" pulumi-lang-java="`testSub`" pulumi-lang-hcl="`test_sub`">`testSub`</span>, <span pulumi-lang-nodejs="`example`" pulumi-lang-dotnet="`Example`" pulumi-lang-go="`example`" pulumi-lang-python="`example`" pulumi-lang-yaml="`example`" pulumi-lang-java="`example`" pulumi-lang-hcl="`example`">`example`</span>, <span pulumi-lang-nodejs="`exampleSub`" pulumi-lang-dotnet="`ExampleSub`" pulumi-lang-go="`exampleSub`" pulumi-lang-python="`example_sub`" pulumi-lang-yaml="`exampleSub`" pulumi-lang-java="`exampleSub`" pulumi-lang-hcl="`example_sub`">`exampleSub`</span>, <span pulumi-lang-nodejs="`normal`" pulumi-lang-dotnet="`Normal`" pulumi-lang-go="`normal`" pulumi-lang-python="`normal`" pulumi-lang-yaml="`normal`" pulumi-lang-java="`normal`" pulumi-lang-hcl="`normal`">`normal`</span>, <span pulumi-lang-nodejs="`normalSub`" pulumi-lang-dotnet="`NormalSub`" pulumi-lang-go="`normalSub`" pulumi-lang-python="`normal_sub`" pulumi-lang-yaml="`normalSub`" pulumi-lang-java="`normalSub`" pulumi-lang-hcl="`normal_sub`">`normalSub`</span>, <span pulumi-lang-nodejs="`backfilled`" pulumi-lang-dotnet="`Backfilled`" pulumi-lang-go="`backfilled`" pulumi-lang-python="`backfilled`" pulumi-lang-yaml="`backfilled`" pulumi-lang-java="`backfilled`" pulumi-lang-hcl="`backfilled`">`backfilled`</span>, <span pulumi-lang-nodejs="`scheduled`" pulumi-lang-dotnet="`Scheduled`" pulumi-lang-go="`scheduled`" pulumi-lang-python="`scheduled`" pulumi-lang-yaml="`scheduled`" pulumi-lang-java="`scheduled`" pulumi-lang-hcl="`scheduled`">`scheduled`</span>, <span pulumi-lang-nodejs="`scheduledSub`" pulumi-lang-dotnet="`ScheduledSub`" pulumi-lang-go="`scheduledSub`" pulumi-lang-python="`scheduled_sub`" pulumi-lang-yaml="`scheduledSub`" pulumi-lang-java="`scheduledSub`" pulumi-lang-hcl="`scheduled_sub`">`scheduledSub`</span>.
     """
+    incident_labels: NotRequired[pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]]
     incident_post_mortem_condition: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     Value must be one of `ALL`, `ANY`, `NONE`.
@@ -7800,6 +7976,8 @@ class WorkflowPostMortemTriggerParamsArgs:
                  incident_condition_incident_roles: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_condition_incident_type: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_condition_kind: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_condition_label: pulumi.Input[Optional[_builtins.str]] = None,
+                 incident_condition_label_use_regexp: pulumi.Input[Optional[_builtins.bool]] = None,
                  incident_condition_mitigated_at: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_condition_resolved_at: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_condition_service: pulumi.Input[Optional[_builtins.str]] = None,
@@ -7812,6 +7990,7 @@ class WorkflowPostMortemTriggerParamsArgs:
                  incident_conditional_inactivity: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_inactivity_duration: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_kinds: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 incident_labels: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  incident_post_mortem_condition: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_post_mortem_condition_cause: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_post_mortem_condition_status: pulumi.Input[Optional[_builtins.str]] = None,
@@ -7831,6 +8010,8 @@ class WorkflowPostMortemTriggerParamsArgs:
         :param pulumi.Input[_builtins.str] incident_condition_incident_roles: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param pulumi.Input[_builtins.str] incident_condition_incident_type: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param pulumi.Input[_builtins.str] incident_condition_kind: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param pulumi.Input[_builtins.str] incident_condition_label: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        :param pulumi.Input[_builtins.bool] incident_condition_label_use_regexp: Value must be one of true or false
         :param pulumi.Input[_builtins.str] incident_condition_mitigated_at: Value must be one of `SET`, `UNSET`.
         :param pulumi.Input[_builtins.str] incident_condition_resolved_at: Value must be one of `SET`, `UNSET`.
         :param pulumi.Input[_builtins.str] incident_condition_service: Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
@@ -7871,6 +8052,10 @@ class WorkflowPostMortemTriggerParamsArgs:
             pulumi.set(__self__, "incident_condition_incident_type", incident_condition_incident_type)
         if incident_condition_kind is not None:
             pulumi.set(__self__, "incident_condition_kind", incident_condition_kind)
+        if incident_condition_label is not None:
+            pulumi.set(__self__, "incident_condition_label", incident_condition_label)
+        if incident_condition_label_use_regexp is not None:
+            pulumi.set(__self__, "incident_condition_label_use_regexp", incident_condition_label_use_regexp)
         if incident_condition_mitigated_at is not None:
             pulumi.set(__self__, "incident_condition_mitigated_at", incident_condition_mitigated_at)
         if incident_condition_resolved_at is not None:
@@ -7895,6 +8080,8 @@ class WorkflowPostMortemTriggerParamsArgs:
             pulumi.set(__self__, "incident_inactivity_duration", incident_inactivity_duration)
         if incident_kinds is not None:
             pulumi.set(__self__, "incident_kinds", incident_kinds)
+        if incident_labels is not None:
+            pulumi.set(__self__, "incident_labels", incident_labels)
         if incident_post_mortem_condition is not None:
             pulumi.set(__self__, "incident_post_mortem_condition", incident_post_mortem_condition)
         if incident_post_mortem_condition_cause is not None:
@@ -8033,6 +8220,30 @@ class WorkflowPostMortemTriggerParamsArgs:
         pulumi.set(self, "incident_condition_kind", value)
 
     @_builtins.property
+    @pulumi.getter(name="incidentConditionLabel")
+    def incident_condition_label(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
+        """
+        return pulumi.get(self, "incident_condition_label")
+
+    @incident_condition_label.setter
+    def incident_condition_label(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "incident_condition_label", value)
+
+    @_builtins.property
+    @pulumi.getter(name="incidentConditionLabelUseRegexp")
+    def incident_condition_label_use_regexp(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Value must be one of true or false
+        """
+        return pulumi.get(self, "incident_condition_label_use_regexp")
+
+    @incident_condition_label_use_regexp.setter
+    def incident_condition_label_use_regexp(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "incident_condition_label_use_regexp", value)
+
+    @_builtins.property
     @pulumi.getter(name="incidentConditionMitigatedAt")
     def incident_condition_mitigated_at(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
@@ -8175,6 +8386,15 @@ class WorkflowPostMortemTriggerParamsArgs:
     @incident_kinds.setter
     def incident_kinds(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "incident_kinds", value)
+
+    @_builtins.property
+    @pulumi.getter(name="incidentLabels")
+    def incident_labels(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
+        return pulumi.get(self, "incident_labels")
+
+    @incident_labels.setter
+    def incident_labels(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "incident_labels", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentPostMortemCondition")
@@ -9417,6 +9637,69 @@ class WorkflowTaskAddToTimelineTaskParamsPostToSlackChannelArgs:
         pulumi.set(self, "name", value)
 
 
+class WorkflowTaskArchiveGoogleChatSpacesTaskParamsArgsDict(TypedDict):
+    spaces: pulumi.Input[Sequence[pulumi.Input['WorkflowTaskArchiveGoogleChatSpacesTaskParamsSpaceArgsDict']]]
+    task_type: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+
+@pulumi.input_type
+class WorkflowTaskArchiveGoogleChatSpacesTaskParamsArgs:
+    def __init__(__self__, *,
+                 spaces: pulumi.Input[Sequence[pulumi.Input['WorkflowTaskArchiveGoogleChatSpacesTaskParamsSpaceArgs']]],
+                 task_type: pulumi.Input[Optional[_builtins.str]] = None):
+        pulumi.set(__self__, "spaces", spaces)
+        if task_type is not None:
+            pulumi.set(__self__, "task_type", task_type)
+
+    @_builtins.property
+    @pulumi.getter
+    def spaces(self) -> pulumi.Input[Sequence[pulumi.Input['WorkflowTaskArchiveGoogleChatSpacesTaskParamsSpaceArgs']]]:
+        return pulumi.get(self, "spaces")
+
+    @spaces.setter
+    def spaces(self, value: pulumi.Input[Sequence[pulumi.Input['WorkflowTaskArchiveGoogleChatSpacesTaskParamsSpaceArgs']]]):
+        pulumi.set(self, "spaces", value)
+
+    @_builtins.property
+    @pulumi.getter(name="taskType")
+    def task_type(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "task_type")
+
+    @task_type.setter
+    def task_type(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "task_type", value)
+
+
+class WorkflowTaskArchiveGoogleChatSpacesTaskParamsSpaceArgsDict(TypedDict):
+    id: pulumi.Input[_builtins.str]
+    name: pulumi.Input[_builtins.str]
+
+@pulumi.input_type
+class WorkflowTaskArchiveGoogleChatSpacesTaskParamsSpaceArgs:
+    def __init__(__self__, *,
+                 id: pulumi.Input[_builtins.str],
+                 name: pulumi.Input[_builtins.str]):
+        pulumi.set(__self__, "id", id)
+        pulumi.set(__self__, "name", name)
+
+    @_builtins.property
+    @pulumi.getter
+    def id(self) -> pulumi.Input[_builtins.str]:
+        return pulumi.get(self, "id")
+
+    @id.setter
+    def id(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "id", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> pulumi.Input[_builtins.str]:
+        return pulumi.get(self, "name")
+
+    @name.setter
+    def name(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "name", value)
+
+
 class WorkflowTaskArchiveMicrosoftTeamsChannelsTaskParamsArgsDict(TypedDict):
     channels: pulumi.Input[Sequence[pulumi.Input['WorkflowTaskArchiveMicrosoftTeamsChannelsTaskParamsChannelArgsDict']]]
     team: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]
@@ -10127,32 +10410,104 @@ class WorkflowTaskCallPeopleTaskParamsArgs:
         pulumi.set(self, "task_type", value)
 
 
+class WorkflowTaskChangeGoogleChatSpacePrivacyTaskParamsArgsDict(TypedDict):
+    space: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]
+    """
+    Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+    """
+    audience: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    """
+    Target audience resource name (e.g. audiences/default). Leave blank to make private.
+    """
+    task_type: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+
+@pulumi.input_type
+class WorkflowTaskChangeGoogleChatSpacePrivacyTaskParamsArgs:
+    def __init__(__self__, *,
+                 space: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]],
+                 audience: pulumi.Input[Optional[_builtins.str]] = None,
+                 task_type: pulumi.Input[Optional[_builtins.str]] = None):
+        """
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] space: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param pulumi.Input[_builtins.str] audience: Target audience resource name (e.g. audiences/default). Leave blank to make private.
+        """
+        pulumi.set(__self__, "space", space)
+        if audience is not None:
+            pulumi.set(__self__, "audience", audience)
+        if task_type is not None:
+            pulumi.set(__self__, "task_type", task_type)
+
+    @_builtins.property
+    @pulumi.getter
+    def space(self) -> pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        """
+        return pulumi.get(self, "space")
+
+    @space.setter
+    def space(self, value: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]):
+        pulumi.set(self, "space", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def audience(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Target audience resource name (e.g. audiences/default). Leave blank to make private.
+        """
+        return pulumi.get(self, "audience")
+
+    @audience.setter
+    def audience(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "audience", value)
+
+    @_builtins.property
+    @pulumi.getter(name="taskType")
+    def task_type(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "task_type")
+
+    @task_type.setter
+    def task_type(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "task_type", value)
+
+
 class WorkflowTaskChangeSlackChannelPrivacyTaskParamsArgsDict(TypedDict):
+    channel: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]
+    """
+    Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+    """
     privacy: pulumi.Input[_builtins.str]
     """
     Value must be one of <span pulumi-lang-nodejs="`private`" pulumi-lang-dotnet="`Private`" pulumi-lang-go="`private`" pulumi-lang-python="`private`" pulumi-lang-yaml="`private`" pulumi-lang-java="`private`" pulumi-lang-hcl="`private`">`private`</span>, <span pulumi-lang-nodejs="`public`" pulumi-lang-dotnet="`Public`" pulumi-lang-go="`public`" pulumi-lang-python="`public`" pulumi-lang-yaml="`public`" pulumi-lang-java="`public`" pulumi-lang-hcl="`public`">`public`</span>.
-    """
-    channel: NotRequired[pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]]
-    """
-    Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
     """
     task_type: NotRequired[pulumi.Input[Optional[_builtins.str]]]
 
 @pulumi.input_type
 class WorkflowTaskChangeSlackChannelPrivacyTaskParamsArgs:
     def __init__(__self__, *,
+                 channel: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]],
                  privacy: pulumi.Input[_builtins.str],
-                 channel: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
                  task_type: pulumi.Input[Optional[_builtins.str]] = None):
         """
-        :param pulumi.Input[_builtins.str] privacy: Value must be one of <span pulumi-lang-nodejs="`private`" pulumi-lang-dotnet="`Private`" pulumi-lang-go="`private`" pulumi-lang-python="`private`" pulumi-lang-yaml="`private`" pulumi-lang-java="`private`" pulumi-lang-hcl="`private`">`private`</span>, <span pulumi-lang-nodejs="`public`" pulumi-lang-dotnet="`Public`" pulumi-lang-go="`public`" pulumi-lang-python="`public`" pulumi-lang-yaml="`public`" pulumi-lang-java="`public`" pulumi-lang-hcl="`public`">`public`</span>.
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param pulumi.Input[_builtins.str] privacy: Value must be one of <span pulumi-lang-nodejs="`private`" pulumi-lang-dotnet="`Private`" pulumi-lang-go="`private`" pulumi-lang-python="`private`" pulumi-lang-yaml="`private`" pulumi-lang-java="`private`" pulumi-lang-hcl="`private`">`private`</span>, <span pulumi-lang-nodejs="`public`" pulumi-lang-dotnet="`Public`" pulumi-lang-go="`public`" pulumi-lang-python="`public`" pulumi-lang-yaml="`public`" pulumi-lang-java="`public`" pulumi-lang-hcl="`public`">`public`</span>.
         """
+        pulumi.set(__self__, "channel", channel)
         pulumi.set(__self__, "privacy", privacy)
-        if channel is not None:
-            pulumi.set(__self__, "channel", channel)
         if task_type is not None:
             pulumi.set(__self__, "task_type", task_type)
+
+    @_builtins.property
+    @pulumi.getter
+    def channel(self) -> pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        """
+        return pulumi.get(self, "channel")
+
+    @channel.setter
+    def channel(self, value: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]):
+        pulumi.set(self, "channel", value)
 
     @_builtins.property
     @pulumi.getter
@@ -10165,18 +10520,6 @@ class WorkflowTaskChangeSlackChannelPrivacyTaskParamsArgs:
     @privacy.setter
     def privacy(self, value: pulumi.Input[_builtins.str]):
         pulumi.set(self, "privacy", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def channel(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
-        """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
-        """
-        return pulumi.get(self, "channel")
-
-    @channel.setter
-    def channel(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
-        pulumi.set(self, "channel", value)
 
     @_builtins.property
     @pulumi.getter(name="taskType")
@@ -11134,6 +11477,18 @@ class WorkflowTaskCreateConfluencePageTaskParamsArgsDict(TypedDict):
     """
     The page content
     """
+    create_as_live_doc: NotRequired[pulumi.Input[Optional[_builtins.bool]]]
+    """
+    Value must be one of true or false
+    """
+    include_overview: NotRequired[pulumi.Input[Optional[_builtins.bool]]]
+    """
+    Value must be one of true or false
+    """
+    include_timeline: NotRequired[pulumi.Input[Optional[_builtins.bool]]]
+    """
+    Value must be one of true or false
+    """
     integration: NotRequired[pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]]
     """
     Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Specify integration id if you have more than one Confluence instance
@@ -11159,6 +11514,9 @@ class WorkflowTaskCreateConfluencePageTaskParamsArgs:
                  title: pulumi.Input[_builtins.str],
                  ancestor: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
                  content: pulumi.Input[Optional[_builtins.str]] = None,
+                 create_as_live_doc: pulumi.Input[Optional[_builtins.bool]] = None,
+                 include_overview: pulumi.Input[Optional[_builtins.bool]] = None,
+                 include_timeline: pulumi.Input[Optional[_builtins.bool]] = None,
                  integration: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
                  mark_post_mortem_as_published: pulumi.Input[Optional[_builtins.bool]] = None,
                  post_mortem_template_id: pulumi.Input[Optional[_builtins.str]] = None,
@@ -11169,6 +11527,9 @@ class WorkflowTaskCreateConfluencePageTaskParamsArgs:
         :param pulumi.Input[_builtins.str] title: The page title
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] ancestor: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param pulumi.Input[_builtins.str] content: The page content
+        :param pulumi.Input[_builtins.bool] create_as_live_doc: Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] include_overview: Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] include_timeline: Value must be one of true or false
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] integration: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Specify integration id if you have more than one Confluence instance
         :param pulumi.Input[_builtins.bool] mark_post_mortem_as_published: Value must be one of true or false
         :param pulumi.Input[_builtins.str] post_mortem_template_id: The Retrospective template to use
@@ -11180,6 +11541,12 @@ class WorkflowTaskCreateConfluencePageTaskParamsArgs:
             pulumi.set(__self__, "ancestor", ancestor)
         if content is not None:
             pulumi.set(__self__, "content", content)
+        if create_as_live_doc is not None:
+            pulumi.set(__self__, "create_as_live_doc", create_as_live_doc)
+        if include_overview is not None:
+            pulumi.set(__self__, "include_overview", include_overview)
+        if include_timeline is not None:
+            pulumi.set(__self__, "include_timeline", include_timeline)
         if integration is not None:
             pulumi.set(__self__, "integration", integration)
         if mark_post_mortem_as_published is not None:
@@ -11238,6 +11605,42 @@ class WorkflowTaskCreateConfluencePageTaskParamsArgs:
     @content.setter
     def content(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "content", value)
+
+    @_builtins.property
+    @pulumi.getter(name="createAsLiveDoc")
+    def create_as_live_doc(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Value must be one of true or false
+        """
+        return pulumi.get(self, "create_as_live_doc")
+
+    @create_as_live_doc.setter
+    def create_as_live_doc(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "create_as_live_doc", value)
+
+    @_builtins.property
+    @pulumi.getter(name="includeOverview")
+    def include_overview(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Value must be one of true or false
+        """
+        return pulumi.get(self, "include_overview")
+
+    @include_overview.setter
+    def include_overview(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "include_overview", value)
+
+    @_builtins.property
+    @pulumi.getter(name="includeTimeline")
+    def include_timeline(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Value must be one of true or false
+        """
+        return pulumi.get(self, "include_timeline")
+
+    @include_timeline.setter
+    def include_timeline(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "include_timeline", value)
 
     @_builtins.property
     @pulumi.getter
@@ -11591,6 +11994,10 @@ class WorkflowTaskCreateGithubIssueTaskParamsArgsDict(TypedDict):
     """
     The issue body
     """
+    custom_fields_mapping: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    """
+    Custom field mappings. Can contain liquid markup and need to be valid JSON
+    """
     issue_type: NotRequired[pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]]
     """
     Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The issue type
@@ -11611,6 +12018,7 @@ class WorkflowTaskCreateGithubIssueTaskParamsArgs:
                  repository: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]],
                  title: pulumi.Input[_builtins.str],
                  body: pulumi.Input[Optional[_builtins.str]] = None,
+                 custom_fields_mapping: pulumi.Input[Optional[_builtins.str]] = None,
                  issue_type: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
                  labels: pulumi.Input[Optional[Sequence[pulumi.Input['WorkflowTaskCreateGithubIssueTaskParamsLabelArgs']]]] = None,
                  parent_issue_number: pulumi.Input[Optional[_builtins.str]] = None,
@@ -11619,6 +12027,7 @@ class WorkflowTaskCreateGithubIssueTaskParamsArgs:
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] repository: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param pulumi.Input[_builtins.str] title: The issue title
         :param pulumi.Input[_builtins.str] body: The issue body
+        :param pulumi.Input[_builtins.str] custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] issue_type: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The issue type
         :param pulumi.Input[Sequence[pulumi.Input['WorkflowTaskCreateGithubIssueTaskParamsLabelArgs']]] labels: The issue labels
         :param pulumi.Input[_builtins.str] parent_issue_number: The parent issue number for sub-issue linking
@@ -11627,6 +12036,8 @@ class WorkflowTaskCreateGithubIssueTaskParamsArgs:
         pulumi.set(__self__, "title", title)
         if body is not None:
             pulumi.set(__self__, "body", body)
+        if custom_fields_mapping is not None:
+            pulumi.set(__self__, "custom_fields_mapping", custom_fields_mapping)
         if issue_type is not None:
             pulumi.set(__self__, "issue_type", issue_type)
         if labels is not None:
@@ -11671,6 +12082,18 @@ class WorkflowTaskCreateGithubIssueTaskParamsArgs:
     @body.setter
     def body(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "body", value)
+
+    @_builtins.property
+    @pulumi.getter(name="customFieldsMapping")
+    def custom_fields_mapping(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Custom field mappings. Can contain liquid markup and need to be valid JSON
+        """
+        return pulumi.get(self, "custom_fields_mapping")
+
+    @custom_fields_mapping.setter
+    def custom_fields_mapping(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "custom_fields_mapping", value)
 
     @_builtins.property
     @pulumi.getter(name="issueType")
@@ -12388,6 +12811,73 @@ class WorkflowTaskCreateGoogleCalendarEventTaskParamsPostToSlackChannelArgs:
         pulumi.set(self, "name", value)
 
 
+class WorkflowTaskCreateGoogleChatSpaceTaskParamsArgsDict(TypedDict):
+    title: pulumi.Input[_builtins.str]
+    audience: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    """
+    Target audience resource name (e.g. audiences/default). Leave blank for private space.
+    """
+    description: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    task_type: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+
+@pulumi.input_type
+class WorkflowTaskCreateGoogleChatSpaceTaskParamsArgs:
+    def __init__(__self__, *,
+                 title: pulumi.Input[_builtins.str],
+                 audience: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 task_type: pulumi.Input[Optional[_builtins.str]] = None):
+        """
+        :param pulumi.Input[_builtins.str] audience: Target audience resource name (e.g. audiences/default). Leave blank for private space.
+        """
+        pulumi.set(__self__, "title", title)
+        if audience is not None:
+            pulumi.set(__self__, "audience", audience)
+        if description is not None:
+            pulumi.set(__self__, "description", description)
+        if task_type is not None:
+            pulumi.set(__self__, "task_type", task_type)
+
+    @_builtins.property
+    @pulumi.getter
+    def title(self) -> pulumi.Input[_builtins.str]:
+        return pulumi.get(self, "title")
+
+    @title.setter
+    def title(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "title", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def audience(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Target audience resource name (e.g. audiences/default). Leave blank for private space.
+        """
+        return pulumi.get(self, "audience")
+
+    @audience.setter
+    def audience(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "audience", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "description")
+
+    @description.setter
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "description", value)
+
+    @_builtins.property
+    @pulumi.getter(name="taskType")
+    def task_type(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "task_type")
+
+    @task_type.setter
+    def task_type(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "task_type", value)
+
+
 class WorkflowTaskCreateGoogleDocsPageTaskParamsArgsDict(TypedDict):
     title: pulumi.Input[_builtins.str]
     """
@@ -12400,6 +12890,14 @@ class WorkflowTaskCreateGoogleDocsPageTaskParamsArgsDict(TypedDict):
     drive: NotRequired[pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]]
     """
     Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+    """
+    include_overview: NotRequired[pulumi.Input[Optional[_builtins.bool]]]
+    """
+    Value must be one of true or false
+    """
+    include_timeline: NotRequired[pulumi.Input[Optional[_builtins.bool]]]
+    """
+    Value must be one of true or false
     """
     mark_post_mortem_as_published: NotRequired[pulumi.Input[Optional[_builtins.bool]]]
     """
@@ -12429,6 +12927,8 @@ class WorkflowTaskCreateGoogleDocsPageTaskParamsArgs:
                  title: pulumi.Input[_builtins.str],
                  content: pulumi.Input[Optional[_builtins.str]] = None,
                  drive: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 include_overview: pulumi.Input[Optional[_builtins.bool]] = None,
+                 include_timeline: pulumi.Input[Optional[_builtins.bool]] = None,
                  mark_post_mortem_as_published: pulumi.Input[Optional[_builtins.bool]] = None,
                  parent_folder: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
                  permissions: pulumi.Input[Optional[_builtins.str]] = None,
@@ -12439,6 +12939,8 @@ class WorkflowTaskCreateGoogleDocsPageTaskParamsArgs:
         :param pulumi.Input[_builtins.str] title: The page title
         :param pulumi.Input[_builtins.str] content: The page content
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] drive: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param pulumi.Input[_builtins.bool] include_overview: Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] include_timeline: Value must be one of true or false
         :param pulumi.Input[_builtins.bool] mark_post_mortem_as_published: Value must be one of true or false
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] parent_folder: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param pulumi.Input[_builtins.str] permissions: Page permissions JSON
@@ -12450,6 +12952,10 @@ class WorkflowTaskCreateGoogleDocsPageTaskParamsArgs:
             pulumi.set(__self__, "content", content)
         if drive is not None:
             pulumi.set(__self__, "drive", drive)
+        if include_overview is not None:
+            pulumi.set(__self__, "include_overview", include_overview)
+        if include_timeline is not None:
+            pulumi.set(__self__, "include_timeline", include_timeline)
         if mark_post_mortem_as_published is not None:
             pulumi.set(__self__, "mark_post_mortem_as_published", mark_post_mortem_as_published)
         if parent_folder is not None:
@@ -12498,6 +13004,30 @@ class WorkflowTaskCreateGoogleDocsPageTaskParamsArgs:
     @drive.setter
     def drive(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "drive", value)
+
+    @_builtins.property
+    @pulumi.getter(name="includeOverview")
+    def include_overview(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Value must be one of true or false
+        """
+        return pulumi.get(self, "include_overview")
+
+    @include_overview.setter
+    def include_overview(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "include_overview", value)
+
+    @_builtins.property
+    @pulumi.getter(name="includeTimeline")
+    def include_timeline(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Value must be one of true or false
+        """
+        return pulumi.get(self, "include_timeline")
+
+    @include_timeline.setter
+    def include_timeline(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "include_timeline", value)
 
     @_builtins.property
     @pulumi.getter(name="markPostMortemAsPublished")
@@ -13819,7 +14349,7 @@ class WorkflowTaskCreateJsmopsAlertTaskParamsArgsDict(TypedDict):
     escalations: NotRequired[pulumi.Input[Optional[Sequence[pulumi.Input['WorkflowTaskCreateJsmopsAlertTaskParamsEscalationArgsDict']]]]]
     priority: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
-    Value must be one of `P3`, `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
+    Value must be one of `P3`, `P1`, `P2`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
     """
     schedules: NotRequired[pulumi.Input[Optional[Sequence[pulumi.Input['WorkflowTaskCreateJsmopsAlertTaskParamsScheduleArgsDict']]]]]
     task_type: NotRequired[pulumi.Input[Optional[_builtins.str]]]
@@ -13842,7 +14372,7 @@ class WorkflowTaskCreateJsmopsAlertTaskParamsArgs:
         :param pulumi.Input[_builtins.str] message: Message of the alert
         :param pulumi.Input[_builtins.str] description: Description field of the alert that is generally used to provide a detailed information about the alert
         :param pulumi.Input[_builtins.str] details: Details payload. Can contain liquid markup and need to be valid JSON
-        :param pulumi.Input[_builtins.str] priority: Value must be one of `P3`, `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
+        :param pulumi.Input[_builtins.str] priority: Value must be one of `P3`, `P1`, `P2`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         """
         pulumi.set(__self__, "message", message)
         if description is not None:
@@ -13911,7 +14441,7 @@ class WorkflowTaskCreateJsmopsAlertTaskParamsArgs:
     @pulumi.getter
     def priority(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Value must be one of `P3`, `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
+        Value must be one of `P3`, `P1`, `P2`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         """
         return pulumi.get(self, "priority")
 
@@ -14157,6 +14687,10 @@ class WorkflowTaskCreateLinearIssueTaskParamsArgsDict(TypedDict):
     """
     The assigned user's email
     """
+    custom_fields_mapping: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    """
+    Custom field mappings. Can contain liquid markup and need to be valid JSON
+    """
     description: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     The issue description
@@ -14179,6 +14713,7 @@ class WorkflowTaskCreateLinearIssueTaskParamsArgs:
                  team: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]],
                  title: pulumi.Input[_builtins.str],
                  assign_user_email: pulumi.Input[Optional[_builtins.str]] = None,
+                 custom_fields_mapping: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  labels: pulumi.Input[Optional[Sequence[pulumi.Input['WorkflowTaskCreateLinearIssueTaskParamsLabelArgs']]]] = None,
                  priority: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
@@ -14189,6 +14724,7 @@ class WorkflowTaskCreateLinearIssueTaskParamsArgs:
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] team: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The team id and display name
         :param pulumi.Input[_builtins.str] title: The issue title
         :param pulumi.Input[_builtins.str] assign_user_email: The assigned user's email
+        :param pulumi.Input[_builtins.str] custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON
         :param pulumi.Input[_builtins.str] description: The issue description
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] project: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The project id and display name
@@ -14198,6 +14734,8 @@ class WorkflowTaskCreateLinearIssueTaskParamsArgs:
         pulumi.set(__self__, "title", title)
         if assign_user_email is not None:
             pulumi.set(__self__, "assign_user_email", assign_user_email)
+        if custom_fields_mapping is not None:
+            pulumi.set(__self__, "custom_fields_mapping", custom_fields_mapping)
         if description is not None:
             pulumi.set(__self__, "description", description)
         if labels is not None:
@@ -14256,6 +14794,18 @@ class WorkflowTaskCreateLinearIssueTaskParamsArgs:
     @assign_user_email.setter
     def assign_user_email(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "assign_user_email", value)
+
+    @_builtins.property
+    @pulumi.getter(name="customFieldsMapping")
+    def custom_fields_mapping(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Custom field mappings. Can contain liquid markup and need to be valid JSON
+        """
+        return pulumi.get(self, "custom_fields_mapping")
+
+    @custom_fields_mapping.setter
+    def custom_fields_mapping(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "custom_fields_mapping", value)
 
     @_builtins.property
     @pulumi.getter
@@ -14360,6 +14910,10 @@ class WorkflowTaskCreateLinearSubtaskIssueTaskParamsArgsDict(TypedDict):
     """
     The assigned user's email
     """
+    custom_fields_mapping: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    """
+    Custom field mappings. Can contain liquid markup and need to be valid JSON
+    """
     description: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     The issue description
@@ -14378,6 +14932,7 @@ class WorkflowTaskCreateLinearSubtaskIssueTaskParamsArgs:
                  state: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]],
                  title: pulumi.Input[_builtins.str],
                  assign_user_email: pulumi.Input[Optional[_builtins.str]] = None,
+                 custom_fields_mapping: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  labels: pulumi.Input[Optional[Sequence[pulumi.Input['WorkflowTaskCreateLinearSubtaskIssueTaskParamsLabelArgs']]]] = None,
                  priority: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
@@ -14387,6 +14942,7 @@ class WorkflowTaskCreateLinearSubtaskIssueTaskParamsArgs:
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] state: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The state id and display name
         :param pulumi.Input[_builtins.str] title: The issue title
         :param pulumi.Input[_builtins.str] assign_user_email: The assigned user's email
+        :param pulumi.Input[_builtins.str] custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON
         :param pulumi.Input[_builtins.str] description: The issue description
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         """
@@ -14395,6 +14951,8 @@ class WorkflowTaskCreateLinearSubtaskIssueTaskParamsArgs:
         pulumi.set(__self__, "title", title)
         if assign_user_email is not None:
             pulumi.set(__self__, "assign_user_email", assign_user_email)
+        if custom_fields_mapping is not None:
+            pulumi.set(__self__, "custom_fields_mapping", custom_fields_mapping)
         if description is not None:
             pulumi.set(__self__, "description", description)
         if labels is not None:
@@ -14451,6 +15009,18 @@ class WorkflowTaskCreateLinearSubtaskIssueTaskParamsArgs:
     @assign_user_email.setter
     def assign_user_email(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "assign_user_email", value)
+
+    @_builtins.property
+    @pulumi.getter(name="customFieldsMapping")
+    def custom_fields_mapping(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Custom field mappings. Can contain liquid markup and need to be valid JSON
+        """
+        return pulumi.get(self, "custom_fields_mapping")
+
+    @custom_fields_mapping.setter
+    def custom_fields_mapping(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "custom_fields_mapping", value)
 
     @_builtins.property
     @pulumi.getter
@@ -14527,6 +15097,10 @@ class WorkflowTaskCreateLinearSubtaskIssueTaskParamsLabelArgs:
 
 
 class WorkflowTaskCreateMicrosoftTeamsChannelTaskParamsArgsDict(TypedDict):
+    team: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]
+    """
+    Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+    """
     title: pulumi.Input[_builtins.str]
     """
     Microsoft Team channel title
@@ -14540,25 +15114,22 @@ class WorkflowTaskCreateMicrosoftTeamsChannelTaskParamsArgsDict(TypedDict):
     Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`true`" pulumi-lang-dotnet="`True`" pulumi-lang-go="`true`" pulumi-lang-python="`true`" pulumi-lang-yaml="`true`" pulumi-lang-java="`true`" pulumi-lang-hcl="`true`">`true`</span>, <span pulumi-lang-nodejs="`false`" pulumi-lang-dotnet="`False`" pulumi-lang-go="`false`" pulumi-lang-python="`false`" pulumi-lang-yaml="`false`" pulumi-lang-java="`false`" pulumi-lang-hcl="`false`">`false`</span>.
     """
     task_type: NotRequired[pulumi.Input[Optional[_builtins.str]]]
-    team: NotRequired[pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]]
-    """
-    Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
-    """
 
 @pulumi.input_type
 class WorkflowTaskCreateMicrosoftTeamsChannelTaskParamsArgs:
     def __init__(__self__, *,
+                 team: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]],
                  title: pulumi.Input[_builtins.str],
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  private: pulumi.Input[Optional[_builtins.str]] = None,
-                 task_type: pulumi.Input[Optional[_builtins.str]] = None,
-                 team: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None):
+                 task_type: pulumi.Input[Optional[_builtins.str]] = None):
         """
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] team: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param pulumi.Input[_builtins.str] title: Microsoft Team channel title
         :param pulumi.Input[_builtins.str] description: Microsoft Team channel description
         :param pulumi.Input[_builtins.str] private: Value must be one of <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>, <span pulumi-lang-nodejs="`true`" pulumi-lang-dotnet="`True`" pulumi-lang-go="`true`" pulumi-lang-python="`true`" pulumi-lang-yaml="`true`" pulumi-lang-java="`true`" pulumi-lang-hcl="`true`">`true`</span>, <span pulumi-lang-nodejs="`false`" pulumi-lang-dotnet="`False`" pulumi-lang-go="`false`" pulumi-lang-python="`false`" pulumi-lang-yaml="`false`" pulumi-lang-java="`false`" pulumi-lang-hcl="`false`">`false`</span>.
-        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] team: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         """
+        pulumi.set(__self__, "team", team)
         pulumi.set(__self__, "title", title)
         if description is not None:
             pulumi.set(__self__, "description", description)
@@ -14566,8 +15137,18 @@ class WorkflowTaskCreateMicrosoftTeamsChannelTaskParamsArgs:
             pulumi.set(__self__, "private", private)
         if task_type is not None:
             pulumi.set(__self__, "task_type", task_type)
-        if team is not None:
-            pulumi.set(__self__, "team", team)
+
+    @_builtins.property
+    @pulumi.getter
+    def team(self) -> pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        """
+        return pulumi.get(self, "team")
+
+    @team.setter
+    def team(self, value: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]):
+        pulumi.set(self, "team", value)
 
     @_builtins.property
     @pulumi.getter
@@ -14613,18 +15194,6 @@ class WorkflowTaskCreateMicrosoftTeamsChannelTaskParamsArgs:
     @task_type.setter
     def task_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "task_type", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def team(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
-        """
-        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
-        """
-        return pulumi.get(self, "team")
-
-    @team.setter
-    def team(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
-        pulumi.set(self, "team", value)
 
 
 class WorkflowTaskCreateMicrosoftTeamsChatTaskParamsArgsDict(TypedDict):
@@ -17976,6 +18545,10 @@ class WorkflowTaskCreateZoomMeetingTaskParamsArgsDict(TypedDict):
     """
     The email to use if creating as email
     """
+    enable_zoom_bot_auto_join: NotRequired[pulumi.Input[Optional[_builtins.bool]]]
+    """
+    Allow the Rootly bot to start recording without waiting for host approval. Value must be one of true or false
+    """
     password: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     The meeting password
@@ -18002,6 +18575,7 @@ class WorkflowTaskCreateZoomMeetingTaskParamsArgs:
                  alternative_hosts: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  auto_recording: pulumi.Input[Optional[_builtins.str]] = None,
                  create_as_email: pulumi.Input[Optional[_builtins.str]] = None,
+                 enable_zoom_bot_auto_join: pulumi.Input[Optional[_builtins.bool]] = None,
                  password: pulumi.Input[Optional[_builtins.str]] = None,
                  post_to_incident_timeline: pulumi.Input[Optional[_builtins.bool]] = None,
                  post_to_slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input['WorkflowTaskCreateZoomMeetingTaskParamsPostToSlackChannelArgs']]]] = None,
@@ -18012,6 +18586,7 @@ class WorkflowTaskCreateZoomMeetingTaskParamsArgs:
         :param pulumi.Input[_builtins.str] topic: The meeting topic
         :param pulumi.Input[_builtins.str] auto_recording: Value must be one of <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`" pulumi-lang-hcl="`none`">`none`</span>, <span pulumi-lang-nodejs="`local`" pulumi-lang-dotnet="`Local`" pulumi-lang-go="`local`" pulumi-lang-python="`local`" pulumi-lang-yaml="`local`" pulumi-lang-java="`local`" pulumi-lang-hcl="`local`">`local`</span>, <span pulumi-lang-nodejs="`cloud`" pulumi-lang-dotnet="`Cloud`" pulumi-lang-go="`cloud`" pulumi-lang-python="`cloud`" pulumi-lang-yaml="`cloud`" pulumi-lang-java="`cloud`" pulumi-lang-hcl="`cloud`">`cloud`</span>.
         :param pulumi.Input[_builtins.str] create_as_email: The email to use if creating as email
+        :param pulumi.Input[_builtins.bool] enable_zoom_bot_auto_join: Allow the Rootly bot to start recording without waiting for host approval. Value must be one of true or false
         :param pulumi.Input[_builtins.str] password: The meeting password
         :param pulumi.Input[_builtins.bool] post_to_incident_timeline: Value must be one of true or false
         :param pulumi.Input[_builtins.bool] record_meeting: Rootly AI will record the meeting and automatically generate a transcript and summary from your meeting. Value must be one of true or false
@@ -18024,6 +18599,8 @@ class WorkflowTaskCreateZoomMeetingTaskParamsArgs:
             pulumi.set(__self__, "auto_recording", auto_recording)
         if create_as_email is not None:
             pulumi.set(__self__, "create_as_email", create_as_email)
+        if enable_zoom_bot_auto_join is not None:
+            pulumi.set(__self__, "enable_zoom_bot_auto_join", enable_zoom_bot_auto_join)
         if password is not None:
             pulumi.set(__self__, "password", password)
         if post_to_incident_timeline is not None:
@@ -18081,6 +18658,18 @@ class WorkflowTaskCreateZoomMeetingTaskParamsArgs:
     @create_as_email.setter
     def create_as_email(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "create_as_email", value)
+
+    @_builtins.property
+    @pulumi.getter(name="enableZoomBotAutoJoin")
+    def enable_zoom_bot_auto_join(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Allow the Rootly bot to start recording without waiting for host approval. Value must be one of true or false
+        """
+        return pulumi.get(self, "enable_zoom_bot_auto_join")
+
+    @enable_zoom_bot_auto_join.setter
+    def enable_zoom_bot_auto_join(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "enable_zoom_bot_auto_join", value)
 
     @_builtins.property
     @pulumi.getter
@@ -19237,6 +19826,226 @@ class WorkflowTaskHttpClientTaskParamsPostToSlackChannelArgs:
         pulumi.set(self, "name", value)
 
 
+class WorkflowTaskInviteToGoogleChatSpaceTaskParamsArgsDict(TypedDict):
+    emails: pulumi.Input[_builtins.str]
+    """
+    Comma separated list of emails to invite
+    """
+    space: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]
+    """
+    Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+    """
+    task_type: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+
+@pulumi.input_type
+class WorkflowTaskInviteToGoogleChatSpaceTaskParamsArgs:
+    def __init__(__self__, *,
+                 emails: pulumi.Input[_builtins.str],
+                 space: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]],
+                 task_type: pulumi.Input[Optional[_builtins.str]] = None):
+        """
+        :param pulumi.Input[_builtins.str] emails: Comma separated list of emails to invite
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] space: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        """
+        pulumi.set(__self__, "emails", emails)
+        pulumi.set(__self__, "space", space)
+        if task_type is not None:
+            pulumi.set(__self__, "task_type", task_type)
+
+    @_builtins.property
+    @pulumi.getter
+    def emails(self) -> pulumi.Input[_builtins.str]:
+        """
+        Comma separated list of emails to invite
+        """
+        return pulumi.get(self, "emails")
+
+    @emails.setter
+    def emails(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "emails", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def space(self) -> pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        """
+        return pulumi.get(self, "space")
+
+    @space.setter
+    def space(self, value: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]):
+        pulumi.set(self, "space", value)
+
+    @_builtins.property
+    @pulumi.getter(name="taskType")
+    def task_type(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "task_type")
+
+    @task_type.setter
+    def task_type(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "task_type", value)
+
+
+class WorkflowTaskInviteToMicrosoftTeamsChannelRootlyTaskParamsArgsDict(TypedDict):
+    channel: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]
+    """
+    Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+    """
+    team: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]
+    """
+    Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+    """
+    escalation_policy_target: NotRequired[pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]]
+    """
+    Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+    """
+    group_target: NotRequired[pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]]
+    """
+    Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+    """
+    schedule_target: NotRequired[pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]]
+    """
+    Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+    """
+    service_target: NotRequired[pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]]
+    """
+    Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+    """
+    task_type: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    user_target: NotRequired[pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]]
+    """
+    Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+    """
+
+@pulumi.input_type
+class WorkflowTaskInviteToMicrosoftTeamsChannelRootlyTaskParamsArgs:
+    def __init__(__self__, *,
+                 channel: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]],
+                 team: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]],
+                 escalation_policy_target: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 group_target: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 schedule_target: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 service_target: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 task_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 user_target: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None):
+        """
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] channel: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] team: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] escalation_policy_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] group_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] schedule_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] service_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] user_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        """
+        pulumi.set(__self__, "channel", channel)
+        pulumi.set(__self__, "team", team)
+        if escalation_policy_target is not None:
+            pulumi.set(__self__, "escalation_policy_target", escalation_policy_target)
+        if group_target is not None:
+            pulumi.set(__self__, "group_target", group_target)
+        if schedule_target is not None:
+            pulumi.set(__self__, "schedule_target", schedule_target)
+        if service_target is not None:
+            pulumi.set(__self__, "service_target", service_target)
+        if task_type is not None:
+            pulumi.set(__self__, "task_type", task_type)
+        if user_target is not None:
+            pulumi.set(__self__, "user_target", user_target)
+
+    @_builtins.property
+    @pulumi.getter
+    def channel(self) -> pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        """
+        return pulumi.get(self, "channel")
+
+    @channel.setter
+    def channel(self, value: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]):
+        pulumi.set(self, "channel", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def team(self) -> pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        """
+        return pulumi.get(self, "team")
+
+    @team.setter
+    def team(self, value: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]):
+        pulumi.set(self, "team", value)
+
+    @_builtins.property
+    @pulumi.getter(name="escalationPolicyTarget")
+    def escalation_policy_target(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        """
+        return pulumi.get(self, "escalation_policy_target")
+
+    @escalation_policy_target.setter
+    def escalation_policy_target(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "escalation_policy_target", value)
+
+    @_builtins.property
+    @pulumi.getter(name="groupTarget")
+    def group_target(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        """
+        return pulumi.get(self, "group_target")
+
+    @group_target.setter
+    def group_target(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "group_target", value)
+
+    @_builtins.property
+    @pulumi.getter(name="scheduleTarget")
+    def schedule_target(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        """
+        return pulumi.get(self, "schedule_target")
+
+    @schedule_target.setter
+    def schedule_target(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "schedule_target", value)
+
+    @_builtins.property
+    @pulumi.getter(name="serviceTarget")
+    def service_target(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        """
+        return pulumi.get(self, "service_target")
+
+    @service_target.setter
+    def service_target(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "service_target", value)
+
+    @_builtins.property
+    @pulumi.getter(name="taskType")
+    def task_type(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "task_type")
+
+    @task_type.setter
+    def task_type(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "task_type", value)
+
+    @_builtins.property
+    @pulumi.getter(name="userTarget")
+    def user_target(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        """
+        return pulumi.get(self, "user_target")
+
+    @user_target.setter
+    def user_target(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "user_target", value)
+
+
 class WorkflowTaskInviteToMicrosoftTeamsChannelTaskParamsArgsDict(TypedDict):
     channel: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]
     """
@@ -19935,7 +20744,7 @@ class WorkflowTaskPageJsmopsOnCallRespondersTaskParamsArgsDict(TypedDict):
     """
     priority: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
-    Value must be one of `P3`, `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
+    Value must be one of `P3`, `P1`, `P2`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
     """
     task_type: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     teams: NotRequired[pulumi.Input[Optional[Sequence[pulumi.Input['WorkflowTaskPageJsmopsOnCallRespondersTaskParamsTeamArgsDict']]]]]
@@ -19958,7 +20767,7 @@ class WorkflowTaskPageJsmopsOnCallRespondersTaskParamsArgs:
         """
         :param pulumi.Input[_builtins.str] description: Description field of the incident that is generally used to provide a detailed information about the incident
         :param pulumi.Input[_builtins.str] message: Message of the incident
-        :param pulumi.Input[_builtins.str] priority: Value must be one of `P3`, `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
+        :param pulumi.Input[_builtins.str] priority: Value must be one of `P3`, `P1`, `P2`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         :param pulumi.Input[_builtins.str] title: Incident title.
         """
         if description is not None:
@@ -20004,7 +20813,7 @@ class WorkflowTaskPageJsmopsOnCallRespondersTaskParamsArgs:
     @pulumi.getter
     def priority(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Value must be one of `P3`, `P1`, `P2`, `P3`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
+        Value must be one of `P3`, `P1`, `P2`, `P4`, `P5`, <span pulumi-lang-nodejs="`auto`" pulumi-lang-dotnet="`Auto`" pulumi-lang-go="`auto`" pulumi-lang-python="`auto`" pulumi-lang-yaml="`auto`" pulumi-lang-java="`auto`" pulumi-lang-hcl="`auto`">`auto`</span>.
         """
         return pulumi.get(self, "priority")
 
@@ -20535,6 +21344,10 @@ class WorkflowTaskPageRootlyOnCallRespondersTaskParamsArgsDict(TypedDict):
     """
     Alert title
     """
+    create_new_alert: NotRequired[pulumi.Input[Optional[_builtins.bool]]]
+    """
+    When true, always create a new alert instead of re-paging the alert that triggered the workflow. Value must be one of true or false
+    """
     description: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     Alert description
@@ -20567,6 +21380,7 @@ class WorkflowTaskPageRootlyOnCallRespondersTaskParamsArgs:
     def __init__(__self__, *,
                  alert_urgency_id: pulumi.Input[_builtins.str],
                  summary: pulumi.Input[_builtins.str],
+                 create_new_alert: pulumi.Input[Optional[_builtins.bool]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  escalation_note: pulumi.Input[Optional[_builtins.str]] = None,
                  escalation_policy_target: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
@@ -20578,6 +21392,7 @@ class WorkflowTaskPageRootlyOnCallRespondersTaskParamsArgs:
         """
         :param pulumi.Input[_builtins.str] alert_urgency_id: Alert urgency ID
         :param pulumi.Input[_builtins.str] summary: Alert title
+        :param pulumi.Input[_builtins.bool] create_new_alert: When true, always create a new alert instead of re-paging the alert that triggered the workflow. Value must be one of true or false
         :param pulumi.Input[_builtins.str] description: Alert description
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] escalation_policy_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] functionality_target: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
@@ -20587,6 +21402,8 @@ class WorkflowTaskPageRootlyOnCallRespondersTaskParamsArgs:
         """
         pulumi.set(__self__, "alert_urgency_id", alert_urgency_id)
         pulumi.set(__self__, "summary", summary)
+        if create_new_alert is not None:
+            pulumi.set(__self__, "create_new_alert", create_new_alert)
         if description is not None:
             pulumi.set(__self__, "description", description)
         if escalation_note is not None:
@@ -20627,6 +21444,18 @@ class WorkflowTaskPageRootlyOnCallRespondersTaskParamsArgs:
     @summary.setter
     def summary(self, value: pulumi.Input[_builtins.str]):
         pulumi.set(self, "summary", value)
+
+    @_builtins.property
+    @pulumi.getter(name="createNewAlert")
+    def create_new_alert(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        When true, always create a new alert instead of re-paging the alert that triggered the workflow. Value must be one of true or false
+        """
+        return pulumi.get(self, "create_new_alert")
+
+    @create_new_alert.setter
+    def create_new_alert(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "create_new_alert", value)
 
     @_builtins.property
     @pulumi.getter
@@ -21282,6 +22111,59 @@ class WorkflowTaskRemoveGoogleDocsPermissionsTaskParamsArgs:
         pulumi.set(self, "task_type", value)
 
 
+class WorkflowTaskRenameGoogleChatSpaceTaskParamsArgsDict(TypedDict):
+    space: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]
+    """
+    Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+    """
+    title: pulumi.Input[_builtins.str]
+    task_type: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+
+@pulumi.input_type
+class WorkflowTaskRenameGoogleChatSpaceTaskParamsArgs:
+    def __init__(__self__, *,
+                 space: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]],
+                 title: pulumi.Input[_builtins.str],
+                 task_type: pulumi.Input[Optional[_builtins.str]] = None):
+        """
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] space: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        """
+        pulumi.set(__self__, "space", space)
+        pulumi.set(__self__, "title", title)
+        if task_type is not None:
+            pulumi.set(__self__, "task_type", task_type)
+
+    @_builtins.property
+    @pulumi.getter
+    def space(self) -> pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        """
+        return pulumi.get(self, "space")
+
+    @space.setter
+    def space(self, value: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]):
+        pulumi.set(self, "space", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def title(self) -> pulumi.Input[_builtins.str]:
+        return pulumi.get(self, "title")
+
+    @title.setter
+    def title(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "title", value)
+
+    @_builtins.property
+    @pulumi.getter(name="taskType")
+    def task_type(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "task_type")
+
+    @task_type.setter
+    def task_type(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "task_type", value)
+
+
 class WorkflowTaskRenameMicrosoftTeamsChannelTaskParamsArgsDict(TypedDict):
     channel: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]
     """
@@ -21858,22 +22740,198 @@ class WorkflowTaskSendEmailTaskParamsArgs:
         pulumi.set(self, "task_type", value)
 
 
+class WorkflowTaskSendGoogleChatAttachmentsTaskParamsArgsDict(TypedDict):
+    attachments: pulumi.Input[_builtins.str]
+    spaces: pulumi.Input[Sequence[pulumi.Input['WorkflowTaskSendGoogleChatAttachmentsTaskParamsSpaceArgsDict']]]
+    task_type: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+
+@pulumi.input_type
+class WorkflowTaskSendGoogleChatAttachmentsTaskParamsArgs:
+    def __init__(__self__, *,
+                 attachments: pulumi.Input[_builtins.str],
+                 spaces: pulumi.Input[Sequence[pulumi.Input['WorkflowTaskSendGoogleChatAttachmentsTaskParamsSpaceArgs']]],
+                 task_type: pulumi.Input[Optional[_builtins.str]] = None):
+        pulumi.set(__self__, "attachments", attachments)
+        pulumi.set(__self__, "spaces", spaces)
+        if task_type is not None:
+            pulumi.set(__self__, "task_type", task_type)
+
+    @_builtins.property
+    @pulumi.getter
+    def attachments(self) -> pulumi.Input[_builtins.str]:
+        return pulumi.get(self, "attachments")
+
+    @attachments.setter
+    def attachments(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "attachments", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def spaces(self) -> pulumi.Input[Sequence[pulumi.Input['WorkflowTaskSendGoogleChatAttachmentsTaskParamsSpaceArgs']]]:
+        return pulumi.get(self, "spaces")
+
+    @spaces.setter
+    def spaces(self, value: pulumi.Input[Sequence[pulumi.Input['WorkflowTaskSendGoogleChatAttachmentsTaskParamsSpaceArgs']]]):
+        pulumi.set(self, "spaces", value)
+
+    @_builtins.property
+    @pulumi.getter(name="taskType")
+    def task_type(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "task_type")
+
+    @task_type.setter
+    def task_type(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "task_type", value)
+
+
+class WorkflowTaskSendGoogleChatAttachmentsTaskParamsSpaceArgsDict(TypedDict):
+    id: pulumi.Input[_builtins.str]
+    name: pulumi.Input[_builtins.str]
+
+@pulumi.input_type
+class WorkflowTaskSendGoogleChatAttachmentsTaskParamsSpaceArgs:
+    def __init__(__self__, *,
+                 id: pulumi.Input[_builtins.str],
+                 name: pulumi.Input[_builtins.str]):
+        pulumi.set(__self__, "id", id)
+        pulumi.set(__self__, "name", name)
+
+    @_builtins.property
+    @pulumi.getter
+    def id(self) -> pulumi.Input[_builtins.str]:
+        return pulumi.get(self, "id")
+
+    @id.setter
+    def id(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "id", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> pulumi.Input[_builtins.str]:
+        return pulumi.get(self, "name")
+
+    @name.setter
+    def name(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "name", value)
+
+
+class WorkflowTaskSendGoogleChatMessageTaskParamsArgsDict(TypedDict):
+    spaces: pulumi.Input[Sequence[pulumi.Input['WorkflowTaskSendGoogleChatMessageTaskParamsSpaceArgsDict']]]
+    text: pulumi.Input[_builtins.str]
+    task_type: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    thread_key: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    """
+    Thread key to reply within a thread. Messages with the same thread key are grouped together
+    """
+
+@pulumi.input_type
+class WorkflowTaskSendGoogleChatMessageTaskParamsArgs:
+    def __init__(__self__, *,
+                 spaces: pulumi.Input[Sequence[pulumi.Input['WorkflowTaskSendGoogleChatMessageTaskParamsSpaceArgs']]],
+                 text: pulumi.Input[_builtins.str],
+                 task_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 thread_key: pulumi.Input[Optional[_builtins.str]] = None):
+        """
+        :param pulumi.Input[_builtins.str] thread_key: Thread key to reply within a thread. Messages with the same thread key are grouped together
+        """
+        pulumi.set(__self__, "spaces", spaces)
+        pulumi.set(__self__, "text", text)
+        if task_type is not None:
+            pulumi.set(__self__, "task_type", task_type)
+        if thread_key is not None:
+            pulumi.set(__self__, "thread_key", thread_key)
+
+    @_builtins.property
+    @pulumi.getter
+    def spaces(self) -> pulumi.Input[Sequence[pulumi.Input['WorkflowTaskSendGoogleChatMessageTaskParamsSpaceArgs']]]:
+        return pulumi.get(self, "spaces")
+
+    @spaces.setter
+    def spaces(self, value: pulumi.Input[Sequence[pulumi.Input['WorkflowTaskSendGoogleChatMessageTaskParamsSpaceArgs']]]):
+        pulumi.set(self, "spaces", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def text(self) -> pulumi.Input[_builtins.str]:
+        return pulumi.get(self, "text")
+
+    @text.setter
+    def text(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "text", value)
+
+    @_builtins.property
+    @pulumi.getter(name="taskType")
+    def task_type(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "task_type")
+
+    @task_type.setter
+    def task_type(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "task_type", value)
+
+    @_builtins.property
+    @pulumi.getter(name="threadKey")
+    def thread_key(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Thread key to reply within a thread. Messages with the same thread key are grouped together
+        """
+        return pulumi.get(self, "thread_key")
+
+    @thread_key.setter
+    def thread_key(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "thread_key", value)
+
+
+class WorkflowTaskSendGoogleChatMessageTaskParamsSpaceArgsDict(TypedDict):
+    id: pulumi.Input[_builtins.str]
+    name: pulumi.Input[_builtins.str]
+
+@pulumi.input_type
+class WorkflowTaskSendGoogleChatMessageTaskParamsSpaceArgs:
+    def __init__(__self__, *,
+                 id: pulumi.Input[_builtins.str],
+                 name: pulumi.Input[_builtins.str]):
+        pulumi.set(__self__, "id", id)
+        pulumi.set(__self__, "name", name)
+
+    @_builtins.property
+    @pulumi.getter
+    def id(self) -> pulumi.Input[_builtins.str]:
+        return pulumi.get(self, "id")
+
+    @id.setter
+    def id(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "id", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> pulumi.Input[_builtins.str]:
+        return pulumi.get(self, "name")
+
+    @name.setter
+    def name(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "name", value)
+
+
 class WorkflowTaskSendMicrosoftTeamsBlocksTaskParamsArgsDict(TypedDict):
     attachments: pulumi.Input[_builtins.str]
     """
     Support liquid markup. Needs to be a valid JSON string after liquid is parsed
     """
+    channels: NotRequired[pulumi.Input[Optional[Sequence[pulumi.Input['WorkflowTaskSendMicrosoftTeamsBlocksTaskParamsChannelArgsDict']]]]]
     task_type: NotRequired[pulumi.Input[Optional[_builtins.str]]]
 
 @pulumi.input_type
 class WorkflowTaskSendMicrosoftTeamsBlocksTaskParamsArgs:
     def __init__(__self__, *,
                  attachments: pulumi.Input[_builtins.str],
+                 channels: pulumi.Input[Optional[Sequence[pulumi.Input['WorkflowTaskSendMicrosoftTeamsBlocksTaskParamsChannelArgs']]]] = None,
                  task_type: pulumi.Input[Optional[_builtins.str]] = None):
         """
         :param pulumi.Input[_builtins.str] attachments: Support liquid markup. Needs to be a valid JSON string after liquid is parsed
         """
         pulumi.set(__self__, "attachments", attachments)
+        if channels is not None:
+            pulumi.set(__self__, "channels", channels)
         if task_type is not None:
             pulumi.set(__self__, "task_type", task_type)
 
@@ -21890,6 +22948,15 @@ class WorkflowTaskSendMicrosoftTeamsBlocksTaskParamsArgs:
         pulumi.set(self, "attachments", value)
 
     @_builtins.property
+    @pulumi.getter
+    def channels(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['WorkflowTaskSendMicrosoftTeamsBlocksTaskParamsChannelArgs']]]]:
+        return pulumi.get(self, "channels")
+
+    @channels.setter
+    def channels(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['WorkflowTaskSendMicrosoftTeamsBlocksTaskParamsChannelArgs']]]]):
+        pulumi.set(self, "channels", value)
+
+    @_builtins.property
     @pulumi.getter(name="taskType")
     def task_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "task_type")
@@ -21897,6 +22964,37 @@ class WorkflowTaskSendMicrosoftTeamsBlocksTaskParamsArgs:
     @task_type.setter
     def task_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "task_type", value)
+
+
+class WorkflowTaskSendMicrosoftTeamsBlocksTaskParamsChannelArgsDict(TypedDict):
+    id: pulumi.Input[_builtins.str]
+    name: pulumi.Input[_builtins.str]
+
+@pulumi.input_type
+class WorkflowTaskSendMicrosoftTeamsBlocksTaskParamsChannelArgs:
+    def __init__(__self__, *,
+                 id: pulumi.Input[_builtins.str],
+                 name: pulumi.Input[_builtins.str]):
+        pulumi.set(__self__, "id", id)
+        pulumi.set(__self__, "name", name)
+
+    @_builtins.property
+    @pulumi.getter
+    def id(self) -> pulumi.Input[_builtins.str]:
+        return pulumi.get(self, "id")
+
+    @id.setter
+    def id(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "id", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> pulumi.Input[_builtins.str]:
+        return pulumi.get(self, "name")
+
+    @name.setter
+    def name(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "name", value)
 
 
 class WorkflowTaskSendMicrosoftTeamsChatMessageTaskParamsArgsDict(TypedDict):
@@ -24495,6 +25593,14 @@ class WorkflowTaskUpdateConfluencePageTaskParamsArgsDict(TypedDict):
     """
     The Confluence page content
     """
+    include_overview: NotRequired[pulumi.Input[Optional[_builtins.bool]]]
+    """
+    Value must be one of true or false
+    """
+    include_timeline: NotRequired[pulumi.Input[Optional[_builtins.bool]]]
+    """
+    Value must be one of true or false
+    """
     integration: NotRequired[pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]]
     """
     Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Specify integration id if you have more than one Confluence instance
@@ -24518,6 +25624,8 @@ class WorkflowTaskUpdateConfluencePageTaskParamsArgs:
     def __init__(__self__, *,
                  file_id: pulumi.Input[_builtins.str],
                  content: pulumi.Input[Optional[_builtins.str]] = None,
+                 include_overview: pulumi.Input[Optional[_builtins.bool]] = None,
+                 include_timeline: pulumi.Input[Optional[_builtins.bool]] = None,
                  integration: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
                  post_mortem_template_id: pulumi.Input[Optional[_builtins.str]] = None,
                  task_type: pulumi.Input[Optional[_builtins.str]] = None,
@@ -24526,6 +25634,8 @@ class WorkflowTaskUpdateConfluencePageTaskParamsArgs:
         """
         :param pulumi.Input[_builtins.str] file_id: The Confluence page ID
         :param pulumi.Input[_builtins.str] content: The Confluence page content
+        :param pulumi.Input[_builtins.bool] include_overview: Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] include_timeline: Value must be one of true or false
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] integration: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. Specify integration id if you have more than one Confluence instance
         :param pulumi.Input[_builtins.str] post_mortem_template_id: Retrospective template to use when updating page, if desired
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] template: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The Confluence template to use
@@ -24534,6 +25644,10 @@ class WorkflowTaskUpdateConfluencePageTaskParamsArgs:
         pulumi.set(__self__, "file_id", file_id)
         if content is not None:
             pulumi.set(__self__, "content", content)
+        if include_overview is not None:
+            pulumi.set(__self__, "include_overview", include_overview)
+        if include_timeline is not None:
+            pulumi.set(__self__, "include_timeline", include_timeline)
         if integration is not None:
             pulumi.set(__self__, "integration", integration)
         if post_mortem_template_id is not None:
@@ -24568,6 +25682,30 @@ class WorkflowTaskUpdateConfluencePageTaskParamsArgs:
     @content.setter
     def content(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "content", value)
+
+    @_builtins.property
+    @pulumi.getter(name="includeOverview")
+    def include_overview(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Value must be one of true or false
+        """
+        return pulumi.get(self, "include_overview")
+
+    @include_overview.setter
+    def include_overview(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "include_overview", value)
+
+    @_builtins.property
+    @pulumi.getter(name="includeTimeline")
+    def include_timeline(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Value must be one of true or false
+        """
+        return pulumi.get(self, "include_timeline")
+
+    @include_timeline.setter
+    def include_timeline(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "include_timeline", value)
 
     @_builtins.property
     @pulumi.getter
@@ -24882,6 +26020,10 @@ class WorkflowTaskUpdateGithubIssueTaskParamsArgsDict(TypedDict):
     """
     The issue body
     """
+    custom_fields_mapping: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    """
+    Custom field mappings. Can contain liquid markup and need to be valid JSON
+    """
     issue_type: NotRequired[pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]]
     """
     Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The issue type
@@ -24910,6 +26052,7 @@ class WorkflowTaskUpdateGithubIssueTaskParamsArgs:
                  completion: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]],
                  issue_id: pulumi.Input[_builtins.str],
                  body: pulumi.Input[Optional[_builtins.str]] = None,
+                 custom_fields_mapping: pulumi.Input[Optional[_builtins.str]] = None,
                  issue_type: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
                  labels: pulumi.Input[Optional[Sequence[pulumi.Input['WorkflowTaskUpdateGithubIssueTaskParamsLabelArgs']]]] = None,
                  labels_mode: pulumi.Input[Optional[_builtins.str]] = None,
@@ -24920,6 +26063,7 @@ class WorkflowTaskUpdateGithubIssueTaskParamsArgs:
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] completion: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
         :param pulumi.Input[_builtins.str] issue_id: The issue id
         :param pulumi.Input[_builtins.str] body: The issue body
+        :param pulumi.Input[_builtins.str] custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] issue_type: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The issue type
         :param pulumi.Input[Sequence[pulumi.Input['WorkflowTaskUpdateGithubIssueTaskParamsLabelArgs']]] labels: The issue labels
         :param pulumi.Input[_builtins.str] labels_mode: How to apply labels. 'replace' (default) overwrites all existing labels. 'append' adds to existing labels without removing them.. Value must be one of <span pulumi-lang-nodejs="`replace`" pulumi-lang-dotnet="`Replace`" pulumi-lang-go="`replace`" pulumi-lang-python="`replace`" pulumi-lang-yaml="`replace`" pulumi-lang-java="`replace`" pulumi-lang-hcl="`replace`">`replace`</span>, <span pulumi-lang-nodejs="`append`" pulumi-lang-dotnet="`Append`" pulumi-lang-go="`append`" pulumi-lang-python="`append`" pulumi-lang-yaml="`append`" pulumi-lang-java="`append`" pulumi-lang-hcl="`append`">`append`</span>.
@@ -24930,6 +26074,8 @@ class WorkflowTaskUpdateGithubIssueTaskParamsArgs:
         pulumi.set(__self__, "issue_id", issue_id)
         if body is not None:
             pulumi.set(__self__, "body", body)
+        if custom_fields_mapping is not None:
+            pulumi.set(__self__, "custom_fields_mapping", custom_fields_mapping)
         if issue_type is not None:
             pulumi.set(__self__, "issue_type", issue_type)
         if labels is not None:
@@ -24978,6 +26124,18 @@ class WorkflowTaskUpdateGithubIssueTaskParamsArgs:
     @body.setter
     def body(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "body", value)
+
+    @_builtins.property
+    @pulumi.getter(name="customFieldsMapping")
+    def custom_fields_mapping(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Custom field mappings. Can contain liquid markup and need to be valid JSON
+        """
+        return pulumi.get(self, "custom_fields_mapping")
+
+    @custom_fields_mapping.setter
+    def custom_fields_mapping(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "custom_fields_mapping", value)
 
     @_builtins.property
     @pulumi.getter(name="issueType")
@@ -25598,6 +26756,66 @@ class WorkflowTaskUpdateGoogleCalendarEventTaskParamsPostToSlackChannelArgs:
         pulumi.set(self, "name", value)
 
 
+class WorkflowTaskUpdateGoogleChatSpaceDescriptionTaskParamsArgsDict(TypedDict):
+    description: pulumi.Input[_builtins.str]
+    """
+    The space description. Supports liquid markup
+    """
+    space: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]
+    """
+    Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+    """
+    task_type: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+
+@pulumi.input_type
+class WorkflowTaskUpdateGoogleChatSpaceDescriptionTaskParamsArgs:
+    def __init__(__self__, *,
+                 description: pulumi.Input[_builtins.str],
+                 space: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]],
+                 task_type: pulumi.Input[Optional[_builtins.str]] = None):
+        """
+        :param pulumi.Input[_builtins.str] description: The space description. Supports liquid markup
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] space: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        """
+        pulumi.set(__self__, "description", description)
+        pulumi.set(__self__, "space", space)
+        if task_type is not None:
+            pulumi.set(__self__, "task_type", task_type)
+
+    @_builtins.property
+    @pulumi.getter
+    def description(self) -> pulumi.Input[_builtins.str]:
+        """
+        The space description. Supports liquid markup
+        """
+        return pulumi.get(self, "description")
+
+    @description.setter
+    def description(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "description", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def space(self) -> pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]:
+        """
+        Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>.
+        """
+        return pulumi.get(self, "space")
+
+    @space.setter
+    def space(self, value: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]):
+        pulumi.set(self, "space", value)
+
+    @_builtins.property
+    @pulumi.getter(name="taskType")
+    def task_type(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "task_type")
+
+    @task_type.setter
+    def task_type(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "task_type", value)
+
+
 class WorkflowTaskUpdateGoogleDocsPageTaskParamsArgsDict(TypedDict):
     file_id: pulumi.Input[_builtins.str]
     """
@@ -25606,6 +26824,14 @@ class WorkflowTaskUpdateGoogleDocsPageTaskParamsArgsDict(TypedDict):
     content: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     The Google Doc content
+    """
+    include_overview: NotRequired[pulumi.Input[Optional[_builtins.bool]]]
+    """
+    Value must be one of true or false
+    """
+    include_timeline: NotRequired[pulumi.Input[Optional[_builtins.bool]]]
+    """
+    Value must be one of true or false
     """
     post_mortem_template_id: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
@@ -25626,6 +26852,8 @@ class WorkflowTaskUpdateGoogleDocsPageTaskParamsArgs:
     def __init__(__self__, *,
                  file_id: pulumi.Input[_builtins.str],
                  content: pulumi.Input[Optional[_builtins.str]] = None,
+                 include_overview: pulumi.Input[Optional[_builtins.bool]] = None,
+                 include_timeline: pulumi.Input[Optional[_builtins.bool]] = None,
                  post_mortem_template_id: pulumi.Input[Optional[_builtins.str]] = None,
                  task_type: pulumi.Input[Optional[_builtins.str]] = None,
                  template_id: pulumi.Input[Optional[_builtins.str]] = None,
@@ -25633,6 +26861,8 @@ class WorkflowTaskUpdateGoogleDocsPageTaskParamsArgs:
         """
         :param pulumi.Input[_builtins.str] file_id: The Google Doc file ID
         :param pulumi.Input[_builtins.str] content: The Google Doc content
+        :param pulumi.Input[_builtins.bool] include_overview: Value must be one of true or false
+        :param pulumi.Input[_builtins.bool] include_timeline: Value must be one of true or false
         :param pulumi.Input[_builtins.str] post_mortem_template_id: Retrospective template to use when updating page, if desired
         :param pulumi.Input[_builtins.str] template_id: The Google Doc file ID to use as a template.
         :param pulumi.Input[_builtins.str] title: The Google Doc title
@@ -25640,6 +26870,10 @@ class WorkflowTaskUpdateGoogleDocsPageTaskParamsArgs:
         pulumi.set(__self__, "file_id", file_id)
         if content is not None:
             pulumi.set(__self__, "content", content)
+        if include_overview is not None:
+            pulumi.set(__self__, "include_overview", include_overview)
+        if include_timeline is not None:
+            pulumi.set(__self__, "include_timeline", include_timeline)
         if post_mortem_template_id is not None:
             pulumi.set(__self__, "post_mortem_template_id", post_mortem_template_id)
         if task_type is not None:
@@ -25672,6 +26906,30 @@ class WorkflowTaskUpdateGoogleDocsPageTaskParamsArgs:
     @content.setter
     def content(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "content", value)
+
+    @_builtins.property
+    @pulumi.getter(name="includeOverview")
+    def include_overview(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Value must be one of true or false
+        """
+        return pulumi.get(self, "include_overview")
+
+    @include_overview.setter
+    def include_overview(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "include_overview", value)
+
+    @_builtins.property
+    @pulumi.getter(name="includeTimeline")
+    def include_timeline(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Value must be one of true or false
+        """
+        return pulumi.get(self, "include_timeline")
+
+    @include_timeline.setter
+    def include_timeline(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "include_timeline", value)
 
     @_builtins.property
     @pulumi.getter(name="postMortemTemplateId")
@@ -26460,6 +27718,10 @@ class WorkflowTaskUpdateLinearIssueTaskParamsArgsDict(TypedDict):
     """
     The assigned user's email
     """
+    custom_fields_mapping: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    """
+    Custom field mappings. Can contain liquid markup and need to be valid JSON
+    """
     description: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     The issue description
@@ -26488,6 +27750,7 @@ class WorkflowTaskUpdateLinearIssueTaskParamsArgs:
     def __init__(__self__, *,
                  issue_id: pulumi.Input[_builtins.str],
                  assign_user_email: pulumi.Input[Optional[_builtins.str]] = None,
+                 custom_fields_mapping: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  labels: pulumi.Input[Optional[Sequence[pulumi.Input['WorkflowTaskUpdateLinearIssueTaskParamsLabelArgs']]]] = None,
                  priority: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
@@ -26498,6 +27761,7 @@ class WorkflowTaskUpdateLinearIssueTaskParamsArgs:
         """
         :param pulumi.Input[_builtins.str] issue_id: The issue id
         :param pulumi.Input[_builtins.str] assign_user_email: The assigned user's email
+        :param pulumi.Input[_builtins.str] custom_fields_mapping: Custom field mappings. Can contain liquid markup and need to be valid JSON
         :param pulumi.Input[_builtins.str] description: The issue description
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] priority: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The priority id and display name
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] project: Map must contain two fields, <span pulumi-lang-nodejs="`id`" pulumi-lang-dotnet="`Id`" pulumi-lang-go="`id`" pulumi-lang-python="`id`" pulumi-lang-yaml="`id`" pulumi-lang-java="`id`" pulumi-lang-hcl="`id`">`id`</span> and <span pulumi-lang-nodejs="`name`" pulumi-lang-dotnet="`Name`" pulumi-lang-go="`name`" pulumi-lang-python="`name`" pulumi-lang-yaml="`name`" pulumi-lang-java="`name`" pulumi-lang-hcl="`name`">`name`</span>. The project id and display name
@@ -26507,6 +27771,8 @@ class WorkflowTaskUpdateLinearIssueTaskParamsArgs:
         pulumi.set(__self__, "issue_id", issue_id)
         if assign_user_email is not None:
             pulumi.set(__self__, "assign_user_email", assign_user_email)
+        if custom_fields_mapping is not None:
+            pulumi.set(__self__, "custom_fields_mapping", custom_fields_mapping)
         if description is not None:
             pulumi.set(__self__, "description", description)
         if labels is not None:
@@ -26545,6 +27811,18 @@ class WorkflowTaskUpdateLinearIssueTaskParamsArgs:
     @assign_user_email.setter
     def assign_user_email(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "assign_user_email", value)
+
+    @_builtins.property
+    @pulumi.getter(name="customFieldsMapping")
+    def custom_fields_mapping(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Custom field mappings. Can contain liquid markup and need to be valid JSON
+        """
+        return pulumi.get(self, "custom_fields_mapping")
+
+    @custom_fields_mapping.setter
+    def custom_fields_mapping(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "custom_fields_mapping", value)
 
     @_builtins.property
     @pulumi.getter

@@ -21,35 +21,50 @@ __all__ = ['CatalogEntityArgs', 'CatalogEntity']
 @pulumi.input_type
 class CatalogEntityArgs:
     def __init__(__self__, *,
+                 catalog_id: pulumi.Input[_builtins.str],
                  backstage_id: pulumi.Input[Optional[_builtins.str]] = None,
                  catalog_entity_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
+                 external_id: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
                  properties: pulumi.Input[Optional[Sequence[pulumi.Input['CatalogEntityPropertyArgs']]]] = None):
         """
         The set of arguments for constructing a CatalogEntity resource.
 
-        :param pulumi.Input[_builtins.str] backstage_id: The Backstage entity ID this catalog entity is linked to.
         :param pulumi.Input[_builtins.str] catalog_id: The ID of the parent catalog
+        :param pulumi.Input[_builtins.str] backstage_id: The Backstage entity ID this catalog entity is linked to.
+        :param pulumi.Input[_builtins.str] external_id: An external identifier for this catalog entity. Must be unique within the catalog.
         :param pulumi.Input[_builtins.float] position: Default position of the item when displayed in a list.
         :param pulumi.Input[Sequence[pulumi.Input['CatalogEntityPropertyArgs']]] properties: Array of property values for this catalog entity
         """
+        pulumi.set(__self__, "catalog_id", catalog_id)
         if backstage_id is not None:
             pulumi.set(__self__, "backstage_id", backstage_id)
         if catalog_entity_id is not None:
             pulumi.set(__self__, "catalog_entity_id", catalog_entity_id)
-        if catalog_id is not None:
-            pulumi.set(__self__, "catalog_id", catalog_id)
         if description is not None:
             pulumi.set(__self__, "description", description)
+        if external_id is not None:
+            pulumi.set(__self__, "external_id", external_id)
         if name is not None:
             pulumi.set(__self__, "name", name)
         if position is not None:
             pulumi.set(__self__, "position", position)
         if properties is not None:
             pulumi.set(__self__, "properties", properties)
+
+    @_builtins.property
+    @pulumi.getter(name="catalogId")
+    def catalog_id(self) -> pulumi.Input[_builtins.str]:
+        """
+        The ID of the parent catalog
+        """
+        return pulumi.get(self, "catalog_id")
+
+    @catalog_id.setter
+    def catalog_id(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "catalog_id", value)
 
     @_builtins.property
     @pulumi.getter(name="backstageId")
@@ -73,18 +88,6 @@ class CatalogEntityArgs:
         pulumi.set(self, "catalog_entity_id", value)
 
     @_builtins.property
-    @pulumi.getter(name="catalogId")
-    def catalog_id(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The ID of the parent catalog
-        """
-        return pulumi.get(self, "catalog_id")
-
-    @catalog_id.setter
-    def catalog_id(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "catalog_id", value)
-
-    @_builtins.property
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "description")
@@ -92,6 +95,18 @@ class CatalogEntityArgs:
     @description.setter
     def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
+
+    @_builtins.property
+    @pulumi.getter(name="externalId")
+    def external_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        An external identifier for this catalog entity. Must be unique within the catalog.
+        """
+        return pulumi.get(self, "external_id")
+
+    @external_id.setter
+    def external_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "external_id", value)
 
     @_builtins.property
     @pulumi.getter
@@ -134,6 +149,8 @@ class _CatalogEntityState:
                  catalog_entity_id: pulumi.Input[Optional[_builtins.str]] = None,
                  catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
+                 external_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 managed_by: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
                  properties: pulumi.Input[Optional[Sequence[pulumi.Input['CatalogEntityPropertyArgs']]]] = None):
@@ -142,6 +159,8 @@ class _CatalogEntityState:
 
         :param pulumi.Input[_builtins.str] backstage_id: The Backstage entity ID this catalog entity is linked to.
         :param pulumi.Input[_builtins.str] catalog_id: The ID of the parent catalog
+        :param pulumi.Input[_builtins.str] external_id: An external identifier for this catalog entity. Must be unique within the catalog.
+        :param pulumi.Input[_builtins.str] managed_by: Which source manages this resource (read-only).. Value must be one of <span pulumi-lang-nodejs="`web`" pulumi-lang-dotnet="`Web`" pulumi-lang-go="`web`" pulumi-lang-python="`web`" pulumi-lang-yaml="`web`" pulumi-lang-java="`web`" pulumi-lang-hcl="`web`">`web`</span>, <span pulumi-lang-nodejs="`adminWeb`" pulumi-lang-dotnet="`AdminWeb`" pulumi-lang-go="`adminWeb`" pulumi-lang-python="`admin_web`" pulumi-lang-yaml="`adminWeb`" pulumi-lang-java="`adminWeb`" pulumi-lang-hcl="`admin_web`">`adminWeb`</span>, <span pulumi-lang-nodejs="`api`" pulumi-lang-dotnet="`Api`" pulumi-lang-go="`api`" pulumi-lang-python="`api`" pulumi-lang-yaml="`api`" pulumi-lang-java="`api`" pulumi-lang-hcl="`api`">`api`</span>, <span pulumi-lang-nodejs="`terraform`" pulumi-lang-dotnet="`Terraform`" pulumi-lang-go="`terraform`" pulumi-lang-python="`terraform`" pulumi-lang-yaml="`terraform`" pulumi-lang-java="`terraform`" pulumi-lang-hcl="`terraform`">`terraform`</span>, <span pulumi-lang-nodejs="`pulumi`" pulumi-lang-dotnet="`Pulumi`" pulumi-lang-go="`pulumi`" pulumi-lang-python="`pulumi`" pulumi-lang-yaml="`pulumi`" pulumi-lang-java="`pulumi`" pulumi-lang-hcl="`pulumi`">`pulumi`</span>, <span pulumi-lang-nodejs="`backstage`" pulumi-lang-dotnet="`Backstage`" pulumi-lang-go="`backstage`" pulumi-lang-python="`backstage`" pulumi-lang-yaml="`backstage`" pulumi-lang-java="`backstage`" pulumi-lang-hcl="`backstage`">`backstage`</span>, <span pulumi-lang-nodejs="`catalogSync`" pulumi-lang-dotnet="`CatalogSync`" pulumi-lang-go="`catalogSync`" pulumi-lang-python="`catalog_sync`" pulumi-lang-yaml="`catalogSync`" pulumi-lang-java="`catalogSync`" pulumi-lang-hcl="`catalog_sync`">`catalogSync`</span>.
         :param pulumi.Input[_builtins.float] position: Default position of the item when displayed in a list.
         :param pulumi.Input[Sequence[pulumi.Input['CatalogEntityPropertyArgs']]] properties: Array of property values for this catalog entity
         """
@@ -153,6 +172,10 @@ class _CatalogEntityState:
             pulumi.set(__self__, "catalog_id", catalog_id)
         if description is not None:
             pulumi.set(__self__, "description", description)
+        if external_id is not None:
+            pulumi.set(__self__, "external_id", external_id)
+        if managed_by is not None:
+            pulumi.set(__self__, "managed_by", managed_by)
         if name is not None:
             pulumi.set(__self__, "name", name)
         if position is not None:
@@ -201,6 +224,30 @@ class _CatalogEntityState:
     @description.setter
     def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
+
+    @_builtins.property
+    @pulumi.getter(name="externalId")
+    def external_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        An external identifier for this catalog entity. Must be unique within the catalog.
+        """
+        return pulumi.get(self, "external_id")
+
+    @external_id.setter
+    def external_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "external_id", value)
+
+    @_builtins.property
+    @pulumi.getter(name="managedBy")
+    def managed_by(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Which source manages this resource (read-only).. Value must be one of <span pulumi-lang-nodejs="`web`" pulumi-lang-dotnet="`Web`" pulumi-lang-go="`web`" pulumi-lang-python="`web`" pulumi-lang-yaml="`web`" pulumi-lang-java="`web`" pulumi-lang-hcl="`web`">`web`</span>, <span pulumi-lang-nodejs="`adminWeb`" pulumi-lang-dotnet="`AdminWeb`" pulumi-lang-go="`adminWeb`" pulumi-lang-python="`admin_web`" pulumi-lang-yaml="`adminWeb`" pulumi-lang-java="`adminWeb`" pulumi-lang-hcl="`admin_web`">`adminWeb`</span>, <span pulumi-lang-nodejs="`api`" pulumi-lang-dotnet="`Api`" pulumi-lang-go="`api`" pulumi-lang-python="`api`" pulumi-lang-yaml="`api`" pulumi-lang-java="`api`" pulumi-lang-hcl="`api`">`api`</span>, <span pulumi-lang-nodejs="`terraform`" pulumi-lang-dotnet="`Terraform`" pulumi-lang-go="`terraform`" pulumi-lang-python="`terraform`" pulumi-lang-yaml="`terraform`" pulumi-lang-java="`terraform`" pulumi-lang-hcl="`terraform`">`terraform`</span>, <span pulumi-lang-nodejs="`pulumi`" pulumi-lang-dotnet="`Pulumi`" pulumi-lang-go="`pulumi`" pulumi-lang-python="`pulumi`" pulumi-lang-yaml="`pulumi`" pulumi-lang-java="`pulumi`" pulumi-lang-hcl="`pulumi`">`pulumi`</span>, <span pulumi-lang-nodejs="`backstage`" pulumi-lang-dotnet="`Backstage`" pulumi-lang-go="`backstage`" pulumi-lang-python="`backstage`" pulumi-lang-yaml="`backstage`" pulumi-lang-java="`backstage`" pulumi-lang-hcl="`backstage`">`backstage`</span>, <span pulumi-lang-nodejs="`catalogSync`" pulumi-lang-dotnet="`CatalogSync`" pulumi-lang-go="`catalogSync`" pulumi-lang-python="`catalog_sync`" pulumi-lang-yaml="`catalogSync`" pulumi-lang-java="`catalogSync`" pulumi-lang-hcl="`catalog_sync`">`catalogSync`</span>.
+        """
+        return pulumi.get(self, "managed_by")
+
+    @managed_by.setter
+    def managed_by(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "managed_by", value)
 
     @_builtins.property
     @pulumi.getter
@@ -246,6 +293,7 @@ class CatalogEntity(pulumi.CustomResource):
                  catalog_entity_id: pulumi.Input[Optional[_builtins.str]] = None,
                  catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
+                 external_id: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
                  properties: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CatalogEntityPropertyArgs', 'CatalogEntityPropertyArgsDict']]]]] = None,
@@ -257,6 +305,7 @@ class CatalogEntity(pulumi.CustomResource):
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.str] backstage_id: The Backstage entity ID this catalog entity is linked to.
         :param pulumi.Input[_builtins.str] catalog_id: The ID of the parent catalog
+        :param pulumi.Input[_builtins.str] external_id: An external identifier for this catalog entity. Must be unique within the catalog.
         :param pulumi.Input[_builtins.float] position: Default position of the item when displayed in a list.
         :param pulumi.Input[Sequence[pulumi.Input[Union['CatalogEntityPropertyArgs', 'CatalogEntityPropertyArgsDict']]]] properties: Array of property values for this catalog entity
         """
@@ -264,7 +313,7 @@ class CatalogEntity(pulumi.CustomResource):
     @overload
     def __init__(__self__,
                  resource_name: str,
-                 args: Optional[CatalogEntityArgs] = None,
+                 args: CatalogEntityArgs,
                  opts: Optional[pulumi.ResourceOptions] = None):
         """
         Create a CatalogEntity resource with the given unique name, props, and options.
@@ -288,6 +337,7 @@ class CatalogEntity(pulumi.CustomResource):
                  catalog_entity_id: pulumi.Input[Optional[_builtins.str]] = None,
                  catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
+                 external_id: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
                  properties: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CatalogEntityPropertyArgs', 'CatalogEntityPropertyArgsDict']]]]] = None,
@@ -302,11 +352,15 @@ class CatalogEntity(pulumi.CustomResource):
 
             __props__.__dict__["backstage_id"] = backstage_id
             __props__.__dict__["catalog_entity_id"] = catalog_entity_id
+            if catalog_id is None and not opts.urn:
+                raise TypeError("Missing required property 'catalog_id'")
             __props__.__dict__["catalog_id"] = catalog_id
             __props__.__dict__["description"] = description
+            __props__.__dict__["external_id"] = external_id
             __props__.__dict__["name"] = name
             __props__.__dict__["position"] = position
             __props__.__dict__["properties"] = properties
+            __props__.__dict__["managed_by"] = None
         super(CatalogEntity, __self__).__init__(
             'rootly:index/catalogEntity:CatalogEntity',
             resource_name,
@@ -322,6 +376,8 @@ class CatalogEntity(pulumi.CustomResource):
             catalog_entity_id: pulumi.Input[Optional[_builtins.str]] = None,
             catalog_id: pulumi.Input[Optional[_builtins.str]] = None,
             description: pulumi.Input[Optional[_builtins.str]] = None,
+            external_id: pulumi.Input[Optional[_builtins.str]] = None,
+            managed_by: pulumi.Input[Optional[_builtins.str]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
             position: pulumi.Input[Optional[_builtins.float]] = None,
             properties: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CatalogEntityPropertyArgs', 'CatalogEntityPropertyArgsDict']]]]] = None) -> 'CatalogEntity':
@@ -334,6 +390,8 @@ class CatalogEntity(pulumi.CustomResource):
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.str] backstage_id: The Backstage entity ID this catalog entity is linked to.
         :param pulumi.Input[_builtins.str] catalog_id: The ID of the parent catalog
+        :param pulumi.Input[_builtins.str] external_id: An external identifier for this catalog entity. Must be unique within the catalog.
+        :param pulumi.Input[_builtins.str] managed_by: Which source manages this resource (read-only).. Value must be one of <span pulumi-lang-nodejs="`web`" pulumi-lang-dotnet="`Web`" pulumi-lang-go="`web`" pulumi-lang-python="`web`" pulumi-lang-yaml="`web`" pulumi-lang-java="`web`" pulumi-lang-hcl="`web`">`web`</span>, <span pulumi-lang-nodejs="`adminWeb`" pulumi-lang-dotnet="`AdminWeb`" pulumi-lang-go="`adminWeb`" pulumi-lang-python="`admin_web`" pulumi-lang-yaml="`adminWeb`" pulumi-lang-java="`adminWeb`" pulumi-lang-hcl="`admin_web`">`adminWeb`</span>, <span pulumi-lang-nodejs="`api`" pulumi-lang-dotnet="`Api`" pulumi-lang-go="`api`" pulumi-lang-python="`api`" pulumi-lang-yaml="`api`" pulumi-lang-java="`api`" pulumi-lang-hcl="`api`">`api`</span>, <span pulumi-lang-nodejs="`terraform`" pulumi-lang-dotnet="`Terraform`" pulumi-lang-go="`terraform`" pulumi-lang-python="`terraform`" pulumi-lang-yaml="`terraform`" pulumi-lang-java="`terraform`" pulumi-lang-hcl="`terraform`">`terraform`</span>, <span pulumi-lang-nodejs="`pulumi`" pulumi-lang-dotnet="`Pulumi`" pulumi-lang-go="`pulumi`" pulumi-lang-python="`pulumi`" pulumi-lang-yaml="`pulumi`" pulumi-lang-java="`pulumi`" pulumi-lang-hcl="`pulumi`">`pulumi`</span>, <span pulumi-lang-nodejs="`backstage`" pulumi-lang-dotnet="`Backstage`" pulumi-lang-go="`backstage`" pulumi-lang-python="`backstage`" pulumi-lang-yaml="`backstage`" pulumi-lang-java="`backstage`" pulumi-lang-hcl="`backstage`">`backstage`</span>, <span pulumi-lang-nodejs="`catalogSync`" pulumi-lang-dotnet="`CatalogSync`" pulumi-lang-go="`catalogSync`" pulumi-lang-python="`catalog_sync`" pulumi-lang-yaml="`catalogSync`" pulumi-lang-java="`catalogSync`" pulumi-lang-hcl="`catalog_sync`">`catalogSync`</span>.
         :param pulumi.Input[_builtins.float] position: Default position of the item when displayed in a list.
         :param pulumi.Input[Sequence[pulumi.Input[Union['CatalogEntityPropertyArgs', 'CatalogEntityPropertyArgsDict']]]] properties: Array of property values for this catalog entity
         """
@@ -345,6 +403,8 @@ class CatalogEntity(pulumi.CustomResource):
         __props__.__dict__["catalog_entity_id"] = catalog_entity_id
         __props__.__dict__["catalog_id"] = catalog_id
         __props__.__dict__["description"] = description
+        __props__.__dict__["external_id"] = external_id
+        __props__.__dict__["managed_by"] = managed_by
         __props__.__dict__["name"] = name
         __props__.__dict__["position"] = position
         __props__.__dict__["properties"] = properties
@@ -375,6 +435,22 @@ class CatalogEntity(pulumi.CustomResource):
     @pulumi.getter
     def description(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "description")
+
+    @_builtins.property
+    @pulumi.getter(name="externalId")
+    def external_id(self) -> pulumi.Output[_builtins.str]:
+        """
+        An external identifier for this catalog entity. Must be unique within the catalog.
+        """
+        return pulumi.get(self, "external_id")
+
+    @_builtins.property
+    @pulumi.getter(name="managedBy")
+    def managed_by(self) -> pulumi.Output[_builtins.str]:
+        """
+        Which source manages this resource (read-only).. Value must be one of <span pulumi-lang-nodejs="`web`" pulumi-lang-dotnet="`Web`" pulumi-lang-go="`web`" pulumi-lang-python="`web`" pulumi-lang-yaml="`web`" pulumi-lang-java="`web`" pulumi-lang-hcl="`web`">`web`</span>, <span pulumi-lang-nodejs="`adminWeb`" pulumi-lang-dotnet="`AdminWeb`" pulumi-lang-go="`adminWeb`" pulumi-lang-python="`admin_web`" pulumi-lang-yaml="`adminWeb`" pulumi-lang-java="`adminWeb`" pulumi-lang-hcl="`admin_web`">`adminWeb`</span>, <span pulumi-lang-nodejs="`api`" pulumi-lang-dotnet="`Api`" pulumi-lang-go="`api`" pulumi-lang-python="`api`" pulumi-lang-yaml="`api`" pulumi-lang-java="`api`" pulumi-lang-hcl="`api`">`api`</span>, <span pulumi-lang-nodejs="`terraform`" pulumi-lang-dotnet="`Terraform`" pulumi-lang-go="`terraform`" pulumi-lang-python="`terraform`" pulumi-lang-yaml="`terraform`" pulumi-lang-java="`terraform`" pulumi-lang-hcl="`terraform`">`terraform`</span>, <span pulumi-lang-nodejs="`pulumi`" pulumi-lang-dotnet="`Pulumi`" pulumi-lang-go="`pulumi`" pulumi-lang-python="`pulumi`" pulumi-lang-yaml="`pulumi`" pulumi-lang-java="`pulumi`" pulumi-lang-hcl="`pulumi`">`pulumi`</span>, <span pulumi-lang-nodejs="`backstage`" pulumi-lang-dotnet="`Backstage`" pulumi-lang-go="`backstage`" pulumi-lang-python="`backstage`" pulumi-lang-yaml="`backstage`" pulumi-lang-java="`backstage`" pulumi-lang-hcl="`backstage`">`backstage`</span>, <span pulumi-lang-nodejs="`catalogSync`" pulumi-lang-dotnet="`CatalogSync`" pulumi-lang-go="`catalogSync`" pulumi-lang-python="`catalog_sync`" pulumi-lang-yaml="`catalogSync`" pulumi-lang-java="`catalogSync`" pulumi-lang-hcl="`catalog_sync`">`catalogSync`</span>.
+        """
+        return pulumi.get(self, "managed_by")
 
     @_builtins.property
     @pulumi.getter

@@ -398,6 +398,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="rootly",
         pulumi_project_path="saas/rootly/",
         pulumi_project_name="ol-saas-rootly",
+        additional_watched_paths=["sdks/rootly/"],
         stages=["Production"],
     ),
     "sentry": SimplePulumiParams(

@@ -2063,7 +2063,7 @@ requires-dist = [
 
 [[package]]
 name = "pulumi-rootly"
-version = "5.16.1"
+version = "5.17.2"
 source = { editable = "sdks/rootly" }
 dependencies = [
     { name = "parver" },

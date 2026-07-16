@@ -22,15 +22,13 @@ class CommunicationsStageArgs:
                  communications_stage_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 position: pulumi.Input[Optional[_builtins.float]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None):
+                 position: pulumi.Input[Optional[_builtins.float]] = None):
         """
         The set of arguments for constructing a CommunicationsStage resource.
 
         :param pulumi.Input[_builtins.str] description: The description of the communications stage
         :param pulumi.Input[_builtins.str] name: The name of the communications stage
         :param pulumi.Input[_builtins.float] position: Position of the communications stage
-        :param pulumi.Input[_builtins.str] slug: The slug of the communications stage
         """
         if communications_stage_id is not None:
             pulumi.set(__self__, "communications_stage_id", communications_stage_id)
@@ -40,8 +38,6 @@ class CommunicationsStageArgs:
             pulumi.set(__self__, "name", name)
         if position is not None:
             pulumi.set(__self__, "position", position)
-        if slug is not None:
-            pulumi.set(__self__, "slug", slug)
 
     @_builtins.property
     @pulumi.getter(name="communicationsStageId")
@@ -87,18 +83,6 @@ class CommunicationsStageArgs:
     @position.setter
     def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The slug of the communications stage
-        """
-        return pulumi.get(self, "slug")
-
-    @slug.setter
-    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "slug", value)
 
 
 @pulumi.input_type
@@ -196,7 +180,6 @@ class CommunicationsStage(pulumi.CustomResource):
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a CommunicationsStage resource with the given unique name, props, and options.
@@ -206,7 +189,6 @@ class CommunicationsStage(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] description: The description of the communications stage
         :param pulumi.Input[_builtins.str] name: The name of the communications stage
         :param pulumi.Input[_builtins.float] position: Position of the communications stage
-        :param pulumi.Input[_builtins.str] slug: The slug of the communications stage
         """
         ...
     @overload
@@ -236,7 +218,6 @@ class CommunicationsStage(pulumi.CustomResource):
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -250,7 +231,7 @@ class CommunicationsStage(pulumi.CustomResource):
             __props__.__dict__["description"] = description
             __props__.__dict__["name"] = name
             __props__.__dict__["position"] = position
-            __props__.__dict__["slug"] = slug
+            __props__.__dict__["slug"] = None
         super(CommunicationsStage, __self__).__init__(
             'rootly:index/communicationsStage:CommunicationsStage',
             resource_name,

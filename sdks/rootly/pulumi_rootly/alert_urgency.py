@@ -21,22 +21,39 @@ class AlertUrgencyArgs:
     def __init__(__self__, *,
                  description: pulumi.Input[_builtins.str],
                  alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 deleted_at: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 position: pulumi.Input[Optional[_builtins.float]] = None):
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 team_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 urgency: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a AlertUrgency resource.
 
         :param pulumi.Input[_builtins.str] description: The description of the alert urgency
+        :param pulumi.Input[_builtins.str] alert_urgency_id: Unique ID of the alert urgency
+        :param pulumi.Input[_builtins.str] color: The color associated with this urgency level
+        :param pulumi.Input[_builtins.str] deleted_at: Date of deletion
         :param pulumi.Input[_builtins.str] name: The name of the alert urgency
         :param pulumi.Input[_builtins.float] position: Position of the alert urgency
+        :param pulumi.Input[_builtins.float] team_id: The ID of the team this urgency belongs to
+        :param pulumi.Input[_builtins.str] urgency: The urgency level
         """
         pulumi.set(__self__, "description", description)
         if alert_urgency_id is not None:
             pulumi.set(__self__, "alert_urgency_id", alert_urgency_id)
+        if color is not None:
+            pulumi.set(__self__, "color", color)
+        if deleted_at is not None:
+            pulumi.set(__self__, "deleted_at", deleted_at)
         if name is not None:
             pulumi.set(__self__, "name", name)
         if position is not None:
             pulumi.set(__self__, "position", position)
+        if team_id is not None:
+            pulumi.set(__self__, "team_id", team_id)
+        if urgency is not None:
+            pulumi.set(__self__, "urgency", urgency)
 
     @_builtins.property
     @pulumi.getter
@@ -53,11 +70,38 @@ class AlertUrgencyArgs:
     @_builtins.property
     @pulumi.getter(name="alertUrgencyId")
     def alert_urgency_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Unique ID of the alert urgency
+        """
         return pulumi.get(self, "alert_urgency_id")
 
     @alert_urgency_id.setter
     def alert_urgency_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alert_urgency_id", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def color(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The color associated with this urgency level
+        """
+        return pulumi.get(self, "color")
+
+    @color.setter
+    def color(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "color", value)
+
+    @_builtins.property
+    @pulumi.getter(name="deletedAt")
+    def deleted_at(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Date of deletion
+        """
+        return pulumi.get(self, "deleted_at")
+
+    @deleted_at.setter
+    def deleted_at(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "deleted_at", value)
 
     @_builtins.property
     @pulumi.getter
@@ -83,38 +127,106 @@ class AlertUrgencyArgs:
     def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
+    @_builtins.property
+    @pulumi.getter(name="teamId")
+    def team_id(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        The ID of the team this urgency belongs to
+        """
+        return pulumi.get(self, "team_id")
+
+    @team_id.setter
+    def team_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "team_id", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def urgency(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The urgency level
+        """
+        return pulumi.get(self, "urgency")
+
+    @urgency.setter
+    def urgency(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "urgency", value)
+
 
 @pulumi.input_type
 class _AlertUrgencyState:
     def __init__(__self__, *,
                  alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 deleted_at: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 position: pulumi.Input[Optional[_builtins.float]] = None):
+                 position: pulumi.Input[Optional[_builtins.float]] = None,
+                 team_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 urgency: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering AlertUrgency resources.
 
+        :param pulumi.Input[_builtins.str] alert_urgency_id: Unique ID of the alert urgency
+        :param pulumi.Input[_builtins.str] color: The color associated with this urgency level
+        :param pulumi.Input[_builtins.str] deleted_at: Date of deletion
         :param pulumi.Input[_builtins.str] description: The description of the alert urgency
         :param pulumi.Input[_builtins.str] name: The name of the alert urgency
         :param pulumi.Input[_builtins.float] position: Position of the alert urgency
+        :param pulumi.Input[_builtins.float] team_id: The ID of the team this urgency belongs to
+        :param pulumi.Input[_builtins.str] urgency: The urgency level
         """
         if alert_urgency_id is not None:
             pulumi.set(__self__, "alert_urgency_id", alert_urgency_id)
+        if color is not None:
+            pulumi.set(__self__, "color", color)
+        if deleted_at is not None:
+            pulumi.set(__self__, "deleted_at", deleted_at)
         if description is not None:
             pulumi.set(__self__, "description", description)
         if name is not None:
             pulumi.set(__self__, "name", name)
         if position is not None:
             pulumi.set(__self__, "position", position)
+        if team_id is not None:
+            pulumi.set(__self__, "team_id", team_id)
+        if urgency is not None:
+            pulumi.set(__self__, "urgency", urgency)
 
     @_builtins.property
     @pulumi.getter(name="alertUrgencyId")
     def alert_urgency_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Unique ID of the alert urgency
+        """
         return pulumi.get(self, "alert_urgency_id")
 
     @alert_urgency_id.setter
     def alert_urgency_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "alert_urgency_id", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def color(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The color associated with this urgency level
+        """
+        return pulumi.get(self, "color")
+
+    @color.setter
+    def color(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "color", value)
+
+    @_builtins.property
+    @pulumi.getter(name="deletedAt")
+    def deleted_at(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Date of deletion
+        """
+        return pulumi.get(self, "deleted_at")
+
+    @deleted_at.setter
+    def deleted_at(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "deleted_at", value)
 
     @_builtins.property
     @pulumi.getter
@@ -152,6 +264,30 @@ class _AlertUrgencyState:
     def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
 
+    @_builtins.property
+    @pulumi.getter(name="teamId")
+    def team_id(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        The ID of the team this urgency belongs to
+        """
+        return pulumi.get(self, "team_id")
+
+    @team_id.setter
+    def team_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "team_id", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def urgency(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The urgency level
+        """
+        return pulumi.get(self, "urgency")
+
+    @urgency.setter
+    def urgency(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "urgency", value)
+
 
 @pulumi.type_token("rootly:index/alertUrgency:AlertUrgency")
 class AlertUrgency(pulumi.CustomResource):
@@ -160,18 +296,27 @@ class AlertUrgency(pulumi.CustomResource):
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
                  alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 deleted_at: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
+                 team_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 urgency: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a AlertUrgency resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
+        :param pulumi.Input[_builtins.str] alert_urgency_id: Unique ID of the alert urgency
+        :param pulumi.Input[_builtins.str] color: The color associated with this urgency level
+        :param pulumi.Input[_builtins.str] deleted_at: Date of deletion
         :param pulumi.Input[_builtins.str] description: The description of the alert urgency
         :param pulumi.Input[_builtins.str] name: The name of the alert urgency
         :param pulumi.Input[_builtins.float] position: Position of the alert urgency
+        :param pulumi.Input[_builtins.float] team_id: The ID of the team this urgency belongs to
+        :param pulumi.Input[_builtins.str] urgency: The urgency level
         """
         ...
     @overload
@@ -198,9 +343,13 @@ class AlertUrgency(pulumi.CustomResource):
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
                  alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 color: pulumi.Input[Optional[_builtins.str]] = None,
+                 deleted_at: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
+                 team_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 urgency: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -211,11 +360,15 @@ class AlertUrgency(pulumi.CustomResource):
             __props__ = AlertUrgencyArgs.__new__(AlertUrgencyArgs)
 
             __props__.__dict__["alert_urgency_id"] = alert_urgency_id
+            __props__.__dict__["color"] = color
+            __props__.__dict__["deleted_at"] = deleted_at
             if description is None and not opts.urn:
                 raise TypeError("Missing required property 'description'")
             __props__.__dict__["description"] = description
             __props__.__dict__["name"] = name
             __props__.__dict__["position"] = position
+            __props__.__dict__["team_id"] = team_id
+            __props__.__dict__["urgency"] = urgency
         super(AlertUrgency, __self__).__init__(
             'rootly:index/alertUrgency:AlertUrgency',
             resource_name,
@@ -228,9 +381,13 @@ class AlertUrgency(pulumi.CustomResource):
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
             alert_urgency_id: pulumi.Input[Optional[_builtins.str]] = None,
+            color: pulumi.Input[Optional[_builtins.str]] = None,
+            deleted_at: pulumi.Input[Optional[_builtins.str]] = None,
             description: pulumi.Input[Optional[_builtins.str]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
-            position: pulumi.Input[Optional[_builtins.float]] = None) -> 'AlertUrgency':
+            position: pulumi.Input[Optional[_builtins.float]] = None,
+            team_id: pulumi.Input[Optional[_builtins.float]] = None,
+            urgency: pulumi.Input[Optional[_builtins.str]] = None) -> 'AlertUrgency':
         """
         Get an existing AlertUrgency resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -238,24 +395,52 @@ class AlertUrgency(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
+        :param pulumi.Input[_builtins.str] alert_urgency_id: Unique ID of the alert urgency
+        :param pulumi.Input[_builtins.str] color: The color associated with this urgency level
+        :param pulumi.Input[_builtins.str] deleted_at: Date of deletion
         :param pulumi.Input[_builtins.str] description: The description of the alert urgency
         :param pulumi.Input[_builtins.str] name: The name of the alert urgency
         :param pulumi.Input[_builtins.float] position: Position of the alert urgency
+        :param pulumi.Input[_builtins.float] team_id: The ID of the team this urgency belongs to
+        :param pulumi.Input[_builtins.str] urgency: The urgency level
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
         __props__ = _AlertUrgencyState.__new__(_AlertUrgencyState)
 
         __props__.__dict__["alert_urgency_id"] = alert_urgency_id
+        __props__.__dict__["color"] = color
+        __props__.__dict__["deleted_at"] = deleted_at
         __props__.__dict__["description"] = description
         __props__.__dict__["name"] = name
         __props__.__dict__["position"] = position
+        __props__.__dict__["team_id"] = team_id
+        __props__.__dict__["urgency"] = urgency
         return AlertUrgency(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
     @pulumi.getter(name="alertUrgencyId")
     def alert_urgency_id(self) -> pulumi.Output[_builtins.str]:
+        """
+        Unique ID of the alert urgency
+        """
         return pulumi.get(self, "alert_urgency_id")
+
+    @_builtins.property
+    @pulumi.getter
+    def color(self) -> pulumi.Output[_builtins.str]:
+        """
+        The color associated with this urgency level
+        """
+        return pulumi.get(self, "color")
+
+    @_builtins.property
+    @pulumi.getter(name="deletedAt")
+    def deleted_at(self) -> pulumi.Output[_builtins.str]:
+        """
+        Date of deletion
+        """
+        return pulumi.get(self, "deleted_at")
 
     @_builtins.property
     @pulumi.getter
@@ -280,4 +465,20 @@ class AlertUrgency(pulumi.CustomResource):
         Position of the alert urgency
         """
         return pulumi.get(self, "position")
+
+    @_builtins.property
+    @pulumi.getter(name="teamId")
+    def team_id(self) -> pulumi.Output[_builtins.float]:
+        """
+        The ID of the team this urgency belongs to
+        """
+        return pulumi.get(self, "team_id")
+
+    @_builtins.property
+    @pulumi.getter
+    def urgency(self) -> pulumi.Output[_builtins.str]:
+        """
+        The urgency level
+        """
+        return pulumi.get(self, "urgency")
 

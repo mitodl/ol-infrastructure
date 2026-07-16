@@ -29,8 +29,7 @@ class IncidentTypeArgs:
                  position: pulumi.Input[Optional[_builtins.float]] = None,
                  properties: pulumi.Input[Optional[Sequence[pulumi.Input['IncidentTypePropertyArgs']]]] = None,
                  slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input['IncidentTypeSlackAliasArgs']]]] = None,
-                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input['IncidentTypeSlackChannelArgs']]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None):
+                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input['IncidentTypeSlackChannelArgs']]]] = None):
         """
         The set of arguments for constructing a IncidentType resource.
 
@@ -42,7 +41,6 @@ class IncidentTypeArgs:
         :param pulumi.Input[Sequence[pulumi.Input['IncidentTypePropertyArgs']]] properties: Array of property values for this incident type.
         :param pulumi.Input[Sequence[pulumi.Input['IncidentTypeSlackAliasArgs']]] slack_aliases: Slack Aliases associated with this incident type
         :param pulumi.Input[Sequence[pulumi.Input['IncidentTypeSlackChannelArgs']]] slack_channels: Slack Channels associated with this incident type
-        :param pulumi.Input[_builtins.str] slug: The slug of the incident type
         """
         if color is not None:
             pulumi.set(__self__, "color", color)
@@ -62,8 +60,6 @@ class IncidentTypeArgs:
             pulumi.set(__self__, "slack_aliases", slack_aliases)
         if slack_channels is not None:
             pulumi.set(__self__, "slack_channels", slack_channels)
-        if slug is not None:
-            pulumi.set(__self__, "slug", slug)
 
     @_builtins.property
     @pulumi.getter
@@ -169,18 +165,6 @@ class IncidentTypeArgs:
     @slack_channels.setter
     def slack_channels(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['IncidentTypeSlackChannelArgs']]]]):
         pulumi.set(self, "slack_channels", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The slug of the incident type
-        """
-        return pulumi.get(self, "slug")
-
-    @slug.setter
-    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "slug", value)
 
 
 @pulumi.input_type
@@ -363,7 +347,6 @@ class IncidentType(pulumi.CustomResource):
                  properties: pulumi.Input[Optional[Sequence[pulumi.Input[Union['IncidentTypePropertyArgs', 'IncidentTypePropertyArgsDict']]]]] = None,
                  slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input[Union['IncidentTypeSlackAliasArgs', 'IncidentTypeSlackAliasArgsDict']]]]] = None,
                  slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input[Union['IncidentTypeSlackChannelArgs', 'IncidentTypeSlackChannelArgsDict']]]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a IncidentType resource with the given unique name, props, and options.
@@ -378,7 +361,6 @@ class IncidentType(pulumi.CustomResource):
         :param pulumi.Input[Sequence[pulumi.Input[Union['IncidentTypePropertyArgs', 'IncidentTypePropertyArgsDict']]]] properties: Array of property values for this incident type.
         :param pulumi.Input[Sequence[pulumi.Input[Union['IncidentTypeSlackAliasArgs', 'IncidentTypeSlackAliasArgsDict']]]] slack_aliases: Slack Aliases associated with this incident type
         :param pulumi.Input[Sequence[pulumi.Input[Union['IncidentTypeSlackChannelArgs', 'IncidentTypeSlackChannelArgsDict']]]] slack_channels: Slack Channels associated with this incident type
-        :param pulumi.Input[_builtins.str] slug: The slug of the incident type
         """
         ...
     @overload
@@ -413,7 +395,6 @@ class IncidentType(pulumi.CustomResource):
                  properties: pulumi.Input[Optional[Sequence[pulumi.Input[Union['IncidentTypePropertyArgs', 'IncidentTypePropertyArgsDict']]]]] = None,
                  slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input[Union['IncidentTypeSlackAliasArgs', 'IncidentTypeSlackAliasArgsDict']]]]] = None,
                  slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input[Union['IncidentTypeSlackChannelArgs', 'IncidentTypeSlackChannelArgsDict']]]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -432,7 +413,7 @@ class IncidentType(pulumi.CustomResource):
             __props__.__dict__["properties"] = properties
             __props__.__dict__["slack_aliases"] = slack_aliases
             __props__.__dict__["slack_channels"] = slack_channels
-            __props__.__dict__["slug"] = slug
+            __props__.__dict__["slug"] = None
         super(IncidentType, __self__).__init__(
             'rootly:index/incidentType:IncidentType',
             resource_name,

@@ -21,14 +21,12 @@ class AlertFieldArgs:
     def __init__(__self__, *,
                  alert_field_id: pulumi.Input[Optional[_builtins.str]] = None,
                  kind: pulumi.Input[Optional[_builtins.str]] = None,
-                 name: pulumi.Input[Optional[_builtins.str]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None):
+                 name: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a AlertField resource.
 
         :param pulumi.Input[_builtins.str] kind: The kind of alert field
         :param pulumi.Input[_builtins.str] name: The name of the alert field
-        :param pulumi.Input[_builtins.str] slug: The slug of the alert field
         """
         if alert_field_id is not None:
             pulumi.set(__self__, "alert_field_id", alert_field_id)
@@ -36,8 +34,6 @@ class AlertFieldArgs:
             pulumi.set(__self__, "kind", kind)
         if name is not None:
             pulumi.set(__self__, "name", name)
-        if slug is not None:
-            pulumi.set(__self__, "slug", slug)
 
     @_builtins.property
     @pulumi.getter(name="alertFieldId")
@@ -71,18 +67,6 @@ class AlertFieldArgs:
     @name.setter
     def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The slug of the alert field
-        """
-        return pulumi.get(self, "slug")
-
-    @slug.setter
-    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "slug", value)
 
 
 @pulumi.input_type
@@ -163,7 +147,6 @@ class AlertField(pulumi.CustomResource):
                  alert_field_id: pulumi.Input[Optional[_builtins.str]] = None,
                  kind: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a AlertField resource with the given unique name, props, and options.
@@ -172,7 +155,6 @@ class AlertField(pulumi.CustomResource):
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.str] kind: The kind of alert field
         :param pulumi.Input[_builtins.str] name: The name of the alert field
-        :param pulumi.Input[_builtins.str] slug: The slug of the alert field
         """
         ...
     @overload
@@ -201,7 +183,6 @@ class AlertField(pulumi.CustomResource):
                  alert_field_id: pulumi.Input[Optional[_builtins.str]] = None,
                  kind: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -214,7 +195,7 @@ class AlertField(pulumi.CustomResource):
             __props__.__dict__["alert_field_id"] = alert_field_id
             __props__.__dict__["kind"] = kind
             __props__.__dict__["name"] = name
-            __props__.__dict__["slug"] = slug
+            __props__.__dict__["slug"] = None
         super(AlertField, __self__).__init__(
             'rootly:index/alertField:AlertField',
             resource_name,

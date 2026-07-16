@@ -20,9 +20,9 @@ __all__ = ['IncidentSubStatusArgs', 'IncidentSubStatus']
 class IncidentSubStatusArgs:
     def __init__(__self__, *,
                  assigned_at: pulumi.Input[_builtins.str],
+                 incident_id: pulumi.Input[_builtins.str],
                  sub_status_id: pulumi.Input[_builtins.str],
                  assigned_by_user_id: pulumi.Input[Optional[_builtins.float]] = None,
-                 incident_id: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_sub_status_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a IncidentSubStatus resource.
@@ -30,11 +30,10 @@ class IncidentSubStatusArgs:
         :param pulumi.Input[_builtins.str] sub_status_id: Note: To change an incident's sub-status, use the PATCH /incidents/:id endpoint and set the<span pulumi-lang-nodejs=" subStatusId " pulumi-lang-dotnet=" SubStatusId " pulumi-lang-go=" subStatusId " pulumi-lang-python=" sub_status_id " pulumi-lang-yaml=" subStatusId " pulumi-lang-java=" subStatusId " pulumi-lang-hcl=" sub_status_id "> subStatusId </span>attribute. This endpoint is for modifying the timestamp of when an incident's sub-status was assigned.
         """
         pulumi.set(__self__, "assigned_at", assigned_at)
+        pulumi.set(__self__, "incident_id", incident_id)
         pulumi.set(__self__, "sub_status_id", sub_status_id)
         if assigned_by_user_id is not None:
             pulumi.set(__self__, "assigned_by_user_id", assigned_by_user_id)
-        if incident_id is not None:
-            pulumi.set(__self__, "incident_id", incident_id)
         if incident_sub_status_id is not None:
             pulumi.set(__self__, "incident_sub_status_id", incident_sub_status_id)
 
@@ -46,6 +45,15 @@ class IncidentSubStatusArgs:
     @assigned_at.setter
     def assigned_at(self, value: pulumi.Input[_builtins.str]):
         pulumi.set(self, "assigned_at", value)
+
+    @_builtins.property
+    @pulumi.getter(name="incidentId")
+    def incident_id(self) -> pulumi.Input[_builtins.str]:
+        return pulumi.get(self, "incident_id")
+
+    @incident_id.setter
+    def incident_id(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "incident_id", value)
 
     @_builtins.property
     @pulumi.getter(name="subStatusId")
@@ -67,15 +75,6 @@ class IncidentSubStatusArgs:
     @assigned_by_user_id.setter
     def assigned_by_user_id(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "assigned_by_user_id", value)
-
-    @_builtins.property
-    @pulumi.getter(name="incidentId")
-    def incident_id(self) -> pulumi.Input[Optional[_builtins.str]]:
-        return pulumi.get(self, "incident_id")
-
-    @incident_id.setter
-    def incident_id(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "incident_id", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentSubStatusId")
@@ -221,6 +220,8 @@ class IncidentSubStatus(pulumi.CustomResource):
                 raise TypeError("Missing required property 'assigned_at'")
             __props__.__dict__["assigned_at"] = assigned_at
             __props__.__dict__["assigned_by_user_id"] = assigned_by_user_id
+            if incident_id is None and not opts.urn:
+                raise TypeError("Missing required property 'incident_id'")
             __props__.__dict__["incident_id"] = incident_id
             __props__.__dict__["incident_sub_status_id"] = incident_sub_status_id
             if sub_status_id is None and not opts.urn:

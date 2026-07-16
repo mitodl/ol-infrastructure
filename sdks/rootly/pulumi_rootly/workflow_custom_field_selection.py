@@ -20,19 +20,20 @@ __all__ = ['WorkflowCustomFieldSelectionArgs', 'WorkflowCustomFieldSelection']
 class WorkflowCustomFieldSelectionArgs:
     def __init__(__self__, *,
                  custom_field_id: pulumi.Input[_builtins.float],
+                 workflow_id: pulumi.Input[_builtins.str],
                  incident_condition: pulumi.Input[Optional[_builtins.str]] = None,
                  selected_option_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
                  values: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 workflow_custom_field_selection_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 workflow_id: pulumi.Input[Optional[_builtins.str]] = None):
+                 workflow_custom_field_selection_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a WorkflowCustomFieldSelection resource.
 
         :param pulumi.Input[_builtins.float] custom_field_id: The custom field for this selection
-        :param pulumi.Input[_builtins.str] incident_condition: The trigger condition. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param pulumi.Input[_builtins.str] workflow_id: The workflow for this selection
+        :param pulumi.Input[_builtins.str] incident_condition: The trigger condition. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         pulumi.set(__self__, "custom_field_id", custom_field_id)
+        pulumi.set(__self__, "workflow_id", workflow_id)
         if incident_condition is not None:
             pulumi.set(__self__, "incident_condition", incident_condition)
         if selected_option_ids is not None:
@@ -41,8 +42,6 @@ class WorkflowCustomFieldSelectionArgs:
             pulumi.set(__self__, "values", values)
         if workflow_custom_field_selection_id is not None:
             pulumi.set(__self__, "workflow_custom_field_selection_id", workflow_custom_field_selection_id)
-        if workflow_id is not None:
-            pulumi.set(__self__, "workflow_id", workflow_id)
 
     @_builtins.property
     @pulumi.getter(name="customFieldId")
@@ -55,6 +54,18 @@ class WorkflowCustomFieldSelectionArgs:
     @custom_field_id.setter
     def custom_field_id(self, value: pulumi.Input[_builtins.float]):
         pulumi.set(self, "custom_field_id", value)
+
+    @_builtins.property
+    @pulumi.getter(name="workflowId")
+    def workflow_id(self) -> pulumi.Input[_builtins.str]:
+        """
+        The workflow for this selection
+        """
+        return pulumi.get(self, "workflow_id")
+
+    @workflow_id.setter
+    def workflow_id(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "workflow_id", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentCondition")
@@ -94,18 +105,6 @@ class WorkflowCustomFieldSelectionArgs:
     @workflow_custom_field_selection_id.setter
     def workflow_custom_field_selection_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "workflow_custom_field_selection_id", value)
-
-    @_builtins.property
-    @pulumi.getter(name="workflowId")
-    def workflow_id(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The workflow for this selection
-        """
-        return pulumi.get(self, "workflow_id")
-
-    @workflow_id.setter
-    def workflow_id(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "workflow_id", value)
 
 
 @pulumi.input_type
@@ -269,6 +268,8 @@ class WorkflowCustomFieldSelection(pulumi.CustomResource):
             __props__.__dict__["selected_option_ids"] = selected_option_ids
             __props__.__dict__["values"] = values
             __props__.__dict__["workflow_custom_field_selection_id"] = workflow_custom_field_selection_id
+            if workflow_id is None and not opts.urn:
+                raise TypeError("Missing required property 'workflow_id'")
             __props__.__dict__["workflow_id"] = workflow_id
         super(WorkflowCustomFieldSelection, __self__).__init__(
             'rootly:index/workflowCustomFieldSelection:WorkflowCustomFieldSelection',
