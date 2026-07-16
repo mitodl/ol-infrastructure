@@ -130,6 +130,10 @@ unchanged from v5.16.1 (the codegen fixes in
 did not touch it), so these remain deferred until the provider schema/read
 behavior is fixed or we choose to leave them unmanaged.
 
+Filed upstream:
+[rootlyhq/terraform-provider-rootly#389](https://github.com/rootlyhq/terraform-provider-rootly/issues/389).
+Re-test with a preview-only import once that ships in a release.
+
 ### Alert source normalization
 
 Alert source webhook secrets are stored in `src/bridge/secrets/rootly/account.yaml`
