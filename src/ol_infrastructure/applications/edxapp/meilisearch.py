@@ -83,6 +83,25 @@ def create_meilisearch_resources(
             "MEILI_ENV": "production",
             "MEILI_MASTER_KEY": secrets["meilisearch_master_key"],
         },
+        # Meilisearch is a single-replica StatefulSet backed by a ReadWriteOnce
+        # EBS volume. Every time its node is rotated the volume must fully detach
+        # from the old node before it can attach to the new one, producing a
+        # multi-minute window with zero ready endpoints (AWS "Multi-Attach error"
+        # / FailedAttachVolume). The only durable fix is to make the pod's node
+        # stop rotating so often, so we harden against both drivers of churn:
+        #   1. karpenter.sh/do-not-disrupt blocks Karpenter's *voluntary*
+        #      disruption (consolidation, drift, emptiness) — the default
+        #      NodePool consolidates aggressively (consolidateAfter: 10m), which
+        #      would otherwise drain this pod's node repeatedly.
+        #   2. Pinning to on-demand capacity removes *spot-interruption*
+        #      evictions, the other involuntary churn source.
+        "podAnnotations": {
+            "karpenter.sh/do-not-disrupt": "true",
+        },
+        "nodeSelector": {
+            "karpenter.sh/capacity-type": meilisearch_config.get("node_capacity_type")
+            or "on-demand",
+        },
         "persistence": {
             "enabled": True,
             "size": meilisearch_config.get("pv_size") or "10Gi",
