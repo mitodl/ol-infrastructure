@@ -756,8 +756,7 @@ opik_keycloak_secret = OLVaultK8SSecret(
         mount="secret-operations",
         mount_type="kv-v1",
         path="sso/opik",
-        restart_target_kind="Deployment",
-        restart_target_name="learn-ai-app",
+        restart_targets=[{"kind": "Deployment", "name": "learn-ai-app"}],
         templates={
             "OPIK_KEYCLOAK_CLIENT_ID": '{{ get .Secrets "client_id" }}',
             "OPIK_KEYCLOAK_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
