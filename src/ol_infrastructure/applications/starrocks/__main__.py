@@ -526,6 +526,8 @@ if starrocks_config.get_bool("use_cn"):
 # entirely.  The base config below is sourced from the starrocks Helm chart
 # defaults and must be reviewed whenever STARROCKS_CHART_VERSION is bumped.
 # Ref: starrocks/values.yaml starrocksFESpec.config in the operator Helm chart.
+# Reviewed for 1.11.6: the only diff from 1.11.5 is an unrelated
+# externalTrafficPolicy service field; the fe.conf config block is unchanged.
 #
 # NOTE: The SSL keystore password appears in fe.conf (→ K8s ConfigMap). This is
 # an inherent limitation of StarRocks' SSL design; the password protects the
@@ -534,9 +536,9 @@ if (
     ssl_enabled
     or starrocks_config.get_bool("use_cn")
     or starrocks_config.get_bool("use_be")
-) and (STARROCKS_CHART_VERSION != "1.11.5"):
+) and (STARROCKS_CHART_VERSION != "1.11.6"):
     msg = (
-        f"_FE_CONFIG_BASE was sourced from chart 1.11.5; review defaults for"
+        f"_FE_CONFIG_BASE was sourced from chart 1.11.6; review defaults for"
         f" {STARROCKS_CHART_VERSION} before deploying with SSL or CN enabled"
     )
     raise ValueError(msg)
