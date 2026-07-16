@@ -502,10 +502,21 @@ def _create_clickhouse_installation(  # noqa: PLR0913
         # 000017_change_tables_to_replicated) into the ``default`` database,
         # while application tables live in ``opik_db``. ``default`` is otherwise
         # an unused scratch database in this cluster.
+        #
+        # ``CLUSTER ON *.*`` is required because newer opik migrations issue
+        # distributed DDL with an explicit ``ON CLUSTER '{cluster}'`` clause
+        # (e.g. 000098_create_cipx_spend_blocks). Altinity 24.8 defaults
+        # ``on_cluster_queries_require_cluster_grant`` to true, and CLUSTER is a
+        # global-only privilege not implied by the database-scoped ``GRANT ALL``
+        # above (without it: Code 497 ACCESS_DENIED, grant CLUSTER ON *.*). This
+        # only permits *issuing* ON CLUSTER queries; the underlying object access
+        # stays constrained by the opik_db / default grants, so cross-tenant
+        # isolation is preserved.
         "opik/grants/query": [
             "GRANT ALL ON opik_db.*",
             "GRANT ALL ON default.*",
             "GRANT SELECT ON system.parts",
+            "GRANT CLUSTER ON *.*",
         ],
     }
 

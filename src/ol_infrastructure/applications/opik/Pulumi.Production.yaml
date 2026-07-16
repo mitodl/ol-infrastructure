@@ -1,0 +1,7 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwF2Q2z6Jw0XKUCUC0oDMEt8AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMzkpuFumakERCZKI9AgEQgDvYkpwtvARaK7eM55N9tDIhL1lBs28Fq7xqVQuCsSHmWCuuVOa54y2t3YA0H0TjgyhzMF2CoIz9bBGUUA==
+config:
+  opik:k8s_domain: opik.ol.mit.edu
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production
