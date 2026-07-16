@@ -115,7 +115,7 @@ config:
     UWSGI_WORKERS: 3
     YOUTUBE_CONFIG_URL: "https://raw.githubusercontent.com/mitodl/open-video-data/main/youtube/channels.yaml"
   mitlearn:zendesk_help_url: "mitlearn.zendesk.com"
-  redis:instance_type: "cache.r7g.2xlarge"
+  redis:instance_type: "cache.r7g.4xlarge"
   redis:password:
     secure: v1:xdJFi6D7NpeVwYrg:C0GQl3mctDO1+ehHcFAPdeJDuhk9PbuNdNGtghRNMlzP6GC/GCOyGS1V0ViUXwiO7JhAFD6zrstWmhg0X/yHQLnK8KA=
   vault:address: https://vault-production.odl.mit.edu
