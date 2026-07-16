@@ -11,6 +11,120 @@ Last verified preview state for this branch (stock bridge, no workarounds):
 pulumi preview --diff
 Resources:
     ~ 1 to update   # provider bridge version 1.1.4 -> 1.2.0 (expected, one-time)
+    144 unchanged
+```
+
+## Upstream bug and required workaround (now fixed in CI and locally)
+
+Pulumi operations for this stack require a patched `pulumi-resource-terraform-provider`
+bridge and this environment variable:
+
+```bash
+export PULUMI_TERRAFORM_VERSION=1.5.0
+```
+
+Root cause: Pulumi's dynamic Terraform bridge sends
+`TerraformVersion: "pulumi-terraform-bridge"` during provider configuration.
+The Rootly provider parses that field as semantic version text with
+`goversion.Must(...)`, so the provider panics and Pulumi reports only:
+
+```text
+error calling ConfigureProvider: rpc error: code = Unavailable desc = error reading from server: EOF
+```
+
+Upstream tracking issues (still open as of this writing — neither project has
+released a fix):
+
+- Rootly provider: <https://github.com/rootlyhq/terraform-provider-rootly/issues/379>
+- Pulumi bridge: <https://github.com/pulumi/pulumi-terraform-bridge/issues/3514>
+- Internal follow-up: <https://github.com/mitodl/ol-infrastructure/issues/4906> (closed —
+  superseded by the CI-side fix below; reopen if the workaround needs revisiting)
+
+**The team decided to patch our own tooling instead of waiting on upstream.** Two
+places now carry the fix:
+
+1. **Local developer machines:** manually patch the `pulumi-resource-terraform-provider`
+   bridge binary (built from a pinned `pulumi-terraform-bridge` commit with a small
+   patch that reads `PULUMI_TERRAFORM_VERSION` instead of hardcoding the bad string),
+   install it at `~/.pulumi/plugins/resource-terraform-provider-v1.1.4/`, and set
+   `PULUMI_TERRAFORM_VERSION=1.5.0`.
+2. **Concourse CI:** [mitodl/ol-concourse#53](https://github.com/mitodl/ol-concourse/pull/53)
+   (merged) adds the same patch to `resources/pulumi/Dockerfile.provisioner` — the
+   actual, current source for the `mitodl/concourse-pulumi-resource-provisioner`
+   image used by every `pulumi-provisioner` Concourse resource in the fleet. (The
+   `mitodl/concourse-pulumi-resource` repo referenced in earlier investigation is
+   archived and only points to `mitodl/ol-concourse` now.) A Renovate custom manager
+   tracks the pinned bridge commit so a human is nudged to revisit this once upstream
+   ships a fix — see that PR for details on why `automerge` is disabled for it.
+
+## Concourse pipeline is now working
+
+The `pulumi-rootly` Concourse pipeline (added in
+[#4905](https://github.com/mitodl/ol-infrastructure/pull/4905)) runs successfully.
+Confirmed via a real production run of `deploy-ol-saas-rootly-production` against
+the patched provisioner image (`mitodl/concourse-pulumi-resource-provisioner:latest`,
+rebuilt from ol-concourse#53):
+
+```text
+Resources:
+    ~ 1 updated
+    148 unchanged
+```
+
+## Upstream bug and required workaround (now fixed in CI and locally)
+
+Pulumi operations for this stack require a patched `pulumi-resource-terraform-provider`
+bridge and this environment variable:
+
+```bash
+export PULUMI_TERRAFORM_VERSION=1.5.0
+```
+
+Root cause: Pulumi's dynamic Terraform bridge sends
+`TerraformVersion: "pulumi-terraform-bridge"` during provider configuration.
+The Rootly provider parses that field as semantic version text with
+`goversion.Must(...)`, so the provider panics and Pulumi reports only:
+
+```text
+error calling ConfigureProvider: rpc error: code = Unavailable desc = error reading from server: EOF
+```
+
+Upstream tracking issues (still open as of this writing — neither project has
+released a fix):
+
+- Rootly provider: <https://github.com/rootlyhq/terraform-provider-rootly/issues/379>
+- Pulumi bridge: <https://github.com/pulumi/pulumi-terraform-bridge/issues/3514>
+- Internal follow-up: <https://github.com/mitodl/ol-infrastructure/issues/4906> (closed —
+  superseded by the CI-side fix below; reopen if the workaround needs revisiting)
+
+**The team decided to patch our own tooling instead of waiting on upstream.** Two
+places now carry the fix:
+
+1. **Local developer machines:** manually patch the `pulumi-resource-terraform-provider`
+   bridge binary (built from a pinned `pulumi-terraform-bridge` commit with a small
+   patch that reads `PULUMI_TERRAFORM_VERSION` instead of hardcoding the bad string),
+   install it at `~/.pulumi/plugins/resource-terraform-provider-v1.1.4/`, and set
+   `PULUMI_TERRAFORM_VERSION=1.5.0`.
+2. **Concourse CI:** [mitodl/ol-concourse#53](https://github.com/mitodl/ol-concourse/pull/53)
+   (merged) adds the same patch to `resources/pulumi/Dockerfile.provisioner` — the
+   actual, current source for the `mitodl/concourse-pulumi-resource-provisioner`
+   image used by every `pulumi-provisioner` Concourse resource in the fleet. (The
+   `mitodl/concourse-pulumi-resource` repo referenced in earlier investigation is
+   archived and only points to `mitodl/ol-concourse` now.) A Renovate custom manager
+   tracks the pinned bridge commit so a human is nudged to revisit this once upstream
+   ships a fix — see that PR for details on why `automerge` is disabled for it.
+
+## Concourse pipeline is now working
+
+The `pulumi-rootly` Concourse pipeline (added in
+[#4905](https://github.com/mitodl/ol-infrastructure/pull/4905)) runs successfully.
+Confirmed via a real production run of `deploy-ol-saas-rootly-production` against
+the patched provisioner image (`mitodl/concourse-pulumi-resource-provisioner:latest`,
+rebuilt from ol-concourse#53):
+
+```text
+Resources:
+    ~ 1 updated
     148 unchanged
 ```
 
@@ -48,25 +162,25 @@ Cleanup that can now happen (not blocking — the workarounds are inert):
   `__main__.py`; slugs are read from the API and produce no diffs.
 - The provider now emits a deprecation warning for `ScheduleRotationUser`:
   it will be **removed in the next provider major version** in favor of the
-  `schedule_rotation_members` attribute on `rootly_schedule_rotation`.
-  Migrating the 4 `ScheduleRotationUser` resources requires deleting them from
-  state and moving membership into the `ScheduleRotation` resource — do this
-  deliberately (it touches the production on-call schedule) before adopting
-  provider v6.
+  `schedule_rotation_members` attribute on `rootly_schedule_rotation`. This
+  has since been migrated — see "Legacy `ScheduleRotationUser` resources
+  removed" below.
 
 ## Imported resources
 
 The old `ol-rootly-manager` import inventory contained 317 resources. This
-migration currently imports 147 of those inventory resources into Pulumi. The
-current Pulumi preview has 149 unchanged resources because it also includes the
-Pulumi stack and explicit Rootly provider resource.
+migration currently imports 143 of those inventory resources into Pulumi (147
+originally, less the 4 legacy `ScheduleRotationUser` resources removed — see
+below). The current Pulumi preview has 144 unchanged resources because it also
+includes the Pulumi stack and explicit Rootly provider resource.
 
 Imported categories include:
 
 - Severities, roles, environments, incident causes, incident types, and incident role
 - Platform Engineering team
 - Rootly services, excluding the empty-state `christest` service
-- On-call schedule, schedule rotation, rotation users, escalation policies, and escalation levels
+- On-call schedule, schedule rotation, and rotation members (via `schedule_rotation_members`),
+  escalation policies, and escalation levels
 - Dashboards and dashboard panels
 - Incident permission sets and resource-scoped incident permissions
 - Alert sources and alert routes, excluding the empty-state Chris Test route
@@ -150,6 +264,27 @@ field, so real resolution-rule changes to them are visible in previews.
 
 The SOPS secret file is currently KMS-encrypted. Add Vault transit recipients with
 `sops updatekeys` when suitable Vault access is available.
+
+### Legacy `ScheduleRotationUser` resources removed
+
+The provider deprecates `rootly_schedule_rotation_user` in favor of the
+`schedule_rotation_members` attribute on `rootly_schedule_rotation` (removal
+planned for the next provider major version). The primary rotation's
+`ScheduleRotation` resource already declared `schedule_rotation_members` with
+the same 4 people/positions as 4 separately-managed `ScheduleRotationUser`
+resources — Rootly was carrying two parallel membership record sets for the
+same rotation (legacy `schedule_rotation_users`, created 2025-05-09, alongside
+newer `schedule_rotation_members`, created 2025-10-09).
+
+Verified via the live Shifts API (`GET /v1/schedules/{id}/shifts`) that actual
+on-call computation already used the `schedule_rotation_members` set (one
+person per week, no duplication), so the legacy records were inert. Removed
+the 4 `ScheduleRotationUser` resources from Pulumi state with
+`pulumi state delete --force` (state-only; no Rootly API calls, so the live
+schedule was unaffected) and deleted the corresponding code. The 4 legacy
+`schedule_rotation_users` API records themselves still exist in Rootly,
+unmanaged and orphaned — deleting them via the Rootly UI/API is optional
+future cleanup, not urgent since they're inert.
 
 ## Validation commands
 
