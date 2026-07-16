@@ -26,7 +26,6 @@ src/bilder/
       files/                # Static files copied to the instance
       templates/            # Jinja2 config templates
     vault/
-    redash/
     concourse/
     ...
   components/               # Reusable provisioning components (imported by deploy.py)

@@ -83,7 +83,6 @@ KUBEWATCH = "ol-application-kubewatch"
 KUBEWATCH_WEBHOOK = "ol-application-kubewatch-webhook"
 FASTLY_REDIRECTOR = "ol-application-fastly-redirector"
 CELERY_MONITORING = "ol-application-celery-monitoring"
-REDASH = "ol-application-redash"
 LEARN_AI = "ol-application-learn-ai"
 MICROMASTERS = "ol-application-micromasters"
 OL_ANALYTICS_API = "ol-application-ol-analytics-api"
@@ -182,7 +181,6 @@ LEGACY_STACK_REF_PREFIXES: dict[str, str] = {
     KUBEWATCH_WEBHOOK: "applications.kubewatch_webhook_handler",
     FASTLY_REDIRECTOR: "applications.fastly_redirector",
     CELERY_MONITORING: "applications.celery_monitoring",
-    REDASH: "applications.redash",
     LEARN_AI: "applications.learn_ai",
     MICROMASTERS: "applications.micromasters",
     MITXONLINE: "applications.mitxonline",
