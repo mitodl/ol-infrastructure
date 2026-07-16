@@ -197,11 +197,7 @@ def build_base_general_config() -> ConfigDict:
         "MEDIA_ROOT": "media/",
         "MEDIA_URL": "/media/",
         "MICROSITE_CONFIGURATION": {},
-        "MKTG_URL_LINK_MAP": {
-            "TOS": "tos",
-            "ABOUT": "about",
-            "ACCESSIBILITY": "accessibility",
-        },
+        "MKTG_URL_LINK_MAP": {},
         "MOBILE_STORE_URLS": {},
         "NOTIFICATION_TYPE_ICONS": {},
         "DEFAULT_NOTIFICATION_ICON_URL": "",
