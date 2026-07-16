@@ -22,11 +22,6 @@
     },
     {
       "type": "sentry:index/sentryTeam:SentryTeam",
-      "name": "team_bootcamps",
-      "id": "mit-office-of-digital-learning/bootcamps"
-    },
-    {
-      "type": "sentry:index/sentryTeam:SentryTeam",
       "name": "team_devops",
       "id": "mit-office-of-digital-learning/devops"
     },
@@ -1157,11 +1152,6 @@
     },
     {
       "type": "sentry:index/sentryOrganizationCodeMapping:SentryOrganizationCodeMapping",
-      "name": "code_mapping_mitxonline_mitodl_bootcamp_ecommerce_116744",
-      "id": "mit-office-of-digital-learning/116744"
-    },
-    {
-      "type": "sentry:index/sentryOrganizationCodeMapping:SentryOrganizationCodeMapping",
       "name": "code_mapping_open_mitodl_open_discussions_117330",
       "id": "mit-office-of-digital-learning/117330"
     },
@@ -1199,11 +1189,6 @@
       "type": "sentry:index/sentryOrganizationCodeMapping:SentryOrganizationCodeMapping",
       "name": "code_mapping_ocw_studio_mitodl_edx_platform_156610",
       "id": "mit-office-of-digital-learning/156610"
-    },
-    {
-      "type": "sentry:index/sentryOrganizationCodeMapping:SentryOrganizationCodeMapping",
-      "name": "code_mapping_mitxonline_mitodl_bootcamp_ecommerce_170836",
-      "id": "mit-office-of-digital-learning/170836"
     },
     {
       "type": "sentry:index/sentryOrganizationCodeMapping:SentryOrganizationCodeMapping",
@@ -1269,11 +1254,6 @@
       "type": "sentry:index/sentryOrganizationCodeMapping:SentryOrganizationCodeMapping",
       "name": "code_mapping_open_next_mitodl_open_discussions_294319",
       "id": "mit-office-of-digital-learning/294319"
-    },
-    {
-      "type": "sentry:index/sentryOrganizationCodeMapping:SentryOrganizationCodeMapping",
-      "name": "code_mapping_mitxonline_mitodl_bootcamp_ecommerce_295753",
-      "id": "mit-office-of-digital-learning/295753"
     },
     {
       "type": "sentry:index/sentryOrganizationCodeMapping:SentryOrganizationCodeMapping",
@@ -1509,11 +1489,6 @@
       "type": "sentry:index/sentryOrganizationCodeMapping:SentryOrganizationCodeMapping",
       "name": "code_mapping_openedx_mitxpro_mitodl_edx_platform_70703",
       "id": "mit-office-of-digital-learning/70703"
-    },
-    {
-      "type": "sentry:index/sentryOrganizationCodeMapping:SentryOrganizationCodeMapping",
-      "name": "code_mapping_learn_ai_mitodl_bootcamp_ecommerce_712895",
-      "id": "mit-office-of-digital-learning/712895"
     },
     {
       "type": "sentry:index/sentryOrganizationCodeMapping:SentryOrganizationCodeMapping",
