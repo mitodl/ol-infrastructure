@@ -376,8 +376,8 @@ FEATURE_FLAGS: dict[str, bool] = {
     # caution. If the feature is enabled you can also set a limit for how much data is
     # returned from each database in the ``SUPERSET_META_DB_LIMIT`` configuration value
     # in this file.
-    # TMM 2023-11-28 - This seems like the same thing as Redash "query set" data source,
-    # which has caused a lot of annoying bugs and bad UX.
+    # TMM 2023-11-28 - This seems like a similar cross-database query set data source
+    # we've seen cause a lot of annoying bugs and bad UX in a previous BI tool.
     "ENABLE_SUPERSET_META_DB": False,
     # Set to True to replace Selenium with Playwright to execute reports and thumbnails.
     # Unlike Selenium, Playwright reports support deck.gl visualizations
