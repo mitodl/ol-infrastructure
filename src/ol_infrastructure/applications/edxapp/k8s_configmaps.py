@@ -291,7 +291,7 @@ def _build_interpolated_config_dict(
                     f"https://{domains['lms']}/static/"
                     f"{stack_info.env_prefix}/images/mit-ol-logo.svg"
                 ),
-                "copyrightText": "\u00a9 MITx Residential. All rights reserved.",
+                "copyrightText": "\u00a9 {year} MITx Residential. All rights reserved.",
             }
         )
 
@@ -328,7 +328,7 @@ def _build_interpolated_config_dict(
                 "honorCodeUrl": f"https://{marketing_domain}/honor-code/",
                 "aboutUrl": f"https://{marketing_domain}/about-us",
                 "supportUrl": f"https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/",
-                "copyrightText": "\u00a9 MIT xPRO. All rights reserved except where noted.",
+                "copyrightText": "\u00a9 {year} MIT xPRO. All rights reserved.",
             }
         )
 
@@ -392,7 +392,13 @@ def _build_interpolated_config_dict(
                     f"https://{edxapp_config.require('mit_learn_domain')}/about"
                 ),
                 "supportUrl": "https://support.learn.mit.edu/",
-                "copyrightText": "\u00a9 MIT Open Learning. All rights reserved except where noted.",
+                "copyrightText": "\u00a9 {year} Massachusetts Institute of Technology",
+                # Footer uses the plain "MIT" mark (mit-logo.svg), not the header
+                # logo.svg, to match the legacy MITxOnline footer.
+                "footerLogoUrl": (
+                    f"https://{domains['lms']}/static/"
+                    f"{stack_info.env_prefix}/images/mit-logo.svg"
+                ),
             }
         )
 
