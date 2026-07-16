@@ -422,46 +422,6 @@ schedule_rotation_primary_rotation = rootly.ScheduleRotation(
     opts=rootly_opts,
 )
 
-schedule_rotation_user_c582bafc_4fa2_4a79_9cdc_41c7bb256b88 = (
-    rootly.ScheduleRotationUser(
-        "c582bafc-4fa2-4a79-9cdc-41c7bb256b88",
-        position=1,
-        schedule_rotation_id="6744d26c-c81d-43c9-96b0-c6d30f4670a7",
-        user_id=99415,
-        opts=rootly_opts,
-    )
-)
-
-schedule_rotation_user_r_4b415521_c830_491e_b818_2d1081f06a26 = (
-    rootly.ScheduleRotationUser(
-        "r-4b415521-c830-491e-b818-2d1081f06a26",
-        position=3,
-        schedule_rotation_id="6744d26c-c81d-43c9-96b0-c6d30f4670a7",
-        user_id=100683,
-        opts=rootly_opts,
-    )
-)
-
-schedule_rotation_user_r_7ebd67c4_f881_4495_baa5_52714520a1a3 = (
-    rootly.ScheduleRotationUser(
-        "r-7ebd67c4-f881-4495-baa5-52714520a1a3",
-        position=2,
-        schedule_rotation_id="6744d26c-c81d-43c9-96b0-c6d30f4670a7",
-        user_id=103372,
-        opts=rootly_opts,
-    )
-)
-
-schedule_rotation_user_r_945d320a_641b_4957_9eaa_245894905e7b = (
-    rootly.ScheduleRotationUser(
-        "r-945d320a-641b-4957-9eaa-245894905e7b",
-        position=4,
-        schedule_rotation_id="6744d26c-c81d-43c9-96b0-c6d30f4670a7",
-        user_id=103392,
-        opts=rootly_opts,
-    )
-)
-
 escalation_policy_default_escalation_policy = rootly.EscalationPolicy(
     "default-escalation-policy",
     business_hours={
