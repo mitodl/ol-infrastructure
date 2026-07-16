@@ -1583,7 +1583,7 @@ mitlearn_k8s_app_oidc_resources_no_prefix = OLApisixOIDCResources(
         k8s_namespace=learn_namespace,
         oidc_logout_path="/logout/oidc",
         oidc_post_logout_redirect_uri=f"https://{mitlearn_config.get('api_domain')}/logout/",
-        oidc_session_cookie_lifetime=60 * 20160,
+        oidc_session_absolute_timeout=60 * 20160,
         # Disable APISIX's own idling/rolling checks (which otherwise default
         # to 15min/60min) so the session envelope lasts the full 14-day
         # absolute_timeout above, matching the Keycloak SSO session and
@@ -1605,7 +1605,7 @@ mitlearn_k8s_app_oidc_resources = OLApisixOIDCResources(
         k8s_namespace=learn_namespace,
         oidc_logout_path="/learn/logout/oidc",
         oidc_post_logout_redirect_uri=f"https://{mitlearn_config.get('api_domain')}/learn/logout/",
-        oidc_session_cookie_lifetime=60 * 20160,
+        oidc_session_absolute_timeout=60 * 20160,
         # See the mitlearn-k8s-no-prefix resources above for why these are 0.
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
