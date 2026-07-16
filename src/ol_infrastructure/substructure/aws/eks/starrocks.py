@@ -95,6 +95,13 @@ def setup_starrocks(
                     "rbac": {
                         "create": True,
                         "serviceAccount": {
+                            # The chart's default SA name ("starrocks") collides
+                            # with the ServiceAccount that applications/starrocks
+                            # creates directly via Pulumi for FE/CN/BE pod IRSA in
+                            # the same namespace. Helm refuses to adopt a resource
+                            # it didn't create, so the operator's own pod identity
+                            # needs a distinct name.
+                            "name": "starrocks-operator",
                             "annotations": {
                                 "eks.amazonaws.com/role-arn": starrocks_trust_role.role.arn,  # noqa: E501
                             },
