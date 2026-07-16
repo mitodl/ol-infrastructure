@@ -368,9 +368,16 @@ class OLAmazonCache(pulumi.ComponentResource):
             },
         }
 
+        # CI/QA alarms should not page on-call: the alarms still exist in
+        # CloudWatch for visibility, but actions_enabled=False means no SNS
+        # notification (and therefore no Rootly alert) ever fires for them.
+        non_paging = {
+            name: {**alarm_args, "enabled": False}
+            for name, alarm_args in global_profiles.items()
+        }
         monitoring_profiles: dict[str, dict[str, Any]] = {
-            "ci": {},
-            "qa": {},
+            "ci": non_paging,
+            "qa": non_paging,
             "production": {},
         }
-        return dict(**global_profiles, **(monitoring_profiles[profile_name]))
+        return {**global_profiles, **monitoring_profiles[profile_name]}
