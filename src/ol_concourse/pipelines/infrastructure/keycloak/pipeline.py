@@ -118,7 +118,7 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
     scim_plugin = s3_object(
         name="scim_for_kecyloak",
         bucket="ol-eng-artifacts",
-        object_regex=rf"keycloak/scim-client/scim-for-keycloak-kc-{KEYCLOAK_VERSION}-(\d+\.\d+\.\d+)-enterprise.jar",
+        object_regex=rf"keycloak/scim-client/scim-for-keycloak-kc-{'.'.join(KEYCLOAK_VERSION.split('.')[:2])}-(\d+\.\d+\.\d+)-enterprise.jar",
     )
 
     #############################################
