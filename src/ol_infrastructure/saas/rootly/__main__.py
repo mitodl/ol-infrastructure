@@ -33,6 +33,32 @@ rootly_pingdom_alert_source_opts = ResourceOptions(
     ignore_changes=["secret", "resolutionRuleAttributes"],
 )
 
+# CloudWatch alarms for QA/CI resources (e.g. "mitlearn-redis-qa-003") route
+# through the same shared warning/critical SNS topics as production (see
+# src/ol_infrastructure/lib/aws/monitoring_helper.py) and would otherwise page
+# on-call just like a production incident. Interim mitigation until the
+# underlying CloudWatch alarms stop sending actions for non-prod resources
+# (see src/ol_infrastructure/components/aws/cache.py): demote urgency to
+# Medium -- the same tier already used as the base urgency for the
+# "Grafana Prometheus - QA" alert source -- for any alarm whose name contains
+# a "-qa-" or "-ci-" environment segment.
+CLOUDWATCH_NON_PROD_URGENCY_RULES = [
+    {
+        "alertUrgencyId": "fce5c971-6660-4ad9-90eb-e75122055f50",
+        "jsonPath": "$.Message.AlarmName",
+        "kind": "payload",
+        "operator": "contains",
+        "value": "-qa-",
+    },
+    {
+        "alertUrgencyId": "fce5c971-6660-4ad9-90eb-e75122055f50",
+        "jsonPath": "$.Message.AlarmName",
+        "kind": "payload",
+        "operator": "contains",
+        "value": "-ci-",
+    },
+]
+
 # Foundation resources imported from the existing Rootly account.
 role_admin = rootly.Role(
     "admin",
@@ -2702,6 +2728,7 @@ alerts_source_cloudwatch_critical = rootly.AlertsSource(
         {"alertFieldId": "4a3add3c-5611-4dd9-ba65-4fb60b7f4fc6"},
         {"alertFieldId": "45a09cf3-b0f2-43cf-b596-34aaab9279dc"},
     ],
+    alert_source_urgency_rules_attributes=CLOUDWATCH_NON_PROD_URGENCY_RULES,
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
     deduplication_key_kind="payload",
     name="Cloudwatch - Critical",
@@ -2720,6 +2747,7 @@ alerts_source_cloudwatch_warning = rootly.AlertsSource(
         {"alertFieldId": "4a3add3c-5611-4dd9-ba65-4fb60b7f4fc6"},
         {"alertFieldId": "45a09cf3-b0f2-43cf-b596-34aaab9279dc"},
     ],
+    alert_source_urgency_rules_attributes=CLOUDWATCH_NON_PROD_URGENCY_RULES,
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
     deduplication_key_kind="payload",
     name="Cloudwatch - Warning",
