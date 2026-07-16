@@ -16,7 +16,6 @@ MEILISEARCH_VERSION = (
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
 OPEN_METADATA_VERSION = "1.13.1"
 OVS_VERSION = "v0.65.1-3-g2630021"
-REDASH_VERSION = "9d273e4"
 # renovate: datasource=github-releases depName=traefik packageName=traefik/traefik
 TRAEFIK_VERSION = "3.7.7"
 TUTOR_PERMISSIONS_VERSION = "15.3.4"
