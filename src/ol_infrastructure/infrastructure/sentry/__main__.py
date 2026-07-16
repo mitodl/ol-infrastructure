@@ -64,14 +64,6 @@ team_bi = sentry.SentryTeam(
     opts=sentry_opts,
 )
 
-team_bootcamps = sentry.SentryTeam(
-    "team_bootcamps",
-    organization=ORGANIZATION,
-    name="bootcamps",
-    slug="bootcamps",
-    opts=sentry_opts,
-)
-
 team_devops = sentry.SentryTeam(
     "team_devops",
     organization=ORGANIZATION,
@@ -2135,20 +2127,6 @@ code_mapping_micromasters_mitodl_odl_video_service_1163593 = (
     )
 )
 
-code_mapping_mitxonline_mitodl_bootcamp_ecommerce_116744 = (
-    sentry.SentryOrganizationCodeMapping(
-        "code_mapping_mitxonline_mitodl_bootcamp_ecommerce_116744",
-        organization=ORGANIZATION,
-        project_id="5864687",
-        repository_id="3938",
-        integration_id="29144",
-        default_branch="master",
-        stack_root="hubspot_sync/",
-        source_root="hubspot_sync/",
-        opts=sentry_opts,
-    )
-)
-
 code_mapping_open_mitodl_open_discussions_117330 = sentry.SentryOrganizationCodeMapping(
     "code_mapping_open_mitodl_open_discussions_117330",
     organization=ORGANIZATION,
@@ -2251,20 +2229,6 @@ code_mapping_ocw_studio_mitodl_edx_platform_156610 = (
         default_branch="master",
         stack_root="django/",
         source_root="common/djangoapps/edxmako/",
-        opts=sentry_opts,
-    )
-)
-
-code_mapping_mitxonline_mitodl_bootcamp_ecommerce_170836 = (
-    sentry.SentryOrganizationCodeMapping(
-        "code_mapping_mitxonline_mitodl_bootcamp_ecommerce_170836",
-        organization=ORGANIZATION,
-        project_id="5864687",
-        repository_id="3938",
-        integration_id="29144",
-        default_branch="master",
-        stack_root="main/",
-        source_root="main/",
         opts=sentry_opts,
     )
 )
@@ -2425,20 +2389,6 @@ code_mapping_open_next_mitodl_open_discussions_294319 = (
         default_branch="master",
         stack_root="news_events/",
         source_root="course_catalog/",
-        opts=sentry_opts,
-    )
-)
-
-code_mapping_mitxonline_mitodl_bootcamp_ecommerce_295753 = (
-    sentry.SentryOrganizationCodeMapping(
-        "code_mapping_mitxonline_mitodl_bootcamp_ecommerce_295753",
-        organization=ORGANIZATION,
-        project_id="5864687",
-        repository_id="3938",
-        integration_id="29144",
-        default_branch="master",
-        stack_root="flexiblepricing/",
-        source_root="applications/",
         opts=sentry_opts,
     )
 )
@@ -3029,20 +2979,6 @@ code_mapping_openedx_mitxpro_mitodl_edx_platform_70703 = (
         organization=ORGANIZATION,
         project_id="1730882",
         repository_id="76810",
-        integration_id="29144",
-        default_branch="master",
-        stack_root="",
-        source_root="",
-        opts=sentry_opts,
-    )
-)
-
-code_mapping_learn_ai_mitodl_bootcamp_ecommerce_712895 = (
-    sentry.SentryOrganizationCodeMapping(
-        "code_mapping_learn_ai_mitodl_bootcamp_ecommerce_712895",
-        organization=ORGANIZATION,
-        project_id="4508932230676480",
-        repository_id="3938",
         integration_id="29144",
         default_branch="master",
         stack_root="",

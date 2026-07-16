@@ -91,7 +91,6 @@ B2B_STORAGE = "ol-application-b2b-partners-storage"
 DIGITAL_CREDENTIALS = "ol-application-digital-credentials"
 STARBURST = "ol-application-starburst"
 ECS_TEST = "ol-application-ecs-test"
-BOOTCAMPS = "ol-application-bootcamps"
 OCW_SITE = "ol-application-ocw-site"
 MIT_LEARN_NEXTJS = "ol-application-mit-learn-nextjs"
 CLICKHOUSE = "ol-application-clickhouse"
@@ -187,7 +186,6 @@ LEGACY_STACK_REF_PREFIXES: dict[str, str] = {
     B2B_STORAGE: "applications.b2b_partners_storage",
     DIGITAL_CREDENTIALS: "applications.digital_credentials",
     STARBURST: "applications.starburst",
-    BOOTCAMPS: "applications.bootcamps",
     OCW_SITE: "applications.ocw_site",
     MIT_LEARN_NEXTJS: "applications.mit_learn_nextjs",
     CLICKHOUSE: "applications.clickhouse",

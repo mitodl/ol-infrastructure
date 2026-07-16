@@ -89,30 +89,6 @@ def create(
     )
 
     alerting.RuleGroup(
-        "loki-heroku-bootcamps",
-        name="bootcamps",
-        folder_uid=folder_uid,
-        interval_seconds=1800,
-        rules=[
-            alerting.RuleGroupRuleArgs(
-                name="BootcampsSAMLIntegrationErrorProd",
-                condition="B",
-                for_="1m",
-                no_data_state="OK",
-                labels={"severity": "critical"},
-                annotations={
-                    "description": "The Bootcamps authentication integration with NovoEd is broken. This prevents learners from accessing courses.",
-                },
-                datas=rd(
-                    'sum by(application, environment) (count_over_time({environment=~".*production", application=~"bootcamp-ecommerce"}'
-                    ' |= "Unable to refresh local metadata" [3h])) >=1'
-                ),
-            ),
-        ],
-        opts=resource_opts,
-    )
-
-    alerting.RuleGroup(
         "loki-heroku-ocw-studio",
         name="ocw-studio",
         folder_uid=folder_uid,
