@@ -1,15 +1,18 @@
 """Deploy witan as a shared, multi-tenant MCP service on the operations cluster.
 
-This stack owns the ``toolhive-witan`` namespace and implements
-``docs/adr/0009-deploy-witan-as-shared-multi-tenant-mcp-service.md``: two
-separate workloads on the existing shared ToolHive operator infrastructure.
+This stack owns the ``witan`` namespace and implements the MCP tier of
+``docs/adr/0009-deploy-witan-as-shared-multi-tenant-mcp-service.md``: witan's
+own FastMCP process (``mcp_servers.py``), run over ``streamable-http``
+transport, registered as an ``MCPServer`` joined to the ``witan-tools``
+``MCPGroup`` and aggregated behind a ``VirtualMCPServer`` exposed through
+APISIX.
 
-- **MCP tier** — witan's own FastMCP process (``mcp_servers.py``), converted
-  to ``streamable-http`` transport, registered as an ``MCPServer`` joined to
-  the ``witan-tools`` ``MCPGroup``, aggregated behind a ``VirtualMCPServer``.
-- **Data tier** — a separate stateless ``omnigraph-server`` Deployment
-  (``data_tier.py``), S3-backed via an ``OLBucket`` + IRSA, reached by the MCP
-  tier over the cluster network only.
+The data tier — the ``omnigraph-server`` graph service witan reads/writes over
+the cluster network — is a **separate stack** (``applications/omnigraph``),
+reached here via a ``StackReference`` to its ``omnigraph_server_addr`` output.
+ToolHive is only the operator that runs this MCP tier; it is an implementation
+detail of this stack, not part of witan's or omnigraph's identity — hence the
+plain ``witan`` / ``omnigraph`` project and namespace names.
 
 Incoming auth — ToolHive's "External OIDC provider" scenario, NOT
 ``toolhive_swe``'s "Embedded auth server" scenario:
@@ -23,12 +26,11 @@ Incoming auth — ToolHive's "External OIDC provider" scenario, NOT
     Swapping that JWT for a vMCP-minted one before it reaches witan would
     break D1 outright. So this stack configures ``incomingAuth`` to validate
     directly against Keycloak's **real** issuer (no ``authServerConfig``,
-    hence no embedded broker, no persistent signing keys, no Redis — none of
-    which toolhive_swe's variant needs either, once there's no broker to keep
-    state for) — ToolHive then has nothing of its own to substitute and simply
-    forwards the client's original bearer token to the ``witan`` MCPServer.
-    See ADR-0009's Resolution addendum and agent-kit ADR-0004's matching
-    Resolution addendum (2026-07-10) for the full decision record.
+    hence no embedded broker, no persistent signing keys, no Redis) — ToolHive
+    then has nothing of its own to substitute and simply forwards the client's
+    original bearer token to the ``witan`` MCPServer. See ADR-0009's
+    Resolution addendum and agent-kit ADR-0004's matching Resolution addendum
+    (2026-07-10) for the full decision record.
 
     This also means clients need an already-valid Keycloak JWT with the right
     audience before calling — there is no vMCP-brokered interactive login
@@ -40,20 +42,15 @@ Incoming auth — ToolHive's "External OIDC provider" scenario, NOT
 
 Follow-up work this stack does NOT cover, tracked separately rather than
 silently assumed:
-    - **Container images.** Neither witan nor omnigraph-server has a
-      Dockerfile or CI image-build job in either repo yet (confirmed via
-      repo-wide search of both at authoring time). This stack only creates
-      the ECR repositories and references ``:latest``, following
-      ``kubewatch_webhook_handler``'s "image built separately, by a Concourse
-      job, before this stack runs" split — that Concourse job still needs to
-      be written for both images before this stack can actually deploy
-      anything live.
+    - **Container image.** witan has no image built in either repo yet; this
+      stack only creates the ECR repository and references ``:latest``, and
+      the ``witan``/``pulumi-witan`` Concourse pipeline builds and pushes it.
     - **Keycloak witan-users token provisioning.** agent-kit ADR-0004 D3
-      assigns this stack the job of "walking the Keycloak witan-users
-      group/role membership and writing a generated token per user" into the
-      shared actor-tokens source. This stack only provisions the destination
-      (the Vault-backed ``witan-actor-tokens`` Secret, seeded with at minimum
-      the ``svc-witan-ci`` entry) — the sync job that keeps per-user entries
+      assigns the job of "walking the Keycloak witan-users group/role
+      membership and writing a generated token per user" into the shared
+      actor-tokens source. This stack only provisions the destination (the
+      Vault-backed ``actor-tokens`` Secret, seeded with at minimum the
+      ``svc-witan-ci`` entry) — the sync job that keeps per-user entries
       current as Keycloak group membership changes is not yet built.
 """
 
@@ -64,14 +61,8 @@ import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, ResourceOptions, export
 
-from ol_infrastructure.applications.toolhive_witan.data_tier import (
-    create_data_tier,
-    omnigraph_server_addr,
-)
-from ol_infrastructure.applications.toolhive_witan.ingress import (
-    create_ingress_resources,
-)
-from ol_infrastructure.applications.toolhive_witan.mcp_servers import (
+from ol_infrastructure.applications.witan.ingress import create_ingress_resources
+from ol_infrastructure.applications.witan.mcp_servers import (
     MCP_GROUP_NAME,
     create_mcp_servers,
 )
@@ -104,7 +95,7 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 setup_vault_provider()
 
 stack_info = parse_stack()
-toolhive_witan_config = Config("toolhive_witan")
+witan_config = Config("witan")
 
 cluster_stack = make_stack_reference(projects.EKS, f"operations.{stack_info.name}")
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
@@ -113,34 +104,40 @@ setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 operator_stack = make_stack_reference(projects.TOOLHIVE_OPERATOR, stack_info.name)
 require_stack_output_value(operator_stack, "toolhive_namespace")
 
-TOOLHIVE_NAMESPACE = "toolhive-witan"
+# Fail fast if the omnigraph data-tier stack hasn't been deployed yet — witan's
+# MCPServer points WITAN_MEMORY_URI at its in-cluster address (below).
+omnigraph_stack = make_stack_reference(projects.OMNIGRAPH, stack_info.name)
+omnigraph_server_addr = require_stack_output_value(
+    omnigraph_stack, "omnigraph_server_addr"
+)
+
+NAMESPACE = "witan"
 
 cluster_stack.require_output("namespaces").apply(
-    lambda ns: check_cluster_namespace(TOOLHIVE_NAMESPACE, ns)
+    lambda ns: check_cluster_namespace(NAMESPACE, ns)
 )
 
 aws_config = AWSBase(
     tags={
         "OU": BusinessUnit.operations,
         "Environment": f"operations-{stack_info.env_suffix}",
-        "Application": "toolhive-witan",
+        "Application": "witan",
         "Owner": "platform-engineering",
     }
 )
 
 k8s_labels = K8sGlobalLabels(
-    service=Services.toolhive,
+    service=Services.witan,
     ou=BusinessUnit.operations,
     stack=stack_info,
 )
 k8s_global_labels = k8s_labels.model_dump()
 
-# Public hostname the vMCP is served on, following the same per-environment
-# convention as toolhive-swe.
+# Public hostname the vMCP is served on.
 if stack_info.env_suffix == "production":
-    VMCP_DOMAIN = "toolhive-witan.ol.mit.edu"
+    VMCP_DOMAIN = "witan.ol.mit.edu"
 else:
-    VMCP_DOMAIN = f"toolhive-witan.{stack_info.env_suffix}.ol.mit.edu"
+    VMCP_DOMAIN = f"witan.{stack_info.env_suffix}.ol.mit.edu"
 VMCP_RESOURCE_URL = f"https://{VMCP_DOMAIN}"
 VMCP_RESOURCE_ID = f"{VMCP_RESOURCE_URL}/"
 
@@ -158,49 +155,47 @@ MCP_OIDC_CONFIG_NAME = "witan-vmcp-oidc"
 # agent-kit ADR-0004 D1) and the vMCP's incomingAuth checks for. Configurable
 # per stack in case the eventual Keycloak client/audience-mapper work lands a
 # different value; defaults to a plain "witan" audience.
-WITAN_OIDC_AUDIENCE = toolhive_witan_config.get("oidc_audience") or "witan"
+WITAN_OIDC_AUDIENCE = witan_config.get("oidc_audience") or "witan"
 
 # Vault-synced secrets: the svc-witan-ci raw token (ADR-0009 decision point 3)
-# and the {actor_id: token} JSON map both witan (WITAN_ACTOR_TOKENS_FILE) and
-# omnigraph-server (OMNIGRAPH_SERVER_BEARER_TOKENS_FILE) read (agent-kit
-# ADR-0004 D3). See the module docstring above re: the per-user sync job
-# that keeps the latter current not yet existing.
+# and the {actor_id: token} JSON map witan reads (WITAN_ACTOR_TOKENS_FILE,
+# agent-kit ADR-0004 D3) — omnigraph-server reads the same map from the same
+# Vault source in its own namespace (see applications/omnigraph).
 WITAN_CI_TOKEN_SECRET_NAME = "witan-ci-token"  # noqa: S105  # pragma: allowlist secret
 WITAN_CI_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
-ACTOR_TOKENS_SECRET_NAME = "witan-actor-tokens"  # noqa: S105  # pragma: allowlist secret
+ACTOR_TOKENS_SECRET_NAME = "actor-tokens"  # noqa: S105  # pragma: allowlist secret
 ACTOR_TOKENS_SECRET_KEY = "tokens.json"  # noqa: S105  # pragma: allowlist secret
 
 ##############################################
-#   Vault auth binding (IRSA + VSO sync)      #
+#   Vault auth binding (VSO sync only)        #
 ##############################################
-# omnigraph-server is the only workload that needs AWS access (its S3-backed
-# store), granted via IRSA below (data_tier.py attaches the actual bucket
-# policy once the OLBucket ARN is known). Both witan and omnigraph-server
-# need the Vault Secrets Operator sync wiring for the secrets above, hence
-# both -vault service accounts in vault_sync_service_account_names.
+# witan needs no AWS access (no IAM policy attached, iam_policy_document=None);
+# the IRSA service account is required by the binding but unused — witan's pods
+# are created by the ToolHive operator with its own service account. The
+# binding exists for the Vault Secrets Operator sync wiring below. Same shape
+# as toolhive_swe's own no-AWS binding.
 witan_auth_binding = OLEKSAuthBinding(
     OLEKSAuthBindingConfig(
-        application_name="toolhive-witan",
-        namespace=TOOLHIVE_NAMESPACE,
+        application_name="witan",
+        namespace=NAMESPACE,
         stack_info=stack_info,
         aws_config=aws_config,
         iam_policy_document=None,
-        vault_policy_path=Path(__file__).parent.joinpath("toolhive_witan_policy.hcl"),
+        vault_policy_path=Path(__file__).parent.joinpath("witan_policy.hcl"),
         cluster_name=cluster_stack.require_output("cluster_name"),
         cluster_identities=cluster_stack.require_output("cluster_identities"),
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
-        irsa_service_account_name="omnigraph-server",
-        create_irsa_service_account=True,
-        vault_sync_service_account_names=["witan-vault", "omnigraph-server-vault"],
+        irsa_service_account_name="witan",
+        vault_sync_service_account_names=["witan-vault"],
         k8s_labels=k8s_labels,
     )
 )
 
 witan_ci_token_secret = OLVaultK8SSecret(
-    f"toolhive-witan-ci-token-secret-{stack_info.env_suffix}",
+    f"witan-ci-token-secret-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(
         name=WITAN_CI_TOKEN_SECRET_NAME,
-        namespace=TOOLHIVE_NAMESPACE,
+        namespace=NAMESPACE,
         labels=k8s_global_labels,
         dest_secret_labels=k8s_global_labels,
         dest_secret_name=WITAN_CI_TOKEN_SECRET_NAME,
@@ -221,10 +216,10 @@ witan_ci_token_secret = OLVaultK8SSecret(
 )
 
 actor_tokens_secret = OLVaultK8SSecret(
-    f"toolhive-witan-actor-tokens-secret-{stack_info.env_suffix}",
+    f"witan-actor-tokens-secret-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(
         name=ACTOR_TOKENS_SECRET_NAME,
-        namespace=TOOLHIVE_NAMESPACE,
+        namespace=NAMESPACE,
         labels=k8s_global_labels,
         dest_secret_labels=k8s_global_labels,
         dest_secret_name=ACTOR_TOKENS_SECRET_NAME,
@@ -245,24 +240,12 @@ actor_tokens_secret = OLVaultK8SSecret(
 )
 
 #########################################
-#   Data tier (omnigraph-server)         #
-#########################################
-data_tier = create_data_tier(
-    stack_info=stack_info,
-    namespace=TOOLHIVE_NAMESPACE,
-    k8s_global_labels=k8s_global_labels,
-    aws_config=aws_config,
-    auth_binding=witan_auth_binding,
-    actor_tokens_secret_name=ACTOR_TOKENS_SECRET_NAME,
-)
-
-#########################################
 #   ECR repository for the witan image   #
 #########################################
-# Same "repo here, image built separately" split as omnigraph-server's own
-# ECR repo in data_tier.py — see this module's docstring.
+# "Repo here, image built separately by a Concourse job" split, mirroring
+# kubewatch_webhook_handler — see this module's docstring.
 witan_ecr_repository = aws.ecr.Repository(
-    f"toolhive-witan-witan-ecr-repository-{stack_info.env_suffix}",
+    f"witan-ecr-repository-{stack_info.env_suffix}",
     name=f"witan-{stack_info.env_suffix.lower()}",
     image_tag_mutability="MUTABLE",
     image_scanning_configuration=aws.ecr.RepositoryImageScanningConfigurationArgs(
@@ -272,7 +255,7 @@ witan_ecr_repository = aws.ecr.Repository(
     tags=aws_config.tags,
 )
 aws.ecr.LifecyclePolicy(
-    f"toolhive-witan-witan-ecr-lifecycle-{stack_info.env_suffix}",
+    f"witan-ecr-lifecycle-{stack_info.env_suffix}",
     repository=witan_ecr_repository.name,
     policy=json.dumps(
         {
@@ -298,11 +281,11 @@ witan_image = witan_ecr_repository.repository_url.apply(lambda url: f"{url}:late
 #########################################
 mcp_servers = create_mcp_servers(
     stack_info=stack_info,
-    namespace=TOOLHIVE_NAMESPACE,
+    namespace=NAMESPACE,
     k8s_global_labels=k8s_global_labels,
     cluster_stack=cluster_stack,
     witan_image=witan_image,
-    omnigraph_server_addr=omnigraph_server_addr(TOOLHIVE_NAMESPACE),
+    omnigraph_server_addr=omnigraph_server_addr,
     oidc_issuer=KEYCLOAK_ISSUER,
     oidc_audience=WITAN_OIDC_AUDIENCE,
     actor_tokens_secret_name=ACTOR_TOKENS_SECRET_NAME,
@@ -317,12 +300,12 @@ mcp_servers = create_mcp_servers(
 # docstring for why this is the "External OIDC provider" scenario, not
 # toolhive_swe's "Embedded auth server" one.
 mcp_oidc_config = kubernetes.apiextensions.CustomResource(
-    f"toolhive-witan-mcp-oidc-config-{stack_info.env_suffix}",
+    f"witan-mcp-oidc-config-{stack_info.env_suffix}",
     api_version="toolhive.stacklok.dev/v1beta1",
     kind="MCPOIDCConfig",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=MCP_OIDC_CONFIG_NAME,
-        namespace=TOOLHIVE_NAMESPACE,
+        namespace=NAMESPACE,
         labels=k8s_global_labels,
     ),
     spec={
@@ -344,12 +327,12 @@ mcp_oidc_config = kubernetes.apiextensions.CustomResource(
 # exactly the "External OIDC provider" scenario ADR-0009's Resolution
 # addendum specifies.
 witan_virtualmcpserver = kubernetes.apiextensions.CustomResource(
-    f"toolhive-witan-vmcp-{stack_info.env_suffix}",
+    f"witan-vmcp-{stack_info.env_suffix}",
     api_version="toolhive.stacklok.dev/v1beta1",
     kind="VirtualMCPServer",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="witan-vmcp",
-        namespace=TOOLHIVE_NAMESPACE,
+        namespace=NAMESPACE,
         labels=k8s_global_labels,
     ),
     spec={
@@ -377,7 +360,6 @@ witan_virtualmcpserver = kubernetes.apiextensions.CustomResource(
             mcp_oidc_config,
             witan_ci_token_secret,
             actor_tokens_secret,
-            data_tier.service,
         ]
     ),
 )
@@ -387,15 +369,15 @@ witan_virtualmcpserver = kubernetes.apiextensions.CustomResource(
 #########################################
 vmcp_cert, vmcp_httproute = create_ingress_resources(
     stack_info=stack_info,
-    namespace=TOOLHIVE_NAMESPACE,
+    namespace=NAMESPACE,
     k8s_global_labels=k8s_global_labels,
     vmcp_domain=VMCP_DOMAIN,
     witan_virtualmcpserver=witan_virtualmcpserver,
 )
 
-export("toolhive_namespace", TOOLHIVE_NAMESPACE)
+export("namespace", NAMESPACE)
 export("mcp_group_name", MCP_GROUP_NAME)
 export("vmcp_domain", VMCP_DOMAIN)
 export("vmcp_oidc_issuer", KEYCLOAK_ISSUER)
 export("witan_ecr_repository_url", witan_ecr_repository.repository_url)
-export("omnigraph_server_addr", omnigraph_server_addr(TOOLHIVE_NAMESPACE))
+export("omnigraph_server_addr", omnigraph_server_addr)

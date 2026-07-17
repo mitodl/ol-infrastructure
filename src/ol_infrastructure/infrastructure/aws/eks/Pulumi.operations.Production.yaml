@@ -12,7 +12,7 @@ config:
   eks:apisix_domains:
   - celery-monitoring.odl.mit.edu
   - toolhive-swe.ol.mit.edu
-  - toolhive-witan.ol.mit.edu
+  - witan.ol.mit.edu
   eks:backup: true
   eks:apisix_min_replicas: '3'
   eks:apisix_max_replicas: '10'
@@ -26,7 +26,8 @@ config:
   - toolhive-swe
   - toolhive-apps
   - toolhive-data
-  - toolhive-witan
+  - omnigraph
+  - witan
   eks:nodegroups:
     worker-xlarge:
       instance_type: c8i-flex.xlarge

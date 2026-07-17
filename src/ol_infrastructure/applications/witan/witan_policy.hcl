@@ -15,7 +15,7 @@ path "secret-operations/data/witan/ci-token" {
 # resolves per-user tokens from (WITAN_ACTOR_TOKENS_FILE). Seeded here with at
 # least the svc-witan-ci entry; per-user entries are written by the
 # Keycloak witan-users sync (tk-... follow-up, not yet built — see
-# toolhive_witan/__main__.py).
+# applications/witan/__main__.py).
 path "secret-operations/witan/actor-tokens" {
   capabilities = ["read"]
 }

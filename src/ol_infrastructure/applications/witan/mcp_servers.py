@@ -47,7 +47,7 @@ ACTOR_TOKENS_MOUNT_PATH = "/etc/witan/actor-tokens"  # pragma: allowlist secret
 ACTOR_TOKENS_FILENAME = "tokens.json"  # pragma: allowlist secret
 
 
-class ToolhiveWitanMCPServers(NamedTuple):
+class WitanMCPServers(NamedTuple):
     """Handles to the group and backend server CRs for depends_on wiring."""
 
     group: kubernetes.apiextensions.CustomResource
@@ -60,16 +60,16 @@ def create_mcp_servers(  # noqa: PLR0913
     k8s_global_labels: dict[str, str],
     cluster_stack: StackReference,
     witan_image: str | Output[str],
-    omnigraph_server_addr: str,
+    omnigraph_server_addr: str | Output[str],
     oidc_issuer: str,
     oidc_audience: str,
     actor_tokens_secret_name: str,
     witan_ci_token_secret_name: str,
     witan_ci_token_secret_key: str,
-) -> ToolhiveWitanMCPServers:
+) -> WitanMCPServers:
     """Provision the witan-tools MCPGroup and the witan MCPServer backend."""
     witan_mcpgroup = kubernetes.apiextensions.CustomResource(
-        f"toolhive-witan-mcpgroup-{stack_info.env_suffix}",
+        f"witan-mcpgroup-{stack_info.env_suffix}",
         api_version="toolhive.stacklok.dev/v1beta1",
         kind="MCPGroup",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -90,7 +90,7 @@ def create_mcp_servers(  # noqa: PLR0913
     # tier (omnigraph-server) is reached over the cluster network only — see
     # data_tier.py — never exposed via this MCPServer directly.
     witan_mcpserver = kubernetes.apiextensions.CustomResource(
-        f"toolhive-witan-mcpserver-{stack_info.env_suffix}",
+        f"witan-mcpserver-{stack_info.env_suffix}",
         api_version="toolhive.stacklok.dev/v1beta1",
         kind="MCPServer",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -173,7 +173,7 @@ def create_mcp_servers(  # noqa: PLR0913
         opts=ResourceOptions(depends_on=[witan_mcpgroup]),
     )
 
-    return ToolhiveWitanMCPServers(
+    return WitanMCPServers(
         group=witan_mcpgroup,
         servers=[witan_mcpserver],
     )

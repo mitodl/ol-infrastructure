@@ -1,0 +1,14 @@
+---
+# `secretsprovider`/`encryptedkey` are intentionally omitted here — this
+# stack has no `secure:` config values yet (all real secrets are Vault-synced
+# K8s Secrets, provisioned in __main__.py, not Pulumi stack config). The
+# first `pulumi stack init --secrets-provider=awskms://alias/infrastructure-secrets-ci`
+# run against this stack will populate both, matching every other stack under
+# this KMS alias (see toolhive_swe/Pulumi.CI.yaml for the resulting shape).
+config:
+  aws:region: us-east-1
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
+  # Audience witan's own JWTVerifier validates (WITAN_OIDC_AUDIENCE) and the
+  # vMCP's incomingAuth checks — see __main__.py. Defaults to "witan" if unset.
+  # witan:oidc_audience: witan

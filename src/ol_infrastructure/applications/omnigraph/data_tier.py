@@ -1,11 +1,12 @@
-"""The witan data tier: a stateless ``omnigraph-server`` Deployment.
+"""The omnigraph data tier: a stateless ``omnigraph-server`` Deployment.
 
 ADR-0009 (ol-infrastructure) decision point 2 / option 3: the data tier is a
 plain Kubernetes ``Deployment`` (no PVC/StatefulSet — state lives entirely in
-S3) reached by the ``witan`` MCPServer over the cluster network only, never
-exposed outside the namespace. This mirrors the Redis-behind-vMCP precedent
-``toolhive_swe`` uses for its own stateful backend, except S3-backed so the
-pod itself needs no persistent volume.
+S3) reached by consumers (today, the ``witan`` MCPServer in the ``witan``
+namespace) over the cluster network only, never exposed outside the cluster.
+This mirrors the Redis-behind-vMCP precedent ``toolhive_swe`` uses for its own
+stateful backend, except S3-backed so the pod itself needs no persistent
+volume.
 
 ``omnigraph-server`` (an external Rust binary,
 https://github.com/ModernRelay/omnigraph — not vendored in either repo) boots
@@ -32,6 +33,7 @@ from pulumi import Output, ResourceOptions
 
 from ol_infrastructure.components.applications.eks import OLEKSAuthBinding
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.components.services.vault import OLVaultK8SSecret
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import StackInfo
@@ -58,10 +60,11 @@ def omnigraph_server_addr(namespace: str) -> str:
     )
 
 
-class ToolhiveWitanDataTier(NamedTuple):
+class OmnigraphDataTier(NamedTuple):
     """Handles to the provisioned data-tier resources for depends_on wiring."""
 
     bucket: OLBucket
+    ecr_repository: aws.ecr.Repository
     service: kubernetes.core.v1.Service
     deployment: kubernetes.apps.v1.Deployment
 
@@ -73,11 +76,12 @@ def create_data_tier(  # noqa: PLR0913
     aws_config: AWSBase,
     auth_binding: OLEKSAuthBinding,
     actor_tokens_secret_name: str,
-) -> ToolhiveWitanDataTier:
+    actor_tokens_secret: OLVaultK8SSecret,
+) -> OmnigraphDataTier:
     """Provision the S3 bucket, IRSA policy, ECR repo, ConfigMap, and Deployment."""
-    bucket_name = f"ol-data-witan-{stack_info.env_suffix}"
-    witan_bucket = OLBucket(
-        f"toolhive-witan-bucket-{stack_info.env_suffix}",
+    bucket_name = f"ol-data-omnigraph-{stack_info.env_suffix}"
+    omnigraph_bucket = OLBucket(
+        f"omnigraph-bucket-{stack_info.env_suffix}",
         S3BucketConfig(
             bucket_name=bucket_name,
             versioning_enabled=True,
@@ -89,8 +93,8 @@ def create_data_tier(  # noqa: PLR0913
     # after the fact and attached to the IRSA role directly — the same
     # pattern clickhouse/__main__.py uses for its own OLBucket-backed IRSA
     # grant (iam_policy_document=None on the OLEKSAuthBinding config).
-    witan_s3_policy_json: Output[str] = Output.all(
-        bucket_arn=witan_bucket.bucket_v2.arn
+    omnigraph_s3_policy_json: Output[str] = Output.all(
+        bucket_arn=omnigraph_bucket.bucket_v2.arn
     ).apply(
         lambda args: json.dumps(
             {
@@ -116,13 +120,13 @@ def create_data_tier(  # noqa: PLR0913
             }
         )
     )
-    witan_s3_iam_policy = aws.iam.Policy(
-        f"toolhive-witan-s3-iam-policy-{stack_info.env_suffix}",
-        policy=witan_s3_policy_json,
+    omnigraph_s3_iam_policy = aws.iam.Policy(
+        f"omnigraph-s3-iam-policy-{stack_info.env_suffix}",
+        policy=omnigraph_s3_policy_json,
     )
     aws.iam.RolePolicyAttachment(
-        f"toolhive-witan-s3-iam-policy-attachment-{stack_info.env_suffix}",
-        policy_arn=witan_s3_iam_policy.arn,
+        f"omnigraph-s3-iam-policy-attachment-{stack_info.env_suffix}",
+        policy_arn=omnigraph_s3_iam_policy.arn,
         role=auth_binding.irsa_role.name,
     )
 
@@ -131,7 +135,7 @@ def create_data_tier(  # noqa: PLR0913
     # mirroring kubewatch_webhook_handler's "ECR repo here, image build
     # elsewhere" split.
     ecr_repository = aws.ecr.Repository(
-        f"toolhive-witan-omnigraph-server-ecr-repository-{stack_info.env_suffix}",
+        f"omnigraph-omnigraph-server-ecr-repository-{stack_info.env_suffix}",
         name=f"omnigraph-server-{stack_info.env_suffix.lower()}",
         image_tag_mutability="MUTABLE",
         image_scanning_configuration=aws.ecr.RepositoryImageScanningConfigurationArgs(
@@ -141,7 +145,7 @@ def create_data_tier(  # noqa: PLR0913
         tags=aws_config.tags,
     )
     aws.ecr.LifecyclePolicy(
-        f"toolhive-witan-omnigraph-server-ecr-lifecycle-{stack_info.env_suffix}",
+        f"omnigraph-omnigraph-server-ecr-lifecycle-{stack_info.env_suffix}",
         repository=ecr_repository.name,
         policy=json.dumps(
             {
@@ -175,14 +179,15 @@ def create_data_tier(  # noqa: PLR0913
     # ConfigMap volume below is mounted with ``sub_path`` so it overlays only
     # the single ``cluster.yaml`` file and leaves that baked-in schema.pg
     # visible alongside it, rather than replacing the whole directory.
-    storage_uri: Output[str] = witan_bucket.bucket_v2.bucket.apply(
+    storage_uri: Output[str] = omnigraph_bucket.bucket_v2.bucket.apply(
         lambda name: f"s3://{name}"
     )
+    cluster_name = f"mitodl-omnigraph-{stack_info.env_suffix.lower()}"
     cluster_yaml_content: Output[str] = storage_uri.apply(
         lambda uri: yaml.dump(
             {
                 "version": 1,
-                "metadata": {"name": f"mitodl-witan-{stack_info.env_suffix.lower()}"},
+                "metadata": {"name": cluster_name},
                 "state": {"backend": "cluster"},
                 "storage": uri,
                 "graphs": {"main": {"schema": "schema.pg"}},
@@ -191,7 +196,7 @@ def create_data_tier(  # noqa: PLR0913
         )
     )
     cluster_configmap = kubernetes.core.v1.ConfigMap(
-        f"toolhive-witan-omnigraph-cluster-config-{stack_info.env_suffix}",
+        f"omnigraph-omnigraph-cluster-config-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name="omnigraph-cluster-config",
             namespace=namespace,
@@ -205,7 +210,7 @@ def create_data_tier(  # noqa: PLR0913
         "app.kubernetes.io/name": OMNIGRAPH_SERVER_SERVICE_NAME,
     }
     omnigraph_deployment = kubernetes.apps.v1.Deployment(
-        f"toolhive-witan-omnigraph-server-deployment-{stack_info.env_suffix}",
+        f"omnigraph-omnigraph-server-deployment-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=OMNIGRAPH_SERVER_SERVICE_NAME,
             namespace=namespace,
@@ -304,11 +309,11 @@ def create_data_tier(  # noqa: PLR0913
                 ),
             ),
         ),
-        opts=ResourceOptions(depends_on=[cluster_configmap]),
+        opts=ResourceOptions(depends_on=[cluster_configmap, actor_tokens_secret]),
     )
 
     omnigraph_service = kubernetes.core.v1.Service(
-        f"toolhive-witan-omnigraph-server-service-{stack_info.env_suffix}",
+        f"omnigraph-omnigraph-server-service-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=OMNIGRAPH_SERVER_SERVICE_NAME,
             namespace=namespace,
@@ -329,8 +334,9 @@ def create_data_tier(  # noqa: PLR0913
         opts=ResourceOptions(depends_on=[omnigraph_deployment]),
     )
 
-    return ToolhiveWitanDataTier(
-        bucket=witan_bucket,
+    return OmnigraphDataTier(
+        bucket=omnigraph_bucket,
+        ecr_repository=ecr_repository,
         service=omnigraph_service,
         deployment=omnigraph_deployment,
     )

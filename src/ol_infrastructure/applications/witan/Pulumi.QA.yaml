@@ -4,4 +4,4 @@ config:
   aws:region: us-east-1
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
-  # toolhive_witan:oidc_audience: witan
+  # witan:oidc_audience: witan

@@ -29,7 +29,7 @@ from ol_infrastructure.lib.pulumi_helper import StackInfo
 # every other vMCP on this operator — not the backend proxy's 8080.
 VMCP_SERVICE_NAME = "vmcp-witan-vmcp"
 VMCP_SERVICE_PORT = 4483
-VMCP_TLS_SECRET_NAME = "toolhive-witan-vmcp-tls"  # noqa: S105  # pragma: allowlist secret
+VMCP_TLS_SECRET_NAME = "witan-vmcp-tls"  # noqa: S105  # pragma: allowlist secret
 
 
 def create_ingress_resources(
@@ -41,9 +41,9 @@ def create_ingress_resources(
 ) -> tuple[OLCertManagerCert, OLApisixHTTPRoute]:
     """Provision the cert-manager Certificate/ApisixTls and the APISIX HTTPRoute."""
     vmcp_cert = OLCertManagerCert(
-        f"toolhive-witan-vmcp-cert-manager-certificate-{stack_info.env_suffix}",
+        f"witan-vmcp-cert-manager-certificate-{stack_info.env_suffix}",
         cert_config=OLCertManagerCertConfig(
-            application_name="toolhive-witan-vmcp",
+            application_name="witan-vmcp",
             k8s_namespace=namespace,
             k8s_labels=k8s_global_labels,
             create_apisixtls_resource=True,
@@ -54,7 +54,7 @@ def create_ingress_resources(
     )
 
     vmcp_httproute = OLApisixHTTPRoute(
-        f"toolhive-witan-vmcp-apisix-httproute-{stack_info.env_suffix}",
+        f"witan-vmcp-apisix-httproute-{stack_info.env_suffix}",
         route_configs=[
             OLApisixHTTPRouteConfig(
                 route_name="vmcp",

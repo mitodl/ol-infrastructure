@@ -477,10 +477,10 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_path="applications/toolhive_swe/",
         pulumi_project_name="ol-application-toolhive-swe",
     ),
-    # NOTE: toolhive-witan is deliberately NOT a simple_pulumi (deploy-only)
-    # app. Its two container images build from a foreign repo (agent-kit) and
-    # the deploy must gate on those builds, so it has a dedicated build+deploy
-    # pipeline: src/ol_concourse/pipelines/infrastructure/toolhive_witan/.
+    # NOTE: omnigraph and witan are deliberately NOT simple_pulumi (deploy-only)
+    # apps. Each builds a container image from a foreign repo (agent-kit) and
+    # the deploy must gate on that build, so each has a dedicated build+deploy
+    # pipeline: src/ol_concourse/pipelines/infrastructure/{omnigraph,witan}/.
     "vector-log-proxy": SimplePulumiParams(
         app_name="vector-log-proxy",
         pulumi_project_path="infrastructure/vector_log_proxy/",
