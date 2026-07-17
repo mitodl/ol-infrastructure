@@ -237,6 +237,14 @@ def _build_interpolated_config_dict(
         },
     }
 
+    # Meilisearch is only enabled on the CMS side, but CORS_ORIGIN_WHITELIST is
+    # shared across the CMS and LMS in this single interpolated config.
+    meilisearch_config = Config("meilisearch")
+    if meilisearch_config.get_bool("enabled"):
+        config["CORS_ORIGIN_WHITELIST"].append(
+            f"https://{meilisearch_config.require('domain')}"
+        )
+
     # Ref: https://docs.openedx.org/en/latest/site_ops/how-tos/use_typesense_search_backend.html
     typesense_config = Config("typesense")
     if typesense_config.get_bool("enabled"):

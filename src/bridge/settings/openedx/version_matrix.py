@@ -301,8 +301,6 @@ ReleaseMap: dict[
                 application="edx-platform",
                 application_type="IDA",
                 release="verawood",
-                branch_override="mitx/verawood",
-                origin_override="https://github.com/mitodl/edx-platform",
             ),
             OpenEdxApplicationVersion(
                 application="edxapp_theme",
@@ -379,9 +377,6 @@ ReleaseMap: dict[
                 application="edx-platform",
                 application_type="IDA",
                 release="verawood",
-                branch_override="mitx/verawood",
-                origin_override="https://github.com/mitodl/edx-platform",
-                runtime_version_override="3.12",
             ),
             OpenEdxApplicationVersion(
                 application="edxapp_theme",
