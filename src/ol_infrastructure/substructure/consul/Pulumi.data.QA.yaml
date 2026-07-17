@@ -1,5 +1,0 @@
----
-secretsprovider: awskms://alias/infrastructure-secrets-qa
-encryptedkey: AQICAHi7xhTkB8tf1ObyPMxDhODJja4Mn4jyIo32zZVlOiZPFgHDBJ8ZJjFFG7Xy46MqEB55AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMZLi2LAhstXx2HyTIAgEQgDvpohIvQbHP6NSP0o/PdPmBQmeRpI64mpey/eZY8jpl3939/Zd+Q5/K+B8gYV+ZH9vnYsik0NXSVtsHgw==
-config:
-  consul:address: https://consul-data-qa.odl.mit.edu
