@@ -56,12 +56,9 @@ consul_ami_fragment = packer_jobs(
 consul_pulumi_infrastructure_fragments = []
 consul_pulumi_substructure_fragments = []
 for network in [
-    "data",
     "operations",
 ]:
-    stages = ["QA", "Production"]
-    if network == "operations":
-        stages.insert(0, "CI")
+    stages = ["CI", "QA", "Production"]
     consul_pulumi_infrastructure_fragment = pulumi_jobs_chain(
         consul_pulumi_infrastructure_code,
         refresh_stack=True,
@@ -78,12 +75,9 @@ for network in [
     )
     consul_pulumi_infrastructure_fragments.append(consul_pulumi_infrastructure_fragment)
 for network in [
-    "data",
     "operations",
 ]:
-    stages = ["QA", "Production"]
-    if network == "operations":
-        stages.insert(0, "CI")
+    stages = ["CI", "QA", "Production"]
     consul_pulumi_substructure_fragment = pulumi_jobs_chain(
         consul_pulumi_substructure_code,
         refresh_stack=True,
