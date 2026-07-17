@@ -526,13 +526,10 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="release-bot",
         pulumi_project_path="applications/release_bot/",
         pulumi_project_name="ol-infrastructure-release-bot",
-        stack_prefix="applications.release_bot.applications",
-        stages=["Production"],
+        stages=["default"],
         additional_watched_paths=["src/bridge/secrets/release_bot/"],
-        # Matches the ECR repository __main__.py actually creates:
-        # f"release-bot-{stack_info.env_suffix.lower()}" for the single
-        # Production stage -- "release-bot-ci" (a leftover from when this
-        # app had CI/QA/Production stages) never received any pushed image.
+        # __main__.py is a singleton (stack "default") and always creates the
+        # ECR repository named "release-bot-production" regardless of stage.
         docker_image=DockerImageConfig(
             image_repository="release-bot-production",
             ecr_region=ECR_REGION,

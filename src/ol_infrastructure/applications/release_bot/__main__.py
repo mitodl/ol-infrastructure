@@ -15,12 +15,13 @@ from pathlib import Path
 
 import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, StackReference, export, log
+from pulumi import Config, export, log
 
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
 from ol_infrastructure.lib.ol_types import AWSBase, BusinessUnit, Environment
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import make_stack_reference, parse_stack
 
 stack_info = parse_stack()
 log.info(f"{stack_info=}")
@@ -32,17 +33,14 @@ aws_config = AWSBase(
     },
 )
 
-cluster_stack = StackReference(
-    f"infrastructure.aws.eks.{stack_info.env_prefix}.{stack_info.name}"
-)
+# Singleton service (stack name "default") -- always deployed against the
+# applications cluster's Production stage, so the target is hardcoded rather
+# than derived from stack_info.
+cluster_stack = make_stack_reference(projects.EKS, "applications.Production")
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
-bot_secrets = read_yaml_secrets(
-    Path(f"release_bot/secrets.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
-)
-concourse_ops_secrets = read_yaml_secrets(
-    Path(f"concourse/operations.{stack_info.env_suffix.lower()}.yaml")
-)
+bot_secrets = read_yaml_secrets(Path("release_bot/secrets.production.yaml"))
+concourse_ops_secrets = read_yaml_secrets(Path("concourse/operations.production.yaml"))
 github_token = concourse_ops_secrets["infrastructure/github"][
     "issues_resource_access_token"
 ]
@@ -100,12 +98,11 @@ default_repos_config = {
 repos_config = bot_config.get_object("repos_config") or default_repos_config
 REPOS_CONFIG = json.dumps(repos_config)
 
-env_suffix_lower = stack_info.env_suffix.lower()
-resource_name = f"release-bot-{env_suffix_lower}"
+resource_name = "release-bot-production"
 namespace = "operations"
 
 ecr_repository = aws.ecr.Repository(
-    f"release-bot-ecr-repository-{stack_info.env_suffix}",
+    "release-bot-ecr-repository-production",
     name=resource_name,
     image_tag_mutability="MUTABLE",
     image_scanning_configuration=aws.ecr.RepositoryImageScanningConfigurationArgs(
@@ -116,7 +113,7 @@ ecr_repository = aws.ecr.Repository(
 )
 
 ecr_lifecycle_policy = aws.ecr.LifecyclePolicy(
-    f"release-bot-ecr-lifecycle-{stack_info.env_suffix}",
+    "release-bot-ecr-lifecycle-production",
     repository=ecr_repository.name,
     policy="""{
         "rules": [{
@@ -136,9 +133,11 @@ ecr_lifecycle_policy = aws.ecr.LifecyclePolicy(
 
 bot_image_name = ecr_repository.repository_url.apply(lambda url: f"{url}:latest")
 
-secret_resource_name = f"release-bot-secret-{env_suffix_lower}"
+secret_resource_name = (
+    "release-bot-secret-production"  # pragma: allowlist secret  # noqa: S105
+)
 bot_secret = kubernetes.core.v1.Secret(
-    f"release-bot-secret-{stack_info.env_suffix}",
+    "release-bot-secret-production",  # pragma: allowlist secret
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=secret_resource_name,
         namespace=namespace,
@@ -166,14 +165,14 @@ def _secret_env(name: str, key: str) -> kubernetes.core.v1.EnvVarArgs:
 
 
 bot_deployment = kubernetes.apps.v1.Deployment(
-    f"release-bot-deployment-{stack_info.env_suffix}",
+    "release-bot-deployment-production",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=resource_name,
         namespace=namespace,
         labels={
             "app": resource_name,
             "ou": BusinessUnit.operations,
-            "environment": stack_info.env_suffix,
+            "environment": "production",
         },
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
