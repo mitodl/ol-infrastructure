@@ -567,6 +567,17 @@ vault_k8s_resources = OLVaultK8SResources(
 db_instance_name = f"ocw-studio-db-applications-{stack_info.env_suffix}"
 rds_endpoint = f"{db_instance_name}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:{DEFAULT_POSTGRES_PORT}"
 
+# All deployments that consume the secret-ocw-studio application secrets and
+# need a rolling restart when those secrets change. Names must match the
+# deterministic naming in OLApplicationK8s (application_name="ocw-studio").
+ocw_studio_restart_deployment_names = [
+    "ocw-studio-app",  # webapp
+    "ocw-studio-default-celery-worker",
+    "ocw-studio-publish-celery-worker",
+    "ocw-studio-batch-celery-worker",
+    "ocw-studio-celery-beat",
+]
+
 # Create Kubernetes secrets
 secret_names, secret_resources = create_ocw_studio_k8s_secrets(
     stack_info=stack_info,
@@ -577,6 +588,7 @@ secret_names, secret_resources = create_ocw_studio_k8s_secrets(
     rds_endpoint=rds_endpoint,
     redis_password=redis_config.require("password"),
     redis_cache=redis_cache,
+    restart_deployment_names=ocw_studio_restart_deployment_names,
 )
 
 # Merge stack-level config vars into the app env vars
