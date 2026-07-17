@@ -2,9 +2,10 @@
 Pulumi stack to deploy the release bot.
 
 This stack:
-1. Creates ECR repository for the Docker image
-2. Deploys the release bot to Kubernetes (image built separately)
-3. Creates necessary secrets
+1. Deploys the release bot to Kubernetes (image built and pushed to ECR
+   by the Concourse simple_pulumi pipeline, including the ECR repository
+   itself)
+2. Creates necessary secrets
 
 The bot uses Slack Socket Mode (outbound WebSocket) — no Service or Ingress required.
 Single replica: Socket Mode connections are not multiplexed.
@@ -41,7 +42,7 @@ setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 bot_secrets = read_yaml_secrets(Path("release_bot/secrets.production.yaml"))
 concourse_ops_secrets = read_yaml_secrets(Path("concourse/operations.production.yaml"))
-github_token = concourse_ops_secrets["infrastructure/github"][
+github_token = concourse_ops_secrets["pipelines"]["infrastructure/github"][
     "issues_resource_access_token"
 ]
 
@@ -101,37 +102,13 @@ REPOS_CONFIG = json.dumps(repos_config)
 resource_name = "release-bot-production"
 namespace = "operations"
 
-ecr_repository = aws.ecr.Repository(
-    "release-bot-ecr-repository-production",
-    name=resource_name,
-    image_tag_mutability="MUTABLE",
-    image_scanning_configuration=aws.ecr.RepositoryImageScanningConfigurationArgs(
-        scan_on_push=True,
-    ),
-    force_delete=True,
-    tags=aws_config.tags,
+# The ECR repository itself is created (idempotently) by the Concourse
+# simple_pulumi image-build job on push, not managed here.
+aws_account = aws.get_caller_identity()
+bot_image_name = (
+    f"{aws_account.account_id}.dkr.ecr.{aws_config.region}.amazonaws.com"
+    f"/{resource_name}:latest"
 )
-
-ecr_lifecycle_policy = aws.ecr.LifecyclePolicy(
-    "release-bot-ecr-lifecycle-production",
-    repository=ecr_repository.name,
-    policy="""{
-        "rules": [{
-            "rulePriority": 1,
-            "description": "Keep last 10 images",
-            "selection": {
-                "tagStatus": "any",
-                "countType": "imageCountMoreThan",
-                "countNumber": 10
-            },
-            "action": {
-                "type": "expire"
-            }
-        }]
-    }""",
-)
-
-bot_image_name = ecr_repository.repository_url.apply(lambda url: f"{url}:latest")
 
 secret_resource_name = (
     "release-bot-secret-production"  # pragma: allowlist secret  # noqa: S105
@@ -234,5 +211,4 @@ bot_deployment = kubernetes.apps.v1.Deployment(
     ),
 )
 
-export("ecr_repository_url", ecr_repository.repository_url)
 export("bot_image", bot_image_name)
