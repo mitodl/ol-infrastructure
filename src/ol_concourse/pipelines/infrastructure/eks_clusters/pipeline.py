@@ -37,6 +37,7 @@ for cluster in ["data", "operations", "applications", "residential"]:
         project_source_path=PULUMI_CODE_PATH.joinpath("infrastructure/aws/eks"),
         stack_names=[f"{cluster}.{stage}" for stage in stages],
     )
+    infra_chain.resources.append(eks_infrastructure_code)
     pipeline_fragments.append(infra_chain)
 
     substructure_chain = pulumi_jobs_chain(
@@ -46,14 +47,12 @@ for cluster in ["data", "operations", "applications", "residential"]:
         project_source_path=PULUMI_CODE_PATH.joinpath("substructure/aws/eks"),
         stack_names=[f"{cluster}.{stage}" for stage in stages],
     )
+    substructure_chain.resources.append(eks_substructure_code)
     pipeline_fragments.append(substructure_chain)
 
 eks_cluster_update_pipeline = PipelineFragment.combine_fragments(
     *pipeline_fragments
 ).to_pipeline()
-
-eks_cluster_update_pipeline.resources.append(eks_infrastructure_code)
-eks_cluster_update_pipeline.resources.append(eks_substructure_code)
 
 if __name__ == "__main__":
     import sys
