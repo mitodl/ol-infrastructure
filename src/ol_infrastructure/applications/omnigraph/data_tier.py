@@ -309,7 +309,17 @@ def create_data_tier(  # noqa: PLR0913
                 ),
             ),
         ),
-        opts=ResourceOptions(depends_on=[cluster_configmap, actor_tokens_secret]),
+        opts=ResourceOptions(
+            depends_on=[
+                cluster_configmap,
+                actor_tokens_secret,
+                # The pod's service_account_name is the IRSA SA this stack
+                # creates via auth_binding (create_irsa_service_account=True);
+                # wait for it so the initial apply doesn't transiently fail
+                # with `serviceaccount "omnigraph-server" not found`.
+                *auth_binding.irsa_service_accounts,
+            ]
+        ),
     )
 
     omnigraph_service = kubernetes.core.v1.Service(

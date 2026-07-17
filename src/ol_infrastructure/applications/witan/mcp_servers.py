@@ -32,7 +32,7 @@ namespace).
 from typing import NamedTuple
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Output, ResourceOptions, StackReference
+from pulumi import Output, Resource, ResourceOptions, StackReference
 
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
@@ -64,8 +64,10 @@ def create_mcp_servers(  # noqa: PLR0913
     oidc_issuer: str,
     oidc_audience: str,
     actor_tokens_secret_name: str,
+    actor_tokens_secret: Resource,
     witan_ci_token_secret_name: str,
     witan_ci_token_secret_key: str,
+    witan_ci_token_secret: Resource,
 ) -> WitanMCPServers:
     """Provision the witan-tools MCPGroup and the witan MCPServer backend."""
     witan_mcpgroup = kubernetes.apiextensions.CustomResource(
@@ -170,7 +172,13 @@ def create_mcp_servers(  # noqa: PLR0913
                 }
             },
         },
-        opts=ResourceOptions(depends_on=[witan_mcpgroup]),
+        # Wait for the secrets this MCPServer consumes (witan-ci-token via
+        # spec.secrets, actor-tokens via podTemplateSpec) so the operator
+        # doesn't reconcile it into a pending pod before they exist — the same
+        # secret-in-depends_on wiring toolhive_swe uses for its backends.
+        opts=ResourceOptions(
+            depends_on=[witan_mcpgroup, witan_ci_token_secret, actor_tokens_secret]
+        ),
     )
 
     return WitanMCPServers(

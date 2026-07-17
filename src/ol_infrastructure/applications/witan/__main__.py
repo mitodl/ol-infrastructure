@@ -289,8 +289,10 @@ mcp_servers = create_mcp_servers(
     oidc_issuer=KEYCLOAK_ISSUER,
     oidc_audience=WITAN_OIDC_AUDIENCE,
     actor_tokens_secret_name=ACTOR_TOKENS_SECRET_NAME,
+    actor_tokens_secret=actor_tokens_secret,
     witan_ci_token_secret_name=WITAN_CI_TOKEN_SECRET_NAME,
     witan_ci_token_secret_key=WITAN_CI_TOKEN_SECRET_KEY,
+    witan_ci_token_secret=witan_ci_token_secret,
 )
 
 #########################################
