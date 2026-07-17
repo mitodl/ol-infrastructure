@@ -235,6 +235,7 @@ def _build_docker_image_job(
     pulumi_code: Any,
     docker_image_resource: Any,
     build_config: BuildConfig,
+    pulumi_project_path: str,
 ) -> Job:
     """Generate a job that builds this app's own image and pushes it to ECR.
 
@@ -247,6 +248,13 @@ def _build_docker_image_job(
     if build_config.build_target:
         additional_build_params = {"TARGET": build_config.build_target}
 
+    # pulumi_code checks out the whole repo, so CONTEXT/DOCKERFILE must be
+    # scoped to the app's own subdirectory -- otherwise oci-build-task
+    # happily builds the unrelated Dockerfile at the repo root instead.
+    app_source_dir = (
+        f"{pulumi_code.name}/{PULUMI_CODE_PATH.joinpath(pulumi_project_path)}"
+    )
+
     plan = [
         GetStep(get=pulumi_code.name, trigger=True),
         LoadVarStep(
@@ -257,8 +265,8 @@ def _build_docker_image_job(
         container_build_task(
             inputs=[Input(name=pulumi_code.name)],
             build_parameters={
-                "CONTEXT": pulumi_code.name,
-                "DOCKERFILE": f"{pulumi_code.name}/{build_config.dockerfile_path}",
+                "CONTEXT": app_source_dir,
+                "DOCKERFILE": str(Path(app_source_dir) / build_config.dockerfile_path),
                 "BUILD_ARG_GIT_REF": "((.:git_ref))",
                 "PROGRESS": "plain",
                 **additional_build_params,
@@ -600,6 +608,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                 pulumi_code=pulumi_code,
                 docker_image_resource=docker_image_resource,
                 build_config=params.build,
+                pulumi_project_path=params.pulumi_project_path,
             )
             get_params["passed"] = [build_job.name]
 
