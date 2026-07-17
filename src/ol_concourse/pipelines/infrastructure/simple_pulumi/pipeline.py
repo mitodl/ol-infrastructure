@@ -232,7 +232,7 @@ def _ensure_ecr_repository_step(ecr_registry_image_resource: Any) -> TaskStep:
 
 def _build_docker_image_job(
     app_name: str,
-    pulumi_code: Any,
+    build_source: Any,
     docker_image_resource: Any,
     build_config: BuildConfig,
     pulumi_project_path: str,
@@ -242,28 +242,34 @@ def _build_docker_image_job(
     Runs ahead of the Pulumi deploy chain; the deploy chain's docker_image
     GetStep gates on this job via `passed` so it only redeploys images this
     pipeline itself built, not an arbitrary push to the same ECR repository.
+
+    ``build_source`` is a git resource scoped to just this app's own
+    subdirectory (and its secrets), separate from the broader ``pulumi_code``
+    resource the deploy chain watches -- so an unrelated shared-lib change
+    (or another app's secrets changing) doesn't trigger a redundant rebuild
+    and push of this app's image.
     """
     job_name = f"build-{app_name}-image"
     additional_build_params = {}
     if build_config.build_target:
         additional_build_params = {"TARGET": build_config.build_target}
 
-    # pulumi_code checks out the whole repo, so CONTEXT/DOCKERFILE must be
+    # build_source checks out the whole repo, so CONTEXT/DOCKERFILE must be
     # scoped to the app's own subdirectory -- otherwise oci-build-task
     # happily builds the unrelated Dockerfile at the repo root instead.
     app_source_dir = (
-        f"{pulumi_code.name}/{PULUMI_CODE_PATH.joinpath(pulumi_project_path)}"
+        f"{build_source.name}/{PULUMI_CODE_PATH.joinpath(pulumi_project_path)}"
     )
 
     plan = [
-        GetStep(get=pulumi_code.name, trigger=True),
+        GetStep(get=build_source.name, trigger=True),
         LoadVarStep(
             load_var="git_ref",
-            file=f"{pulumi_code.name}/.git/ref",
+            file=f"{build_source.name}/.git/ref",
             reveal=True,
         ),
         container_build_task(
-            inputs=[Input(name=pulumi_code.name)],
+            inputs=[Input(name=build_source.name)],
             build_parameters={
                 "CONTEXT": app_source_dir,
                 "DOCKERFILE": str(Path(app_source_dir) / build_config.dockerfile_path),
@@ -278,7 +284,7 @@ def _build_docker_image_job(
             put=docker_image_resource.name,
             params={
                 "image": "image/image.tar",
-                "additional_tags": f"./{pulumi_code.name}/.git/short_ref",
+                "additional_tags": f"./{build_source.name}/.git/short_ref",
             },
         ),
     ]
@@ -586,6 +592,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
     docker_dependencies = []
     docker_env_vars_from_files = {}
     build_job: Job | None = None
+    build_source = None
 
     if params.docker_image:
         docker_image_resource = registry_image(
@@ -603,9 +610,22 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
         # redeploy only fires off images this pipeline itself built.
         get_params: dict[str, Any] = {}
         if params.build:
+            # Dedicated resource scoped to just this app's own subdirectory (and
+            # secrets), separate from pulumi_code's broad PULUMI_WATCHED_PATHS --
+            # otherwise an unrelated shared-lib change or another app's secrets
+            # changing triggers a redundant rebuild+push of this app's image.
+            build_source = git_repo(
+                name=Identifier(f"{app_name}-docker-source"),
+                uri="https://github.com/mitodl/ol-infrastructure",
+                branch=params.branch,
+                paths=[
+                    str(PULUMI_CODE_PATH.joinpath(params.pulumi_project_path)),
+                    *params.additional_watched_paths,
+                ],
+            )
             build_job = _build_docker_image_job(
                 app_name=app_name,
-                pulumi_code=pulumi_code,
+                build_source=build_source,
                 docker_image_resource=docker_image_resource,
                 build_config=params.build,
                 pulumi_project_path=params.pulumi_project_path,
@@ -736,6 +756,8 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             all_pipeline_resources = [pulumi_code, *cross_env_resources, *all_resources]
             if docker_image_resource:
                 all_pipeline_resources.append(docker_image_resource)
+            if build_source:
+                all_pipeline_resources.append(build_source)
 
             combined_fragment = PipelineFragment(
                 resource_types=all_resource_types,
@@ -764,6 +786,8 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             ]
             if docker_image_resource:
                 all_pipeline_resources.append(docker_image_resource)
+            if build_source:
+                all_pipeline_resources.append(build_source)
 
             combined_fragment = PipelineFragment(
                 resource_types=pulumi_fragment.resource_types,
@@ -797,6 +821,8 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
         ]
         if docker_image_resource:
             all_pipeline_resources.append(docker_image_resource)
+        if build_source:
+            all_pipeline_resources.append(build_source)
 
         combined_fragment = PipelineFragment(
             resource_types=pulumi_fragment.resource_types,
