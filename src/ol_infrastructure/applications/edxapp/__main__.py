@@ -758,7 +758,9 @@ redis_cluster_security_group = ec2.SecurityGroup(
 )
 
 redis_defaults = defaults(stack_info)["redis"]
-redis_instance_type = redis_config.get("instance_type") or redis_defaults["instance_type"]
+redis_instance_type = (
+    redis_config.get("instance_type") or redis_defaults["instance_type"]
+)
 redis_cache_config = OLAmazonRedisConfig(
     encrypt_transit=True,
     auth_token=read_yaml_secrets(
