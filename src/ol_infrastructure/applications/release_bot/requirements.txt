@@ -1,2 +1,2 @@
-slack-bolt[async]>=2.0,<3
+slack-bolt[async]>=1.18,<2
 aiohttp>=3.9,<4
