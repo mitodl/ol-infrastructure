@@ -19,6 +19,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
@@ -33,6 +34,7 @@ def _create_static_secret(
     templates: dict[str, str],
     vaultauth: str,
     mount_type: str = "kv-v1",
+    restart_targets: list[OLVaultRestartTarget] | None = None,
     opts: ResourceOptions | None = None,
 ) -> tuple[str, OLVaultK8SSecret]:
     """
@@ -48,6 +50,7 @@ def _create_static_secret(
         templates: Dictionary defining how Vault data maps to Kubernetes secret keys.
         vaultauth: Name of the Vault Kubernetes auth backend role.
         mount_type: Type of the Vault mount (e.g., "kv-v1", "kv-v2"). Defaults to "kv-v1".
+        restart_targets: Deployments to rolling-restart when the secret data changes.
         opts: Optional Pulumi resource options.
 
     Returns:
@@ -69,6 +72,7 @@ def _create_static_secret(
             exclude_raw=True,
             templates=templates,
             vaultauth=vaultauth,
+            restart_targets=restart_targets,
         ),
         opts=opts,
     )
@@ -133,6 +137,7 @@ def create_ocw_studio_k8s_secrets(
     rds_endpoint: str,
     redis_password: str,
     redis_cache: OLAmazonCache,
+    restart_deployment_names: list[str] | None = None,
 ) -> tuple[list[str], list[OLVaultK8SSecret | kubernetes.core.v1.Secret]]:
     """
     Create all Kubernetes secrets required by the OCW Studio application.
@@ -149,6 +154,8 @@ def create_ocw_studio_k8s_secrets(
         rds_endpoint: The endpoint address of the RDS instance.
         redis_password: The password for the Redis cluster.
         redis_cache: The Redis cache resource for connection details.
+        restart_deployment_names: Deployment names to rolling-restart when the
+            application secrets in the secret-ocw-studio mount change.
 
     Returns:
         A tuple containing a list of the names of the created Kubernetes secrets
@@ -158,6 +165,15 @@ def create_ocw_studio_k8s_secrets(
     secret_resources: list[OLVaultK8SSecret | kubernetes.core.v1.Secret] = []
 
     vaultauth = vault_k8s_resources.auth_name
+
+    app_restart_targets = (
+        [
+            OLVaultRestartTarget(kind="Deployment", name=name)
+            for name in restart_deployment_names
+        ]
+        if restart_deployment_names
+        else None
+    )
 
     # 1. Dynamic AWS credentials
     # App does not support IAM roles for service accounts (IRSA)
@@ -257,6 +273,7 @@ def create_ocw_studio_k8s_secrets(
             path=config["path"],
             templates=config["templates"],
             vaultauth=vaultauth,
+            restart_targets=app_restart_targets,
         )
         secret_names.append(secret_name)
         secret_resources.append(secret_resource)
