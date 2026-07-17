@@ -124,3 +124,7 @@ config:
   - https://opik-ci.ol.mit.edu/*
   keycloak_realm:ol-platform-engineering-openlit-redirect-uris:
   - https://openlit-ci.ol.mit.edu/*
+  keycloak_realm:olapps-ol-analytics-api-client-secret:
+    secure: v1:bo+niIekVjjm04zJ:3ef+tjDwt4wRLqmsuFtc8x8hY2ieUxHoBEEMjKv3x5eBJssLymnNPwXZE4oS+mnj11QdZ/Jb3YuzE6gwhele7SzoAadvnd1kKglQ8Oq45Ss=
+  keycloak_realm:olapps-ol-analytics-api-redirect-uris:
+  - https://analytics-ci.odl.mit.edu/*
