@@ -220,7 +220,21 @@ def create_data_tier(  # noqa: PLR0913
             labels=omnigraph_pod_labels,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
+            # Single writer, deliberately. omnigraph's own deployment contract
+            # documents multi-replica serving off shared storage as "unvalidated"
+            # and lists it under Don't; concurrent writers rely on a single
+            # server's in-process CAS, not cross-process coordination. Do NOT add
+            # an HPA or bump replicas without validating multi-writer safety.
             replicas=1,
+            # Recreate, NOT the default RollingUpdate: storage is
+            # strict-single-version ("a binary reads exactly one storage-format
+            # version"; a mixed fleet writing one graph is unsupported), so a
+            # rollout must never run the old and new image against the same S3
+            # store at once. Recreate tears down the old pod before starting the
+            # new one, eliminating that overlap window. (A rollout that actually
+            # bumps the storage format still needs the offline export/rebuild
+            # runbook — Recreate only covers same-format restarts.)
+            strategy=kubernetes.apps.v1.DeploymentStrategyArgs(type="Recreate"),
             selector=kubernetes.meta.v1.LabelSelectorArgs(
                 match_labels={"app.kubernetes.io/name": OMNIGRAPH_SERVER_SERVICE_NAME}
             ),
@@ -258,16 +272,23 @@ def create_data_tier(  # noqa: PLR0913
                                     container_port=OMNIGRAPH_SERVER_PORT
                                 )
                             ],
+                            # omnigraph documents `/healthz` (flat, never
+                            # auth-gated) as the health-check endpoint; use it
+                            # over a bare TCP check so the probe reflects the
+                            # server actually being up, not just the port being
+                            # bound.
                             readiness_probe=kubernetes.core.v1.ProbeArgs(
-                                tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
-                                    port=OMNIGRAPH_SERVER_PORT
+                                http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                                    path="/healthz",
+                                    port=OMNIGRAPH_SERVER_PORT,
                                 ),
                                 initial_delay_seconds=5,
                                 period_seconds=10,
                             ),
                             liveness_probe=kubernetes.core.v1.ProbeArgs(
-                                tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
-                                    port=OMNIGRAPH_SERVER_PORT
+                                http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                                    path="/healthz",
+                                    port=OMNIGRAPH_SERVER_PORT,
                                 ),
                                 initial_delay_seconds=15,
                                 period_seconds=20,
