@@ -398,8 +398,9 @@ redis_cluster_security_group = ec2.SecurityGroup(
     vpc_id=data_vpc["id"],
 )
 
+redis_defaults = defaults(stack_info)["redis"]
 redis_instance_type = (
-    redis_config.get("instance_type") or defaults(stack_info)["redis"]["instance_type"]
+    redis_config.get("instance_type") or redis_defaults["instance_type"]
 )
 redis_auth_token = superset_secrets["redis"]["token"]
 redis_cache_config = OLAmazonRedisConfig(
@@ -410,6 +411,7 @@ redis_cache_config = OLAmazonRedisConfig(
     engine_version="7.2",
     engine="valkey",
     instance_type=redis_instance_type,
+    monitoring_profile_name=redis_defaults["monitoring_profile_name"],
     num_instances=3,
     shard_count=1,
     auto_upgrade=True,
