@@ -79,7 +79,10 @@ def create_data_tier(  # noqa: PLR0913
     actor_tokens_secret: OLVaultK8SSecret,
 ) -> OmnigraphDataTier:
     """Provision the S3 bucket, IRSA policy, ECR repo, ConfigMap, and Deployment."""
-    bucket_name = f"ol-data-omnigraph-{stack_info.env_suffix}"
+    # The bucket is named for its tenant (witan's graphs), not the omnigraph
+    # service — omnigraph is generic and a future second instance would get its
+    # own tenant-named bucket rather than colliding on an omnigraph-named one.
+    bucket_name = f"ol-data-witan-{stack_info.env_suffix}"
     omnigraph_bucket = OLBucket(
         f"omnigraph-bucket-{stack_info.env_suffix}",
         S3BucketConfig(
@@ -182,7 +185,7 @@ def create_data_tier(  # noqa: PLR0913
     storage_uri: Output[str] = omnigraph_bucket.bucket_v2.bucket.apply(
         lambda name: f"s3://{name}"
     )
-    cluster_name = f"mitodl-omnigraph-{stack_info.env_suffix.lower()}"
+    cluster_name = f"mitodl-witan-{stack_info.env_suffix.lower()}"
     cluster_yaml_content: Output[str] = storage_uri.apply(
         lambda uri: yaml.dump(
             {
