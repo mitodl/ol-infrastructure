@@ -56,6 +56,16 @@ setup_k8s_provider(require_stack_output_value(cluster_stack, "kube_config"))
 stateful_workload_storage = require_stack_output_value(
     cluster_stack, "stateful_workload_storage"
 )
+
+# The FE/CN Helm chart below (starrocks_release) requires the StarRocks operator
+# to already be running, or its initPassword hook silently no-ops against a
+# nonexistent FE and the FE's root user is left permanently out of sync with the
+# k8s secret (see incident 2026-07-17: substructure/aws/eks's operator release
+# was installed 3 days after this chart, so initPassword never actually ran).
+# Requiring this output fails preview/up hard, before any resources are touched,
+# instead of letting the chart install race ahead of the operator.
+eks_sub_stack = make_stack_reference(projects.EKS_SUB, f"data.{stack_info.name}")
+require_stack_output_value(eks_sub_stack, "starrocks_operator_status")
 use_io_optimized_nodes = stateful_workload_storage["use_io_optimized_nodes"]
 starrocks_data_storage_class = stateful_workload_storage["storage_class"]
 

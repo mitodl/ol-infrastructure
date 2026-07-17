@@ -1,5 +1,5 @@
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, ResourceOptions, StackReference
+from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import get_caller_identity, iam
 
 from bridge.lib.versions import STARROCKS_OPERATOR_CHART_VERSION
@@ -78,7 +78,13 @@ def setup_starrocks(
         role=starrocks_trust_role.role.name,
     )
 
-    kubernetes.helm.v3.Release(
+    # skip_await=False (the default) makes this resource block until Helm confirms
+    # the operator is actually deployed. The applications/starrocks stack requires
+    # this export before installing the FE/CN chart, so that stack fails hard
+    # instead of racing ahead of the operator — the FE/CN chart's initPassword
+    # hook silently no-ops if the operator (and thus the FE) doesn't exist yet,
+    # leaving the FE root user permanently out of sync with the k8s secret.
+    starrocks_operator_release = kubernetes.helm.v3.Release(
         f"{cluster_name}-starrocks-operator-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
             name="starrocks-operator",
@@ -128,3 +134,5 @@ def setup_starrocks(
         ),
         opts=ResourceOptions(provider=k8s_provider, delete_before_replace=True),
     )
+
+    export("starrocks_operator_status", starrocks_operator_release.status.status)
