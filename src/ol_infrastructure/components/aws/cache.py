@@ -48,7 +48,7 @@ class OLAmazonCacheConfig(AWSBase):
     engine: str
     engine_version: str
     instance_type: str
-    monitoring_profile_name: str = "ci"
+    monitoring_profile_name: str = "production"
     num_instances: PositiveInt = PositiveInt(3)
     parameter_overrides: dict[str, Any] | None = None
     port: int
@@ -340,7 +340,7 @@ class OLAmazonCache(pulumi.ComponentResource):
         return {}  # not implemented
 
     def _get_default_redis_monitoring_profile(self, profile_name: str):
-        global_profiles = {
+        global_profiles: dict[str, dict[str, Any]] = {
             "EngineCPUUtilization": {
                 "comparison_operator": "GreaterThanThreshold",
                 "description": (
@@ -371,11 +371,11 @@ class OLAmazonCache(pulumi.ComponentResource):
         # CI/QA alarms should not page on-call: the alarms still exist in
         # CloudWatch for visibility, but actions_enabled=False means no SNS
         # notification (and therefore no Rootly alert) ever fires for them.
-        non_paging = {
+        non_paging: dict[str, dict[str, Any]] = {
             name: {**alarm_args, "enabled": False}
             for name, alarm_args in global_profiles.items()
         }
-        monitoring_profiles: dict[str, dict[str, Any]] = {
+        monitoring_profiles: dict[str, dict[str, dict[str, Any]]] = {
             "ci": non_paging,
             "qa": non_paging,
             "production": {},
