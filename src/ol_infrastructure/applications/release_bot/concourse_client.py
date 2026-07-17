@@ -11,6 +11,13 @@ CONCOURSE_TEAM = os.environ.get("CONCOURSE_TEAM", "main")
 CONCOURSE_USER = os.environ.get("CONCOURSE_USER", "")
 CONCOURSE_PASS = os.environ.get("CONCOURSE_PASSWORD", "")
 
+# Concourse's skymarshal hardcodes this public OAuth2 client for the fly-login
+# (resource-owner password credentials) grant -- not a secret, just how
+# Concourse identifies "fly" as the calling client. See flyClientID/
+# flyClientSecret in concourse/concourse's atc/atccmd/command.go.
+_FLY_CLIENT_ID = "fly"
+_FLY_CLIENT_SECRET = "Zmx5"  # pragma: allowlist secret  # noqa: S105
+
 _token: str | None = None
 _token_expiry: float = 0.0
 _token_lock = asyncio.Lock()
@@ -34,9 +41,10 @@ async def _get_token() -> str:
             "password": CONCOURSE_PASS,
             "scope": "openid profile email federated:id groups",
         }
+        auth = aiohttp.BasicAuth(_FLY_CLIENT_ID, _FLY_CLIENT_SECRET)
         async with (
             aiohttp.ClientSession() as session,
-            session.post(url, data=data) as resp,
+            session.post(url, data=data, auth=auth) as resp,
         ):
             resp.raise_for_status()
             body = await resp.json()
