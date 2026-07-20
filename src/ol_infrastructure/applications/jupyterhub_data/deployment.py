@@ -283,9 +283,17 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
         opts=ResourceOptions(depends_on=app_vault_backend),
     )
 
-    # APISIX shared plugins (request-id, prometheus, etc.) — creates both v2
-    # ApisixPluginConfig (legacy) and v1alpha1 PluginConfig (Gateway API) resources
-    # under the same name so OLApisixHTTPRoute can reference it via ExtensionRef.
+    # APISIX shared plugins (cors, redirect, response-rewrite, prometheus,
+    # opentelemetry, request-id) — creates both v2 ApisixPluginConfig (legacy)
+    # and v1alpha1 PluginConfig (Gateway API) resources under the same name so
+    # OLApisixHTTPRoute can reference it via ExtensionRef.
+    #
+    # OLApisixHTTPRoute attaches only the shared PluginConfig via ExtensionRef
+    # when shared_plugin_config_name is set, ignoring the route's own
+    # `plugins` list entirely -- including the request-id plugin
+    # OLApisixHTTPRouteConfig's validator would otherwise add. request-id is
+    # not part of OLApisixSharedPlugins' defaults, so it's added explicitly
+    # here to keep request tracing/correlation working.
     shared_plugins = OLApisixSharedPlugins(
         name=f"ol-{base_name}-external-service-apisix-plugins",
         plugin_config=OLApisixSharedPluginsConfig(
@@ -294,6 +302,13 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
             k8s_namespace=namespace,
             k8s_labels=application_labels,
             enable_defaults=True,
+            plugins=[
+                {
+                    "name": "request-id",
+                    "enable": True,
+                    "config": {"include_in_response": True},
+                },
+            ],
         ),
     )
 
