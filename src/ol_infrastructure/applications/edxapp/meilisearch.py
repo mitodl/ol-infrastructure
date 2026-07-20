@@ -8,6 +8,10 @@ from pulumi import Config, ResourceOptions
 
 from bridge.lib.versions import MEILISEARCH_CHART_VERSION, MEILISEARCH_VERSION
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.components.services.apisix import (
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
+)
 from ol_infrastructure.components.services.apisix_gateway_api import (
     OLApisixHTTPRoute,
     OLApisixHTTPRouteConfig,
@@ -50,6 +54,16 @@ def create_meilisearch_resources(
         ),
     )
 
+    meilisearch_shared_plugins = OLApisixSharedPlugins(
+        f"ol-{stack_info.env_prefix}-edxapp-meilisearch-shared-plugins-{stack_info.env_suffix}",
+        plugin_config=OLApisixSharedPluginsConfig(
+            application_name="meilisearch",
+            resource_suffix="ol-shared-plugins",
+            k8s_namespace=namespace,
+            k8s_labels=k8s_global_labels,
+        ),
+    )
+
     OLApisixHTTPRoute(
         f"ol-{stack_info.env_prefix}-edxapp-meilisearch-httproute-{stack_info.env_suffix}",
         k8s_namespace=namespace,
@@ -61,6 +75,7 @@ def create_meilisearch_resources(
                 paths=["/*"],
                 backend_service_name="meilisearch",
                 backend_service_port=7700,
+                shared_plugin_config_name=meilisearch_shared_plugins.resource_name,
                 plugins=[],
             ),
         ],
