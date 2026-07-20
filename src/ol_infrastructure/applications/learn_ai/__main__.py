@@ -73,6 +73,10 @@ from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
 )
+from ol_infrastructure.lib.k8s_keda import (
+    build_webapp_keda_config,
+    create_webapp_prometheus_trigger_auth,
+)
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
     BusinessUnit,
@@ -794,6 +798,37 @@ env_vars.update(
 # signals carry organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(env_vars, k8s_global_labels)
 
+# Horizontal scaling is KEDA-driven on APISIX request rate and p95 latency, with a
+# CPU trigger as a backstop, matching edxapp, mit-learn and mitxonline. CPU is an
+# especially poor saturation signal for this app: it spends most of a request waiting
+# on upstream LLM and embedding calls, so a saturated pod can sit near-idle on CPU
+# while requests queue behind it.
+#
+# The route matcher covers both the direct and the mit-learn-fronted routes. Verified
+# against live metrics -- `count by (route) (apisix_http_status)` returns
+# learn-ai_learn-ai-production-https-olapisixroute_passauth and
+# learn-ai_mit-learn-learn-ai-production-https-olapisixroute_{passauth,reqauth}, so the
+# leading `.*` is load-bearing.
+webapp_trigger_auth, webapp_trigger_auth_name = create_webapp_prometheus_trigger_auth(
+    application_name="learn-ai",
+    env_name=env_name,
+    namespace=learn_ai_namespace,
+    k8s_global_labels=k8s_global_labels,
+    stack_info=stack_info,
+    vault_k8s_resources=vault_k8s_resources,
+)
+
+learn_ai_webapp_keda_config = build_webapp_keda_config(
+    trigger_auth_name=webapp_trigger_auth_name,
+    route_matcher=f"learn-ai_.*learn-ai-{stack_info.env_suffix}-https-olapisixroute_.*",
+    namespace=learn_ai_namespace,
+    pod_matcher="learn-ai-app-.*",
+    container_name="learn-ai-app",
+    requests_threshold=learn_ai_config.get("autoscaling_requests_threshold") or "20",
+    latency_threshold=learn_ai_config.get("autoscaling_latency_threshold") or "2000",
+    cpu_threshold=learn_ai_config.get("autoscaling_cpu_threshold") or "60",
+)
+
 # Instantiate the OLApplicationK8s component
 learn_ai_app_k8s = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
@@ -872,23 +907,11 @@ learn_ai_app_k8s = OLApplicationK8s(
             resource_requests={"cpu": "10m", "memory": "384Mi"},
             resource_limits={"memory": "384Mi"},
         ),
-        # Memory removed from the HPA: it duplicated the component default and is now
-        # handled vertically by the component's webapp memory VPA. An HPA memory
-        # metric is a fleet average and cannot prevent an individual pod from being
-        # OOMKilled. This block now matches the component default and could be dropped
-        # entirely; it is kept explicit because the CPU target is intentional.
-        hpa_scaling_metrics=[
-            kubernetes.autoscaling.v2.MetricSpecArgs(
-                type="Resource",
-                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
-                    name="cpu",
-                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
-                        type="Utilization",
-                        average_utilization=60,  # Target CPU utilization (60%)
-                    ),
-                ),
-            ),
-        ],
+        # hpa_scaling_metrics is left at the component default. It is unused here:
+        # the component builds a KEDA ScaledObject instead of a native HPA when
+        # webapp_keda_config is set, and the CPU backstop lives in the KEDA triggers.
+        # Memory is managed vertically by the component's webapp memory VPA.
+        webapp_keda_config=learn_ai_webapp_keda_config,
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
@@ -900,6 +923,8 @@ learn_ai_app_k8s = OLApplicationK8s(
             opik_keycloak_secret,
             vault_k8s_resources,
             learn_ai_application_security_group,
+            # The ScaledObject references the trigger authentication by name.
+            webapp_trigger_auth,
         ],
     ),
 )

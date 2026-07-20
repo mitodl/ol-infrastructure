@@ -65,8 +65,14 @@ def create_webapp_prometheus_trigger_auth(  # noqa: PLR0913
     Returns:
         A tuple of (TriggerAuthentication resource, trigger authentication name).
     """
-    auth_secret_name = f"{env_name}-{application_name}-webapp-prometheus-auth"
-    trigger_auth_name = f"{env_name}-{application_name}-webapp-prometheus-auth-trigger"
+    # Callers derive env_name in their own way and not all of them are safe to
+    # interpolate into a Kubernetes object name -- learn_ai, for instance, uses
+    # `f"learn_ai-{env_suffix}"`, and an underscore is not a legal character in a
+    # k8s name. Normalizing here rather than at each call site means the failure
+    # cannot resurface as an apply-time rejection for the next adopter.
+    name_stem = f"{env_name}-{application_name}".replace("_", "-").lower()
+    auth_secret_name = f"{name_stem}-webapp-prometheus-auth"
+    trigger_auth_name = f"{name_stem}-webapp-prometheus-auth-trigger"
 
     auth_secret = OLVaultK8SSecret(
         f"ol-{stack_info.env_prefix}-{application_name}-webapp-prometheus-auth-{stack_info.env_suffix}",
