@@ -139,6 +139,91 @@ def test_make_vpa_container_name_scoped():
 
 
 @pulumi.runtime.test
+def test_make_vpa_other_containers_not_disabled_by_default():
+    """Without disable_other_containers only the named policy is emitted.
+
+    This is the pre-existing behaviour and is a trap: VPA applies its default
+    behaviour to any container lacking a matching policy, so naming one container
+    does NOT leave sidecars alone.
+    """
+    vpa = make_vpa(
+        name="test-vpa-no-optout",
+        namespace="default",
+        target_kind="Deployment",
+        target_name="my-deployment",
+        controlled_resources=["memory"],
+        container_name="my-app",
+        min_allowed={"memory": "128Mi"},
+        max_allowed={"memory": "4Gi"},
+        k8s_provider=_fake_provider(),
+    )
+
+    def check(spec):
+        policies = spec["resourcePolicy"]["containerPolicies"]
+        assert len(policies) == 1
+        assert policies[0]["containerName"] == "my-app"
+
+    return vpa.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_make_vpa_disable_other_containers_appends_off_policy():
+    """disable_other_containers appends a catch-all policy with mode Off.
+
+    Order matters: the specific container policy must come first so it wins over
+    the wildcard for the container it names.
+    """
+    vpa = make_vpa(
+        name="test-vpa-optout",
+        namespace="default",
+        target_kind="Deployment",
+        target_name="my-deployment",
+        controlled_resources=["memory"],
+        container_name="my-app",
+        disable_other_containers=True,
+        min_allowed={"memory": "128Mi"},
+        max_allowed={"memory": "4Gi"},
+        k8s_provider=_fake_provider(),
+    )
+
+    def check(spec):
+        policies = spec["resourcePolicy"]["containerPolicies"]
+        assert len(policies) == 2
+        assert policies[0]["containerName"] == "my-app"
+        assert policies[0]["controlledResources"] == ["memory"]
+        assert policies[1] == {"containerName": "*", "mode": "Off"}
+
+    return vpa.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_make_vpa_disable_other_containers_ignored_for_wildcard_target():
+    """The opt-out is a no-op when the policy already targets every container.
+
+    Emitting both a wildcard bounds policy and a wildcard Off policy would be
+    self-contradictory, so the catch-all is suppressed in that case.
+    """
+    vpa = make_vpa(
+        name="test-vpa-optout-wildcard",
+        namespace="default",
+        target_kind="Deployment",
+        target_name="my-deployment",
+        controlled_resources=["memory"],
+        disable_other_containers=True,
+        min_allowed={"memory": "128Mi"},
+        max_allowed={"memory": "4Gi"},
+        k8s_provider=_fake_provider(),
+    )
+
+    def check(spec):
+        policies = spec["resourcePolicy"]["containerPolicies"]
+        assert len(policies) == 1
+        assert policies[0]["containerName"] == "*"
+
+    return vpa.spec.apply(check)
+
+
+@pulumi.runtime.test
 def test_make_vpa_target_ref():
     """VPA targetRef reflects the provided kind and name."""
     vpa = make_vpa(
