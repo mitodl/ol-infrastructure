@@ -29,8 +29,6 @@ config:
   - courses-backend.rc.learn.mit.edu
   - courses-backend.rc.xpro.mit.edu
   - dcc.rc.learn.mit.edu
-  - meilisearch-mitx-qa-draft.mitx.mit.edu
-  - meilisearch-mitx-qa.mitx.mit.edu
   - meilisearch-rc.xpro.mit.edu
   - meilisearch.courses.rc.learn.mit.edu
   - micromasters-rc-backend.odl.mit.edu
