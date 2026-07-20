@@ -42,6 +42,12 @@ DEFAULT_REQUESTS_THRESHOLD = "20"
 # p95 latency in milliseconds.
 DEFAULT_LATENCY_THRESHOLD = "2000"
 DEFAULT_CPU_THRESHOLD = "60"
+# 25 minutes. Deliberately long -- see the scale-down comment in
+# build_webapp_keda_config.
+DEFAULT_SCALE_DOWN_SECONDS = 300 * 5
+# The OLApplicationK8sKedaWebappScalingConfig model default, for callers that were
+# on it before adopting this helper and want to stay there.
+MODEL_DEFAULT_SCALE_DOWN_SECONDS = 300
 
 
 def create_webapp_prometheus_trigger_auth(  # noqa: PLR0913
@@ -126,6 +132,8 @@ def build_webapp_keda_config(  # noqa: PLR0913
     requests_threshold: str = DEFAULT_REQUESTS_THRESHOLD,
     latency_threshold: str | None = DEFAULT_LATENCY_THRESHOLD,
     cpu_threshold: str = DEFAULT_CPU_THRESHOLD,
+    scale_down_stabilization_seconds: int = DEFAULT_SCALE_DOWN_SECONDS,
+    scale_down_period_seconds: int = DEFAULT_SCALE_DOWN_SECONDS,
 ) -> OLApplicationK8sKedaWebappScalingConfig:
     """Build a KEDA ScaledObject config driven by APISIX request rate and latency.
 
@@ -146,6 +154,11 @@ def build_webapp_keda_config(  # noqa: PLR0913
             the latency trigger (appropriate where request duration is dominated
             by payload size rather than contention, e.g. edxapp CMS).
         cpu_threshold: CPU utilization percent for the backstop trigger.
+        scale_down_stabilization_seconds: How long the scaler must observe lower
+            demand before shedding replicas. Defaults to 25 minutes, which suits
+            apps with expensive cold starts; pass a smaller value where holding
+            replicas that long is not worth the cost.
+        scale_down_period_seconds: Evaluation period for the scale-down policy.
 
     Returns:
         A populated OLApplicationK8sKedaWebappScalingConfig.
@@ -153,10 +166,16 @@ def build_webapp_keda_config(  # noqa: PLR0913
     # Divide by pod count so the threshold is per-pod and stays meaningful as the
     # deployment scales. Without this, total request rate rises with replicas and
     # the scaler ratchets upward indefinitely.
+    #
+    # `or vector(1)` guards the divisor: when the pod matcher selects nothing --
+    # mid-rollout, or because the matcher is wrong -- `count()` returns no series
+    # rather than 0, which makes the whole division return an empty result and
+    # leaves KEDA with no value to scale on. Falling back to 1 degrades to
+    # "total request rate" instead of silently going blind.
     requests_query = (
         f'sum(rate(apisix_http_status{{route=~"{route_matcher}"}}[5m]))'
-        f'/count(kube_pod_info{{job="integrations/kubernetes/kube-state-metrics",'
-        f'namespace="{namespace}",pod=~"{pod_matcher}"}})'
+        f'/(count(kube_pod_info{{job="integrations/kubernetes/kube-state-metrics",'
+        f'namespace="{namespace}",pod=~"{pod_matcher}"}}) or vector(1))'
     )
     latency_query = (
         f"histogram_quantile(0.95,sum(rate("
@@ -204,12 +223,13 @@ def build_webapp_keda_config(  # noqa: PLR0913
         scale_up_stabilization_seconds=60,
         scale_up_percent=50,
         scale_up_period_seconds=60,
-        # Scale down slowly. These apps have expensive cold starts (migrations
-        # check, static asset load, edX/Redis connection setup), so shedding
-        # replicas quickly after a traffic spike tends to cause a second spike.
-        scale_down_stabilization_seconds=300 * 5,  # 25 minutes
+        # Scale down slowly by default. These apps have expensive cold starts
+        # (migrations check, static asset load, edX/Redis connection setup), so
+        # shedding replicas quickly after a traffic spike tends to cause a second
+        # spike. Callers that would rather reclaim capacity promptly can override.
+        scale_down_stabilization_seconds=scale_down_stabilization_seconds,
         scale_down_percent=10,
-        scale_down_period_seconds=300 * 5,  # 25 minutes
+        scale_down_period_seconds=scale_down_period_seconds,
         polling_interval=60,
         cooldown_period=300,
         trigger_authentication_name=trigger_auth_name,

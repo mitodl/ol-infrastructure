@@ -13,6 +13,7 @@ from ol_infrastructure.components.services.k8s import (
 )
 from ol_infrastructure.components.services.vault import OLVaultK8SResources
 from ol_infrastructure.lib.k8s_keda import (
+    MODEL_DEFAULT_SCALE_DOWN_SECONDS,
     build_webapp_keda_config,
     create_webapp_prometheus_trigger_auth,
 )
@@ -80,7 +81,13 @@ def build_cms_webapp_keda_config(
 
     No latency trigger: CMS request duration is dominated by course-import and
     asset-upload payload size rather than by contention, so p95 latency is not a
-    saturation signal there. This preserves the pre-existing behaviour.
+    saturation signal there.
+
+    CMS also keeps the 5-minute scale-down it had before adopting the shared
+    helper, rather than inheriting the helper's 25-minute default. Authoring
+    traffic is bursty and comparatively low-volume, so holding replicas for 25
+    minutes after a burst costs capacity without buying much. Making this
+    explicit keeps the refactor behaviour-preserving for CMS.
 
     See build_lms_webapp_keda_config for the divisor-namespace correction.
     """
@@ -94,6 +101,8 @@ def build_cms_webapp_keda_config(
         or "20",
         latency_threshold=None,
         cpu_threshold=edxapp_config.get("autoscaling_cms_cpu_threshold") or "70",
+        scale_down_stabilization_seconds=MODEL_DEFAULT_SCALE_DOWN_SECONDS,
+        scale_down_period_seconds=MODEL_DEFAULT_SCALE_DOWN_SECONDS,
     )
 
 
