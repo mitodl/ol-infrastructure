@@ -206,8 +206,9 @@ def _in_channel(respond):
     default; release state needs to be visible to the whole team.
     """
 
-    async def wrapped(text):
-        await respond(text=text, response_type="in_channel")
+    async def wrapped(*args, **kwargs):
+        kwargs.setdefault("response_type", "in_channel")
+        await respond(*args, **kwargs)
 
     return wrapped
 
