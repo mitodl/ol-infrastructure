@@ -29,8 +29,7 @@ class SeverityArgs:
                  severity: pulumi.Input[Optional[_builtins.str]] = None,
                  severity_id: pulumi.Input[Optional[_builtins.str]] = None,
                  slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input['SeveritySlackAliasArgs']]]] = None,
-                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input['SeveritySlackChannelArgs']]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None):
+                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input['SeveritySlackChannelArgs']]]] = None):
         """
         The set of arguments for constructing a Severity resource.
 
@@ -42,7 +41,6 @@ class SeverityArgs:
         :param pulumi.Input[_builtins.str] severity: The severity of the severity. Value must be one of <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`" pulumi-lang-hcl="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         :param pulumi.Input[Sequence[pulumi.Input['SeveritySlackAliasArgs']]] slack_aliases: Slack Aliases associated with this severity
         :param pulumi.Input[Sequence[pulumi.Input['SeveritySlackChannelArgs']]] slack_channels: Slack Channels associated with this severity
-        :param pulumi.Input[_builtins.str] slug: The slug of the severity
         """
         if color is not None:
             pulumi.set(__self__, "color", color)
@@ -62,8 +60,6 @@ class SeverityArgs:
             pulumi.set(__self__, "slack_aliases", slack_aliases)
         if slack_channels is not None:
             pulumi.set(__self__, "slack_channels", slack_channels)
-        if slug is not None:
-            pulumi.set(__self__, "slug", slug)
 
     @_builtins.property
     @pulumi.getter
@@ -169,18 +165,6 @@ class SeverityArgs:
     @slack_channels.setter
     def slack_channels(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['SeveritySlackChannelArgs']]]]):
         pulumi.set(self, "slack_channels", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The slug of the severity
-        """
-        return pulumi.get(self, "slug")
-
-    @slug.setter
-    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "slug", value)
 
 
 @pulumi.input_type
@@ -363,7 +347,6 @@ class Severity(pulumi.CustomResource):
                  severity_id: pulumi.Input[Optional[_builtins.str]] = None,
                  slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input[Union['SeveritySlackAliasArgs', 'SeveritySlackAliasArgsDict']]]]] = None,
                  slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input[Union['SeveritySlackChannelArgs', 'SeveritySlackChannelArgsDict']]]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a Severity resource with the given unique name, props, and options.
@@ -378,7 +361,6 @@ class Severity(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] severity: The severity of the severity. Value must be one of <span pulumi-lang-nodejs="`critical`" pulumi-lang-dotnet="`Critical`" pulumi-lang-go="`critical`" pulumi-lang-python="`critical`" pulumi-lang-yaml="`critical`" pulumi-lang-java="`critical`" pulumi-lang-hcl="`critical`">`critical`</span>, <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         :param pulumi.Input[Sequence[pulumi.Input[Union['SeveritySlackAliasArgs', 'SeveritySlackAliasArgsDict']]]] slack_aliases: Slack Aliases associated with this severity
         :param pulumi.Input[Sequence[pulumi.Input[Union['SeveritySlackChannelArgs', 'SeveritySlackChannelArgsDict']]]] slack_channels: Slack Channels associated with this severity
-        :param pulumi.Input[_builtins.str] slug: The slug of the severity
         """
         ...
     @overload
@@ -413,7 +395,6 @@ class Severity(pulumi.CustomResource):
                  severity_id: pulumi.Input[Optional[_builtins.str]] = None,
                  slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input[Union['SeveritySlackAliasArgs', 'SeveritySlackAliasArgsDict']]]]] = None,
                  slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input[Union['SeveritySlackChannelArgs', 'SeveritySlackChannelArgsDict']]]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -432,7 +413,7 @@ class Severity(pulumi.CustomResource):
             __props__.__dict__["severity_id"] = severity_id
             __props__.__dict__["slack_aliases"] = slack_aliases
             __props__.__dict__["slack_channels"] = slack_channels
-            __props__.__dict__["slug"] = slug
+            __props__.__dict__["slug"] = None
         super(Severity, __self__).__init__(
             'rootly:index/severity:Severity',
             resource_name,

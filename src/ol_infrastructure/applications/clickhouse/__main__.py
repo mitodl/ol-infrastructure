@@ -154,7 +154,7 @@ _LLMOPS_PROFILES = {
 }
 _LLMOPS_QUOTAS = {
     "llmops_quota/interval/duration": "3600",
-    "llmops_quota/interval/queries": "1000",
+    "llmops_quota/interval/queries": "20000",
     "llmops_quota/interval/errors": "100",
     "llmops_quota/interval/result_rows": "1000000000",
     "llmops_quota/interval/read_rows": "10000000000",
@@ -278,6 +278,18 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
                     "podTemplates": [
                         {
                             "name": "keeper-pod",
+                            # Prevent Karpenter consolidation from disrupting single-replica Keeper.
+                            **(
+                                {
+                                    "metadata": {
+                                        "annotations": {
+                                            "karpenter.sh/do-not-disrupt": "true"
+                                        },
+                                    },
+                                }
+                                if replicas == 1
+                                else {}
+                            ),
                             "spec": {
                                 "securityContext": {"fsGroup": 101},
                                 "tolerations": tolerations,
@@ -475,13 +487,37 @@ def _create_clickhouse_installation(  # noqa: PLR0913
         "opik/profile": "llmops_profile",
         "opik/quota": "llmops_quota",
         "opik/networks/ip": ["::/0", "0.0.0.0/0"],
-        # ``default`` is required in addition to ``opik_db``: opik's Liquibase
+        # Explicit RBAC grants (rendered as <grants><query>…</query></grants> in
+        # the user's XML) instead of the legacy <allow_databases> whitelist.
+        # ``allow_databases`` restricts the user's grants to *only* the listed
+        # application databases, which denies opik the SELECT on ``system.parts``
+        # it needs to compute per-workspace/table storage metrics (Code: 497
+        # ACCESS_DENIED SELECT(...) ON system.parts). Enumerating grants lets us
+        # add that one system-table read without opening the whole ``system``
+        # database (preserving cross-tenant isolation vs. e.g. system.query_log).
+        #
+        # ``default`` is granted in addition to ``opik_db``: opik's Liquibase
         # migrations hard-code the DATABASECHANGELOG / DATABASECHANGELOGLOCK
         # bookkeeping tables (and the replicated ``...1`` shadow tables from
         # 000017_change_tables_to_replicated) into the ``default`` database,
         # while application tables live in ``opik_db``. ``default`` is otherwise
         # an unused scratch database in this cluster.
-        "opik/allow_databases/database": ["opik_db", "default"],
+        #
+        # ``CLUSTER ON *.*`` is required because newer opik migrations issue
+        # distributed DDL with an explicit ``ON CLUSTER '{cluster}'`` clause
+        # (e.g. 000098_create_cipx_spend_blocks). Altinity 24.8 defaults
+        # ``on_cluster_queries_require_cluster_grant`` to true, and CLUSTER is a
+        # global-only privilege not implied by the database-scoped ``GRANT ALL``
+        # above (without it: Code 497 ACCESS_DENIED, grant CLUSTER ON *.*). This
+        # only permits *issuing* ON CLUSTER queries; the underlying object access
+        # stays constrained by the opik_db / default grants, so cross-tenant
+        # isolation is preserved.
+        "opik/grants/query": [
+            "GRANT ALL ON opik_db.*",
+            "GRANT ALL ON default.*",
+            "GRANT SELECT ON system.parts",
+            "GRANT CLUSTER ON *.*",
+        ],
     }
 
     return Output.all(
@@ -543,6 +579,18 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                     "podTemplates": [
                         {
                             "name": "clickhouse-pod-template",
+                            # Prevent Karpenter consolidation from disrupting single-replica ClickHouse.
+                            **(
+                                {
+                                    "metadata": {
+                                        "annotations": {
+                                            "karpenter.sh/do-not-disrupt": "true"
+                                        },
+                                    },
+                                }
+                                if ch_replicas == 1
+                                else {}
+                            ),
                             "spec": {
                                 "serviceAccountName": "clickhouse",
                                 "tolerations": ch_tolerations,

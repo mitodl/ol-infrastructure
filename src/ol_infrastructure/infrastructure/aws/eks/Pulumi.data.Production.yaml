@@ -13,6 +13,7 @@ config:
   eks:apisix_domains:
   - airbyte.odl.mit.edu
   - api-airbyte.odl.mit.edu
+  - opik.ol.mit.edu
   - pipelines.odl.mit.edu
   - analytics.odl.mit.edu
   eks:apisix_min_replicas: '3'
@@ -34,6 +35,7 @@ config:
   - marimo
   - ol-analytics
   - open-metadata
+  - opik
   - qdrant
   - starrocks
   - superset

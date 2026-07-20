@@ -56,6 +56,16 @@ setup_k8s_provider(require_stack_output_value(cluster_stack, "kube_config"))
 stateful_workload_storage = require_stack_output_value(
     cluster_stack, "stateful_workload_storage"
 )
+
+# The FE/CN Helm chart below (starrocks_release) requires the StarRocks operator
+# to already be running, or its initPassword hook silently no-ops against a
+# nonexistent FE and the FE's root user is left permanently out of sync with the
+# k8s secret (see incident 2026-07-17: substructure/aws/eks's operator release
+# was installed 3 days after this chart, so initPassword never actually ran).
+# Requiring this output fails preview/up hard, before any resources are touched,
+# instead of letting the chart install race ahead of the operator.
+eks_sub_stack = make_stack_reference(projects.EKS_SUB, f"data.{stack_info.name}")
+require_stack_output_value(eks_sub_stack, "starrocks_operator_status")
 use_io_optimized_nodes = stateful_workload_storage["use_io_optimized_nodes"]
 starrocks_data_storage_class = stateful_workload_storage["storage_class"]
 
@@ -360,13 +370,9 @@ starrocks_values: dict[str, Any] = {
         # BDB/BDBJE catalog replay and starmgr loadMeta (the second only runs on
         # the leader). Either can block the HTTP server for 30-120+ seconds.
         # 120s liveness tolerance prevents spurious kills during these phases.
-        # 600s startup tolerance covers the initial JVM + Raft bootstrap before
-        # the HTTP server opens at all.
+        # See startupProbeFailureSeconds below for the startup-phase tolerance.
         "livenessProbeFailureSeconds": fe_config.get(
             "liveness_probe_failure_seconds", 120
-        ),
-        "startupProbeFailureSeconds": fe_config.get(
-            "startup_probe_failure_seconds", 600
         ),
         "resources": {
             "requests": {
@@ -388,6 +394,13 @@ starrocks_values: dict[str, Any] = {
             "storageSize": fe_config.get("storage", "100Gi"),
             "logStorageSize": fe_config.get("log_storage", "100Gi"),
         },
+        # After extended downtime, FE must replay accumulated starmgr BDB journals
+        # before it can serve traffic. The default 300s startup probe is too short
+        # when replaying several days of journals. 7200s (2 hours) is sufficient
+        # headroom for even multi-day recovery scenarios.
+        "startupProbeFailureSeconds": fe_config.get(
+            "startup_probe_failure_seconds", 7200
+        ),
         **(
             {"feEnvVars": [{"name": "JAVA_TOOL_OPTIONS", "value": irsa_jvm_opts}]}
             if irsa_jvm_opts is not None
@@ -503,6 +516,14 @@ if starrocks_config.get_bool("use_cn"):
                 ],
             },
         },
+        # CN registration requires the starmgr to have a stable leader after FE
+        # recovery. With extended FE downtime, starmgr journal replay takes time,
+        # during which ADD COMPUTE NODE commands fail. 7200s gives CN enough
+        # time to succeed once the starmgr settles. Configurable via
+        # cn_config:startup_probe_failure_seconds.
+        "startupProbeFailureSeconds": cn_config.get(
+            "startup_probe_failure_seconds", 7200
+        ),
         **(
             {"cnEnvVars": [{"name": "JAVA_TOOL_OPTIONS", "value": irsa_jvm_opts}]}
             if irsa_jvm_opts is not None
@@ -515,6 +536,8 @@ if starrocks_config.get_bool("use_cn"):
 # entirely.  The base config below is sourced from the starrocks Helm chart
 # defaults and must be reviewed whenever STARROCKS_CHART_VERSION is bumped.
 # Ref: starrocks/values.yaml starrocksFESpec.config in the operator Helm chart.
+# Reviewed for 1.11.6: the only diff from 1.11.5 is an unrelated
+# externalTrafficPolicy service field; the fe.conf config block is unchanged.
 #
 # NOTE: The SSL keystore password appears in fe.conf (→ K8s ConfigMap). This is
 # an inherent limitation of StarRocks' SSL design; the password protects the
@@ -523,9 +546,9 @@ if (
     ssl_enabled
     or starrocks_config.get_bool("use_cn")
     or starrocks_config.get_bool("use_be")
-) and (STARROCKS_CHART_VERSION != "1.11.5"):
+) and (STARROCKS_CHART_VERSION != "1.11.6"):
     msg = (
-        f"_FE_CONFIG_BASE was sourced from chart 1.11.5; review defaults for"
+        f"_FE_CONFIG_BASE was sourced from chart 1.11.6; review defaults for"
         f" {STARROCKS_CHART_VERSION} before deploying with SSL or CN enabled"
     )
     raise ValueError(msg)

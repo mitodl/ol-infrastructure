@@ -19,9 +19,9 @@ __all__ = ['IncidentRoleTaskArgs', 'IncidentRoleTask']
 @pulumi.input_type
 class IncidentRoleTaskArgs:
     def __init__(__self__, *,
+                 incident_role_id: pulumi.Input[_builtins.str],
                  task: pulumi.Input[_builtins.str],
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 incident_role_id: pulumi.Input[Optional[_builtins.str]] = None,
                  incident_role_task_id: pulumi.Input[Optional[_builtins.str]] = None,
                  priority: pulumi.Input[Optional[_builtins.str]] = None):
         """
@@ -31,15 +31,23 @@ class IncidentRoleTaskArgs:
         :param pulumi.Input[_builtins.str] description: The description of incident task
         :param pulumi.Input[_builtins.str] priority: The priority of the incident task. Value must be one of <span pulumi-lang-nodejs="`high`" pulumi-lang-dotnet="`High`" pulumi-lang-go="`high`" pulumi-lang-python="`high`" pulumi-lang-yaml="`high`" pulumi-lang-java="`high`" pulumi-lang-hcl="`high`">`high`</span>, <span pulumi-lang-nodejs="`medium`" pulumi-lang-dotnet="`Medium`" pulumi-lang-go="`medium`" pulumi-lang-python="`medium`" pulumi-lang-yaml="`medium`" pulumi-lang-java="`medium`" pulumi-lang-hcl="`medium`">`medium`</span>, <span pulumi-lang-nodejs="`low`" pulumi-lang-dotnet="`Low`" pulumi-lang-go="`low`" pulumi-lang-python="`low`" pulumi-lang-yaml="`low`" pulumi-lang-java="`low`" pulumi-lang-hcl="`low`">`low`</span>.
         """
+        pulumi.set(__self__, "incident_role_id", incident_role_id)
         pulumi.set(__self__, "task", task)
         if description is not None:
             pulumi.set(__self__, "description", description)
-        if incident_role_id is not None:
-            pulumi.set(__self__, "incident_role_id", incident_role_id)
         if incident_role_task_id is not None:
             pulumi.set(__self__, "incident_role_task_id", incident_role_task_id)
         if priority is not None:
             pulumi.set(__self__, "priority", priority)
+
+    @_builtins.property
+    @pulumi.getter(name="incidentRoleId")
+    def incident_role_id(self) -> pulumi.Input[_builtins.str]:
+        return pulumi.get(self, "incident_role_id")
+
+    @incident_role_id.setter
+    def incident_role_id(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "incident_role_id", value)
 
     @_builtins.property
     @pulumi.getter
@@ -64,15 +72,6 @@ class IncidentRoleTaskArgs:
     @description.setter
     def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
-
-    @_builtins.property
-    @pulumi.getter(name="incidentRoleId")
-    def incident_role_id(self) -> pulumi.Input[Optional[_builtins.str]]:
-        return pulumi.get(self, "incident_role_id")
-
-    @incident_role_id.setter
-    def incident_role_id(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "incident_role_id", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentRoleTaskId")
@@ -237,6 +236,8 @@ class IncidentRoleTask(pulumi.CustomResource):
             __props__ = IncidentRoleTaskArgs.__new__(IncidentRoleTaskArgs)
 
             __props__.__dict__["description"] = description
+            if incident_role_id is None and not opts.urn:
+                raise TypeError("Missing required property 'incident_role_id'")
             __props__.__dict__["incident_role_id"] = incident_role_id
             __props__.__dict__["incident_role_task_id"] = incident_role_task_id
             __props__.__dict__["priority"] = priority

@@ -325,7 +325,7 @@ def get_plugin_download_url():
 	return None
 
 def get_version():
-    return "5.16.1"
+    return "5.17.2"
 
 _package_lock = asyncio.Lock()
 _package_ref = ...
@@ -339,12 +339,12 @@ async def get_package():
 					parameterization = resource_pb2.Parameterization(
 						name="rootly",
 						version=get_version(),
-						value=base64.b64decode("eyJyZW1vdGUiOnsidXJsIjoicmVnaXN0cnkub3BlbnRvZnUub3JnL3Jvb3RseWhxL3Jvb3RseSIsInZlcnNpb24iOiI1LjE2LjEifX0="),
+						value=base64.b64decode("eyJyZW1vdGUiOnsidXJsIjoicmVnaXN0cnkub3BlbnRvZnUub3JnL3Jvb3RseWhxL3Jvb3RseSIsInZlcnNpb24iOiI1LjE3LjIifX0="),
 					)
 					registerPackageResponse = monitor.RegisterPackage(
 						resource_pb2.RegisterPackageRequest(
 							name="terraform-provider",
-							version="1.1.4",
+							version="1.2.0",
 							download_url=get_plugin_download_url(),
 							parameterization=parameterization,
 						))

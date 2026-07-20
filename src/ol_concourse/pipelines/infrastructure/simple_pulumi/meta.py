@@ -173,13 +173,16 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--env",
-        choices=["production", "qa"],
+        choices=["production", "qa", "ci"],
         default="production",
         help=(
             "Target Concourse environment. 'production' (default) generates the "
             "pipeline for the production Concourse instance. 'qa' generates a "
             "pipeline for the QA Concourse instance, which includes apps whose "
-            "local.Command resources need direct access to QA VPC infrastructure."
+            "local.Command resources need direct access to QA VPC infrastructure. "
+            "'ci' generates a pipeline for the CI Concourse instance (odl-ci), "
+            "which includes apps whose local.Command resources need direct "
+            "access to CI VPC infrastructure."
         ),
     )
     cli_args = parser.parse_args()
@@ -205,6 +208,7 @@ if __name__ == "__main__":
         "open-metadata-substructure",
         "opensearch",
         "qdrant-cloud",
+        "release-bot",
         "rootly",
         "sentry",
         "starrocks",
@@ -223,10 +227,18 @@ if __name__ == "__main__":
         "starrocks-substructure-qa",
     ]
 
+    ci_app_names = [
+        "starrocks-substructure-ci",
+    ]
+
     if cli_args.env == "qa":
         app_names = qa_app_names
         extra_args: list[str] | None = ["--env", "qa"]
         fly_target = "qa-inf"
+    elif cli_args.env == "ci":
+        app_names = ci_app_names
+        extra_args = ["--env", "ci"]
+        fly_target = "odl-ci"
     else:
         app_names = production_app_names
         extra_args = None

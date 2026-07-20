@@ -19,20 +19,28 @@ __all__ = ['RetrospectiveProcessGroupStepArgs', 'RetrospectiveProcessGroupStep']
 @pulumi.input_type
 class RetrospectiveProcessGroupStepArgs:
     def __init__(__self__, *,
+                 retrospective_process_group_id: pulumi.Input[_builtins.str],
                  retrospective_step_id: pulumi.Input[_builtins.str],
                  position: pulumi.Input[Optional[_builtins.float]] = None,
-                 retrospective_process_group_id: pulumi.Input[Optional[_builtins.str]] = None,
                  retrospective_process_group_step_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a RetrospectiveProcessGroupStep resource.
         """
+        pulumi.set(__self__, "retrospective_process_group_id", retrospective_process_group_id)
         pulumi.set(__self__, "retrospective_step_id", retrospective_step_id)
         if position is not None:
             pulumi.set(__self__, "position", position)
-        if retrospective_process_group_id is not None:
-            pulumi.set(__self__, "retrospective_process_group_id", retrospective_process_group_id)
         if retrospective_process_group_step_id is not None:
             pulumi.set(__self__, "retrospective_process_group_step_id", retrospective_process_group_step_id)
+
+    @_builtins.property
+    @pulumi.getter(name="retrospectiveProcessGroupId")
+    def retrospective_process_group_id(self) -> pulumi.Input[_builtins.str]:
+        return pulumi.get(self, "retrospective_process_group_id")
+
+    @retrospective_process_group_id.setter
+    def retrospective_process_group_id(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "retrospective_process_group_id", value)
 
     @_builtins.property
     @pulumi.getter(name="retrospectiveStepId")
@@ -51,15 +59,6 @@ class RetrospectiveProcessGroupStepArgs:
     @position.setter
     def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
-
-    @_builtins.property
-    @pulumi.getter(name="retrospectiveProcessGroupId")
-    def retrospective_process_group_id(self) -> pulumi.Input[Optional[_builtins.str]]:
-        return pulumi.get(self, "retrospective_process_group_id")
-
-    @retrospective_process_group_id.setter
-    def retrospective_process_group_id(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "retrospective_process_group_id", value)
 
     @_builtins.property
     @pulumi.getter(name="retrospectiveProcessGroupStepId")
@@ -182,6 +181,8 @@ class RetrospectiveProcessGroupStep(pulumi.CustomResource):
             __props__ = RetrospectiveProcessGroupStepArgs.__new__(RetrospectiveProcessGroupStepArgs)
 
             __props__.__dict__["position"] = position
+            if retrospective_process_group_id is None and not opts.urn:
+                raise TypeError("Missing required property 'retrospective_process_group_id'")
             __props__.__dict__["retrospective_process_group_id"] = retrospective_process_group_id
             __props__.__dict__["retrospective_process_group_step_id"] = retrospective_process_group_step_id
             if retrospective_step_id is None and not opts.urn:

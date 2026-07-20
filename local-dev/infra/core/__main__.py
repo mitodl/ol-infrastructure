@@ -156,7 +156,13 @@ create_cache(_k8s, namespaces["local-infra"])
 
 search = create_search(_k8s, namespaces["local-infra"])
 
-messaging = create_messaging(_k8s, namespaces["local-infra"])
+messaging = create_messaging(
+    _k8s,
+    namespaces["local-infra"],
+    apisix_release=ingress.apisix,
+    tls_secret=tls.tls_secret,
+    mail_hostname=f"mail.{root_domain}",
+)
 
 # Create database cluster (needed by Keycloak, LiteLLM)
 db = create_database(_k8s, namespaces["local-infra"], cnpg_version)

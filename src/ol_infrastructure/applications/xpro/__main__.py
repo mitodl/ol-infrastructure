@@ -598,11 +598,11 @@ if k8s_deploy:
     )
 
     # VPA objects for xpro workloads.
-    # No webapp VPA: xpro doesn't set webapp_keda_config or override
-    # hpa_scaling_metrics, so it gets OLApplicationK8sConfig's default native HPA,
-    # which scales on both cpu (60%) and memory (80%) Resource metrics -- there's
-    # no resource axis left for VPA to safely control without fighting the HPA's
-    # utilization signal.
+    # The webapp's memory VPA is created by OLApplicationK8s
+    # (manage_webapp_memory_vpa), paired with the component's now CPU-only HPA
+    # default. Previously the default HPA also carried a memory metric and no webapp
+    # VPA existed, which left memory unmanaged: a fleet-average memory metric cannot
+    # prevent an individual pod from being OOMKilled.
     # Celery workers and beat are scaled via KEDA (Redis queue depth), so
     # CPU+memory VPA is safe for those.
     _worker_vpa_bounds = {

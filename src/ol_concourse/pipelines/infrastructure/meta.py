@@ -70,10 +70,6 @@ PIPELINE_CONFIGS: list[tuple[str, str]] = [
         "src/ol_concourse/pipelines/infrastructure/kubewatch/pipeline.py",
     ),
     (
-        "packer-pulumi-redash",
-        "src/ol_concourse/pipelines/infrastructure/redash/pipeline.py",
-    ),
-    (
         "docker-pulumi-superset",
         "src/ol_concourse/pipelines/infrastructure/superset/pipeline.py",
     ),

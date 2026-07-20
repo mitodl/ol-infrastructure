@@ -19,9 +19,9 @@ __all__ = ['PlaybookTaskArgs', 'PlaybookTask']
 @pulumi.input_type
 class PlaybookTaskArgs:
     def __init__(__self__, *,
+                 playbook_id: pulumi.Input[_builtins.str],
                  task: pulumi.Input[_builtins.str],
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 playbook_id: pulumi.Input[Optional[_builtins.str]] = None,
                  playbook_task_id: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None):
         """
@@ -31,15 +31,23 @@ class PlaybookTaskArgs:
         :param pulumi.Input[_builtins.str] description: The description of task
         :param pulumi.Input[_builtins.float] position: The position of the task
         """
+        pulumi.set(__self__, "playbook_id", playbook_id)
         pulumi.set(__self__, "task", task)
         if description is not None:
             pulumi.set(__self__, "description", description)
-        if playbook_id is not None:
-            pulumi.set(__self__, "playbook_id", playbook_id)
         if playbook_task_id is not None:
             pulumi.set(__self__, "playbook_task_id", playbook_task_id)
         if position is not None:
             pulumi.set(__self__, "position", position)
+
+    @_builtins.property
+    @pulumi.getter(name="playbookId")
+    def playbook_id(self) -> pulumi.Input[_builtins.str]:
+        return pulumi.get(self, "playbook_id")
+
+    @playbook_id.setter
+    def playbook_id(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "playbook_id", value)
 
     @_builtins.property
     @pulumi.getter
@@ -64,15 +72,6 @@ class PlaybookTaskArgs:
     @description.setter
     def description(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "description", value)
-
-    @_builtins.property
-    @pulumi.getter(name="playbookId")
-    def playbook_id(self) -> pulumi.Input[Optional[_builtins.str]]:
-        return pulumi.get(self, "playbook_id")
-
-    @playbook_id.setter
-    def playbook_id(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "playbook_id", value)
 
     @_builtins.property
     @pulumi.getter(name="playbookTaskId")
@@ -237,6 +236,8 @@ class PlaybookTask(pulumi.CustomResource):
             __props__ = PlaybookTaskArgs.__new__(PlaybookTaskArgs)
 
             __props__.__dict__["description"] = description
+            if playbook_id is None and not opts.urn:
+                raise TypeError("Missing required property 'playbook_id'")
             __props__.__dict__["playbook_id"] = playbook_id
             __props__.__dict__["playbook_task_id"] = playbook_task_id
             __props__.__dict__["position"] = position

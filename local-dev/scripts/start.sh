@@ -72,6 +72,17 @@ fi
 ok "TLS certificates found."
 
 # ---------------------------------------------------------------------------
+# Heal wedged kubelet exec/streaming (post-sleep recovery)
+# ---------------------------------------------------------------------------
+# After a Docker VM pause on Mac sleep (OrbStack or Docker Desktop), a node's kubelet exec/streaming server
+# can come back wedged, so `kubectl exec` 502s even though the node is Ready.
+# This is a no-op when everything is healthy. Best-effort: never block startup.
+log "Checking kubelet exec/streaming health..."
+if ! "${SCRIPT_DIR}/heal-exec.sh"; then
+	warn "Exec heal reported problems; continuing to start Tilt anyway."
+fi
+
+# ---------------------------------------------------------------------------
 # Sync Python dependencies
 # ---------------------------------------------------------------------------
 log "Syncing Python dependencies via uv..."

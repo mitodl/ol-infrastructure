@@ -68,6 +68,8 @@ class ConcourseWebConfig(ConcourseBaseConfig):
     _node_type: str = "web"
     admin_password: SecretStr = Field(..., exclude=True)
     admin_user: str = Field(default="admin", exclude=True)
+    ocw_user_password: SecretStr | None = Field(None, exclude=True)
+    release_bot_password: SecretStr | None = Field(None, exclude=True)
     auth_duration: str | None = Field(
         None,
         alias="CONCOURSE_AUTH_DURATION",
@@ -1772,8 +1774,12 @@ class ConcourseWebConfig(ConcourseBaseConfig):
 
     @property
     def local_user(self):
-        password_value = self.admin_password.get_secret_value()
-        return f"{self.admin_user}:{password_value}"
+        users = [f"{self.admin_user}:{self.admin_password.get_secret_value()}"]
+        if self.ocw_user_password is not None:
+            users.append(f"ocw:{self.ocw_user_password.get_secret_value()}")
+        if self.release_bot_password is not None:
+            users.append(f"release-bot:{self.release_bot_password.get_secret_value()}")
+        return ",".join(users)
 
     def concourse_env(self) -> dict[str, str]:
         concourse_env_dict = super().concourse_env()

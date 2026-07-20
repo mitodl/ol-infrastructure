@@ -523,6 +523,39 @@ roles_setup_cmd = command.local.Command(
     opts=ResourceOptions(delete_before_replace=True, depends_on=_role_deps),
 )
 
+# --- b2b_analytics database ---------------------------------------------
+# Dedicated database (default_catalog) backing the B2B self-serve analytics
+# StarRocks MVs (see hq#10006 / hq#10012). The `app` role already has
+# SELECT/INSERT/UPDATE/DELETE ON ALL TABLES IN ALL DATABASES from the base
+# roles SQL above, which covers dbt's write path once tables/MVs exist in
+# this database. What's missing — and StarRocks-specific — is that creating
+# new tables/materialized views requires its own CREATE TABLE / CREATE
+# MATERIALIZED VIEW privilege, granted at the database level, distinct from
+# the table-level DML privileges above.
+_b2b_analytics_db_sql = """\
+CREATE DATABASE IF NOT EXISTS b2b_analytics;
+GRANT CREATE TABLE ON DATABASE b2b_analytics TO ROLE app;
+GRANT CREATE MATERIALIZED VIEW ON DATABASE b2b_analytics TO ROLE app;"""
+
+_b2b_analytics_db_drop_sql = "DROP DATABASE IF EXISTS b2b_analytics;"
+
+command.local.Command(
+    f"starrocks-{stack_info.env_suffix}-b2b-analytics-database-setup",
+    create=_exec_sql,
+    update=_exec_sql,
+    delete=_exec_delete_sql,
+    environment={
+        **_mysql_env,
+        "STARROCKS_SQL": _b2b_analytics_db_sql,
+        "STARROCKS_DELETE_SQL": _b2b_analytics_db_drop_sql,
+    },
+    triggers=[hashlib.sha256(_b2b_analytics_db_sql.encode()).hexdigest()],
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[roles_setup_cmd],
+    ),
+)
+
 # --- OIDC / OAuth2 authentication via Keycloak ------------------------------
 # StarRocks v3.5+ uses a "security integration" (SQL object) to hold OAuth2
 # provider settings rather than fe.conf env vars.  The integration name goes

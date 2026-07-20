@@ -48,12 +48,13 @@ for cluster in ["data", "operations", "applications", "residential"]:
     )
     pipeline_fragments.append(substructure_chain)
 
+pipeline_fragments.append(
+    PipelineFragment(resources=[eks_infrastructure_code, eks_substructure_code])
+)
+
 eks_cluster_update_pipeline = PipelineFragment.combine_fragments(
     *pipeline_fragments
 ).to_pipeline()
-
-eks_cluster_update_pipeline.resources.append(eks_infrastructure_code)
-eks_cluster_update_pipeline.resources.append(eks_substructure_code)
 
 if __name__ == "__main__":
     import sys

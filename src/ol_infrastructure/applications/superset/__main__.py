@@ -398,8 +398,9 @@ redis_cluster_security_group = ec2.SecurityGroup(
     vpc_id=data_vpc["id"],
 )
 
+redis_defaults = defaults(stack_info)["redis"]
 redis_instance_type = (
-    redis_config.get("instance_type") or defaults(stack_info)["redis"]["instance_type"]
+    redis_config.get("instance_type") or redis_defaults["instance_type"]
 )
 redis_auth_token = superset_secrets["redis"]["token"]
 redis_cache_config = OLAmazonRedisConfig(
@@ -410,6 +411,7 @@ redis_cache_config = OLAmazonRedisConfig(
     engine_version="7.2",
     engine="valkey",
     instance_type=redis_instance_type,
+    monitoring_profile_name=redis_defaults["monitoring_profile_name"],
     num_instances=3,
     shard_count=1,
     auto_upgrade=True,
@@ -672,16 +674,19 @@ superset_chart = kubernetes.helm.v3.Release(
                 ]
                 if secret_name is not None
             ],
-            # Connections (non-secret parts)
+            # Connections (non-secret parts). `database`/`cache` supersede the
+            # chart's deprecated `supersetNode.connections.*` keys as of 0.20.0.
+            "database": {
+                "host": superset_db.db_instance.address,
+                "port": str(DEFAULT_POSTGRES_PORT),
+                "name": superset_db_config.db_name,
+            },
+            "cache": {
+                "host": superset_redis_cache.address,
+                "port": str(DEFAULT_REDIS_PORT),
+            },
             "supersetNode": {
                 "podLabels": k8s_global_labels,
-                "connections": {
-                    "redis_host": superset_redis_cache.address,
-                    "redis_port": str(DEFAULT_REDIS_PORT),
-                    "db_name": superset_db_config.db_name,
-                    "db_port": str(DEFAULT_POSTGRES_PORT),
-                    "db_host": superset_db.db_instance.address,
-                },
                 "replicas": {"enabled": False},
                 "autoscaling": {
                     "enabled": True,

@@ -38,6 +38,12 @@ root_domain = config.get("root_domain") or os.environ.get(
 keycloak_hostname = config.get("keycloak_hostname") or f"sso.ol.{root_domain}"
 keycloak_url = config.get("keycloak_url") or f"https://{keycloak_hostname}"
 
+# Mirrors production by default; override locally (uncommitted) with:
+#   pulumi config set --stack local-dev.apps-infra.Dev verify_email false
+verify_email = config.get_bool("verify_email")
+if verify_email is None:
+    verify_email = True
+
 # Client secrets for OIDC configuration
 mitlearn_client_secret = config.require_secret("mitlearn_client_secret")
 learn_ai_client_secret = config.require_secret("learn_ai_client_secret")
@@ -90,6 +96,7 @@ create_olapps_dev_realm(
     learn_ai_client_secret=learn_ai_client_secret,
     mitxonline_client_secret=mitxonline_client_secret,
     unified_ecommerce_client_secret=unified_ecommerce_client_secret,
+    verify_email=verify_email,
 )
 
 # ---------------------------------------------------------------------------

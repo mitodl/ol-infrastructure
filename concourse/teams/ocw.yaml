@@ -1,0 +1,24 @@
+---
+roles:
+- name: owner
+  github:
+    orgs:
+    - mitodl
+  local:
+    users:
+    - oldevops
+  oidc:
+    groups:
+    - admin
+    - developer
+- name: viewer
+  github:
+    orgs:
+    - mitodl
+  oidc:
+    groups:
+    - developer
+- name: pipeline-operator
+  local:
+    users:
+    - ocw

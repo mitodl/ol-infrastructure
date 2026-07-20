@@ -20,26 +20,25 @@ __all__ = ['FormSetConditionArgs', 'FormSetCondition']
 class FormSetConditionArgs:
     def __init__(__self__, *,
                  form_field_id: pulumi.Input[_builtins.str],
+                 form_set_id: pulumi.Input[_builtins.str],
                  values: pulumi.Input[Sequence[pulumi.Input[_builtins.str]]],
                  comparison: pulumi.Input[Optional[_builtins.str]] = None,
-                 form_set_condition_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 form_set_id: pulumi.Input[Optional[_builtins.str]] = None):
+                 form_set_condition_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a FormSetCondition resource.
 
         :param pulumi.Input[_builtins.str] form_field_id: The form field this condition applies.
+        :param pulumi.Input[_builtins.str] form_set_id: The form set this condition applies.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] values: The values for comparison.
         :param pulumi.Input[_builtins.str] comparison: The condition comparison.. Value must be one of <span pulumi-lang-nodejs="`equal`" pulumi-lang-dotnet="`Equal`" pulumi-lang-go="`equal`" pulumi-lang-python="`equal`" pulumi-lang-yaml="`equal`" pulumi-lang-java="`equal`" pulumi-lang-hcl="`equal`">`equal`</span>.
-        :param pulumi.Input[_builtins.str] form_set_id: The form set this condition applies.
         """
         pulumi.set(__self__, "form_field_id", form_field_id)
+        pulumi.set(__self__, "form_set_id", form_set_id)
         pulumi.set(__self__, "values", values)
         if comparison is not None:
             pulumi.set(__self__, "comparison", comparison)
         if form_set_condition_id is not None:
             pulumi.set(__self__, "form_set_condition_id", form_set_condition_id)
-        if form_set_id is not None:
-            pulumi.set(__self__, "form_set_id", form_set_id)
 
     @_builtins.property
     @pulumi.getter(name="formFieldId")
@@ -52,6 +51,18 @@ class FormSetConditionArgs:
     @form_field_id.setter
     def form_field_id(self, value: pulumi.Input[_builtins.str]):
         pulumi.set(self, "form_field_id", value)
+
+    @_builtins.property
+    @pulumi.getter(name="formSetId")
+    def form_set_id(self) -> pulumi.Input[_builtins.str]:
+        """
+        The form set this condition applies.
+        """
+        return pulumi.get(self, "form_set_id")
+
+    @form_set_id.setter
+    def form_set_id(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "form_set_id", value)
 
     @_builtins.property
     @pulumi.getter
@@ -85,18 +96,6 @@ class FormSetConditionArgs:
     @form_set_condition_id.setter
     def form_set_condition_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "form_set_condition_id", value)
-
-    @_builtins.property
-    @pulumi.getter(name="formSetId")
-    def form_set_id(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The form set this condition applies.
-        """
-        return pulumi.get(self, "form_set_id")
-
-    @form_set_id.setter
-    def form_set_id(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "form_set_id", value)
 
 
 @pulumi.input_type
@@ -249,6 +248,8 @@ class FormSetCondition(pulumi.CustomResource):
                 raise TypeError("Missing required property 'form_field_id'")
             __props__.__dict__["form_field_id"] = form_field_id
             __props__.__dict__["form_set_condition_id"] = form_set_condition_id
+            if form_set_id is None and not opts.urn:
+                raise TypeError("Missing required property 'form_set_id'")
             __props__.__dict__["form_set_id"] = form_set_id
             if values is None and not opts.urn:
                 raise TypeError("Missing required property 'values'")

@@ -101,6 +101,7 @@ cluster_substructure_stack = make_stack_reference(
 dns_stack = make_stack_reference(projects.DNS, "default")
 monitoring_stack = make_stack_reference(projects.MONITORING, "default")
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
+opik_stack = make_stack_reference(projects.OPIK, stack_info.name)
 policy_stack = make_stack_reference(projects.POLICIES, "default")
 vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
@@ -735,7 +736,59 @@ static_secrets = OLVaultK8SSecret(
     ),
 )
 
+# Opik LLM-observability credentials. The ``ol-opik-client`` Keycloak client
+# (client-credentials grant) and its realm discovery URL are published by the
+# keycloak substructure to Vault at ``secret-operations/sso/opik``. Sync them
+# into a K8s secret via VSO and expose them to the app as the OPIK_KEYCLOAK_*
+# env vars. The token endpoint is derived from the realm ``url`` key so it stays
+# correct across environments (sso-ci / sso-qa / sso) without hardcoding.
+opik_keycloak_secret_name = (
+    "learn-ai-opik-keycloak"  # pragma: allowlist secret  # noqa: S105
+)
+opik_keycloak_secret = OLVaultK8SSecret(
+    name=f"learn-ai-{stack_info.env_suffix}-opik-keycloak-secret",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name="learn-ai-opik-keycloak",
+        namespace=learn_ai_namespace,
+        labels=k8s_global_labels,
+        dest_secret_name=opik_keycloak_secret_name,
+        dest_secret_labels=k8s_global_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="sso/opik",
+        restart_targets=[{"kind": "Deployment", "name": "learn-ai-app"}],
+        templates={
+            "OPIK_KEYCLOAK_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+            "OPIK_KEYCLOAK_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
+            "OPIK_KEYCLOAK_TOKEN_URL": (
+                '{{ get .Secrets "url" }}/protocol/openid-connect/token'
+            ),
+        },
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        parent=vault_k8s_resources,
+    ),
+)
+
 env_vars = dict(learn_ai_config.require_object("env_vars") or {})
+
+# Opik instrumentation (non-secret settings). OPIK_URL_OVERRIDE is derived from
+# the opik application stack's exported URL so it tracks the deployed instance
+# per environment; the workspace/project are static for our OSS install. The
+# Keycloak client id/secret and token URL arrive via envFrom (see the VSO secret
+# above). Note: do NOT set OPIK_API_KEY — the app's Keycloak auth flow owns the
+# Authorization header (see the opik stack's OPIK_SDK_KEYCLOAK_AUTH.md).
+env_vars.update(
+    {
+        "OPIK_URL_OVERRIDE": opik_stack.require_output("opik_url").apply(
+            lambda url: f"{url}/api/"
+        ),
+        "OPIK_WORKSPACE": "default",
+        "OPIK_PROJECT_NAME": "learn-ai",
+    }
+)
 
 # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
 # signals carry organizational metadata regardless of stack environment.
@@ -756,6 +809,7 @@ learn_ai_app_k8s = OLApplicationK8s(
             db_creds_secret_name,
             redis_creds_secret_name,
             static_secrets_name,
+            opik_keycloak_secret_name,
         ],
         application_security_group_id=learn_ai_application_security_group.id,
         # Use the fixed name used in the SecurityGroupPolicy spec
@@ -818,6 +872,11 @@ learn_ai_app_k8s = OLApplicationK8s(
             resource_requests={"cpu": "10m", "memory": "384Mi"},
             resource_limits={"memory": "384Mi"},
         ),
+        # Memory removed from the HPA: it duplicated the component default and is now
+        # handled vertically by the component's webapp memory VPA. An HPA memory
+        # metric is a fleet average and cannot prevent an individual pod from being
+        # OOMKilled. This block now matches the component default and could be dropped
+        # entirely; it is kept explicit because the CPU target is intentional.
         hpa_scaling_metrics=[
             kubernetes.autoscaling.v2.MetricSpecArgs(
                 type="Resource",
@@ -826,17 +885,6 @@ learn_ai_app_k8s = OLApplicationK8s(
                     target=kubernetes.autoscaling.v2.MetricTargetArgs(
                         type="Utilization",
                         average_utilization=60,  # Target CPU utilization (60%)
-                    ),
-                ),
-            ),
-            # Scale up when avg usage exceeds: 1800 * 0.8 = 1440 Mi
-            kubernetes.autoscaling.v2.MetricSpecArgs(
-                type="Resource",
-                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
-                    name="memory",
-                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
-                        type="Utilization",
-                        average_utilization=80,  # Target memory utilization (80%)
                     ),
                 ),
             ),
@@ -849,6 +897,7 @@ learn_ai_app_k8s = OLApplicationK8s(
             db_creds_secret,
             redis_creds,
             static_secrets,
+            opik_keycloak_secret,
             vault_k8s_resources,
             learn_ai_application_security_group,
         ],

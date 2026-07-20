@@ -10,7 +10,6 @@ import json
 from pathlib import Path
 
 import pulumi_github as github
-import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import (
     ROOT_STACK_RESOURCE,
@@ -23,7 +22,6 @@ from pulumi import (
 from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import (
-    DEFAULT_NGINX_PORT,
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
 )
@@ -427,6 +425,11 @@ app_env_vars = {
     "SOCIAL_AUTH_SAML_IDP_ENTITY_ID": "https://idp.mit.edu/shibboleth",
     "SOCIAL_AUTH_SAML_IDP_URL": "https://idp.mit.edu/idp/profile/SAML2/Redirect/SSO",
     "SOCIAL_AUTH_SAML_LOGIN_URL": "https://idp.mit.edu/idp/profile/SAML2/Redirect/SSO",
+    "SESSION_COOKIE_NAME": (
+        "session_ocwstudio"
+        if stack_info.name == "Production"
+        else f"session_ocwstudio_{env_name}"
+    ),
     "SOCIAL_AUTH_SAML_ORG_DISPLAYNAME": "MIT Open Learning",
     "SOCIAL_AUTH_SAML_SECURITY_ENCRYPTED": "True",
     "USE_X_FORWARDED_PORT": "True",
@@ -564,6 +567,17 @@ vault_k8s_resources = OLVaultK8SResources(
 db_instance_name = f"ocw-studio-db-applications-{stack_info.env_suffix}"
 rds_endpoint = f"{db_instance_name}.cbnm7ajau6mi.us-east-1.rds.amazonaws.com:{DEFAULT_POSTGRES_PORT}"
 
+# All deployments that consume the secret-ocw-studio application secrets and
+# need a rolling restart when those secrets change. Names must match the
+# deterministic naming in OLApplicationK8s (application_name="ocw-studio").
+ocw_studio_restart_deployment_names = [
+    "ocw-studio-app",  # webapp
+    "ocw-studio-default-celery-worker",
+    "ocw-studio-publish-celery-worker",
+    "ocw-studio-batch-celery-worker",
+    "ocw-studio-celery-beat",
+]
+
 # Create Kubernetes secrets
 secret_names, secret_resources = create_ocw_studio_k8s_secrets(
     stack_info=stack_info,
@@ -574,11 +588,12 @@ secret_names, secret_resources = create_ocw_studio_k8s_secrets(
     rds_endpoint=rds_endpoint,
     redis_password=redis_config.require("password"),
     redis_cache=redis_cache,
+    restart_deployment_names=ocw_studio_restart_deployment_names,
 )
 
 # Merge stack-level config vars into the app env vars
 app_env_vars.update(**ocw_studio_config.get_object("vars") or {})
-app_env_vars["POSTHOG_API_HOST"] = app_env_vars.pop(
+app_env_vars["POSTHOG_API_HOST"] = app_env_vars.get(
     "PUBLISH_POSTHOG_API_HOST",
     ocw_studio_config.get("posthog_api_host") or "https://app.posthog.com",
 )
@@ -646,44 +661,6 @@ ocw_studio_k8s_app = OLApplicationK8s(
         ),
         resource_requests={"cpu": "100m", "memory": "1Gi"},
         resource_limits={"memory": "3Gi"},
-        # Reverted from django-health-check probes (#4874): app-side
-        # django-health-check's redis contrib check raises
-        # AttributeError('Redis' object has no attribute 'aclose') against
-        # the app's sync redis client. Revert to /nginx-health until the
-        # app-side fix lands.
-        probe_configs={
-            "liveness_probe": kubernetes.core.v1.ProbeArgs(
-                http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                    path="/nginx-health",
-                    port=DEFAULT_NGINX_PORT,
-                ),
-                initial_delay_seconds=30,
-                period_seconds=30,
-                failure_threshold=3,
-                timeout_seconds=3,
-            ),
-            "readiness_probe": kubernetes.core.v1.ProbeArgs(
-                http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                    path="/nginx-health",
-                    port=DEFAULT_NGINX_PORT,
-                ),
-                initial_delay_seconds=15,
-                period_seconds=15,
-                failure_threshold=3,
-                timeout_seconds=3,
-            ),
-            "startup_probe": kubernetes.core.v1.ProbeArgs(
-                http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                    path="/nginx-health",
-                    port=DEFAULT_NGINX_PORT,
-                ),
-                initial_delay_seconds=10,
-                period_seconds=10,
-                failure_threshold=6,
-                success_threshold=1,
-                timeout_seconds=5,
-            ),
-        },
     ),
     opts=ResourceOptions(depends_on=[ocw_studio_app_security_group, *secret_resources]),
 )

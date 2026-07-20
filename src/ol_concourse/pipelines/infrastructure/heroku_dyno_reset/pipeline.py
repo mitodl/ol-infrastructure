@@ -47,14 +47,6 @@ qa_dyno_map = {
             "worker=1:Standard-1X",
         ],
     },
-    "bootcamp-ecommerce-rc": {
-        "owner": "mitx-devops",
-        "dyno_list": [
-            "extra_worker=0:Standard-1x",
-            # "web=1:Standard-1X",
-            "worker=1:Standard-1X",
-        ],
-    },
     "xpro-rc": {
         "owner": "mitx-devops",
         "dyno_list": [
@@ -108,14 +100,6 @@ production_dyno_map = {
         "owner": "mitx-devops",
         "dyno_list": [
             "extra_worker=2:Standard-2x",
-            # "web=3:Standard-2X",
-            "worker=1:Standard-2X",
-        ],
-    },
-    "bootcamp-ecommerce-rc": {
-        "owner": "mitx-devops",
-        "dyno_list": [
-            "extra_worker=0:Standard-1x",
             # "web=3:Standard-2X",
             "worker=1:Standard-2X",
         ],

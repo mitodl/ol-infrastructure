@@ -64,14 +64,6 @@ team_bi = sentry.SentryTeam(
     opts=sentry_opts,
 )
 
-team_bootcamps = sentry.SentryTeam(
-    "team_bootcamps",
-    organization=ORGANIZATION,
-    name="bootcamps",
-    slug="bootcamps",
-    opts=sentry_opts,
-)
-
 team_devops = sentry.SentryTeam(
     "team_devops",
     organization=ORGANIZATION,
@@ -329,32 +321,6 @@ project_python = sentry.SentryProject(
     slug="python",
     platform="python",
     teams=["mit-office-of-digital-learning"],
-    digests_min_delay=300,
-    digests_max_delay=1800,
-    resolve_age=0,
-    opts=sentry_opts,
-)
-
-project_redash = sentry.SentryProject(
-    "project_redash",
-    organization=ORGANIZATION,
-    name="Redash",
-    slug="redash",
-    platform="python-flask",
-    teams=["applications", "bi"],
-    digests_min_delay=300,
-    digests_max_delay=1800,
-    resolve_age=0,
-    opts=sentry_opts,
-)
-
-project_redash_production = sentry.SentryProject(
-    "project_redash_production",
-    organization=ORGANIZATION,
-    name="redash-production",
-    slug="redash-production",
-    platform="python-flask",
-    teams=["bi"],
     digests_min_delay=300,
     digests_max_delay=1800,
     resolve_age=0,
@@ -1655,14 +1621,6 @@ github_repository_mitodl_realistic_mm_users = sentry.SentryOrganizationRepositor
     opts=sentry_opts,
 )
 
-github_repository_mitodl_redash = sentry.SentryOrganizationRepositoryGithub(
-    "github_repository_mitodl_redash",
-    organization=ORGANIZATION,
-    identifier="mitodl/redash",
-    integration_id="29144",
-    opts=sentry_opts,
-)
-
 github_repository_mitodl_reddit_config = sentry.SentryOrganizationRepositoryGithub(
     "github_repository_mitodl_reddit_config",
     organization=ORGANIZATION,
@@ -2115,20 +2073,6 @@ code_mapping_open_next_mitodl_learn_ai_1102230 = sentry.SentryOrganizationCodeMa
     opts=sentry_opts,
 )
 
-code_mapping_redash_production_mitodl_redash_1108282 = (
-    sentry.SentryOrganizationCodeMapping(
-        "code_mapping_redash_production_mitodl_redash_1108282",
-        organization=ORGANIZATION,
-        project_id="6603410",
-        repository_id="3154318",
-        integration_id="29144",
-        default_branch="master",
-        stack_root="",
-        source_root="",
-        opts=sentry_opts,
-    )
-)
-
 code_mapping_micromasters_mitodl_mit_open_bk_1109367 = (
     sentry.SentryOrganizationCodeMapping(
         "code_mapping_micromasters_mitodl_mit_open_bk_1109367",
@@ -2169,18 +2113,6 @@ code_mapping_mitxonline_mitodl_open_discussions_114735 = (
     )
 )
 
-code_mapping_redash_mitodl_redash_1161304 = sentry.SentryOrganizationCodeMapping(
-    "code_mapping_redash_mitodl_redash_1161304",
-    organization=ORGANIZATION,
-    project_id="1019180",
-    repository_id="3154318",
-    integration_id="29144",
-    default_branch="master",
-    stack_root="",
-    source_root="",
-    opts=sentry_opts,
-)
-
 code_mapping_micromasters_mitodl_odl_video_service_1163593 = (
     sentry.SentryOrganizationCodeMapping(
         "code_mapping_micromasters_mitodl_odl_video_service_1163593",
@@ -2191,20 +2123,6 @@ code_mapping_micromasters_mitodl_odl_video_service_1163593 = (
         default_branch="master",
         stack_root="",
         source_root="",
-        opts=sentry_opts,
-    )
-)
-
-code_mapping_mitxonline_mitodl_bootcamp_ecommerce_116744 = (
-    sentry.SentryOrganizationCodeMapping(
-        "code_mapping_mitxonline_mitodl_bootcamp_ecommerce_116744",
-        organization=ORGANIZATION,
-        project_id="5864687",
-        repository_id="3938",
-        integration_id="29144",
-        default_branch="master",
-        stack_root="hubspot_sync/",
-        source_root="hubspot_sync/",
         opts=sentry_opts,
     )
 )
@@ -2311,20 +2229,6 @@ code_mapping_ocw_studio_mitodl_edx_platform_156610 = (
         default_branch="master",
         stack_root="django/",
         source_root="common/djangoapps/edxmako/",
-        opts=sentry_opts,
-    )
-)
-
-code_mapping_mitxonline_mitodl_bootcamp_ecommerce_170836 = (
-    sentry.SentryOrganizationCodeMapping(
-        "code_mapping_mitxonline_mitodl_bootcamp_ecommerce_170836",
-        organization=ORGANIZATION,
-        project_id="5864687",
-        repository_id="3938",
-        integration_id="29144",
-        default_branch="master",
-        stack_root="main/",
-        source_root="main/",
         opts=sentry_opts,
     )
 )
@@ -2461,20 +2365,6 @@ code_mapping_ocw_next_mitodl_ocw_studio_274572 = sentry.SentryOrganizationCodeMa
     opts=sentry_opts,
 )
 
-code_mapping_redash_production_mitodl_odl_video_service_279591 = (
-    sentry.SentryOrganizationCodeMapping(
-        "code_mapping_redash_production_mitodl_odl_video_service_279591",
-        organization=ORGANIZATION,
-        project_id="6603410",
-        repository_id="3937",
-        integration_id="29144",
-        default_branch="master",
-        stack_root="redash/",
-        source_root="ui/",
-        opts=sentry_opts,
-    )
-)
-
 code_mapping_mitxonline_mitodl_odl_video_service_288198 = (
     sentry.SentryOrganizationCodeMapping(
         "code_mapping_mitxonline_mitodl_odl_video_service_288198",
@@ -2503,20 +2393,6 @@ code_mapping_open_next_mitodl_open_discussions_294319 = (
     )
 )
 
-code_mapping_mitxonline_mitodl_bootcamp_ecommerce_295753 = (
-    sentry.SentryOrganizationCodeMapping(
-        "code_mapping_mitxonline_mitodl_bootcamp_ecommerce_295753",
-        organization=ORGANIZATION,
-        project_id="5864687",
-        repository_id="3938",
-        integration_id="29144",
-        default_branch="master",
-        stack_root="flexiblepricing/",
-        source_root="applications/",
-        opts=sentry_opts,
-    )
-)
-
 code_mapping_open_mitodl_edx_platform_299172 = sentry.SentryOrganizationCodeMapping(
     "code_mapping_open_mitodl_edx_platform_299172",
     organization=ORGANIZATION,
@@ -2527,32 +2403,6 @@ code_mapping_open_mitodl_edx_platform_299172 = sentry.SentryOrganizationCodeMapp
     stack_root="mail/",
     source_root="lms/djangoapps/bulk_email/",
     opts=sentry_opts,
-)
-
-code_mapping_redash_mitodl_ocw_studio_334289 = sentry.SentryOrganizationCodeMapping(
-    "code_mapping_redash_mitodl_ocw_studio_334289",
-    organization=ORGANIZATION,
-    project_id="1019180",
-    repository_id="132118",
-    integration_id="29144",
-    default_branch="master",
-    stack_root="redash/models/",
-    source_root="",
-    opts=sentry_opts,
-)
-
-code_mapping_redash_production_mitodl_ocw_studio_335329 = (
-    sentry.SentryOrganizationCodeMapping(
-        "code_mapping_redash_production_mitodl_ocw_studio_335329",
-        organization=ORGANIZATION,
-        project_id="6603410",
-        repository_id="132118",
-        integration_id="29144",
-        default_branch="master",
-        stack_root="redash/models/",
-        source_root="",
-        opts=sentry_opts,
-    )
 )
 
 code_mapping_mitxonline_mitodl_ocw_studio_355382 = sentry.SentryOrganizationCodeMapping(
@@ -3137,20 +2987,6 @@ code_mapping_openedx_mitxpro_mitodl_edx_platform_70703 = (
     )
 )
 
-code_mapping_learn_ai_mitodl_bootcamp_ecommerce_712895 = (
-    sentry.SentryOrganizationCodeMapping(
-        "code_mapping_learn_ai_mitodl_bootcamp_ecommerce_712895",
-        organization=ORGANIZATION,
-        project_id="4508932230676480",
-        repository_id="3938",
-        integration_id="29144",
-        default_branch="master",
-        stack_root="",
-        source_root="",
-        opts=sentry_opts,
-    )
-)
-
 code_mapping_ocw_next_mitodl_ocw_hugo_themes_722324 = (
     sentry.SentryOrganizationCodeMapping(
         "code_mapping_ocw_next_mitodl_ocw_hugo_themes_722324",
@@ -3165,37 +3001,11 @@ code_mapping_ocw_next_mitodl_ocw_hugo_themes_722324 = (
     )
 )
 
-code_mapping_redash_production_mitodl_redash_724265 = (
-    sentry.SentryOrganizationCodeMapping(
-        "code_mapping_redash_production_mitodl_redash_724265",
-        organization=ORGANIZATION,
-        project_id="6603410",
-        repository_id="2287977",
-        integration_id="29144",
-        default_branch="master",
-        stack_root="",
-        source_root="",
-        opts=sentry_opts,
-    )
-)
-
 code_mapping_open_mitodl_open_discussions_73048 = sentry.SentryOrganizationCodeMapping(
     "code_mapping_open_mitodl_open_discussions_73048",
     organization=ORGANIZATION,
     project_id="216201",
     repository_id="3935",
-    integration_id="29144",
-    default_branch="master",
-    stack_root="",
-    source_root="",
-    opts=sentry_opts,
-)
-
-code_mapping_redash_mitodl_redash_731688 = sentry.SentryOrganizationCodeMapping(
-    "code_mapping_redash_mitodl_redash_731688",
-    organization=ORGANIZATION,
-    project_id="1019180",
-    repository_id="2287977",
     integration_id="29144",
     default_branch="master",
     stack_root="",
@@ -3639,22 +3449,6 @@ key_python_default_7cc91e53ac70f26e91a2e788288be63d = sentry.SentryKey(
     "key_python_default_7cc91e53ac70f26e91a2e788288be63d",  # pragma: allowlist secret
     organization=ORGANIZATION,
     project="python",
-    name="Default",
-    opts=sentry_opts,
-)
-
-key_redash_default_2b7b50a264744ce094ba347d4ff9e9de = sentry.SentryKey(
-    "key_redash_default_2b7b50a264744ce094ba347d4ff9e9de",  # pragma: allowlist secret
-    organization=ORGANIZATION,
-    project="redash",
-    name="Default",
-    opts=sentry_opts,
-)
-
-key_redash_production_default_1d5061bd5ae34e8cb2a5ca15d922a580 = sentry.SentryKey(
-    "key_redash_production_default_1d5061bd5ae34e8cb2a5ca15d922a580",  # pragma: allowlist secret
-    organization=ORGANIZATION,
-    project="redash-production",
     name="Default",
     opts=sentry_opts,
 )

@@ -1,0 +1,7 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgEkYdnRYGRPJTAcGVokO2DoAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMvcH9kt3zvTuzX8YPAgEQgDvL4RElRu9HJYrppO2yywmEf2HK412ghtoHrfG9b6M1eooKD5aTeL8SJW8YMbKV1o8dHhBiubDHFCV2vA==
+config:
+  opik:k8s_domain: opik-qa.ol.mit.edu
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa

@@ -1,12 +1,24 @@
 """Helper functions for managing Keycloak SAML integrations."""
 
 import logging
+import ssl
 import xml.etree.ElementTree as ET
 from typing import Any
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+import certifi
+
 logger = logging.getLogger(__name__)
+
+# Some standalone/pyenv-managed Python builds (e.g. on macOS) don't reliably
+# pick up the system trust store via ssl.create_default_context(), causing
+# CERTIFICATE_VERIFY_FAILED for otherwise-valid certificates (e.g. issued by
+# HARICA). Load the default (system) certs as usual, then layer certifi's
+# actively-maintained bundle on top, so both trust sources are honored instead
+# of certifi replacing the system/enterprise trust store.
+_SSL_CONTEXT = ssl.create_default_context()
+_SSL_CONTEXT.load_verify_locations(cafile=certifi.where())
 
 SAML_FRIENDLY_NAMES = {
     "firstName": [
@@ -80,7 +92,7 @@ def _fetch_and_parse_saml_metadata(metadata_url: str) -> ET.Element | None:
                 "User-Agent": "Mozilla/5.0 (compatible; Keycloak-metadata-fetcher)"
             },
         )
-        with urlopen(request, timeout=10) as metadata_file:  # noqa: S310
+        with urlopen(request, timeout=10, context=_SSL_CONTEXT) as metadata_file:  # noqa: S310
             metadata_bytes = metadata_file.read(MAX_METADATA_SIZE + 1)
             if len(metadata_bytes) > MAX_METADATA_SIZE:
                 logger.warning(

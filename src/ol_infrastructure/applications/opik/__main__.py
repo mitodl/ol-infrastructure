@@ -344,6 +344,11 @@ opik_session_oidc_plugin = opik_oidc.get_full_oidc_plugin_config(unauth_action="
 # clients get a clean 401 instead of an HTML login page.
 opik_bearer_oidc_plugin = opik_oidc.get_full_oidc_plugin_config(unauth_action="deny")
 opik_bearer_oidc_plugin["config"]["bearer_only"] = True
+# Verify the JWT signature locally against Keycloak's JWKS. Without this the
+# plugin falls back to token introspection, and Keycloak reports active: false
+# for client-credentials service-account tokens (transient sessions), so every
+# SDK request would 401 even with a freshly-issued valid token.
+opik_bearer_oidc_plugin["config"]["use_jwks"] = True
 
 # Match ``/api/*`` requests that carry a Bearer ``Authorization`` header so they
 # are routed to the bearer-only rule; everything else under ``/api`` falls

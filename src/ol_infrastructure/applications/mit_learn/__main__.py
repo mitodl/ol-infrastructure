@@ -1564,6 +1564,12 @@ mitlearn_k8s_app = OLApplicationK8s(
         ),
         resource_requests={"cpu": "500m", "memory": "3200Mi"},
         resource_limits={"memory": "3200Mi"},
+        # Preserves the bounds of the hand-rolled mitlearn-webapp-vpa this replaces.
+        # The floor is deliberately well below resource_limits (unlike the component
+        # default, which pins the floor at the limit) so the VPA can also size these
+        # pods back down rather than only up.
+        webapp_vpa_min_allowed_memory="256Mi",
+        webapp_vpa_max_allowed_memory="4Gi",
         webapp_keda_config=webapp_keda_config,
     ),
     opts=ResourceOptions(
@@ -1583,7 +1589,7 @@ mitlearn_k8s_app_oidc_resources_no_prefix = OLApisixOIDCResources(
         k8s_namespace=learn_namespace,
         oidc_logout_path="/logout/oidc",
         oidc_post_logout_redirect_uri=f"https://{mitlearn_config.get('api_domain')}/logout/",
-        oidc_session_cookie_lifetime=60 * 20160,
+        oidc_session_absolute_timeout=60 * 20160,
         # Disable APISIX's own idling/rolling checks (which otherwise default
         # to 15min/60min) so the session envelope lasts the full 14-day
         # absolute_timeout above, matching the Keycloak SSO session and
@@ -1605,7 +1611,7 @@ mitlearn_k8s_app_oidc_resources = OLApisixOIDCResources(
         k8s_namespace=learn_namespace,
         oidc_logout_path="/learn/logout/oidc",
         oidc_post_logout_redirect_uri=f"https://{mitlearn_config.get('api_domain')}/learn/logout/",
-        oidc_session_cookie_lifetime=60 * 20160,
+        oidc_session_absolute_timeout=60 * 20160,
         # See the mitlearn-k8s-no-prefix resources above for why these are 0.
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
@@ -1743,23 +1749,15 @@ learn_external_service_apisix_route = OLApisixRoute(
 
 
 # VPA objects for mit-learn workloads.
-# Webapp has a CPU-based HPA, so VPA must not control CPU (would distort HPA utilization signals).
+# The webapp's memory VPA is created by OLApplicationK8s (manage_webapp_memory_vpa)
+# rather than declared here, so every app gets the same split: the horizontal scaler
+# (a KEDA cpu trigger, in mit-learn's case) owns CPU and the VPA owns memory. Bounds
+# come from webapp_vpa_min/max_allowed_memory on the OLApplicationK8sConfig above.
 # Celery workers and beat are scaled via KEDA (Redis queue depth), so CPU+memory VPA is safe.
 _worker_vpa_bounds = {
     "min_allowed": {"cpu": "25m", "memory": "128Mi"},
     "max_allowed": {"cpu": "1000m", "memory": "3Gi"},
 }
-make_vpa(
-    name="mitlearn-webapp-vpa",
-    namespace=learn_namespace,
-    target_kind="Deployment",
-    target_name=mitlearn_k8s_app.webapp_deployment_name,
-    controlled_resources=["memory"],
-    container_name="mitlearn-app",
-    min_allowed={"memory": "256Mi"},
-    max_allowed={"memory": "4Gi"},
-    opts=ResourceOptions(depends_on=[mitlearn_k8s_app]),
-)
 for _celery_name in mitlearn_k8s_app.celery_deployment_names:
     make_vpa(
         name=f"{_celery_name}-vpa",

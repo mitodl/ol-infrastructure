@@ -18,11 +18,46 @@ rootly_provider = rootly.Provider(
     api_token=rootly_secrets["api_token"],
 )
 rootly_opts = ResourceOptions(provider=rootly_provider, protect=True)
+# "secret" is ignored on all alert sources: Pulumi/provider secret comparison
+# churn plans no-op updates even when the SOPS value matches the stored state.
 rootly_alert_source_opts = ResourceOptions(
+    provider=rootly_provider,
+    protect=True,
+    ignore_changes=["secret"],
+)
+# Pingdom's resolution rule is still provider-normalized into a no-op diff
+# (present through provider v5.17.2), so it additionally ignores that field.
+rootly_pingdom_alert_source_opts = ResourceOptions(
     provider=rootly_provider,
     protect=True,
     ignore_changes=["secret", "resolutionRuleAttributes"],
 )
+
+# CloudWatch alarms for QA/CI resources (e.g. "mitlearn-redis-qa-003") route
+# through the same shared warning/critical SNS topics as production (see
+# src/ol_infrastructure/lib/aws/monitoring_helper.py) and would otherwise page
+# on-call just like a production incident. Interim mitigation until the
+# underlying CloudWatch alarms stop sending actions for non-prod resources
+# (see src/ol_infrastructure/components/aws/cache.py): demote urgency to
+# Medium -- the same tier already used as the base urgency for the
+# "Grafana Prometheus - QA" alert source -- for any alarm whose name contains
+# a "-qa-" or "-ci-" environment segment.
+CLOUDWATCH_NON_PROD_URGENCY_RULES = [
+    {
+        "alertUrgencyId": "fce5c971-6660-4ad9-90eb-e75122055f50",
+        "jsonPath": "$.Message.AlarmName",
+        "kind": "payload",
+        "operator": "contains",
+        "value": "-qa-",
+    },
+    {
+        "alertUrgencyId": "fce5c971-6660-4ad9-90eb-e75122055f50",
+        "jsonPath": "$.Message.AlarmName",
+        "kind": "payload",
+        "operator": "contains",
+        "value": "-ci-",
+    },
+]
 
 # Foundation resources imported from the existing Rootly account.
 role_admin = rootly.Role(
@@ -56,7 +91,6 @@ role_admin = rootly.Role(
     services_permissions=["create", "read", "update", "delete"],
     severities_permissions=["create", "read", "update", "delete"],
     slas_permissions=["create", "read", "update", "delete"],
-    slug="admin",
     status_pages_permissions=["create", "read", "update", "delete"],
     sub_statuses_permissions=["create", "read", "update", "delete"],
     webhooks_permissions=["create", "read", "update", "delete"],
@@ -67,7 +101,6 @@ role_admin = rootly.Role(
 role_none = rootly.Role(
     "none",
     name="None",
-    slug="no_access",
     opts=rootly_opts,
 )
 
@@ -98,7 +131,6 @@ role_observer = rootly.Role(
     retrospective_permissions=["read"],
     services_permissions=["read"],
     severities_permissions=["read"],
-    slug="observer",
     status_pages_permissions=["read"],
     sub_statuses_permissions=["read"],
     workflows_permissions=["read"],
@@ -137,7 +169,6 @@ role_owner = rootly.Role(
     services_permissions=["create", "read", "update", "delete"],
     severities_permissions=["create", "read", "update", "delete"],
     slas_permissions=["create", "read", "update", "delete"],
-    slug="owner",
     status_pages_permissions=["create", "read", "update", "delete"],
     sub_statuses_permissions=["create", "read", "update", "delete"],
     webhooks_permissions=["create", "read", "update", "delete"],
@@ -173,7 +204,6 @@ role_user = rootly.Role(
     secrets_permissions=["create", "read", "update", "delete"],
     services_permissions=["create", "read", "update", "delete"],
     severities_permissions=["create", "read", "update", "delete"],
-    slug="user",
     status_pages_permissions=["create", "read", "update", "delete"],
     sub_statuses_permissions=["read"],
     workflows_permissions=["create", "read", "update", "delete"],
@@ -189,7 +219,6 @@ team_platform_engineering = rootly.Team(
     description="The go-to team for all incidents.",
     name="Platform Engineering",
     position=1,
-    slug="platform-engineering",
     user_ids=[99415, 100683, 103372, 103392],
     opts=rootly_opts,
 )
@@ -200,7 +229,6 @@ environment_development = rootly.Environment(
     description="Development Environment",
     name="Development",
     position=1,
-    slug="development",
     opts=rootly_opts,
 )
 
@@ -210,7 +238,6 @@ environment_production = rootly.Environment(
     description="Production Environment",
     name="Production",
     position=3,
-    slug="production",
     opts=rootly_opts,
 )
 
@@ -220,7 +247,6 @@ environment_staging = rootly.Environment(
     description="Staging Environment",
     name="Staging",
     position=2,
-    slug="staging",
     opts=rootly_opts,
 )
 
@@ -234,7 +260,6 @@ severity_sev0 = rootly.Severity(
     name="P1",
     position=1,
     severity="critical",
-    slug="p1",
     opts=rootly_opts,
 )
 
@@ -248,7 +273,6 @@ severity_sev1 = rootly.Severity(
     name="P2",
     position=2,
     severity="high",
-    slug="p2",
     opts=rootly_opts,
 )
 
@@ -262,7 +286,6 @@ severity_sev2 = rootly.Severity(
     name="P3",
     position=3,
     severity="medium",
-    slug="p3",
     opts=rootly_opts,
 )
 
@@ -272,7 +295,6 @@ cause_bug = rootly.Cause(
     description="Bug in code",
     name="Bug",
     position=1,
-    slug="bug",
     opts=rootly_opts,
 )
 
@@ -281,7 +303,6 @@ cause_configuration_change = rootly.Cause(
     description="Cause by change in configuration (eg. Set wrong environment variable)",
     name="Configuration Change",
     position=5,
-    slug="configuration-change",
     opts=rootly_opts,
 )
 
@@ -290,7 +311,6 @@ cause_human_error = rootly.Cause(
     description="Caused by human error",
     name="Human Error",
     position=3,
-    slug="human-error",
     opts=rootly_opts,
 )
 
@@ -299,7 +319,6 @@ cause_load = rootly.Cause(
     description="Excessive load or related issues on infrastructure",
     name="Load",
     position=2,
-    slug="load",
     opts=rootly_opts,
 )
 
@@ -308,7 +327,6 @@ cause_r_3rd_party_outage = rootly.Cause(
     description="Errors caused by 3rd party service failure (eg. Stripe API Failing)",
     name="3rd Party Outage",
     position=4,
-    slug="3rd-party-outage",
     opts=rootly_opts,
 )
 
@@ -317,7 +335,6 @@ cause_unknown = rootly.Cause(
     description="Exact cause can't be identified",
     name="Unknown",
     position=6,
-    slug="unknown",
     opts=rootly_opts,
 )
 
@@ -327,7 +344,6 @@ incident_type_cloud = rootly.IncidentType(
     description="Cloud provider related incidents (eg: AWS Kinesis outage)",
     name="Cloud",
     position=2,
-    slug="cloud",
     opts=rootly_opts,
 )
 
@@ -337,7 +353,6 @@ incident_type_customer_facing = rootly.IncidentType(
     description="Customers are actively experiencing a deteriorated experience",
     name="Customer Facing",
     position=3,
-    slug="customer-facing",
     opts=rootly_opts,
 )
 
@@ -347,7 +362,6 @@ incident_type_default = rootly.IncidentType(
     description="Used unless specific incident type is identified",
     name="Default",
     position=1,
-    slug="default",
     opts=rootly_opts,
 )
 
@@ -357,7 +371,6 @@ incident_type_security = rootly.IncidentType(
     description="Security related incidents (eg. PII leak, unauthorized access)",
     name="Security",
     position=4,
-    slug="security",
     opts=rootly_opts,
 )
 
@@ -374,7 +387,6 @@ incident_role_commander = rootly.IncidentRole(
     enabled=True,
     name="Commander",
     position=1,
-    slug="commander",
     summary=(
         "Responsible for the overall management of the incident from start "
         "to finish, delegation of tasks across the response team, and final "
@@ -420,46 +432,6 @@ schedule_rotation_primary_rotation = rootly.ScheduleRotation(
     schedule_rotationable_type="ScheduleWeeklyRotation",
     time_zone="America/New_York",
     opts=rootly_opts,
-)
-
-schedule_rotation_user_c582bafc_4fa2_4a79_9cdc_41c7bb256b88 = (
-    rootly.ScheduleRotationUser(
-        "c582bafc-4fa2-4a79-9cdc-41c7bb256b88",
-        position=1,
-        schedule_rotation_id="6744d26c-c81d-43c9-96b0-c6d30f4670a7",
-        user_id=99415,
-        opts=rootly_opts,
-    )
-)
-
-schedule_rotation_user_r_4b415521_c830_491e_b818_2d1081f06a26 = (
-    rootly.ScheduleRotationUser(
-        "r-4b415521-c830-491e-b818-2d1081f06a26",
-        position=3,
-        schedule_rotation_id="6744d26c-c81d-43c9-96b0-c6d30f4670a7",
-        user_id=100683,
-        opts=rootly_opts,
-    )
-)
-
-schedule_rotation_user_r_7ebd67c4_f881_4495_baa5_52714520a1a3 = (
-    rootly.ScheduleRotationUser(
-        "r-7ebd67c4-f881-4495-baa5-52714520a1a3",
-        position=2,
-        schedule_rotation_id="6744d26c-c81d-43c9-96b0-c6d30f4670a7",
-        user_id=103372,
-        opts=rootly_opts,
-    )
-)
-
-schedule_rotation_user_r_945d320a_641b_4957_9eaa_245894905e7b = (
-    rootly.ScheduleRotationUser(
-        "r-945d320a-641b-4957-9eaa-245894905e7b",
-        position=4,
-        schedule_rotation_id="6744d26c-c81d-43c9-96b0-c6d30f4670a7",
-        user_id=103392,
-        opts=rootly_opts,
-    )
 )
 
 escalation_policy_default_escalation_policy = rootly.EscalationPolicy(
@@ -610,7 +582,6 @@ service_api_authentication = rootly.Service(
     name="API - Authentication",
     position=1,
     public_description="Authentications API",
-    slug="api-authentication",
     opts=rootly_opts,
 )
 
@@ -626,7 +597,6 @@ service_catchall = rootly.Service(
     name="CatchAll",
     owner_group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     position=2,
-    slug="catchall",
     opts=rootly_opts,
 )
 
@@ -642,7 +612,6 @@ service_mit_learn_ai_celery = rootly.Service(
     owner_group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     position=9,
     service_ids=["dfc02e84-e281-43a6-b340-0e7cadd62036"],
-    slug="mit-learn-ai-celery",
     opts=rootly_opts,
 )
 
@@ -657,7 +626,6 @@ service_mit_learn_ai_django_webapp = rootly.Service(
     name="MIT Learn AI - Django - Webapp",
     owner_group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     position=5,
-    slug="mit-learn-ai",
     opts=rootly_opts,
 )
 
@@ -676,7 +644,6 @@ service_mit_learn_ai_postgres = rootly.Service(
         "964321a2-ebd8-46d4-bd9e-c582cb4e4e49",
         "dfc02e84-e281-43a6-b340-0e7cadd62036",
     ],
-    slug="mit-learn-ai-postgres",
     opts=rootly_opts,
 )
 
@@ -696,7 +663,6 @@ service_mit_learn_ai_redis = rootly.Service(
         "aefc0e95-1376-41f2-b102-335a186e9eb7",
         "dfc02e84-e281-43a6-b340-0e7cadd62036",
     ],
-    slug="mit-learn-ai-redis",
     opts=rootly_opts,
 )
 
@@ -712,7 +678,6 @@ service_mit_learn_celery = rootly.Service(
     owner_group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     position=7,
     service_ids=["c144023f-00c1-48dd-9e38-ad4c302207e3"],
-    slug="mit-learn-celery",
     opts=rootly_opts,
 )
 
@@ -727,7 +692,6 @@ service_mit_learn_django_webapp = rootly.Service(
     name="MIT Learn - Django - Webapp",
     owner_group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     position=3,
-    slug="mit-learn-django",
     opts=rootly_opts,
 )
 
@@ -746,7 +710,6 @@ service_mit_learn_keycloak_postgres = rootly.Service(
         "b2389961-09be-4167-a304-a2ee1ef9af1b",
         "c144023f-00c1-48dd-9e38-ad4c302207e3",
     ],
-    slug="mit-learn-keycloak-postgres",
     opts=rootly_opts,
 )
 
@@ -762,7 +725,6 @@ service_mit_learn_keycloak_webapp = rootly.Service(
     owner_group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     position=27,
     service_ids=["c144023f-00c1-48dd-9e38-ad4c302207e3"],
-    slug="mit-learn-keycloak-webapp",
     opts=rootly_opts,
 )
 
@@ -781,7 +743,6 @@ service_mit_learn_nextjs = rootly.Service(
         "70173c97-f29d-453f-93ea-da9321d5984d",
         "c144023f-00c1-48dd-9e38-ad4c302207e3",
     ],
-    slug="mit-learn-nextjs",
     opts=rootly_opts,
 )
 
@@ -802,7 +763,6 @@ service_mit_learn_opensearch = rootly.Service(
         "7b46658d-cd59-4c49-970b-9e9dc8998a7e",
         "c144023f-00c1-48dd-9e38-ad4c302207e3",
     ],
-    slug="mit-learn-opensearch",
     opts=rootly_opts,
 )
 
@@ -823,7 +783,6 @@ service_mit_learn_postgres = rootly.Service(
         "b2389961-09be-4167-a304-a2ee1ef9af1b",
         "0e8c091d-274d-4687-bb70-d85c5600e90b",
     ],
-    slug="mit-learn-postgres",
     opts=rootly_opts,
 )
 
@@ -846,7 +805,6 @@ service_mit_learn_qdrant = rootly.Service(
         "c144023f-00c1-48dd-9e38-ad4c302207e3",
         "70173c97-f29d-453f-93ea-da9321d5984d",
     ],
-    slug="mit-learn-qdrant",
     opts=rootly_opts,
 )
 
@@ -866,7 +824,6 @@ service_mit_learn_redis = rootly.Service(
         "b2389961-09be-4167-a304-a2ee1ef9af1b",
         "c144023f-00c1-48dd-9e38-ad4c302207e3",
     ],
-    slug="mit-learn-redis",
     opts=rootly_opts,
 )
 
@@ -890,7 +847,6 @@ service_mit_learn_tika = rootly.Service(
         "c144023f-00c1-48dd-9e38-ad4c302207e3",
         "70173c97-f29d-453f-93ea-da9321d5984d",
     ],
-    slug="mit-learn-tika",
     opts=rootly_opts,
 )
 
@@ -914,7 +870,6 @@ service_mitx_online_django_webapp = rootly.Service(
         "24ef3748-0a12-4a55-9b4e-5eb94a08fe03",
         "24abd4d9-4aac-4ea0-afc6-eb2106cc52fd",
     ],
-    slug="mitx-online-django",
     opts=rootly_opts,
 )
 
@@ -933,7 +888,6 @@ service_mitx_online_open_edx_cms_celery = rootly.Service(
         "0f046ecc-a5eb-4cdf-aba2-6922001ad774",
         "db3e4db5-fa3f-4239-a0f4-aa558847df66",
     ],
-    slug="mitx-online-open-edx-cms-celery",
     opts=rootly_opts,
 )
 
@@ -952,7 +906,6 @@ service_mitx_online_open_edx_cms_webapp = rootly.Service(
         "145db75f-c893-444b-9564-85ff41d42c6a",
         "6ee39557-47af-40e9-a4f7-eccee9406ecf",
     ],
-    slug="mitx-online-open-edx-cms-webapp",
     opts=rootly_opts,
 )
 
@@ -968,7 +921,6 @@ service_mitx_online_open_edx_lms_celery = rootly.Service(
     owner_group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     position=12,
     service_ids=["6ee39557-47af-40e9-a4f7-eccee9406ecf"],
-    slug="mitx-online-open-edx-lms-celery",
     opts=rootly_opts,
 )
 
@@ -982,7 +934,6 @@ service_mitx_online_open_edx_lms_webapp = rootly.Service(
     name="MITx Online - Open edX - LMS - Webapp",
     owner_group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     position=4,
-    slug="mitx-online-open-edx",
     opts=rootly_opts,
 )
 
@@ -1003,7 +954,6 @@ service_mitx_online_open_edx_mongodb = rootly.Service(
         "6ee39557-47af-40e9-a4f7-eccee9406ecf",
         "ce09f262-1edf-475f-b145-3185d0da7241",
     ],
-    slug="mitx-online-open-edx-mongodb",
     opts=rootly_opts,
 )
 
@@ -1024,7 +974,6 @@ service_mitx_online_open_edx_mysql = rootly.Service(
         "145db75f-c893-444b-9564-85ff41d42c6a",
         "6ee39557-47af-40e9-a4f7-eccee9406ecf",
     ],
-    slug="mitx-online-open-edx-mysql",
     opts=rootly_opts,
 )
 
@@ -1049,7 +998,6 @@ service_mitx_online_open_edx_opensearch = rootly.Service(
         "24ef3748-0a12-4a55-9b4e-5eb94a08fe03",
         "24abd4d9-4aac-4ea0-afc6-eb2106cc52fd",
     ],
-    slug="mitx-online-open-edx-opensearch",
     opts=rootly_opts,
 )
 
@@ -1070,7 +1018,6 @@ service_mitx_online_open_edx_redis = rootly.Service(
         "6ee39557-47af-40e9-a4f7-eccee9406ecf",
         "db3e4db5-fa3f-4239-a0f4-aa558847df66",
     ],
-    slug="mitx-online-open-edx-redis",
     opts=rootly_opts,
 )
 
@@ -1086,7 +1033,6 @@ service_odl_video_celery = rootly.Service(
     owner_group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     position=25,
     service_ids=["defb1faa-e8a4-4fe5-8f03-4103667592f1"],
-    slug="odl-video-celery",
     opts=rootly_opts,
 )
 
@@ -1101,7 +1047,6 @@ service_odl_video_django_webapp = rootly.Service(
     name="ODL Video - Django - Webapp",
     owner_group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     position=6,
-    slug="odl-video",
     opts=rootly_opts,
 )
 
@@ -1119,7 +1064,6 @@ service_odl_video_postgres = rootly.Service(
         "9fc1b049-d60c-4a4c-b5d9-95ea8db3aae8",
         "defb1faa-e8a4-4fe5-8f03-4103667592f1",
     ],
-    slug="odl-video-postgres",
     opts=rootly_opts,
 )
 
@@ -1133,7 +1077,6 @@ service_ui_user_profile_block = rootly.Service(
     name="UI - User Profile Block",
     position=1,
     public_description="User Profile UI Block",
-    slug="ui-user-profile-block",
     opts=rootly_opts,
 )
 
@@ -2454,7 +2397,6 @@ incident_permission_set_default = rootly.IncidentPermissionSet(
     name="Default",
     private_incident_permissions=["create", "read", "update", "delete"],
     public_incident_permissions=["create", "read", "update", "delete"],
-    slug="default",
     opts=rootly_opts,
 )
 
@@ -2463,7 +2405,6 @@ incident_permission_set_observer = rootly.IncidentPermissionSet(
     name="Observer",
     private_incident_permissions=["read"],
     public_incident_permissions=["read", "create"],
-    slug="observer",
     opts=rootly_opts,
 )
 
@@ -2776,7 +2717,6 @@ sev3 = rootly.Severity(
     name="P4",
     position=4,
     severity="low",
-    slug="p4",
     opts=rootly_opts,
 )
 
@@ -2788,6 +2728,7 @@ alerts_source_cloudwatch_critical = rootly.AlertsSource(
         {"alertFieldId": "4a3add3c-5611-4dd9-ba65-4fb60b7f4fc6"},
         {"alertFieldId": "45a09cf3-b0f2-43cf-b596-34aaab9279dc"},
     ],
+    alert_source_urgency_rules_attributes=CLOUDWATCH_NON_PROD_URGENCY_RULES,
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
     deduplication_key_kind="payload",
     name="Cloudwatch - Critical",
@@ -2806,6 +2747,7 @@ alerts_source_cloudwatch_warning = rootly.AlertsSource(
         {"alertFieldId": "4a3add3c-5611-4dd9-ba65-4fb60b7f4fc6"},
         {"alertFieldId": "45a09cf3-b0f2-43cf-b596-34aaab9279dc"},
     ],
+    alert_source_urgency_rules_attributes=CLOUDWATCH_NON_PROD_URGENCY_RULES,
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
     deduplication_key_kind="payload",
     name="Cloudwatch - Warning",
@@ -3005,7 +2947,7 @@ alerts_source_pingdom = rootly.AlertsSource(
     },
     status="connected",
     webhook_endpoint="https://webhooks.rootly.com/webhooks/incoming/generic_webhooks/notify/<TYPE>/<ID>",
-    opts=rootly_alert_source_opts,
+    opts=rootly_pingdom_alert_source_opts,
 )
 
 alerts_source_platform_engineering_team_email_monitor = rootly.AlertsSource(

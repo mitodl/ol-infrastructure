@@ -23,8 +23,7 @@ class IncidentPermissionSetArgs:
                  incident_permission_set_id: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  private_incident_permissions: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 public_incident_permissions: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None):
+                 public_incident_permissions: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None):
         """
         The set of arguments for constructing a IncidentPermissionSet resource.
 
@@ -32,7 +31,6 @@ class IncidentPermissionSetArgs:
         :param pulumi.Input[_builtins.str] name: The incident permission set name.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] private_incident_permissions: Value must be one of <span pulumi-lang-nodejs="`create`" pulumi-lang-dotnet="`Create`" pulumi-lang-go="`create`" pulumi-lang-python="`create`" pulumi-lang-yaml="`create`" pulumi-lang-java="`create`" pulumi-lang-hcl="`create`">`create`</span>, <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`" pulumi-lang-hcl="`read`">`read`</span>, <span pulumi-lang-nodejs="`update`" pulumi-lang-dotnet="`Update`" pulumi-lang-go="`update`" pulumi-lang-python="`update`" pulumi-lang-yaml="`update`" pulumi-lang-java="`update`" pulumi-lang-hcl="`update`">`update`</span>, <span pulumi-lang-nodejs="`delete`" pulumi-lang-dotnet="`Delete`" pulumi-lang-go="`delete`" pulumi-lang-python="`delete`" pulumi-lang-yaml="`delete`" pulumi-lang-java="`delete`" pulumi-lang-hcl="`delete`">`delete`</span>.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] public_incident_permissions: Value must be one of <span pulumi-lang-nodejs="`create`" pulumi-lang-dotnet="`Create`" pulumi-lang-go="`create`" pulumi-lang-python="`create`" pulumi-lang-yaml="`create`" pulumi-lang-java="`create`" pulumi-lang-hcl="`create`">`create`</span>, <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`" pulumi-lang-hcl="`read`">`read`</span>, <span pulumi-lang-nodejs="`update`" pulumi-lang-dotnet="`Update`" pulumi-lang-go="`update`" pulumi-lang-python="`update`" pulumi-lang-yaml="`update`" pulumi-lang-java="`update`" pulumi-lang-hcl="`update`">`update`</span>, <span pulumi-lang-nodejs="`delete`" pulumi-lang-dotnet="`Delete`" pulumi-lang-go="`delete`" pulumi-lang-python="`delete`" pulumi-lang-yaml="`delete`" pulumi-lang-java="`delete`" pulumi-lang-hcl="`delete`">`delete`</span>.
-        :param pulumi.Input[_builtins.str] slug: The incident permission set slug.
         """
         if description is not None:
             pulumi.set(__self__, "description", description)
@@ -44,8 +42,6 @@ class IncidentPermissionSetArgs:
             pulumi.set(__self__, "private_incident_permissions", private_incident_permissions)
         if public_incident_permissions is not None:
             pulumi.set(__self__, "public_incident_permissions", public_incident_permissions)
-        if slug is not None:
-            pulumi.set(__self__, "slug", slug)
 
     @_builtins.property
     @pulumi.getter
@@ -103,18 +99,6 @@ class IncidentPermissionSetArgs:
     @public_incident_permissions.setter
     def public_incident_permissions(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "public_incident_permissions", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The incident permission set slug.
-        """
-        return pulumi.get(self, "slug")
-
-    @slug.setter
-    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "slug", value)
 
 
 @pulumi.input_type
@@ -229,7 +213,6 @@ class IncidentPermissionSet(pulumi.CustomResource):
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  private_incident_permissions: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  public_incident_permissions: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a IncidentPermissionSet resource with the given unique name, props, and options.
@@ -240,7 +223,6 @@ class IncidentPermissionSet(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] name: The incident permission set name.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] private_incident_permissions: Value must be one of <span pulumi-lang-nodejs="`create`" pulumi-lang-dotnet="`Create`" pulumi-lang-go="`create`" pulumi-lang-python="`create`" pulumi-lang-yaml="`create`" pulumi-lang-java="`create`" pulumi-lang-hcl="`create`">`create`</span>, <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`" pulumi-lang-hcl="`read`">`read`</span>, <span pulumi-lang-nodejs="`update`" pulumi-lang-dotnet="`Update`" pulumi-lang-go="`update`" pulumi-lang-python="`update`" pulumi-lang-yaml="`update`" pulumi-lang-java="`update`" pulumi-lang-hcl="`update`">`update`</span>, <span pulumi-lang-nodejs="`delete`" pulumi-lang-dotnet="`Delete`" pulumi-lang-go="`delete`" pulumi-lang-python="`delete`" pulumi-lang-yaml="`delete`" pulumi-lang-java="`delete`" pulumi-lang-hcl="`delete`">`delete`</span>.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] public_incident_permissions: Value must be one of <span pulumi-lang-nodejs="`create`" pulumi-lang-dotnet="`Create`" pulumi-lang-go="`create`" pulumi-lang-python="`create`" pulumi-lang-yaml="`create`" pulumi-lang-java="`create`" pulumi-lang-hcl="`create`">`create`</span>, <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`" pulumi-lang-hcl="`read`">`read`</span>, <span pulumi-lang-nodejs="`update`" pulumi-lang-dotnet="`Update`" pulumi-lang-go="`update`" pulumi-lang-python="`update`" pulumi-lang-yaml="`update`" pulumi-lang-java="`update`" pulumi-lang-hcl="`update`">`update`</span>, <span pulumi-lang-nodejs="`delete`" pulumi-lang-dotnet="`Delete`" pulumi-lang-go="`delete`" pulumi-lang-python="`delete`" pulumi-lang-yaml="`delete`" pulumi-lang-java="`delete`" pulumi-lang-hcl="`delete`">`delete`</span>.
-        :param pulumi.Input[_builtins.str] slug: The incident permission set slug.
         """
         ...
     @overload
@@ -271,7 +253,6 @@ class IncidentPermissionSet(pulumi.CustomResource):
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  private_incident_permissions: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  public_incident_permissions: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -286,7 +267,7 @@ class IncidentPermissionSet(pulumi.CustomResource):
             __props__.__dict__["name"] = name
             __props__.__dict__["private_incident_permissions"] = private_incident_permissions
             __props__.__dict__["public_incident_permissions"] = public_incident_permissions
-            __props__.__dict__["slug"] = slug
+            __props__.__dict__["slug"] = None
         super(IncidentPermissionSet, __self__).__init__(
             'rootly:index/incidentPermissionSet:IncidentPermissionSet',
             resource_name,

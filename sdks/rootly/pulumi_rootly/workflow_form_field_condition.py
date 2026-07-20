@@ -20,6 +20,7 @@ __all__ = ['WorkflowFormFieldConditionArgs', 'WorkflowFormFieldCondition']
 class WorkflowFormFieldConditionArgs:
     def __init__(__self__, *,
                  form_field_id: pulumi.Input[_builtins.str],
+                 workflow_id: pulumi.Input[_builtins.str],
                  incident_condition: pulumi.Input[Optional[_builtins.str]] = None,
                  selected_catalog_entity_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_cause_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
@@ -31,16 +32,16 @@ class WorkflowFormFieldConditionArgs:
                  selected_service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  selected_user_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
                  values: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
-                 workflow_form_field_condition_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 workflow_id: pulumi.Input[Optional[_builtins.str]] = None):
+                 workflow_form_field_condition_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a WorkflowFormFieldCondition resource.
 
         :param pulumi.Input[_builtins.str] form_field_id: The custom field for this condition
-        :param pulumi.Input[_builtins.str] incident_condition: The trigger condition. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         :param pulumi.Input[_builtins.str] workflow_id: The workflow for this condition
+        :param pulumi.Input[_builtins.str] incident_condition: The trigger condition. Value must be one of `IS`, `IS NOT`, `ANY`, `CONTAINS`, `CONTAINS_ALL`, `CONTAINS_NONE`, `NONE`, `SET`, `UNSET`.
         """
         pulumi.set(__self__, "form_field_id", form_field_id)
+        pulumi.set(__self__, "workflow_id", workflow_id)
         if incident_condition is not None:
             pulumi.set(__self__, "incident_condition", incident_condition)
         if selected_catalog_entity_ids is not None:
@@ -65,8 +66,6 @@ class WorkflowFormFieldConditionArgs:
             pulumi.set(__self__, "values", values)
         if workflow_form_field_condition_id is not None:
             pulumi.set(__self__, "workflow_form_field_condition_id", workflow_form_field_condition_id)
-        if workflow_id is not None:
-            pulumi.set(__self__, "workflow_id", workflow_id)
 
     @_builtins.property
     @pulumi.getter(name="formFieldId")
@@ -79,6 +78,18 @@ class WorkflowFormFieldConditionArgs:
     @form_field_id.setter
     def form_field_id(self, value: pulumi.Input[_builtins.str]):
         pulumi.set(self, "form_field_id", value)
+
+    @_builtins.property
+    @pulumi.getter(name="workflowId")
+    def workflow_id(self) -> pulumi.Input[_builtins.str]:
+        """
+        The workflow for this condition
+        """
+        return pulumi.get(self, "workflow_id")
+
+    @workflow_id.setter
+    def workflow_id(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "workflow_id", value)
 
     @_builtins.property
     @pulumi.getter(name="incidentCondition")
@@ -190,18 +201,6 @@ class WorkflowFormFieldConditionArgs:
     @workflow_form_field_condition_id.setter
     def workflow_form_field_condition_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "workflow_form_field_condition_id", value)
-
-    @_builtins.property
-    @pulumi.getter(name="workflowId")
-    def workflow_id(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The workflow for this condition
-        """
-        return pulumi.get(self, "workflow_id")
-
-    @workflow_id.setter
-    def workflow_id(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "workflow_id", value)
 
 
 @pulumi.input_type
@@ -485,6 +484,8 @@ class WorkflowFormFieldCondition(pulumi.CustomResource):
             __props__.__dict__["selected_user_ids"] = selected_user_ids
             __props__.__dict__["values"] = values
             __props__.__dict__["workflow_form_field_condition_id"] = workflow_form_field_condition_id
+            if workflow_id is None and not opts.urn:
+                raise TypeError("Missing required property 'workflow_id'")
             __props__.__dict__["workflow_id"] = workflow_id
         super(WorkflowFormFieldCondition, __self__).__init__(
             'rootly:index/workflowFormFieldCondition:WorkflowFormFieldCondition',

@@ -23,14 +23,12 @@ class CustomFormArgs:
                  custom_form_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  enabled: pulumi.Input[Optional[_builtins.bool]] = None,
-                 name: pulumi.Input[Optional[_builtins.str]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None):
+                 name: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a CustomForm resource.
 
         :param pulumi.Input[_builtins.str] command: The Slack command used to trigger this form.
         :param pulumi.Input[_builtins.str] name: The name of the custom form.
-        :param pulumi.Input[_builtins.str] slug: The custom form slug. Add this to form_field.shown or form_field.required to associate form fields with custom forms.
         """
         pulumi.set(__self__, "command", command)
         if custom_form_id is not None:
@@ -41,8 +39,6 @@ class CustomFormArgs:
             pulumi.set(__self__, "enabled", enabled)
         if name is not None:
             pulumi.set(__self__, "name", name)
-        if slug is not None:
-            pulumi.set(__self__, "slug", slug)
 
     @_builtins.property
     @pulumi.getter
@@ -94,18 +90,6 @@ class CustomFormArgs:
     @name.setter
     def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The custom form slug. Add this to form_field.shown or form_field.required to associate form fields with custom forms.
-        """
-        return pulumi.get(self, "slug")
-
-    @slug.setter
-    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "slug", value)
 
 
 @pulumi.input_type
@@ -212,7 +196,6 @@ class CustomForm(pulumi.CustomResource):
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  enabled: pulumi.Input[Optional[_builtins.bool]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a CustomForm resource with the given unique name, props, and options.
@@ -221,7 +204,6 @@ class CustomForm(pulumi.CustomResource):
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.str] command: The Slack command used to trigger this form.
         :param pulumi.Input[_builtins.str] name: The name of the custom form.
-        :param pulumi.Input[_builtins.str] slug: The custom form slug. Add this to form_field.shown or form_field.required to associate form fields with custom forms.
         """
         ...
     @overload
@@ -252,7 +234,6 @@ class CustomForm(pulumi.CustomResource):
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  enabled: pulumi.Input[Optional[_builtins.bool]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -269,7 +250,7 @@ class CustomForm(pulumi.CustomResource):
             __props__.__dict__["description"] = description
             __props__.__dict__["enabled"] = enabled
             __props__.__dict__["name"] = name
-            __props__.__dict__["slug"] = slug
+            __props__.__dict__["slug"] = None
         super(CustomForm, __self__).__init__(
             'rootly:index/customForm:CustomForm',
             resource_name,

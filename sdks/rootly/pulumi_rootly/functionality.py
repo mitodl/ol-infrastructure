@@ -42,8 +42,7 @@ class FunctionalityArgs:
                  service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  service_now_ci_sys_id: pulumi.Input[Optional[_builtins.str]] = None,
                  slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalitySlackAliasArgs']]]] = None,
-                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalitySlackChannelArgs']]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None):
+                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalitySlackChannelArgs']]]] = None):
         """
         The set of arguments for constructing a Functionality resource.
 
@@ -68,7 +67,6 @@ class FunctionalityArgs:
         :param pulumi.Input[_builtins.str] service_now_ci_sys_id: The Service Now CI sys id associated to this functionality
         :param pulumi.Input[Sequence[pulumi.Input['FunctionalitySlackAliasArgs']]] slack_aliases: Slack Aliases associated with this functionality
         :param pulumi.Input[Sequence[pulumi.Input['FunctionalitySlackChannelArgs']]] slack_channels: Slack Channels associated with this functionality
-        :param pulumi.Input[_builtins.str] slug: The slug of the functionality
         """
         if backstage_id is not None:
             pulumi.set(__self__, "backstage_id", backstage_id)
@@ -114,8 +112,6 @@ class FunctionalityArgs:
             pulumi.set(__self__, "slack_aliases", slack_aliases)
         if slack_channels is not None:
             pulumi.set(__self__, "slack_channels", slack_channels)
-        if slug is not None:
-            pulumi.set(__self__, "slug", slug)
 
     @_builtins.property
     @pulumi.getter(name="backstageId")
@@ -377,18 +373,6 @@ class FunctionalityArgs:
     @slack_channels.setter
     def slack_channels(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['FunctionalitySlackChannelArgs']]]]):
         pulumi.set(self, "slack_channels", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The slug of the functionality
-        """
-        return pulumi.get(self, "slug")
-
-    @slug.setter
-    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "slug", value)
 
 
 @pulumi.input_type
@@ -792,7 +776,6 @@ class Functionality(pulumi.CustomResource):
                  service_now_ci_sys_id: pulumi.Input[Optional[_builtins.str]] = None,
                  slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input[Union['FunctionalitySlackAliasArgs', 'FunctionalitySlackAliasArgsDict']]]]] = None,
                  slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input[Union['FunctionalitySlackChannelArgs', 'FunctionalitySlackChannelArgsDict']]]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a Functionality resource with the given unique name, props, and options.
@@ -820,7 +803,6 @@ class Functionality(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] service_now_ci_sys_id: The Service Now CI sys id associated to this functionality
         :param pulumi.Input[Sequence[pulumi.Input[Union['FunctionalitySlackAliasArgs', 'FunctionalitySlackAliasArgsDict']]]] slack_aliases: Slack Aliases associated with this functionality
         :param pulumi.Input[Sequence[pulumi.Input[Union['FunctionalitySlackChannelArgs', 'FunctionalitySlackChannelArgsDict']]]] slack_channels: Slack Channels associated with this functionality
-        :param pulumi.Input[_builtins.str] slug: The slug of the functionality
         """
         ...
     @overload
@@ -868,7 +850,6 @@ class Functionality(pulumi.CustomResource):
                  service_now_ci_sys_id: pulumi.Input[Optional[_builtins.str]] = None,
                  slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input[Union['FunctionalitySlackAliasArgs', 'FunctionalitySlackAliasArgsDict']]]]] = None,
                  slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input[Union['FunctionalitySlackChannelArgs', 'FunctionalitySlackChannelArgsDict']]]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -900,7 +881,7 @@ class Functionality(pulumi.CustomResource):
             __props__.__dict__["service_now_ci_sys_id"] = service_now_ci_sys_id
             __props__.__dict__["slack_aliases"] = slack_aliases
             __props__.__dict__["slack_channels"] = slack_channels
-            __props__.__dict__["slug"] = slug
+            __props__.__dict__["slug"] = None
         super(Functionality, __self__).__init__(
             'rootly:index/functionality:Functionality',
             resource_name,

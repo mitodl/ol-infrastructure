@@ -4,6 +4,7 @@ encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAFUqc+t5s6+UczAij
 config:
   redirects:domains:
     amps.odl.mit.edu: https://video.odl.mit.edu
+    bi.odl.mit.edu: https://bi.ol.mit.edu
     chalkradiopodcast.com: https://chalk-radio.simplecast.com
     chalkradiopodcast.net: https://chalk-radio.simplecast.com
     chalkradiopodcast.org: https://chalk-radio.simplecast.com
@@ -13,3 +14,4 @@ config:
     preview.mitxonline.mit.edu: https://preview.courses.learn.mit.edu
     starcellbio.mit.edu: https://github.com/starteam/starcellbio_html
     studio.mitxonline.mit.edu: https://studio.courses.learn.mit.edu
+    pe.ol.mit.edu: https://engineering.ol.mit.edu

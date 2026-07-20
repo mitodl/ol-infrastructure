@@ -1,6 +1,8 @@
 # ruff: noqa: ERA001, E501
 """K8s application deployment components."""
 
+import hashlib
+import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -27,6 +29,7 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.lib.versions import NGINX_VERSION
 from ol_infrastructure.lib.aws.eks_helper import cached_image_uri, ecr_image_uri
+from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import Component, KubernetesServiceAppProtocol
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
@@ -310,7 +313,16 @@ class OLApplicationK8sConfig(BaseModel):
     vault_k8s_resource_auth_name: str
     registry: Literal["dockerhub", "ecr"] = "ecr"
     image_pull_policy: str = "IfNotPresent"
-    # You get CPU and memory autoscaling by default
+    # CPU-only by default. Memory is handled vertically by the webapp VPA (see
+    # manage_webapp_memory_vpa below), NOT horizontally here.
+    #
+    # HPA `type: Resource` metrics are a *mean across all pods*. A single pod
+    # ramping toward its own limit is OOMKilled while the fleet average stays
+    # under target, so a memory HPA never reacts to the failure it is nominally
+    # there to prevent. Observed on mitxonline production 2026-07: pods OOMKilled
+    # at ~85% of their limit while replicas sat pinned at minReplicas for a week.
+    # Adding more replicas also does not shrink the working set of the pod that is
+    # actually about to die. Memory is a vertical problem; use the VPA.
     hpa_scaling_metrics: list[kubernetes.autoscaling.v2.MetricSpecArgs] = [
         kubernetes.autoscaling.v2.MetricSpecArgs(
             type="Resource",
@@ -322,17 +334,38 @@ class OLApplicationK8sConfig(BaseModel):
                 ),
             ),
         ),
-        kubernetes.autoscaling.v2.MetricSpecArgs(
-            type="Resource",
-            resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
-                name="memory",  # Memory utilization as the scaling metric
-                target=kubernetes.autoscaling.v2.MetricTargetArgs(
-                    type="Utilization",
-                    average_utilization=80,  # Target memory utilization (60%)
-                ),
-            ),
-        ),
     ]
+    manage_webapp_memory_vpa: bool = Field(
+        default=True,
+        description=(
+            "Create a VerticalPodAutoscaler that manages memory requests/limits for "
+            "the webapp container. Memory-only, so it cannot distort the CPU "
+            "utilization signal the HPA (or a KEDA cpu trigger) divides by. Set False "
+            "only when the caller builds its own webapp VPA, otherwise two VPAs would "
+            "target the same Deployment."
+        ),
+    )
+    webapp_vpa_min_allowed_memory: str | None = Field(
+        default=None,
+        description=(
+            "Floor for the webapp memory VPA. Defaults to resource_requests['memory'] "
+            "(falling back to resource_limits['memory']), which preserves the pod's "
+            "current scheduling footprint as the floor. Deliberately NOT the memory "
+            "*limit*: for a burstable pod whose request is below its limit, a "
+            "limit-derived floor would silently inflate the cluster-wide reservation "
+            "the moment the VPA is introduced."
+        ),
+    )
+    webapp_vpa_max_allowed_memory: str | None = Field(
+        default=None,
+        description=(
+            "Ceiling for the webapp memory VPA. Defaults to 2x "
+            "resource_limits['memory']. Note that when granian_config is set with "
+            "limit_workers_max_rss, --workers-max-rss is resolved at synth time from "
+            "resource_limits and will NOT track this ceiling -- set "
+            "GranianConfig.workers_max_rss explicitly to keep the two in sync."
+        ),
+    )
     import_nginx_config: bool = Field(default=True)
     import_nginx_config_path: str = "files/web.conf"
     import_uwsgi_config: bool = Field(default=False)
@@ -488,6 +521,20 @@ class OLApplicationK8sConfig(BaseModel):
             "Not added to main application or celery containers."
         ),
     )
+    config_hash_inputs: dict[str, str | Output[str]] = Field(
+        default_factory=dict,
+        description=(
+            "Named strings/Outputs folded into a config-hash annotation applied to "
+            "the webapp, celery worker, and celery beat pod templates. Kubernetes "
+            "only rolls pods when their pod template changes, so ConfigMaps/Secrets "
+            "referenced by name elsewhere (e.g. via env_from_secret_names, or a "
+            "volume in extra_volumes) don't trigger a restart when their contents "
+            "change out-of-band. Pass a value here (e.g. a Secret's resourceVersion, "
+            "or a hash of externally-managed config) for anything whose changes "
+            "should trigger a rolling restart. The content of the nginx/uwsgi "
+            "ConfigMaps this component manages is folded in automatically."
+        ),
+    )
     webapp_deployment_aliases: list[Any] = Field(
         default_factory=list,
         description=(
@@ -575,6 +622,40 @@ class OLApplicationK8sConfig(BaseModel):
                 "whose upstream address matches the overridden port."
             )
             raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def validate_memory_scaling_not_split(self) -> "OLApplicationK8sConfig":
+        """Reject configs where memory is scaled both horizontally and vertically.
+
+        A memory HPA metric and a memory VPA on the same Deployment actively fight:
+        the VPA raises memory requests, which lowers the utilization percentage the
+        HPA computes (usage / request), which makes the HPA scale *down*, which
+        concentrates load onto fewer pods and drives usage back up. The two settle
+        into oscillation rather than a stable size.
+
+        Memory belongs to exactly one controller. The component default is the VPA;
+        a caller that genuinely wants a memory HPA must opt out of the VPA by
+        setting manage_webapp_memory_vpa=False.
+        """
+        if not self.manage_webapp_memory_vpa:
+            return self
+        for metric in self.hpa_scaling_metrics:
+            resource = getattr(metric, "resource", None)
+            if getattr(metric, "type", None) == "Resource" and (
+                getattr(resource, "name", None) == "memory"
+            ):
+                msg = (
+                    "hpa_scaling_metrics contains a memory Resource metric while "
+                    "manage_webapp_memory_vpa is True. Memory would be controlled by "
+                    "both the HPA and the VPA, which oscillate against each other. "
+                    "Remove the memory metric from hpa_scaling_metrics (preferred -- "
+                    "HPA memory metrics are a fleet average and cannot prevent a "
+                    "single pod from being OOMKilled), or set "
+                    "manage_webapp_memory_vpa=False to keep horizontal-only memory "
+                    "scaling."
+                )
+                raise ValueError(msg)
         return self
 
     @model_validator(mode="after")
@@ -800,8 +881,20 @@ class OLApplicationK8s(ComponentResource):
             effective_cmd_array = ol_app_k8s_config.application_cmd_array
             effective_arg_array = ol_app_k8s_config.application_arg_array
 
+        # Config/secret content folded into a rolling-restart annotation on the
+        # webapp/celery/beat pod templates. Kubernetes only restarts pods when their
+        # pod template changes, so this catches config that's referenced by name
+        # (and therefore wouldn't otherwise show up in the pod spec diff).
+        config_hash_sources: dict[str, str | Output[str]] = dict(
+            ol_app_k8s_config.config_hash_inputs
+        )
+
         # Import nginx configuration as a configmap
         if ol_app_k8s_config.import_nginx_config:
+            _nginx_conf_text = ol_app_k8s_config.project_root.joinpath(
+                effective_nginx_config_path
+            ).read_text()
+            config_hash_sources["nginx.conf"] = _nginx_conf_text
             application_nginx_configmap = kubernetes.core.v1.ConfigMap(
                 f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-nginx-configmap",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -809,11 +902,7 @@ class OLApplicationK8s(ComponentResource):
                     namespace=ol_app_k8s_config.application_namespace,
                     labels=ol_app_k8s_config.k8s_global_labels,
                 ),
-                data={
-                    "web.conf": ol_app_k8s_config.project_root.joinpath(
-                        effective_nginx_config_path
-                    ).read_text(),
-                },
+                data={"web.conf": _nginx_conf_text},
                 opts=resource_options,
             )
             volumes.append(
@@ -858,6 +947,10 @@ class OLApplicationK8s(ComponentResource):
 
         # Import uwsgi configuration as a configmap
         if ol_app_k8s_config.import_uwsgi_config:
+            _uwsgi_ini_text = ol_app_k8s_config.project_root.joinpath(
+                "files/uwsgi.ini"
+            ).read_text()
+            config_hash_sources["uwsgi.ini"] = _uwsgi_ini_text
             application_uwsgi_configmap = kubernetes.core.v1.ConfigMap(
                 f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-uwsgi-configmap",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -865,11 +958,7 @@ class OLApplicationK8s(ComponentResource):
                     namespace=ol_app_k8s_config.application_namespace,
                     labels=ol_app_k8s_config.k8s_global_labels,
                 ),
-                data={
-                    "uwsgi.ini": ol_app_k8s_config.project_root.joinpath(
-                        "files/uwsgi.ini"
-                    ).read_text(),
-                },
+                data={"uwsgi.ini": _uwsgi_ini_text},
                 opts=resource_options,
             )
             volumes.append(
@@ -1030,6 +1119,20 @@ class OLApplicationK8s(ComponentResource):
                 ol_app_k8s_config.pod_security_context
             )
 
+        # Annotation applied to every pod template so that changes to config/secret
+        # content named in config_hash_sources (nginx/uwsgi config managed by this
+        # component, plus anything the caller adds via config_hash_inputs) trigger a
+        # rolling restart even though the pod spec itself is otherwise unchanged.
+        pod_config_hash_annotations: dict[str, Output[str]] = {}
+        if config_hash_sources:
+            pod_config_hash_annotations["ol.mit.edu/config-hash"] = Output.all(
+                **config_hash_sources
+            ).apply(
+                lambda values: hashlib.sha256(
+                    json.dumps(values, sort_keys=True).encode()
+                ).hexdigest()
+            )
+
         _application_deployment_name = truncate_k8s_metanames(
             f"{ol_app_k8s_config.application_name}-app"
         )
@@ -1091,6 +1194,19 @@ class OLApplicationK8s(ComponentResource):
                                     image_pull_policy=image_pull_policy,
                                     env=application_deployment_env_vars,
                                     env_from=application_deployment_envfrom,
+                                    # This pod template carries `application_labels`,
+                                    # which is also the webapp Deployment's selector, so
+                                    # the HPA includes these pods when computing
+                                    # utilization. A container without cpu/memory
+                                    # requests makes the HPA fail closed with
+                                    # FailedGetResourceMetric ("missing request for cpu
+                                    # in container <name>"), reporting <unknown> for
+                                    # *every* metric and suspending all scaling until
+                                    # the Job is garbage collected.
+                                    resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                        requests=ol_app_k8s_config.resource_requests,
+                                        limits=ol_app_k8s_config.resource_limits,
+                                    ),
                                     volume_mounts=ol_app_k8s_config.extra_volume_mounts
                                     or None,
                                 )
@@ -1196,6 +1312,7 @@ class OLApplicationK8s(ComponentResource):
                             "kubectl.kubernetes.io/default-container": (
                                 f"{ol_app_k8s_config.application_name}-app"
                             ),
+                            **pod_config_hash_annotations,
                         },
                     ),
                     spec=kubernetes.core.v1.PodSpecArgs(
@@ -1554,6 +1671,59 @@ class OLApplicationK8s(ComponentResource):
                 ),
             )
 
+        # Vertical memory management for the webapp container.
+        #
+        # This is the counterpart to dropping memory from hpa_scaling_metrics: the
+        # horizontal scaler (HPA or KEDA) owns CPU/throughput, and this VPA owns
+        # memory. They do not contend because they no longer share a resource.
+        # Without it, memory would be unmanaged entirely and pods would keep being
+        # OOMKilled at whatever static limit was declared.
+        #
+        # controlled_resources is memory-only by design -- letting the VPA move CPU
+        # requests would change the denominator of the CPU utilization the HPA (or a
+        # KEDA cpu trigger) scales on.
+        if ol_app_k8s_config.manage_webapp_memory_vpa:
+            _webapp_memory_limit = ol_app_k8s_config.resource_limits.get("memory")
+            if _webapp_memory_limit is None:
+                msg = (
+                    f"{ol_app_k8s_config.application_name}: "
+                    "manage_webapp_memory_vpa requires resource_limits['memory'] to "
+                    "derive the VPA bounds. Set a memory limit, or pass "
+                    "manage_webapp_memory_vpa=False."
+                )
+                raise ValueError(msg)
+            _vpa_min_memory = (
+                ol_app_k8s_config.webapp_vpa_min_allowed_memory
+                or ol_app_k8s_config.resource_requests.get("memory")
+                or _webapp_memory_limit
+            )
+            if ol_app_k8s_config.webapp_vpa_max_allowed_memory is not None:
+                _vpa_max_memory = ol_app_k8s_config.webapp_vpa_max_allowed_memory
+            else:
+                # Default ceiling of 2x the declared limit: enough headroom to absorb
+                # the growth that was previously ending in an OOM kill, while still
+                # bounding a genuine leak rather than letting it consume the node.
+                _vpa_max_memory = f"{int(parse_quantity(_webapp_memory_limit)) * 2 // (1024 * 1024)}Mi"
+            make_vpa(
+                name=truncate_k8s_metanames(
+                    f"{_application_deployment_name}-memory-vpa"
+                ),
+                namespace=ol_app_k8s_config.application_namespace,
+                target_kind="Deployment",
+                target_name=_application_deployment_name,
+                controlled_resources=["memory"],
+                container_name=f"{ol_app_k8s_config.application_name}-app",
+                # Sidecars (nginx, vector, ...) keep their own declared requests.
+                # Naming a single container is not enough on its own: VPA applies its
+                # default behaviour to any container lacking a matching policy.
+                disable_other_containers=True,
+                min_allowed={"memory": _vpa_min_memory},
+                max_allowed={"memory": _vpa_max_memory},
+                opts=resource_options.merge(
+                    ResourceOptions(depends_on=[_application_deployment])
+                ),
+            )
+
         # A kubernetes service resource to act as load balancer for the app instances
         _application_service = kubernetes.core.v1.Service(
             f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-service",
@@ -1624,6 +1794,7 @@ class OLApplicationK8s(ComponentResource):
                     template=kubernetes.core.v1.PodTemplateSpecArgs(
                         metadata=kubernetes.meta.v1.ObjectMetaArgs(
                             labels=celery_labels,
+                            annotations=pod_config_hash_annotations or None,
                         ),
                         # Ref: https://docs.celeryq.dev/en/stable/reference/cli.html#celery-worker
                         spec=kubernetes.core.v1.PodSpecArgs(
@@ -1806,6 +1977,7 @@ class OLApplicationK8s(ComponentResource):
                     template=kubernetes.core.v1.PodTemplateSpecArgs(
                         metadata=kubernetes.meta.v1.ObjectMetaArgs(
                             labels=beat_labels,
+                            annotations=pod_config_hash_annotations or None,
                         ),
                         spec=kubernetes.core.v1.PodSpecArgs(
                             service_account_name=ol_app_k8s_config.application_service_account_name,

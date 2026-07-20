@@ -84,7 +84,7 @@ Rootly). That path is independent of Grafana and is managed in
 | `log_rules/base.py` | Loki datasource UIDs, two-stage pipeline helper, folder creation, delegates to sub-modules. |
 | `log_rules/cert_manager.py` | cert-manager ACME issuer and DNS challenge alert rules. |
 | `log_rules/edxapp.py` | edxapp application log alert rules (500 errors, Redis OOM, credential issues, forum timeouts, SAML). |
-| `log_rules/heroku.py` | Heroku application log alert rules (invalid AWS keys, Bootcamps SAML, OCW Studio, Keycloak). |
+| `log_rules/heroku.py` | Heroku application log alert rules (invalid AWS keys, OCW Studio, Keycloak). |
 | `log_rules/mit_learn.py` | MIT Learn and MITx Online 5xx error rate alert rules. |
 | `log_rules/vault.py` | Vault secret-absent and auth-failure alert rules. |
 | `pingdom_checks.py` | Pingdom uptime checks via Pulumi dynamic provider. Runs in the production stack only. |

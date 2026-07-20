@@ -79,11 +79,11 @@ MARIMO_DATA = "ol-application-marimo-data"
 SUPERSET = "ol-application-superset"
 OPEN_METADATA = "ol-application-open-metadata"
 OPENLIT = "ol-application-openlit"
+OPIK = "ol-application-opik"
 KUBEWATCH = "ol-application-kubewatch"
 KUBEWATCH_WEBHOOK = "ol-application-kubewatch-webhook"
 FASTLY_REDIRECTOR = "ol-application-fastly-redirector"
 CELERY_MONITORING = "ol-application-celery-monitoring"
-REDASH = "ol-application-redash"
 LEARN_AI = "ol-application-learn-ai"
 MICROMASTERS = "ol-application-micromasters"
 OL_ANALYTICS_API = "ol-application-ol-analytics-api"
@@ -92,7 +92,6 @@ B2B_STORAGE = "ol-application-b2b-partners-storage"
 DIGITAL_CREDENTIALS = "ol-application-digital-credentials"
 STARBURST = "ol-application-starburst"
 ECS_TEST = "ol-application-ecs-test"
-BOOTCAMPS = "ol-application-bootcamps"
 OCW_SITE = "ol-application-ocw-site"
 MIT_LEARN_NEXTJS = "ol-application-mit-learn-nextjs"
 CLICKHOUSE = "ol-application-clickhouse"
@@ -182,14 +181,12 @@ LEGACY_STACK_REF_PREFIXES: dict[str, str] = {
     KUBEWATCH_WEBHOOK: "applications.kubewatch_webhook_handler",
     FASTLY_REDIRECTOR: "applications.fastly_redirector",
     CELERY_MONITORING: "applications.celery_monitoring",
-    REDASH: "applications.redash",
     LEARN_AI: "applications.learn_ai",
     MICROMASTERS: "applications.micromasters",
     MITXONLINE: "applications.mitxonline",
     B2B_STORAGE: "applications.b2b_partners_storage",
     DIGITAL_CREDENTIALS: "applications.digital_credentials",
     STARBURST: "applications.starburst",
-    BOOTCAMPS: "applications.bootcamps",
     OCW_SITE: "applications.ocw_site",
     MIT_LEARN_NEXTJS: "applications.mit_learn_nextjs",
     CLICKHOUSE: "applications.clickhouse",

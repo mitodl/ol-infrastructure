@@ -28,8 +28,7 @@ class CatalogChecklistTemplateArgs:
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  owners: pulumi.Input[Optional[Sequence[pulumi.Input['CatalogChecklistTemplateOwnerArgs']]]] = None,
                  scope_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 scope_type: pulumi.Input[Optional[_builtins.str]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None):
+                 scope_type: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a CatalogChecklistTemplate resource.
 
@@ -40,7 +39,6 @@ class CatalogChecklistTemplateArgs:
         :param pulumi.Input[Sequence[pulumi.Input['CatalogChecklistTemplateOwnerArgs']]] owners: Template owners
         :param pulumi.Input[_builtins.str] scope_id: The scope ID
         :param pulumi.Input[_builtins.str] scope_type: The scope type. Value must be one of `Team`, `Catalog`.
-        :param pulumi.Input[_builtins.str] slug: The slug of the checklist template
         """
         if catalog_checklist_template_id is not None:
             pulumi.set(__self__, "catalog_checklist_template_id", catalog_checklist_template_id)
@@ -58,8 +56,6 @@ class CatalogChecklistTemplateArgs:
             pulumi.set(__self__, "scope_id", scope_id)
         if scope_type is not None:
             pulumi.set(__self__, "scope_type", scope_type)
-        if slug is not None:
-            pulumi.set(__self__, "slug", slug)
 
     @_builtins.property
     @pulumi.getter(name="catalogChecklistTemplateId")
@@ -153,18 +149,6 @@ class CatalogChecklistTemplateArgs:
     @scope_type.setter
     def scope_type(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "scope_type", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The slug of the checklist template
-        """
-        return pulumi.get(self, "slug")
-
-    @slug.setter
-    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "slug", value)
 
 
 @pulumi.input_type
@@ -330,7 +314,6 @@ class CatalogChecklistTemplate(pulumi.CustomResource):
                  owners: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CatalogChecklistTemplateOwnerArgs', 'CatalogChecklistTemplateOwnerArgsDict']]]]] = None,
                  scope_id: pulumi.Input[Optional[_builtins.str]] = None,
                  scope_type: pulumi.Input[Optional[_builtins.str]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a CatalogChecklistTemplate resource with the given unique name, props, and options.
@@ -344,7 +327,6 @@ class CatalogChecklistTemplate(pulumi.CustomResource):
         :param pulumi.Input[Sequence[pulumi.Input[Union['CatalogChecklistTemplateOwnerArgs', 'CatalogChecklistTemplateOwnerArgsDict']]]] owners: Template owners
         :param pulumi.Input[_builtins.str] scope_id: The scope ID
         :param pulumi.Input[_builtins.str] scope_type: The scope type. Value must be one of `Team`, `Catalog`.
-        :param pulumi.Input[_builtins.str] slug: The slug of the checklist template
         """
         ...
     @overload
@@ -378,7 +360,6 @@ class CatalogChecklistTemplate(pulumi.CustomResource):
                  owners: pulumi.Input[Optional[Sequence[pulumi.Input[Union['CatalogChecklistTemplateOwnerArgs', 'CatalogChecklistTemplateOwnerArgsDict']]]]] = None,
                  scope_id: pulumi.Input[Optional[_builtins.str]] = None,
                  scope_type: pulumi.Input[Optional[_builtins.str]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -396,7 +377,7 @@ class CatalogChecklistTemplate(pulumi.CustomResource):
             __props__.__dict__["owners"] = owners
             __props__.__dict__["scope_id"] = scope_id
             __props__.__dict__["scope_type"] = scope_type
-            __props__.__dict__["slug"] = slug
+            __props__.__dict__["slug"] = None
         super(CatalogChecklistTemplate, __self__).__init__(
             'rootly:index/catalogChecklistTemplate:CatalogChecklistTemplate',
             resource_name,

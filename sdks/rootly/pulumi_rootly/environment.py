@@ -29,8 +29,7 @@ class EnvironmentArgs:
                  position: pulumi.Input[Optional[_builtins.float]] = None,
                  properties: pulumi.Input[Optional[Sequence[pulumi.Input['EnvironmentPropertyArgs']]]] = None,
                  slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input['EnvironmentSlackAliasArgs']]]] = None,
-                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input['EnvironmentSlackChannelArgs']]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None):
+                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input['EnvironmentSlackChannelArgs']]]] = None):
         """
         The set of arguments for constructing a Environment resource.
 
@@ -42,7 +41,6 @@ class EnvironmentArgs:
         :param pulumi.Input[Sequence[pulumi.Input['EnvironmentPropertyArgs']]] properties: Array of property values for this environment.
         :param pulumi.Input[Sequence[pulumi.Input['EnvironmentSlackAliasArgs']]] slack_aliases: Slack Aliases associated with this environment
         :param pulumi.Input[Sequence[pulumi.Input['EnvironmentSlackChannelArgs']]] slack_channels: Slack Channels associated with this environment
-        :param pulumi.Input[_builtins.str] slug: The slug of the environment
         """
         if color is not None:
             pulumi.set(__self__, "color", color)
@@ -62,8 +60,6 @@ class EnvironmentArgs:
             pulumi.set(__self__, "slack_aliases", slack_aliases)
         if slack_channels is not None:
             pulumi.set(__self__, "slack_channels", slack_channels)
-        if slug is not None:
-            pulumi.set(__self__, "slug", slug)
 
     @_builtins.property
     @pulumi.getter
@@ -169,18 +165,6 @@ class EnvironmentArgs:
     @slack_channels.setter
     def slack_channels(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['EnvironmentSlackChannelArgs']]]]):
         pulumi.set(self, "slack_channels", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The slug of the environment
-        """
-        return pulumi.get(self, "slug")
-
-    @slug.setter
-    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "slug", value)
 
 
 @pulumi.input_type
@@ -363,7 +347,6 @@ class Environment(pulumi.CustomResource):
                  properties: pulumi.Input[Optional[Sequence[pulumi.Input[Union['EnvironmentPropertyArgs', 'EnvironmentPropertyArgsDict']]]]] = None,
                  slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input[Union['EnvironmentSlackAliasArgs', 'EnvironmentSlackAliasArgsDict']]]]] = None,
                  slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input[Union['EnvironmentSlackChannelArgs', 'EnvironmentSlackChannelArgsDict']]]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a Environment resource with the given unique name, props, and options.
@@ -378,7 +361,6 @@ class Environment(pulumi.CustomResource):
         :param pulumi.Input[Sequence[pulumi.Input[Union['EnvironmentPropertyArgs', 'EnvironmentPropertyArgsDict']]]] properties: Array of property values for this environment.
         :param pulumi.Input[Sequence[pulumi.Input[Union['EnvironmentSlackAliasArgs', 'EnvironmentSlackAliasArgsDict']]]] slack_aliases: Slack Aliases associated with this environment
         :param pulumi.Input[Sequence[pulumi.Input[Union['EnvironmentSlackChannelArgs', 'EnvironmentSlackChannelArgsDict']]]] slack_channels: Slack Channels associated with this environment
-        :param pulumi.Input[_builtins.str] slug: The slug of the environment
         """
         ...
     @overload
@@ -413,7 +395,6 @@ class Environment(pulumi.CustomResource):
                  properties: pulumi.Input[Optional[Sequence[pulumi.Input[Union['EnvironmentPropertyArgs', 'EnvironmentPropertyArgsDict']]]]] = None,
                  slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input[Union['EnvironmentSlackAliasArgs', 'EnvironmentSlackAliasArgsDict']]]]] = None,
                  slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input[Union['EnvironmentSlackChannelArgs', 'EnvironmentSlackChannelArgsDict']]]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -432,7 +413,7 @@ class Environment(pulumi.CustomResource):
             __props__.__dict__["properties"] = properties
             __props__.__dict__["slack_aliases"] = slack_aliases
             __props__.__dict__["slack_channels"] = slack_channels
-            __props__.__dict__["slug"] = slug
+            __props__.__dict__["slug"] = None
         super(Environment, __self__).__init__(
             'rootly:index/environment:Environment',
             resource_name,

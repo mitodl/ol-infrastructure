@@ -16,7 +16,10 @@ production_defaults = {
         "performance_insights_enabled": True,
         "performance_insights_retention_period": 7,
     },
-    "redis": {"instance_type": CacheInstanceTypes.high_mem_large},
+    "redis": {
+        "instance_type": CacheInstanceTypes.high_mem_large,
+        "monitoring_profile_name": "production",
+    },
     "opensearch": {
         "instance_type": SearchInstanceTypes.high_mem_regular.value,
         "instance_count": 3,
@@ -32,7 +35,10 @@ qa_defaults = {
         "backup_days": 7,
         "monitoring_profile_name": "qa",
     },
-    "redis": {"instance_type": CacheInstanceTypes.small},
+    "redis": {
+        "instance_type": CacheInstanceTypes.small,
+        "monitoring_profile_name": "qa",
+    },
     "opensearch": {
         "instance_type": SearchInstanceTypes.medium.value,
         "instance_count": 3,
@@ -48,7 +54,10 @@ ci_defaults = {
         "backup_days": 1,
         "monitoring_profile_name": "ci",
     },
-    "redis": {"instance_type": CacheInstanceTypes.small},
+    "redis": {
+        "instance_type": CacheInstanceTypes.small,
+        "monitoring_profile_name": "ci",
+    },
     "opensearch": {
         "instance_type": SearchInstanceTypes.medium.value,
         "instance_count": 3,

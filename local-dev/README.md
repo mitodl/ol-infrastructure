@@ -58,6 +58,7 @@ Install these tools before running setup:
 | Helm | ≥ 3.14 | `brew install helm` |
 | mkcert | ≥ 1.4 | `brew install mkcert` |
 | Pulumi CLI | ≥ 3.x | `brew install pulumi` |
+| uv | ≥ 0.9.3 | `brew install uv` |
 
 > **Docker memory:** The cluster runs PostgreSQL, Valkey, APISIX, Keycloak, Qdrant, and up to four Django apps. Allocate at least 8 GB to Docker Desktop (Settings → Resources).
 
@@ -109,8 +110,9 @@ The easiest way is to use the provided start script, which validates your setup 
 
 This will:
 1. Validate that `setup.sh` has been run (cluster exists, kubeconfig configured, certs present)
-2. Sync Python dependencies via `uv`
-3. Start Tilt
+2. Heal any wedged kubelet exec/streaming (see [Troubleshooting](#kubectl-exec-fails-with-a-502-wedged-kubelet-streaming)) — a no-op when healthy
+3. Sync Python dependencies via `uv`
+4. Start Tilt
 
 **Alternative:** If you prefer to start manually without the validation wrapper:
 
@@ -186,10 +188,12 @@ ol-infrastructure/
     │
     ├── scripts/
     │   ├── setup.sh                  # One-time bootstrap (cluster, certs, /etc/hosts)
-    │   ├── start.sh                  # Start the environment (validate setup, sync deps, tilt up)
+    │   ├── start.sh                  # Start the environment (validate setup, heal exec, sync deps, tilt up)
     │   ├── stop.sh                   # Pause the cluster (fast resume via start.sh)
     │   ├── teardown.sh               # Destroy the cluster
-    │   └── seed.sh                   # CLI seeding wrapper (kubectl exec into pods)
+    │   ├── seed.sh                   # CLI seeding wrapper (kubectl exec into pods)
+    │   ├── heal-exec.sh              # Repair wedged kubelet exec/streaming after sleep
+    │   └── wakeup.example.sh         # Example sleepwatcher wake hook (macOS auto-heal)
     │
     ├── certs/                        # mkcert output (gitignored)
     │   ├── local-dev.pem
@@ -329,12 +333,7 @@ kubectl exec -n local-infra local-pg-1 -- psql -U app -d mitlearn
 
 ### Inspect emails (Mailpit)
 
-All outbound email is captured by Mailpit. Access the web UI:
-
-```bash
-kubectl port-forward -n local-infra svc/mailpit 8025:8025
-open http://localhost:8025
-```
+All outbound email is captured by Mailpit. Access the web UI at `https://mail.mit.dev`.
 
 ---
 
@@ -699,6 +698,39 @@ Then restart your browser. The cert was generated with the correct wildcard SANs
 The Next.js build needs ~4 GB of memory. If it OOMs:
 - Increase Docker Desktop memory to 10+ GB
 - Or use a prebuilt image by removing `mit-learn` from `enabled_apps` in `tilt_config.json` and letting Tilt use the `prebuilt_tags` value instead
+
+### `kubectl exec` fails with a 502 (wedged kubelet streaming)
+
+`kubectl exec` / `attach` / `logs -f` into a pod may fail like this, even though `kubectl get` / `describe` / `logs` still work and the node shows `Ready`:
+
+```
+error: Internal error occurred: error sending request: Post
+"https://192.168.97.3:10250/exec/...": proxy error from 127.0.0.1:6443
+while dialing 192.168.97.3:10250, code 502: 502 Bad Gateway
+```
+
+**Why:** the API server proxies exec/attach/logs-follow to each node's kubelet on `:10250`. When that streaming server on a node gets wedged, exec 502s while ordinary kubectl keeps working (it doesn't use the streaming path). This is a known k3s/kind failure mode with several triggers; the one you'll hit most on this stack is **macOS sleep** — k3d nodes run inside the Docker VM (OrbStack or Docker Desktop), the Mac sleeping pauses that VM, and a node's kubelet can come back wedged on resume. (A Linux host that suspends could in principle do the same; a Linux box that never sleeps generally won't.) Either way, restarting Tilt does **not** help — it only recycles workloads, not the node containers.
+
+**Fix (any platform):** run the heal script, which probes each node and `docker restart`s only the wedged ones — this clears the wedge whatever caused it, and preserves the node's IP (unlike `k3d cluster stop/start`). It's a no-op when everything is healthy:
+
+```bash
+./local-dev/scripts/heal-exec.sh
+```
+
+`start.sh` runs this automatically, so starting your session with it already covers the cold-start case on every platform.
+
+**Automatic on wake (macOS):** to heal without thinking about it, use [sleepwatcher](https://www.bernhard-baehr.de/) to run the heal on every wake:
+
+```bash
+brew install sleepwatcher
+# edit the REPO path inside the example hook first, then symlink it as ~/.wakeup:
+ln -sf "$PWD/local-dev/scripts/wakeup.example.sh" ~/.wakeup
+brew services start sleepwatcher
+```
+
+sleepwatcher runs `~/.wakeup` on every wake; the example hook calls `heal-exec.sh` and logs to `~/Library/Logs/local-dev-heal.log`.
+
+**Automatic on wake (Linux):** we don't ship a hook, but if your dev box suspends and you hit this, wrap `heal-exec.sh` in a systemd resume hook — a script in `/usr/lib/systemd/system-sleep/` (invoked with `post`/`resume`) or a unit ordered `After=suspend.target`.
 
 ### macOS: Port conflict during cluster creation
 

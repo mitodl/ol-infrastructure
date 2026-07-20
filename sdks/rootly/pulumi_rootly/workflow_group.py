@@ -25,7 +25,6 @@ class WorkflowGroupArgs:
                  kind: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  workflow_group_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a WorkflowGroup resource.
@@ -36,7 +35,6 @@ class WorkflowGroupArgs:
         :param pulumi.Input[_builtins.str] kind: The kind of the workflow group. Value must be one of <span pulumi-lang-nodejs="`simple`" pulumi-lang-dotnet="`Simple`" pulumi-lang-go="`simple`" pulumi-lang-python="`simple`" pulumi-lang-yaml="`simple`" pulumi-lang-java="`simple`" pulumi-lang-hcl="`simple`">`simple`</span>, <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`" pulumi-lang-hcl="`incident`">`incident`</span>, <span pulumi-lang-nodejs="`postMortem`" pulumi-lang-dotnet="`PostMortem`" pulumi-lang-go="`postMortem`" pulumi-lang-python="`post_mortem`" pulumi-lang-yaml="`postMortem`" pulumi-lang-java="`postMortem`" pulumi-lang-hcl="`post_mortem`">`postMortem`</span>, <span pulumi-lang-nodejs="`actionItem`" pulumi-lang-dotnet="`ActionItem`" pulumi-lang-go="`actionItem`" pulumi-lang-python="`action_item`" pulumi-lang-yaml="`actionItem`" pulumi-lang-java="`actionItem`" pulumi-lang-hcl="`action_item`">`actionItem`</span>, <span pulumi-lang-nodejs="`pulse`" pulumi-lang-dotnet="`Pulse`" pulumi-lang-go="`pulse`" pulumi-lang-python="`pulse`" pulumi-lang-yaml="`pulse`" pulumi-lang-java="`pulse`" pulumi-lang-hcl="`pulse`">`pulse`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`" pulumi-lang-hcl="`alert`">`alert`</span>.
         :param pulumi.Input[_builtins.str] name: The name of the workflow group.
         :param pulumi.Input[_builtins.float] position: The position of the workflow group
-        :param pulumi.Input[_builtins.str] slug: The slug of the workflow group.
         """
         if description is not None:
             pulumi.set(__self__, "description", description)
@@ -50,8 +48,6 @@ class WorkflowGroupArgs:
             pulumi.set(__self__, "name", name)
         if position is not None:
             pulumi.set(__self__, "position", position)
-        if slug is not None:
-            pulumi.set(__self__, "slug", slug)
         if workflow_group_id is not None:
             pulumi.set(__self__, "workflow_group_id", workflow_group_id)
 
@@ -126,18 +122,6 @@ class WorkflowGroupArgs:
     @position.setter
     def position(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "position", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The slug of the workflow group.
-        """
-        return pulumi.get(self, "slug")
-
-    @slug.setter
-    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "slug", value)
 
     @_builtins.property
     @pulumi.getter(name="workflowGroupId")
@@ -294,7 +278,6 @@ class WorkflowGroup(pulumi.CustomResource):
                  kind: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  workflow_group_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
@@ -308,7 +291,6 @@ class WorkflowGroup(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] kind: The kind of the workflow group. Value must be one of <span pulumi-lang-nodejs="`simple`" pulumi-lang-dotnet="`Simple`" pulumi-lang-go="`simple`" pulumi-lang-python="`simple`" pulumi-lang-yaml="`simple`" pulumi-lang-java="`simple`" pulumi-lang-hcl="`simple`">`simple`</span>, <span pulumi-lang-nodejs="`incident`" pulumi-lang-dotnet="`Incident`" pulumi-lang-go="`incident`" pulumi-lang-python="`incident`" pulumi-lang-yaml="`incident`" pulumi-lang-java="`incident`" pulumi-lang-hcl="`incident`">`incident`</span>, <span pulumi-lang-nodejs="`postMortem`" pulumi-lang-dotnet="`PostMortem`" pulumi-lang-go="`postMortem`" pulumi-lang-python="`post_mortem`" pulumi-lang-yaml="`postMortem`" pulumi-lang-java="`postMortem`" pulumi-lang-hcl="`post_mortem`">`postMortem`</span>, <span pulumi-lang-nodejs="`actionItem`" pulumi-lang-dotnet="`ActionItem`" pulumi-lang-go="`actionItem`" pulumi-lang-python="`action_item`" pulumi-lang-yaml="`actionItem`" pulumi-lang-java="`actionItem`" pulumi-lang-hcl="`action_item`">`actionItem`</span>, <span pulumi-lang-nodejs="`pulse`" pulumi-lang-dotnet="`Pulse`" pulumi-lang-go="`pulse`" pulumi-lang-python="`pulse`" pulumi-lang-yaml="`pulse`" pulumi-lang-java="`pulse`" pulumi-lang-hcl="`pulse`">`pulse`</span>, <span pulumi-lang-nodejs="`alert`" pulumi-lang-dotnet="`Alert`" pulumi-lang-go="`alert`" pulumi-lang-python="`alert`" pulumi-lang-yaml="`alert`" pulumi-lang-java="`alert`" pulumi-lang-hcl="`alert`">`alert`</span>.
         :param pulumi.Input[_builtins.str] name: The name of the workflow group.
         :param pulumi.Input[_builtins.float] position: The position of the workflow group
-        :param pulumi.Input[_builtins.str] slug: The slug of the workflow group.
         """
         ...
     @overload
@@ -340,7 +322,6 @@ class WorkflowGroup(pulumi.CustomResource):
                  kind: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  position: pulumi.Input[Optional[_builtins.float]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  workflow_group_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
@@ -357,8 +338,8 @@ class WorkflowGroup(pulumi.CustomResource):
             __props__.__dict__["kind"] = kind
             __props__.__dict__["name"] = name
             __props__.__dict__["position"] = position
-            __props__.__dict__["slug"] = slug
             __props__.__dict__["workflow_group_id"] = workflow_group_id
+            __props__.__dict__["slug"] = None
         super(WorkflowGroup, __self__).__init__(
             'rootly:index/workflowGroup:WorkflowGroup',
             resource_name,

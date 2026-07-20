@@ -53,8 +53,7 @@ class ServiceArgs:
                  service_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  service_now_ci_sys_id: pulumi.Input[Optional[_builtins.str]] = None,
                  slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input['ServiceSlackAliasArgs']]]] = None,
-                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input['ServiceSlackChannelArgs']]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None):
+                 slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input['ServiceSlackChannelArgs']]]] = None):
         """
         The set of arguments for constructing a Service resource.
 
@@ -90,7 +89,6 @@ class ServiceArgs:
         :param pulumi.Input[_builtins.str] service_now_ci_sys_id: The Service Now CI sys id associated to this service
         :param pulumi.Input[Sequence[pulumi.Input['ServiceSlackAliasArgs']]] slack_aliases: Slack Aliases associated with this service
         :param pulumi.Input[Sequence[pulumi.Input['ServiceSlackChannelArgs']]] slack_channels: Slack Channels associated with this service
-        :param pulumi.Input[_builtins.str] slug: The slug of the service
         """
         if alert_broadcast_channel is not None:
             pulumi.set(__self__, "alert_broadcast_channel", alert_broadcast_channel)
@@ -158,8 +156,6 @@ class ServiceArgs:
             pulumi.set(__self__, "slack_aliases", slack_aliases)
         if slack_channels is not None:
             pulumi.set(__self__, "slack_channels", slack_channels)
-        if slug is not None:
-            pulumi.set(__self__, "slug", slug)
 
     @_builtins.property
     @pulumi.getter(name="alertBroadcastChannel")
@@ -553,18 +549,6 @@ class ServiceArgs:
     @slack_channels.setter
     def slack_channels(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['ServiceSlackChannelArgs']]]]):
         pulumi.set(self, "slack_channels", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def slug(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The slug of the service
-        """
-        return pulumi.get(self, "slug")
-
-    @slug.setter
-    def slug(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "slug", value)
 
 
 @pulumi.input_type
@@ -1155,7 +1139,6 @@ class Service(pulumi.CustomResource):
                  service_now_ci_sys_id: pulumi.Input[Optional[_builtins.str]] = None,
                  slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input[Union['ServiceSlackAliasArgs', 'ServiceSlackAliasArgsDict']]]]] = None,
                  slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input[Union['ServiceSlackChannelArgs', 'ServiceSlackChannelArgsDict']]]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a Service resource with the given unique name, props, and options.
@@ -1194,7 +1177,6 @@ class Service(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] service_now_ci_sys_id: The Service Now CI sys id associated to this service
         :param pulumi.Input[Sequence[pulumi.Input[Union['ServiceSlackAliasArgs', 'ServiceSlackAliasArgsDict']]]] slack_aliases: Slack Aliases associated with this service
         :param pulumi.Input[Sequence[pulumi.Input[Union['ServiceSlackChannelArgs', 'ServiceSlackChannelArgsDict']]]] slack_channels: Slack Channels associated with this service
-        :param pulumi.Input[_builtins.str] slug: The slug of the service
         """
         ...
     @overload
@@ -1253,7 +1235,6 @@ class Service(pulumi.CustomResource):
                  service_now_ci_sys_id: pulumi.Input[Optional[_builtins.str]] = None,
                  slack_aliases: pulumi.Input[Optional[Sequence[pulumi.Input[Union['ServiceSlackAliasArgs', 'ServiceSlackAliasArgsDict']]]]] = None,
                  slack_channels: pulumi.Input[Optional[Sequence[pulumi.Input[Union['ServiceSlackChannelArgs', 'ServiceSlackChannelArgsDict']]]]] = None,
-                 slug: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -1296,7 +1277,7 @@ class Service(pulumi.CustomResource):
             __props__.__dict__["service_now_ci_sys_id"] = service_now_ci_sys_id
             __props__.__dict__["slack_aliases"] = slack_aliases
             __props__.__dict__["slack_channels"] = slack_channels
-            __props__.__dict__["slug"] = slug
+            __props__.__dict__["slug"] = None
         super(Service, __self__).__init__(
             'rootly:index/service:Service',
             resource_name,

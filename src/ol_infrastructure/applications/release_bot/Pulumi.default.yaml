@@ -1,0 +1,6 @@
+---
+config:
+  vault:address: https://vault-production.odl.mit.edu
+  release_bot:concourse_url: https://cicd.odl.mit.edu
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwG8fw3M8Hlc3o1k8H6ZZVBIAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMIZ4r8lx++C0NH8NsAgEQgDs/gJacFqyotzBvtEp4j4JpwUl4z0UNeikxGbVMJqRT5uGRWANdwOc6rNSRALNH0KUzqLBsWiBwikc9GQ==

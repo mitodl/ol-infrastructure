@@ -16,6 +16,10 @@ roles:
   github:
     teams:
     - mitodl:odl-engineering
+  local:
+    users:
+    - ocw
+    - release-bot
   oidc:
     groups:
     - admin

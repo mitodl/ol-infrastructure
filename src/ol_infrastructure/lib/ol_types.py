@@ -27,7 +27,6 @@ class BusinessUnit(StrEnum):
     different business units.
     """
 
-    bootcamps = "bootcamps"
     data = "data"
     digital_credentials = "digital-credentials"
     micromasters = "micromasters"
@@ -62,7 +61,6 @@ class Services(StrEnum):
 
     airbyte = "airbyte"
     superset = "superset"
-    bootcamps = "bootcamps"
     celery_monitoring = "celery-monitoring"
     clickhouse = "clickhouse"
     codejail = "codejail"
@@ -91,7 +89,6 @@ class Services(StrEnum):
     open_metadata = "open-metadata"
     openedx = "openedx"
     openlit = "openlit"
-    redash = "redash"
     starrocks = "starrocks"
     tika = "tika"
     toolhive = "toolhive"
@@ -105,7 +102,6 @@ class Services(StrEnum):
 class Application(StrEnum):
     airbyte = "airbyte"
     superset = "superset"
-    bootcamps = "bootcamps"
     celery_monitoring = "celery-monitoring"
     clickhouse = "clickhouse"
     codejail = "codejail"
@@ -131,7 +127,6 @@ class Application(StrEnum):
     openedx_platform = "openedx-platform"
     open_metadata = "open-metadata"
     openlit = "openlit"
-    redash = "redash"
     starrocks = "starrocks"
     tika = "tika"
     toolhive = "toolhive"

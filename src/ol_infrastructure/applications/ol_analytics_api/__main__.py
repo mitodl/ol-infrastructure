@@ -213,6 +213,38 @@ ol_analytics_api_auth_binding = OLEKSAuthBinding(
     )
 )
 
+# The data cluster's Vault kubernetes auth backend config (vault_secrets_operator.py,
+# infrastructure/aws/eks) has no token_reviewer_jwt set, so Vault authenticates each
+# login by replaying the caller's own JWT against the Kubernetes TokenReview API --
+# which requires that caller's ServiceAccount to hold "system:auth-delegator"
+# clusterwide. OLVaultK8SResources (components/services/vault.py) only grants that
+# binding to the "{application_name}-vault" VSO sync account, since every other app
+# in this repo only ever authenticates to Vault through the vault-secrets-operator.
+# ol_analytics_api is the exception: core/db/vault_credentials.py logs in directly
+# with the app's own IRSA ServiceAccount to fetch dynamic StarRocks credentials, so
+# that account needs the same delegator binding or every login 403s with a generic
+# "permission denied" -- see the CI CrashLoopBackOff this was written to fix.
+ol_analytics_api_app_auth_delegator_binding = kubernetes.rbac.v1.ClusterRoleBinding(
+    f"ol-analytics-api-app-vault-cluster-role-binding-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=f"{APPLICATION_NAME}:cluster-auth",
+        labels=k8s_global_labels,
+    ),
+    role_ref=kubernetes.rbac.v1.RoleRefArgs(
+        api_group="rbac.authorization.k8s.io",
+        kind="ClusterRole",
+        name="system:auth-delegator",
+    ),
+    subjects=[
+        kubernetes.rbac.v1.SubjectArgs(
+            kind="ServiceAccount",
+            name=APPLICATION_NAME,
+            namespace=APPLICATION_NAMESPACE,
+        ),
+    ],
+    opts=ResourceOptions(parent=ol_analytics_api_auth_binding),
+)
+
 ########################################################################
 # Static application secrets -- SENTRY_DSN
 ########################################################################
@@ -371,8 +403,7 @@ ol_analytics_api_k8s = OLApplicationK8s(
         application_security_group_name=Output.from_input(APPLICATION_NAME),
         application_service_account_name=APPLICATION_NAME,
         vault_k8s_resource_auth_name=ol_analytics_api_auth_binding.vault_k8s_resources.auth_name,
-        application_image_repository="mitodl/ol-analytics-api",
-        registry="dockerhub",
+        application_image_repository="mitodl/ol-analytics-api-app",
         **docker_image_config_kwargs("OL_ANALYTICS_API"),
         application_min_replicas=ol_analytics_api_config.get_int("min_replicas") or 2,
         # The image's own CMD runs uvicorn on port 8000 -- no command override.
