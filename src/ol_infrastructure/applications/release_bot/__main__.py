@@ -22,7 +22,11 @@ from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
 from ol_infrastructure.lib.ol_types import AWSBase, BusinessUnit, Environment
-from ol_infrastructure.lib.pulumi_helper import make_stack_reference, parse_stack
+from ol_infrastructure.lib.pulumi_helper import (
+    format_docker_image_ref,
+    make_stack_reference,
+    parse_stack,
+)
 
 stack_info = parse_stack()
 log.info(f"{stack_info=}")
@@ -103,12 +107,17 @@ resource_name = "release-bot-production"
 namespace = "operations"
 
 # The ECR repository itself is created (idempotently) by the Concourse
-# simple_pulumi image-build job on push, not managed here.
+# simple_pulumi image-build job on push, not managed here. The image is
+# pinned by digest (RELEASE_BOT_DOCKER_SHA, set by the build job) rather
+# than the mutable "latest" tag, so a new push actually changes this
+# Deployment's pod spec and triggers a rollout instead of silently leaving
+# the running pod on a stale image.
 aws_account = aws.get_caller_identity()
-bot_image_name = (
+image_repository = (
     f"{aws_account.account_id}.dkr.ecr.{aws_config.region}.amazonaws.com"
-    f"/{resource_name}:latest"
+    f"/{resource_name}"
 )
+bot_image_name = format_docker_image_ref(image_repository, "RELEASE_BOT")
 
 secret_resource_name = (
     "release-bot-secret-production"  # pragma: allowlist secret  # noqa: S105
@@ -188,7 +197,7 @@ bot_deployment = kubernetes.apps.v1.Deployment(
                             ),
                             kubernetes.core.v1.EnvVarArgs(
                                 name="CONCOURSE_TEAM",
-                                value="main",
+                                value="infrastructure",
                             ),
                             kubernetes.core.v1.EnvVarArgs(
                                 name="REPOS_CONFIG",

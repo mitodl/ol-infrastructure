@@ -547,6 +547,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         docker_image=DockerImageConfig(
             image_repository="release-bot-production",
             ecr_region=ECR_REGION,
+            env_var_for_digest="RELEASE_BOT_DOCKER_SHA",
         ),
         build=BuildConfig(dockerfile_path="./Dockerfile"),
     ),
