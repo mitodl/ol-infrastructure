@@ -1129,6 +1129,19 @@ class OLApplicationK8s(ComponentResource):
                                     image_pull_policy=image_pull_policy,
                                     env=application_deployment_env_vars,
                                     env_from=application_deployment_envfrom,
+                                    # This pod template carries `application_labels`,
+                                    # which is also the webapp Deployment's selector, so
+                                    # the HPA includes these pods when computing
+                                    # utilization. A container without cpu/memory
+                                    # requests makes the HPA fail closed with
+                                    # FailedGetResourceMetric ("missing request for cpu
+                                    # in container <name>"), reporting <unknown> for
+                                    # *every* metric and suspending all scaling until
+                                    # the Job is garbage collected.
+                                    resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                        requests=ol_app_k8s_config.resource_requests,
+                                        limits=ol_app_k8s_config.resource_limits,
+                                    ),
                                     volume_mounts=ol_app_k8s_config.extra_volume_mounts
                                     or None,
                                 )

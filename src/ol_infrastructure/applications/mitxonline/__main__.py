@@ -515,7 +515,28 @@ secret_names, secret_resources = create_mitxonline_k8s_secrets(
     redis_cache=redis_cache,
 )
 
+# Webapp memory is owned by the VPA (see the VPA block at the end of this file), not
+# the HPA. `mitxonline_web_memory_limit` is only the starting/floor budget pods launch
+# with; the VPA raises requests and limits toward `mitxonline_web_memory_ceiling` based
+# on observed usage.
 mitxonline_web_memory_limit = "1200Mi"
+mitxonline_web_memory_ceiling = "3Gi"
+_MITXONLINE_WEB_MEMORY_CEILING_MIB = 3 * 1024
+
+# Granian's --workers-max-rss is resolved at Pulumi synth time, so it cannot be derived
+# from the container memory limit once the VPA starts moving that limit at runtime.
+# Deriving it from the VPA ceiling instead keeps the worker cap valid across the entire
+# range the VPA may resize into. Left to the component default
+# (limit / workers * 0.9) it would stay pinned to the 1200Mi starting budget, and
+# workers would recycle at ~540MiB forever without ever using the headroom the VPA
+# granted.
+MITXONLINE_GRANIAN_WORKERS = 2
+# Headroom for the Granian master process and interpreter overhead, which sit outside
+# the per-worker RSS budget but inside the container memory limit.
+GRANIAN_MASTER_OVERHEAD_MIB = 256
+mitxonline_granian_workers_max_rss = (
+    _MITXONLINE_WEB_MEMORY_CEILING_MIB - GRANIAN_MASTER_OVERHEAD_MIB
+) // MITXONLINE_GRANIAN_WORKERS
 
 mitxonline_k8s_app = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
@@ -536,9 +557,12 @@ mitxonline_k8s_app = OLApplicationK8s(
         application_cmd_array=["uwsgi"],
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
         granian_config=GranianConfig(
-            workers=2,
+            workers=MITXONLINE_GRANIAN_WORKERS,
             blocking_threads_idle_timeout=120,
             enable_metrics=True,
+            # Pinned to the VPA ceiling rather than the component's default
+            # limit-derived calculation. See the note above.
+            workers_max_rss=mitxonline_granian_workers_max_rss,
         )
         if mitxonline_config.get_bool("use_granian")
         else None,
@@ -574,6 +598,12 @@ mitxonline_k8s_app = OLApplicationK8s(
         ),
         resource_requests={"cpu": "250m", "memory": mitxonline_web_memory_limit},
         resource_limits={"memory": mitxonline_web_memory_limit},
+        # CPU only. Memory is deliberately NOT an HPA metric here: HPA Resource
+        # metrics are a mean across all pods, so a single pod ramping to its own
+        # limit gets OOMKilled while the fleet average stays well under target and
+        # the HPA never reacts. Observed in production 2026-07: pods OOMKilled at
+        # ~85% of limit while replicas sat pinned at minReplicas for a week. Memory
+        # is a vertical problem and is handled by the VPA at the end of this file.
         hpa_scaling_metrics=[
             kubernetes.autoscaling.v2.MetricSpecArgs(
                 type="Resource",
@@ -582,17 +612,6 @@ mitxonline_k8s_app = OLApplicationK8s(
                     target=kubernetes.autoscaling.v2.MetricTargetArgs(
                         type="Utilization",
                         average_utilization=60,  # Target CPU utilization (60%)
-                    ),
-                ),
-            ),
-            # Scale up when avg usage exceeds: 1800 * 0.8 = 1440 Mi
-            kubernetes.autoscaling.v2.MetricSpecArgs(
-                type="Resource",
-                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
-                    name="memory",
-                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
-                        type="Utilization",
-                        average_utilization=80,  # Target memory utilization (80%)
                     ),
                 ),
             ),
@@ -1041,15 +1060,40 @@ route53.Record(
 )
 
 # VPA objects for mitxonline workloads.
-# No webapp VPA: the webapp's native HPA scales on both cpu (60%) and memory
-# (80%) Resource metrics (see hpa_scaling_metrics default in
-# OLApplicationK8sConfig), so there's no resource axis left for VPA to safely
-# control without fighting the HPA's utilization signal.
+#
+# The webapp splits the two autoscaling axes: the HPA owns horizontal scaling on CPU
+# only, and this VPA owns memory. They no longer contend, because they no longer share
+# a resource. This replaces the previous arrangement where the HPA nominally covered
+# memory and no webapp VPA existed, which left memory effectively unmanaged --
+# individual pods OOMKilled at their limit while the HPA's fleet-average memory
+# utilization stayed under target and never triggered a scale-out.
+#
+# controlled_resources is memory-only: letting the VPA move CPU requests would distort
+# the utilization denominator the CPU HPA divides by, which is the classic HPA/VPA
+# conflict.
+#
+# min_allowed pins the floor at the current limit so the VPA can only ever size up from
+# today's budget; max_allowed is the ceiling that
+# `mitxonline_granian_workers_max_rss` is derived from -- keep the two in sync.
+make_vpa(
+    name=f"{mitxonline_k8s_app.webapp_deployment_name}-vpa",
+    namespace=mitxonline_namespace,
+    target_kind="Deployment",
+    target_name=mitxonline_k8s_app.webapp_deployment_name,
+    controlled_resources=["memory"],
+    container_name=f"{Services.mitxonline}-app",
+    # Leave the nginx sidecar on its declared 50Mi request/limit. Without this the VPA
+    # applies its default behaviour to any container lacking an explicit policy and
+    # would resize the sidecar too.
+    disable_other_containers=True,
+    min_allowed={"memory": mitxonline_web_memory_limit},
+    max_allowed={"memory": mitxonline_web_memory_ceiling},
+    opts=ResourceOptions(depends_on=[mitxonline_k8s_app]),
+)
+
 # Celery workers and beat are scaled via KEDA (Redis queue depth), so CPU+memory VPA is safe.
-_worker_vpa_bounds = {
-    "min_allowed": {"cpu": "25m", "memory": "128Mi"},
-    "max_allowed": {"cpu": "1000m", "memory": "3Gi"},
-}
+_worker_vpa_min_allowed = {"cpu": "25m", "memory": "128Mi"}
+_worker_vpa_max_allowed = {"cpu": "1000m", "memory": "3Gi"}
 for _celery_name in mitxonline_k8s_app.celery_deployment_names:
     make_vpa(
         name=f"{_celery_name}-vpa",
@@ -1058,7 +1102,8 @@ for _celery_name in mitxonline_k8s_app.celery_deployment_names:
         target_name=_celery_name,
         controlled_resources=["cpu", "memory"],
         container_name="celery-worker",
-        **_worker_vpa_bounds,
+        min_allowed=_worker_vpa_min_allowed,
+        max_allowed=_worker_vpa_max_allowed,
         opts=ResourceOptions(depends_on=[mitxonline_k8s_app]),
     )
 if mitxonline_k8s_app.beat_deployment_name:
@@ -1069,7 +1114,8 @@ if mitxonline_k8s_app.beat_deployment_name:
         target_name=mitxonline_k8s_app.beat_deployment_name,
         controlled_resources=["cpu", "memory"],
         container_name="celery-beat",
-        **_worker_vpa_bounds,
+        min_allowed=_worker_vpa_min_allowed,
+        max_allowed=_worker_vpa_max_allowed,
         opts=ResourceOptions(depends_on=[mitxonline_k8s_app]),
     )
 
