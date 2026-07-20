@@ -153,6 +153,25 @@ tika_helm_release = kubernetes.helm.v3.Release(
                     "memory": "2Gi",
                 },
             },
+            # By default the JVM's container-aware ergonomics only give the
+            # heap 25% of the container memory limit (512Mi of 2Gi here),
+            # leaving the rest unclaimed while Metaspace/direct memory have no
+            # cap and can grow unbounded. That combination lets a single large
+            # or OCR-heavy document balloon off-heap and get the whole
+            # container OOMKilled by the kernel rather than the JVM raising a
+            # catchable OutOfMemoryError. Budget the full 2Gi limit instead:
+            # 1152Mi heap + 320Mi metaspace + 320Mi direct memory, leaving
+            # ~256Mi margin for thread stacks, JVM code cache, and native
+            # OCR/imagemagick subprocess memory.
+            "env": [
+                {
+                    "name": "JAVA_TOOL_OPTIONS",
+                    "value": (
+                        "-Xmx1152m -XX:MaxMetaspaceSize=320m "
+                        "-XX:MaxDirectMemorySize=320m"
+                    ),
+                },
+            ],
         },
         skip_await=False,
     ),
