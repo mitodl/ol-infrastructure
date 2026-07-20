@@ -14,6 +14,7 @@ from pathlib import Path
 import pulumi
 import pulumi_fastly as fastly
 import pulumi_vault as vault
+from kubernetes.utils.quantity import parse_quantity
 from pulumi import (
     ROOT_STACK_RESOURCE,
     Alias,
@@ -520,7 +521,6 @@ secret_names, secret_resources = create_mitxonline_k8s_secrets(
 # on observed usage.
 mitxonline_web_memory_limit = "1200Mi"
 mitxonline_web_memory_ceiling = "3Gi"
-_MITXONLINE_WEB_MEMORY_CEILING_MIB = 3 * 1024
 
 # Granian's --workers-max-rss is resolved at Pulumi synth time, so it cannot be derived
 # from the container memory limit once the VPA starts moving that limit at runtime.
@@ -529,12 +529,17 @@ _MITXONLINE_WEB_MEMORY_CEILING_MIB = 3 * 1024
 # (limit / workers * 0.9) it would stay pinned to the 1200Mi starting budget, and
 # workers would recycle at ~540MiB forever without ever using the headroom the VPA
 # granted.
+#
+# The MiB value is parsed from `mitxonline_web_memory_ceiling` rather than restated as
+# a literal, so the ceiling has exactly one source of truth and changing its value or
+# units cannot silently mis-size the worker cap.
 MITXONLINE_GRANIAN_WORKERS = 2
 # Headroom for the Granian master process and interpreter overhead, which sit outside
 # the per-worker RSS budget but inside the container memory limit.
 GRANIAN_MASTER_OVERHEAD_MIB = 256
 mitxonline_granian_workers_max_rss = (
-    _MITXONLINE_WEB_MEMORY_CEILING_MIB - GRANIAN_MASTER_OVERHEAD_MIB
+    int(parse_quantity(mitxonline_web_memory_ceiling)) // (1024 * 1024)
+    - GRANIAN_MASTER_OVERHEAD_MIB
 ) // MITXONLINE_GRANIAN_WORKERS
 
 mitxonline_k8s_app = OLApplicationK8s(

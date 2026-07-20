@@ -42,8 +42,10 @@ def make_vpa(  # noqa: PLR0913
     containers alone: VPA applies its default behaviour to any container without a
     matching policy, so sidecars would still be resized. Set
     disable_other_containers=True to append a catch-all ``containerName: "*"`` policy
-    with ``mode: "Off"``, which pins every unnamed container to its declared
-    requests. Only meaningful when container_name is not "*".
+    with ``mode: "Off"``, which leaves every unnamed container's requests *and*
+    limits exactly as declared in the pod spec -- VPA still computes
+    recommendations for them, but never applies them. Only meaningful when
+    container_name is not "*".
     """
     container_policies: list[dict[str, Any]] = [
         {
