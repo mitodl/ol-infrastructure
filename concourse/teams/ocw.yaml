@@ -21,4 +21,4 @@ roles:
 - name: pipeline-operator
   local:
     users:
-    - release-bot
+    - ocw
