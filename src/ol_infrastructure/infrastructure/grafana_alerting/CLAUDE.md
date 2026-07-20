@@ -163,7 +163,17 @@ only** to avoid creating duplicate checks across CI/QA/Production stacks.
 Each `_PingdomCheck` resource calls `POST /checks` on create, `PUT /checks/{id}`
 on update, and `DELETE /checks/{id}` on destroy. The Pingdom check ID is stored
 as the Pulumi resource ID in state, so `pulumi refresh` detects drift if a check
-is manually changed or deleted in the Pingdom UI.
+is manually changed or deleted in the Pingdom UI — **in principle**. In practice,
+the 39 checks currently live in the production Pingdom account are **not**
+tracked in Pulumi state at all; see
+[docs/adr/0010-pingdom-checks-unmanaged-in-pulumi-state.md](../../../../docs/adr/0010-pingdom-checks-unmanaged-in-pulumi-state.md)
+for why (`pulumi import` cannot adopt Python dynamic-provider resources) and
+what the options are for fixing it properly.
+
+Because of that gap, `pingdom_checks.create()` refuses to run unless
+`pulumi config set allow_pingdom_apply true` has been set on the stack — a
+plain `pulumi up` would otherwise try to create all 39 checks again, producing
+real duplicates in Pingdom. Read the ADR above before setting that flag.
 
 ### Adding a new Pingdom check
 
@@ -172,6 +182,13 @@ Add an `_SMCheck(...)` entry to the `_CHECKS` list in `pingdom_checks.py`. The
 Set `alert_sensitivity="high"` for production services and `"low"` for
 QA/RC/staging. Set `paused=True` if the target is known to be down at creation
 time.
+
+Until ADR 0010 is resolved, creating it through Pulumi is unreliable: `create()`
+has repeatedly reported failure while the check was nonetheless created
+correctly in Pingdom (see the ADR's Issue 2). After running `pulumi up
+--target <urn>` for the new check, always verify directly against the Pingdom
+API (`GET /api/3.1/checks`) that exactly one new check appeared before trusting
+Pulumi's own reported result.
 
 ---
 
