@@ -14,9 +14,11 @@ logger = logging.getLogger(__name__)
 # Some standalone/pyenv-managed Python builds (e.g. on macOS) don't reliably
 # pick up the system trust store via ssl.create_default_context(), causing
 # CERTIFICATE_VERIFY_FAILED for otherwise-valid certificates (e.g. issued by
-# HARICA). Pin the CA bundle to certifi's, which is actively maintained and
-# bundled with the interpreter regardless of OS trust store quirks.
-_SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
+# HARICA). Load the default (system) certs as usual, then layer certifi's
+# actively-maintained bundle on top, so both trust sources are honored instead
+# of certifi replacing the system/enterprise trust store.
+_SSL_CONTEXT = ssl.create_default_context()
+_SSL_CONTEXT.load_verify_locations(cafile=certifi.where())
 
 SAML_FRIENDLY_NAMES = {
     "firstName": [
