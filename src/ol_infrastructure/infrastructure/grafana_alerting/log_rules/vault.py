@@ -23,7 +23,7 @@ def create(
         rules=[
             alerting.RuleGroupRuleArgs(
                 name="edxapp_VaultSecretsAbsent",
-                condition="B",
+                condition="C",
                 for_="5m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
@@ -37,7 +37,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="edxapp_VaultAuthFailure",
-                condition="B",
+                condition="C",
                 for_="5m",
                 no_data_state="OK",
                 labels={"severity": "critical"},

@@ -28,7 +28,7 @@ def create(
         rules=[
             alerting.RuleGroupRuleArgs(
                 name="CPUUsageWarning",
-                condition="B",
+                condition="C",
                 for_="6h",
                 no_data_state="OK",
                 labels={"severity": "warning"},
@@ -55,7 +55,7 @@ def create(
         rules=[
             alerting.RuleGroupRuleArgs(
                 name="MemoryUsageWarning",
-                condition="B",
+                condition="C",
                 for_="2h",
                 no_data_state="OK",
                 labels={"severity": "warning"},
@@ -78,7 +78,7 @@ def create(
         rules=[
             alerting.RuleGroupRuleArgs(
                 name="DiskUsageWarning",
-                condition="B",
+                condition="C",
                 for_="1h",
                 no_data_state="OK",
                 labels={"severity": "warning"},
@@ -91,7 +91,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="DiskUsageCritical",
-                condition="B",
+                condition="C",
                 for_="10m",
                 no_data_state="OK",
                 labels={"severity": "critical"},

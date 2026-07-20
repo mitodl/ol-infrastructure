@@ -26,7 +26,7 @@ def create(
         rules=[
             alerting.RuleGroupRuleArgs(
                 name="mitxonline-5xx-error-percentage",
-                condition="B",
+                condition="C",
                 for_="5m",
                 no_data_state="OK",
                 labels={"severity": "critical", "service": "mitxonline"},
@@ -45,7 +45,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="mitlearn-5xx-error-percentage",
-                condition="B",
+                condition="C",
                 for_="5m",
                 no_data_state="OK",
                 labels={"severity": "critical", "service": "mitlearn"},

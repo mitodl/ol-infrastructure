@@ -29,7 +29,7 @@ def create(
         rules=[
             alerting.RuleGroupRuleArgs(
                 name="CertManagerACMEIssuerUnavailableProduction",
-                condition="B",
+                condition="C",
                 for_="20m",
                 no_data_state="OK",
                 labels={"severity": "critical", "environment": "production"},
@@ -48,7 +48,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="CertManagerChallengePresentationFailureProduction",
-                condition="B",
+                condition="C",
                 for_="5m",
                 no_data_state="OK",
                 labels={"severity": "critical", "environment": "production"},
@@ -77,7 +77,7 @@ def create(
         rules=[
             alerting.RuleGroupRuleArgs(
                 name="CertManagerACMEIssuerUnavailableNonProd",
-                condition="B",
+                condition="C",
                 for_="20m",
                 no_data_state="OK",
                 labels={"severity": "warning", "environment": "non-production"},
@@ -96,7 +96,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="CertManagerChallengePresentationFailureNonProd",
-                condition="B",
+                condition="C",
                 for_="5m",
                 no_data_state="OK",
                 labels={"severity": "warning", "environment": "non-production"},
