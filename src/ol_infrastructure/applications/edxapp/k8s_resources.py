@@ -738,6 +738,11 @@ def create_k8s_resources(  # noqa: C901
             resource_limits={
                 "memory": resources_dict["webapp"]["lms"]["memory_limit"],
             },
+            # Preserves the bounds of the hand-rolled lms-webapp-vpa this replaces.
+            # The floor is deliberately below resource_limits so the VPA can size
+            # these pods down as well as up.
+            webapp_vpa_min_allowed_memory="256Mi",
+            webapp_vpa_max_allowed_memory="4Gi",
             pod_security_context=pod_security_context,
             extra_volumes=lms_edxapp_volumes,
             extra_volume_mounts=common_extra_volume_mounts,
@@ -1035,6 +1040,10 @@ def create_k8s_resources(  # noqa: C901
             resource_limits={
                 "memory": resources_dict["webapp"]["cms"]["memory_limit"],
             },
+            # Preserves the bounds of the hand-rolled cms-webapp-vpa this replaces.
+            # See the LMS config above.
+            webapp_vpa_min_allowed_memory="256Mi",
+            webapp_vpa_max_allowed_memory="4Gi",
             pod_security_context=pod_security_context,
             extra_volumes=cms_edxapp_volumes,
             extra_volume_mounts=common_extra_volume_mounts,
@@ -1681,6 +1690,12 @@ def create_k8s_resources(  # noqa: C901
     )
 
     # VPA objects.
+    # The LMS and CMS webapp memory VPAs are created by OLApplicationK8s
+    # (manage_webapp_memory_vpa) rather than declared here. Declaring them here as
+    # well would put two VPAs on each webapp Deployment, which is unsupported and
+    # produces undefined resizing behaviour. Bounds are passed through
+    # webapp_vpa_min/max_allowed_memory on each OLApplicationK8sConfig above.
+    #
     # Webapp scaling is managed by a KEDA ScaledObject (Prometheus request-rate)
     # with a cpu trigger retained as a backstop (autoscaling_lms/cms_cpu_threshold)
     # -- that cpu trigger becomes a Resource-type HPA metric under the hood, so
@@ -1688,32 +1703,8 @@ def create_k8s_resources(  # noqa: C901
     # same signal. Memory has no competing scaler, so VPA controls it alone.
     # Celery workers are scaled purely on Redis queue depth (an external metric),
     # so VPA may control both cpu and memory there.
-    _webapp_vpa_bounds = {
-        "min_allowed": {"memory": "256Mi"},
-        "max_allowed": {"memory": "4Gi"},
-    }
     _worker_vpa_min_allowed = {"cpu": "25m", "memory": "128Mi"}
 
-    make_vpa(
-        name=f"{env_name}-edxapp-lms-webapp-vpa",
-        namespace=namespace,
-        target_kind="Deployment",
-        target_name=lms_app.webapp_deployment_name,
-        controlled_resources=["memory"],
-        container_name="lms-edxapp-app",
-        **_webapp_vpa_bounds,
-        opts=ResourceOptions(depends_on=[lms_app]),
-    )
-    make_vpa(
-        name=f"{env_name}-edxapp-cms-webapp-vpa",
-        namespace=namespace,
-        target_kind="Deployment",
-        target_name=cms_app.webapp_deployment_name,
-        controlled_resources=["memory"],
-        container_name="cms-edxapp-app",
-        **_webapp_vpa_bounds,
-        opts=ResourceOptions(depends_on=[cms_app]),
-    )
     make_vpa(
         name=f"{env_name}-edxapp-lms-celery-vpa",
         namespace=namespace,
