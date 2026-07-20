@@ -13,7 +13,6 @@ from pathlib import Path
 
 import pulumi
 import pulumi_fastly as fastly
-import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import (
     ROOT_STACK_RESOURCE,
@@ -598,24 +597,11 @@ mitxonline_k8s_app = OLApplicationK8s(
         ),
         resource_requests={"cpu": "250m", "memory": mitxonline_web_memory_limit},
         resource_limits={"memory": mitxonline_web_memory_limit},
-        # CPU only. Memory is deliberately NOT an HPA metric here: HPA Resource
-        # metrics are a mean across all pods, so a single pod ramping to its own
-        # limit gets OOMKilled while the fleet average stays well under target and
-        # the HPA never reacts. Observed in production 2026-07: pods OOMKilled at
-        # ~85% of limit while replicas sat pinned at minReplicas for a week. Memory
-        # is a vertical problem and is handled by the VPA at the end of this file.
-        hpa_scaling_metrics=[
-            kubernetes.autoscaling.v2.MetricSpecArgs(
-                type="Resource",
-                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
-                    name="cpu",
-                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
-                        type="Utilization",
-                        average_utilization=60,  # Target CPU utilization (60%)
-                    ),
-                ),
-            ),
-        ],
+        # hpa_scaling_metrics is left at the component default (CPU only). Memory is
+        # managed vertically by the component's webapp VPA; the ceiling below is what
+        # `mitxonline_granian_workers_max_rss` is derived from, so keep the two in
+        # sync if either changes.
+        webapp_vpa_max_allowed_memory=mitxonline_web_memory_ceiling,
     ),
     opts=ResourceOptions(
         # Ensure secrets are created before the application deployment
@@ -1060,37 +1046,8 @@ route53.Record(
 )
 
 # VPA objects for mitxonline workloads.
-#
-# The webapp splits the two autoscaling axes: the HPA owns horizontal scaling on CPU
-# only, and this VPA owns memory. They no longer contend, because they no longer share
-# a resource. This replaces the previous arrangement where the HPA nominally covered
-# memory and no webapp VPA existed, which left memory effectively unmanaged --
-# individual pods OOMKilled at their limit while the HPA's fleet-average memory
-# utilization stayed under target and never triggered a scale-out.
-#
-# controlled_resources is memory-only: letting the VPA move CPU requests would distort
-# the utilization denominator the CPU HPA divides by, which is the classic HPA/VPA
-# conflict.
-#
-# min_allowed pins the floor at the current limit so the VPA can only ever size up from
-# today's budget; max_allowed is the ceiling that
-# `mitxonline_granian_workers_max_rss` is derived from -- keep the two in sync.
-make_vpa(
-    name=f"{mitxonline_k8s_app.webapp_deployment_name}-vpa",
-    namespace=mitxonline_namespace,
-    target_kind="Deployment",
-    target_name=mitxonline_k8s_app.webapp_deployment_name,
-    controlled_resources=["memory"],
-    container_name=f"{Services.mitxonline}-app",
-    # Leave the nginx sidecar on its declared 50Mi request/limit. Without this the VPA
-    # applies its default behaviour to any container lacking an explicit policy and
-    # would resize the sidecar too.
-    disable_other_containers=True,
-    min_allowed={"memory": mitxonline_web_memory_limit},
-    max_allowed={"memory": mitxonline_web_memory_ceiling},
-    opts=ResourceOptions(depends_on=[mitxonline_k8s_app]),
-)
-
+# The webapp's memory VPA is created by OLApplicationK8s (manage_webapp_memory_vpa),
+# which pairs with the component's CPU-only HPA default.
 # Celery workers and beat are scaled via KEDA (Redis queue depth), so CPU+memory VPA is safe.
 _worker_vpa_min_allowed = {"cpu": "25m", "memory": "128Mi"}
 _worker_vpa_max_allowed = {"cpu": "1000m", "memory": "3Gi"}

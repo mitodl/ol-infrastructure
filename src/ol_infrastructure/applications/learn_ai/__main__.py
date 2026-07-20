@@ -818,6 +818,11 @@ learn_ai_app_k8s = OLApplicationK8s(
             resource_requests={"cpu": "10m", "memory": "384Mi"},
             resource_limits={"memory": "384Mi"},
         ),
+        # Memory removed from the HPA: it duplicated the component default and is now
+        # handled vertically by the component's webapp memory VPA. An HPA memory
+        # metric is a fleet average and cannot prevent an individual pod from being
+        # OOMKilled. This block now matches the component default and could be dropped
+        # entirely; it is kept explicit because the CPU target is intentional.
         hpa_scaling_metrics=[
             kubernetes.autoscaling.v2.MetricSpecArgs(
                 type="Resource",
@@ -826,17 +831,6 @@ learn_ai_app_k8s = OLApplicationK8s(
                     target=kubernetes.autoscaling.v2.MetricTargetArgs(
                         type="Utilization",
                         average_utilization=60,  # Target CPU utilization (60%)
-                    ),
-                ),
-            ),
-            # Scale up when avg usage exceeds: 1800 * 0.8 = 1440 Mi
-            kubernetes.autoscaling.v2.MetricSpecArgs(
-                type="Resource",
-                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
-                    name="memory",
-                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
-                        type="Utilization",
-                        average_utilization=80,  # Target memory utilization (80%)
                     ),
                 ),
             ),
