@@ -2824,6 +2824,33 @@ alerts_source_grafana_prometheus_production = rootly.AlertsSource(
             "operator": "is",
             "value": "DiskUsageCritical",
         },
+        # Self-healing / no-runway-required alerts: labeled severity=critical
+        # in Grafana because the underlying condition genuinely is critical
+        # to notice, but demoted to Medium urgency here (same tier as
+        # DiskUsageCritical above) since none of these need someone paged at
+        # 3am -- Kubernetes is usually already retrying/rescheduling, or
+        # there's hours/days of runway before real user impact.
+        *[
+            {
+                "alertUrgencyId": "fce5c971-6660-4ad9-90eb-e75122055f50",
+                "jsonPath": "$.commonLabels.alertname",
+                "kind": "payload",
+                "operator": "is",
+                "value": alertname,
+            }
+            for alertname in [
+                "PodCrashLoopingCritical",
+                "PodOOMKilledCritical",
+                "CeleryBeatPodRestartsCritical",
+                "DaemonsetReplicasMissingCritical",
+                "StatefulSetReplicasMissingCritical",
+                "KubernetesJobFailedCritical",
+                "CertManagerACMEIssuerUnavailableProduction",
+                "CertManagerChallengePresentationFailureProduction",
+                "OCWStudioContentSyncInvalidPasswordProd",
+                "HPAAtMaxReplicasCritical",
+            ]
+        ],
     ],
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
     deduplication_key_kind="payload",
