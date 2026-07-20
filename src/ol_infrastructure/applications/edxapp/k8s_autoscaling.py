@@ -1,25 +1,22 @@
-# ruff: noqa: E501, PLR0913
+# ruff: noqa: PLR0913
 """KEDA autoscaling resources for the edxapp application."""
 
 from typing import Any
 
 import pulumi
 import pulumi_kubernetes as kubernetes
-from pulumi import ResourceOptions
 
 from bridge.lib.magic_numbers import DEFAULT_REDIS_PORT
 from ol_infrastructure.components.aws.cache import OLAmazonCache
 from ol_infrastructure.components.services.k8s import (
     OLApplicationK8sKedaWebappScalingConfig,
 )
-from ol_infrastructure.components.services.vault import (
-    OLVaultK8SResources,
-    OLVaultK8SSecret,
-    OLVaultK8SStaticSecretConfig,
+from ol_infrastructure.components.services.vault import OLVaultK8SResources
+from ol_infrastructure.lib.k8s_keda import (
+    build_webapp_keda_config,
+    create_webapp_prometheus_trigger_auth,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
-
-_PROMETHEUS_SERVER = "https://prometheus-prod-10-prod-us-central-0.grafana.net/api/prom"
 
 
 def create_webapp_trigger_auth(
@@ -38,50 +35,14 @@ def create_webapp_trigger_auth(
     Returns:
         A tuple of (TriggerAuthentication resource, trigger authentication name).
     """
-    auth_secret_name = f"{env_name}-edxapp-webapp-prometheus-auth"
-    trigger_auth_name = f"{env_name}-edxapp-webapp-prometheus-auth-trigger"
-
-    auth_secret = OLVaultK8SSecret(
-        f"ol-{stack_info.env_prefix}-edxapp-webapp-prometheus-auth-{stack_info.env_suffix}",
-        OLVaultK8SStaticSecretConfig(
-            name=auth_secret_name,
-            namespace=namespace,
-            dest_secret_labels=k8s_global_labels,
-            dest_secret_name=auth_secret_name,
-            labels=k8s_global_labels,
-            mount="secret-global",
-            mount_type="kv-v2",
-            path="grafana",
-            templates={
-                "username": '{{ get .Secrets "k8s_monitoring_metrics_username" }}',
-                "password": '{{ get .Secrets "k8s_monitoring_api_key" }}',
-            },
-            vaultauth=vault_k8s_resources.auth_name,
-        ),
-        opts=ResourceOptions(
-            delete_before_replace=True, depends_on=[vault_k8s_resources]
-        ),
+    return create_webapp_prometheus_trigger_auth(
+        application_name="edxapp",
+        env_name=env_name,
+        namespace=namespace,
+        k8s_global_labels=k8s_global_labels,
+        stack_info=stack_info,
+        vault_k8s_resources=vault_k8s_resources,
     )
-
-    trigger_auth = kubernetes.apiextensions.CustomResource(
-        f"ol-{stack_info.env_prefix}-edxapp-webapp-prometheus-trigger-auth-{stack_info.env_suffix}",
-        api_version="keda.sh/v1alpha1",
-        kind="TriggerAuthentication",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=trigger_auth_name,
-            namespace=namespace,
-            labels=k8s_global_labels,
-        ),
-        spec={
-            "secretTargetRef": [
-                {"parameter": "username", "name": auth_secret_name, "key": "username"},
-                {"parameter": "password", "name": auth_secret_name, "key": "password"},
-            ]
-        },
-        opts=pulumi.ResourceOptions(depends_on=[auth_secret]),
-    )
-
-    return trigger_auth, trigger_auth_name
 
 
 def build_lms_webapp_keda_config(
@@ -89,59 +50,24 @@ def build_lms_webapp_keda_config(
     stack_info: StackInfo,
     edxapp_config: pulumi.Config,
 ) -> OLApplicationK8sKedaWebappScalingConfig:
-    """Build the KEDA ScaledObject config for the LMS webapp deployment."""
-    lms_prom_route_name = f"{stack_info.env_prefix}-openedx_ol-{stack_info.env_prefix}-edxapp-lms-apisix-route-{stack_info.env_suffix}_lms-default"
+    """Build the KEDA ScaledObject config for the LMS webapp deployment.
 
-    lms_requests_query = f'sum(rate(apisix_http_status{{route="{lms_prom_route_name}"}}[5m]))/count(kube_pod_info{{job="integrations/kubernetes/kube-state-metrics",namespace="mitxonline-openedx",pod=~".*lms-edxapp-app.*"}})'
-    lms_requests_threshold = (
-        edxapp_config.get("autoscaling_lms_requests_threshold") or "20"
-    )
-
-    lms_latency_query = f'histogram_quantile(0.95,sum(rate(apisix_http_latency_bucket{{route="{lms_prom_route_name}"}}[5m])) by (le, route))'
-    lms_latency_threshold = (
-        edxapp_config.get("autoscaling_lms_latency_threshold") or "2000"
-    )
-
-    lms_cpu_threshold = edxapp_config.get("autoscaling_lms_cpu_threshold") or "70"
-
-    return OLApplicationK8sKedaWebappScalingConfig(
-        scale_up_stabilization_seconds=60,
-        scale_up_percent=50,
-        scale_up_period_seconds=60,
-        scale_down_stabilization_seconds=300 * 5,  # 25 minutes
-        scale_down_percent=10,
-        scale_down_period_seconds=300 * 5,  # 25 minutes
-        polling_interval=60,
-        cooldown_period=300,
-        trigger_authentication_name=trigger_auth_name,
-        triggers=[
-            {
-                "type": "prometheus",
-                "metadata": {
-                    "serverAddress": _PROMETHEUS_SERVER,
-                    "query": lms_requests_query,
-                    "threshold": lms_requests_threshold,
-                    "authModes": "basic",
-                },
-            },
-            {
-                "type": "prometheus",
-                "metadata": {
-                    "serverAddress": _PROMETHEUS_SERVER,
-                    "query": lms_latency_query,
-                    "threshold": lms_latency_threshold,
-                    "authModes": "basic",
-                },
-            },
-            {
-                "type": "cpu",
-                "metricType": "Utilization",
-                "metadata": {
-                    "value": lms_cpu_threshold,
-                    "containerName": "lms-edxapp-app",
-                },
-            },
-        ],
+    NOTE: the per-pod divisor namespace is now derived from the stack's
+    env_prefix. It was previously hardcoded to "mitxonline-openedx" for every
+    edxapp deployment, so the mitx, xpro and mitx-staging stacks were dividing
+    their own request rate by mitxonline's pod count.
+    """
+    return build_webapp_keda_config(
+        trigger_auth_name=trigger_auth_name,
+        route_matcher=f"{stack_info.env_prefix}-openedx_ol-{stack_info.env_prefix}-edxapp-lms-apisix-route-{stack_info.env_suffix}_lms-default",
+        namespace=f"{stack_info.env_prefix}-openedx",
+        pod_matcher=".*lms-edxapp-app.*",
+        container_name="lms-edxapp-app",
+        requests_threshold=edxapp_config.get("autoscaling_lms_requests_threshold")
+        or "20",
+        latency_threshold=edxapp_config.get("autoscaling_lms_latency_threshold")
+        or "2000",
+        cpu_threshold=edxapp_config.get("autoscaling_lms_cpu_threshold") or "70",
     )
 
 
@@ -150,39 +76,24 @@ def build_cms_webapp_keda_config(
     stack_info: StackInfo,
     edxapp_config: pulumi.Config,
 ) -> OLApplicationK8sKedaWebappScalingConfig:
-    """Build the KEDA ScaledObject config for the CMS webapp deployment."""
-    cms_prom_route_name = f"{stack_info.env_prefix}-openedx_ol-{stack_info.env_prefix}-edxapp-cms-apisix-route-{stack_info.env_suffix}_cms-default"
+    """Build the KEDA ScaledObject config for the CMS webapp deployment.
 
-    cms_requests_query = f'sum(rate(apisix_http_status{{route="{cms_prom_route_name}"}}[5m]))/count(kube_pod_info{{job="integrations/kubernetes/kube-state-metrics",namespace="mitxonline-openedx",pod=~".*cms-edxapp-app.*"}})'
-    cms_requests_threshold = (
-        edxapp_config.get("autoscaling_cms_requests_threshold") or "20"
-    )
+    No latency trigger: CMS request duration is dominated by course-import and
+    asset-upload payload size rather than by contention, so p95 latency is not a
+    saturation signal there. This preserves the pre-existing behaviour.
 
-    cms_cpu_threshold = edxapp_config.get("autoscaling_cms_cpu_threshold") or "70"
-
-    return OLApplicationK8sKedaWebappScalingConfig(
-        polling_interval=60,
-        cooldown_period=300,
-        trigger_authentication_name=trigger_auth_name,
-        triggers=[
-            {
-                "type": "prometheus",
-                "metadata": {
-                    "serverAddress": _PROMETHEUS_SERVER,
-                    "query": cms_requests_query,
-                    "threshold": cms_requests_threshold,
-                    "authModes": "basic",
-                },
-            },
-            {
-                "type": "cpu",
-                "metricType": "Utilization",
-                "metadata": {
-                    "value": cms_cpu_threshold,
-                    "containerName": "cms-edxapp-app",
-                },
-            },
-        ],
+    See build_lms_webapp_keda_config for the divisor-namespace correction.
+    """
+    return build_webapp_keda_config(
+        trigger_auth_name=trigger_auth_name,
+        route_matcher=f"{stack_info.env_prefix}-openedx_ol-{stack_info.env_prefix}-edxapp-cms-apisix-route-{stack_info.env_suffix}_cms-default",
+        namespace=f"{stack_info.env_prefix}-openedx",
+        pod_matcher=".*cms-edxapp-app.*",
+        container_name="cms-edxapp-app",
+        requests_threshold=edxapp_config.get("autoscaling_cms_requests_threshold")
+        or "20",
+        latency_threshold=None,
+        cpu_threshold=edxapp_config.get("autoscaling_cms_cpu_threshold") or "70",
     )
 
 
