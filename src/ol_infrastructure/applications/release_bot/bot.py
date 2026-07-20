@@ -199,6 +199,19 @@ _SUBCOMMANDS = {
 }
 
 
+def _in_channel(respond):
+    """Wrap `respond` so its message posts visibly to the channel.
+
+    Slash command responses are ephemeral (visible only to the invoker) by
+    default; release state needs to be visible to the whole team.
+    """
+
+    async def wrapped(text):
+        await respond(text=text, response_type="in_channel")
+
+    return wrapped
+
+
 async def _cmd_doof(repos, ack, respond, command, context):
     parts = command["text"].split(None, 1)
     if not parts or parts[0] not in _SUBCOMMANDS:
@@ -207,7 +220,9 @@ async def _cmd_doof(repos, ack, respond, command, context):
         return
     subcommand, *rest = parts
     sub_command = dict(command, text=rest[0] if rest else "")
-    await _SUBCOMMANDS[subcommand](repos, ack, respond, sub_command, context)
+    await _SUBCOMMANDS[subcommand](
+        repos, ack, _in_channel(respond), sub_command, context
+    )
 
 
 def create_app():
