@@ -24,7 +24,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import requests
-from pulumi import Config, Input, ResourceOptions
+from pulumi import Config, Input, ResourceOptions, log
 from pulumi.dynamic import (
     CreateResult,
     ReadResult,
@@ -503,22 +503,24 @@ def create(api_token: Input[str], integration_ids: list[int]) -> None:
     The 39 checks below already exist, live and correctly configured, in the
     production Pingdom account -- but are NOT tracked in this stack's Pulumi
     state (see docs/adr/0010-pingdom-checks-unmanaged-in-pulumi-state.md for
-    why `pulumi import` cannot be used to fix this). Running this function
-    against a stack that has none of them in state will attempt to create 39
+    why `pulumi import` cannot be used to fix this). Registering them against
+    a stack that has none of them in state would attempt to create 39
     duplicates. Requiring an explicit opt-in here prevents that from
-    happening as a side effect of an unrelated `pulumi up`.
+    happening as a side effect of an unrelated `pulumi up` -- by skipping
+    registration entirely (rather than raising) so the rest of the stack
+    remains manageable without opting in to Pingdom changes on every run.
     """
     if not Config().get_bool("allow_pingdom_apply"):
-        msg = (
+        log.warn(
             "Pingdom checks are live in Pingdom but unmanaged in Pulumi "
             "state -- see docs/adr/0010-pingdom-checks-unmanaged-in-pulumi-"
-            "state.md. Refusing to run to avoid creating 39 duplicate "
-            "checks. Read that ADR, then set "
+            "state.md. Skipping Pingdom resource registration this run to "
+            "avoid creating 39 duplicate checks. Read that ADR, then set "
             "`pulumi config set allow_pingdom_apply true` if you intend to "
-            "proceed anyway (e.g. to add a single new check with "
-            "--target)."
+            "manage Pingdom checks in this run (e.g. to add a single new "
+            "check with --target)."
         )
-        raise RuntimeError(msg)
+        return
 
     for check in _CHECKS:
         parsed = urlparse(check.target)

@@ -170,10 +170,13 @@ tracked in Pulumi state at all; see
 for why (`pulumi import` cannot adopt Python dynamic-provider resources) and
 what the options are for fixing it properly.
 
-Because of that gap, `pingdom_checks.create()` refuses to run unless
-`pulumi config set allow_pingdom_apply true` has been set on the stack — a
-plain `pulumi up` would otherwise try to create all 39 checks again, producing
-real duplicates in Pingdom. Read the ADR above before setting that flag.
+Because of that gap, `pingdom_checks.create()` skips registering any of the 39
+checks (logging a warning instead) unless `pulumi config set
+allow_pingdom_apply true` has been set on the stack — a plain `pulumi up`
+would otherwise try to create all 39 checks again, producing real duplicates
+in Pingdom. This is a skip, not a hard failure, so the rest of the stack
+(rule groups, contact points, notification policy) stays fully manageable
+without opting in. Read the ADR above before setting that flag.
 
 ### Adding a new Pingdom check
 

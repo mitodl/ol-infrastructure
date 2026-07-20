@@ -182,7 +182,12 @@ without deliberate opt-in, and document the gap clearly here and in
   preview`/diff workflows indefinitely, until someone picks this up.
 
 **This is the option implemented alongside this ADR** — see `pingdom_checks.py`, which now
-requires `pulumi config set allow_pingdom_apply true` before `create()` will run at all.
+requires `pulumi config set allow_pingdom_apply true` before it will register any of the 39
+Pingdom check resources. Without that flag, `create()` logs a warning and returns immediately
+(rather than raising), so the rest of the stack — rule groups, contact points, notification
+policy — remains fully manageable on every `pulumi up`. An earlier version of this guard raised
+unconditionally, which aborted the *entire* stack update/preview (not just the Pingdom part) —
+caught in review before merge; skipping registration is the correct fix.
 
 ### Option B — Hand-edit Pulumi state directly (`stack export` → inject → `stack import`)
 
