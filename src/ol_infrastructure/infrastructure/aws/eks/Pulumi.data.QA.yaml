@@ -13,6 +13,7 @@ config:
   eks:apisix_domains:
   - airbyte-qa.odl.mit.edu
   - api-airbyte-qa.odl.mit.edu
+  - opik-qa.ol.mit.edu
   - pipelines-qa.odl.mit.edu
   - analytics-qa.odl.mit.edu
   eks:apisix_viewer_key:
@@ -34,6 +35,7 @@ config:
   - marimo
   - ol-analytics
   - open-metadata
+  - opik
   - qdrant
   - starrocks
   - superset

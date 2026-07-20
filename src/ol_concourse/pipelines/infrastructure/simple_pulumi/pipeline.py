@@ -398,6 +398,12 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             "xpro",
         ],
     ),
+    "opik": SimplePulumiParams(
+        app_name="opik",
+        pulumi_project_path="applications/opik/",
+        pulumi_project_name="ol-application-opik",
+        stages=["CI", "QA", "Production"],
+    ),
     "qdrant-cloud": SimplePulumiParams(
         app_name="qdrant-cloud",
         pulumi_project_path="infrastructure/qdrant_cloud/",
