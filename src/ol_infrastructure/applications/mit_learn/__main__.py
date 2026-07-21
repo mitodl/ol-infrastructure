@@ -1530,13 +1530,21 @@ learn_external_service_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=learn_namespace,
         k8s_labels=application_labels,
         enable_defaults=True,
+        # Gated behind enable_api_fastly_cutover, same as the DNS cutover
+        # below: until api_domain's DNS actually points at Fastly, direct
+        # traffic from browsers/API clients arrives at APISIX from non-Fastly
+        # IPs. Applying this allowlist unconditionally would block all of
+        # that (i.e. all current production traffic) the moment this
+        # deploys, not just bot traffic bypassing Fastly.
         plugins=[
             {
                 "name": "ip-restriction",
                 "enable": True,
                 "config": {"whitelist": fastly_origin_allowlist},
             },
-        ],
+        ]
+        if enable_api_fastly_cutover
+        else [],
     ),
 )
 

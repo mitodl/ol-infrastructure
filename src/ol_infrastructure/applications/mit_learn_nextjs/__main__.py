@@ -76,8 +76,8 @@ nextjs_config = Config("nextjs")
 # means raising nextjs_memory_limit later hands all of the added memory straight to
 # the heap (the actual thing that needs more room); a percentage would keep skimming
 # an ever-larger, unneeded slice off the top as the limit grows.
-nextjs_memory_limit = "4Gi"  # doubled from 1Gi: still crash-looping at the computed
-# 800MiB old-space ceiling, so give double headroom while a stable value is measured
+nextjs_memory_limit = "4Gi"  # raised from 1Gi: still crash-looping at the computed
+# 800MiB old-space ceiling, so give generous headroom while a stable value is measured
 NEXTJS_NON_HEAP_OVERHEAD_MIB = 224
 nextjs_max_old_space_size_mib = (
     int(parse_quantity(nextjs_memory_limit)) // (1024 * 1024)
