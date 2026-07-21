@@ -489,6 +489,18 @@ escalation_policy_default_escalation_policy = rootly.EscalationPolicy(
     opts=rootly_opts,
 )
 
+# Sources that should be visible in Slack but must never page use this policy.
+# Its only escalation level posts once to #devops-alerts.
+escalation_policy_slack_notifications_only = rootly.EscalationPolicy(
+    "slack-notifications-only",
+    description=(
+        "Posts non-paging alert sources to #devops-alerts without paging on-call."
+    ),
+    name="Slack Notifications Only",
+    repeat_count=1,
+    opts=rootly_opts,
+)
+
 escalation_policy_exampledeleteme_escalationpolicy = rootly.EscalationPolicy(
     "exampledeleteme-escalationpolicy",
     business_hours={
@@ -507,17 +519,10 @@ escalation_policy_exampledeleteme_escalationpolicy = rootly.EscalationPolicy(
 
 escalation_level_b94aa0a3_cda6_4ee6_bcb1_cddf33c69088 = rootly.EscalationLevel(
     "b94aa0a3-cda6-4ee6-bcb1-cddf33c69088",
-    delay=5,
+    delay=0,
     escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
     escalation_policy_path_id="adc991bc-d498-4323-9d80-9d2dfa156b0c",
-    notification_target_params=[
-        {
-            "id": "fad27d50-f0e4-4d21-9b6d-57eb2dec648b",
-            "teamMembers": "all",
-            "type": "schedule",
-        }
-    ],
-    paging_strategy_configuration_schedule_strategy="on_call_only",
+    notification_target_params=[{"id": "GBDLJJX51", "type": "slack_channel"}],
     paging_strategy_configuration_strategy="default",
     position=1,
     opts=rootly_opts,
@@ -537,6 +542,17 @@ escalation_level_r_4351b5b9_00d3_46ae_a044_05930cfbe0e2 = rootly.EscalationLevel
 
 escalation_level_r_75bc919c_824c_46a1_9589_0fc8b85e0d77 = rootly.EscalationLevel(
     "r-75bc919c-824c-46a1-9589-0fc8b85e0d77",
+    delay=0,
+    escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
+    escalation_policy_path_id="67658f83-7fac-4a19-8e2a-0d8eee57f0a8",
+    notification_target_params=[{"id": "GBDLJJX51", "type": "slack_channel"}],
+    paging_strategy_configuration_strategy="default",
+    position=1,
+    opts=rootly_opts,
+)
+
+escalation_level_default_path_on_call_after_five_minutes = rootly.EscalationLevel(
+    "default-path-on-call-after-five-minutes",
     delay=5,
     escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
     escalation_policy_path_id="67658f83-7fac-4a19-8e2a-0d8eee57f0a8",
@@ -549,13 +565,13 @@ escalation_level_r_75bc919c_824c_46a1_9589_0fc8b85e0d77 = rootly.EscalationLevel
     ],
     paging_strategy_configuration_schedule_strategy="on_call_only",
     paging_strategy_configuration_strategy="default",
-    position=1,
+    position=2,
     opts=rootly_opts,
 )
 
 escalation_level_r_8ee197b2_ffe5_4696_b4a0_760e5c84a343 = rootly.EscalationLevel(
     "r-8ee197b2-ffe5-4696-b4a0-760e5c84a343",
-    delay=10,
+    delay=5,
     escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
     escalation_policy_path_id="adc991bc-d498-4323-9d80-9d2dfa156b0c",
     notification_target_params=[
@@ -565,9 +581,21 @@ escalation_level_r_8ee197b2_ffe5_4696_b4a0_760e5c84a343 = rootly.EscalationLevel
             "type": "schedule",
         }
     ],
-    paging_strategy_configuration_schedule_strategy="everyone",
+    paging_strategy_configuration_schedule_strategy="on_call_only",
     paging_strategy_configuration_strategy="default",
     position=2,
+    opts=rootly_opts,
+)
+
+# Leaving escalation_policy_path_id unset attaches this level to the new
+# policy's default path, as defined by the Rootly provider schema.
+escalation_level_slack_notifications_only = rootly.EscalationLevel(
+    "slack-notifications-only",
+    delay=0,
+    escalation_policy_id=escalation_policy_slack_notifications_only.id,
+    notification_target_params=[{"id": "GBDLJJX51", "type": "slack_channel"}],
+    paging_strategy_configuration_strategy="default",
+    position=1,
     opts=rootly_opts,
 )
 
@@ -3041,22 +3069,31 @@ alert_route_pingdom_catch_all_route = rootly.AlertRoute(
     opts=rootly_opts,
 )
 
+# Keep the imported resource name to avoid replacing this protected route, but
+# broaden it to cover every source that should notify Slack without paging.
 alert_route_platform_engineering_team_email_monitor_route = rootly.AlertRoute(
     "platform-engineering-team-email-monitor-route",
-    alerts_source_ids=["5933666e-e61e-4339-9b39-41756dafdd00"],
+    alerts_source_ids=[
+        alerts_source_cloudwatch_warning.id,
+        alerts_source_grafana.id,
+        alerts_source_grafana_prometheus_ci.id,
+        alerts_source_grafana_prometheus_qa.id,
+        alerts_source_mitol_sentry.id,
+        alerts_source_platform_engineering_team_email_monitor.id,
+    ],
     enabled=True,
-    name="Platform Engineering Team Email Monitor Route",
+    name="Non-Paging Alerts Route",
     owning_team_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     rules=[
         {
             "destinations": [
                 {
-                    "targetId": "9f00e9f1-2f13-470e-a856-50ab5003f260",
-                    "targetType": "Group",
+                    "targetId": escalation_policy_slack_notifications_only.id,
+                    "targetType": "EscalationPolicy",
                 }
             ],
             "fallbackRule": True,
-            "name": "Fallback Rule for Platform Engineering Team Email Monitor Route",
+            "name": "Fallback Rule for Non-Paging Alerts Route",
             "position": 1,
         }
     ],
