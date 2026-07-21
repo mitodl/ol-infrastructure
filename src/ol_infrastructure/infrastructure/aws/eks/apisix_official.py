@@ -146,6 +146,25 @@ APISIX_ENABLED_PLUGINS: list[str] = [
 ]
 
 
+def _double_memory_quantity(quantity: str) -> str:
+    """Double a Kubernetes memory quantity, preserving its unit suffix.
+
+    Used to derive a default memory limit with burst headroom above the
+    configured request when no explicit limit override is supplied.
+    Supports the binary (Ki/Mi/Gi/Ti) and decimal (K/M/G/T) suffixes valid
+    for a Kubernetes memory quantity, and fractional prefixes (e.g.
+    "1.5Gi"). Pi/Ei and exponential notation are not supported -- not a
+    realistic unit for a gateway memory request/limit -- and raise the
+    same clear error as any other unrecognized suffix.
+    """
+    for suffix in ("Ki", "Mi", "Gi", "Ti", "K", "M", "G", "T"):
+        if quantity.endswith(suffix):
+            value = float(quantity[: -len(suffix)]) * 2
+            return f"{int(value) if value.is_integer() else value}{suffix}"
+    msg = f"Unsupported memory quantity suffix: {quantity!r}"
+    raise ValueError(msg)
+
+
 def setup_apisix(
     cluster_name: str,
     k8s_provider: kubernetes.Provider,
@@ -361,13 +380,29 @@ def setup_apisix(
                     "timeoutSeconds": 1,
                     "failureThreshold": 30,  # Allow 5 minutes before marking unhealthy
                 },
+                # requests.memory != limits.memory deliberately: a transient
+                # buffering spike (e.g. several concurrent large course-CSV/
+                # JupyterHub-bundle downloads pinned to one pod via HTTP/2)
+                # needs burst headroom above the steady-state baseline.  With
+                # requests == limits (the prior config), the pod was OOMKilled
+                # the instant usage crossed the request value, well before the
+                # VPA's periodic recommendation loop could observe the spike
+                # and react -- VPA cannot prevent an OOM that happens faster
+                # than its sampling/recommendation interval. limits.memory now
+                # defaults to double the request so ordinary bursts are
+                # absorbed as Burstable QoS headroom instead of an instant
+                # hard kill; the VPA (below) still owns raising the baseline
+                # request over time via apisix_memory/apisix_max_memory.
                 "resources": {
                     "requests": {
                         "cpu": "100m",
                         "memory": eks_config.get("apisix_memory") or "400Mi",
                     },
                     "limits": {
-                        "memory": eks_config.get("apisix_memory") or "400Mi",
+                        "memory": eks_config.get("apisix_memory_limit")
+                        or _double_memory_quantity(
+                            eks_config.get("apisix_memory") or "400Mi"
+                        ),
                     },
                 },
                 # --- Rolling Update Strategy and Pod Lifecycle ---
@@ -549,6 +584,43 @@ def setup_apisix(
                                 """\
                                 client_header_buffer_size 8k;
                                 large_client_header_buffers 4 64k;
+
+                                # Explicit response-buffering tuning (2026-07-21
+                                # applications-production OOM incident): large,
+                                # slowly-consumed proxied responses (multi-MB
+                                # course CSVs, JupyterHub notebook_core.<hash>.js
+                                # bundles) were observed with request_time up to
+                                # 46.8s against upstream_response_time under
+                                # 0.1s -- i.e. held in a worker's memory for the
+                                # client's full slow-download duration rather
+                                # than overflowing to disk. proxy_buffering was
+                                # already on by default, but was left implicit
+                                # and unsized; making it explicit here so the
+                                # disk-overflow behavior is documented and
+                                # auditable rather than relying on upstream
+                                # chart/NGINX defaults silently changing.
+                                # proxy_buffers/proxy_buffer_size bound the
+                                # in-memory portion per request to ~72KB
+                                # (8k proxy_buffer_size + 8x8k proxy_buffers,
+                                # which are separate buffer pools -- the
+                                # former for the leading part of the response,
+                                # the latter for the rest); the remainder of
+                                # a large body spills to a temp
+                                # file (bounded by proxy_max_temp_file_size)
+                                # instead of growing worker RSS. If OOMs persist
+                                # after this change, the leading suspect is a
+                                # Lua body_filter-based plugin buffering the
+                                # full response into the Lua VM heap, which
+                                # bypasses these NGINX-level directives entirely
+                                # -- check enabled plugins on the affected
+                                # routes (course CSV / JupyterHub) for anything
+                                # that reads the response body.
+                                proxy_buffering on;
+                                proxy_buffer_size 8k;
+                                proxy_buffers 8 8k;
+                                proxy_busy_buffers_size 16k;
+                                proxy_max_temp_file_size 1024m;
+                                proxy_temp_file_write_size 64k;
                                 """
                             ),
                             "httpEnd": "",
@@ -977,6 +1049,12 @@ def setup_apisix(
     # (K8s 1.33+, VPA 1.6+), falling back to eviction only when an in-place update is
     # not possible. The PodDisruptionBudget (maxUnavailable: 1) ensures at most one pod
     # is disrupted at a time if eviction is needed, protecting gateway availability.
+    #
+    # controlledValues "RequestsAndLimits" scales the limit proportionally to
+    # whatever request/limit ratio is set on the Deployment (see the pod spec's
+    # resources block above, which now sets limit = 2x request by default) --
+    # VPA raises the request toward maxAllowed based on observed usage and
+    # keeps that same burst-headroom ratio on the limit as it does.
     kubernetes.apiextensions.CustomResource(
         f"{cluster_name}-apisix-vpa",
         api_version="autoscaling.k8s.io/v1",
