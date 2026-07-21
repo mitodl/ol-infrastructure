@@ -594,8 +594,12 @@ def setup_apisix(
                                 # auditable rather than relying on upstream
                                 # chart/NGINX defaults silently changing.
                                 # proxy_buffers/proxy_buffer_size bound the
-                                # in-memory portion per request to 64KB; the
-                                # remainder of a large body spills to a temp
+                                # in-memory portion per request to ~72KB
+                                # (8k proxy_buffer_size + 8x8k proxy_buffers,
+                                # which are separate buffer pools -- the
+                                # former for the leading part of the response,
+                                # the latter for the rest); the remainder of
+                                # a large body spills to a temp
                                 # file (bounded by proxy_max_temp_file_size)
                                 # instead of growing worker RSS. If OOMs persist
                                 # after this change, the leading suspect is a
