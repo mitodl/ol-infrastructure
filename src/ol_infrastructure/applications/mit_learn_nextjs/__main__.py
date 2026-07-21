@@ -76,7 +76,8 @@ nextjs_config = Config("nextjs")
 # means raising nextjs_memory_limit later hands all of the added memory straight to
 # the heap (the actual thing that needs more room); a percentage would keep skimming
 # an ever-larger, unneeded slice off the top as the limit grows.
-nextjs_memory_limit = "1Gi"
+nextjs_memory_limit = "4Gi"  # doubled from 1Gi: still crash-looping at the computed
+# 800MiB old-space ceiling, so give double headroom while a stable value is measured
 NEXTJS_NON_HEAP_OVERHEAD_MIB = 224
 nextjs_max_old_space_size_mib = (
     int(parse_quantity(nextjs_memory_limit)) // (1024 * 1024)
@@ -202,6 +203,11 @@ env_vars.append(
 
 
 pod_count = nextjs_config.get_int("pod_count") or 2
+nextjs_max_replicas = nextjs_config.get_int("autoscaling_max_replicas") or 10
+nextjs_cpu_request = nextjs_config.get("cpu_request") or "500m"
+nextjs_autoscaling_cpu_threshold = (
+    nextjs_config.get_int("autoscaling_cpu_threshold") or 70
+)
 
 mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
     f"mit-learn-nextjs-{stack_info.name}-deployment",
@@ -219,7 +225,9 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
         selector=kubernetes.meta.v1.LabelSelectorArgs(
             match_labels=k8s_app_labels,
         ),
-        replicas=pod_count,
+        # replicas intentionally omitted: the HorizontalPodAutoscaler below owns
+        # this deployment's replica count. Setting it here would fight the HPA
+        # on every `pulumi up`, resetting live scale-outs back to pod_count.
         min_ready_seconds=10,
         strategy=kubernetes.apps.v1.DeploymentStrategyArgs(
             type="RollingUpdate",
@@ -246,7 +254,14 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
                         ],
                         image_pull_policy="Always",
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                            requests={"cpu": "100m", "memory": nextjs_memory_limit},
+                            # cpu request sized off observed steady-state usage
+                            # (~450-500m/pod) so the HPA's utilization percentage
+                            # is meaningful instead of comparing against a
+                            # token 100m request.
+                            requests={
+                                "cpu": nextjs_cpu_request,
+                                "memory": nextjs_memory_limit,
+                            },
                             limits={"memory": nextjs_memory_limit},
                         ),
                         env=env_vars,
@@ -282,6 +297,67 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
                 ],
             ),
         ),
+    ),
+)
+
+kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
+    f"mit-learn-nextjs-{stack_info.name}-hpa",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="mit-learn-nextjs-hpa",
+        namespace=learn_namespace,
+        labels=k8s_app_labels,
+    ),
+    spec=kubernetes.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
+        scale_target_ref=kubernetes.autoscaling.v2.CrossVersionObjectReferenceArgs(
+            api_version="apps/v1",
+            kind="Deployment",
+            name="mit-learn-nextjs",
+        ),
+        min_replicas=pod_count,
+        max_replicas=nextjs_max_replicas,
+        # CPU only: memory is deliberately not a scaling metric here. A per-pod
+        # memory leak would make the HPA "fix" the symptom by scaling out
+        # forever instead of surfacing the leak; memory stays governed by the
+        # container limit/OOM handling above, scaling stays about throughput.
+        metrics=[
+            kubernetes.autoscaling.v2.MetricSpecArgs(
+                type="Resource",
+                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                    name="cpu",
+                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                        type="Utilization",
+                        average_utilization=nextjs_autoscaling_cpu_threshold,
+                    ),
+                ),
+            ),
+        ],
+        behavior=kubernetes.autoscaling.v2.HorizontalPodAutoscalerBehaviorArgs(
+            scale_up=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
+                stabilization_window_seconds=60,
+                select_policy="Max",
+                policies=[
+                    kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
+                        type="Percent",
+                        value=100,
+                        period_seconds=60,
+                    )
+                ],
+            ),
+            scale_down=kubernetes.autoscaling.v2.HPAScalingRulesArgs(
+                stabilization_window_seconds=300,
+                select_policy="Min",
+                policies=[
+                    kubernetes.autoscaling.v2.HPAScalingPolicyArgs(
+                        type="Percent",
+                        value=25,
+                        period_seconds=60,
+                    )
+                ],
+            ),
+        ),
+    ),
+    opts=ResourceOptions(
+        depends_on=[mit_learn_nextjs_deployment],
     ),
 )
 
