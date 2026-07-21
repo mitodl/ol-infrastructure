@@ -571,6 +571,60 @@ escalation_level_r_8ee197b2_ffe5_4696_b4a0_760e5c84a343 = rootly.EscalationLevel
     opts=rootly_opts,
 )
 
+# Medium-urgency alerts (see the alert_source_urgency_rules_attributes demotion
+# rules above) still paged on-call once even outside business hours, because
+# neither of the two existing (unmanaged, pre-dating this Pulumi migration)
+# escalation paths on the Default Escalation Policy actually holds/defers --
+# they only differ in how far they escalate if unacknowledged. This adds a
+# real Rootly "deferral path": Medium-urgency alerts arriving outside
+# Mon-Fri 9am-5pm ET are held (logged + visible in Rootly, no page) and
+# replayed through the normal paths once business hours resume. Alerts
+# arriving *during* business hours don't match this path's time-window rule,
+# so they fall through unaffected -- exactly matching the review decision
+# from 2026-07-20 (demote 10 specific alertnames, business-hours page is
+# still acceptable for them, only overnight/weekend paging is not).
+escalation_path_defer_medium_urgency_off_hours = rootly.EscalationPath(
+    "defer-medium-urgency-off-hours",
+    name="Defer Medium urgency outside business hours",
+    escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
+    path_type="deferral",
+    match_mode="match-all-rules",
+    after_deferral_behavior="re_evaluate",
+    rules=[
+        {
+            "ruleType": "alert_urgency",
+            "urgencyIds": ["fce5c971-6660-4ad9-90eb-e75122055f50"],
+        },
+        {
+            "ruleType": "deferral_window",
+            "timeZone": "America/New_York",
+            "timeBlocks": [
+                {
+                    "monday": True,
+                    "tuesday": True,
+                    "wednesday": True,
+                    "thursday": True,
+                    "friday": True,
+                    "startTime": "00:00",
+                    "endTime": "09:00",
+                },
+                {
+                    "monday": True,
+                    "tuesday": True,
+                    "wednesday": True,
+                    "thursday": True,
+                    "friday": True,
+                    "startTime": "17:00",
+                    "endTime": "23:59",
+                },
+                {"saturday": True, "allDay": True},
+                {"sunday": True, "allDay": True},
+            ],
+        },
+    ],
+    opts=rootly_opts,
+)
+
 # Services imported from the existing Rootly account.
 service_api_authentication = rootly.Service(
     "api-authentication",
@@ -2824,6 +2878,33 @@ alerts_source_grafana_prometheus_production = rootly.AlertsSource(
             "operator": "is",
             "value": "DiskUsageCritical",
         },
+        # Self-healing / no-runway-required alerts: labeled severity=critical
+        # in Grafana because the underlying condition genuinely is critical
+        # to notice, but demoted to Medium urgency here (same tier as
+        # DiskUsageCritical above) since none of these need someone paged at
+        # 3am -- Kubernetes is usually already retrying/rescheduling, or
+        # there's hours/days of runway before real user impact.
+        *[
+            {
+                "alertUrgencyId": "fce5c971-6660-4ad9-90eb-e75122055f50",
+                "jsonPath": "$.commonLabels.alertname",
+                "kind": "payload",
+                "operator": "is",
+                "value": alertname,
+            }
+            for alertname in [
+                "PodCrashLoopingCritical",
+                "PodOOMKilledCritical",
+                "CeleryBeatPodRestartsCritical",
+                "DaemonsetReplicasMissingCritical",
+                "StatefulSetReplicasMissingCritical",
+                "KubernetesJobFailedCritical",
+                "CertManagerACMEIssuerUnavailableProduction",
+                "CertManagerChallengePresentationFailureProduction",
+                "OCWStudioContentSyncInvalidPasswordProd",
+                "HPAAtMaxReplicasCritical",
+            ]
+        ],
     ],
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
     deduplication_key_kind="payload",

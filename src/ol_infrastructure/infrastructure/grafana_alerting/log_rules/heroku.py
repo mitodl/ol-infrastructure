@@ -30,7 +30,7 @@ def create(
         rules=[
             alerting.RuleGroupRuleArgs(
                 name="InvalidAccessKeyProduction",
-                condition="B",
+                condition="C",
                 for_="1m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
@@ -44,7 +44,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="InvalidAccessKeyNonProd",
-                condition="B",
+                condition="C",
                 for_="1m",
                 no_data_state="OK",
                 labels={"severity": "warning"},
@@ -58,7 +58,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="AlternateInvalidAccessKeyProduction",
-                condition="B",
+                condition="C",
                 for_="1m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
@@ -72,7 +72,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="AlternateInvalidAccessKeyNonProd",
-                condition="B",
+                condition="C",
                 for_="1m",
                 no_data_state="OK",
                 labels={"severity": "warning"},
@@ -96,7 +96,7 @@ def create(
         rules=[
             alerting.RuleGroupRuleArgs(
                 name="OCWStudio3PlayErrorDetectedNonProd",
-                condition="B",
+                condition="C",
                 for_="1m",
                 no_data_state="OK",
                 labels={"severity": "warning", "channel": "notifications-ocw-misc"},
@@ -110,7 +110,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="OCWStudio3PlayErrorDetectedProd",
-                condition="B",
+                condition="C",
                 for_="1m",
                 no_data_state="OK",
                 labels={"severity": "warning", "channel": "notifications-ocw-misc"},
@@ -124,7 +124,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="OCWStudioContentSyncInvalidPasswordNonProd",
-                condition="B",
+                condition="C",
                 for_="1m",
                 no_data_state="OK",
                 labels={"severity": "warning"},
@@ -138,7 +138,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="OCWStudioContentSyncInvalidPasswordProd",
-                condition="B",
+                condition="C",
                 for_="1m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
@@ -162,7 +162,7 @@ def create(
         rules=[
             alerting.RuleGroupRuleArgs(
                 name="KeycloakInternalError",
-                condition="B",
+                condition="C",
                 for_="1m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
@@ -175,7 +175,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="KeycloakSAMLAssertionDecryptError",
-                condition="B",
+                condition="C",
                 for_="1m",
                 no_data_state="OK",
                 labels={"severity": "warning"},
@@ -188,7 +188,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="KeycloakServerError",
-                condition="B",
+                condition="C",
                 for_="1m",
                 no_data_state="OK",
                 labels={"severity": "critical"},

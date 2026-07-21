@@ -2,15 +2,27 @@
 
 Migrated from grafana-alerts/cortex-rules/ (previously synced via cortextool).
 
-Two-stage evaluation pipeline per rule
----------------------------------------
+Three-stage evaluation pipeline per rule
+-----------------------------------------
 Grafana-managed alert rules cannot use a bare PromQL expression as a condition
 the way the Mimir ruler API can. Instead each rule needs:
 
   Stage A — instant PromQL query against the per-environment Mimir datasource.
              The PromQL already contains the threshold (e.g. "< 1.0"), so it
              returns a non-empty result set only when the condition is met.
-  Stage B — classic condition: fires when the count of rows returned by A > 0.
+  Stage B — reduce: passes each series returned by A through unchanged
+             (reducer "last" on a single instant value is a no-op numerically).
+  Stage C — threshold: fires per-series when B's value is > 0.
+
+Stages B and C use "reduce"/"threshold" expressions rather than a single
+"classic_condition", specifically so each matching series keeps its own
+labels (cluster, namespace, pod, container, ...) on the resulting alert
+instance. A classic condition instead collapses every matching series into
+one alertname-only instance with no labels at all -- see
+https://grafana.com/docs/grafana/latest/alerting/alerting-rules/templates/examples/
+("You cannot use $labels ... if you are using classic conditions"). This
+silently broke every `{{ $labels.x }}` reference in every rule's annotations
+until fixed (all alerts fired with "[no value]" in place of the real labels).
 
 no_data_state="OK"
 -------------------
@@ -44,7 +56,7 @@ _MIMIR_DATASOURCE_UID = "grafanacloud-prom"
 
 
 def _rule_data(expr: str, mimir_uid: str) -> list[alerting.RuleGroupRuleDataArgs]:
-    """Build the two-stage data pipeline for a single alert rule."""
+    """Build the three-stage data pipeline for a single alert rule."""
     return [
         # Stage A: run the PromQL expression against Mimir.
         alerting.RuleGroupRuleDataArgs(
@@ -64,7 +76,8 @@ def _rule_data(expr: str, mimir_uid: str) -> list[alerting.RuleGroupRuleDataArgs
                 }
             ),
         ),
-        # Stage B: fire when A returns any rows (count > 0).
+        # Stage B: reduce (per series, labels preserved -- unlike a classic
+        # condition). "last" is a no-op on an instant query's single point.
         alerting.RuleGroupRuleDataArgs(
             ref_id="B",
             datasource_uid="-100",  # "-100" is Grafana's internal UID for expressions
@@ -73,18 +86,44 @@ def _rule_data(expr: str, mimir_uid: str) -> list[alerting.RuleGroupRuleDataArgs
             ),
             model=json.dumps(
                 {
+                    "type": "reduce",
+                    "datasource": {"type": "__expr__", "uid": "-100"},
+                    "expression": "A",
+                    "conditions": [
+                        {
+                            "evaluator": {"type": "gt", "params": []},
+                            "operator": {"type": "and"},
+                            "query": {"params": ["A"]},
+                            "reducer": {"type": "last", "params": []},
+                            "type": "query",
+                        }
+                    ],
+                    "reducer": "last",
+                    "refId": "B",
+                }
+            ),
+        ),
+        # Stage C: threshold, per series -- fires when B's value is > 0.
+        alerting.RuleGroupRuleDataArgs(
+            ref_id="C",
+            datasource_uid="-100",
+            relative_time_range=alerting.RuleGroupRuleDataRelativeTimeRangeArgs(
+                from_=600, to=0
+            ),
+            model=json.dumps(
+                {
+                    "type": "threshold",
+                    "datasource": {"type": "__expr__", "uid": "-100"},
+                    "expression": "B",
                     "conditions": [
                         {
                             "evaluator": {"type": "gt", "params": [0]},
                             "operator": {"type": "and"},
-                            "query": {"params": ["A"]},
-                            "reducer": {"type": "count", "params": []},
+                            "query": {"params": []},
                             "type": "query",
                         }
                     ],
-                    "datasource": {"type": "__expr__", "uid": "-100"},
-                    "refId": "B",
-                    "type": "classic_conditions",
+                    "refId": "C",
                 }
             ),
         ),

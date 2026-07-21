@@ -23,7 +23,7 @@ def create(
         rules=[
             alerting.RuleGroupRuleArgs(
                 name="MitxOnline500Errors",
-                condition="B",
+                condition="C",
                 for_="5m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
@@ -51,7 +51,7 @@ def create(
         rules=[
             alerting.RuleGroupRuleArgs(
                 name="RedisMemoryIssuesProduction",
-                condition="B",
+                condition="C",
                 for_="1m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
@@ -66,7 +66,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="RedisMemoryIssuesNonProd",
-                condition="B",
+                condition="C",
                 for_="1m",
                 no_data_state="OK",
                 labels={"severity": "warning"},
@@ -81,7 +81,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="CredentialIssueProduction",
-                condition="B",
+                condition="C",
                 for_="1m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
@@ -96,7 +96,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="CredentialIssueNonProd",
-                condition="B",
+                condition="C",
                 for_="1m",
                 no_data_state="OK",
                 labels={"severity": "warning"},
@@ -121,7 +121,7 @@ def create(
         rules=[
             alerting.RuleGroupRuleArgs(
                 name="ForumTimeoutProduction",
-                condition="B",
+                condition="C",
                 for_="1m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
@@ -136,7 +136,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="ForumTimeoutNonProd",
-                condition="B",
+                condition="C",
                 for_="1m",
                 no_data_state="OK",
                 labels={"severity": "warning"},
@@ -151,7 +151,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="NoSAMLProviderDataProduction",
-                condition="B",
+                condition="C",
                 for_="1m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
@@ -172,7 +172,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="NoSAMLProviderDataNonProd",
-                condition="B",
+                condition="C",
                 for_="1m",
                 no_data_state="OK",
                 labels={"severity": "warning"},

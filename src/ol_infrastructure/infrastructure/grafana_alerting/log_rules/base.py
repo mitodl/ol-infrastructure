@@ -2,8 +2,8 @@
 
 Migrated from grafana-alerts/loki-rules/ (previously synced via cortextool).
 
-Two-stage evaluation pipeline per rule
----------------------------------------
+Three-stage evaluation pipeline per rule
+-----------------------------------------
 Same pattern as metric_rules, but Stage A queries the Loki datasource with a
 LogQL metric expression instead of PromQL:
 
@@ -11,7 +11,16 @@ LogQL metric expression instead of PromQL:
              Must be metric-producing (count_over_time, rate, etc.) with the
              threshold baked in so it returns no rows when the condition is
              not met.
-  Stage B — classic condition: fires when count of A > 0.
+  Stage B — reduce: passes each series returned by A through unchanged.
+  Stage C — threshold: fires per-series when B's value is > 0.
+
+Stages B and C use "reduce"/"threshold" expressions rather than a single
+"classic_condition", specifically so each matching series keeps its own
+labels on the resulting alert instance -- a classic condition instead
+collapses every matching series into one label-less instance, silently
+breaking every `{{ $labels.x }}` reference in every rule's annotations (all
+alerts fired with "[no value]" in place of the real labels). See
+https://grafana.com/docs/grafana/latest/alerting/alerting-rules/templates/examples/
 
 Differences from the original YAML
 ------------------------------------
@@ -56,7 +65,7 @@ _LOKI_DATASOURCE_UID = "grafanacloud-logs"
 
 
 def _rule_data(expr: str, loki_uid: str) -> list[alerting.RuleGroupRuleDataArgs]:
-    """Build the two-stage data pipeline for a single log alert rule."""
+    """Build the three-stage data pipeline for a single log alert rule."""
     return [
         # Stage A: run the LogQL metric expression against Loki.
         alerting.RuleGroupRuleDataArgs(
@@ -79,7 +88,8 @@ def _rule_data(expr: str, loki_uid: str) -> list[alerting.RuleGroupRuleDataArgs]
                 }
             ),
         ),
-        # Stage B: fire when A returns any rows (count > 0).
+        # Stage B: reduce (per series, labels preserved -- unlike a classic
+        # condition). "last" is a no-op on an instant query's single point.
         alerting.RuleGroupRuleDataArgs(
             ref_id="B",
             datasource_uid="-100",  # "-100" is Grafana's internal UID for expressions
@@ -88,18 +98,44 @@ def _rule_data(expr: str, loki_uid: str) -> list[alerting.RuleGroupRuleDataArgs]
             ),
             model=json.dumps(
                 {
+                    "type": "reduce",
+                    "datasource": {"type": "__expr__", "uid": "-100"},
+                    "expression": "A",
+                    "conditions": [
+                        {
+                            "evaluator": {"type": "gt", "params": []},
+                            "operator": {"type": "and"},
+                            "query": {"params": ["A"]},
+                            "reducer": {"type": "last", "params": []},
+                            "type": "query",
+                        }
+                    ],
+                    "reducer": "last",
+                    "refId": "B",
+                }
+            ),
+        ),
+        # Stage C: threshold, per series -- fires when B's value is > 0.
+        alerting.RuleGroupRuleDataArgs(
+            ref_id="C",
+            datasource_uid="-100",
+            relative_time_range=alerting.RuleGroupRuleDataRelativeTimeRangeArgs(
+                from_=600, to=0
+            ),
+            model=json.dumps(
+                {
+                    "type": "threshold",
+                    "datasource": {"type": "__expr__", "uid": "-100"},
+                    "expression": "B",
                     "conditions": [
                         {
                             "evaluator": {"type": "gt", "params": [0]},
                             "operator": {"type": "and"},
-                            "query": {"params": ["A"]},
-                            "reducer": {"type": "count", "params": []},
+                            "query": {"params": []},
                             "type": "query",
                         }
                     ],
-                    "datasource": {"type": "__expr__", "uid": "-100"},
-                    "refId": "B",
-                    "type": "classic_conditions",
+                    "refId": "C",
                 }
             ),
         ),

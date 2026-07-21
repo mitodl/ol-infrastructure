@@ -30,7 +30,7 @@ def create(
             # least one node is missing a daemonset pod (e.g. scheduling issue).
             alerting.RuleGroupRuleArgs(
                 name="DaemonsetReplicasMissingWarning",
-                condition="B",
+                condition="C",
                 for_="10m",
                 no_data_state="OK",
                 labels={"severity": "warning"},
@@ -43,7 +43,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="DaemonsetReplicasMissingCritical",
-                condition="B",
+                condition="C",
                 for_="10m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
@@ -58,7 +58,7 @@ def create(
             # Fires when available replicas / total replicas < 1.0.
             alerting.RuleGroupRuleArgs(
                 name="DeploymentReplicasMissingWarning",
-                condition="B",
+                condition="C",
                 for_="10m",
                 no_data_state="OK",
                 labels={"severity": "warning"},
@@ -71,7 +71,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="DeploymentReplicasMissingCritical",
-                condition="B",
+                condition="C",
                 for_="10m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
@@ -87,7 +87,7 @@ def create(
             # meaning the deployment cannot serve traffic.
             alerting.RuleGroupRuleArgs(
                 name="DeploymentUnavailableWarning",
-                condition="B",
+                condition="C",
                 for_="10m",
                 no_data_state="OK",
                 labels={"severity": "warning"},
@@ -100,7 +100,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="DeploymentUnavailableCritical",
-                condition="B",
+                condition="C",
                 for_="10m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
@@ -115,7 +115,7 @@ def create(
             # Fires when ready replicas / desired replicas < 1.0.
             alerting.RuleGroupRuleArgs(
                 name="StatefulSetReplicasMissingWarning",
-                condition="B",
+                condition="C",
                 for_="10m",
                 no_data_state="OK",
                 labels={"severity": "warning"},
@@ -128,7 +128,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="StatefulSetReplicasMissingCritical",
-                condition="B",
+                condition="C",
                 for_="10m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
@@ -143,7 +143,7 @@ def create(
             # Fires when a node's Ready condition == 0 (not ready).
             alerting.RuleGroupRuleArgs(
                 name="NodeNotReadyWarning",
-                condition="B",
+                condition="C",
                 for_="5m",
                 no_data_state="OK",
                 labels={"severity": "warning"},
@@ -156,7 +156,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="NodeNotReadyCritical",
-                condition="B",
+                condition="C",
                 for_="5m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
@@ -171,7 +171,7 @@ def create(
             # Fires when a container is in CrashLoopBackOff state.
             alerting.RuleGroupRuleArgs(
                 name="PodCrashLoopingWarning",
-                condition="B",
+                condition="C",
                 for_="5m",
                 no_data_state="OK",
                 labels={"severity": "warning"},
@@ -184,7 +184,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="PodCrashLoopingCritical",
-                condition="B",
+                condition="C",
                 for_="5m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
@@ -201,7 +201,7 @@ def create(
             # Runbook: https://github.com/mitodl/mit-learn/wiki/Celery-Beat-Troubleshooting
             alerting.RuleGroupRuleArgs(
                 name="CeleryBeatPodRestarts",
-                condition="B",
+                condition="C",
                 for_="5m",
                 no_data_state="OK",
                 labels={"severity": "warning"},
@@ -216,7 +216,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="CeleryBeatPodRestartsCritical",
-                condition="B",
+                condition="C",
                 for_="5m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
@@ -236,7 +236,7 @@ def create(
             # still looping, not historical one-off kills.
             alerting.RuleGroupRuleArgs(
                 name="PodOOMKilledWarning",
-                condition="B",
+                condition="C",
                 for_="5m",
                 no_data_state="OK",
                 labels={"severity": "warning"},
@@ -253,7 +253,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="PodOOMKilledCritical",
-                condition="B",
+                condition="C",
                 for_="5m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
@@ -273,7 +273,7 @@ def create(
             # Dagster namespace is excluded — it manages its own job retry logic.
             alerting.RuleGroupRuleArgs(
                 name="KubernetesJobFailedWarning",
-                condition="B",
+                condition="C",
                 for_="5m",
                 no_data_state="OK",
                 labels={"severity": "warning"},
@@ -286,7 +286,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="KubernetesJobFailedCritical",
-                condition="B",
+                condition="C",
                 for_="5m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
@@ -302,7 +302,7 @@ def create(
             # meaning the workload cannot scale further under load.
             alerting.RuleGroupRuleArgs(
                 name="HPAAtMaxReplicasWarning",
-                condition="B",
+                condition="C",
                 for_="15m",
                 no_data_state="OK",
                 labels={"severity": "warning"},
@@ -315,7 +315,7 @@ def create(
             ),
             alerting.RuleGroupRuleArgs(
                 name="HPAAtMaxReplicasCritical",
-                condition="B",
+                condition="C",
                 for_="15m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
