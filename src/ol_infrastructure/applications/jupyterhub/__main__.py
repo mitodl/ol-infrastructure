@@ -190,6 +190,9 @@ COURSE_NAMES = [
     "supervised_learning_fundamentals",
     "introduction_to_data_analytics_and_machine_learning",
     "base_authoring_image",
+    "mitxt-6.3710.3x",
+    "mitxt-6.3710.4x",
+    "mitxt-6.3710.5x",
 ]
 COURSE_NAMES.extend(
     [
