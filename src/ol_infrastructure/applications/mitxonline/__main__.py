@@ -516,10 +516,24 @@ secret_names, secret_resources = create_mitxonline_k8s_secrets(
 )
 
 # Webapp memory is owned by the VPA (see the VPA block at the end of this file), not
-# the HPA. `mitxonline_web_memory_limit` is only the starting/floor budget pods launch
-# with; the VPA raises requests and limits toward `mitxonline_web_memory_ceiling` based
-# on observed usage.
-mitxonline_web_memory_limit = "1200Mi"
+# the HPA. These are the starting values pods launch with; the VPA raises them toward
+# `mitxonline_web_memory_ceiling` based on observed usage -- in principle. In practice
+# the VPA updater's "don't disrupt short-lived pods" safety check appears to have
+# prevented it from ever applying its own (correct) recommendation here, since this
+# deployment is redeployed often enough that pods rarely age past that threshold. See
+# https://github.com/mitodl/ol-infrastructure/pull/XXXX for the investigation.
+#
+# request vs limit are intentionally different (Burstable QoS), not equal like most
+# other apps in this file: 7 days of container_memory_working_set_bytes history showed
+# p50=863MB, p90=1038MB, p99=1946MB, p99.9=2561MB, max=2651MB. The previous 1200Mi
+# figure, used for both request and limit, sat right around p85-90 -- meaning roughly
+# 10-15% of all samples already exceeded it, which is why OOMKilled was firing
+# regularly (confirmed via `kubectl describe pod` showing Reason: OOMKilled,
+# exitCode=137). Splitting them lets the *reservation* (request) track typical usage
+# instead of the rare worst case, while the *limit* still has enough headroom for a
+# real burst to not get killed.
+mitxonline_web_memory_request = "1000Mi"  # ~p90 of observed usage
+mitxonline_web_memory_limit = "2560Mi"  # ~p99.9 of observed usage, plus a little margin
 mitxonline_web_memory_ceiling = "3Gi"
 
 # Granian's --workers-max-rss is resolved at Pulumi synth time, so it cannot be derived
@@ -600,7 +614,7 @@ mitxonline_k8s_app = OLApplicationK8s(
             resource_requests={"cpu": "10m", "memory": "384Mi"},
             resource_limits={"memory": "384Mi"},
         ),
-        resource_requests={"cpu": "250m", "memory": mitxonline_web_memory_limit},
+        resource_requests={"cpu": "250m", "memory": mitxonline_web_memory_request},
         resource_limits={"memory": mitxonline_web_memory_limit},
         # hpa_scaling_metrics is left at the component default (CPU only). Memory is
         # managed vertically by the component's webapp VPA; the ceiling below is what
