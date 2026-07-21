@@ -50,7 +50,7 @@ config:
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["studio.library_authoring_mfe", "--deactivate"]
   - ["legacy_studio.certificates", "--create", "--everyone"]
-  - ["instructor.legacy_instructor_dashboard", "--create", "--everyone"]
+  - ["instructor.legacy_instructor_dashboard", "--deactivate"]
   edxapp:business_unit: residential
   edxapp:db_instance_size: "db.r7g.xlarge"
   edxapp:db_max_storage_gb: "1500"
@@ -68,6 +68,7 @@ config:
     secure: v1:MSer6cBbKNVi/Pas:v5XAeVblUaT5pyxdhhk9wn9cVjadZcHscOWhN1nlPHBsCD8/HgEtsvAjtTOWnW/yVMYaMzlIjOxoKvEw0/qNESQj0M7bFKC7/dtfU+qlrWyI0PJEVVmiz9QPLAOvl4rA8In2hJTAmN+BAREDqSRFM9YiOKmdOuoDssTGv+fD1+oC5EcFz4BKPUnbZDQ1
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
+    admin_console: admin-console
     authoring: authoring
     communications: communications
     discussions: discuss
@@ -85,7 +86,7 @@ config:
   edxapp:worker_disk_size: "50"
   edxapp:worker_instance_type: "m7a.xlarge"
   edxapp:enable_xqueue: "true"
-  edxapp:xqueue_domain: xqueue.mitx.odl.mit.edu
+  edxapp:xqueue_domain: unused_placeholder
   mongodb:atlas_project_id: 61b728704656cb4747e589a0
   redis:instance_type: cache.r7g.2xlarge
   vault:address: https://vault-production.odl.mit.edu
@@ -135,15 +136,16 @@ config:
   edxapp:k8s_vpc: residential_mitx_vpc
   edxapp:canvas_base_url: https://canvas.mit.edu
   meilisearch:deploy: "true"
-  meilisearch:enabled: "false"
+  meilisearch:enabled: "true"
   meilisearch:domain: meilisearch.mitx.mit.edu
   meilisearch:replica_count: "1"
   meilisearch:pv_size: 100Gi
   meilisearch:cpu_request: "250m"
   meilisearch:memory_request: "1Gi"
-  meilisearch:memory_limit: "1Gi"
+  meilisearch:memory_limit: "3Gi"
   typesense:deploy: "true"
-  typesense:enabled: "false"
+  typesense:enabled: "true"
+  typesense:course_search_enabled: "true"
   edxapp:site_project:
     deployment: mitx
     mfe_apps:
