@@ -147,14 +147,20 @@ APISIX_ENABLED_PLUGINS: list[str] = [
 
 
 def _double_memory_quantity(quantity: str) -> str:
-    """Double a Kubernetes memory quantity, preserving its Mi/Gi suffix.
+    """Double a Kubernetes memory quantity, preserving its unit suffix.
 
     Used to derive a default memory limit with burst headroom above the
     configured request when no explicit limit override is supplied.
+    Supports the binary (Ki/Mi/Gi/Ti) and decimal (K/M/G/T) suffixes valid
+    for a Kubernetes memory quantity, and fractional prefixes (e.g.
+    "1.5Gi"). Pi/Ei and exponential notation are not supported -- not a
+    realistic unit for a gateway memory request/limit -- and raise the
+    same clear error as any other unrecognized suffix.
     """
-    for suffix in ("Mi", "Gi"):
+    for suffix in ("Ki", "Mi", "Gi", "Ti", "K", "M", "G", "T"):
         if quantity.endswith(suffix):
-            return f"{int(quantity[: -len(suffix)]) * 2}{suffix}"
+            value = float(quantity[: -len(suffix)]) * 2
+            return f"{int(value) if value.is_integer() else value}{suffix}"
     msg = f"Unsupported memory quantity suffix: {quantity!r}"
     raise ValueError(msg)
 
