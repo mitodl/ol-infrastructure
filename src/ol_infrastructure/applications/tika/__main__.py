@@ -147,12 +147,34 @@ tika_helm_release = kubernetes.helm.v3.Release(
             "resources": {
                 "requests": {
                     "cpu": "10m",  # does nothing most of the time
-                    "memory": "2Gi",  # java never gives it back
+                    "memory": "3Gi",  # java never gives it back
                 },
                 "limits": {
-                    "memory": "2Gi",
+                    "memory": "3Gi",
                 },
             },
+            # By default the JVM's container-aware ergonomics only give the
+            # heap 25% of the container memory limit, leaving the rest
+            # unclaimed while Metaspace/direct memory have no cap and can grow
+            # unbounded. That combination lets a single large document balloon
+            # off-heap and get the whole container OOMKilled by the kernel
+            # rather than the JVM raising a catchable OutOfMemoryError.
+            # Budget the JVM at 1152Mi heap + 320Mi metaspace + 320Mi direct
+            # memory (1792Mi total). The container limit is raised to 3Gi
+            # (rather than sized to exactly match the JVM budget) to leave
+            # ~1280Mi of headroom outside the JVM entirely: Tika's default PDF
+            # OCR strategy is AUTO, which auto-invokes the `tesseract` binary
+            # as a native subprocess for scanned/image PDF pages, and that
+            # subprocess's memory isn't bounded by any JAVA_TOOL_OPTIONS flag.
+            "env": [
+                {
+                    "name": "JAVA_TOOL_OPTIONS",
+                    "value": (
+                        "-Xmx1152m -XX:MaxMetaspaceSize=320m "
+                        "-XX:MaxDirectMemorySize=320m"
+                    ),
+                },
+            ],
         },
         skip_await=False,
     ),
