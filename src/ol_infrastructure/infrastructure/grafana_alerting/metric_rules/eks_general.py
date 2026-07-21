@@ -300,6 +300,13 @@ def create(
             # --- HPA at max replicas ---
             # Fires when an HPA has been at its maximum replica count for 15m,
             # meaning the workload cannot scale further under load.
+            #
+            # Excludes HPAs where min_replicas == max_replicas (e.g. a
+            # single-fixed-replica HPA with min=max=1): those are permanently
+            # "at max" by construction, so the condition is always true and
+            # carries no signal about the workload actually being saturated.
+            # Observed in production 2026-07: xqwatcher's HPAs (min=max=1)
+            # fired this rule continuously, unrelated to any real incident.
             alerting.RuleGroupRuleArgs(
                 name="HPAAtMaxReplicasWarning",
                 condition="C",
@@ -310,7 +317,7 @@ def create(
                     "description": "HPA {{ $labels.horizontalpodautoscaler }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been at its maximum replica count for 15 minutes. The workload may be unable to scale further under load."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{cluster=~".*-(ci|qa)"}) >= sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{cluster=~".*-(ci|qa)"})'
+                    'sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{cluster=~".*-(ci|qa)"}) >= sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{cluster=~".*-(ci|qa)"}) and sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{cluster=~".*-(ci|qa)"}) != sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_min_replicas{cluster=~".*-(ci|qa)"})'
                 ),
             ),
             alerting.RuleGroupRuleArgs(
@@ -323,7 +330,7 @@ def create(
                     "description": "HPA {{ $labels.horizontalpodautoscaler }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been at its maximum replica count for 15 minutes. The workload may be unable to scale further under load."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{cluster=~".*-(production)"}) >= sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{cluster=~".*-(production)"})'
+                    'sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{cluster=~".*-(production)"}) >= sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{cluster=~".*-(production)"}) and sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{cluster=~".*-(production)"}) != sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_min_replicas{cluster=~".*-(production)"})'
                 ),
             ),
         ],
