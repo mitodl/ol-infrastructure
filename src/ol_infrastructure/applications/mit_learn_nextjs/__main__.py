@@ -69,6 +69,13 @@ nextjs_config = Config("nextjs")
 # default. NEXTJS_NON_HEAP_OVERHEAD_MIB reserves headroom within the same limit for
 # non-heap V8/Node needs (code cache, native buffers, thread stacks) that sit outside
 # the old-space budget.
+#
+# This is a fixed MiB amount rather than a percentage of the limit on purpose:
+# non-heap overhead is driven by concurrency/workload shape, not by how much memory
+# the container happens to have, so it doesn't scale with the limit. A fixed reserve
+# means raising nextjs_memory_limit later hands all of the added memory straight to
+# the heap (the actual thing that needs more room); a percentage would keep skimming
+# an ever-larger, unneeded slice off the top as the limit grows.
 nextjs_memory_limit = "1Gi"
 NEXTJS_NON_HEAP_OVERHEAD_MIB = 224
 nextjs_max_old_space_size_mib = (
