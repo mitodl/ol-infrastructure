@@ -1,6 +1,7 @@
 """Pulumi program for deploying the MIT Learn Next.js application to Kubernetes."""
 
 import pulumi_kubernetes as kubernetes
+from kubernetes.utils.quantity import parse_quantity
 from pulumi import Config, ResourceOptions, export
 
 from bridge.lib.magic_numbers import DEFAULT_NEXTJS_PORT
@@ -59,6 +60,29 @@ cluster_stack.require_output("namespaces").apply(
 
 nextjs_config = Config("nextjs")
 
+# Node (v24) auto-sizes its default heap ceiling from the container's cgroup memory
+# limit, but production logs show it consistently landing around ~500MiB and crashing
+# with "FATAL ERROR: ... JavaScript heap out of memory" (exit 139) roughly every 90
+# minutes per pod under normal, steady request volume -- well short of the 1Gi this
+# container is actually allowed. Setting --max-old-space-size explicitly makes V8 use
+# the memory it's already been granted instead of self-limiting to a much lower
+# default. NEXTJS_NON_HEAP_OVERHEAD_MIB reserves headroom within the same limit for
+# non-heap V8/Node needs (code cache, native buffers, thread stacks) that sit outside
+# the old-space budget.
+#
+# This is a fixed MiB amount rather than a percentage of the limit on purpose:
+# non-heap overhead is driven by concurrency/workload shape, not by how much memory
+# the container happens to have, so it doesn't scale with the limit. A fixed reserve
+# means raising nextjs_memory_limit later hands all of the added memory straight to
+# the heap (the actual thing that needs more room); a percentage would keep skimming
+# an ever-larger, unneeded slice off the top as the limit grows.
+nextjs_memory_limit = "1Gi"
+NEXTJS_NON_HEAP_OVERHEAD_MIB = 224
+nextjs_max_old_space_size_mib = (
+    int(parse_quantity(nextjs_memory_limit)) // (1024 * 1024)
+    - NEXTJS_NON_HEAP_OVERHEAD_MIB
+)
+
 stay_updated_hubspot_form_ids = {
     "ci": "f201f3af-c2c0-4b7d-b297-ddbb75912cc1",
     "qa": "f201f3af-c2c0-4b7d-b297-ddbb75912cc1",
@@ -73,6 +97,7 @@ except KeyError as exc:
 
 raw_env_vars = {
     # Env vars available only on server
+    "NODE_OPTIONS": f"--max-old-space-size={nextjs_max_old_space_size_mib}",
     "MITOL_NOINDEX": nextjs_config.get("mitol_noindex"),
     "NEXT_PUBLIC_OPTIMIZE_IMAGES": nextjs_config.get("optimize_images"),
     "GTM_TRACKING_ID": nextjs_config.get("gtm_tracking_id") or "",
@@ -221,8 +246,8 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
                         ],
                         image_pull_policy="Always",
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                            requests={"cpu": "100m", "memory": "1Gi"},
-                            limits={"memory": "1Gi"},
+                            requests={"cpu": "100m", "memory": nextjs_memory_limit},
+                            limits={"memory": nextjs_memory_limit},
                         ),
                         env=env_vars,
                         liveness_probe=kubernetes.core.v1.ProbeArgs(
