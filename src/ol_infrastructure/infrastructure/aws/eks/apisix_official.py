@@ -317,10 +317,10 @@ def setup_apisix(
                     "enabled": True,
                     "minReplicas": eks_config.get_int("apisix_min_replicas") or 3,
                     "maxReplicas": eks_config.get_int("apisix_max_replicas") or 5,
-                    "targetCPUUtilizationPercentage": eks_config.get_int(
-                        "apisix_target_cpu_utilization_percentage"
-                    )
-                    or 50,
+                    "targetCPUUtilizationPercentage": (
+                        eks_config.get_int("apisix_target_cpu_utilization_percentage")
+                        or 50
+                    ),
                 },
                 # --- Pod Configuration ---
                 "tolerations": operations_tolerations,
