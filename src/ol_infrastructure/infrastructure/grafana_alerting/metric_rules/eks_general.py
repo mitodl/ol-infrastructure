@@ -234,6 +234,17 @@ def create(
             # actively restarting (restart count increased in the past hour).
             # The join ensures we only alert on OOM-killed containers that are
             # still looping, not historical one-off kills.
+            #
+            # Warning stays at "> 0" restarts for visibility/trend-tracking:
+            # several production workloads (e.g. apisix, mitlearn-app,
+            # mitxonline-app) intentionally launch pods at a low memory floor
+            # and rely on a VPA to raise limits toward a ceiling based on
+            # observed usage, so a single OOM-and-recover right after a
+            # deploy is expected, self-healing behavior, not an incident.
+            # Critical requires "> 1" (at least a second restart within the
+            # window) so a lone self-healing OOM doesn't page anyone, while a
+            # container that's genuinely stuck crash-looping still trips it
+            # within a few minutes (container restart backoff is short).
             alerting.RuleGroupRuleArgs(
                 name="PodOOMKilledWarning",
                 condition="C",
@@ -258,13 +269,13 @@ def create(
                 no_data_state="OK",
                 labels={"severity": "critical"},
                 annotations={
-                    "description": "Container {{ $labels.container }} in pod {{ $labels.pod }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been OOMKilled and is actively restarting. Memory limits may need to be increased."
+                    "description": "Container {{ $labels.container }} in pod {{ $labels.pod }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been OOMKilled and is repeatedly restarting (2+ restarts within the past hour). Memory limits may need to be increased."
                 },
                 datas=rd(
                     "sum by (cluster, namespace, pod, container) (\n"
                     '  (kube_pod_container_status_last_terminated_reason{cluster=~".*-(production)", reason="OOMKilled"} == 1)\n'
                     "  * on (cluster, namespace, pod, container) group_left()\n"
-                    "  (increase(kube_pod_container_status_restarts_total[1h]) > 0)\n"
+                    "  (increase(kube_pod_container_status_restarts_total[1h]) > 1)\n"
                     ")"
                 ),
             ),
