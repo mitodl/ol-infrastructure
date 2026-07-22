@@ -48,6 +48,12 @@ spec:
             name: mitxonline-env
         - secretRef:
             name: mitxonline-secrets
+        # Gitignored per-developer overrides; must stay LAST so its keys win
+        # over both sources above. See "Local Configuration Overrides" in
+        # local-dev/README.md.
+        - configMapRef:
+            name: mitxonline-env-local
+            optional: true
         volumeMounts:
         - name: static-files
           mountPath: /src/staticfiles
@@ -81,6 +87,12 @@ spec:
             name: mitxonline-env
         - secretRef:
             name: mitxonline-secrets
+        # Gitignored per-developer overrides; must stay LAST so its keys win
+        # over both sources above. See "Local Configuration Overrides" in
+        # local-dev/README.md.
+        - configMapRef:
+            name: mitxonline-env-local
+            optional: true
         resources:
           requests:
             cpu: 250m
@@ -184,6 +196,12 @@ spec:
             name: mitxonline-env
         - secretRef:
             name: mitxonline-secrets
+        # Gitignored per-developer overrides; must stay LAST so its keys win
+        # over both sources above. See "Local Configuration Overrides" in
+        # local-dev/README.md.
+        - configMapRef:
+            name: mitxonline-env-local
+            optional: true
         resources:
           requests:
             cpu: 100m
@@ -248,6 +266,12 @@ spec:
             name: mitxonline-env
         - secretRef:
             name: mitxonline-secrets
+        # Gitignored per-developer overrides; must stay LAST so its keys win
+        # over both sources above. See "Local Configuration Overrides" in
+        # local-dev/README.md.
+        - configMapRef:
+            name: mitxonline-env-local
+            optional: true
         # beat loads the full Django app like the worker, so give it comparable
         # memory headroom — it OOMs with less.
         resources:

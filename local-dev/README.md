@@ -100,6 +100,11 @@ cp tilt_config.json.example tilt_config.json
 
 At minimum, review `enabled_apps` to enable only the services you need.
 
+For per-developer app env vars and secrets (API keys, feature flags), don't
+edit the tracked manifests — drop a gitignored `app-env.local.yaml` ConfigMap
+next to the app's tracked one instead. See
+[Local Configuration Overrides](#local-configuration-overrides).
+
 ### 3. Start the environment
 
 The easiest way is to use the provided start script, which validates your setup and syncs dependencies:
@@ -218,6 +223,8 @@ ol-infrastructure/
         │   ├── apisix-routes.yaml    # Routes for api.learn.mit.dev
         │   └── configmaps/
         │       ├── app-env.yaml      # Non-secret env vars
+        │       ├── app-env.local.yaml         # (optional, gitignored) your overrides
+        │       ├── app-env.local.yaml.example
         │       └── nginx.yaml        # nginx sidecar config
         │
         ├── mit-learn-nextjs/         # Next.js frontend manifests
@@ -390,11 +397,7 @@ tilt trigger seed-mit-learn-fixtures
     "learn-ai=0.28.3",
     "mitxonline=1.144.5",
     "odl-video-service=0.85.0"
-  ],
-
-  "openai_api_key": "",
-  "langsmith_api_key": "",
-  "canvas_ai_token": ""
+  ]
 }
 ```
 
@@ -403,9 +406,15 @@ tilt trigger seed-mit-learn-fixtures
 | `enabled_apps` | all four | Apps to deploy. Omit any to skip it entirely. |
 | `per_app_databases` | `false` | `true` deploys isolated CNPG + Valkey per namespace (Phase 6A). |
 | `prebuilt_tags` | see file | `["app=tag"]` list of image tags used when the app repo is not checked out locally. |
-| `openai_api_key` | `""` | OpenAI API key — required for learn-ai vector search and LiteLLM. |
-| `langsmith_api_key` | `""` | LangSmith API key for tracing (optional). |
-| `canvas_ai_token` | `""` | Canvas AI token (optional). |
+
+The rule of thumb for which config surface a knob belongs to: settings that
+change **which/how Tilt runs things** (apps, image tags, domain) go in
+`tilt_config.json`; anything that sets an **env var or secret value inside a
+workload** (API keys, feature flags, endpoints) goes in a gitignored
+`app-env.local.yaml` override ConfigMap — see [Local Configuration Overrides](#local-configuration-overrides).
+(`openai_api_key`, `langsmith_api_key`, and `canvas_ai_token` used to be
+listed here but were never wired to anything and have been removed — delete
+them from your `tilt_config.json` if present, or `config.parse()` will error.)
 
 ### Pulumi stack config
 
@@ -442,10 +451,17 @@ local-dev/apps/<app-name>/
 ├── apisix-routes.yaml    # ApisixTls + ApisixRoute
 └── configmaps/
     ├── app-env.yaml      # Non-secret env vars
+    ├── app-env.local.yaml.example  # Template for per-dev overrides
     └── nginx.yaml        # (if using nginx sidecar)
 ```
 
-Use an existing app (e.g., `learn-ai/`) as a template.
+Use an existing app (e.g., `learn-ai/`) as a template. In particular, copy
+the `envFrom` pattern from an existing `deployment.yaml`: every container
+lists the tracked ConfigMap, the tracked Secret, then the optional
+`<app>-env-local` override ConfigMap **last** (see
+[Local Configuration Overrides](#local-configuration-overrides)), and pass
+`local_overrides='configmaps/app-env.local.yaml'` to `k8s_yaml_local` in the
+Tiltfile.
 
 ### 2. Add the app database to the CNPG cluster
 
@@ -552,59 +568,71 @@ Tilt also runs `pulumi up` automatically when infra files change. You can also t
 
 ### Local Configuration Overrides
 
-The ConfigMaps and Secrets are tracked by the repository. For personal development customizations (API keys, custom endpoints, etc.), you have several options:
-
-**Option 1: tilt_config.json (recommended for most cases)**
-
-```json
-{
-  "enabled_apps": ["mit-learn"],
-  "openai_api_key": "sk-...",  # pragma: allowlist secret
-  "langsmith_api_key": "ls-..."  # pragma: allowlist secret
-}
-```
-
-Pass config values via Tilt's config system. See `tilt_config.json.example` for all available options.
-
-**Option 2: kubectl patch (for local debugging)**
-
-Modify a ConfigMap or Secret in-cluster without committing:
+The ConfigMaps and Secrets are tracked by the repository. For per-developer
+customizations (API keys, feature flags, custom endpoints), each app has an
+optional, gitignored override ConfigMap:
 
 ```bash
-# Patch an env var
-kubectl patch configmap -n mit-learn app-env -p \
-  '{"data":{"MY_VAR":"new_value"}}'
-
-# View changes
-kubectl get configmap -n mit-learn app-env -o yaml
+cp local-dev/apps/mitxonline/configmaps/app-env.local.yaml.example \
+   local-dev/apps/mitxonline/configmaps/app-env.local.yaml
+# then add your overrides under data:, e.g.
+#   FEATURE_IGNORE_EDX_FAILURES: "True"
 ```
 
-These changes persist until the pod restarts or `tilt up` is re-run.
+How it works — plain Kubernetes, visible in each app's `deployment.yaml`:
+every container's `envFrom` list references the override ConfigMap
+(`mitxonline-env-local` etc.) **last** and with `optional: true`. Kubernetes
+resolves duplicate `envFrom` keys by letting the last source win, so your
+overrides beat both the tracked ConfigMap *and* the tracked Secret — secret
+values are fine in this file, it never leaves your machine. `optional: true`
+means no file → no ConfigMap → no-op for everyone else.
 
-**Option 3: Stash workflow (if heavily customizing)**
+Day-to-day behavior:
 
-If you have many local changes to tracked files, you can stash them before pulling:
+- Creating or editing the file mid-session re-applies it — no Tilt restart.
+  Pods roll automatically so new values actually take effect: because
+  Kubernetes does not restart pods on ConfigMap changes, `tiltlib.star`
+  stamps a fingerprint of your overrides onto each Deployment's pod template
+  (the `ol.mit.edu/local-overrides-hash` annotation), which is also the
+  idiomatic production pattern (cf. Helm `checksum/config` annotations).
+- Overridden key **names** (never values) are printed in the **Tiltfile
+  resource's log** in the Tilt UI, and your full delta is inspectable
+  in-cluster at any time:
+  `kubectl get cm -n mitxonline mitxonline-env-local -o yaml`
+- Gotchas: the ConfigMap's `metadata.name` must match what `deployment.yaml`
+  references (`<app>-env-local` — copy the example, don't type it), and all
+  `data:` values must be YAML **strings** (quote things like `"True"` and
+  `"8080"`). A typo'd key is applied but ignored by the app. If you *delete*
+  the file mid-session, prefer emptying `data:` instead — the already-applied
+  ConfigMap can linger in-cluster until `tilt down`.
 
-```bash
-# Stash local changes
-git stash
+Scope notes:
 
-# Pull latest
-git pull
-
-# Reapply your changes
-git stash pop
-```
+- **mit-learn-nextjs** can't participate yet: it has no ConfigMap/Secret —
+  its env lives directly in `deployment.yaml`. Moving that env block to a
+  ConfigMap would enable it.
+- **OpenAI key for LiteLLM** (`local-infra` namespace, Pulumi-managed) is
+  separate from the app overlays — create the Secret directly (the
+  deployment marks it optional, so this is safe to skip entirely):
+  ```bash
+  kubectl create secret generic litellm-secrets -n local-infra \
+    --from-literal=openai_api_key=sk-your-key  # pragma: allowlist secret
+  ```
+  (That `openai_api_key` Secret *data key* is unrelated to the old
+  `tilt_config.json` key of the same name, which was never wired to anything
+  and has been removed.)
 
 ### GPU Support for Ollama
 
 If you prefer to run Ollama on your host machine to use GPU acceleration:
 
-1. **Stop the in-cluster Ollama** — Set `OLLAMA_ENDPOINT` in your app ConfigMap to point to your host:
+1. **Stop the in-cluster Ollama** — point `OLLAMA_ENDPOINT` at your host via
+   the app's gitignored `app-env.local.yaml` (see
+   [Local Configuration Overrides](#local-configuration-overrides)):
    ```yaml
-   OLLAMA_ENDPOINT: "http://host.docker.internal:11434"  # Docker Desktop
-   OLLAMA_ENDPOINT: "http://172.17.0.1:11434"            # Linux
+   OLLAMA_ENDPOINT: "http://host.docker.internal:11434"
    ```
+   (Docker Desktop; on Linux use `http://172.17.0.1:11434`.)
 
 2. **Run Ollama on your host:**
    ```bash
@@ -615,13 +643,15 @@ If you prefer to run Ollama on your host machine to use GPU acceleration:
 
 The local-dev stack doesn't include S3 storage by default. To add it:
 
-**Option 1: Use external MinIO instance** — Run MinIO on your host and configure apps to use it:
+**Option 1: Use external MinIO instance** — Run MinIO on your host and point
+apps at it via their gitignored `app-env.local.yaml` (see
+[Local Configuration Overrides](#local-configuration-overrides)):
 ```yaml
-AWS_ENDPOINT_URL: "http://host.docker.internal:9000"  # Docker Desktop
-AWS_ENDPOINT_URL: "http://172.17.0.1:9000"            # Linux
+AWS_ENDPOINT_URL: "http://host.docker.internal:9000"
 AWS_ACCESS_KEY_ID: "minioadmin"  # pragma: allowlist secret
 AWS_SECRET_ACCESS_KEY: "minioadmin"  # pragma: allowlist secret
 ```
+(Docker Desktop; on Linux use `http://172.17.0.1:9000`.)
 
 **Option 2: Deploy MinIO in-cluster** — Modify `local-dev/infra/__main__.py` to add a MinIO Helm chart and patch the ConfigMaps accordingly.
 
