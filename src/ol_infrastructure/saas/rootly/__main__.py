@@ -505,6 +505,15 @@ escalation_policy_exampledeleteme_escalationpolicy = rootly.EscalationPolicy(
     opts=rootly_opts,
 )
 
+# Adds an explicit Slack-channel notification target to this level, alongside
+# the existing schedule target, so #devops-alerts visibility for Production
+# no longer depends solely on the account-wide "default alerts channel" Slack
+# integration setting. Discovered 2026-07-22: that global setting posts every
+# alert account-wide unconditionally, independent of routing/escalation, which
+# is why CI/QA alerts (routed separately to their own Slack-only escalation
+# policy) were also still landing in #devops-alerts. Once this level -- and
+# its counterpart below on the other escalation path -- are confirmed working,
+# the global toggle can be turned off to fully separate the two channels.
 escalation_level_b94aa0a3_cda6_4ee6_bcb1_cddf33c69088 = rootly.EscalationLevel(
     "b94aa0a3-cda6-4ee6-bcb1-cddf33c69088",
     delay=5,
@@ -515,7 +524,11 @@ escalation_level_b94aa0a3_cda6_4ee6_bcb1_cddf33c69088 = rootly.EscalationLevel(
             "id": "fad27d50-f0e4-4d21-9b6d-57eb2dec648b",
             "teamMembers": "all",
             "type": "schedule",
-        }
+        },
+        {
+            "id": "GBDLJJX51",  # #devops-alerts
+            "type": "slack_channel",
+        },
     ],
     paging_strategy_configuration_schedule_strategy="on_call_only",
     paging_strategy_configuration_strategy="default",
@@ -535,6 +548,9 @@ escalation_level_r_4351b5b9_00d3_46ae_a044_05930cfbe0e2 = rootly.EscalationLevel
     opts=rootly_opts,
 )
 
+# See the comment on escalation_level_b94aa0a3_cda6_4ee6_bcb1_cddf33c69088
+# above -- this is the equivalent position-1 level on the Default Escalation
+# Policy's other escalation path, updated the same way for the same reason.
 escalation_level_r_75bc919c_824c_46a1_9589_0fc8b85e0d77 = rootly.EscalationLevel(
     "r-75bc919c-824c-46a1-9589-0fc8b85e0d77",
     delay=5,
@@ -545,7 +561,11 @@ escalation_level_r_75bc919c_824c_46a1_9589_0fc8b85e0d77 = rootly.EscalationLevel
             "id": "fad27d50-f0e4-4d21-9b6d-57eb2dec648b",
             "teamMembers": "all",
             "type": "schedule",
-        }
+        },
+        {
+            "id": "GBDLJJX51",  # #devops-alerts
+            "type": "slack_channel",
+        },
     ],
     paging_strategy_configuration_schedule_strategy="on_call_only",
     paging_strategy_configuration_strategy="default",
