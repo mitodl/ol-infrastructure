@@ -195,6 +195,7 @@ def create_mitlearn_k8s_secrets(
             "SECRET_KEY": '{{ get .Secrets "django_secret_key" }}',
             "SENTRY_DSN": '{{ get .Secrets "sentry_dsn" }}',
             "STATUS_TOKEN": '{{ get .Secrets "django_status_token" }}',
+            "UNSUBSCRIBE_SECRET_KEY": '{{ get .Secrets "unsubscribe_secret_key" }}',
             "YOUTUBE_DEVELOPER_KEY": '{{ get .Secrets "youtube_developer_key" }}',
         },
         vaultauth=vault_k8s_resources.auth_name,
