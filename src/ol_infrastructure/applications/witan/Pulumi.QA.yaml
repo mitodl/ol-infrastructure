@@ -5,3 +5,5 @@ config:
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
   # witan:oidc_audience: witan
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgFurjegA1WE1b8N4qiEM2KVAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMPKzZtLLEs+e1lDyxAgEQgDvcpTPZFDqJ0PRIVpj9brgaTIzNqWSoJAIjfZmtHhx574TzRhGmQ8O2iFsh1Em3Gev5En32LbkcHW4z9w==

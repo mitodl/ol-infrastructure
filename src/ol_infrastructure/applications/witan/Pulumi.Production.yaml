@@ -5,3 +5,5 @@ config:
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   # witan:oidc_audience: witan
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwEm+wja3knm1eEmHZI7JWkfAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMlJ+T612UiySXgzekAgEQgDuOrSfm9GTTDgmNn6BIsIZocvor5Laz3HVw5xhFSYxEMzwzmTw3US3R92hFxOoMXPMyjyaAoqgPtbucxw==

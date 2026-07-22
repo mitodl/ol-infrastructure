@@ -4,3 +4,5 @@ config:
   aws:region: us-east-1
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgHdah3681q3jIoMB6EquY0xAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMQkBOIyzkj00xRzZ9AgEQgDvOaikBeNnKV3FG4ZgMGvt3MOO4WsufLhs1b/FFH28hvQEuaZnfrQ1oLOS4NHXINUEJweVvuqaQUVj9gg==

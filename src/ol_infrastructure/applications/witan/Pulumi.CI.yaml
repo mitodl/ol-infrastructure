@@ -12,3 +12,5 @@ config:
   # Audience witan's own JWTVerifier validates (WITAN_OIDC_AUDIENCE) and the
   # vMCP's incomingAuth checks — see __main__.py. Defaults to "witan" if unset.
   # witan:oidc_audience: witan
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagHLkctZoMvaE7mWAgpTuNSIAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMuPBwL9uojwj00zzcAgEQgDs4haODM7tIivRyKtSdy7bT1PcYHy+mxlXoNb+Pvg2qXJsKDDQtTp4bZUS+OFyZZuPfOzNrIIYE9qTT+g==
