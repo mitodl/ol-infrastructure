@@ -110,6 +110,21 @@ def create_meilisearch_resources(
             "MEILI_ENV": "production",
             "MEILI_MASTER_KEY": secrets["meilisearch_master_key"],
         },
+        # Meilisearch is a single-replica StatefulSet backed by a ReadWriteOnce
+        # EBS volume. Every time its node is rotated the volume must fully detach
+        # from the old node before it can attach to the new one, producing a
+        # multi-minute window with zero ready endpoints (AWS "Multi-Attach error"
+        # / FailedAttachVolume). The durable fix is to keep the pod's node from
+        # rotating so often: karpenter.sh/do-not-disrupt blocks Karpenter's
+        # *voluntary* disruption (consolidation, drift, emptiness) — the default
+        # NodePool consolidates aggressively (consolidateAfter: 10m), which would
+        # otherwise drain this pod's node repeatedly. Involuntary disruption
+        # (spot interruption, node failure) is not covered here; pin to
+        # on-demand capacity via a nodeSelector if that becomes the dominant
+        # churn source in a given environment.
+        "podAnnotations": {
+            "karpenter.sh/do-not-disrupt": "true",
+        },
         "persistence": {
             "enabled": True,
             "size": meilisearch_config.get("pv_size") or "10Gi",
