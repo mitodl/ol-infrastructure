@@ -1,3 +1,7 @@
+path "database-starrocks-production/creds/*" {
+  capabilities = ["read", "list"]
+}
+
 path "secret-global/*" {
   capabilities = ["read", "list"]
 }
