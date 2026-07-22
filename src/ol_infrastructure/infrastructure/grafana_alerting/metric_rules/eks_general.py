@@ -235,22 +235,31 @@ def create(
             # The join ensures we only alert on OOM-killed containers that are
             # still looping, not historical one-off kills.
             #
-            # Warning stays at "> 0" restarts for visibility/trend-tracking:
-            # several production workloads (e.g. apisix, mitlearn-app,
-            # mitxonline-app) intentionally launch pods at a low memory floor
-            # and rely on a VPA to raise limits toward a ceiling based on
-            # observed usage, so a single OOM-and-recover right after a
-            # deploy is expected, self-healing behavior, not an incident.
-            # Critical requires "> 2" (at least 3 restarts within the window)
-            # so a lone self-healing OOM doesn't page anyone, while a
-            # container that's genuinely stuck crash-looping still trips it
-            # within a few minutes (container restart backoff is short).
-            # NOTE: increase() extrapolates over the range, so a single
-            # restart commonly reports as ~1.01-1.02 rather than exactly 1
-            # (observed directly in production: single-restart pods reported
-            # 1.008-1.017). A ">1" threshold would still fire on a single
-            # restart; ">2" leaves enough margin that two real restarts
-            # (~2.02-2.03 observed) still clear it while one restart cannot.
+            # Warning ("> 0", ci/qa clusters only -- see cluster=~ below) is
+            # for visibility/trend-tracking in lower environments; there is
+            # no equivalent lower-severity signal for production, only
+            # Critical below. Several production workloads (e.g. apisix,
+            # mitlearn-app, mitxonline-app) intentionally launch pods at a
+            # low memory floor and rely on a VPA to raise limits toward a
+            # ceiling based on observed usage, so a single OOM-and-recover
+            # right after a deploy is expected, self-healing behavior, not an
+            # incident -- Critical's threshold below is set high enough that
+            # this case produces no alert in production at all, paging or
+            # otherwise.
+            #
+            # Critical requires "> 3", i.e. at least 3 real restarts within
+            # the window, so a lone self-healing OOM doesn't page anyone,
+            # while a container that's genuinely stuck crash-looping still
+            # trips it within a few minutes (container restart backoff is
+            # short). NOTE: increase() extrapolates over the range, so N real
+            # restarts commonly report as a value just above N rather than
+            # exactly N -- observed directly in production: single-restart
+            # pods reported 1.008-1.017, and a double-restart pod reported
+            # ~2.034. A raw ">2" threshold would therefore fire on 2 real
+            # restarts, not 3 as the description below states; ">3" is what
+            # actually requires a 3rd restart, since extrapolation is bounded
+            # to roughly one scrape interval per edge of the range and can't
+            # push 2 real restarts' value anywhere near 3.
             alerting.RuleGroupRuleArgs(
                 name="PodOOMKilledWarning",
                 condition="C",
@@ -281,7 +290,7 @@ def create(
                     "sum by (cluster, namespace, pod, container) (\n"
                     '  (kube_pod_container_status_last_terminated_reason{cluster=~".*-(production)", reason="OOMKilled"} == 1)\n'
                     "  * on (cluster, namespace, pod, container) group_left()\n"
-                    "  (increase(kube_pod_container_status_restarts_total[1h]) > 2)\n"
+                    "  (increase(kube_pod_container_status_restarts_total[1h]) > 3)\n"
                     ")"
                 ),
             ),
