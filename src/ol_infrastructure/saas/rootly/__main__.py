@@ -2977,45 +2977,45 @@ escalation_level_ci_qa_slack_notifications = rootly.EscalationLevel(
     opts=rootly_opts,
 )
 
-alert_route_grafana_prometheus_ci_slack_warnings = rootly.AlertRoute(
+alert_route_grafana_prometheus_ci_slack_warnings_route = rootly.AlertRoute(
     "grafana-prometheus-ci-slack-warnings-route",
-    name="Grafana Prometheus CI - Slack Warnings Route",
-    enabled=True,
-    owning_team_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     alerts_source_ids=[alerts_source_grafana_prometheus_ci.id],
+    enabled=True,
+    name="Grafana Prometheus CI - Slack Warnings Route",
+    owning_team_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     rules=[
         {
-            "name": "Fallback Rule for Grafana Prometheus CI - Slack Warnings Route",
-            "fallback_rule": True,
-            "position": 1,
             "destinations": [
                 {
-                    "target_type": "EscalationPolicy",
-                    "target_id": escalation_policy_ci_qa_slack_notifications.id,
+                    "targetId": escalation_policy_ci_qa_slack_notifications.id,
+                    "targetType": "EscalationPolicy",
                 },
             ],
+            "fallbackRule": True,
+            "name": "Fallback Rule for Grafana Prometheus CI - Slack Warnings Route",
+            "position": 1,
         },
     ],
     opts=rootly_opts,
 )
 
-alert_route_grafana_prometheus_qa_slack_warnings = rootly.AlertRoute(
+alert_route_grafana_prometheus_qa_slack_warnings_route = rootly.AlertRoute(
     "grafana-prometheus-qa-slack-warnings-route",
-    name="Grafana Prometheus QA - Slack Warnings Route",
-    enabled=True,
-    owning_team_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     alerts_source_ids=[alerts_source_grafana_prometheus_qa.id],
+    enabled=True,
+    name="Grafana Prometheus QA - Slack Warnings Route",
+    owning_team_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     rules=[
         {
-            "name": "Fallback Rule for Grafana Prometheus QA - Slack Warnings Route",
-            "fallback_rule": True,
-            "position": 1,
             "destinations": [
                 {
-                    "target_type": "EscalationPolicy",
-                    "target_id": escalation_policy_ci_qa_slack_notifications.id,
+                    "targetId": escalation_policy_ci_qa_slack_notifications.id,
+                    "targetType": "EscalationPolicy",
                 },
             ],
+            "fallbackRule": True,
+            "name": "Fallback Rule for Grafana Prometheus QA - Slack Warnings Route",
+            "position": 1,
         },
     ],
     opts=rootly_opts,
