@@ -60,11 +60,9 @@ def setup_typesense_operator(
                     "manager": {
                         "resources": {
                             "requests": {
-                                "cpu": "10m",
                                 "memory": "128Mi",
                             },
                             "limits": {
-                                "cpu": "500m",
                                 "memory": "512Mi",
                             },
                         },
