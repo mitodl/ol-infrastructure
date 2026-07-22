@@ -561,7 +561,17 @@ mitxonline_k8s_app = OLApplicationK8s(
         application_cmd_array=["uwsgi"],
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
         granian_config=GranianConfig(
+            # Holding pins: preserve the pre-overhaul effective concurrency until
+            # this app's stage of the rollout. Granian derived backpressure=64
+            # (backlog=128 // workers=2) and blocking_threads=64 // 2 = 32.
+            # Delete all four (and revert workers to the default) to adopt the
+            # component defaults (1 worker, 8 blocking threads, 16 backpressure).
+            # See docs/plans/granian-configuration-overhaul.md
             workers=MITXONLINE_GRANIAN_WORKERS,
+            runtime_mode="mt",
+            runtime_threads=2,
+            blocking_threads=32,
+            backpressure=64,
             blocking_threads_idle_timeout=120,
             enable_metrics=True,
             # Pinned to the VPA ceiling rather than the component's default

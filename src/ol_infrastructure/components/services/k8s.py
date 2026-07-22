@@ -253,12 +253,16 @@ class GranianConfig(BaseModel):
             ("--backpressure", self.backpressure),
             ("--workers-max-rss", self.workers_max_rss),
             ("--blocking-threads-idle-timeout", self.blocking_threads_idle_timeout),
-            ("--backlog", self.backlog),
         ):
             if value is not None:
                 args += [flag, str(value)]
+        # Emitted after the loop rather than inside it so the relative order of
+        # --respawn-failed-workers and --backlog matches what deployed stacks
+        # already have, keeping the pulumi diff to the genuinely new flags.
         if self.respawn_failed_workers:
             args.append("--respawn-failed-workers")
+        if self.backlog is not None:
+            args += ["--backlog", str(self.backlog)]
         if self.enable_metrics:
             args += [
                 "--metrics",

@@ -108,6 +108,30 @@ def test_async_interfaces_allow_explicit_backpressure(interface):
     assert arg_value(gc.build_args(), "--backpressure") == "64"
 
 
+def test_holding_pins_reproduce_granians_old_derivation():
+    """Callers awaiting their rollout stage pin the values Granian used to derive.
+
+    Granian's own resolution is ``backpressure = backlog // workers`` and, for WSGI,
+    ``blocking_threads = backpressure // 2``. At the pre-overhaul defaults
+    (backlog=128, workers=2) that is 64 and 32 -- which is what the pin blocks in
+    micromasters/xpro/ocw_studio/odl_video_service/mitxonline/edxapp carry, so
+    landing the component change does not alter their behavior.
+    """
+    backlog, workers = 128, 2
+    granian_backpressure = max(1, backlog // workers)
+    granian_blocking_threads = max(1, granian_backpressure // 2)
+    assert (granian_blocking_threads, granian_backpressure) == (32, 64)
+
+    args = GranianConfig(
+        workers=workers,
+        backlog=backlog,
+        blocking_threads=granian_blocking_threads,
+        backpressure=granian_backpressure,
+    ).build_args()
+    assert arg_value(args, "--blocking-threads") == "32"
+    assert arg_value(args, "--backpressure") == "64"
+
+
 # ─── workers_max_rss ──────────────────────────────────────────────────────────
 
 

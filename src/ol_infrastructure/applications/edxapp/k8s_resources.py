@@ -674,6 +674,15 @@ def create_k8s_resources(  # noqa: C901
                 no_ws=True,
                 runtime_mode="mt",
                 runtime_threads=2,
+                # Holding pins: preserve the pre-overhaul effective concurrency
+                # until this app's stage of the rollout. Granian derived
+                # backpressure=64 (backlog=128 // workers=2) and
+                # blocking_threads=64 // 2 = 32. Delete these (plus workers,
+                # runtime_mode, runtime_threads above) to adopt the component
+                # defaults (1 worker, 8 blocking threads, 16 backpressure).
+                # See docs/plans/granian-configuration-overhaul.md
+                blocking_threads=32,
+                backpressure=64,
                 respawn_failed_workers=True,
                 backlog=128,
                 static_path_mounts=["/openedx/staticfiles"],
@@ -976,6 +985,15 @@ def create_k8s_resources(  # noqa: C901
                 no_ws=True,
                 runtime_mode="mt",
                 runtime_threads=2,
+                # Holding pins: preserve the pre-overhaul effective concurrency
+                # until this app's stage of the rollout. Granian derived
+                # backpressure=64 (backlog=128 // workers=2) and
+                # blocking_threads=64 // 2 = 32. Delete these (plus workers,
+                # runtime_mode, runtime_threads above) to adopt the component
+                # defaults (1 worker, 8 blocking threads, 16 backpressure).
+                # See docs/plans/granian-configuration-overhaul.md
+                blocking_threads=32,
+                backpressure=64,
                 respawn_failed_workers=True,
                 backlog=128,
                 static_path_mounts=["/openedx/staticfiles"],
