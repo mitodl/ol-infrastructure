@@ -121,22 +121,6 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                 password="((dockerhub.password))",  # noqa: S106
             )
 
-            # Per-deployment lehrer parameters (values previously hardcoded inside
-            # lehrer core, extracted in https://github.com/mitodl/lehrer/pull/41).
-            translations_repo = (
-                "mitodl/mitxonline-translations"
-                if deployment_name == "mitxonline"
-                else "openedx/openedx-translations"
-            )
-            # edx-name-affirmation conflicts with the mitxonline build only
-            packages_to_remove_args = (
-                "--packages-to-remove edx-name-affirmation"
-                if deployment_name == "mitxonline"
-                else ""
-            )
-            # Proctortrack is the same package for all deployments
-            proctortrack_url = "git+https://github.com/verificient/edx-proctoring-proctortrack.git#f0fa9edbd16aa5af5a41ac309d2609e529ea8732"
-
             # Each earthly build requires several inputs, build that list pre-emptively
             earthly_build_job = Job(
                 name=f"build-{release_name}-{deployment_name}-edxapp-image",
@@ -195,7 +179,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                                     THEME_DIR="../{theme_git_resource.name}"
                                     PYTHON_VERSION="{edx_platform.runtime_version}"
                                     NODE_VERSION="((.:node_version))"
-                                    DAGGER_LOG_LEVEL=debug dagger call platform build-platform --progress plain --deployment-name $DEPLOYMENT_NAME --release-name $RELEASE_NAME --pip-package-lists ./deployments/mit-ol/pip_package_lists --pip-package-overrides ./deployments/mit-ol/pip_package_overrides --custom-settings ./deployments/mit-ol/settings --source $EDX_PLATFORM_DIR --theme-source $THEME_DIR --node-version $NODE_VERSION --python-version $PYTHON_VERSION --settings-namespace mitol --extra-ssh-hosts github.mit.edu --translations-repo {translations_repo} {packages_to_remove_args} --extra-npm-packages '{proctortrack_url}' export --path ../artifacts/image.tar;""",
+                                    DAGGER_LOG_LEVEL=debug dagger call platform build-platform --progress plain --deployment-name $DEPLOYMENT_NAME --release-name $RELEASE_NAME --build-manifest ./deployments/mit-ol/build_manifest.yaml --custom-settings ./deployments/mit-ol/settings --source $EDX_PLATFORM_DIR --theme-source $THEME_DIR --node-version $NODE_VERSION --python-version $PYTHON_VERSION export --path ../artifacts/image.tar;""",
                                 ],
                             ),
                         ),
