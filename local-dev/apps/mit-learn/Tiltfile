@@ -4,7 +4,7 @@
 # When the sibling mit-learn repo is not checked out, Tilt uses the prebuilt
 # DockerHub image (mitodl/mit-learn-app:latest) without attempting a local build.
 
-load("../../tiltlib.star", "k8s_yaml_with_domain")
+load("../../tiltlib.star", "k8s_yaml_local")
 
 NAMESPACE = "mit-learn"
 IMAGE = "mitodl/mit-learn-app"
@@ -47,13 +47,13 @@ if os.path.exists(os.path.join(MIT_LEARN_DIR, ".git")):
 # ─────────────────────────────────────────────────────────────
 
 # Apply all manifests in order.
-k8s_yaml_with_domain([
+k8s_yaml_local([
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/configmaps/nginx.yaml"),
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/configmaps/app-env.yaml"),
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/secrets.yaml"),
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/deployment.yaml"),
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/apisix-routes.yaml"),
-])
+], local_overrides=os.path.join(config.main_dir, "local-dev/apps/mit-learn/configmaps/app-env.local.yaml"))
 
 # ─────────────────────────────────────────────────────────────
 # Resource grouping + dependency declarations

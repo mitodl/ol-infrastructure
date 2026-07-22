@@ -27,6 +27,10 @@ pyinfra-debug.log
 .pulumi
 local-dev/certs/
 tilt_config.json
+# Per-developer local-dev overrides (see "Local Configuration Overrides" in
+# local-dev/README.md). Broad on purpose: never track a real secret anywhere
+# under local-dev/. Does not match the committed *.local.yaml.example files.
+local-dev/**/*.local.yaml
 
 # Generated Concourse pipeline JSON emitted by pipeline.py/meta.py __main__ blocks
 definition.json

@@ -1,0 +1,16 @@
+# Per-developer overrides for mitxonline (gitignored when copied).
+#
+# Copy to app-env.local.yaml and add entries under data: — because this
+# ConfigMap is referenced LAST in every envFrom list in deployment.yaml, its
+# keys override both the tracked app-env ConfigMap AND the tracked Secret
+# (secret values are fine here: the file never leaves your machine). Pods
+# roll automatically when you edit it. See "Local Configuration Overrides"
+# in local-dev/README.md.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mitxonline-env-local
+  namespace: mitxonline
+data:
+  # FEATURE_IGNORE_EDX_FAILURES: "True"

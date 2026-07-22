@@ -14,7 +14,7 @@
 # DockerHub image (mitodl/mit-learn-nextjs-app:latest) without a local build;
 # that image is the production `runner` stage (no hot reload).
 
-load("../../tiltlib.star", "k8s_yaml_with_domain")
+load("../../tiltlib.star", "k8s_yaml_local")
 
 workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
 APP_DIR = os.path.join(workspace_root, "mit-learn")
@@ -56,7 +56,7 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         ],
     )
 
-k8s_yaml_with_domain([
+k8s_yaml_local([
     'deployment.yaml',
     'apisix-routes.yaml',
 ])

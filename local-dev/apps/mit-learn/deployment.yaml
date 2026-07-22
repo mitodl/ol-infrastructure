@@ -80,6 +80,12 @@ spec:
             name: mitlearn-env
         - secretRef:
             name: mitlearn-secrets
+        # Gitignored per-developer overrides; must stay LAST so its keys win
+        # over both sources above. See "Local Configuration Overrides" in
+        # local-dev/README.md.
+        - configMapRef:
+            name: mitlearn-env-local
+            optional: true
         resources:
           requests:
             cpu: 100m
@@ -134,6 +140,12 @@ spec:
             name: mitlearn-env
         - secretRef:
             name: mitlearn-secrets
+        # Gitignored per-developer overrides; must stay LAST so its keys win
+        # over both sources above. See "Local Configuration Overrides" in
+        # local-dev/README.md.
+        - configMapRef:
+            name: mitlearn-env-local
+            optional: true
         resources:
           requests:
             cpu: 100m
@@ -250,6 +262,12 @@ spec:
             name: mitlearn-env
         - secretRef:
             name: mitlearn-secrets
+        # Gitignored per-developer overrides; must stay LAST so its keys win
+        # over both sources above. See "Local Configuration Overrides" in
+        # local-dev/README.md.
+        - configMapRef:
+            name: mitlearn-env-local
+            optional: true
         resources:
           requests:
             cpu: 100m
@@ -322,6 +340,12 @@ spec:
             name: mitlearn-env
         - secretRef:
             name: mitlearn-secrets
+        # Gitignored per-developer overrides; must stay LAST so its keys win
+        # over both sources above. See "Local Configuration Overrides" in
+        # local-dev/README.md.
+        - configMapRef:
+            name: mitlearn-env-local
+            optional: true
         resources:
           requests:
             cpu: 100m
@@ -394,6 +418,12 @@ spec:
             name: mitlearn-env
         - secretRef:
             name: mitlearn-secrets
+        # Gitignored per-developer overrides; must stay LAST so its keys win
+        # over both sources above. See "Local Configuration Overrides" in
+        # local-dev/README.md.
+        - configMapRef:
+            name: mitlearn-env-local
+            optional: true
         resources:
           requests:
             cpu: 100m
@@ -463,6 +493,12 @@ spec:
             name: mitlearn-env
         - secretRef:
             name: mitlearn-secrets
+        # Gitignored per-developer overrides; must stay LAST so its keys win
+        # over both sources above. See "Local Configuration Overrides" in
+        # local-dev/README.md.
+        - configMapRef:
+            name: mitlearn-env-local
+            optional: true
         resources:
           requests:
             cpu: 50m

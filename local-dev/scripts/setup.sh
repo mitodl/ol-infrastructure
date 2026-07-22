@@ -420,7 +420,8 @@ cat <<EOF
   Next steps:
     1. Copy and edit your personal config:
          cp tilt_config.json.example tilt_config.json
-       (Add openai_api_key if you want AI/embedding features)
+       (App env vars / API keys go in gitignored app-env.local.yaml files instead —
+        see "Local Configuration Overrides" in local-dev/README.md)
 
     2. Start the full stack:
          tilt up

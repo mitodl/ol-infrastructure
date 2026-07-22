@@ -13,9 +13,5 @@
     "odl-video-service=0.85.0"
   ],
 
-  "openai_api_key": "",
-  "langsmith_api_key": "",
-  "canvas_ai_token": "",
-
   "root_domain": "mit.dev"
 }

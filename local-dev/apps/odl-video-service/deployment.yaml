@@ -45,6 +45,12 @@ spec:
             name: odlvideo-env
         - secretRef:
             name: odlvideo-secrets
+        # Gitignored per-developer overrides; must stay LAST so its keys win
+        # over both sources above. See "Local Configuration Overrides" in
+        # local-dev/README.md.
+        - configMapRef:
+            name: odlvideo-env-local
+            optional: true
         volumeMounts:
         - name: static-files
           mountPath: /src/staticfiles
@@ -74,6 +80,12 @@ spec:
             name: odlvideo-env
         - secretRef:
             name: odlvideo-secrets
+        # Gitignored per-developer overrides; must stay LAST so its keys win
+        # over both sources above. See "Local Configuration Overrides" in
+        # local-dev/README.md.
+        - configMapRef:
+            name: odlvideo-env-local
+            optional: true
         resources:
           requests:
             cpu: 250m
@@ -168,6 +180,12 @@ spec:
             name: odlvideo-env
         - secretRef:
             name: odlvideo-secrets
+        # Gitignored per-developer overrides; must stay LAST so its keys win
+        # over both sources above. See "Local Configuration Overrides" in
+        # local-dev/README.md.
+        - configMapRef:
+            name: odlvideo-env-local
+            optional: true
         resources:
           requests:
             cpu: 100m
@@ -232,6 +250,12 @@ spec:
             name: odlvideo-env
         - secretRef:
             name: odlvideo-secrets
+        # Gitignored per-developer overrides; must stay LAST so its keys win
+        # over both sources above. See "Local Configuration Overrides" in
+        # local-dev/README.md.
+        - configMapRef:
+            name: odlvideo-env-local
+            optional: true
         resources:
           requests:
             cpu: 50m

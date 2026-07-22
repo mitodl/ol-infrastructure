@@ -3,7 +3,7 @@
 # prebuilt DockerHub image (mitodl/odl-video-service-app:latest) without
 # attempting a local build.
 
-load("../../tiltlib.star", "k8s_yaml_with_domain")
+load("../../tiltlib.star", "k8s_yaml_local")
 
 workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
 APP_DIR = os.path.join(workspace_root, "odl-video-service")
@@ -25,13 +25,13 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         ],
     )
 
-k8s_yaml_with_domain([
+k8s_yaml_local([
     'configmaps/app-env.yaml',
     'configmaps/nginx.yaml',
     'secrets.yaml',
     'deployment.yaml',
     'apisix-routes.yaml',
-])
+], local_overrides='configmaps/app-env.local.yaml')
 
 k8s_resource(
     DEPLOY_NAME,

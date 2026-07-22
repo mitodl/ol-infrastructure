@@ -16,11 +16,10 @@ docker_prune_settings(
 # ---------------------------------------------------------------------------
 config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service")
 config.define_bool("per_app_databases", usage="Deploy isolated DB/Valkey per app namespace")
+# openedx_mode is declared but not yet wired: nothing branches on it, and
+# local-dev/apps/openedx/Tiltfile is not yet included by the APPS loop below.
 config.define_string("openedx_mode", usage="qa (default) or local (Tutor)")
 config.define_string_list("prebuilt_tags", usage="Prebuilt image tag overrides per app, e.g. mit-learn=0.62.0 learn-ai=0.28.3")
-config.define_string("openai_api_key", usage="OpenAI API key for AI/embedding features (optional)")
-config.define_string("langsmith_api_key", usage="LangSmith API key for tracing (optional)")
-config.define_string("canvas_ai_token", usage="Canvas AI token (optional)")
 config.define_string("root_domain", usage="Root DNS domain for all local-dev services (default: mit.dev). Overrides LOCAL_DEV_ROOT_DOMAIN env var.")
 cfg = config.parse()
 
