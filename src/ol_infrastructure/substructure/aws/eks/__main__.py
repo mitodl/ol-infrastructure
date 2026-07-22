@@ -269,18 +269,26 @@ if cluster_stack.require_output("has_ebs_storage"):
                 # full controller/pod/node cluster-state snapshot from
                 # backup before it can do anything else, so this is a
                 # consistent per-startup need, not an occasional burst above
-                # a fine idle baseline. Keeping request == limit
-                # (Guaranteed) rather than only raising the limit: a single
-                # pod per cluster, so the aggregate reservation cost is
-                # small, and Guaranteed protects it from being a preferred
-                # eviction target under node memory pressure while it's
-                # already struggling to survive its own startup.
+                # a fine idle baseline. Guaranteed QoS requires every
+                # resource (not just memory) to have request == limit, so
+                # cpu is set explicitly here too, matching the chart's own
+                # default limit (100m) that was already silently in effect
+                # -- our previous override only ever set requests.cpu=10m,
+                # never touched limits.cpu, so Helm merged in the chart
+                # default there. Making that explicit and matching request
+                # to it, rather than leaving the mismatch, so the pod
+                # actually gets Guaranteed QoS: a single pod per cluster, so
+                # the aggregate reservation cost is small, and Guaranteed
+                # protects it from being a preferred eviction target under
+                # node memory pressure while it's already struggling to
+                # survive its own startup.
                 "resources": {
                     "requests": {
-                        "cpu": "10m",
+                        "cpu": "100m",
                         "memory": "512Mi",
                     },
                     "limits": {
+                        "cpu": "100m",
                         "memory": "512Mi",
                     },
                 },
