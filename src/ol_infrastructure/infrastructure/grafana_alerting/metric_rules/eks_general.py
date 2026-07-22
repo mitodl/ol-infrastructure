@@ -234,6 +234,38 @@ def create(
             # actively restarting (restart count increased in the past hour).
             # The join ensures we only alert on OOM-killed containers that are
             # still looping, not historical one-off kills.
+            #
+            # Warning ("> 0", ci/qa clusters only -- see cluster=~ below) is
+            # for visibility/trend-tracking in lower environments; there is
+            # no equivalent lower-severity signal for production, only
+            # Critical below. Several production workloads (e.g. apisix,
+            # mitlearn-app, mitxonline-app) intentionally launch pods at a
+            # low memory floor and rely on a VPA to raise limits toward a
+            # ceiling based on observed usage, so a single OOM-and-recover
+            # right after a deploy is expected, self-healing behavior, not an
+            # incident -- Critical's threshold below is set high enough that
+            # this case produces no alert in production at all, paging or
+            # otherwise.
+            #
+            # Critical requires ">= 3", i.e. at least 3 real restarts within
+            # the window, so a lone self-healing OOM doesn't page anyone,
+            # while a container that's genuinely stuck crash-looping still
+            # trips it within a few minutes (container restart backoff is
+            # short). NOTE: increase() extrapolates over the range, so N real
+            # restarts commonly report as a value just above N rather than
+            # exactly N -- observed directly in production: single-restart
+            # pods reported 1.008-1.017, and a double-restart pod reported
+            # ~2.034. A raw ">2" threshold would therefore fire on 2 real
+            # restarts, not 3 as the description below states. We use ">= 3"
+            # rather than "> 3": extrapolation only pushes the value *up*
+            # from the raw integer delta, and only reaches exactly the raw
+            # integer (e.g. exactly 3.0 for 3 real restarts) in the edge case
+            # where a sample lands exactly on each range boundary, which can
+            # happen when scrape and rule-evaluation timestamps align. A
+            # strict "> 3" would then wrongly require a 4th restart in that
+            # case; ">= 3" reliably means "at least 3 real restarts" either
+            # way, since extrapolation can't push 2 real restarts' value
+            # anywhere near 3.
             alerting.RuleGroupRuleArgs(
                 name="PodOOMKilledWarning",
                 condition="C",
@@ -258,13 +290,13 @@ def create(
                 no_data_state="OK",
                 labels={"severity": "critical"},
                 annotations={
-                    "description": "Container {{ $labels.container }} in pod {{ $labels.pod }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been OOMKilled and is actively restarting. Memory limits may need to be increased."
+                    "description": "Container {{ $labels.container }} in pod {{ $labels.pod }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been OOMKilled and is repeatedly restarting (3+ restarts within the past hour). Memory limits may need to be increased."
                 },
                 datas=rd(
                     "sum by (cluster, namespace, pod, container) (\n"
                     '  (kube_pod_container_status_last_terminated_reason{cluster=~".*-(production)", reason="OOMKilled"} == 1)\n'
                     "  * on (cluster, namespace, pod, container) group_left()\n"
-                    "  (increase(kube_pod_container_status_restarts_total[1h]) > 0)\n"
+                    "  (increase(kube_pod_container_status_restarts_total[1h]) >= 3)\n"
                     ")"
                 ),
             ),
