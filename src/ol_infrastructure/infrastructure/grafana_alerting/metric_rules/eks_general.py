@@ -241,10 +241,16 @@ def create(
             # and rely on a VPA to raise limits toward a ceiling based on
             # observed usage, so a single OOM-and-recover right after a
             # deploy is expected, self-healing behavior, not an incident.
-            # Critical requires "> 1" (at least a second restart within the
-            # window) so a lone self-healing OOM doesn't page anyone, while a
+            # Critical requires "> 2" (at least 3 restarts within the window)
+            # so a lone self-healing OOM doesn't page anyone, while a
             # container that's genuinely stuck crash-looping still trips it
             # within a few minutes (container restart backoff is short).
+            # NOTE: increase() extrapolates over the range, so a single
+            # restart commonly reports as ~1.01-1.02 rather than exactly 1
+            # (observed directly in production: single-restart pods reported
+            # 1.008-1.017). A ">1" threshold would still fire on a single
+            # restart; ">2" leaves enough margin that two real restarts
+            # (~2.02-2.03 observed) still clear it while one restart cannot.
             alerting.RuleGroupRuleArgs(
                 name="PodOOMKilledWarning",
                 condition="C",
@@ -269,13 +275,13 @@ def create(
                 no_data_state="OK",
                 labels={"severity": "critical"},
                 annotations={
-                    "description": "Container {{ $labels.container }} in pod {{ $labels.pod }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been OOMKilled and is repeatedly restarting (2+ restarts within the past hour). Memory limits may need to be increased."
+                    "description": "Container {{ $labels.container }} in pod {{ $labels.pod }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been OOMKilled and is repeatedly restarting (3+ restarts within the past hour). Memory limits may need to be increased."
                 },
                 datas=rd(
                     "sum by (cluster, namespace, pod, container) (\n"
                     '  (kube_pod_container_status_last_terminated_reason{cluster=~".*-(production)", reason="OOMKilled"} == 1)\n'
                     "  * on (cluster, namespace, pod, container) group_left()\n"
-                    "  (increase(kube_pod_container_status_restarts_total[1h]) > 1)\n"
+                    "  (increase(kube_pod_container_status_restarts_total[1h]) > 2)\n"
                     ")"
                 ),
             ),
