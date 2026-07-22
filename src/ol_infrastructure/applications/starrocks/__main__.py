@@ -409,6 +409,19 @@ starrocks_values: dict[str, Any] = {
     },
 }
 
+if stack_info.name == "Production":
+    # Incident 2026-07-22: Karpenter voluntarily consolidated the spot node
+    # under an FE pod three times in ~13 minutes (cost-driven, not a crash),
+    # and each EBS volume detach/reattach cycle took long enough that the
+    # StatefulSet spent over 10 minutes below full replica count, tripping
+    # StatefulSetReplicasMissingCritical. FE only tolerates losing 1 of 3
+    # replicas before quorum is at risk, so CI/QA (fine to disrupt anytime)
+    # are left alone and only prod opts out of voluntary node consolidation
+    # for FE pods specifically.
+    starrocks_values["starrocksFESpec"]["annotations"] = {
+        "karpenter.sh/do-not-disrupt": "true",
+    }
+
 # Placeholder ConfigMap for the file-based group provider managed by the substructure
 # stack (substructure/starrocks keycloak_group_sync.py).  Created here so the FE pods
 # have the volume available at startup; the substructure stack populates groups.txt
@@ -821,6 +834,33 @@ starrocks_release = kubernetes.helm.v3.Release(
         depends_on=[starrocks_root_password_secret, starrocks_auth_binding],
     ),
 )
+
+if stack_info.name == "Production":
+    # Backstop for any voluntary-eviction path other than Karpenter (e.g. a
+    # manual `kubectl drain`, an EKS-managed node group upgrade) that respects
+    # PDBs but not the karpenter.sh/do-not-disrupt annotation set above.
+    # max_unavailable=1 preserves FE's 2-of-3 quorum requirement while still
+    # allowing one replica at a time to be evicted when genuinely necessary.
+    starrocks_fe_pdb = kubernetes.policy.v1.PodDisruptionBudget(
+        f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-fe-pdb",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{stack_info.env_prefix}-starrocks-fe-pdb",
+            namespace=namespace,
+            labels=k8s_app_labels.model_dump(),
+        ),
+        spec=kubernetes.policy.v1.PodDisruptionBudgetSpecArgs(
+            max_unavailable=1,
+            selector=kubernetes.meta.v1.LabelSelectorArgs(
+                match_labels={
+                    "app.kubernetes.io/component": "fe",
+                    "app.starrocks.ownerreference/name": (
+                        f"{stack_info.env_prefix}-starrocks-fe"
+                    ),
+                },
+            ),
+        ),
+        opts=ResourceOptions(depends_on=[starrocks_release]),
+    )
 
 cert_manager_certificate = OLCertManagerCert(
     f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-tls-cert",
