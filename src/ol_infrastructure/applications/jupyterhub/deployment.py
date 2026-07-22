@@ -315,13 +315,18 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                     },
                     "userScheduler": {
                         "enabled": True,
+                        # The chart leaves this unbounded by default; our
+                        # 128Mi cap was too tight for a scheduler whose
+                        # informer caches scale with total cluster object
+                        # count. A watch invalidation forcing a full relist
+                        # of Pods/Nodes/etc. OOMKilled it in production.
                         "resources": {
                             "requests": {
                                 "cpu": "100m",
-                                "memory": "128Mi",
+                                "memory": "256Mi",
                             },
                             "limits": {
-                                "memory": "128Mi",
+                                "memory": "512Mi",
                             },
                         },
                     },
