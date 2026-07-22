@@ -20,6 +20,9 @@ KNOWN_COURSES = [
     "supervised_learning_fundamentals",
     "introduction_to_data_analytics_and_machine_learning",
     "base_authoring_image",
+    "mitxt-6.3710.3x",
+    "mitxt-6.3710.4x",
+    "mitxt-6.3710.5x",
 ]
 # We have notebooks in UAI courses 6-13, excluding 10
 KNOWN_COURSES.extend(
