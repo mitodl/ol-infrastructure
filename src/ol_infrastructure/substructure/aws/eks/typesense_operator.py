@@ -51,6 +51,26 @@ def setup_typesense_operator(
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
                 repo="https://akyriako.github.io/typesense-operator/",
             ),
+            values={
+                # The chart's default 256Mi limit was too tight for the
+                # manager's cluster-wide informer caches: a watch
+                # invalidation forcing a full relist OOMKilled it in
+                # production. Give it more headroom in both directions.
+                "controllerManager": {
+                    "manager": {
+                        "resources": {
+                            "requests": {
+                                "cpu": "10m",
+                                "memory": "128Mi",
+                            },
+                            "limits": {
+                                "cpu": "500m",
+                                "memory": "512Mi",
+                            },
+                        },
+                    },
+                },
+            },
         ),
         opts=ResourceOptions(provider=k8s_provider, delete_before_replace=True),
     )

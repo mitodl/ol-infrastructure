@@ -94,13 +94,19 @@ def setup_keda(
                     },
                 },
                 "resources": {
+                    # The operator's informer caches scale with total cluster
+                    # object count. A watch invalidation ("too old resource
+                    # version") forces a full relist and a one-time memory
+                    # spike; 400Mi was too tight and OOMKilled the operator
+                    # during one such relist. Chart default is 1000Mi; split
+                    # the difference to give headroom without over-allocating.
                     "operator": {
                         "requests": {
                             "cpu": "10m",
-                            "memory": "400Mi",
+                            "memory": "200Mi",
                         },
                         "limits": {
-                            "memory": "400Mi",
+                            "memory": "800Mi",
                         },
                     },
                     "metricServer": {
