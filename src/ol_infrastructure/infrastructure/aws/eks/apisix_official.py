@@ -317,7 +317,10 @@ def setup_apisix(
                     "enabled": True,
                     "minReplicas": eks_config.get_int("apisix_min_replicas") or 3,
                     "maxReplicas": eks_config.get_int("apisix_max_replicas") or 5,
-                    "targetCPUUtilizationPercentage": 50,
+                    "targetCPUUtilizationPercentage": eks_config.get_int(
+                        "apisix_target_cpu_utilization_percentage"
+                    )
+                    or 50,
                 },
                 # --- Pod Configuration ---
                 "tolerations": operations_tolerations,
@@ -1041,9 +1044,11 @@ def setup_apisix(
     # Create a VerticalPodAutoscaler for the APISIX gateway deployment.
     #
     # VPA manages memory sizing only; CPU-based horizontal scaling is handled by the HPA
-    # (targetCPUUtilizationPercentage: 50, minReplicas: 3, maxReplicas: 5). Splitting
-    # authority this way avoids the known HPA/VPA conflict: VPA adjusting CPU requests
-    # would distort the CPU utilization percentage that the HPA observes.
+    # above (targetCPUUtilizationPercentage/minReplicas/maxReplicas, configurable via
+    # apisix_target_cpu_utilization_percentage/apisix_min_replicas/apisix_max_replicas,
+    # defaulting to 50/3/5). Splitting authority this way avoids the known HPA/VPA
+    # conflict: VPA adjusting CPU requests would distort the CPU utilization
+    # percentage that the HPA observes.
     #
     # updateMode "InPlaceOrRecreate" attempts to resize memory without evicting the pod
     # (K8s 1.33+, VPA 1.6+), falling back to eviction only when an in-place update is
