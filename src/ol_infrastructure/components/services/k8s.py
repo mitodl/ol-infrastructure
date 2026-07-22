@@ -24,6 +24,8 @@ from pydantic import (
 from bridge.lib.magic_numbers import (
     DEFAULT_NGINX_PORT,
     DEFAULT_REDIS_PORT,
+    DEFAULT_WSGI_BACKPRESSURE_MULTIPLIER,
+    DEFAULT_WSGI_BLOCKING_THREADS,
     DEFAULT_WSGI_PORT,
     MAXIMUM_K8S_NAME_LENGTH,
 )
@@ -115,9 +117,16 @@ class GranianConfig(BaseModel):
     create a PodMonitor — replacing the manual if/else blocks in each caller.
 
     The supported subset of granian CLI options is: interface, host, port, workers,
-    runtime_mode, runtime_threads, no_ws, workers_max_rss,
-    blocking_threads_idle_timeout, respawn_failed_workers, backlog, log_level,
-    application_module, and metrics-related flags.
+    runtime_mode, runtime_threads, blocking_threads, backpressure, no_ws,
+    workers_max_rss, blocking_threads_idle_timeout, respawn_failed_workers, backlog,
+    log_level, application_module, and metrics-related flags.
+
+    **Concurrency defaults:** ``workers``, ``runtime_threads`` and ``runtime_mode`` track
+    Granian's own CLI defaults (1 / 1 / auto); scale horizontally with replicas rather
+    than with workers per pod.  ``blocking_threads`` and ``backpressure`` are resolved
+    explicitly for WSGI apps instead of being left to Granian's
+    ``backpressure = backlog // workers`` / ``blocking_threads = backpressure // 2``
+    derivation, which yielded 32 GIL-competing threads per worker at the old defaults.
 
     **Port/nginx coupling:** when ``import_nginx_config=True`` on
     ``OLApplicationK8sConfig``, the nginx config proxies to a fixed upstream address
@@ -130,9 +139,24 @@ class GranianConfig(BaseModel):
     interface: Literal["wsgi", "asgi", "asginl"] = "wsgi"
     host: str = "0.0.0.0"  # noqa: S104
     port: Annotated[int, Field(ge=1, le=65535)] = DEFAULT_WSGI_PORT
-    workers: PositiveInt = 2
-    runtime_mode: str | None = "mt"
-    runtime_threads: PositiveInt = 2
+    workers: PositiveInt = 1
+    runtime_mode: str | None = None
+    runtime_threads: PositiveInt = 1
+    blocking_threads: PositiveInt | None = None
+    """Size of the Python thread pool that executes WSGI request handlers (granian
+    ``--blocking-threads``). These threads compete for the GIL, so this is a concurrency
+    knob, not a throughput knob -- keep it within a small multiple of the container's CPU
+    allocation. Only meaningful for ``interface='wsgi'``; Granian forces it to 1 for
+    asgi/asginl. When ``None`` on a WSGI app, resolves to
+    ``DEFAULT_WSGI_BLOCKING_THREADS`` rather than letting Granian derive it from
+    ``backpressure // 2``."""
+    backpressure: PositiveInt | None = None
+    """Maximum in-flight requests a single worker will accept before it stops draining the
+    accept queue (granian ``--backpressure``). Excess connections wait in the kernel
+    backlog (and behind the nginx sidecar), which is where they belong -- an oversized
+    backpressure just moves the queue inside the worker where it inflates tail latency
+    invisibly. When ``None`` on a WSGI app, resolves to 2x the resolved
+    ``blocking_threads``."""
     no_ws: bool = True
     limit_workers_max_rss: bool = True
     """When ``True`` (default), automatically cap each worker's RSS at 90 % of the
@@ -148,6 +172,9 @@ class GranianConfig(BaseModel):
     """Seconds before an idle blocking thread is retired (granian ``--blocking-threads-idle-timeout``). Omitted when ``None``."""
     respawn_failed_workers: bool = True
     backlog: PositiveInt | None = 128
+    """Kernel listen backlog (granian ``--backlog``). Now that ``backpressure`` is
+    resolved explicitly this no longer feeds Granian's thread-pool derivation, so it means
+    only what it says: how many connections queue outside the workers."""
     log_level: str = "warning"
     application_module: str = "main.wsgi:application"
     enable_metrics: bool = True
@@ -176,6 +203,35 @@ class GranianConfig(BaseModel):
             raise ValueError(msg)
         return v
 
+    @model_validator(mode="after")
+    def resolve_concurrency(self) -> "GranianConfig":
+        """Resolve blocking_threads/backpressure at config time, not at build_args time.
+
+        Doing this here rather than inside ``build_args()`` keeps the effective values
+        inspectable from the model, which is what makes them testable and greppable in a
+        stack's Pulumi state.
+
+        Granian hard-codes ``blocking_threads=1`` for the async interfaces, so an explicit
+        value there would be silently ignored. A config that reads as tuned but isn't is
+        worse than a synth-time failure, hence the ValueError.
+        """
+        if self.interface == "wsgi":
+            if self.blocking_threads is None:
+                self.blocking_threads = DEFAULT_WSGI_BLOCKING_THREADS
+            if self.backpressure is None:
+                self.backpressure = (
+                    DEFAULT_WSGI_BACKPRESSURE_MULTIPLIER * self.blocking_threads
+                )
+        elif self.blocking_threads is not None and self.blocking_threads > 1:
+            msg = (
+                f"granian_config.blocking_threads={self.blocking_threads} was set with "
+                f"interface='{self.interface}', but Granian forces blocking_threads=1 "
+                "for the asgi/asginl interfaces and ignores the flag. Remove the setting "
+                "or switch to interface='wsgi'."
+            )
+            raise ValueError(msg)
+        return self
+
     def build_args(self) -> list[str]:
         """Build the granian CLI argument list from this configuration."""
         args = [
@@ -190,20 +246,19 @@ class GranianConfig(BaseModel):
         ]
         if self.no_ws:
             args.append("--no-ws")
-        if self.runtime_mode is not None:
-            args += ["--runtime-mode", self.runtime_mode]
-        args += ["--runtime-threads", str(self.runtime_threads)]
-        if self.workers_max_rss is not None:
-            args += ["--workers-max-rss", str(self.workers_max_rss)]
-        if self.blocking_threads_idle_timeout is not None:
-            args += [
-                "--blocking-threads-idle-timeout",
-                str(self.blocking_threads_idle_timeout),
-            ]
+        for flag, value in (
+            ("--runtime-mode", self.runtime_mode),
+            ("--runtime-threads", self.runtime_threads),
+            ("--blocking-threads", self.blocking_threads),
+            ("--backpressure", self.backpressure),
+            ("--workers-max-rss", self.workers_max_rss),
+            ("--blocking-threads-idle-timeout", self.blocking_threads_idle_timeout),
+            ("--backlog", self.backlog),
+        ):
+            if value is not None:
+                args += [flag, str(value)]
         if self.respawn_failed_workers:
             args.append("--respawn-failed-workers")
-        if self.backlog is not None:
-            args += ["--backlog", str(self.backlog)]
         if self.enable_metrics:
             args += [
                 "--metrics",
@@ -360,10 +415,16 @@ class OLApplicationK8sConfig(BaseModel):
         default=None,
         description=(
             "Ceiling for the webapp memory VPA. Defaults to 2x "
-            "resource_limits['memory']. Note that when granian_config is set with "
+            "resource_limits['memory']. When granian_config is set with "
             "limit_workers_max_rss, --workers-max-rss is resolved at synth time from "
-            "resource_limits and will NOT track this ceiling -- set "
-            "GranianConfig.workers_max_rss explicitly to keep the two in sync."
+            "resource_limits and deliberately does NOT track this ceiling: the RSS cap "
+            "has to fire before the kernel OOM killer does, and the OOM killer enforces "
+            "the pod's CURRENT declared limit, not the ceiling the VPA is allowed to "
+            "grow to. Pinning GranianConfig.workers_max_rss to this ceiling is an "
+            "anti-pattern -- it disables the RSS safety net until the VPA has already "
+            "grown the pod near its ceiling. Tracking the limit as the VPA moves it "
+            "requires reading the cgroup at runtime, tracked in "
+            "tk-evaluate-runtime-cgroup-derived-workers-max-rss--1cd258."
         ),
     )
     import_nginx_config: bool = Field(default=True)
