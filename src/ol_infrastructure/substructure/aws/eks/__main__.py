@@ -263,13 +263,25 @@ if cluster_stack.require_output("has_ebs_storage"):
                         "ebs_storageclass"
                     ),
                 },
+                # This has bounced between 100Mi/200Mi/256Mi several times
+                # (see git history) chasing recurring OOM kills -- most
+                # recently 200Mi, which still OOMs: every restart reloads a
+                # full controller/pod/node cluster-state snapshot from
+                # backup before it can do anything else, so this is a
+                # consistent per-startup need, not an occasional burst above
+                # a fine idle baseline. Keeping request == limit
+                # (Guaranteed) rather than only raising the limit: a single
+                # pod per cluster, so the aggregate reservation cost is
+                # small, and Guaranteed protects it from being a preferred
+                # eviction target under node memory pressure while it's
+                # already struggling to survive its own startup.
                 "resources": {
                     "requests": {
                         "cpu": "10m",
-                        "memory": "200Mi",
+                        "memory": "512Mi",
                     },
                     "limits": {
-                        "memory": "200Mi",
+                        "memory": "512Mi",
                     },
                 },
             },

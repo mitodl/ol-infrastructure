@@ -397,6 +397,18 @@ def setup_aws_integrations(
                 "enableRebalanceDraining": True,
                 "emitKubernetesEvents": True,
                 "podTerminationGracePeriod": 30,
+                # 24Mi (set in #3560, never revisited) is fine for idle
+                # steady-state -- 5 of 6 daemonset pods are healthy at
+                # exactly this limit. It's only insufficient while actively
+                # processing a real interruption/rebalance event
+                # (draining/cordoning the node, talking to the API server),
+                # and the pod re-discovers the same pending event via IMDS
+                # on every restart, so an undersized limit here means a
+                # crash loop that never clears on its own until the node is
+                # replaced. Burstable rather than Guaranteed: keep the
+                # request at the real idle footprint (cheap across every
+                # node, since this is a daemonset) and only raise the limit
+                # to cover the occasional burst.
                 "resources": {
                     "requests": {
                         "cpu": "50m",
@@ -404,7 +416,7 @@ def setup_aws_integrations(
                     },
                     "limits": {
                         "cpu": "50m",
-                        "memory": "24Mi",
+                        "memory": "64Mi",
                     },
                 },
             },
