@@ -33,9 +33,20 @@ def _overrides_fingerprint(path, text):
     docs = [d for d in decode_yaml_stream(text) if d != None]
     if len(docs) != 1 or docs[0].get("kind") != "ConfigMap":
         fail("%s: expected a single ConfigMap manifest" % path)
-    data = docs[0].get("data", {})
+    # A data: key with nothing (or only comments) under it parses as None.
+    data = docs[0].get("data", {}) or {}
+    for k in data:
+        if type(data[k]) != "string":
+            fail(
+                '%s: data.%s must be a YAML string — quote the value (e.g. "True", "8080"); got %s'
+                % (path, k, type(data[k]))
+            )
     keys = sorted(data.keys())
     print("[%s] local overrides active: %s" % (path, ", ".join(keys) if keys else "(none)"))
+    if not keys:
+        # Empty data: treat as "no overrides" — apply the (empty) ConfigMap
+        # but skip stamping, so Deployments return to their unannotated state.
+        return ""
     canon = "".join(["%s=%s\n" % (k, data[k]) for k in keys])
     return str(hash(canon))
 
