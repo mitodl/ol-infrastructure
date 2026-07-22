@@ -20,6 +20,7 @@ mitx = [
         support_url="https://odl.zendesk.com/hc/en-us/requests/new",
         terms_of_service_url="https://lms-ci.mitx.mit.edu/tos",
         mit_open_learning_site_link="https://openlearning.mit.edu",
+        enable_tagging_taxonomy_pages="true",
     ),
     OpenEdxVars(
         environment="mitx-qa",
@@ -36,6 +37,7 @@ mitx = [
         support_url="https://odl.zendesk.com/hc/en-us/requests/new",
         terms_of_service_url="https://mitx-qa.mitx.mit.edu/tos",
         mit_open_learning_site_link="https://openlearning.mit.edu",
+        enable_tagging_taxonomy_pages="true",
     ),
     OpenEdxVars(
         environment="mitx-production",
@@ -52,6 +54,7 @@ mitx = [
         support_url="https://odl.zendesk.com/hc/en-us/requests/new",
         terms_of_service_url="https://lms.mitx.mit.edu/tos",
         mit_open_learning_site_link="https://openlearning.mit.edu",
+        enable_tagging_taxonomy_pages="true",
     ),
 ]
 
@@ -72,6 +75,7 @@ mitx_staging = [
         studio_domain="studio-staging-ci.mitx.mit.edu",
         support_url="https://odl.zendesk.com/hc/en-us/requests/new",
         terms_of_service_url="https://staging-ci.mitx.mit.edu/tos",
+        enable_tagging_taxonomy_pages="true",
     ),
     OpenEdxVars(
         deployment_name="mitx-staging",
@@ -87,6 +91,7 @@ mitx_staging = [
         studio_domain="studio-mitx-qa-draft.mitx.mit.edu",
         support_url="https://odl.zendesk.com/hc/en-us/requests/new",
         terms_of_service_url="https://mitx-qa-draft.mitx.mit.edu/tos",
+        enable_tagging_taxonomy_pages="true",
     ),
     OpenEdxVars(
         deployment_name="mitx-staging",
@@ -102,6 +107,7 @@ mitx_staging = [
         studio_domain="studio-staging.mitx.mit.edu",
         support_url="https://odl.zendesk.com/hc/en-us/requests/new",
         terms_of_service_url="https://staging.mitx.mit.edu/tos",
+        enable_tagging_taxonomy_pages="true",
     ),
 ]
 
