@@ -247,7 +247,7 @@ def create(
             # this case produces no alert in production at all, paging or
             # otherwise.
             #
-            # Critical requires "> 3", i.e. at least 3 real restarts within
+            # Critical requires ">= 3", i.e. at least 3 real restarts within
             # the window, so a lone self-healing OOM doesn't page anyone,
             # while a container that's genuinely stuck crash-looping still
             # trips it within a few minutes (container restart backoff is
@@ -256,10 +256,16 @@ def create(
             # exactly N -- observed directly in production: single-restart
             # pods reported 1.008-1.017, and a double-restart pod reported
             # ~2.034. A raw ">2" threshold would therefore fire on 2 real
-            # restarts, not 3 as the description below states; ">3" is what
-            # actually requires a 3rd restart, since extrapolation is bounded
-            # to roughly one scrape interval per edge of the range and can't
-            # push 2 real restarts' value anywhere near 3.
+            # restarts, not 3 as the description below states. We use ">= 3"
+            # rather than "> 3": extrapolation only pushes the value *up*
+            # from the raw integer delta, and only reaches exactly the raw
+            # integer (e.g. exactly 3.0 for 3 real restarts) in the edge case
+            # where a sample lands exactly on each range boundary, which can
+            # happen when scrape and rule-evaluation timestamps align. A
+            # strict "> 3" would then wrongly require a 4th restart in that
+            # case; ">= 3" reliably means "at least 3 real restarts" either
+            # way, since extrapolation can't push 2 real restarts' value
+            # anywhere near 3.
             alerting.RuleGroupRuleArgs(
                 name="PodOOMKilledWarning",
                 condition="C",
@@ -290,7 +296,7 @@ def create(
                     "sum by (cluster, namespace, pod, container) (\n"
                     '  (kube_pod_container_status_last_terminated_reason{cluster=~".*-(production)", reason="OOMKilled"} == 1)\n'
                     "  * on (cluster, namespace, pod, container) group_left()\n"
-                    "  (increase(kube_pod_container_status_restarts_total[1h]) > 3)\n"
+                    "  (increase(kube_pod_container_status_restarts_total[1h]) >= 3)\n"
                     ")"
                 ),
             ),
