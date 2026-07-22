@@ -172,6 +172,11 @@ dagster_s3_permissions: list[dict[str, str | list[str]]] = [
             "s3:GetObject",
             "s3:PutObject",
             "s3:DeleteObject*",
+            # Lets Dagster (and operational scripts running as this role) restore
+            # objects that have aged into S3 Intelligent-Tiering's archive access
+            # tiers, since GetObject on an archived object raises InvalidObjectState
+            # until it is explicitly restored.
+            "s3:RestoreObject",
         ],
         "Resource": [
             f"arn:aws:s3:::ol-data-lake-*-{stack_info.env_suffix}",
