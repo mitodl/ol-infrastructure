@@ -2937,6 +2937,86 @@ alerts_source_grafana_prometheus_qa = rootly.AlertsSource(
     opts=rootly_alert_source_opts,
 )
 
+# CI/QA alerts currently have no effective routing to any Slack-visible
+# destination (confirmed against the live Rootly account), unlike Production,
+# which has two catch-all routes. So these alerts aren't cluttering
+# #devops-alerts today -- they're most likely not reaching Slack anywhere.
+# This adds a real route for both, additive alongside whatever else (if
+# anything) exists per source, per Rootly's own guidance: alerts fan out
+# across every route connected to their source, so adding a second route
+# here doesn't disturb any other existing routing.
+#
+# Per Rootly support: the recommended way to target a Slack channel is via an
+# EscalationPolicy whose level notifies the channel directly (as opposed to
+# a Workflow, which isn't ideal for this since you can't ack/resolve through
+# it, or a per-Service announcement setting). This policy is intentionally
+# minimal -- one level, no schedule, no paging -- since CI/QA alerts should
+# be visible in Slack, not page anyone.
+escalation_policy_ci_qa_slack_notifications = rootly.EscalationPolicy(
+    "ci-qa-slack-notifications-escalation-policy",
+    name="CI/QA Slack Notifications",
+    description=(
+        "Posts CI/QA Grafana alerts to #devops-warnings for visibility. "
+        "Not intended to page anyone -- see the single Slack-channel level."
+    ),
+    group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
+    repeat_count=1,
+    opts=rootly_opts,
+)
+
+escalation_level_ci_qa_slack_notifications = rootly.EscalationLevel(
+    "ci-qa-slack-notifications-escalation-level",
+    escalation_policy_id=escalation_policy_ci_qa_slack_notifications.id,
+    position=1,
+    notification_target_params=[
+        {
+            "type": "slack_channel",
+            "id": "C0BK6BHUCDP",  # #devops-warnings
+        },
+    ],
+    opts=rootly_opts,
+)
+
+alert_route_grafana_prometheus_ci_slack_warnings = rootly.AlertRoute(
+    "grafana-prometheus-ci-slack-warnings-route",
+    name="Grafana Prometheus CI - Slack Warnings Route",
+    alerts_source_ids=[alerts_source_grafana_prometheus_ci.id],
+    rules=[
+        {
+            "name": "Fallback Rule for Grafana Prometheus CI - Slack Warnings Route",
+            "fallback_rule": True,
+            "position": 1,
+            "destinations": [
+                {
+                    "target_type": "EscalationPolicy",
+                    "target_id": escalation_policy_ci_qa_slack_notifications.id,
+                },
+            ],
+        },
+    ],
+    opts=rootly_opts,
+)
+
+alert_route_grafana_prometheus_qa_slack_warnings = rootly.AlertRoute(
+    "grafana-prometheus-qa-slack-warnings-route",
+    name="Grafana Prometheus QA - Slack Warnings Route",
+    alerts_source_ids=[alerts_source_grafana_prometheus_qa.id],
+    rules=[
+        {
+            "name": "Fallback Rule for Grafana Prometheus QA - Slack Warnings Route",
+            "fallback_rule": True,
+            "position": 1,
+            "destinations": [
+                {
+                    "target_type": "EscalationPolicy",
+                    "target_id": escalation_policy_ci_qa_slack_notifications.id,
+                },
+            ],
+        },
+    ],
+    opts=rootly_opts,
+)
+
 alerts_source_mitol_sentry = rootly.AlertsSource(
     "mitol-sentry",
     alert_source_fields_attributes=[
