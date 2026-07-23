@@ -62,7 +62,7 @@ if __name__ == "__main__":
     write_description_svg(
         DESCRIPTION,
         str(Path(__file__).parent / "description.svg"),
-        DescriptionStyle(anchor="bottom", panel_opacity=0.45),
+        DescriptionStyle(panel_opacity=0.45),  # anchor="center" default
     )
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(hello_pipeline().model_dump_json(indent=2))

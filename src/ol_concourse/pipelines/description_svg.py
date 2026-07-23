@@ -11,17 +11,24 @@ that blend, meant to be committed alongside each pipeline's ``pipeline.py``
 and served via a raw.githubusercontent.com URL.
 
 Concourse applies the image via CSS ``background-size: cover;
-background-position: center`` (see ``web/elm/src/Pipeline/Styles.elm`` in
-concourse/concourse) — there is no user-facing zoom/rescale control. ``cover``
-scales the image up until it fills the container in *both* dimensions, then
-crops whatever overflows, centered. A source image with an extreme aspect
-ratio (very wide and short, or very tall and narrow) gets scaled up hard on
-its short axis to satisfy ``cover``, blowing its long axis far past the
-viewport. The mitigations are in the source image, not in Concourse: pick an
-aspect ratio closer to a typical browser viewport, and keep content within a
-smaller, centered fraction of the canvas — the crop is always centered, so
-margin from the canvas center (not from a particular edge) is what
-determines whether content survives.
+background-position: center`` on a ``position: absolute; width/height: 100%``
+div (see ``pipelineBackground`` in ``web/elm/src/Pipeline/Styles.elm`` in
+concourse/concourse) sized to the visible viewport — there is no user-facing
+zoom/rescale control, and unlike the job graph (a separately pannable/
+zoomable SVG layer drawn on top) this background cannot be panned to reveal
+cropped content; whatever `cover` crops off is genuinely gone for that
+viewport. ``cover`` scales the image up until it fills the container on
+*both* axes, then crops whichever axis overflows, centered on the image.
+Which axis overflows depends on how the viewer's viewport aspect ratio
+compares to this image's aspect ratio — it can be either axis, and we can't
+know a given viewer's window size in advance. The only position that
+survives regardless of which axis gets cropped is the image's own center;
+anchoring near *any* edge (top, bottom, left, or right) is vulnerable on
+some viewport shape. `anchor="center"` is the safe default for that reason.
+Top/bottom anchoring trades that safety for a chance at clearing the job
+graph, which starts drawing from the top-left — reasonable only if you also
+know your own viewers' typical viewport proportions, since the graph itself
+can always be dragged aside if it does overlap, while a cover-crop cannot.
 """
 
 import textwrap
@@ -52,12 +59,13 @@ Anchor = Literal["top", "center", "bottom"]
 class DescriptionStyle:
     """Sizing/scaling/contrast/positioning knobs for :func:`render_description_svg`.
 
-    ``anchor`` controls where the text block sits vertically (top/center/
-    bottom) so it can be steered clear of a given pipeline's job graph, which
-    Concourse draws starting from the top-left of the canvas — a small
-    pipeline is least likely to occlude a bottom-anchored block. Panning by
-    click-and-drag in the Concourse UI is always available as a fallback for
-    larger graphs.
+    ``anchor`` controls where the text block sits vertically (default
+    ``"center"`` — the only position safe against Concourse's
+    ``background-size: cover`` crop on an arbitrary viewport; see module
+    docstring). ``"top"``/``"bottom"`` are available to trade that safety
+    for a chance at clearing the job graph, which Concourse draws from the
+    top-left, but only make sense if you know your viewers' viewport shape
+    is close to ``width``/``height``'s aspect ratio.
 
     ``outline_color``/``outline_width`` add a stroke around the text itself
     for contrast against a busy graph; ``panel_opacity``/``panel_color`` (0
@@ -81,7 +89,7 @@ class DescriptionStyle:
     height: int = _DEFAULT_HEIGHT
     font_size: int = _DEFAULT_FONT_SIZE
     padding: int = _DEFAULT_PADDING
-    anchor: Anchor = "bottom"
+    anchor: Anchor = "center"
     wrap_chars: int | None = None
     text_width_fraction: float = _DEFAULT_TEXT_WIDTH_FRACTION
     vertical_margin_fraction: float = _DEFAULT_VERTICAL_MARGIN_FRACTION
