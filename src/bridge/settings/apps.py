@@ -7,9 +7,14 @@ so an app's GitHub repo, default branch, and Slack channel are defined in
 exactly one place instead of being hand-duplicated (and drifting) across
 both control surfaces.
 
-Only entries that differ from the defaults need to be listed in ``APPS`` --
-an app with no entry (or an entry with unset fields) falls back to
-``mitodl/{app_name}`` and branch ``"main"`` via the accessor functions below.
+``APPS`` is the canonical enumeration of every app both control surfaces
+know about -- the release bot iterates its keys directly
+(``for app_name in APPS``) to build its config, so an app must have an entry
+here to be picked up at all, even if every field is left at its default.
+Only the *field values* default sparsely: leave ``github_repo``/
+``repo_main_branch`` unset on an ``AppRegistration()`` when the app's repo is
+``mitodl/{app_name}`` on branch ``"main"``; the accessor functions below fill
+those in.
 """
 
 from dataclasses import dataclass
