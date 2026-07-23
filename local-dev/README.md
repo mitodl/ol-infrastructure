@@ -59,6 +59,7 @@ Install these tools before running setup:
 | Helm | ≥ 3.14 | `brew install helm` |
 | mkcert | ≥ 1.4 | `brew install mkcert` |
 | Pulumi CLI | ≥ 3.x | `brew install pulumi` |
+| bash | ≥ 4 | `brew install bash` (stock macOS ships 3.2; the seeding and prune scripts use `mapfile`) |
 | uv | ≥ 0.9.3 | `brew install uv` |
 
 > **Docker memory:** The cluster runs PostgreSQL, Valkey, APISIX, Keycloak, Qdrant, and up to four Django apps. Allocate at least 8 GB to Docker Desktop (Settings → Resources).
@@ -550,13 +551,15 @@ Tilt also runs `pulumi up` automatically when infra files change. You can also t
 Every Tilt image build produces a multi-GB image in **three places**: the
 local Docker daemon, the k3d registry (`k3d-registry.localhost:5001`), and —
 once pulled — each k3s node's internal containerd store. Tilt's built-in
-pruner (`docker_prune_settings`) only ever touches the first, has silent
-failure modes, and by design cannot reach the registry
-([tilt-dev/tilt#2102](https://github.com/tilt-dev/tilt/issues/2102)) or the
-node stores
-([tilt-dev/tilt#4228](https://github.com/tilt-dev/tilt/issues/4228)). Left
-alone, these stores grow by tens of GB per rebuild until kubelet taints every
-node with `disk-pressure` and no pod can schedule.
+pruner (`docker_prune_settings`) has silent failure modes and by design only
+reaches the first[^tilt-pruner]. Left alone, these stores grow by several GB
+per rebuild until kubelet taints every node with `disk-pressure` and no pod
+can schedule.
+
+[^tilt-pruner]: Registry cleanup is
+    [tilt-dev/tilt#2102](https://github.com/tilt-dev/tilt/issues/2102);
+    node-store cleanup is
+    [tilt-dev/tilt#4228](https://github.com/tilt-dev/tilt/issues/4228).
 
 Three mechanisms keep the footprint bounded, with no per-developer setup:
 
@@ -567,8 +570,8 @@ Three mechanisms keep the footprint bounded, with no per-developer setup:
 | `prune-docker` (manual, break-glass) | Local daemon + registry, destructively (node stores only with `--sweep-nodes` — read the script header first; it orphans running containers) | Tilt UI button / `tilt trigger prune-docker`, or run `local-dev/scripts/prune-docker.sh` directly |
 
 The janitor enforces a **retention policy** — keep the newest N tags per
-image plus anything a pod currently references — so it is safe to run at any
-moment, unlike a wipe. Knobs, via `tilt_config.json` (or env var fallback):
+image plus anything the cluster still references (pods or workload
+templates) — so it is safe to run at any moment, unlike a wipe. Knobs, via `tilt_config.json` (or env var fallback):
 
 - `disk_keep_tags` / `LOCAL_DEV_DISK_KEEP_TAGS` — tags kept per image
   (default 3). Old tags are nearly pure waste: pods only reference the
