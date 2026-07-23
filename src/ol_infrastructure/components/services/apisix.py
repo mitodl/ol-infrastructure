@@ -560,3 +560,76 @@ class OLApisixExternalUpstream(ComponentResource):
                 opts=resource_options,
             )
         )
+
+
+class OLApisixUpstreamConfig(BaseModel):
+    """Configuration for OLApisixUpstream.
+
+    Configures load-balancing behavior for an in-cluster Kubernetes Service
+    upstream. ``service_name`` must match the target Service's name exactly —
+    apisix-ingress-controller associates an ApisixUpstream resource with a
+    Service by same-name, same-namespace lookup, not by an explicit
+    reference from ApisixRoute.
+    Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_upstream/
+    """
+
+    service_name: str
+    k8s_namespace: str
+    k8s_labels: dict[str, str] = {}
+    loadbalancer_type: Literal["roundrobin", "chash", "ewma", "least_conn"] = (
+        "roundrobin"
+    )
+    # Required when loadbalancer_type == "chash", e.g. hash_on="vars" with
+    # hash_key="remote_addr" to consistently route a given client IP to the
+    # same upstream pod.
+    hash_on: Literal["vars", "header", "cookie", "consumer"] | None = None
+    hash_key: str | None = None
+
+    @model_validator(mode="after")
+    def validate_chash_fields(self) -> "OLApisixUpstreamConfig":
+        """Ensure hash_on/hash_key are set only when using chash load balancing."""
+        if self.loadbalancer_type == "chash" and not (self.hash_on and self.hash_key):
+            msg = "chash load balancing requires both hash_on and hash_key."
+            raise ValueError(msg)
+        if self.loadbalancer_type != "chash" and (self.hash_on or self.hash_key):
+            msg = "hash_on/hash_key are only meaningful when loadbalancer_type='chash'."
+            raise ValueError(msg)
+        return self
+
+
+class OLApisixUpstream(ComponentResource):
+    """
+    Load-balancing configuration for an in-cluster Service-backed upstream.
+    Defines and creates an "ApisixUpstream" resource in the k8s cluster.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        upstream_config: OLApisixUpstreamConfig,
+        opts: ResourceOptions | None = None,
+    ):
+        """Initialize the OLApisixUpstream component resource."""
+        super().__init__(
+            "ol:infrastructure:services:k8s:OLApisixUpstream", name, None, opts
+        )
+        resource_options = ResourceOptions(parent=self).merge(opts)
+
+        loadbalancer_spec: dict[str, Any] = {"type": upstream_config.loadbalancer_type}
+        if upstream_config.loadbalancer_type == "chash":
+            loadbalancer_spec["hashOn"] = upstream_config.hash_on
+            loadbalancer_spec["key"] = upstream_config.hash_key
+
+        self.apisix_upstream_resource = kubernetes.apiextensions.CustomResource(
+            f"OLApisixUpstream-{name}",
+            api_version="apisix.apache.org/v2",
+            kind="ApisixUpstream",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                # Must equal the target Service's name — see class docstring.
+                name=upstream_config.service_name,
+                labels=upstream_config.k8s_labels,
+                namespace=upstream_config.k8s_namespace,
+            ),
+            spec={"loadbalancer": loadbalancer_spec},
+            opts=resource_options,
+        )
