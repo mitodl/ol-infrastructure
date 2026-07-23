@@ -52,6 +52,10 @@ github_token = concourse_ops_secrets["pipelines"]["infrastructure/github"][
 
 bot_config = Config("release_bot")
 concourse_url = bot_config.get("concourse_url") or "https://cicd.odl.mit.edu"
+# Fallback Slack channel ID for "ready to promote" notifications when an app
+# doesn't set its own `channel` in repos_config. Unset by default -- the
+# notifier silently skips any app with no channel configured either way.
+release_announce_channel = bot_config.get("release_announce_channel")
 
 default_repos_config = {
     "learn-ai": {
@@ -202,6 +206,16 @@ bot_deployment = kubernetes.apps.v1.Deployment(
                             kubernetes.core.v1.EnvVarArgs(
                                 name="REPOS_CONFIG",
                                 value=REPOS_CONFIG,
+                            ),
+                            *(
+                                [
+                                    kubernetes.core.v1.EnvVarArgs(
+                                        name="RELEASE_ANNOUNCE_CHANNEL",
+                                        value=release_announce_channel,
+                                    )
+                                ]
+                                if release_announce_channel
+                                else []
                             ),
                         ],
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(

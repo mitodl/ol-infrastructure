@@ -9,6 +9,17 @@ import aiohttp
 GITHUB_API = "https://api.github.com"
 
 _RELEASE_TAG_RE = re.compile(r"^\d{4}\.\d{2}\.\d{2}\.\d+$")
+_CHECKLIST_LINE_RE = re.compile(r"^- \[( |x)\]")
+# Matches the "## Release <version>" header the release resource's
+# _build_checklist() writes at the top of the issue body. The issue *title*
+# is always just "Release {app_name}" with no version -- the version only
+# ever appears here.
+_VERSION_HEADER_RE = re.compile(r"^## Release (?P<version>\S+)", re.MULTILINE)
+
+# Applied once a release issue's checklist is fully checked, so subsequent
+# polls don't re-notify Slack every cycle. Not a gate signal itself -- purely
+# a "have we already posted about this" marker for the bot.
+PROMOTE_READY_LABEL = "promote-ready"
 
 
 def _github_token() -> str:
@@ -108,9 +119,46 @@ async def open_release_issues(repo_slug: str) -> list[dict[str, Any]]:
             "number": i["number"],
             "title": i["title"],
             "url": i["html_url"],
+            "body": i.get("body") or "",
+            "labels": [lbl["name"] for lbl in i.get("labels", [])],
         }
         for i in issues
     ]
+
+
+def checklist_status(body: str) -> tuple[int, int]:
+    """Return (checked_count, total_count) of checklist lines in an issue body."""
+    total = 0
+    checked = 0
+    for line in body.splitlines():
+        match = _CHECKLIST_LINE_RE.match(line)
+        if match:
+            total += 1
+            if match.group(1) == "x":
+                checked += 1
+    return checked, total
+
+
+def is_fully_checked(body: str) -> bool:
+    """Return True if the body has at least one checklist line and all are checked."""
+    checked, total = checklist_status(body)
+    return total > 0 and checked == total
+
+
+def extract_version(body: str) -> str | None:
+    """Return the release version from a checklist body's "## Release X" header."""
+    match = _VERSION_HEADER_RE.search(body)
+    return match.group("version") if match else None
+
+
+async def add_issue_label(repo_slug: str, issue_number: int, label: str) -> None:
+    """Add a label to the given issue. Idempotent -- GitHub dedupes existing labels."""
+    url = f"{GITHUB_API}/repos/{repo_slug}/issues/{issue_number}/labels"
+    async with (
+        aiohttp.ClientSession() as session,
+        session.post(url, headers=_auth_headers(), json={"labels": [label]}) as resp,
+    ):
+        resp.raise_for_status()
 
 
 async def close_release_issue(repo_slug: str, issue_number: int, comment: str) -> None:

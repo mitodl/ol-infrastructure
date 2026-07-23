@@ -115,6 +115,12 @@ async def _cmd_promote(repos, ack, respond, command, context):
         log.exception("Failed to promote %s", app_name)
         await respond(f"❌ Failed to promote `{app_name}`.")
         return
+    try:
+        # Don't make the deploy wait for the release-gate resource's normal
+        # poll interval (default 60m) to notice the issue just closed.
+        await concourse.check_resource(cfg.pipeline, f"{app_name}-release-gate")
+    except Exception:
+        log.exception("Failed to force release-gate check for %s", app_name)
     await respond(
         f"✅ `{app_name}` {issues[0]['title']} promoted. Production deploy triggered."
     )
@@ -169,7 +175,9 @@ async def _handle_promote_button(repos, ack, body, say):
         log.exception("Failed to fetch issues for promote button: %s", app_name)
         await say(f"⚠️ Failed to fetch release issues for `{app_name}`.")
         return
-    matching = [i for i in issues if version in i["title"]]
+    # The issue title is always just "Release {app_name}" -- the version only
+    # ever appears in the body's "## Release <version>" header.
+    matching = [i for i in issues if github.extract_version(i["body"]) == version]
     if not matching:
         await say(f"⚠️ Could not find open release issue for `{app_name}` `{version}`.")
         return
@@ -183,6 +191,12 @@ async def _handle_promote_button(repos, ack, body, say):
         log.exception("Failed to close issue for %s %s", app_name, version)
         await say(f"⚠️ Failed to promote `{app_name}` `{version}`.")
         return
+    try:
+        # Don't make the deploy wait for the release-gate resource's normal
+        # poll interval (default 60m) to notice the issue just closed.
+        await concourse.check_resource(cfg.pipeline, f"{app_name}-release-gate")
+    except Exception:
+        log.exception("Failed to force release-gate check for %s", app_name)
     await say(
         f"🚀 <@{user_id}> promoted `{app_name}` `{version}` to Production. "
         "Concourse deploy triggered."
@@ -231,11 +245,86 @@ def create_app():
     app = AsyncApp(token=os.environ["SLACK_BOT_TOKEN"])
     app.command("/doof")(partial(_cmd_doof, repos))
     app.action("promote_production")(partial(_handle_promote_button, repos))
-    return app
+    return app, repos
+
+
+_READY_TO_PROMOTE_POLL_SECONDS = 120
+
+
+def _ready_to_promote_blocks(
+    app_name: str, version: str, issue_url: str
+) -> list[dict[str, object]]:
+    return [
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": (
+                    f"✅ *`{app_name}` {version}* — all checklist items are "
+                    f"checked off. <{issue_url}|Release issue> ready for promotion."
+                ),
+            },
+        },
+        {
+            "type": "actions",
+            "elements": [
+                {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "🚀 Promote to Production"},
+                    "style": "primary",
+                    "action_id": "promote_production",
+                    "value": f"{app_name}:{version}",
+                }
+            ],
+        },
+    ]
+
+
+async def _notify_ready_to_promote(app, repos) -> None:
+    """Notify Slack for any open release issue whose checklist is now fully checked.
+
+    Marks each notified issue with `github.PROMOTE_READY_LABEL` so repeated
+    polls don't re-send the same notification every cycle.
+    """
+    for app_name, cfg in repos.items():
+        channel = cfg.channel or os.environ.get("RELEASE_ANNOUNCE_CHANNEL")
+        if not channel:
+            continue
+        try:
+            issues = await github.open_release_issues(cfg.repo)
+        except Exception:
+            log.exception("Failed to poll release issues for %s", app_name)
+            continue
+        for issue in issues:
+            if github.PROMOTE_READY_LABEL in issue["labels"]:
+                continue
+            if not github.is_fully_checked(issue["body"]):
+                continue
+            version = github.extract_version(issue["body"]) or issue["title"]
+            try:
+                await app.client.chat_postMessage(
+                    channel=channel,
+                    text=f"✅ `{app_name}` {version} is ready to promote.",
+                    blocks=_ready_to_promote_blocks(app_name, version, issue["url"]),
+                )
+                await github.add_issue_label(
+                    cfg.repo, issue["number"], github.PROMOTE_READY_LABEL
+                )
+            except Exception:
+                log.exception(
+                    "Failed to send ready-to-promote notification for %s", app_name
+                )
+
+
+async def _poll_ready_to_promote_loop(app, repos) -> None:
+    while True:
+        await asyncio.sleep(_READY_TO_PROMOTE_POLL_SECONDS)
+        await _notify_ready_to_promote(app, repos)
 
 
 async def main():
-    app = create_app()
+    app, repos = create_app()
+    asyncio.create_task(_poll_ready_to_promote_loop(app, repos))  # noqa: RUF006
     handler = AsyncSocketModeHandler(app, os.environ["SLACK_APP_TOKEN"])
     await handler.start_async()
 
