@@ -87,16 +87,24 @@ prune_local_tags() {
     (( removed > 0 )) && log "local daemon: removed $removed old tilt tag(s)"
 }
 
-# Every image ref any pod (incl. init containers) currently points at.
-# Failed pods (Evicted etc.) are excluded: their containers never restart in
-# place — a replacement pod is created from the current template — so they
-# should not pin old tags. Pending pods DO count: kubelet still has to pull
-# their images.
+# Every image ref the cluster might still pull: live pods (incl. init
+# containers) PLUS workload templates. Templates are the durable source of
+# truth — during node-restart churn pods can transiently be Failed or absent
+# while their Deployment still specifies the tag, and a pods-only keep-set
+# deletes a tag the replacement pod then fails to pull. Failed pods are
+# excluded (their containers never restart in place; the owning template is
+# what matters and is covered); Pending pods count — kubelet still has to
+# pull for them.
 pod_image_refs() {
-    kubectl --context "$KUBE_CONTEXT" get pods -A \
-        --field-selector=status.phase!=Failed \
-        -o jsonpath='{range .items[*]}{range .spec.initContainers[*]}{.image}{"\n"}{end}{range .spec.containers[*]}{.image}{"\n"}{end}{end}' \
-        2>/dev/null
+    {
+        kubectl --context "$KUBE_CONTEXT" get pods -A \
+            --field-selector=status.phase!=Failed \
+            -o jsonpath='{range .items[*]}{range .spec.initContainers[*]}{.image}{"\n"}{end}{range .spec.containers[*]}{.image}{"\n"}{end}{end}' \
+            2>/dev/null || return 1
+        kubectl --context "$KUBE_CONTEXT" get deployments,statefulsets,daemonsets -A \
+            -o jsonpath='{range .items[*]}{range .spec.template.spec.initContainers[*]}{.image}{"\n"}{end}{range .spec.template.spec.containers[*]}{.image}{"\n"}{end}{end}' \
+            2>/dev/null || return 1
+    }
 }
 
 # Strip any known registry host prefix, yielding "repo:tag" lines.
