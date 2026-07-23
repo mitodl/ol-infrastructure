@@ -66,8 +66,15 @@ if container_running "$REGISTRY_CONTAINER"; then
     # blobs exist; without a restart it answers the next push's existence
     # checks with "layer already exists", producing manifests whose blobs
     # were never re-uploaded (pods then fail pulls with "unexpected EOF" —
-    # this corrupted the registry during the 2026-07-23 incident).
-    docker restart "$REGISTRY_CONTAINER" >/dev/null
+    # this corrupted the registry during the 2026-07-23 incident). If the
+    # restart fails, the stale cache is live over wiped storage — the exact
+    # incident pre-condition — so stop hard rather than continue.
+    if ! docker restart "$REGISTRY_CONTAINER" >/dev/null; then
+        warn "REGISTRY RESTART FAILED — do NOT push (Tilt included) until"
+        warn "'docker restart ${REGISTRY_CONTAINER}' succeeds, or the next"
+        warn "push will silently corrupt the registry (stale blob cache)."
+        exit 1
+    fi
     ok "Registry storage cleared (registry restarted to drop its blob cache)."
 else
     warn "${REGISTRY_CONTAINER} not running — skipping registry cleanup."
@@ -97,9 +104,14 @@ if [[ "${1:-}" == "--sweep-nodes" ]]; then
     else
         for node in "${nodes[@]}"; do
             log "Sweeping images on node ${node} (containers will need re-pulls to restart)..."
-            docker exec "$node" sh -c \
-                'crictl images -q | xargs -r -n1 sh -c "crictl rmi \"\$0\" 2>/dev/null || true"'
-            ok "${node} swept."
+            # || warn: under set -e a node stopping mid-sweep would otherwise
+            # abort the remaining nodes and skip the follow-up instructions.
+            if docker exec "$node" sh -c \
+                'crictl images -q | xargs -r -n1 sh -c "crictl rmi \"\$0\" 2>/dev/null || true"'; then
+                ok "${node} swept."
+            else
+                warn "${node} sweep failed (node stopped?) — continuing with remaining nodes."
+            fi
         done
         warn "Node stores swept. Follow up: let Tilt rebuild+push all app images,"
         warn "then 'docker restart' each k3d node one at a time (see script header)."

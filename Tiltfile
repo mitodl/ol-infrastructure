@@ -2,13 +2,16 @@
 # Run: tilt up
 # Docs: local-dev/README.md
 
-# Prune Tilt-built images/containers aggressively — the app images are
-# multi-GB, so stale builds eat disk fast.
+# Tilt's own pruner, kept as a backstop only — disk-janitor (below) is
+# authoritative for tilt-built images. keep_recent matches the janitor's
+# default keep_tags so the two policies agree on retention depth; a lower
+# value here would silently cap the janitor's knob (Tilt prunes the tag from
+# the daemon, and the janitor then drops its registry copy).
 docker_prune_settings(
     disable=False,
-    max_age_mins=60,      # anything older than 1h goes (local daemon only — see below)
+    max_age_mins=720,     # 12h — the janitor handles day-to-day retention
     num_builds=5,         # also prune every 5 image builds
-    keep_recent=2,        # always keep the 2 most recent tags per image
+    keep_recent=3,        # keep in sync with disk_keep_tags default
 )
 
 # ---------------------------------------------------------------------------
