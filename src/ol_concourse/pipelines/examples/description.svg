@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
-  <rect x="0" y="485.0" width="1200" height="190.0" fill="black" fill-opacity="0.45" />
-  <text x="50%" y="525.0" text-anchor="middle" font-family="sans-serif" font-size="30" fill="white" stroke="black" stroke-width="3" paint-order="stroke">
+  <rect x="0" y="424.0" width="1200" height="200.0" fill="black" fill-opacity="0.45" />
+  <text x="50%" y="464.0" text-anchor="middle" font-family="sans-serif" font-size="30" fill="white" stroke="black" stroke-width="3" paint-order="stroke">
     <tspan x="50%" dy="0">Prototype pipeline for validating per-</tspan>
     <tspan x="50%" dy="40">pipeline description text via</tspan>
     <tspan x="50%" dy="40">display.background_image. Not part of any</tspan>

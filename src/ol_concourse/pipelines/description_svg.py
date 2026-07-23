@@ -41,6 +41,9 @@ _AVG_CHAR_WIDTH_RATIO = 0.55
 # Cap the text block to this fraction of canvas width by default, centered,
 # so there's margin on both sides before a "cover" crop reaches it.
 _DEFAULT_TEXT_WIDTH_FRACTION = 0.6
+# Minimum top/bottom margin for a top/bottom-anchored text block, as a
+# fraction of canvas height (takes precedence over `padding` when larger).
+_DEFAULT_VERTICAL_MARGIN_FRACTION = 0.12
 
 Anchor = Literal["top", "center", "bottom"]
 
@@ -68,7 +71,10 @@ class DescriptionStyle:
     ``background-size: cover`` and no rescale control, keeping the text
     block narrower than the full canvas and centered is what makes it
     survive being cropped on viewports with a different aspect ratio than
-    ``width``/``height`` (see module docstring).
+    ``width``/``height`` (see module docstring). ``vertical_margin_fraction``
+    is the same idea for the top/bottom edge a top- or bottom-anchored block
+    sits against (default 0.12 of ``height``; ``padding`` is used instead
+    wherever it's larger).
     """
 
     width: int = _DEFAULT_WIDTH
@@ -78,6 +84,7 @@ class DescriptionStyle:
     anchor: Anchor = "bottom"
     wrap_chars: int | None = None
     text_width_fraction: float = _DEFAULT_TEXT_WIDTH_FRACTION
+    vertical_margin_fraction: float = _DEFAULT_VERTICAL_MARGIN_FRACTION
     text_color: str = "white"
     outline_color: str | None = "black"
     outline_width: float = 3
@@ -101,13 +108,12 @@ def render_description_svg(text: str, style: DescriptionStyle | None = None) -> 
         wrap_chars = max(10, int(text_width / avg_char_width))
     lines = textwrap.wrap(text, width=wrap_chars)
     block_height = len(lines) * line_height
+    vertical_margin = max(style.padding, style.height * style.vertical_margin_fraction)
 
     if style.anchor == "top":
-        first_line_y = float(style.padding + style.font_size)
+        first_line_y = vertical_margin + style.font_size
     elif style.anchor == "bottom":
-        first_line_y = float(
-            style.height - style.padding - block_height + style.font_size
-        )
+        first_line_y = style.height - vertical_margin - block_height + style.font_size
     else:
         first_line_y = (style.height - block_height) / 2 + style.font_size
 
