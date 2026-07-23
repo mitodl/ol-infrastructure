@@ -14,11 +14,16 @@ agents: 2
 image: docker.io/rancher/k3s:v1.31.4-k3s1
 
 # Local image registry — images built by Tilt are pushed here.
+# The registry container itself is created by setup.sh (`k3d registry create
+# --image <zot>`) rather than by this file, because its config file must be
+# bind-mounted from the repo checkout and this YAML cannot express that host
+# path portably. The registry is zot rather than registry:2: zot enforces
+# image retention (keep the N most recently pushed tags) and garbage
+# collection as its own declarative config — local-dev/cluster/zot-config.json
+# — so no external cleanup process has to reach into its storage.
 registries:
-  create:
-    name: k3d-registry.localhost
-    host: "0.0.0.0"
-    hostPort: "5001"
+  use:
+  - k3d-registry.localhost:5001
   config: |
     mirrors:
       "k3d-registry.localhost:5001":

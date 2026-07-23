@@ -561,17 +561,32 @@ can schedule.
     node-store cleanup is
     [tilt-dev/tilt#4228](https://github.com/tilt-dev/tilt/issues/4228).
 
-Three mechanisms keep the footprint bounded, with no per-developer setup:
+Each store is bounded by retention config owned by the component that
+enforces it, with no per-developer setup:
 
 | Mechanism | Covers | Where |
 |---|---|---|
-| `disk-janitor` (automatic, runs with every `tilt up`) | Old tilt-built image tags in the local daemon and the registry; build-cache size cap | `local-dev/scripts/disk-janitor.sh`, wired as a `serve_cmd` resource in the root Tiltfile |
+| `disk-janitor` (automatic, runs with every `tilt up`) | Old tilt-built image tags in the local daemon; build-cache size cap | `local-dev/scripts/disk-janitor.sh`, wired as a `serve_cmd` resource in the root Tiltfile |
+| zot registry retention + GC | The k3d registry — zot keeps the 10 most recently pushed tags per repo and garbage-collects the rest itself | `local-dev/cluster/zot-config.json` (the registry image is [zot](https://zotregistry.dev), not registry:2; created by `setup.sh`) |
 | kubelet image GC | Node containerd stores | Thresholds in `local-dev/cluster/k3d-config.yaml` (applies on cluster re-create) |
 | `prune-docker` (manual, break-glass) | Local daemon + registry, destructively (node stores only with `--sweep-nodes` — read the script header first; it orphans running containers) | Tilt UI button / `tilt trigger prune-docker`, or run `local-dev/scripts/prune-docker.sh` directly |
 
-The janitor enforces a **retention policy** — keep the newest N tags per
-image plus anything the cluster still references (pods or workload
-templates) — so it is safe to run at any moment, unlike a wipe. Knobs, via `tilt_config.json` (or env var fallback):
+**Existing setups:** a registry container created before the zot swap
+(2026-07) still runs `registry:2`, which has no retention and will grow
+unbounded — the janitor warns about this each cycle until you migrate:
+
+```bash
+k3d registry delete k3d-registry.localhost
+./local-dev/scripts/setup.sh   # recreates it as zot, reconnects the cluster network
+```
+
+Registry contents are a disposable cache — Tilt re-pushes whatever the
+current build needs on its next build, and running pods are unaffected
+(nodes cache their images).
+
+Retention (keep the newest N) is safe to apply at any moment — unlike a
+wipe, it can never delete an image something is about to need. Janitor
+knobs, via `tilt_config.json` (or env var fallback):
 
 - `disk_keep_tags` / `LOCAL_DEV_DISK_KEEP_TAGS` — tags kept per image
   (default 3). Old tags are nearly pure waste: pods only reference the

@@ -52,30 +52,28 @@ docker image prune -f >/dev/null
 ok "Local Docker daemon pruned."
 
 # ---------------------------------------------------------------------------
-# 2. k3d registry — the registry has no default expiry, so old pushes (every
-#    Tilt build, forever) just accumulate as blobs. There's nothing worth
-#    keeping in this cache: Tilt re-pushes whatever the current build needs
-#    on the next `tilt up`, from its own local build cache, so wiping it is
-#    cheap to recover from.
+# 2. k3d registry — day-to-day, zot's own retention/GC keeps this bounded
+#    (local-dev/cluster/zot-config.json); this is the break-glass full wipe.
+#    There's nothing worth keeping in this cache: Tilt re-pushes whatever the
+#    current build needs on the next `tilt up`, from its own local build
+#    cache, so wiping it is cheap to recover from.
+#    The wipe is done stopped: deleting storage under a RUNNING registry
+#    leaves stale in-memory state that can silently corrupt the next push
+#    (registry:2's blob-descriptor cache did exactly that in the 2026-07-23
+#    incident — "layer already exists" for blobs that were gone). Paths cover
+#    both zot (/var/lib/zot) and pre-migration registry:2 (/var/lib/registry).
 # ---------------------------------------------------------------------------
 if container_running "$REGISTRY_CONTAINER"; then
     log "Clearing local registry storage (${REGISTRY_CONTAINER})..."
-    docker exec "$REGISTRY_CONTAINER" sh -c \
-        'rm -rf /var/lib/registry/docker/registry/v2/blobs/* /var/lib/registry/docker/registry/v2/repositories/*'
-    # The registry's in-memory blob-descriptor cache still believes the wiped
-    # blobs exist; without a restart it answers the next push's existence
-    # checks with "layer already exists", producing manifests whose blobs
-    # were never re-uploaded (pods then fail pulls with "unexpected EOF" —
-    # this corrupted the registry during the 2026-07-23 incident). If the
-    # restart fails, the stale cache is live over wiped storage — the exact
-    # incident pre-condition — so stop hard rather than continue.
-    if ! docker restart "$REGISTRY_CONTAINER" >/dev/null; then
-        warn "REGISTRY RESTART FAILED — do NOT push (Tilt included) until"
-        warn "'docker restart ${REGISTRY_CONTAINER}' succeeds, or the next"
-        warn "push will silently corrupt the registry (stale blob cache)."
+    docker stop "$REGISTRY_CONTAINER" >/dev/null
+    docker run --rm --volumes-from "$REGISTRY_CONTAINER" alpine sh -c \
+        'rm -rf /var/lib/zot/* /var/lib/registry/docker/registry/v2/blobs/* /var/lib/registry/docker/registry/v2/repositories/* 2>/dev/null; true'
+    if ! docker start "$REGISTRY_CONTAINER" >/dev/null; then
+        warn "REGISTRY FAILED TO START after wipe — run"
+        warn "'docker start ${REGISTRY_CONTAINER}' before any push or pull."
         exit 1
     fi
-    ok "Registry storage cleared (registry restarted to drop its blob cache)."
+    ok "Registry storage cleared (wiped stopped, restarted clean)."
 else
     warn "${REGISTRY_CONTAINER} not running — skipping registry cleanup."
 fi
