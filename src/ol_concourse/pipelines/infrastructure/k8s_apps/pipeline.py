@@ -1320,16 +1320,18 @@ def _build_release_resource_app_pipeline(
         # Production: wait for release gate (closed release issue); start prod deployment.
         custom_dependencies={
             0: [
+                # Concourse implicitly re-gets a resource right after a `put`
+                # succeeds, so deployment.json (written by the get/`in` action)
+                # is already available to the later action=finish put without
+                # an explicit `get` here. An explicit `get` step for this
+                # resource would count as a job input requiring the scheduler
+                # to resolve a pre-existing version -- which can never happen
+                # for a resource whose only versions come from this job's own
+                # `put`, deadlocking the job forever on its first-ever run.
                 PutStep(
                     put=deployment_rc.name,
                     params={"action": "start", "ref": "((.:image_tag))"},
                 ),
-                # The github-deployments resource's "finish" out-action reads
-                # deployment.json written by a `get`, not by the prior `put` itself
-                # (see ol-concourse resources/github-deployments/README.md's
-                # documented put-start -> get -> ... -> put-finish flow). Without
-                # this, the QA post-step's action=finish put fails to find the file.
-                GetStep(get=deployment_rc.name, trigger=False),
             ],
             1: [
                 GetStep(get=release_gate.name, trigger=True, version="every"),
@@ -1339,13 +1341,12 @@ def _build_release_resource_app_pipeline(
                     trigger=False,
                     passed=[release_image_build_job.name],
                 ),
+                # See the deployment_rc comment above: the implicit get after
+                # this put already makes deployment.json available.
                 PutStep(
                     put=deployment_prod.name,
                     params={"action": "start", "ref": "((.:image_tag))"},
                 ),
-                # See the deployment_rc comment above: action=finish needs
-                # deployment.json from an explicit `get`, not just the prior `put`.
-                GetStep(get=deployment_prod.name, trigger=False),
             ],
         },
         additional_env_vars={
