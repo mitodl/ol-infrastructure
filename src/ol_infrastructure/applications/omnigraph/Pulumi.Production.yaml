@@ -1,0 +1,8 @@
+---
+# See Pulumi.CI.yaml for why `secretsprovider`/`encryptedkey` are omitted.
+config:
+  aws:region: us-east-1
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwF51lHyFZBMipn03XTrTTsKAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMIK7o7DGmOomYnJtDAgEQgDuWNWhBp4MmY5g1IS5INjiOfMa0yZcKOzoHa0L7AjLfrw9rMSs/jELIM0qfIJguIuQsCYjLMpJoX7CgSQ==

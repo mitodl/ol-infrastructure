@@ -1,0 +1,13 @@
+---
+name: ol-application-omnigraph
+runtime: python
+description: >
+  Deploy omnigraph-server, the stateless S3-backed graph service that backs
+  witan, on the operations EKS cluster. This stack owns the omnigraph
+  namespace: a single omnigraph-server Deployment + ClusterIP Service, an S3
+  bucket reached via IRSA, the generated cluster.yaml ConfigMap, and the
+  Vault-synced actor-tokens Secret its bearer-token auth boots from. Consumers
+  (the ol-application-witan stack) reach it over the cluster network via a
+  StackReference to the omnigraph_server_addr output.
+backend:
+  url: s3://mitol-pulumi-state/

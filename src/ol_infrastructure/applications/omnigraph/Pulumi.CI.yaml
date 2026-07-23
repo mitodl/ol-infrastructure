@@ -1,0 +1,13 @@
+---
+# `secretsprovider`/`encryptedkey` are intentionally omitted here — this
+# stack has no `secure:` config values (all real secrets are Vault-synced
+# K8s Secrets, provisioned in __main__.py, not Pulumi stack config). The
+# first `pulumi stack init --secrets-provider=awskms://alias/infrastructure-secrets-ci`
+# run against this stack will populate both, matching every other stack under
+# this KMS alias.
+config:
+  aws:region: us-east-1
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagHdMkilOMMReBzl5ZFVAxo4AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMp4JVj0Zbv48c45+qAgEQgDt/KPJs42c+WEXeS2IPS6gVYHOCM2L51SVYdqGNpSII1XjPkxQgj6ypYwhz6wdA7GrvJjK9P89/US3Nww==

@@ -70,6 +70,14 @@ PIPELINE_CONFIGS: list[tuple[str, str]] = [
         "src/ol_concourse/pipelines/infrastructure/kubewatch/pipeline.py",
     ),
     (
+        "pulumi-omnigraph",
+        "src/ol_concourse/pipelines/infrastructure/omnigraph/pipeline.py",
+    ),
+    (
+        "pulumi-witan",
+        "src/ol_concourse/pipelines/infrastructure/witan/pipeline.py",
+    ),
+    (
         "docker-pulumi-superset",
         "src/ol_concourse/pipelines/infrastructure/superset/pipeline.py",
     ),

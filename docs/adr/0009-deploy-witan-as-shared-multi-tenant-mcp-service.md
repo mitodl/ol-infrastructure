@@ -245,6 +245,46 @@ token exchange are not adopted.**
   `toolhive_swe`'s scenario, but `toolhive_witan` isn't stuck with that
   scenario. See agent-kit ADR-0004's matching Resolution addendum.
 
+## Addendum (2026-07-17) — split into two projects; drop `toolhive` from element naming
+
+During implementation (ol-infrastructure PR #4919 / #4985) the single
+`toolhive_witan` namespace/Pulumi stack of Decision points 1–2 was split into
+**two independently deployable Pulumi projects, each in its own namespace**.
+The Decision's substance is unchanged — still two workloads (MCP tier + data
+tier), same auth model, same S3-backed store — only the packaging and naming
+are revised:
+
+- **`ol-application-omnigraph`** (`applications/omnigraph/`, namespace
+  `omnigraph`) — the stateless `omnigraph-server` service: S3 bucket + IRSA,
+  ECR, cluster-config ConfigMap, its own `actor-tokens` Secret, and the
+  `Deployment`/ClusterIP `Service`. Exports `omnigraph_server_addr`.
+- **`ol-application-witan`** (`applications/witan/`, namespace `witan`) — the
+  MCP tier: `MCPServer`/`MCPGroup`/`VirtualMCPServer` + APISIX ingress + its
+  own ECR and Secrets. It reaches the data tier over the cluster network via a
+  `StackReference` to the omnigraph stack's `omnigraph_server_addr`, and its
+  deploy **fails fast** if omnigraph is not yet up.
+
+**Why.** ToolHive is only the operator that *runs* the witan MCP tier — an
+implementation detail, not an element of the system. omnigraph and witan are
+the two real elements, and omnigraph is a standalone service witan is merely
+one consumer of, so each earns its own project, namespace, and CI/CD lifecycle.
+Consequently the `toolhive` prefix is dropped everywhere it named an element
+rather than the operator: the namespaces (`omnigraph`, `witan`, was
+`toolhive-witan`), the public vMCP host (`witan[.<env>].ol.mit.edu`, was
+`toolhive-witan…`), and the `Services`/`Application` labels. The shared
+ToolHive operator (`toolhive_operator`) is unchanged and still reconciles the
+witan `MCPServer` resources in the `witan` namespace.
+
+Each namespace syncs its own `actor-tokens` Secret from the one Vault source
+(`secret-operations/witan/actor-tokens`), since Kubernetes Secrets are
+namespace-scoped. This was greenfield (never deployed, no images built yet), so
+the project/namespace renames needed no Pulumi state migration or aliases.
+
+**CI/CD.** Two independent Concourse build+deploy pipelines (`pulumi-omnigraph`,
+`pulumi-witan`) replace the single combined one — each builds its one image
+from the foreign `mitodl/agent-kit` repo and gates its `pulumi_jobs_chain` on
+that build. See `src/ol_concourse/pipelines/infrastructure/{omnigraph,witan}/`.
+
 ## Implementation Notes
 
 - **Effort Estimate:** Multi-week — spans a concurrency-behavior spike, witan
@@ -265,7 +305,7 @@ token exchange are not adopted.**
 
 - [ADR-0003](0003-use-hybrid-httproute-apisixtls-for-per-app-tls.md) — Use
   Hybrid HTTPRoute + ApisixTls for Per-App TLS — reused as-is for the new
-  `toolhive_witan` ingress.
+  `witan` ingress (see 2026-07-17 addendum).
 - [ADR-0005](0005-high-performance-stateful-applications-eks.md) — High
   Performance Stateful Applications on EKS — informed the choice of an
   S3-backed data tier over an EBS-backed StatefulSet, since the `MCPServer`
@@ -298,5 +338,6 @@ spanning both repos.
 |------|----------|----------|-------|
 | 2026-07-07 | _Pending_ | _Pending_ | Created during agentic scoping session |
 | 2026-07-07 | Tobias Macey | Approved | Accepted after Copilot automated review feedback addressed (RFC citation, ADR index, self-containment) |
+| 2026-07-17 | Tobias Macey | Amended | Added 2026-07-17 addendum: split `toolhive_witan` into separate `omnigraph` + `witan` projects/namespaces; dropped `toolhive` from element naming |
 
-**Last Updated:** 2026-07-07
+**Last Updated:** 2026-07-17
