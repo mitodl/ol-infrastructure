@@ -35,7 +35,8 @@ config:
   - "https://learn-ai-qa.ol.mit.edu/*"
   - "https://api-learn-ai-qa.ol.mit.edu/*"
   keycloak_realm:olapps-learn-ai-client-roles: ["https://api-learn-ai-qa.ol.mit.edu/*"]
-  keycloak_realm:olapps-ol-analytics-api-redirect-uris: ["https://analytics-qa.odl.mit.edu/*"]
+  keycloak_realm:olapps-ol-analytics-api-redirect-uris: ["https://analytics-qa.ol.mit.edu/*",
+    "https://analytics.rc.learn.mit.edu/*"]
   keycloak_realm:olapps-mitlearn-client-redirect-uris:
   - "https://api.rc.learn.mit.edu/*"
   - "https://rc.learn.mit.edu/*"

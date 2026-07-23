@@ -4,7 +4,8 @@ config:
   aws:region: us-east-1
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
-  ol_analytics_api:domain: analytics-qa.odl.mit.edu
+  ol_analytics_api:domain: analytics-qa.ol.mit.edu
+  ol_analytics_api:learn_domain: analytics.rc.learn.mit.edu
   ol_analytics_api:env_vars:
     OL_ANALYTICS_API_ENVIRONMENT: qa
     LOG_LEVEL: INFO
