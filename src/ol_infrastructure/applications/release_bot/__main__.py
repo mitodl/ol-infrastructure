@@ -52,10 +52,12 @@ github_token = concourse_ops_secrets["pipelines"]["infrastructure/github"][
 
 bot_config = Config("release_bot")
 concourse_url = bot_config.get("concourse_url") or "https://cicd.odl.mit.edu"
-# Fallback Slack channel ID for "ready to promote" notifications when an app
-# doesn't set its own `channel` in repos_config. Unset by default -- the
-# notifier silently skips any app with no channel configured either way.
-release_announce_channel = bot_config.get("release_announce_channel")
+# Fallback Slack channel for "ready to promote" notifications when an app
+# doesn't set its own `channel` in repos_config (e.g. ol-analytics-api,
+# which has no dedicated product channel yet).
+release_announce_channel = (
+    bot_config.get("release_announce_channel") or "product-infrastructure"
+)
 
 default_repos_config = {
     "learn-ai": {
