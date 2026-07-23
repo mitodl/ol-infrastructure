@@ -7,6 +7,8 @@ config:
   - odl.mit.edu
   - .ol.mit.edu
   - ol.mit.edu
+  - .learn.mit.edu
+  - learn.mit.edu
   eks:backup: false
   eks:apisix_admin_key:
     secure: v1:alhS5zTWGpzPC3t3:QxvqqeD7zQ0zWxyKnnGWVRsmQwVx35NmdIaza5rI5re8+frp5OzpQZJR++4cfgzd13VBeNdOB1PM9Q3Z8hUaqGbjAhtclG6HSOg7z7tf3Ak=
@@ -16,7 +18,8 @@ config:
   - openlit-ci.ol.mit.edu
   - pipelines-ci.odl.mit.edu
   - opik-ci.ol.mit.edu
-  - analytics-ci.odl.mit.edu
+  - analytics-ci.ol.mit.edu
+  - analytics.ci.learn.mit.edu
   eks:apisix_viewer_key:
     secure: v1:ZFN4gG/xa7D+1wDe:qwerlKPydX7u54UjHLBvNUCT2Oha5e4EgXs5Uf+8tMOMUtf4yz/5SYy4rfpfls1HDMgroXWwRUY9U21sgKsGF+YJ5lexA+Fo9VSStrw9zPc=
   eks:stateful_workload_storage_backend: ebs

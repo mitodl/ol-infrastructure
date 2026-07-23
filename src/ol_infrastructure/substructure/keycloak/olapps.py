@@ -388,7 +388,16 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
             access_type="CONFIDENTIAL",
             standard_flow_enabled=True,
             implicit_flow_enabled=False,
-            service_accounts_enabled=False,
+            # Service accounts (the client-credentials grant) are enabled so the
+            # same client can issue machine-to-machine tokens -- for automated
+            # smoke checks and any headless caller -- alongside the browser
+            # authorization-code flow the MIT Learn frontend uses. A
+            # client-credentials token carries no `organization` claim or user
+            # `sub`, so it cannot satisfy the org-manager endpoints (which
+            # additionally verify manager status against MITx Online); grant the
+            # service account the realm role the admin endpoints check
+            # (mit_contract_admin) to authorize those.
+            service_accounts_enabled=True,
             valid_redirect_uris=keycloak_realm_config.get_object(
                 "olapps-ol-analytics-api-redirect-uris"
             ),

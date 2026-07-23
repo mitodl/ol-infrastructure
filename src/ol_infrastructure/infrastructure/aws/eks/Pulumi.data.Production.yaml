@@ -17,7 +17,8 @@ config:
   - api-airbyte.odl.mit.edu
   - opik.ol.mit.edu
   - pipelines.odl.mit.edu
-  - analytics.odl.mit.edu
+  - analytics.ol.mit.edu
+  - analytics.learn.mit.edu
   eks:apisix_min_replicas: '3'
   eks:apisix_max_replicas: '10'
   eks:apisix_memory: 800Mi
