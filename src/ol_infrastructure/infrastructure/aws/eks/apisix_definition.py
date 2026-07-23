@@ -285,6 +285,7 @@ class ApisixGatewayConfig(BaseModel):
     image_repository: str | None = None
     # Unset uses the chart's appVersion tag.
     image_tag: str | None = None
+    image_pull_policy: Literal["Always", "IfNotPresent"] = "IfNotPresent"
     # proxy-wasm plugins to register, e.g. [{"name": "coraza-filter",
     # "priority": 7999, "file": "/usr/local/apisix/coraza-filter.wasm"}]. The
     # files have to exist in the image; the stock apache/apisix image has none.
@@ -792,7 +793,7 @@ def apisix_helm_values(config: ApisixGatewayConfig) -> dict[str, Any]:
                         if config.image_tag is not None
                         else {}
                     ),
-                    "pullPolicy": "IfNotPresent",
+                    "pullPolicy": config.image_pull_policy,
                 }
             }
             if config.image_repository is not None

@@ -169,6 +169,12 @@ def setup_apisix(
             else cached_image_uri("apache/apisix")
         ),
         image_tag=apisix_custom_image_tag,
+        # A custom image is expected to track a moving tag (e.g.
+        # "latest"), so always re-check the registry; the stock
+        # image is already digest-cached via cached_image_uri.
+        image_pull_policy=(
+            "Always" if apisix_custom_image_repository else "IfNotPresent"
+        ),
         wasm_plugins=apisix_wasm_plugins,
         tolerations=operations_tolerations,
         labels=k8s_global_labels,
