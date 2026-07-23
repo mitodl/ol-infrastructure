@@ -223,6 +223,21 @@ def setup_apisix(
     # e.g. [{"name": "coraza-filter", "priority": 7999,
     #        "file": "/usr/local/apisix/coraza-filter.wasm"}]
     apisix_wasm_plugins = eks_config.get_object("apisix_wasm_plugins") or []
+    if apisix_custom_image_repository and not apisix_custom_image_tag:
+        msg = (
+            "apisix_custom_image_tag must be set when "
+            "apisix_custom_image_repository is set -- the custom image build "
+            "only publishes 'latest' and git-short-ref tags, not the stock "
+            "chart's default appVersion tag, so an untagged pull would fail."
+        )
+        raise ValueError(msg)
+    if apisix_wasm_plugins and not apisix_custom_image_repository:
+        msg = (
+            "apisix_wasm_plugins requires apisix_custom_image_repository -- "
+            "the stock apache/apisix image does not contain any wasm plugin "
+            "binaries, so APISIX would fail to load the configured plugin file."
+        )
+        raise ValueError(msg)
 
     session_cookie_name = f"{stack_info.env_suffix}_gateway_session".removeprefix(
         "production"
