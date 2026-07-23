@@ -23,4 +23,4 @@ def get_monitoring_sns_arn(level: Literal["warning", "critical"]) -> Output[str]
     return StackReference(
         "implicit.infrastructure.monitoring",
         stack_name=stack_ref(projects.MONITORING, "default"),
-    ).require_output("opsgenie_sns_topics")[f"{level}_sns_topic_arn"]
+    ).require_output("notification_sns_topics")[f"{level}_sns_topic_arn"]
