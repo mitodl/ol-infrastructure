@@ -101,8 +101,18 @@ warning_notifications_webhook_subscription = sns.TopicSubscription(
 )
 
 # Old export retained so any not-yet-redeployed downstream stack's
-# StackReference read still resolves during the transition; remove once
-# nothing consumes it (grep the repo for "opsgenie_sns_topics").
+# StackReference read still resolves during the transition; get_monitoring_sns_arn()
+# (lib/aws/monitoring_helper.py) falls back to this if notification_sns_topics
+# is absent. A repo-wide grep for "opsgenie_sns_topics" is NOT a sufficient
+# removal criterion by itself -- it only reflects checked-out code, not
+# deployed state. A stack can have zero code references to the old export
+# while its last-deployed CloudWatch alarms still have the old topic ARN
+# baked in, simply because it hasn't been redeployed since this change
+# merged. Before removing this export (and, later, the old topics
+# themselves), confirm via a live AWS check -- e.g. `aws cloudwatch
+# describe-alarms` across all accounts/regions, filtered for AlarmActions
+# matching the old OpsGenie_* topic ARNs -- that nothing still points at
+# them, not just that the source code has moved on.
 export(
     "opsgenie_sns_topics",
     {

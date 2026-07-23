@@ -20,7 +20,20 @@ def get_monitoring_sns_arn(level: Literal["warning", "critical"]) -> Output[str]
     # delete_before_replace is intentionally omitted (defaults to False) so that
     # if the referenced stack name changes Pulumi creates the new reference before
     # removing the old one, avoiding a failed read from the now-gone legacy stack.
-    return StackReference(
+    monitoring_stack = StackReference(
         "implicit.infrastructure.monitoring",
         stack_name=stack_ref(projects.MONITORING, "default"),
-    ).require_output("notification_sns_topics")[f"{level}_sns_topic_arn"]
+    )
+    # Downstream stacks redeploy independently, on their own schedule, so this
+    # code can reach a stack's deploy before the monitoring stack itself has
+    # been applied with the notification_sns_topics export (added alongside
+    # the legacy opsgenie_sns_topics one -- see monitoring/__main__.py).
+    # get_output returns None for a missing key instead of raising, for both
+    # exports, so this never hard-fails a downstream deploy regardless of
+    # which side gets applied first; it just prefers the new export once
+    # that stack's redeploy makes it visible.
+    new_topics = monitoring_stack.get_output("notification_sns_topics")
+    legacy_topics = monitoring_stack.get_output("opsgenie_sns_topics")
+    return Output.all(new_topics, legacy_topics).apply(
+        lambda topics: (topics[0] or topics[1])[f"{level}_sns_topic_arn"]
+    )
