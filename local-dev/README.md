@@ -568,7 +568,7 @@ enforces it, with no per-developer setup:
 |---|---|---|
 | `disk-janitor` (automatic, runs with every `tilt up`) | Old tilt-built image tags in the local daemon; build-cache size cap | `local-dev/scripts/disk-janitor.sh`, wired as a `serve_cmd` resource in the root Tiltfile |
 | zot registry retention + GC | The k3d registry — zot keeps the 10 most recently pushed tags per repo and garbage-collects the rest itself | `local-dev/cluster/zot-config.json` (the registry image is [zot](https://zotregistry.dev), not registry:2; created by `setup.sh`) |
-| kubelet image GC | Node containerd stores | Thresholds in `local-dev/cluster/k3d-config.yaml` (applies on cluster re-create) |
+| kubelet image GC | Node containerd stores | Thresholds in `local-dev/cluster/k3d-config.yaml` (applies at cluster creation; existing clusters keep the old 85/80 until you run `local-dev/scripts/migrate-kubelet-gc-thresholds.sh`) |
 | `prune-docker` (manual, break-glass) | Local daemon + registry, destructively (node stores only with `--sweep-nodes` — read the script header first; it orphans running containers) | Tilt UI button / `tilt trigger prune-docker`, or run `local-dev/scripts/prune-docker.sh` directly |
 
 **Existing setups:** a registry container created before the zot swap
@@ -600,7 +600,9 @@ knobs, via `tilt_config.json` (or env var fallback):
 
 If images ever pile up again despite the janitor, `tilt docker-prune --debug`
 prints Tilt's own per-image skip reasons and is the fastest way to see why
-something isn't being reclaimed.
+something isn't being reclaimed. To check whether zot is doing its part,
+`docker logs k3d-registry.localhost` shows its retention decisions
+(`"module":"retention"` lines, logged at info level).
 
 ---
 
