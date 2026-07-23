@@ -870,6 +870,11 @@ def _define_release_resources(
         labels=["release"],
         access_token="((github.release_resource_access_token))",  # noqa: S106
         gh_host=None,
+        # A retriggered QA deploy with no new app commit re-runs this put
+        # with the same checklist; editing in place (instead of the default
+        # comment-per-hit behavior) avoids reopening the issue with a fresh,
+        # all-unchecked checklist for a release that hasn't actually changed.
+        update_in_place=True,
     )
     deployment_rc = github_deployment(
         name=Identifier(f"{app_name}-deployment-rc"),
