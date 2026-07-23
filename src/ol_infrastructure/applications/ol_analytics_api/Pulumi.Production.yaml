@@ -25,3 +25,4 @@ config:
     # real backend API domain, matching mitxonline's own Pulumi.Production.yaml
     # backend_domain.
     OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_API_BASE_URL: https://api.mitxonline.mit.edu
+encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQF6EHjQEU/rITguhkMpZkAGAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMmI837wHwSIpvnqVzAgEQgDu3S5KJVVdrunCdsumRyycZRYJKixWMYIT0bEO6Pn2q1unM9gsSLH+XwJYrzI4N5HKHZJWcibnBp+avGA==

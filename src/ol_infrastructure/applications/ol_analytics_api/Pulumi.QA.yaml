@@ -25,3 +25,4 @@ config:
     # must set this explicitly. QA points at the RC (release-candidate) stack,
     # matching mitxonline's own Pulumi.QA.yaml backend_domain.
     OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_API_BASE_URL: https://api.rc.mitxonline.mit.edu
+encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQGpJg9r/l/e4/j3u7c1Q6PpAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMhYZkyfyFaBfe27o+AgEQgDtaxgvH+Z/eGa0K5VgjaN2FArYieVOl8cC1ovbTaqj8PCzatlhfnD9NnrMeTiuB/ktTIrhn3fOyzHMGiw==
