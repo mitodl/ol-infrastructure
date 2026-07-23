@@ -18,8 +18,8 @@
 #   1. Local Docker daemon: keep the newest N tilt-built tags per repo
 #      (localhost:5001/*); remove older ones. Never touches other images.
 #   2. k3d registry: delete tags that are neither kept locally nor referenced
-#      by any pod, then garbage-collect blobs (skipped while a push is in
-#      flight).
+#      by any pod, then garbage-collect blobs offline (the registry is
+#      briefly stopped; deferred while a push is in flight).
 #   3. Docker build cache: prune down to a size cap, least-recently-used
 #      first. NOTE: the BuildKit cache is one daemon-wide pool shared with
 #      everything else you build on this machine, so this is the one step
@@ -66,7 +66,9 @@ container_running() {
 
 # ---------------------------------------------------------------------------
 # 1. Local daemon: keep newest KEEP_TAGS tags per localhost:5001/* repo.
-# CreatedAt ("2026-07-23 15:17:42 +0000 UTC") sorts correctly lexically.
+# CreatedAt is formatted client-side in the local zone, where lexical sort
+# breaks during the DST fall-back hour — TZ=UTC pins it to a sortable format
+# ("2026-07-23 15:17:42 +0000 UTC").
 # `docker rmi` without --force fails (tolerated) on anything still in use.
 # ---------------------------------------------------------------------------
 prune_local_tags() {
@@ -79,7 +81,7 @@ prune_local_tags() {
             log "  kept $ref (in use or remove failed)"
         fi
     done < <(
-        docker images --filter reference='localhost:5001/*' \
+        TZ=UTC docker images --filter reference='localhost:5001/*' \
             --format '{{.CreatedAt}}\t{{.Repository}}\t{{.Tag}}' 2>/dev/null \
             | sort -r \
             | awk -F'\t' -v keep="$KEEP_TAGS" '{ if (++seen[$2] > keep) print $2 ":" $3 }'
@@ -126,76 +128,126 @@ strip_registry_prefix() {
 # 2. Registry: a tag is kept iff it survives locally (Tilt may redeploy it)
 # or a pod references it (kubelet may re-pull it). Everything else goes.
 # Tag dirs are removed in place; blobs are freed by the registry's own
-# garbage collector, which we only run when no upload is in flight.
-# If kubectl fails we skip the whole phase — fail safe, prune nothing.
+# garbage collector (offline — see registry_gc).
+# Delete candidates are snapshotted BEFORE the keep-set is computed, so a tag
+# Tilt pushes mid-phase can never be a candidate (it would race the keep-set
+# otherwise). If kubectl or docker fails we skip the whole phase — fail safe,
+# prune nothing.
+# Registry dirs are one level deep today: Tilt flattens image names
+# (mitodl/mit-learn-app -> mitodl_mit-learn-app) when it prepends the
+# registry. If a build ever pushes a nested repo (foo/bar), this ls walk
+# silently misses it — failure direction is unbounded growth for that repo,
+# never a wrong deletion.
 # ---------------------------------------------------------------------------
+REGISTRY_GC_PENDING=0
+
 prune_registry() {
     container_running "$REGISTRY_CONTAINER" || return 0
+
+    local candidates
+    candidates="$(
+        while IFS= read -r repo; do
+            [[ -z "$repo" ]] && continue
+            while IFS= read -r tag; do
+                [[ -z "$tag" ]] && continue
+                echo "${repo}:${tag}"
+            done < <(docker exec "$REGISTRY_CONTAINER" \
+                        ls "${REGISTRY_DATA}/repositories/${repo}/_manifests/tags" 2>/dev/null)
+        done < <(docker exec "$REGISTRY_CONTAINER" \
+                    ls "${REGISTRY_DATA}/repositories" 2>/dev/null)
+    )"
+    [[ -z "$candidates" ]] && return 0
 
     local pod_refs
     if ! pod_refs="$(pod_image_refs)"; then
         log "registry: kubectl unavailable — skipping registry retention this cycle"
         return 0
     fi
+    local local_tags
+    if ! local_tags="$(docker images --filter reference='localhost:5001/*' \
+            --format '{{.Repository}}:{{.Tag}}' 2>/dev/null)"; then
+        log "registry: docker images failed — skipping registry retention this cycle"
+        return 0
+    fi
 
     local keep
     keep="$(
         {
-            docker images --filter reference='localhost:5001/*' \
-                --format '{{.Repository}}:{{.Tag}}' 2>/dev/null
+            echo "$local_tags"
             echo "$pod_refs"
         } | strip_registry_prefix | sort -u
     )"
 
-    local removed=0 repo tag
-    while IFS= read -r repo; do
-        [[ -z "$repo" ]] && continue
-        while IFS= read -r tag; do
-            [[ -z "$tag" ]] && continue
-            if ! grep -qx "${repo}:${tag}" <<<"$keep"; then
-                docker exec "$REGISTRY_CONTAINER" \
-                    rm -rf "${REGISTRY_DATA}/repositories/${repo}/_manifests/tags/${tag}"
+    local removed=0 candidate repo tag
+    while IFS= read -r candidate; do
+        [[ -z "$candidate" ]] && continue
+        if ! grep -qxF "$candidate" <<<"$keep"; then
+            repo="${candidate%%:*}"
+            tag="${candidate#*:}"
+            if docker exec "$REGISTRY_CONTAINER" \
+                rm -rf "${REGISTRY_DATA}/repositories/${repo}/_manifests/tags/${tag}"; then
                 removed=$((removed + 1))
             fi
-        done < <(docker exec "$REGISTRY_CONTAINER" \
-                    ls "${REGISTRY_DATA}/repositories/${repo}/_manifests/tags" 2>/dev/null)
-    done < <(docker exec "$REGISTRY_CONTAINER" \
-                ls "${REGISTRY_DATA}/repositories" 2>/dev/null)
+        fi
+    done <<<"$candidates"
 
     if (( removed > 0 )); then
         log "registry: removed $removed stale tag(s)"
-        registry_gc
+        REGISTRY_GC_PENDING=1
     fi
 }
 
+# Blob GC runs OFFLINE: stop the registry, collect in a throwaway container
+# sharing its volume, start it again. Online GC is unsafe by construction —
+# a concurrent push whose layers "already exist" writes nothing to _uploads
+# (only HEAD checks + a manifest PUT), so no guard can see it, and the
+# registry's in-memory blob-descriptor cache would answer those HEADs from
+# blobs GC just deleted, storing a manifest with missing blobs (the
+# 2026-07-23 incident). With the registry stopped, a racing push fails
+# loudly and Docker/Tilt retries; and each start begins with a cold cache,
+# so no restart choreography is needed. GC stays pending across cycles until
+# it succeeds (a deferral is otherwise lost if no later cycle removes tags).
 registry_gc() {
-    # An in-flight push writes under _uploads/; GC during a push can corrupt
-    # it, so defer to the next cycle if anything is there.
+    container_running "$REGISTRY_CONTAINER" || return 0
+
+    # A visibly in-flight upload means Tilt is mid-push; defer rather than
+    # fail its push. (Politeness only — stopping the registry is what makes
+    # GC safe. A stale interrupted upload can defer this repeatedly; the
+    # registry purges those after ~168h.)
     if docker exec "$REGISTRY_CONTAINER" \
         sh -c "find ${REGISTRY_DATA}/repositories -path '*/_uploads/*' -type f 2>/dev/null | head -1" \
         | grep -q .; then
-        log "registry: push in flight — deferring blob GC to next cycle"
+        log "registry: push in flight — deferring blob GC"
         return 0
     fi
     # --delete-untagged (registry >= 2.8) also drops the manifests our tag
     # deletion orphaned; without it blobs stay pinned and GC frees ~nothing.
-    if docker exec "$REGISTRY_CONTAINER" registry garbage-collect --help 2>&1 \
+    if ! docker exec "$REGISTRY_CONTAINER" registry garbage-collect --help 2>&1 \
         | grep -q -- --delete-untagged; then
-        if docker exec "$REGISTRY_CONTAINER" \
-            registry garbage-collect --delete-untagged /etc/docker/registry/config.yml \
-            >/dev/null 2>&1; then
-            # The running registry's in-memory blob-descriptor cache still
-            # believes GC'd blobs exist, so it would tell the next `docker
-            # push` "layer already exists" and silently produce a manifest
-            # with missing blobs (this exact failure corrupted the registry
-            # in the 2026-07-23 incident). Restart to drop the cache.
-            docker restart "$REGISTRY_CONTAINER" >/dev/null 2>&1
-            log "registry: blob GC complete (registry restarted to drop its blob cache)"
-        else
-            log "registry: blob GC failed (will retry next cycle)"
-        fi
-    else
         log "registry: 'registry garbage-collect --delete-untagged' unsupported — tags removed but blobs not freed"
+        REGISTRY_GC_PENDING=0
+        return 0
+    fi
+
+    local image rc=0
+    image="$(docker inspect --format '{{.Config.Image}}' "$REGISTRY_CONTAINER" 2>/dev/null)"
+    if [[ -z "$image" ]]; then
+        log "registry: cannot determine registry image — deferring blob GC"
+        return 0
+    fi
+    docker stop "$REGISTRY_CONTAINER" >/dev/null 2>&1
+    docker run --rm --volumes-from "$REGISTRY_CONTAINER" "$image" \
+        garbage-collect --delete-untagged /etc/docker/registry/config.yml \
+        >/dev/null 2>&1 || rc=$?
+    if ! docker start "$REGISTRY_CONTAINER" >/dev/null 2>&1; then
+        log "registry: FAILED TO RESTART ${REGISTRY_CONTAINER} after GC — start it manually (docker start ${REGISTRY_CONTAINER})"
+        return 0
+    fi
+    if (( rc == 0 )); then
+        REGISTRY_GC_PENDING=0
+        log "registry: offline blob GC complete"
+    else
+        log "registry: blob GC failed (will retry next cycle)"
     fi
 }
 
@@ -212,7 +264,9 @@ prune_build_cache() {
     fi
     [[ "$cap" == "0" ]] && return 0
 
-    # Flag was renamed --keep-storage -> --max-used-space in newer buildx.
+    # --max-used-space (buildx >= 0.18, needs BuildKit >= 0.17) is the newer
+    # total-size cap; older tooling spells it --keep-storage (since
+    # deprecated in favor of --reserved-space). Both accept "<N>gb".
     local flag="--keep-storage"
     docker builder prune --help 2>&1 | grep -q -- --max-used-space && flag="--max-used-space"
     docker builder prune -f "$flag" "${cap}gb" >/dev/null 2>&1 \
@@ -222,6 +276,7 @@ prune_build_cache() {
 run_cycle() {
     prune_local_tags
     prune_registry
+    (( REGISTRY_GC_PENDING )) && registry_gc
     prune_build_cache
 }
 
