@@ -348,8 +348,10 @@ def setup_apisix(
                         else {}
                     ),
                     # A custom image is expected to track a moving tag (e.g.
-                    # "latest"), so always re-check the registry; the stock
-                    # image is already digest-cached via cached_image_uri.
+                    # "latest"), so always re-check the registry. The stock
+                    # image path is unchanged from prior behavior -- it isn't
+                    # digest-pinned either, cached_image_uri only rewrites the
+                    # repository to our ECR pull-through cache, not a digest.
                     "pullPolicy": (
                         "Always" if apisix_custom_image_repository else "IfNotPresent"
                     ),
