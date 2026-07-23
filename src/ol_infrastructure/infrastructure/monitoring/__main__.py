@@ -63,14 +63,14 @@ warning_sns_topic = sns.Topic(
 
 critical_top_webhook_subscription = sns.TopicSubscription(
     "monitoring-critical-alerts-sns-topic-webhook-subscription",
-    endpoint=monitoring_config.get("rootly_critical_webhook_url"),
+    endpoint=monitoring_config.require_secret("rootly_critical_webhook_url"),
     protocol="https",
     topic=critical_sns_topic.arn,
 )
 
 warning_topic_subscription = sns.TopicSubscription(
     "monitoring-warning-alerts-sns-topic-subscription",
-    endpoint=monitoring_config.get("rootly_warning_webhook_url"),
+    endpoint=monitoring_config.require_secret("rootly_warning_webhook_url"),
     protocol="https",
     topic=warning_sns_topic.arn,
 )
@@ -88,14 +88,14 @@ warning_notifications_sns_topic = sns.Topic(
 
 critical_notifications_webhook_subscription = sns.TopicSubscription(
     "monitoring-critical-notifications-sns-topic-webhook-subscription",
-    endpoint=monitoring_config.get("rootly_critical_webhook_url"),
+    endpoint=monitoring_config.require_secret("rootly_critical_webhook_url"),
     protocol="https",
     topic=critical_notifications_sns_topic.arn,
 )
 
 warning_notifications_webhook_subscription = sns.TopicSubscription(
     "monitoring-warning-notifications-sns-topic-webhook-subscription",
-    endpoint=monitoring_config.get("rootly_warning_webhook_url"),
+    endpoint=monitoring_config.require_secret("rootly_warning_webhook_url"),
     protocol="https",
     topic=warning_notifications_sns_topic.arn,
 )
