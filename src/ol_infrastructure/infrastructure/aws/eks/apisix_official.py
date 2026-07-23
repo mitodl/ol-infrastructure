@@ -458,6 +458,14 @@ def setup_apisix(
                         "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
                         "service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
                         "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled": "true",
+                        # NLB target-type "ip" disables client IP preservation by
+                        # default (unlike "instance" targets). Without this, APISIX
+                        # only ever sees the NLB's own address as $remote_addr, which
+                        # breaks the "real-ip" plugin's trustedAddresses check (it can
+                        # never match a Fastly IP) and any per-client-IP logic
+                        # downstream (upstream chash/hashOn=remote_addr, rate
+                        # limiting, etc).
+                        "service.beta.kubernetes.io/aws-load-balancer-target-group-attributes": "preserve_client_ip.enabled=true",
                         "service.beta.kubernetes.io/aws-load-balancer-subnets": target_vpc.apply(
                             lambda tvpc: ",".join(tvpc["k8s_public_subnet_ids"])
                         ),

@@ -39,6 +39,8 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    OLApisixUpstream,
+    OLApisixUpstreamConfig,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -1685,8 +1687,33 @@ def create_k8s_resources(  # noqa: C901
                 paths=["/*"],
                 backend_service_name=cms_webapp_deployment_name,
                 backend_service_port="http",
+                # "endpoint" makes APISIX load-balance across cms-edxapp-app
+                # pod IPs directly (paired with the chash ApisixUpstream
+                # below), instead of the default "service" granularity which
+                # would hand load-balancing off to a single ClusterIP node
+                # and make per-client hashing impossible.
+                backend_resolve_granularity="endpoint",
             ),
         ],
+    )
+
+    # Studio's chunked course-import upload endpoint tracks each chunk's
+    # progress via the on-disk file size at a path keyed by course id, which
+    # isn't safe to read/write from multiple pods concurrently. Consistent-
+    # hash on the (APISIX-resolved, real) client IP so every chunk of one
+    # upload lands on the same cms-edxapp-app pod, regardless of which of
+    # the 3-5 APISIX gateway replicas or which CMS pod a given HTTP request
+    # would otherwise round-robin to.
+    cms_apisix_upstream = OLApisixUpstream(
+        name=f"ol-{stack_info.env_prefix}-edxapp-cms-apisix-upstream-{stack_info.env_suffix}",
+        upstream_config=OLApisixUpstreamConfig(
+            service_name=cms_webapp_deployment_name,
+            k8s_namespace=namespace,
+            k8s_labels=k8s_global_labels,
+            loadbalancer_type="chash",
+            hash_on="vars",
+            hash_key="remote_addr",
+        ),
     )
 
     # VPA objects.
