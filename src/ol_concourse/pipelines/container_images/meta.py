@@ -74,6 +74,10 @@ PIPELINE_CONFIGS: list[tuple[str, str]] = [
         "ocw-course-publisher-image",
         "src/ol_concourse/pipelines/container_images/ocw_course_publisher.py",
     ),
+    (
+        "apisix-waf-docker",
+        "src/ol_concourse/pipelines/container_images/apisix_waf.py",
+    ),
 ]
 
 

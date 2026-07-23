@@ -332,7 +332,12 @@ def setup_apisix(
                         if apisix_custom_image_tag
                         else {}
                     ),
-                    "pullPolicy": "IfNotPresent",
+                    # A custom image is expected to track a moving tag (e.g.
+                    # "latest"), so always re-check the registry; the stock
+                    # image is already digest-cached via cached_image_uri.
+                    "pullPolicy": (
+                        "Always" if apisix_custom_image_repository else "IfNotPresent"
+                    ),
                 },
                 # --- Wasm plugins (opt-in, see apisix_wasm_plugins above) ---
                 **(
