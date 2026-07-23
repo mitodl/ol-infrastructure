@@ -222,6 +222,14 @@ def setup_traefik(
                         "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
                         "service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
                         "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled": "true",
+                        # NLB target-type "ip" disables client IP preservation by
+                        # default (unlike "instance" targets). Without this,
+                        # Traefik only ever sees the NLB's own address as the
+                        # peer IP -- breaking ForwardedHeaders/real client IP
+                        # visibility for anything routed through this gateway.
+                        # See src/ol_infrastructure/infrastructure/aws/eks/apisix_official.py
+                        # for the same fix applied to the APISIX gateway NLB.
+                        "service.beta.kubernetes.io/aws-load-balancer-target-group-attributes": "preserve_client_ip.enabled=true",
                         "service.beta.kubernetes.io/aws-load-balancer-subnets": target_vpc.apply(
                             lambda tvpc: ",".join(tvpc["k8s_public_subnet_ids"])
                         ),
