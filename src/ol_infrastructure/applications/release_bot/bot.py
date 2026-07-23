@@ -346,8 +346,11 @@ async def _notify_ready_to_promote(app, repos) -> None:
 
 
 async def _poll_ready_to_promote_loop(app, repos) -> None:
+    # Check-then-sleep, not sleep-then-check: a release can already be fully
+    # checked and waiting at the moment the bot starts (e.g. after a
+    # deploy/restart), and sleeping first would delay that notification by up
+    # to _READY_TO_PROMOTE_POLL_SECONDS for no reason.
     while True:
-        await asyncio.sleep(_READY_TO_PROMOTE_POLL_SECONDS)
         try:
             await _notify_ready_to_promote(app, repos)
         except Exception:
@@ -355,6 +358,7 @@ async def _poll_ready_to_promote_loop(app, repos) -> None:
             # background task permanently and silently -- the feature stops
             # working with no log until someone notices and restarts the pod.
             log.exception("ready-to-promote poll iteration failed")
+        await asyncio.sleep(_READY_TO_PROMOTE_POLL_SECONDS)
 
 
 async def main():
