@@ -33,7 +33,6 @@ can always be dragged aside if it does overlap, while a cover-crop cannot.
 
 import textwrap
 from dataclasses import dataclass
-from typing import Literal
 
 # 16:9 reads much closer to a typical viewport than a short, wide banner, which
 # keeps the "cover" scale-up factor (and thus the risk of content running off
@@ -48,24 +47,25 @@ _AVG_CHAR_WIDTH_RATIO = 0.55
 # Cap the text block to this fraction of canvas width by default, centered,
 # so there's margin on both sides before a "cover" crop reaches it.
 _DEFAULT_TEXT_WIDTH_FRACTION = 0.6
-# Minimum top/bottom margin for a top/bottom-anchored text block, as a
-# fraction of canvas height (takes precedence over `padding` when larger).
+# Minimum top/bottom margin the text block's vertical range is confined
+# within, as a fraction of canvas height (takes precedence over `padding`
+# when larger).
 _DEFAULT_VERTICAL_MARGIN_FRACTION = 0.12
-
-Anchor = Literal["top", "center", "bottom"]
 
 
 @dataclass(frozen=True)
 class DescriptionStyle:
     """Sizing/scaling/contrast/positioning knobs for :func:`render_description_svg`.
 
-    ``anchor`` controls where the text block sits vertically (default
-    ``"center"`` — the only position safe against Concourse's
-    ``background-size: cover`` crop on an arbitrary viewport; see module
-    docstring). ``"top"``/``"bottom"`` are available to trade that safety
-    for a chance at clearing the job graph, which Concourse draws from the
-    top-left, but only make sense if you know your viewers' viewport shape
-    is close to ``width``/``height``'s aspect ratio.
+    ``vertical_position`` places the text block on a continuous 0.0 (top of
+    the safe zone) to 1.0 (bottom of the safe zone) scale; 0.5 (default) is
+    dead center — the only position safe against Concourse's
+    ``background-size: cover`` crop on an arbitrary viewport (see module
+    docstring). Moving away from 0.5 trades some of that crop-safety for a
+    chance at clearing the job graph, which Concourse draws from the
+    top-left; nudge it a little (e.g. 0.65) rather than going all the way to
+    an edge (0.0/1.0), and only if you have a sense of your viewers' typical
+    viewport shape relative to ``width``/``height``'s aspect ratio.
 
     ``outline_color``/``outline_width`` add a stroke around the text itself
     for contrast against a busy graph; ``panel_opacity``/``panel_color`` (0
@@ -89,7 +89,7 @@ class DescriptionStyle:
     height: int = _DEFAULT_HEIGHT
     font_size: int = _DEFAULT_FONT_SIZE
     padding: int = _DEFAULT_PADDING
-    anchor: Anchor = "center"
+    vertical_position: float = 0.5
     wrap_chars: int | None = None
     text_width_fraction: float = _DEFAULT_TEXT_WIDTH_FRACTION
     vertical_margin_fraction: float = _DEFAULT_VERTICAL_MARGIN_FRACTION
@@ -117,13 +117,9 @@ def render_description_svg(text: str, style: DescriptionStyle | None = None) -> 
     lines = textwrap.wrap(text, width=wrap_chars)
     block_height = len(lines) * line_height
     vertical_margin = max(style.padding, style.height * style.vertical_margin_fraction)
-
-    if style.anchor == "top":
-        first_line_y = vertical_margin + style.font_size
-    elif style.anchor == "bottom":
-        first_line_y = style.height - vertical_margin - block_height + style.font_size
-    else:
-        first_line_y = (style.height - block_height) / 2 + style.font_size
+    top_safe_y = vertical_margin + style.font_size
+    bottom_safe_y = style.height - vertical_margin - block_height + style.font_size
+    first_line_y = top_safe_y + style.vertical_position * (bottom_safe_y - top_safe_y)
 
     text_attrs = f'fill="{style.text_color}"'
     if style.outline_color:

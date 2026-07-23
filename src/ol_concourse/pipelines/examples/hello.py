@@ -62,7 +62,10 @@ if __name__ == "__main__":
     write_description_svg(
         DESCRIPTION,
         str(Path(__file__).parent / "description.svg"),
-        DescriptionStyle(panel_opacity=0.45),  # anchor="center" default
+        # vertical_position=0.5 (dead center) is the crop-safe default; nudged
+        # here to dodge this pipeline's own job graph on typical viewports,
+        # trading a little of that safety margin away (see description_svg.py).
+        DescriptionStyle(panel_opacity=0.45, vertical_position=0.65),
     )
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(hello_pipeline().model_dump_json(indent=2))
