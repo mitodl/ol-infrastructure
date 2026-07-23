@@ -96,7 +96,46 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
     alerting.NotificationPolicy(
         "grafana-notification-policy",
         contact_point="oblivion",
-        group_bies=["alertname", "environment"],
+        # Grouping by alertname (+ environment, which only log_rules-based
+        # alerts carry -- metric_rules ones use `cluster` instead) bundles
+        # every resource a rule can match into one notification thread. Most
+        # rules here match many independent resources at once (any pod, any
+        # HPA, any node, any deployment, ... cluster-wide, sometimes across
+        # multiple real clusters via regex), so one resource changing state
+        # resends the whole bundle and sweeps in every other still-firing
+        # resource under the same rule, even though nothing about them
+        # changed (observed 2026-07-23: an apisix HPA alert firing
+        # continuously since the day before kept reappearing in
+        # notifications purely because an unrelated HPA in another
+        # namespace kept flapping). Adding every resource-identifying label
+        # used across metric_rules and log_rules gives each distinct
+        # resource its own notification thread, only re-notified when that
+        # specific resource's own state changes. A label absent from a given
+        # alert (e.g. `pod` on an HPA alert) is harmless -- Alertmanager
+        # treats it as empty for grouping, so each rule naturally groups
+        # down to whichever of these labels it actually carries.
+        #
+        # Trade-off: this also splits apart genuinely-correlated alerts that
+        # used to bundle by coincidence (e.g. several unrelated pods
+        # OOMKilled by the same root cause at the same instant no longer
+        # arrive as one grouped message) -- accepted in exchange for no
+        # longer bundling truly-unrelated resources together.
+        group_bies=[
+            "alertname",
+            "environment",
+            "cluster",
+            "namespace",
+            "application",
+            "pod",
+            "container",
+            "deployment",
+            "statefulset",
+            "daemonset",
+            "horizontalpodautoscaler",
+            "node",
+            "job_name",
+            "instance",
+        ],
         # "1m", not "60s" — Grafana normalizes durations to the largest unit and
         # a mismatched spelling shows as a perpetual diff on every preview.
         group_wait="1m",
