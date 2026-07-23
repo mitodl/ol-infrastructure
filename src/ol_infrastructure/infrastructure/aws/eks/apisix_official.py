@@ -32,6 +32,7 @@ from ol_infrastructure.infrastructure.aws.eks.apisix_definition import (
 )
 from ol_infrastructure.lib.aws.eks_helper import (
     cached_image_uri,
+    ecr_image_uri,
 )
 from ol_infrastructure.lib.k8s_crds import adopt_helm_chart_crds
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -97,6 +98,18 @@ def setup_apisix(
     """
     apisix_domains = eks_config.get_object("apisix_domains") or []
 
+    # Opt-in, per-cluster: point at a custom-built APISIX image (e.g. the
+    # apisix-waf spike image at dockerfiles/apisix-waf/, published by
+    # src/ol_concourse/pipelines/container_images/apisix_waf.py) instead of
+    # the stock apache/apisix image, and/or register wasm plugins against it.
+    # Defaults to today's behavior (stock image, no wasm) on every cluster
+    # unless a stack explicitly sets these.
+    apisix_custom_image_repository = eks_config.get("apisix_custom_image_repository")
+    apisix_custom_image_tag = eks_config.get("apisix_custom_image_tag")
+    # e.g. [{"name": "coraza-filter", "priority": 7999,
+    #        "file": "/usr/local/apisix/coraza-filter.wasm"}]
+    apisix_wasm_plugins = eks_config.get_object("apisix_wasm_plugins") or []
+
     # APISIX chart uses a different chart version scheme
     # Chart version 2.17.x contains APISIX 3.18.x
     apisix_chart_version = versions["APISIX_CHART"]
@@ -150,7 +163,13 @@ def setup_apisix(
             ),
         ),
         ingress_controller_replicas=3,
-        image_repository=cached_image_uri("apache/apisix"),
+        image_repository=(
+            ecr_image_uri(apisix_custom_image_repository)
+            if apisix_custom_image_repository
+            else cached_image_uri("apache/apisix")
+        ),
+        image_tag=apisix_custom_image_tag,
+        wasm_plugins=apisix_wasm_plugins,
         tolerations=operations_tolerations,
         labels=k8s_global_labels,
         trusted_addresses=fastly_ips,

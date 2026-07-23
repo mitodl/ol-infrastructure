@@ -283,6 +283,12 @@ class ApisixGatewayConfig(BaseModel):
     memory_limit: str | None = None
     # Unset uses the chart's own image.
     image_repository: str | None = None
+    # Unset uses the chart's appVersion tag.
+    image_tag: str | None = None
+    # proxy-wasm plugins to register, e.g. [{"name": "coraza-filter",
+    # "priority": 7999, "file": "/usr/local/apisix/coraza-filter.wasm"}]. The
+    # files have to exist in the image; the stock apache/apisix image has none.
+    wasm_plugins: list[dict[str, Any]] = []
     tolerations: list[dict[str, str]] = []
     # Labels for the objects the chart creates. When set, they also replace
     # the chart's selector labels, which is immutable on the Deployment: an
@@ -781,10 +787,20 @@ def apisix_helm_values(config: ApisixGatewayConfig) -> dict[str, Any]:
             {
                 "image": {
                     "repository": config.image_repository,
+                    **(
+                        {"tag": config.image_tag}
+                        if config.image_tag is not None
+                        else {}
+                    ),
                     "pullPolicy": "IfNotPresent",
                 }
             }
             if config.image_repository is not None
+            else {}
+        ),
+        **(
+            {"wasm": {"enabled": True, "plugins": config.wasm_plugins}}
+            if config.wasm_plugins
             else {}
         ),
         **(
