@@ -29,11 +29,24 @@ def get_monitoring_sns_arn(level: Literal["warning", "critical"]) -> Output[str]
     # been applied with the notification_sns_topics export (added alongside
     # the legacy opsgenie_sns_topics one -- see monitoring/__main__.py).
     # get_output returns None for a missing key instead of raising, for both
-    # exports, so this never hard-fails a downstream deploy regardless of
-    # which side gets applied first; it just prefers the new export once
-    # that stack's redeploy makes it visible.
+    # exports, so a stack picking up this code before the monitoring stack's
+    # own redeploy still resolves via the legacy export rather than hard
+    # failing. If the monitoring stack has neither export -- which shouldn't
+    # happen today (the legacy export is already live), but would if a
+    # future change ever dropped it before this one -- raise a clear error
+    # instead of a bare TypeError from indexing into None.
     new_topics = monitoring_stack.get_output("notification_sns_topics")
     legacy_topics = monitoring_stack.get_output("opsgenie_sns_topics")
-    return Output.all(new_topics, legacy_topics).apply(
-        lambda topics: (topics[0] or topics[1])[f"{level}_sns_topic_arn"]
-    )
+
+    def _resolve_topic_arn(topics: list[dict[str, str] | None]) -> str:
+        resolved = topics[0] or topics[1]
+        if resolved is None:
+            msg = (
+                "Neither the notification_sns_topics nor the legacy "
+                "opsgenie_sns_topics export was found on the monitoring "
+                "stack -- has it been deployed at least once?"
+            )
+            raise ValueError(msg)
+        return resolved[f"{level}_sns_topic_arn"]
+
+    return Output.all(new_topics, legacy_topics).apply(_resolve_topic_arn)
