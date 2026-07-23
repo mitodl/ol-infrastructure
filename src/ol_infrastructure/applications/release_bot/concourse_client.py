@@ -70,3 +70,24 @@ async def trigger_job(pipeline: str, job: str) -> str:
         build = await resp.json()
 
     return f"{CONCOURSE_URL}/builds/{build['id']}"
+
+
+async def check_resource(pipeline: str, resource: str) -> None:
+    """Trigger an immediate check of a resource instead of waiting for its interval.
+
+    Used after closing a release issue so the production `-release-gate`
+    resource picks up the closed issue right away, rather than leaving the
+    production deploy stalled for up to its normal check_every interval.
+    """
+    token = await _get_token()
+    url = (
+        f"{CONCOURSE_URL}/api/v1/teams/{CONCOURSE_TEAM}"
+        f"/pipelines/{pipeline}/resources/{resource}/check"
+    )
+    async with (
+        aiohttp.ClientSession() as session,
+        session.post(
+            url, headers={"Authorization": f"Bearer {token}"}, json={}
+        ) as resp,
+    ):
+        resp.raise_for_status()

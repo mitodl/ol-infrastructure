@@ -56,6 +56,12 @@ github_token = concourse_ops_secrets["pipelines"]["infrastructure/github"][
 
 bot_config = Config("release_bot")
 concourse_url = bot_config.get("concourse_url") or "https://cicd.odl.mit.edu"
+# Fallback Slack channel for "ready to promote" notifications when an app
+# doesn't set its own `channel` in repos_config (e.g. ol-analytics-api,
+# which has no dedicated product channel yet).
+release_announce_channel = (
+    bot_config.get("release_announce_channel") or "product-infrastructure"
+)
 
 # Derived from bridge.settings.apps -- the shared app registry also used by
 # the Concourse pipeline generator (k8s_apps/pipeline.py) -- so an app's repo,
@@ -177,6 +183,16 @@ bot_deployment = kubernetes.apps.v1.Deployment(
                             kubernetes.core.v1.EnvVarArgs(
                                 name="REPOS_CONFIG",
                                 value=REPOS_CONFIG,
+                            ),
+                            *(
+                                [
+                                    kubernetes.core.v1.EnvVarArgs(
+                                        name="RELEASE_ANNOUNCE_CHANNEL",
+                                        value=release_announce_channel,
+                                    )
+                                ]
+                                if release_announce_channel
+                                else []
                             ),
                         ],
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(
