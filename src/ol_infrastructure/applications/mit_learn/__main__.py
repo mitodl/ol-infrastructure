@@ -1216,7 +1216,6 @@ env_vars = {
     "EMBEDDINGS_EXTERNAL_FETCH_USE_WEBDRIVER": True,
     "EMBEDDING_SCHEDULE_MINUTES": 120,
     "LITELLM_TOKEN_ENCODING_NAME": "cl100k_base",
-    "MICROMASTERS_CATALOG_API_URL": "https://micromasters.mit.edu/api/v0/catalog/",
     "MICROMASTERS_CMS_API_URL": "https://micromasters.mit.edu/api/v0/wagtail/",
     "MITOL_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
     "MITOL_AXIOS_BASE_PATH": f"https://{mitlearn_config.get('frontend_domain')}",
