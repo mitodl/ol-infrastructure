@@ -5,7 +5,7 @@
 # modes (a Docker hiccup at `tilt up` disables it for the whole session, and
 # every per-image skip is Debug-level only), and it can never reach the k3d
 # registry (tilt-dev/tilt#2102) or the k3s nodes' containerd stores
-# (tilt-dev/tilt#4228). Left alone, those stores grow by ~36GB per app
+# (tilt-dev/tilt#4228). Left alone, those stores grow by several GB per app
 # rebuild until kubelet taints every node with disk-pressure and nothing
 # schedules.
 #
