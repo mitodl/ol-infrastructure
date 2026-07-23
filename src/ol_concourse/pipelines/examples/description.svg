@@ -1,7 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="800" height="200" viewBox="0 0 800 200">
-  <text x="50%" y="40" text-anchor="middle" font-family="sans-serif" font-size="22" fill="white">
-    <tspan x="50%" dy="0">Prototype pipeline for validating per-pipeline</tspan>
-    <tspan x="50%" dy="30">description text via display.background_image.</tspan>
-    <tspan x="50%" dy="30">Not part of any real deployment.</tspan>
+  <rect x="0" y="82.0" width="800" height="118.0" fill="black" fill-opacity="0.45" />
+  <text x="50%" y="112.0" text-anchor="middle" font-family="sans-serif" font-size="22" fill="white" stroke="black" stroke-width="3" paint-order="stroke">
+    <tspan x="50%" dy="0">Prototype pipeline for validating per-pipeline description</tspan>
+    <tspan x="50%" dy="30">text via display.background_image. Not part of any real</tspan>
+    <tspan x="50%" dy="30">deployment.</tspan>
   </text>
 </svg>

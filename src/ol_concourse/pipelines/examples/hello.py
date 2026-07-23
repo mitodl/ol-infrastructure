@@ -12,7 +12,10 @@ from ol_concourse.lib.models.pipeline import (
     TaskStep,
 )
 
-from ol_concourse.pipelines.description_svg import write_description_svg
+from ol_concourse.pipelines.description_svg import (
+    DescriptionStyle,
+    write_description_svg,
+)
 
 # Raw-GitHub-hosted SVG rendering of DESCRIPTION, committed as description.svg
 # alongside this file, used as the pipeline's dashboard background image
@@ -56,7 +59,11 @@ if __name__ == "__main__":
     import sys
     from pathlib import Path
 
-    write_description_svg(DESCRIPTION, str(Path(__file__).parent / "description.svg"))
+    write_description_svg(
+        DESCRIPTION,
+        str(Path(__file__).parent / "description.svg"),
+        DescriptionStyle(anchor="bottom", panel_opacity=0.45),
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(hello_pipeline().model_dump_json(indent=2))
     sys.stdout.write(hello_pipeline().model_dump_json(indent=2))
