@@ -431,6 +431,24 @@ ol_analytics_api_k8s = OLApplicationK8s(
 ########################################################################
 ol_analytics_api_domain = ol_analytics_api_config.require("domain")
 
+# Additional host(s) that also route to this service beyond the canonical
+# `domain`: the MIT Learn frontend consumes it under a Learn-scoped host
+# (`analytics.learn.mit.edu`) alongside the canonical `analytics.ol.mit.edu`.
+# Each host gets its own APISIX route (same backend + OIDC plugin) rather than
+# being folded into one route's host list, so HOST-based tenant routing or
+# host-specific plugins can be layered on later without restructuring; all
+# hosts share a single SAN certificate. A learn.mit.edu host only provisions
+# once `learn.mit.edu` is in the data cluster's `allowed_dns_zones` -- both the
+# external-dns domainFilter and the cert-manager DNS-01 solver selector read
+# that list (see infrastructure/aws/eks and substructure/aws/eks).
+ol_analytics_api_learn_domain = ol_analytics_api_config.get("learn_domain")
+ol_analytics_api_routes = [("ol-analytics-api", ol_analytics_api_domain)]
+if ol_analytics_api_learn_domain:
+    ol_analytics_api_routes.append(
+        ("ol-analytics-api-learn", ol_analytics_api_learn_domain)
+    )
+ol_analytics_api_hosts = [host for _, host in ol_analytics_api_routes]
+
 # Shared plugins (redirect http->https, cors, prometheus, opentelemetry, ...).
 ol_analytics_api_shared_plugins = OLApisixSharedPlugins(
     f"ol-analytics-api-{stack_info.env_suffix}-ol-shared-plugins",
@@ -477,7 +495,7 @@ ol_analytics_api_cert = OLCertManagerCert(
         k8s_labels=k8s_global_labels,
         create_apisixtls_resource=True,
         dest_secret_name="ol-analytics-api-tls",  # noqa: S106  # pragma: allowlist secret
-        dns_names=[ol_analytics_api_domain],
+        dns_names=ol_analytics_api_hosts,
     ),
 )
 
@@ -491,7 +509,7 @@ ol_analytics_api_route = OLApisixRoute(
     k8s_labels=k8s_global_labels,
     route_configs=[
         OLApisixRouteConfig(
-            route_name="ol-analytics-api",
+            route_name=route_name,
             priority=10,
             shared_plugin_config_name=ol_analytics_api_shared_plugins.resource_name,
             plugins=[
@@ -501,12 +519,13 @@ ol_analytics_api_route = OLApisixRoute(
                     )
                 ),
             ],
-            hosts=[ol_analytics_api_domain],
+            hosts=[host],
             paths=["/*"],
             backend_service_name=ol_analytics_api_k8s.application_lb_service_name,
             backend_service_port=ol_analytics_api_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",
-        ),
+        )
+        for route_name, host in ol_analytics_api_routes
     ],
     opts=ResourceOptions(
         delete_before_replace=True,
