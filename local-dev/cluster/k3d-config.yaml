@@ -42,6 +42,22 @@ options:
     - arg: --disable=traefik
       nodeFilters:
       - server:*
+    # Each node's containerd image store caches every image it ever pulls and
+    # nothing else cleans it up (Tilt can't reach it; see disk-janitor.sh).
+    # kubelet's own image GC does, but its default thresholds (85%/80%) are
+    # percentages of the node filesystem — which under OrbStack/Docker Desktop
+    # is the entire host disk — so by default it only acts at nearly the same
+    # fullness that triggers the disk-pressure eviction taint. Lower the
+    # thresholds so node image caches are reclaimed long before that.
+    # Applies on cluster (re)create: teardown.sh + setup.sh.
+    - arg: --kubelet-arg=image-gc-high-threshold=75
+      nodeFilters:
+      - server:*
+      - agent:*
+    - arg: --kubelet-arg=image-gc-low-threshold=70
+      nodeFilters:
+      - server:*
+      - agent:*
 
 kubeAPI:
   hostIP: "0.0.0.0"
