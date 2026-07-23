@@ -15,6 +15,7 @@ from pulumi import Config, InvokeOptions, Output, ResourceOptions
 from bridge.lib.magic_numbers import AWS_LOAD_BALANCER_NAME_MAX_LENGTH
 from ol_infrastructure.lib.aws.eks_helper import (
     cached_image_uri,
+    ecr_image_uri,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import StackInfo
@@ -211,6 +212,18 @@ def setup_apisix(
     """
     apisix_domains = eks_config.get_object("apisix_domains") or []
 
+    # Opt-in, per-cluster: point at a custom-built APISIX image (e.g. the
+    # apisix-waf spike image at dockerfiles/apisix-waf/, published by
+    # src/ol_concourse/pipelines/container_images/apisix_waf.py) instead of
+    # the stock apache/apisix image, and/or register wasm plugins against it.
+    # Defaults to today's behavior (stock image, no wasm) on every cluster
+    # unless a stack explicitly sets these.
+    apisix_custom_image_repository = eks_config.get("apisix_custom_image_repository")
+    apisix_custom_image_tag = eks_config.get("apisix_custom_image_tag")
+    # e.g. [{"name": "coraza-filter", "priority": 7999,
+    #        "file": "/usr/local/apisix/coraza-filter.wasm"}]
+    apisix_wasm_plugins = eks_config.get_object("apisix_wasm_plugins") or []
+
     session_cookie_name = f"{stack_info.env_suffix}_gateway_session".removeprefix(
         "production"
     ).strip("_")
@@ -309,9 +322,24 @@ def setup_apisix(
             values={
                 # --- Global/Image Configuration ---
                 "image": {
-                    "repository": cached_image_uri("apache/apisix"),
+                    "repository": (
+                        ecr_image_uri(apisix_custom_image_repository)
+                        if apisix_custom_image_repository
+                        else cached_image_uri("apache/apisix")
+                    ),
+                    **(
+                        {"tag": apisix_custom_image_tag}
+                        if apisix_custom_image_tag
+                        else {}
+                    ),
                     "pullPolicy": "IfNotPresent",
                 },
+                # --- Wasm plugins (opt-in, see apisix_wasm_plugins above) ---
+                **(
+                    {"wasm": {"enabled": True, "plugins": apisix_wasm_plugins}}
+                    if apisix_wasm_plugins
+                    else {}
+                ),
                 # --- Autoscaling ---
                 "autoscaling": {
                     "enabled": True,
