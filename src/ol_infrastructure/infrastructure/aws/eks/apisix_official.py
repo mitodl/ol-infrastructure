@@ -231,6 +231,14 @@ def setup_apisix(
             "chart's default appVersion tag, so an untagged pull would fail."
         )
         raise ValueError(msg)
+    if apisix_custom_image_tag and not apisix_custom_image_repository:
+        msg = (
+            "apisix_custom_image_repository must be set when "
+            "apisix_custom_image_tag is set -- otherwise the tag is silently "
+            "applied to the stock apache/apisix image instead of the intended "
+            "custom image."
+        )
+        raise ValueError(msg)
     if apisix_wasm_plugins and not apisix_custom_image_repository:
         msg = (
             "apisix_wasm_plugins requires apisix_custom_image_repository -- "
