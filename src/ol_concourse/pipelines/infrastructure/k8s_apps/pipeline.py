@@ -870,6 +870,11 @@ def _define_release_resources(
         labels=["release"],
         access_token="((github.release_resource_access_token))",  # noqa: S106
         gh_host=None,
+        # A retriggered QA deploy with no new app commit re-runs this put
+        # with the same checklist; editing in place (instead of the default
+        # comment-per-hit behavior) avoids reopening the issue with a fresh,
+        # all-unchecked checklist for a release that hasn't actually changed.
+        update_in_place=True,
     )
     deployment_rc = github_deployment(
         name=Identifier(f"{app_name}-deployment-rc"),
@@ -1238,11 +1243,17 @@ def _build_release_resource_app_pipeline(
     # Build per-stack additional_post_steps and custom_dependencies for QA+Production
     qa_post_steps: list[GetStep | PutStep | TaskStep] = [
         # Open a GitHub Release Issue with the checklist from the release resource.
+        # title_template embeds the release version (via the image_tag var
+        # loaded from release_res earlier in this job's plan) so each release
+        # gets its own distinct issue title instead of every version
+        # colliding on "Release {app_name}" -- Concourse resolves
+        # ((.:image_tag)) to a plain string before the resource ever sees it.
         PutStep(
             put=release_issue.name,
             params={
                 "body_file": f"{release_res.name}/checklist.md",
                 "labels": ["release"],
+                "title_template": f"Release {app_name} ((.:image_tag))",
             },
         ),
         # Mark the RC GitHub Deployment as successful.
