@@ -831,6 +831,11 @@ learn_ai_app_k8s = OLApplicationK8s(
             interface="asgi",
             workers=1,
             runtime_mode=None,
+            # Holding pin: the component default dropped to 1. asgi forces
+            # blocking_threads=1 regardless, so this is the only axis on which the
+            # overhaul touches learn_ai until its review task.
+            # See docs/plans/granian-configuration-overhaul.md
+            runtime_threads=2,
             no_ws=False,
             backlog=None,
             log_level="debug",

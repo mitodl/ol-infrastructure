@@ -35,6 +35,13 @@ DEFAULT_POSTGRES_PORT = 5432
 DEFAULT_REDIS_PORT = 6379
 DEFAULT_RSA_KEY_SIZE = 2048
 DEFAULT_WSGI_PORT = 8073  # Arbitrary
+# Size of the Granian blocking-thread pool for WSGI apps. These threads all contend
+# for the GIL, so this tracks the container's CPU allocation (100m-500m requested for
+# our webapps), not the request rate.
+DEFAULT_WSGI_BLOCKING_THREADS = 8
+# Multiplier applied to blocking_threads to derive Granian's --backpressure for WSGI
+# apps: enough in-flight requests to keep every thread busy plus one queued each.
+DEFAULT_WSGI_BACKPRESSURE_MULTIPLIER = 2
 EIGHT_HOURS_SECONDS = 28800
 FIVE_MINUTES = 60 * 5
 FORUM_SERVICE_PORT = 4567

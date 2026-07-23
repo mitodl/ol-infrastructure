@@ -858,7 +858,17 @@ micromasters_k8s_app = OLApplicationK8s(
         **docker_image_config_kwargs("MICROMASTERS"),
         granian_config=GranianConfig(
             application_module="micromasters.wsgi:application",
+            # Holding pins: preserve the pre-overhaul effective concurrency until
+            # this app's stage of the rollout. Granian derived backpressure=64
+            # (backlog=128 // workers=2) and blocking_threads=64 // 2 = 32.
+            # Delete all five to adopt the component defaults (1 worker, 8
+            # blocking threads, 16 backpressure).
+            # See docs/plans/granian-configuration-overhaul.md
             workers=2,
+            runtime_mode="mt",
+            runtime_threads=2,
+            blocking_threads=32,
+            backpressure=64,
             blocking_threads_idle_timeout=120,
             enable_metrics=True,
         ),

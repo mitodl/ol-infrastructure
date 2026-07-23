@@ -1523,6 +1523,11 @@ mitlearn_k8s_app = OLApplicationK8s(
             log_level=mitlearn_config.get("granian_log_level") or "info",
             application_module="main.asgi:application",
             runtime_mode=None,
+            # Holding pin: the component default dropped to 1. asginl forces
+            # blocking_threads=1 regardless, so this is the only axis on which the
+            # overhaul touches mit_learn until its review task.
+            # See docs/plans/granian-configuration-overhaul.md
+            runtime_threads=2,
         )
         if mitlearn_config.get_bool("use_granian")
         else None,
