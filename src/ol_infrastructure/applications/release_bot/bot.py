@@ -300,26 +300,61 @@ async def _notify_ready_to_promote(app, repos) -> None:
                 continue
             if not github.is_fully_checked(issue["body"]):
                 continue
-            version = github.extract_version(issue["body"]) or issue["title"]
+            version = github.extract_version(issue["body"])
+            if not version:
+                # The promote button's value is "{app_name}:{version}", and
+                # _handle_promote_button matches it back to an issue via
+                # extract_version(issue["body"]). Falling back to the title
+                # here (which never contains a version -- it's always just
+                # "Release {app_name}") would produce a button that can never
+                # find its issue. Skip rather than send a broken button.
+                log.warning(
+                    "Release issue #%s for %s has no version header; skipping"
+                    " ready-to-promote notification",
+                    issue["number"],
+                    app_name,
+                )
+                continue
             try:
                 await app.client.chat_postMessage(
                     channel=channel,
                     text=f"✅ `{app_name}` {version} is ready to promote.",
                     blocks=_ready_to_promote_blocks(app_name, version, issue["url"]),
                 )
+            except Exception:
+                log.exception(
+                    "Failed to send ready-to-promote notification for %s", app_name
+                )
+                continue
+            try:
                 await github.add_issue_label(
                     cfg.repo, issue["number"], github.PROMOTE_READY_LABEL
                 )
             except Exception:
+                # The notification already went out -- only the "don't repeat
+                # this" bookkeeping failed. Log distinctly from a notify
+                # failure so the two aren't conflated; worst case this issue
+                # gets re-notified next poll cycle, which is a minor nuisance
+                # next to silently never notifying at all.
                 log.exception(
-                    "Failed to send ready-to-promote notification for %s", app_name
+                    "Sent ready-to-promote notification for %s but failed to"
+                    " apply %s label; issue #%s may be re-notified next poll",
+                    app_name,
+                    github.PROMOTE_READY_LABEL,
+                    issue["number"],
                 )
 
 
 async def _poll_ready_to_promote_loop(app, repos) -> None:
     while True:
         await asyncio.sleep(_READY_TO_PROMOTE_POLL_SECONDS)
-        await _notify_ready_to_promote(app, repos)
+        try:
+            await _notify_ready_to_promote(app, repos)
+        except Exception:
+            # Without this, any unexpected exception here kills the
+            # background task permanently and silently -- the feature stops
+            # working with no log until someone notices and restarts the pod.
+            log.exception("ready-to-promote poll iteration failed")
 
 
 async def main():

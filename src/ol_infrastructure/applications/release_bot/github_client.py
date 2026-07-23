@@ -9,7 +9,7 @@ import aiohttp
 GITHUB_API = "https://api.github.com"
 
 _RELEASE_TAG_RE = re.compile(r"^\d{4}\.\d{2}\.\d{2}\.\d+$")
-_CHECKLIST_LINE_RE = re.compile(r"^- \[( |x)\]")
+_CHECKLIST_LINE_RE = re.compile(r"^- \[( |x)\]", re.IGNORECASE)
 # Matches the "## Release <version>" header the release resource's
 # _build_checklist() writes at the top of the issue body. The issue *title*
 # is always just "Release {app_name}" with no version -- the version only
@@ -134,7 +134,7 @@ def checklist_status(body: str) -> tuple[int, int]:
         match = _CHECKLIST_LINE_RE.match(line)
         if match:
             total += 1
-            if match.group(1) == "x":
+            if match.group(1).lower() == "x":
                 checked += 1
     return checked, total
 

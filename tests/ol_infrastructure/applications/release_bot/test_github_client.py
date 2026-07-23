@@ -19,6 +19,11 @@ FULLY_CHECKED_BODY = CHECKLIST_BODY.replace(
     "- [x] `abc1234` chore: bump version by bot@example.com",
 )
 
+UPPERCASE_CHECKED_BODY = CHECKLIST_BODY.replace(
+    "- [ ] `abc1234` chore: bump version by bot@example.com",
+    "- [X] `abc1234` chore: bump version by bot@example.com",
+)
+
 NO_CHECKLIST_BODY = "Just some notes, no checklist here."
 
 
@@ -42,6 +47,14 @@ def test_is_fully_checked_false_when_any_line_unchecked():
 def test_is_fully_checked_true_when_all_lines_checked():
     """Fully checked once every checklist line is checked."""
     assert github.is_fully_checked(FULLY_CHECKED_BODY) is True
+
+
+def test_checklist_status_counts_uppercase_x_as_checked():
+    """GitHub treats "[X]" (uppercase) the same as "[x]" -- so must we."""
+    checked, total = github.checklist_status(UPPERCASE_CHECKED_BODY)
+    assert checked == 2
+    assert total == 2
+    assert github.is_fully_checked(UPPERCASE_CHECKED_BODY) is True
 
 
 def test_is_fully_checked_false_when_no_checklist_lines():
