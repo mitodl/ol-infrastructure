@@ -39,15 +39,34 @@ class AppRegistration:
 
 
 APPS: dict[str, AppRegistration] = {
-    "learn-ai": AppRegistration(),
-    "micromasters": AppRegistration(repo_main_branch="master"),
-    "mit-learn": AppRegistration(),
-    "mit-learn-nextjs": AppRegistration(github_repo="mitodl/mit-learn"),
-    "mitxonline": AppRegistration(),
-    "ocw-studio": AppRegistration(repo_main_branch="master"),
-    "odl-video-service": AppRegistration(repo_main_branch="master"),
+    "learn-ai": AppRegistration(slack_channel="product-learn-ai"),
+    "micromasters": AppRegistration(
+        repo_main_branch="master", slack_channel="product-micromasters"
+    ),
+    "mit-learn": AppRegistration(slack_channel="product-mit-learn"),
+    # mit-learn-nextjs shares mit-learn's repo *and* Slack channel -- they are
+    # independently versioned pipelines/release issues (different issue_prefix,
+    # different checklists) that both draw from the same commit history, so
+    # the same channel will see two separate "ready to promote" notifications
+    # for a change that touches both frontend and backend. Not reconciled
+    # into a single release flow here; flagging as a known wrinkle.
+    "mit-learn-nextjs": AppRegistration(
+        github_repo="mitodl/mit-learn", slack_channel="product-mit-learn"
+    ),
+    "mitxonline": AppRegistration(slack_channel="product-mitx-online"),
+    "ocw-studio": AppRegistration(
+        repo_main_branch="master", slack_channel="product-ocw"
+    ),
+    "odl-video-service": AppRegistration(
+        repo_main_branch="master", slack_channel="product-ovs"
+    ),
+    # No app-specific channel given -- falls back to RELEASE_ANNOUNCE_CHANNEL.
     "ol-analytics-api": AppRegistration(),
-    "xpro": AppRegistration(github_repo="mitodl/mitxpro", repo_main_branch="master"),
+    "xpro": AppRegistration(
+        github_repo="mitodl/mitxpro",
+        repo_main_branch="master",
+        slack_channel="product-xpro",
+    ),
 }
 
 
