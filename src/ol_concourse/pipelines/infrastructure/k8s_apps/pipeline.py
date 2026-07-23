@@ -42,6 +42,8 @@ from ol_concourse.lib.resources import (
 from ol_concourse.lib.tasks import bump_version_task
 from pydantic import BaseModel, model_validator
 
+from bridge.settings.apps import github_repo as app_github_repo
+from bridge.settings.apps import repo_main_branch as app_repo_main_branch
 from ol_concourse.pipelines.constants import (
     ECR_REGION,
     PULUMI_WATCHED_PATHS,
@@ -174,7 +176,7 @@ pipeline_params = {
     "micromasters": AppPipelineParams(
         app_name="micromasters",
         build_target="production",
-        repo_main_branch="master",
+        repo_main_branch=app_repo_main_branch("micromasters"),
         settings_dir="micromasters",
         version_file="VERSION",
     ),
@@ -184,7 +186,7 @@ pipeline_params = {
         # No build_target: use the default `runner` stage, which bakes `yarn build`
         # into the Docker image via `output: "standalone"` in next.config.js.
         # NEXT_PUBLIC_* values are injected at runtime from Kubernetes env vars.
-        repo_name="mit-learn",
+        repo_name=app_github_repo("mit-learn-nextjs").split("/", 1)[1],
         dockerfile_path="frontends/main/Dockerfile.web",
         purge_fastly_cache=True,
         fastly_domains={
@@ -202,19 +204,19 @@ pipeline_params = {
     ),
     "xpro": AppPipelineParams(
         app_name="xpro",
-        repo_name="mitxpro",
-        repo_main_branch="master",
+        repo_name=app_github_repo("xpro").split("/", 1)[1],
+        repo_main_branch=app_repo_main_branch("xpro"),
         build_target="production",
         settings_dir="mitxpro",
     ),
     "ocw-studio": AppPipelineParams(
         app_name="ocw-studio",
-        repo_main_branch="master",
+        repo_main_branch=app_repo_main_branch("ocw-studio"),
         build_target="production",
     ),
     "odl-video-service": AppPipelineParams(
         app_name="odl-video-service",
-        repo_main_branch="master",
+        repo_main_branch=app_repo_main_branch("odl-video-service"),
         build_target="production",
         settings_dir="odl_video",
     ),

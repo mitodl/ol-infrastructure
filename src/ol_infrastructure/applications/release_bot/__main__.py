@@ -19,6 +19,10 @@ import pulumi_kubernetes as kubernetes
 from pulumi import Config, export, log
 
 from bridge.secrets.sops import read_yaml_secrets
+from bridge.settings.apps import APPS
+from bridge.settings.apps import github_repo as app_github_repo
+from bridge.settings.apps import repo_main_branch as app_repo_main_branch
+from bridge.settings.apps import slack_channel as app_slack_channel
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
 from ol_infrastructure.lib.ol_types import AWSBase, BusinessUnit, Environment
@@ -53,52 +57,23 @@ github_token = concourse_ops_secrets["pipelines"]["infrastructure/github"][
 bot_config = Config("release_bot")
 concourse_url = bot_config.get("concourse_url") or "https://cicd.odl.mit.edu"
 
+# Derived from bridge.settings.apps -- the shared app registry also used by
+# the Concourse pipeline generator (k8s_apps/pipeline.py) -- so an app's repo,
+# branch, and Slack channel are defined in exactly one place. The Pulumi
+# config override below still lets a specific stack diverge if it ever needs
+# to (e.g. testing against a fork).
 default_repos_config = {
-    "learn-ai": {
-        "pipeline": "learn-ai-pipeline",
-        "repo": "mitodl/learn-ai",
-        "branch": "main",
-    },
-    "micromasters": {
-        "pipeline": "micromasters-pipeline",
-        "repo": "mitodl/micromasters",
-        "branch": "master",
-    },
-    "mit-learn": {
-        "pipeline": "mit-learn-pipeline",
-        "repo": "mitodl/mit-learn",
-        "branch": "main",
-    },
-    "mit-learn-nextjs": {
-        "pipeline": "mit-learn-nextjs-pipeline",
-        "repo": "mitodl/mit-learn",
-        "branch": "main",
-    },
-    "mitxonline": {
-        "pipeline": "mitxonline-pipeline",
-        "repo": "mitodl/mitxonline",
-        "branch": "main",
-    },
-    "ocw-studio": {
-        "pipeline": "ocw-studio-pipeline",
-        "repo": "mitodl/ocw-studio",
-        "branch": "master",
-    },
-    "odl-video-service": {
-        "pipeline": "odl-video-service-pipeline",
-        "repo": "mitodl/odl-video-service",
-        "branch": "master",
-    },
-    "ol-analytics-api": {
-        "pipeline": "ol-analytics-api-pipeline",
-        "repo": "mitodl/ol-analytics-api",
-        "branch": "main",
-    },
-    "xpro": {
-        "pipeline": "xpro-pipeline",
-        "repo": "mitodl/mitxpro",
-        "branch": "master",
-    },
+    app_name: {
+        "pipeline": f"{app_name}-pipeline",
+        "repo": app_github_repo(app_name),
+        "branch": app_repo_main_branch(app_name),
+        **(
+            {"channel": app_slack_channel(app_name)}
+            if app_slack_channel(app_name)
+            else {}
+        ),
+    }
+    for app_name in APPS
 }
 repos_config = bot_config.get_object("repos_config") or default_repos_config
 REPOS_CONFIG = json.dumps(repos_config)
