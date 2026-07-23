@@ -1,0 +1,32 @@
+{
+  "distSpecVersion": "1.1.1",
+  "storage": {
+    "rootDirectory": "/var/lib/zot",
+    "gc": true,
+    "gcDelay": "1h",
+    "gcInterval": "1h",
+    "retention": {
+      "delay": "24h",
+      "policies": [
+        {
+          "repositories": ["**"],
+          "deleteReferrers": true,
+          "deleteUntagged": true,
+          "keepTags": [
+            {
+              "mostRecentlyPushedCount": 10
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "http": {
+    "address": "0.0.0.0",
+    "port": "5000",
+    "compat": ["docker2s2"]
+  },
+  "log": {
+    "level": "warn"
+  }
+}
