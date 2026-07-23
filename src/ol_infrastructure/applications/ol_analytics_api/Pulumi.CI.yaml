@@ -4,7 +4,8 @@ config:
   aws:region: us-east-1
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
-  ol_analytics_api:domain: analytics-ci.odl.mit.edu
+  ol_analytics_api:domain: analytics-ci.ol.mit.edu
+  ol_analytics_api:learn_domain: analytics.ci.learn.mit.edu
   ol_analytics_api:env_vars:
     OL_ANALYTICS_API_ENVIRONMENT: ci
     LOG_LEVEL: INFO
