@@ -9,19 +9,38 @@ draws the job graph on top of it starting from the top-left. This module
 renders a description string into a minimal SVG that reads reasonably under
 that blend, meant to be committed alongside each pipeline's ``pipeline.py``
 and served via a raw.githubusercontent.com URL.
+
+Concourse applies the image via CSS ``background-size: cover;
+background-position: center`` (see ``web/elm/src/Pipeline/Styles.elm`` in
+concourse/concourse) — there is no user-facing zoom/rescale control. ``cover``
+scales the image up until it fills the container in *both* dimensions, then
+crops whatever overflows, centered. A source image with an extreme aspect
+ratio (very wide and short, or very tall and narrow) gets scaled up hard on
+its short axis to satisfy ``cover``, blowing its long axis far past the
+viewport. The mitigations are in the source image, not in Concourse: pick an
+aspect ratio closer to a typical browser viewport, and keep content within a
+smaller, centered fraction of the canvas — the crop is always centered, so
+margin from the canvas center (not from a particular edge) is what
+determines whether content survives.
 """
 
 import textwrap
 from dataclasses import dataclass
 from typing import Literal
 
-_DEFAULT_WIDTH = 800
-_DEFAULT_HEIGHT = 200
-_DEFAULT_FONT_SIZE = 22
+# 16:9 reads much closer to a typical viewport than a short, wide banner, which
+# keeps the "cover" scale-up factor (and thus the risk of content running off
+# the visible crop) far smaller than an extreme aspect ratio would.
+_DEFAULT_WIDTH = 1200
+_DEFAULT_HEIGHT = 675
+_DEFAULT_FONT_SIZE = 30
 _DEFAULT_PADDING = 20
 _LINE_HEIGHT_RATIO = 1.35
 # Rough average glyph width for a sans-serif font, as a fraction of font_size.
 _AVG_CHAR_WIDTH_RATIO = 0.55
+# Cap the text block to this fraction of canvas width by default, centered,
+# so there's margin on both sides before a "cover" crop reaches it.
+_DEFAULT_TEXT_WIDTH_FRACTION = 0.6
 
 Anchor = Literal["top", "center", "bottom"]
 
@@ -42,8 +61,14 @@ class DescriptionStyle:
     by default, i.e. no panel) additionally draw a solid backdrop rectangle
     behind the whole text block. Both are independent, combinable contrast
     controls. ``width``/``height``/``font_size`` control overall scaling;
-    ``wrap_chars`` overrides the automatic line-wrap width (derived from
-    ``width`` and ``font_size`` otherwise).
+    ``wrap_chars`` overrides the automatic line-wrap width entirely.
+    ``text_width_fraction`` instead caps the auto-derived wrap width to a
+    fraction of ``width`` (default 0.6, i.e. text stays centered within the
+    middle 60%) — since Concourse renders this image with
+    ``background-size: cover`` and no rescale control, keeping the text
+    block narrower than the full canvas and centered is what makes it
+    survive being cropped on viewports with a different aspect ratio than
+    ``width``/``height`` (see module docstring).
     """
 
     width: int = _DEFAULT_WIDTH
@@ -52,6 +77,7 @@ class DescriptionStyle:
     padding: int = _DEFAULT_PADDING
     anchor: Anchor = "bottom"
     wrap_chars: int | None = None
+    text_width_fraction: float = _DEFAULT_TEXT_WIDTH_FRACTION
     text_color: str = "white"
     outline_color: str | None = "black"
     outline_width: float = 3
@@ -67,8 +93,12 @@ def render_description_svg(text: str, style: DescriptionStyle | None = None) -> 
     line_height = round(style.font_size * _LINE_HEIGHT_RATIO)
     wrap_chars = style.wrap_chars
     if wrap_chars is None:
+        text_width = min(
+            style.width - 2 * style.padding,
+            style.width * style.text_width_fraction,
+        )
         avg_char_width = style.font_size * _AVG_CHAR_WIDTH_RATIO
-        wrap_chars = max(10, int((style.width - 2 * style.padding) / avg_char_width))
+        wrap_chars = max(10, int(text_width / avg_char_width))
     lines = textwrap.wrap(text, width=wrap_chars)
     block_height = len(lines) * line_height
 
