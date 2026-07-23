@@ -27,6 +27,6 @@
     "compat": ["docker2s2"]
   },
   "log": {
-    "level": "warn"
+    "level": "info"
   }
 }

@@ -2,18 +2,6 @@
 # Run: tilt up
 # Docs: local-dev/README.md
 
-# Tilt's own pruner, kept as a backstop only — disk-janitor (below) is
-# authoritative for tilt-built images. keep_recent matches the janitor's
-# default keep_tags so the two policies agree on retention depth; a lower
-# value here would silently cap the janitor's knob (Tilt prunes the tag from
-# the daemon, and the janitor then drops its registry copy).
-docker_prune_settings(
-    disable=False,
-    max_age_mins=720,     # 12h — the janitor handles day-to-day retention
-    num_builds=5,         # also prune every 5 image builds
-    keep_recent=3,        # keep in sync with disk_keep_tags default
-)
-
 # ---------------------------------------------------------------------------
 # Developer configuration
 # ---------------------------------------------------------------------------
@@ -53,24 +41,36 @@ workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
 # ---------------------------------------------------------------------------
 # Disk management
 #
-# docker_prune_settings above only covers the local Docker daemon and has
-# silent failure modes; it can never reach the k3d registry or the k3s nodes'
-# containerd stores, which otherwise grow unbounded until kubelet taints the
-# nodes with disk-pressure. Three complementary mechanisms keep the footprint
-# bounded (details in local-dev/scripts/disk-janitor.sh and the "Disk
-# Management" section of local-dev/README.md):
-#   - disk-janitor (below): retention policy for tilt-built image tags
-#     (local daemon + registry) and a build-cache size cap.
+# Every image store bounds itself with retention config owned by the
+# component that enforces it (details in the "Disk Management" section of
+# local-dev/README.md):
+#   - disk-janitor (below): newest-N retention for tilt-built image tags in
+#     the local Docker daemon, plus a build-cache size cap.
+#   - zot registry: enforces its own retention + GC declaratively
+#     (local-dev/cluster/zot-config.json).
 #   - kubelet image GC: node containerd stores, thresholds in
 #     local-dev/cluster/k3d-config.yaml.
 #   - prune-docker (below): manual break-glass full cleanup.
 # ---------------------------------------------------------------------------
+
+# Tilt's own pruner, kept as a backstop only — disk-janitor (below) is
+# authoritative for tilt-built images in the local daemon. keep_recent is
+# derived from the same knob as the janitor so the two policies on that store
+# can't disagree (a lower keep_recent would silently cap disk_keep_tags).
+disk_keep_tags = int(cfg.get("disk_keep_tags") or os.environ.get("LOCAL_DEV_DISK_KEEP_TAGS", "") or "3")
+docker_prune_settings(
+    disable=False,
+    max_age_mins=720,     # 12h — the janitor handles day-to-day retention
+    num_builds=5,         # also prune every 5 image builds
+    keep_recent=disk_keep_tags,
+)
+
 local_resource(
     "disk-janitor",
     serve_cmd="./local-dev/scripts/disk-janitor.sh",
     deps=["./local-dev/scripts/disk-janitor.sh"],
     serve_env={
-        "JANITOR_KEEP_TAGS": cfg.get("disk_keep_tags") or os.environ.get("LOCAL_DEV_DISK_KEEP_TAGS", ""),
+        "JANITOR_KEEP_TAGS": str(disk_keep_tags),
         "JANITOR_BUILDCACHE_MAX_GB": cfg.get("disk_buildcache_max_gb") or os.environ.get("LOCAL_DEV_BUILDCACHE_MAX_GB", ""),
     },
     labels=["infra"],
