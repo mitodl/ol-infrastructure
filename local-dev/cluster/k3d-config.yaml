@@ -45,10 +45,11 @@ options:
     # Each node's containerd image store caches every image it ever pulls and
     # nothing else cleans it up (Tilt can't reach it; see disk-janitor.sh).
     # kubelet's own image GC does, but its default thresholds (85%/80%) are
-    # percentages of the node filesystem — which under OrbStack/Docker Desktop
-    # is the entire host disk — so by default it only acts at nearly the same
-    # fullness that triggers the disk-pressure eviction taint. Lower the
-    # thresholds so node image caches are reclaimed long before that.
+    # percentages of the node filesystem — the Docker VM's data disk, shared
+    # by all nodes, under OrbStack/Docker Desktop — while k3s sets the
+    # disk-pressure eviction taint at 95% used (nodefs.available<5%). That
+    # leaves only ~10% of the disk between "GC starts" and "everything
+    # stops scheduling". Starting GC at 75% doubles that band to ~20%.
     # Applies on cluster (re)create: teardown.sh + setup.sh.
     - arg: --kubelet-arg=image-gc-high-threshold=75
       nodeFilters:
