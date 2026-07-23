@@ -263,13 +263,33 @@ if cluster_stack.require_output("has_ebs_storage"):
                         "ebs_storageclass"
                     ),
                 },
+                # This has bounced between 100Mi/200Mi/256Mi several times
+                # (see git history) chasing recurring OOM kills -- most
+                # recently 200Mi, which still OOMs: every restart reloads a
+                # full controller/pod/node cluster-state snapshot from
+                # backup before it can do anything else, so this is a
+                # consistent per-startup need, not an occasional burst above
+                # a fine idle baseline. Guaranteed QoS requires every
+                # resource (not just memory) to have request == limit, so
+                # cpu is set explicitly here too, matching the chart's own
+                # default limit (100m) that was already silently in effect
+                # -- our previous override only ever set requests.cpu=10m,
+                # never touched limits.cpu, so Helm merged in the chart
+                # default there. Making that explicit and matching request
+                # to it, rather than leaving the mismatch, so the pod
+                # actually gets Guaranteed QoS: a single pod per cluster, so
+                # the aggregate reservation cost is small, and Guaranteed
+                # protects it from being a preferred eviction target under
+                # node memory pressure while it's already struggling to
+                # survive its own startup.
                 "resources": {
                     "requests": {
-                        "cpu": "10m",
-                        "memory": "200Mi",
+                        "cpu": "100m",
+                        "memory": "512Mi",
                     },
                     "limits": {
-                        "memory": "200Mi",
+                        "cpu": "100m",
+                        "memory": "512Mi",
                     },
                 },
             },
