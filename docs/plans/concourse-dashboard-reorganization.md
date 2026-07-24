@@ -290,7 +290,7 @@ component). `ol-analytics-api-pipeline` sits in data-platform rather than
 applications despite being a `k8s_apps` app, because it is read as part of the
 data stack; it is still `release_bot`-referenced and must not be renamed.
 
-#### `main` (32 tiles, 5 clusters)
+#### `main` (32 tiles, 6 clusters)
 
 1. **meta** (8) — `container-images-meta`, `ol-concourse-resource-meta`,
    `ol-api-clients-meta`, `publish-python-packages-meta`, `mfe-meta-pipeline`,
@@ -306,11 +306,11 @@ data stack; it is still `release_bot`-referenced and must not be renamed.
    `ol-python-base-docker`, `ol-infrastructure-docker-container`,
    `docker-openedx-tubular-image`, `ocw-course-publisher-image`,
    `ol-superset-image`, `build-redash-image`, `docker-google-ads-opt-image`
-4. **package-publishing** (5) — `publish-ol-django-pypi`,
-   `publish-open-edx-plugins-pypi`, `publish-jupyterhub-extensions-pypi`,
+4. **package-publishing** (4) — `publish-open-edx-plugins-pypi`, `publish-jupyterhub-extensions-pypi`,
    `mit-learn-api-client`, `mitxonline-api-client`
 5. **apps-misc** (4) — `platform-engineering-site`, `edx-sysadmin`,
    `sign-and-verify`, `google-ads-optimization`
+6. **deprecated** (1) — `publish-ol-django-pypi`, parked pending archive (§4.4)
 
 The canonical ordering lists live in `bin/` (see §6) so they can be re-applied
 idempotently rather than being one-shot shell history.
@@ -556,7 +556,17 @@ sibling `api_clients_pipeline.py` (also `main`) already uses
 `((npm_publish.odlbot_private_ssh_key))`. One-line fix. No `mitol-django-*`
 release has published since.
 
-Tracked as `tk-fix-publish-ol-django-pypi-undefined-var-github--505ae3`.
+**Decision 2026-07-24: not fixing.** The owner's call is that this pipeline is
+incorrectly implemented as a whole and should be removed or left broken rather
+than repaired — applying the one-line secret fix would resume publishing from a
+pipeline whose design is wrong. Tracked and closed won't-fix as
+`tk-fix-publish-ol-django-pypi-undefined-var-github--505ae3`.
+
+Disposition: `publish-ol-django-pypi` moves out of `main`'s `package-publishing`
+cluster into a new `deprecated` cluster at the bottom of the `main` ordering, and
+joins the Phase 2 archive candidates (§4.1 covers the `infrastructure` ones). A
+replacement for mitol-django publishing, if wanted, is a rewrite filed
+separately — not a repair of this pipeline.
 
 ### 4.5 The Concourse SOPS file is not a complete secret inventory
 
