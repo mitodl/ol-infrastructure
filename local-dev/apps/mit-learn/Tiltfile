@@ -24,6 +24,19 @@ if os.path.exists(os.path.join(MIT_LEARN_DIR, ".git")):
         # local-dev target = development (dev deps included) + a mitodl-owned
         # /src so live-update syncs can write into the container.
         target="local-dev",
+        # This is the granian/Django backend; it never reads the frontend
+        # workspace (no STATICFILES_DIRS/webpack refs) — that ships as the
+        # separate mit-learn-nextjs image. Keep frontends/ (incl. its .next
+        # build output), the yarn cache, and all node_modules out of the build
+        # context: ~1GB of dead weight off the image, and frontend edits stop
+        # triggering backend syncs/rebuilds. Scoped here (not in the shared
+        # repo-root .dockerignore) because the nextjs build uses the same
+        # context and needs frontends/ + .yarn/ via its own only=[...].
+        ignore=[
+            "frontends/",
+            ".yarn/",
+            "**/node_modules",
+        ],
         # Live update: sync source changes into the container; granian runs
         # with --reload (see deployment.yaml) and restarts workers on change.
         live_update=[

@@ -17,8 +17,9 @@ A fully local, Kubernetes-based development environment for the MIT Learn applic
 9. [Configuration Reference](#configuration-reference)
 10. [Adding a New App](#adding-a-new-app)
 11. [Modifying Shared Infrastructure](#modifying-shared-infrastructure)
-12. [Teardown](#teardown)
-13. [Troubleshooting](#troubleshooting)
+12. [Disk Management](#disk-management)
+13. [Teardown](#teardown)
+14. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -58,6 +59,7 @@ Install these tools before running setup:
 | Helm | ≥ 3.14 | `brew install helm` |
 | mkcert | ≥ 1.4 | `brew install mkcert` |
 | Pulumi CLI | ≥ 3.x | `brew install pulumi` |
+| bash | ≥ 4 | `brew install bash` (stock macOS ships 3.2; the seeding and prune scripts use `mapfile`) |
 | uv | ≥ 0.9.3 | `brew install uv` |
 
 > **Docker memory:** The cluster runs PostgreSQL, Valkey, APISIX, Keycloak, Qdrant, and up to four Django apps. Allocate at least 8 GB to Docker Desktop (Settings → Resources).
@@ -541,6 +543,66 @@ Tilt also runs `pulumi up` automatically when infra files change. You can also t
 **Add a new shared service:** Add it to `infra/core/__main__.py`. Use the existing Qdrant or Valkey blocks as a reference.
 
 **Modify the Keycloak realm or add a new OIDC client:** Edit `infra/modules/keycloak.py`. On `pulumi up`, pulumi-keycloak will diff the realm state and apply only what changed.
+
+---
+
+## Disk Management
+
+Every Tilt image build produces a multi-GB image in **three places**: the
+local Docker daemon, the k3d registry (`k3d-registry.localhost:5001`), and —
+once pulled — each k3s node's internal containerd store. Tilt's built-in
+pruner (`docker_prune_settings`) has silent failure modes and by design only
+reaches the first[^tilt-pruner]. Left alone, these stores grow by several GB
+per rebuild until kubelet taints every node with `disk-pressure` and no pod
+can schedule.
+
+[^tilt-pruner]: Registry cleanup is
+    [tilt-dev/tilt#2102](https://github.com/tilt-dev/tilt/issues/2102);
+    node-store cleanup is
+    [tilt-dev/tilt#4228](https://github.com/tilt-dev/tilt/issues/4228).
+
+Each store is bounded by retention config owned by the component that
+enforces it, with no per-developer setup:
+
+| Mechanism | Covers | Where |
+|---|---|---|
+| `disk-janitor` (automatic, runs with every `tilt up`) | Old tilt-built image tags in the local daemon; build-cache size cap | `local-dev/scripts/disk-janitor.sh`, wired as a `serve_cmd` resource in the root Tiltfile |
+| zot registry retention + GC | The k3d registry — zot keeps the 10 most recently pushed tags per repo and garbage-collects the rest itself | `local-dev/cluster/zot-config.json` (the registry image is [zot](https://zotregistry.dev), not registry:2; created by `setup.sh`) |
+| kubelet image GC | Node containerd stores | Thresholds in `local-dev/cluster/k3d-config.yaml` (applies at cluster creation; existing clusters keep the old 85/80 until you run `local-dev/scripts/migrate-kubelet-gc-thresholds.sh`) |
+| `prune-docker` (manual, break-glass) | Local daemon + registry, destructively (node stores only with `--sweep-nodes` — read the script header first; it orphans running containers) | Tilt UI button / `tilt trigger prune-docker`, or run `local-dev/scripts/prune-docker.sh` directly |
+
+**Existing setups:** a registry container created before the zot swap
+(2026-07) still runs `registry:2`, which has no retention and will grow
+unbounded — the janitor warns about this each cycle until you migrate:
+
+```bash
+k3d registry delete k3d-registry.localhost
+./local-dev/scripts/setup.sh   # recreates it as zot, reconnects the cluster network
+```
+
+Registry contents are a disposable cache — Tilt re-pushes whatever the
+current build needs on its next build, and running pods are unaffected
+(nodes cache their images).
+
+Retention (keep the newest N) is safe to apply at any moment — unlike a
+wipe, it can never delete an image something is about to need. Janitor
+knobs, via `tilt_config.json` (or env var fallback):
+
+- `disk_keep_tags` / `LOCAL_DEV_DISK_KEEP_TAGS` — tags kept per image
+  (default 3). Old tags are nearly pure waste: pods only reference the
+  current tag, and rebuild speed comes from the build cache, not old tags.
+- `disk_buildcache_max_gb` / `LOCAL_DEV_BUILDCACHE_MAX_GB` — build-cache cap
+  in GB (default: 10% of total disk). **This is the one knob whose effect is
+  not scoped to local-dev**: BuildKit keeps a single daemon-wide cache pool,
+  so eviction can slow rebuilds of unrelated projects on your machine (speed
+  only, never correctness). Set to `0` to opt out and manage the pool
+  yourself (e.g. `builder.gc` in your Docker engine config).
+
+If images ever pile up again despite the janitor, `tilt docker-prune --debug`
+prints Tilt's own per-image skip reasons and is the fastest way to see why
+something isn't being reclaimed. To check whether zot is doing its part,
+`docker logs k3d-registry.localhost` shows its retention decisions
+(`"module":"retention"` lines, logged at info level).
 
 ---
 

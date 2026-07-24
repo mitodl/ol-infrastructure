@@ -2,15 +2,6 @@
 # Run: tilt up
 # Docs: local-dev/README.md
 
-# Prune Tilt-built images/containers aggressively — the app images are
-# multi-GB, so stale builds eat disk fast.
-docker_prune_settings(
-    disable=False,
-    max_age_mins=720,     # anything older than 12h goes
-    num_builds=5,         # also prune every 5 image builds
-    keep_recent=2,        # always keep the 2 most recent tags per image
-)
-
 # ---------------------------------------------------------------------------
 # Developer configuration
 # ---------------------------------------------------------------------------
@@ -21,6 +12,8 @@ config.define_bool("per_app_databases", usage="Deploy isolated DB/Valkey per app
 config.define_string("openedx_mode", usage="qa (default) or local (Tutor)")
 config.define_string_list("prebuilt_tags", usage="Prebuilt image tag overrides per app, e.g. mit-learn=0.62.0 learn-ai=0.28.3")
 config.define_string("root_domain", usage="Root DNS domain for all local-dev services (default: mit.dev). Overrides LOCAL_DEV_ROOT_DOMAIN env var.")
+config.define_string("disk_keep_tags", usage="Newest tilt-built image tags kept per repo by the disk janitor (default: 3). Overrides LOCAL_DEV_DISK_KEEP_TAGS env var.")
+config.define_string("disk_buildcache_max_gb", usage="Docker build-cache size cap in GB (default: 10% of total disk; 0 disables). Overrides LOCAL_DEV_BUILDCACHE_MAX_GB env var.")
 cfg = config.parse()
 
 enabled_apps = cfg.get("enabled_apps", ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"])
@@ -44,6 +37,55 @@ prebuilt_tags = {
 # Workspace root: directory that contains ol-infrastructure and sibling app repos.
 # Override with MITOL_WORKSPACE_ROOT environment variable.
 workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
+
+# ---------------------------------------------------------------------------
+# Disk management
+#
+# Every image store bounds itself with retention config owned by the
+# component that enforces it (details in the "Disk Management" section of
+# local-dev/README.md):
+#   - disk-janitor (below): newest-N retention for tilt-built image tags in
+#     the local Docker daemon, plus a build-cache size cap.
+#   - zot registry: enforces its own retention + GC declaratively
+#     (local-dev/cluster/zot-config.json).
+#   - kubelet image GC: node containerd stores, thresholds in
+#     local-dev/cluster/k3d-config.yaml.
+#   - prune-docker (below): manual break-glass full cleanup.
+# ---------------------------------------------------------------------------
+
+# Tilt's own pruner, kept as a backstop only — disk-janitor (below) is
+# authoritative for tilt-built images in the local daemon. keep_recent is
+# derived from the same knob as the janitor so the two policies on that store
+# can't disagree (a lower keep_recent would silently cap disk_keep_tags).
+disk_keep_tags = int(cfg.get("disk_keep_tags") or os.environ.get("LOCAL_DEV_DISK_KEEP_TAGS", "") or "3")
+docker_prune_settings(
+    disable=False,
+    max_age_mins=720,     # 12h — the janitor handles day-to-day retention
+    num_builds=5,         # also prune every 5 image builds
+    keep_recent=disk_keep_tags,
+)
+
+local_resource(
+    "disk-janitor",
+    serve_cmd="./local-dev/scripts/disk-janitor.sh",
+    deps=["./local-dev/scripts/disk-janitor.sh"],
+    serve_env={
+        "JANITOR_KEEP_TAGS": str(disk_keep_tags),
+        "JANITOR_BUILDCACHE_MAX_GB": cfg.get("disk_buildcache_max_gb") or os.environ.get("LOCAL_DEV_BUILDCACHE_MAX_GB", ""),
+    },
+    labels=["infra"],
+)
+
+# Break-glass full cleanup (Tilt UI button, or `tilt trigger prune-docker`).
+# The janitor should make this unnecessary; expect image re-pulls and full
+# rebuilds after running it.
+local_resource(
+    "prune-docker",
+    cmd="./local-dev/scripts/prune-docker.sh",
+    labels=["infra"],
+    trigger_mode=TRIGGER_MODE_MANUAL,
+    auto_init=False,
+)
 
 # ---------------------------------------------------------------------------
 # Application registry

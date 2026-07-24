@@ -14,11 +14,16 @@ agents: 2
 image: docker.io/rancher/k3s:v1.31.4-k3s1
 
 # Local image registry — images built by Tilt are pushed here.
+# The registry container itself is created by setup.sh (`k3d registry create
+# --image <zot>`) rather than by this file, because its config file must be
+# bind-mounted from the repo checkout and this YAML cannot express that host
+# path portably. The registry is zot rather than registry:2: zot enforces
+# image retention (keep the N most recently pushed tags) and garbage
+# collection as its own declarative config — local-dev/cluster/zot-config.json
+# — so no external cleanup process has to reach into its storage.
 registries:
-  create:
-    name: k3d-registry.localhost
-    host: "0.0.0.0"
-    hostPort: "5001"
+  use:
+  - k3d-registry.localhost:5001
   config: |
     mirrors:
       "k3d-registry.localhost:5001":
@@ -42,6 +47,23 @@ options:
     - arg: --disable=traefik
       nodeFilters:
       - server:*
+    # Each node's containerd image store caches every image it ever pulls and
+    # nothing else cleans it up (Tilt can't reach it; see disk-janitor.sh).
+    # kubelet's own image GC does, but its default thresholds (85%/80%) are
+    # percentages of the node filesystem — the Docker VM's data disk, shared
+    # by all nodes, under OrbStack/Docker Desktop — while k3s sets the
+    # disk-pressure eviction taint at 95% used (nodefs.available<5%). That
+    # leaves only ~10% of the disk between "GC starts" and "everything
+    # stops scheduling". Starting GC at 75% doubles that band to ~20%.
+    # Applies on cluster (re)create: teardown.sh + setup.sh.
+    - arg: --kubelet-arg=image-gc-high-threshold=75
+      nodeFilters:
+      - server:*
+      - agent:*
+    - arg: --kubelet-arg=image-gc-low-threshold=70
+      nodeFilters:
+      - server:*
+      - agent:*
 
 kubeAPI:
   hostIP: "0.0.0.0"

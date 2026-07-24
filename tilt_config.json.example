@@ -13,5 +13,9 @@
     "odl-video-service=0.85.0"
   ],
 
-  "root_domain": "mit.dev"
+  "root_domain": "mit.dev",
+
+  "disk_keep_tags": "3",
+
+  "disk_buildcache_max_gb": ""
 }
