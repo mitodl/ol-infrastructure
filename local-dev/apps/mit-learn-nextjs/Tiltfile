@@ -64,6 +64,5 @@ k8s_yaml_local([
 
 k8s_resource(
     'mitlearn-nextjs',
-    port_forwards=['3000:3000'],
     labels=['mit-learn'],
 )
