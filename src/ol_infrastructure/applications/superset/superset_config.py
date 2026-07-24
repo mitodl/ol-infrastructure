@@ -148,6 +148,39 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
             expanded.extend(AUTH_ROLES_MAPPING.get(role_key, []))
         return expanded
 
+    @staticmethod
+    def _role_keys_from_jwt(jwt_data: dict[str, object]) -> list[str]:
+        """Extract the ``role_keys`` claim as a list of strings.
+
+        Keycloak emits ``role_keys`` as a multivalued String claim, but the
+        token is externally supplied, so coerce defensively: keep only string
+        items and drop anything else. This honors the ``list[str]`` contract the
+        downstream membership checks (``role_key in AUTH_ROLES_MAPPING``) rely on
+        and avoids a ``TypeError`` if the claim ever carries an unhashable value.
+        """
+        role_keys_obj = jwt_data.get("role_keys", [])
+        if not isinstance(role_keys_obj, list):
+            return []
+        return [role_key for role_key in role_keys_obj if isinstance(role_key, str)]
+
+    @staticmethod
+    def _has_authorized_role_key(role_keys: list[str]) -> bool:
+        """Report whether the token carries an auto-provisioning allow-list claim.
+
+        A JWT may auto-provision a Superset account only if it carries at least
+        one role_key present in AUTH_ROLES_MAPPING. Because the role_keys claim
+        is populated exclusively from ol-superset-client roles (via the
+        UserClientRoleProtocolMapper), this is equivalent to requiring that the
+        principal was explicitly granted a Superset role in Keycloak.
+
+        Audience validation (JWT_DECODE_AUDIENCE) already rejects tokens minted
+        for other realm clients; this gate additionally stops a
+        merely-authenticated realm member — who can obtain an ol-superset-client
+        token but holds none of its roles — from self-registering an account
+        through the REST API.
+        """
+        return any(role_key in AUTH_ROLES_MAPPING for role_key in role_keys)
+
     def _get_roles_from_keycloak_roles(self, role_keys: list[str]) -> list[object]:
         """Map Keycloak role_keys to Superset roles.
 
@@ -194,11 +227,24 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
         email = str(jwt_data.get("email", ""))
         first_name = str(jwt_data.get("given_name", ""))
         last_name = str(jwt_data.get("family_name", ""))
-        role_keys_obj = jwt_data.get("role_keys", [])
-        role_keys = list(role_keys_obj) if isinstance(role_keys_obj, list) else []
+        role_keys = self._role_keys_from_jwt(jwt_data)
 
         if not username:
             logging.error("Cannot create user: JWT missing 'preferred_username' claim")
+            return None
+
+        # Auto-provisioning allow-list: only create accounts for principals that
+        # were explicitly granted a Superset role in Keycloak (surfaced in
+        # role_keys). This blocks a merely-authenticated realm member from
+        # self-registering a Superset account via the REST API, even though their
+        # token passes audience validation.
+        if not self._has_authorized_role_key(role_keys):
+            logging.warning(
+                "Refusing to auto-provision user '%s' from JWT: no authorized "
+                "role_keys present (have %s)",
+                username,
+                role_keys,
+            )
             return None
 
         try:
@@ -209,12 +255,17 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
             # through the same path as regular users.
             roles = self._get_roles_from_keycloak_roles(role_keys)
 
-            # Ensure at least one role
+            # An authorized role_key that resolves to no existing Superset role
+            # means the governance roles were not imported; refuse rather than
+            # create a role-less account.
             if not roles:
                 logging.warning(
-                    "User '%s' has no roles from JWT, assigning Public role", username
+                    "Refusing to auto-provision user '%s' from JWT: role_keys %s "
+                    "map to no existing Superset role",
+                    username,
+                    role_keys,
                 )
-                roles = [self.find_role("Public")]
+                return None
 
             # Create the user
             logging.info(
@@ -283,8 +334,7 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
             # for the OAuth path. This ensures role changes in Keycloak (including
             # granting the service account ol_platform_admin) take effect without
             # requiring the user record to be deleted and recreated.
-            role_keys_obj = jwt_data.get("role_keys", [])
-            role_keys = list(role_keys_obj) if isinstance(role_keys_obj, list) else []
+            role_keys = self._role_keys_from_jwt(jwt_data)
             roles = self._get_roles_from_keycloak_roles(role_keys)
             if roles:
                 user.roles = roles
