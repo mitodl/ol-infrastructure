@@ -2,6 +2,11 @@
 
 A fully local, Kubernetes-based development environment for the MIT Learn application stack, running in [k3d](https://k3d.io) with [Tilt](https://tilt.dev) for live development and Pulumi for shared infrastructure.
 
+This README covers getting up and running, day-to-day usage, and troubleshooting. Two companion docs go deeper:
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — how the pieces fit together (k3d, Tilt, APISIX, the registry), written for people comfortable with Docker Compose but new to Kubernetes. Genuinely helpful background, not required reading.
+- **[EXTENDING.md](EXTENDING.md)** — adding a new app to the stack or modifying shared infrastructure.
+
 ---
 
 ## Table of Contents
@@ -10,17 +15,14 @@ A fully local, Kubernetes-based development environment for the MIT Learn applic
 2. [Prerequisites](#prerequisites)
 3. [Quick Start](#quick-start)
 4. [Starting and Stopping](#starting-and-stopping)
-5. [Architecture](#architecture)
-6. [Directory Structure](#directory-structure)
-7. [How It Works](#how-it-works)
-8. [Working with Apps](#working-with-apps)
-9. [Seeding Data](#seeding-data)
-10. [Configuration Reference](#configuration-reference)
-11. [Adding a New App](#adding-a-new-app)
-12. [Modifying Shared Infrastructure](#modifying-shared-infrastructure)
-13. [Disk Management](#disk-management)
-14. [Teardown](#teardown)
-15. [Troubleshooting](#troubleshooting)
+5. [Directory Structure](#directory-structure)
+6. [Working with Apps](#working-with-apps)
+7. [Seeding Data](#seeding-data)
+8. [Configuration Reference](#configuration-reference)
+9. [Disk Management](#disk-management)
+10. [Teardown](#teardown)
+11. [Customization & Advanced Setup](#customization--advanced-setup)
+12. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -104,14 +106,9 @@ cp tilt_config.json.example tilt_config.json
 
 At minimum, review `enabled_apps` to enable only the services you need.
 
-For per-developer app env vars and secrets (API keys, feature flags), don't
-edit the tracked manifests — drop a gitignored `app-env.local.yaml` ConfigMap
-next to the app's tracked one instead. See
-[Local Configuration Overrides](#local-configuration-overrides).
+For per-developer app env vars and secrets (API keys, feature flags), don't edit the tracked manifests — drop a gitignored `app-env.local.yaml` ConfigMap next to the app's tracked one instead. See [Local Configuration Overrides](#local-configuration-overrides).
 
 ### 3. Start the environment
-
-The easiest way is to use the provided start script, which validates your setup and syncs dependencies:
 
 ```bash
 ./local-dev/scripts/start.sh
@@ -138,16 +135,10 @@ Open the Tilt UI at `http://localhost:10350` to monitor deployments and trigger 
 
 ## Starting and Stopping
 
-The stack has two independently-running halves, and knowing which is which
-answers most lifecycle questions:
+The stack has two independently-running halves, and knowing which is which answers most lifecycle questions:
 
-- **The cluster** (k3d node containers + every pod inside them) runs
-  *detached*, like `docker compose up -d`. It needs no terminal and survives
-  you closing everything.
-- **Tilt** (`start.sh` / the `tilt up` terminal) is the *dev loop*: the UI at
-  localhost:10350, file-watching and live-sync, automatic rebuilds, and the
-  disk-janitor. It runs in the foreground, on purpose — there is no
-  detached mode.
+- **The cluster** (k3d node containers + every pod inside them) runs *detached*, like `docker compose up -d`. It needs no terminal and survives you closing everything.
+- **Tilt** (`start.sh` / the `tilt up` terminal) is the *dev loop*: the UI at localhost:10350, file-watching and live-sync, automatic rebuilds, and the disk-janitor. It runs in the foreground, on purpose — there is no detached mode.
 
 Day-to-day:
 
@@ -158,179 +149,30 @@ Day-to-day:
 | Shut down for the day | `Ctrl+C` Tilt, then `./local-dev/scripts/stop.sh` | Removes Tilt-managed workloads, pauses the cluster; DB data survives |
 | Destroy everything | `./local-dev/scripts/teardown.sh` | Deletes the cluster, Pulumi resources, certs, /etc/hosts entries |
 
-Closing the Tilt terminal (or Ctrl+C) never deletes anything from the
-cluster — pods keep running because Kubernetes, not Tilt, keeps them alive.
-The one thing to remember: with Tilt stopped, a pod that gets recreated
-comes up from its last-built image *without* your live-synced edits; they
-re-sync when Tilt next runs.
-
----
-
-## Architecture
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│  k3d cluster: local-dev                                       │
-│                                                               │
-│  ┌──────────┐  ┌──────────────────────────────────────────┐  │
-│  │operations│  │           local-infra                    │  │
-│  │          │  │  PostgreSQL (CNPG)  Valkey  Qdrant       │  │
-│  │  APISIX  │  │  OpenSearch  Tika  Keycloak  LiteLLM     │  │
-│  │          │  │  Mailpit                                 │  │
-│  └────┬─────┘  └──────────────────────────────────────────┘  │
-│       │                                                       │
-│       │  routes traffic by hostname                          │
-│       ├──────────────────────────────────────────────────┐   │
-│       │                                                  │   │
-│  ┌────▼──────┐  ┌───────────┐  ┌──────────┐  ┌────────┐ │   │
-│  │ mit-learn │  │ learn-ai  │  │mitxonline│  │  odl-  │ │   │
-│  │  (ns)     │  │   (ns)    │  │   (ns)   │  │ video  │ │   │
-│  │ Next.js   │  │ granian   │  │  uwsgi   │  │  uwsgi │ │   │
-│  │ Django    │  │ Celery×2  │  │  Celery  │  │ Celery │ │   │
-│  │ Celery×3  │  │           │  │          │  │        │ │   │
-│  └───────────┘  └───────────┘  └──────────┘  └────────┘ │   │
-└──────────────────────────────────────────────────────────────┘
-         ▲
-         │  HTTPS (mkcert TLS, trusted by OS)
-    Developer browser / curl
-```
-
-### Key design decisions
-
-**Ownership boundary:** `setup.sh` owns only the k3d cluster, TLS certificates, and `/etc/hosts`. _All_ in-cluster resources are owned by either Pulumi (shared infra) or Tilt (app manifests). This prevents drift and conflicts.
-
-**APISIX as ingress:** Traefik is disabled in k3d. APISIX handles all ingress, TLS termination, and OIDC authentication (via the `openid-connect` plugin). Each app's `apisix-routes.yaml` declares its `ApisixRoute` and `ApisixTls` CRDs.
-
-**Shared database cluster:** All apps share one CloudNativePG (CNPG) cluster in the `local-infra` namespace with isolated databases (`mitlearn`, `learnai`, `mitxonline`, `odlvideo`, `keycloak`, `litellm`). This keeps memory usage low. (A `per_app_databases` config key is declared but not wired to anything yet — setting it has no effect.)
-
-**TLS:** mkcert generates a wildcard certificate for all `.dev` domains. The cert is read by Pulumi at stack evaluation time and stored as `local-dev-tls` Kubernetes Secrets in every app namespace. APISIX's `ApisixTls` CRs reference these secrets.
-
-**Keycloak realm:** The `olapps` realm mirrors production, including the fake-Touchstone SAML IdP, all OIDC clients, and organizations support. Test users: `admin@odl.local`, `student@odl.local`, `prof@odl.local` (password: `localdev123`).  <!-- pragma: allowlist secret -->
+Closing the Tilt terminal (or Ctrl+C) never deletes anything from the cluster — pods keep running because Kubernetes, not Tilt, keeps them alive. The one thing to remember: with Tilt stopped, a pod that gets recreated comes up from its last-built image *without* your live-synced edits; they re-sync when Tilt next runs.
 
 ---
 
 ## Directory Structure
 
+The files you'll actually touch:
+
 ```
 ol-infrastructure/
-├── Tiltfile                          # Root entry point; wires all app Tiltfiles
-├── tilt_config.json.example          # Developer config template (copy → tilt_config.json)
+├── Tiltfile                     # Root entry point; wires all app Tiltfiles
+├── tilt_config.json             # Your dev config (copy of tilt_config.json.example)
 │
 └── local-dev/
-    ├── cluster/
-    │   ├── k3d-config.yaml           # k3d cluster definition (ports, registry mirror, no Traefik)
-    │   └── zot-config.json           # Registry retention + GC config (see Disk Management)
-    │
-    ├── scripts/
-    │   ├── setup.sh                  # One-time bootstrap (registry, cluster, certs, /etc/hosts)
-    │   ├── start.sh                  # Start the environment (validate setup, heal exec, sync deps, tilt up)
-    │   ├── stop.sh                   # Stop Tilt + pause the cluster (fast resume via start.sh)
-    │   ├── teardown.sh               # Destroy the cluster (incl. pulumi destroy)
-    │   ├── seed.sh                   # CLI seeding wrapper (kubectl exec into pods)
-    │   ├── disk-janitor.sh           # Retention for local image tags + build cache (run by Tilt)
-    │   ├── prune-docker.sh           # Break-glass disk cleanup (see Disk Management)
-    │   ├── migrate-kubelet-gc-thresholds.sh  # One-time; for clusters created before 2026-07
-    │   ├── heal-exec.sh              # Repair wedged kubelet exec/streaming after sleep
-    │   ├── kc-seed-users.sh          # Seed Keycloak test users (run by Tilt)
-    │   ├── kc-fix-flow-bindings.sh   # Repair Keycloak realm flow bindings (run by Tilt)
-    │   ├── wait-for-keycloak-admin.sh  # Startup ordering helper for the apps_infra stack
-    │   └── wakeup.example.sh         # Example sleepwatcher wake hook (macOS auto-heal)
-    │
-    ├── certs/                        # mkcert output (gitignored)
-    │   ├── local-dev.pem
-    │   ├── local-dev-key.pem
-    │   └── rootCA.pem
-    │
-    ├── infra/                        # Pulumi stacks — shared in-cluster infrastructure
-    │   ├── core/                     # Core stack: operators, Keycloak, APISIX, DB, Valkey
-    │   │   ├── Pulumi.yaml
-    │   │   ├── Pulumi.local-dev.core.Dev.yaml   # Stack config (chart versions, Keycloak hostname)
-    │   │   └── __main__.py
-    │   └── apps_infra/               # Apps-infra stack: Keycloak realm + OIDC clients
-    │       ├── Pulumi.yaml
-    │       ├── Pulumi.local-dev.apps-infra.Dev.yaml   # Stack config (client secrets)
-    │       └── __main__.py
-    │
-    └── apps/
-        ├── mit-learn/                # Django backend manifests
-        │   ├── Tiltfile
-        │   ├── deployment.yaml       # Web + 3 Celery workers + Beat
-        │   ├── secrets.yaml
-        │   ├── apisix-routes.yaml    # Routes for api.learn.mit.dev
-        │   └── configmaps/
-        │       ├── app-env.yaml      # Non-secret env vars
-        │       ├── app-env.local.yaml         # (optional, gitignored) your overrides
-        │       ├── app-env.local.yaml.example
-        │       └── nginx.yaml        # nginx sidecar config
-        │
-        ├── mit-learn-nextjs/         # Next.js frontend manifests
-        │   ├── Tiltfile
-        │   ├── deployment.yaml       # NEXT_PUBLIC_* injected here at runtime
-        │   └── apisix-routes.yaml    # Route for learn.mit.dev
-        │
-        ├── learn-ai/                 # Django AI proxy manifests
-        │   ├── Tiltfile
-        │   ├── deployment.yaml       # Web + 2 Celery workers + Beat
-        │   ├── secrets.yaml
-        │   ├── apisix-routes.yaml    # Route for ai.learn.mit.dev
-        │   └── configmaps/
-        │
-        ├── mitxonline/               # MITx Online LMS manifests
-        │   ├── Tiltfile
-        │   ├── deployment.yaml       # Web + Celery + Beat
-        │   ├── secrets.yaml
-        │   ├── apisix-routes.yaml    # Route for mitxonline.mit.dev
-        │   └── configmaps/
-        │
-        └── odl-video-service/        # ODL Video Service manifests
-            ├── Tiltfile
-            ├── deployment.yaml       # Web + Celery + Beat
-            ├── secrets.yaml
-            ├── apisix-routes.yaml    # Route for video.odl.mit.dev
-            └── configmaps/
+    ├── scripts/                 # setup.sh, start.sh, stop.sh, teardown.sh, seed.sh,
+    │                            # heal-exec.sh, prune-docker.sh (each described in its header)
+    ├── cluster/                 # k3d cluster definition + registry retention config
+    ├── certs/                   # mkcert output (gitignored)
+    ├── infra/                   # Pulumi stacks: shared in-cluster infra (see EXTENDING.md)
+    └── apps/<app>/              # Per-app k8s manifests + Tiltfile
+        └── configmaps/
+            └── app-env.local.yaml   # (optional, gitignored) your env overrides — see
+                                     # Local Configuration Overrides below
 ```
-
----
-
-## How It Works
-
-### Startup sequence
-
-```
-tilt up
-  │
-  ├── pulumi up (local-dev/infra/)
-  │     Deploys: CNPG operator → PostgreSQL cluster → Valkey → cert-manager
-  │              → Qdrant → OpenSearch → Tika → LiteLLM → Mailpit → APISIX
-  │              → Keycloak operator → Keycloak instance → olapps realm
-  │
-  └── for each enabled app:
-        ├── docker build (if source repo present, else pull prebuilt image)
-        ├── kubectl apply configmaps/ secrets.yaml deployment.yaml
-        │     initContainer: migrate + collectstatic + data-specific seeds
-        └── kubectl apply apisix-routes.yaml
-              APISIX picks up new routes → app reachable at its .dev URL
-```
-
-### Live updates (Django apps)
-
-When a file changes in a checked-out app repo, Tilt syncs it directly into the running container without a rebuild (sub-second). granian runs with `--reload`, notices the change, and restarts its workers — the new code serves once Django finishes re-importing (roughly 10–30 s depending on the app). Watch for `Changes detected, reloading workers..` in the app logs.
-
-This applies to the webapp (granian) containers. Celery workers and beat don't auto-reload — restart those resources from the Tilt UI after changing task code.
-
-When `pyproject.toml` or `uv.lock` changes, Tilt runs `uv sync` inside the container; granian then reloads as above.
-
-### Pre-built image fallback
-
-If an app repo is not cloned on your machine, Tilt uses the pre-built Docker Hub image (`mitodl/<app>-app`) at the tag listed in `tilt_config.json` under `prebuilt_tags`. You can work on mit-learn without having learn-ai checked out.
-
-### Live updates (Next.js frontend)
-
-With a mit-learn checkout, Tilt builds the `local-dev` stage of `Dockerfile.web`, which runs `next dev` (Turbopack). Source changes under `frontends/` are live-synced into the container and hot-reload in place — edit-to-served is roughly a second (the first request to each page after a pod start pays a one-time on-demand compile). HMR websockets are proxied through apisix, so the browser hot-updates on `https://learn.mit.dev` too. `NEXT_PUBLIC_*` values are runtime env vars (see `deployment.yaml`), not build args, so no rebuild is needed to change them — just edit and let Tilt redeploy.
-
-When `yarn.lock` changes, Tilt runs `yarn install` inside the container.
-
-Without a checkout, the prebuilt DockerHub image (production `runner` stage) serves instead; it does not hot-reload.
 
 ---
 
@@ -347,6 +189,18 @@ Edit `tilt_config.json`:
 ```
 
 Only the listed apps will be deployed. Shared infrastructure always runs.
+
+### Test accounts
+
+Log in at any app (or `https://sso.ol.mit.dev` directly) with the seeded Keycloak users: `admin@odl.local`, `student@odl.local`, `prof@odl.local` — password `localdev123` for all three.  <!-- pragma: allowlist secret -->
+
+### Editing code
+
+With an app repo checked out next to `ol-infrastructure`, Tilt live-syncs your edits into the running containers — no rebuild. (Curious how? See [Two transports](ARCHITECTURE.md#two-transports-how-your-code-reaches-a-pod) in ARCHITECTURE.md.) What to expect:
+
+- **Django apps:** granian runs with `--reload` and restarts its workers on each change — the new code serves once Django finishes re-importing (roughly 10–30 s depending on the app). Watch for `Changes detected, reloading workers..` in the app logs. Celery workers and beat don't auto-reload — restart those resources from the Tilt UI after changing task code. When `pyproject.toml` or `uv.lock` changes, Tilt runs `uv sync` inside the container first.
+- **Next.js frontend:** Tilt builds the `local-dev` stage of `Dockerfile.web`, which runs `next dev` (Turbopack). Changes under `frontends/` hot-reload in roughly a second (the first request to each page after a pod start pays a one-time on-demand compile). HMR websockets are proxied through apisix, so the browser hot-updates on `https://learn.mit.dev` too. `NEXT_PUBLIC_*` values are runtime env vars (see `deployment.yaml`), not build args, so changing them needs no rebuild. When `yarn.lock` changes, Tilt runs `yarn install` inside the container.
+- **No checkout:** Tilt deploys the pre-built Docker Hub image (`mitodl/<app>-app`) at the tag listed in `tilt_config.json` under `prebuilt_tags`. It works, but does not hot-reload — you can work on mit-learn without having learn-ai checked out.
 
 ### Access logs
 
@@ -446,11 +300,7 @@ tilt trigger seed-mit-learn-fixtures
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
 | `per_app_databases`, `openedx_mode` | — | Declared but not wired to anything yet; setting them has no effect. |
 
-The rule of thumb for which config surface a knob belongs to: settings that
-change **which/how Tilt runs things** (apps, image tags, domain) go in
-`tilt_config.json`; anything that sets an **env var or secret value inside a
-workload** (API keys, feature flags, endpoints) goes in a gitignored
-`app-env.local.yaml` override ConfigMap — see [Local Configuration Overrides](#local-configuration-overrides).
+The rule of thumb for which config surface a knob belongs to: settings that change **which/how Tilt runs things** (apps, image tags, domain) go in `tilt_config.json`; anything that sets an **env var or secret value inside a workload** (API keys, feature flags, endpoints) goes in a gitignored `app-env.local.yaml` override ConfigMap — see [Local Configuration Overrides](#local-configuration-overrides).
 
 ### Pulumi stack config
 
@@ -475,124 +325,13 @@ The infrastructure is split across two Pulumi stacks:
 
 ---
 
-## Adding a New App
-
-### 1. Create the app manifests directory
-
-```
-local-dev/apps/<app-name>/
-├── Tiltfile
-├── deployment.yaml       # Deployment(s) + Service
-├── secrets.yaml          # Placeholder k8s Secrets
-├── apisix-routes.yaml    # ApisixTls + ApisixRoute
-└── configmaps/
-    ├── app-env.yaml      # Non-secret env vars
-    ├── app-env.local.yaml.example  # Template for per-dev overrides
-    └── nginx.yaml        # (if using nginx sidecar)
-```
-
-Use an existing app (e.g., `learn-ai/`) as a template. In particular, copy
-the `envFrom` pattern from an existing `deployment.yaml`: every container
-lists the tracked ConfigMap, the tracked Secret, then the optional
-`<app>-env-local` override ConfigMap **last** (see
-[Local Configuration Overrides](#local-configuration-overrides)), and pass
-`local_overrides='configmaps/app-env.local.yaml'` to `k8s_yaml_local` in the
-Tiltfile.
-
-### 2. Add the app database to the CNPG cluster
-
-In `local-dev/infra/modules/database.py`, add to the `postInitSQL` list:
-
-```python
-"CREATE DATABASE myapp OWNER app;",
-```
-
-### 3. Register the namespace (TLS secret comes with it)
-
-Add `"my-app"` to the `APP_NAMESPACES` tuple in
-`local-dev/infra/modules/namespaces.py`, and to the matching
-`app_namespaces` tuple in `local-dev/infra/modules/tls.py` — the latter's
-loops then create the `local-dev-tls` Secret and mkcert CA ConfigMap in the
-new namespace automatically.
-
-### 4. Add the Keycloak OIDC client (if needed)
-
-In `local-dev/infra/modules/keycloak.py`, add a new client and call `_make_oidc_secret()` to create the OIDC credentials Secret in the app namespace.
-
-### 5. Register in the root Tiltfile
-
-In `Tiltfile`, add an entry to the `APPS` list:
-
-```python
-{
-    "name": "my-app",
-    "dir": "my-app",              # sibling repo directory name
-    "namespace": "my-app",
-    "deploy_name": "myapp-webapp",
-    "image_backend": "mitodl/my-app",
-    "prebuilt_tag_backend": "1.0.0",
-    "tiltfile": "./local-dev/apps/my-app/Tiltfile",
-    "seed_commands": [
-        {
-            "label": "seed-myapp-data",
-            "description": "Load initial data",
-            "cmd": "python manage.py loaddata initial_data",
-        },
-    ],
-},
-```
-
-### 6. Add hosts and DNS
-
-In `setup.sh`, add the hostname to `HOSTS` and ensure it's covered by a `MKCERT_DOMAINS` wildcard. Re-run `setup.sh` to update `/etc/hosts` and regenerate the cert.
-
----
-
-## Modifying Shared Infrastructure
-
-Shared infrastructure is split into two Pulumi stacks in `local-dev/infra/`. The `core` stack provisions operators, databases, Valkey, APISIX, and the Keycloak instance. The `apps_infra` stack provisions the Keycloak realm and all OIDC client registrations. Changes here affect all apps.
-
-```bash
-# Preview and apply core stack changes
-cd local-dev/infra/core
-pulumi preview --stack local-dev.core.Dev
-pulumi up --stack local-dev.core.Dev
-
-# Preview and apply apps_infra stack changes
-cd local-dev/infra/apps_infra
-pulumi preview --stack local-dev.apps-infra.Dev
-pulumi up --stack local-dev.apps-infra.Dev
-```
-
-Tilt also runs `pulumi up` automatically when infra files change. You can also trigger it manually from the Tilt UI (`local-infra-core` and `local-infra-apps` resources).
-
-### Common modifications
-
-**Change a Helm chart version:** Edit the version in `infra/core/Pulumi.local-dev.core.Dev.yaml` and run `pulumi up` in `infra/core/`.
-
-**Add a new shared service:** Add a module under `infra/modules/` and call it from `infra/core/__main__.py`. Use the existing modules (`cache.py`, `search.py`, `ai.py`) as references.
-
-**Modify the Keycloak realm or add a new OIDC client:** Edit `infra/modules/keycloak.py`. On `pulumi up`, pulumi-keycloak will diff the realm state and apply only what changed.
-
----
-
 ## Disk Management
 
-Every Tilt image build produces a multi-GB image in **three places**: the
-local Docker daemon, the k3d registry (`k3d-registry.localhost:5001`), and —
-once pulled — each k3s node's internal containerd store. Tilt's built-in
-pruner (`docker_prune_settings`) has silent failure modes and by design only
-reaches the first[^tilt-pruner]. Left alone, these stores grow by several GB
-per rebuild until kubelet taints every node with `disk-pressure` and no pod
-can schedule.
+Every Tilt image build produces a multi-GB image in **three places**: the local Docker daemon, the k3d registry (`k3d-registry.localhost:5001`), and — once pulled — each k3s node's internal containerd store. Tilt's built-in pruner (`docker_prune_settings`) has silent failure modes and by design only reaches the first[^tilt-pruner]. Left alone, these stores grow by several GB per rebuild until kubelet taints every node with `disk-pressure` and no pod can schedule.
 
-[^tilt-pruner]: Registry cleanup is
-    [tilt-dev/tilt#2102](https://github.com/tilt-dev/tilt/issues/2102);
-    node-store cleanup is
-    [tilt-dev/tilt#4228](https://github.com/tilt-dev/tilt/issues/4228).
+[^tilt-pruner]: Registry cleanup is [tilt-dev/tilt#2102](https://github.com/tilt-dev/tilt/issues/2102); node-store cleanup is [tilt-dev/tilt#4228](https://github.com/tilt-dev/tilt/issues/4228).
 
-Each store is bounded by retention config owned by the component that
-enforces it, with no per-developer setup:
+Each store is bounded by retention config owned by the component that enforces it, with no per-developer setup:
 
 | Mechanism | Covers | Where |
 |---|---|---|
@@ -601,38 +340,21 @@ enforces it, with no per-developer setup:
 | kubelet image GC | Node containerd stores | Thresholds in `local-dev/cluster/k3d-config.yaml` (applies at cluster creation; existing clusters keep the old 85/80 until you run `local-dev/scripts/migrate-kubelet-gc-thresholds.sh`) |
 | `prune-docker` (manual, break-glass) | Local daemon + registry, destructively (node stores only with `--sweep-nodes` — read the script header first; it orphans running containers) | Tilt UI button / `tilt trigger prune-docker`, or run `local-dev/scripts/prune-docker.sh` directly |
 
-**Existing setups:** a registry container created before the zot swap
-(2026-07) still runs `registry:2`, which has no retention and will grow
-unbounded — the janitor warns about this each cycle until you migrate:
+**Existing setups:** a registry container created before the zot swap (2026-07) still runs `registry:2`, which has no retention and will grow unbounded — the janitor warns about this each cycle until you migrate:
 
 ```bash
 k3d registry delete k3d-registry.localhost
 ./local-dev/scripts/setup.sh   # recreates it as zot, reconnects the cluster network
 ```
 
-Registry contents are a disposable cache — Tilt re-pushes whatever the
-current build needs on its next build, and running pods are unaffected
-(nodes cache their images).
+Registry contents are a disposable cache — Tilt re-pushes whatever the current build needs on its next build, and running pods are unaffected (nodes cache their images).
 
-Retention (keep the newest N) is safe to apply at any moment — unlike a
-wipe, it can never delete an image something is about to need. Janitor
-knobs, via `tilt_config.json` (or env var fallback):
+Retention (keep the newest N) is safe to apply at any moment — unlike a wipe, it can never delete an image something is about to need. Janitor knobs, via `tilt_config.json` (or env var fallback):
 
-- `disk_keep_tags` / `LOCAL_DEV_DISK_KEEP_TAGS` — tags kept per image
-  (default 3). Old tags are nearly pure waste: pods only reference the
-  current tag, and rebuild speed comes from the build cache, not old tags.
-- `disk_buildcache_max_gb` / `LOCAL_DEV_BUILDCACHE_MAX_GB` — build-cache cap
-  in GB (default: 10% of total disk). **This is the one knob whose effect is
-  not scoped to local-dev**: BuildKit keeps a single daemon-wide cache pool,
-  so eviction can slow rebuilds of unrelated projects on your machine (speed
-  only, never correctness). Set to `0` to opt out and manage the pool
-  yourself (e.g. `builder.gc` in your Docker engine config).
+- `disk_keep_tags` / `LOCAL_DEV_DISK_KEEP_TAGS` — tags kept per image (default 3). Old tags are nearly pure waste: pods only reference the current tag, and rebuild speed comes from the build cache, not old tags.
+- `disk_buildcache_max_gb` / `LOCAL_DEV_BUILDCACHE_MAX_GB` — build-cache cap in GB (default: 10% of total disk). **This is the one knob whose effect is not scoped to local-dev**: BuildKit keeps a single daemon-wide cache pool, so eviction can slow rebuilds of unrelated projects on your machine (speed only, never correctness). Set to `0` to opt out and manage the pool yourself (e.g. `builder.gc` in your Docker engine config).
 
-If images ever pile up again despite the janitor, `tilt docker-prune --debug`
-prints Tilt's own per-image skip reasons and is the fastest way to see why
-something isn't being reclaimed. To check whether zot is doing its part,
-`docker logs k3d-registry.localhost` shows its retention decisions
-(`"module":"retention"` lines, logged at info level).
+If images ever pile up again despite the janitor, `tilt docker-prune --debug` prints Tilt's own per-image skip reasons and is the fastest way to see why something isn't being reclaimed. To check whether zot is doing its part, `docker logs k3d-registry.localhost` shows its retention decisions (`"module":"retention"` lines, logged at info level).
 
 ---
 
@@ -660,9 +382,7 @@ something isn't being reclaimed. To check whether zot is doing its part,
 
 ### Local Configuration Overrides
 
-The ConfigMaps and Secrets are tracked by the repository. For per-developer
-customizations (API keys, feature flags, custom endpoints), each app has an
-optional, gitignored override ConfigMap:
+The ConfigMaps and Secrets are tracked by the repository. For per-developer customizations (API keys, feature flags, custom endpoints), each app has an optional, gitignored override ConfigMap:
 
 ```bash
 cp local-dev/apps/mitxonline/configmaps/app-env.local.yaml.example \
@@ -671,56 +391,29 @@ cp local-dev/apps/mitxonline/configmaps/app-env.local.yaml.example \
 #   FEATURE_IGNORE_EDX_FAILURES: "True"
 ```
 
-How it works — plain Kubernetes, visible in each app's `deployment.yaml`:
-every container's `envFrom` list references the override ConfigMap
-(`mitxonline-env-local` etc.) **last** and with `optional: true`. Kubernetes
-resolves duplicate `envFrom` keys by letting the last source win, so your
-overrides beat both the tracked ConfigMap *and* the tracked Secret — secret
-values are fine in this file, it never leaves your machine. `optional: true`
-means no file → no ConfigMap → no-op for everyone else.
+How it works — plain Kubernetes, visible in each app's `deployment.yaml`: every container's `envFrom` list references the override ConfigMap (`mitxonline-env-local` etc.) **last** and with `optional: true`. Kubernetes resolves duplicate `envFrom` keys by letting the last source win, so your overrides beat both the tracked ConfigMap *and* the tracked Secret — secret values are fine in this file, it never leaves your machine. `optional: true` means no file → no ConfigMap → no-op for everyone else.
 
 Day-to-day behavior:
 
-- Creating or editing the file mid-session re-applies it — no Tilt restart.
-  Pods roll automatically so new values actually take effect: because
-  Kubernetes does not restart pods on ConfigMap changes, `tiltlib.star`
-  stamps a fingerprint of your overrides onto each Deployment's pod template
-  (the `ol.mit.edu/local-overrides-hash` annotation), which is also the
-  idiomatic production pattern (cf. Helm `checksum/config` annotations).
-- Overridden key **names** (never values) are printed in the **Tiltfile
-  resource's log** in the Tilt UI, and your full delta is inspectable
-  in-cluster at any time:
-  `kubectl get cm -n mitxonline mitxonline-env-local -o yaml`
-- Gotchas: the ConfigMap's `metadata.name` must match what `deployment.yaml`
-  references (`<app>-env-local` — copy the example, don't type it), and all
-  `data:` values must be YAML **strings** (quote things like `"True"` and
-  `"8080"`). A typo'd key is applied but ignored by the app. If you *delete*
-  the file mid-session, prefer emptying `data:` instead — the already-applied
-  ConfigMap can linger in-cluster until `tilt down`.
+- Creating or editing the file mid-session re-applies it — no Tilt restart. Pods roll automatically so new values actually take effect: because Kubernetes does not restart pods on ConfigMap changes, `tiltlib.star` stamps a fingerprint of your overrides onto each Deployment's pod template (the `ol.mit.edu/local-overrides-hash` annotation), which is also the idiomatic production pattern (cf. Helm `checksum/config` annotations).
+- Overridden key **names** (never values) are printed in the **Tiltfile resource's log** in the Tilt UI, and your full delta is inspectable in-cluster at any time: `kubectl get cm -n mitxonline mitxonline-env-local -o yaml`
+- Gotchas: the ConfigMap's `metadata.name` must match what `deployment.yaml` references (`<app>-env-local` — copy the example, don't type it), and all `data:` values must be YAML **strings** (quote things like `"True"` and `"8080"`). A typo'd key is applied but ignored by the app. If you *delete* the file mid-session, prefer emptying `data:` instead — the already-applied ConfigMap can linger in-cluster until `tilt down`.
 
 Scope notes:
 
-- **mit-learn-nextjs** can't participate yet: it has no ConfigMap/Secret —
-  its env lives directly in `deployment.yaml`. Moving that env block to a
-  ConfigMap would enable it.
-- **OpenAI key for LiteLLM** (`local-infra` namespace, Pulumi-managed) is
-  separate from the app overlays — create the Secret directly (the
-  deployment marks it optional, so this is safe to skip entirely):
+- **mit-learn-nextjs** can't participate yet: it has no ConfigMap/Secret — its env lives directly in `deployment.yaml`. Moving that env block to a ConfigMap would enable it.
+- **OpenAI key for LiteLLM** (`local-infra` namespace, Pulumi-managed) is separate from the app overlays — create the Secret directly (the deployment marks it optional, so this is safe to skip entirely):
   ```bash
   kubectl create secret generic litellm-secrets -n local-infra \
     --from-literal=openai_api_key=sk-your-key  # pragma: allowlist secret
   ```
-  (That `openai_api_key` Secret *data key* is unrelated to the old
-  `tilt_config.json` key of the same name, which was never wired to anything
-  and has been removed.)
+  (That `openai_api_key` Secret *data key* is unrelated to the old `tilt_config.json` key of the same name, which was never wired to anything and has been removed.)
 
 ### GPU Support for Ollama
 
 If you prefer to run Ollama on your host machine to use GPU acceleration:
 
-1. **Stop the in-cluster Ollama** — point `OLLAMA_ENDPOINT` at your host via
-   the app's gitignored `app-env.local.yaml` (see
-   [Local Configuration Overrides](#local-configuration-overrides)):
+1. **Stop the in-cluster Ollama** — point `OLLAMA_ENDPOINT` at your host via the app's gitignored `app-env.local.yaml` (see [Local Configuration Overrides](#local-configuration-overrides)):
    ```yaml
    OLLAMA_ENDPOINT: "http://host.docker.internal:11434"
    ```
@@ -735,9 +428,7 @@ If you prefer to run Ollama on your host machine to use GPU acceleration:
 
 The local-dev stack doesn't include S3 storage by default. To add it:
 
-**Option 1: Use external MinIO instance** — Run MinIO on your host and point
-apps at it via their gitignored `app-env.local.yaml` (see
-[Local Configuration Overrides](#local-configuration-overrides)):
+**Option 1: Use external MinIO instance** — Run MinIO on your host and point apps at it via their gitignored `app-env.local.yaml` (see [Local Configuration Overrides](#local-configuration-overrides)):
 ```yaml
 AWS_ENDPOINT_URL: "http://host.docker.internal:9000"
 AWS_ACCESS_KEY_ID: "minioadmin"  # pragma: allowlist secret
@@ -745,7 +436,7 @@ AWS_SECRET_ACCESS_KEY: "minioadmin"  # pragma: allowlist secret
 ```
 (Docker Desktop; on Linux use `http://172.17.0.1:9000`.)
 
-**Option 2: Deploy MinIO in-cluster** — Modify `local-dev/infra/__main__.py` to add a MinIO Helm chart and patch the ConfigMaps accordingly.
+**Option 2: Deploy MinIO in-cluster** — Add a MinIO module to the `core` Pulumi stack and patch the ConfigMaps accordingly (see [EXTENDING.md](EXTENDING.md#modifying-shared-infrastructure)).
 
 ---
 
@@ -875,8 +566,6 @@ sudo sysctl fs.inotify.max_user_watches=100000
 # Make it permanent (add to /etc/sysctl.conf)
 echo 'fs.inotify.max_user_watches=100000' | sudo tee -a /etc/sysctl.conf
 ```
-
----
 
 ### WSL2: kubeconfig context not found
 
