@@ -9,6 +9,10 @@
 # Expect a few minutes of churn as each node's pods restart. Images persist
 # in the node volumes, so nothing re-pulls. Don't run mid-build.
 #
+# DELETE ME once the handful of clusters that predate PR #5102 have migrated
+# (tracked in witan: tk-local-dev-delete-migrate-kubelet-gc-thresholds-s-1576b6).
+# Anyone creating a cluster after that PR merged never needs this script.
+#
 # Usage: ./local-dev/scripts/migrate-kubelet-gc-thresholds.sh
 set -euo pipefail
 
