@@ -149,6 +149,21 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
         return expanded
 
     @staticmethod
+    def _role_keys_from_jwt(jwt_data: dict[str, object]) -> list[str]:
+        """Extract the ``role_keys`` claim as a list of strings.
+
+        Keycloak emits ``role_keys`` as a multivalued String claim, but the
+        token is externally supplied, so coerce defensively: keep only string
+        items and drop anything else. This honors the ``list[str]`` contract the
+        downstream membership checks (``role_key in AUTH_ROLES_MAPPING``) rely on
+        and avoids a ``TypeError`` if the claim ever carries an unhashable value.
+        """
+        role_keys_obj = jwt_data.get("role_keys", [])
+        if not isinstance(role_keys_obj, list):
+            return []
+        return [role_key for role_key in role_keys_obj if isinstance(role_key, str)]
+
+    @staticmethod
     def _has_authorized_role_key(role_keys: list[str]) -> bool:
         """Report whether the token carries an auto-provisioning allow-list claim.
 
@@ -212,8 +227,7 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
         email = str(jwt_data.get("email", ""))
         first_name = str(jwt_data.get("given_name", ""))
         last_name = str(jwt_data.get("family_name", ""))
-        role_keys_obj = jwt_data.get("role_keys", [])
-        role_keys = list(role_keys_obj) if isinstance(role_keys_obj, list) else []
+        role_keys = self._role_keys_from_jwt(jwt_data)
 
         if not username:
             logging.error("Cannot create user: JWT missing 'preferred_username' claim")
@@ -320,8 +334,7 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
             # for the OAuth path. This ensures role changes in Keycloak (including
             # granting the service account ol_platform_admin) take effect without
             # requiring the user record to be deleted and recreated.
-            role_keys_obj = jwt_data.get("role_keys", [])
-            role_keys = list(role_keys_obj) if isinstance(role_keys_obj, list) else []
+            role_keys = self._role_keys_from_jwt(jwt_data)
             roles = self._get_roles_from_keycloak_roles(role_keys)
             if roles:
                 user.roles = roles
