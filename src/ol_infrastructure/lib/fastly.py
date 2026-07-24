@@ -32,6 +32,8 @@ from bridge.secrets.sops import read_yaml_secrets
 # request_duration_usec : The time since the request started in microseconds.
 # request_header_size_bytes : Total header bytes read from the client generating the request.
 # request_method : HTTP method sent by the client
+# request_next_router_prefetch : Next-Router-Prefetch request header, sent by the
+#   Next.js app router on prefetch requests. Empty if absent.
 # request_protocol : HTTP protocol version in use for this request.
 # request_referer : HTTP referer as provided by the client
 # request_user_agent : HTTP useragent as provided by the client
@@ -80,6 +82,7 @@ __base_fastly_log_format_string = """{
 "request_duration_usec":%{time.elapsed.usec}V,
 "request_header_size_bytes":%{req.header_bytes_read}V,
 "request_method":"%{json.escape(req.method)}V",
+"request_next_router_prefetch":"%{json.escape(req.http.Next-Router-Prefetch)}V",
 "request_protocol":"%{json.escape(req.proto)}V",
 "request_referer":"%{json.escape(req.http.referer)}V",
 "request_user_agent":"%{json.escape(req.http.User-Agent)}V",
