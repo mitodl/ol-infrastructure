@@ -50,7 +50,7 @@ from ol_infrastructure.lib.aws.ec2_helper import (
     InstanceTypes,
     default_egress_args,
 )
-from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
+from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import (
@@ -231,22 +231,41 @@ iam_policy_names = set(
 )
 
 iam_policy_objects = {}
+iam_policy_modules = {}
 for iam_policy in iam_policy_names or []:
     policy_module = importlib.import_module(f"iam_policies.{iam_policy}")
+    iam_policy_modules[iam_policy] = policy_module
+    parliament_config = {
+        "CREDENTIALS_EXPOSURE": {
+            "ignore_locations": [{"actions": ["ecr:getauthorizationtoken"]}]
+        },
+        "PERMISSIONS_MANAGEMENT_ACTIONS": {
+            "ignore_locations": [{"actions": ["ec2:modifysnapshotattribute"]}]
+        },
+        "RESOURCE_STAR": {},
+    }
+    if iam_policy == "pulumi_infra":
+        # These actions are real, observed Pulumi usage (CloudTrail-derived) and
+        # are already scoped to Resource ARNs under /ol-applications/* and
+        # /ol-infrastructure/* in the policy itself -- Parliament's
+        # PRIVILEGE_ESCALATION check flags them purely on action co-occurrence
+        # and can't see that resource-level scoping, so it fires regardless.
+        parliament_config["PRIVILEGE_ESCALATION"] = {
+            "ignore_locations": [
+                {"actions": ["iam:createaccesskey"]},
+                {"actions": ["iam:createpolicyversion"]},
+                {"actions": ["iam:attachuserpolicy"]},
+                {"actions": ["iam:attachrolepolicy"]},
+                {"actions": ["iam:addusertogroup"]},
+                {"actions": ["iam:updateassumerolepolicy"]},
+            ]
+        }
     iam_policy_object = iam.Policy(
         f"cicd-iam-permissions-policy-{iam_policy}-{stack_info.env_suffix}",
         path=f"/ol-infrastructure/iam/cicd-{stack_info.env_suffix}/",
         policy=lint_iam_policy(
             policy_module.policy_definition,
-            parliament_config={
-                "CREDENTIALS_EXPOSURE": {
-                    "ignore_locations": [{"actions": ["ecr:getauthorizationtoken"]}]
-                },
-                "PERMISSIONS_MANAGEMENT_ACTIONS": {
-                    "ignore_locations": [{"actions": ["ec2:modifysnapshotattributte"]}]
-                },
-                "RESOURCE_STAR": {},
-            },
+            parliament_config=parliament_config,
         ),
         name_prefix=f"cicd-policy-{iam_policy}-{stack_info.env_suffix}",
         tags=aws_config.tags,
@@ -662,6 +681,90 @@ concourse_worker_instance_profiles = []
 for worker_def in concourse_config.get_object("workers") or []:
     worker_class_name = worker_def["name"]
 
+    worker_role_kwargs: dict[str, Any] = {}
+    if worker_class_name == "infra":
+        # The infra pool is the only pool that runs pulumi_job() steps, so this
+        # role's own Pulumi runs are what attach its policies -- including the
+        # pulumi_infra IAM self-management statement, which grants
+        # iam:CreatePolicy/CreatePolicyVersion/AttachRolePolicy scoped to
+        # /ol-applications/* and /ol-infrastructure/*. This role's own path
+        # (/ol-applications/concourse/role/) matches that scoping, so without a
+        # ceiling the role could create a new Action:"*" policy under an
+        # allowed path and attach it to itself.
+        #
+        # A permissions boundary closes that off without having to special-case
+        # "self" in the underlying policies (which would break normal Pulumi
+        # reconciliation of this role's own attachments, since that's a
+        # legitimate, routine operation here): effective permissions are
+        # capped to the intersection of whatever's attached and this boundary,
+        # so self-attaching a broader policy grants nothing beyond what the
+        # union of this pool's own policies already allows.
+        #
+        # The boundary policy lives outside /ol-applications/* and
+        # /ol-infrastructure/*, and this role is never granted
+        # iam:PutRolePermissionsBoundary/DeleteRolePermissionsBoundary, so the
+        # role can't widen, remove, or repoint its own ceiling. That also means
+        # this role can't apply the boundary to itself: the initial `pulumi
+        # up` that introduces it, and any later change to its action set, must
+        # be run with more privileged credentials than this role has.
+        infra_worker_boundary_actions: set[str] = set()
+        for iam_policy_name in worker_def["iam_policies"] or []:
+            for statement in iam_policy_modules[iam_policy_name].policy_definition[
+                "Statement"
+            ]:
+                action = statement.get("Action", [])
+                if isinstance(action, str):
+                    action = [action]
+                infra_worker_boundary_actions.update(action)
+        concourse_infra_worker_permissions_boundary = iam.Policy(
+            f"concourse-instance-role-worker-infra-permissions-boundary-{stack_info.env_suffix}",
+            path="/ol-security-boundaries/concourse/",
+            policy=lint_iam_policy(
+                {
+                    "Version": IAM_POLICY_VERSION,
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": sorted(infra_worker_boundary_actions),
+                            "Resource": "*",
+                        }
+                    ],
+                },
+                parliament_config={
+                    "CREDENTIALS_EXPOSURE": {
+                        "ignore_locations": [{"actions": ["ecr:getauthorizationtoken"]}]
+                    },
+                    "PERMISSIONS_MANAGEMENT_ACTIONS": {
+                        "ignore_locations": [
+                            {"actions": ["ec2:modifysnapshotattribute"]}
+                        ]
+                    },
+                    "RESOURCE_STAR": {},
+                    # As with pulumi_infra itself, these actions co-occurring
+                    # with Resource: "*" is expected here -- but a permissions
+                    # boundary document is intersected with, never unioned
+                    # into, the caller's effective permissions, so it cannot
+                    # itself grant escalation regardless of which actions it
+                    # lists.
+                    "PRIVILEGE_ESCALATION": {
+                        "ignore_locations": [
+                            {"actions": ["iam:createaccesskey"]},
+                            {"actions": ["iam:createpolicyversion"]},
+                            {"actions": ["iam:attachuserpolicy"]},
+                            {"actions": ["iam:attachrolepolicy"]},
+                            {"actions": ["iam:addusertogroup"]},
+                            {"actions": ["iam:updateassumerolepolicy"]},
+                        ]
+                    },
+                },
+            ),
+            name_prefix=f"concourse-infra-worker-boundary-{stack_info.env_suffix}",
+            tags=aws_config.tags,
+        )
+        worker_role_kwargs["permissions_boundary"] = (
+            concourse_infra_worker_permissions_boundary.arn
+        )
+
     # Create IAM role + attach policies to it
     concourse_worker_instance_role = iam.Role(
         f"concourse-instance-role-worker-{worker_class_name}-{stack_info.env_suffix}",
@@ -677,6 +780,7 @@ for worker_def in concourse_config.get_object("workers") or []:
         ),
         path="/ol-applications/concourse/role/",
         tags=aws_config.tags,  # We will leave all the IAM resources with default tags.
+        **worker_role_kwargs,
     )
 
     export(f"{worker_class_name}-instance-role-arn", concourse_worker_instance_role.arn)

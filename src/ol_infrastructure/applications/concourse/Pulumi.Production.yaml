@@ -64,6 +64,7 @@ config:
     - operations
     - cloud_custodian
     - pulumi_state
+    - pulumi_infra
     instance_type: m7a.4xlarge
     name: infra
     spot_options:
