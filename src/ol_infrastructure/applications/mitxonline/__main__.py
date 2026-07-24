@@ -78,6 +78,10 @@ from ol_infrastructure.lib.aws.route53_helper import (
     lookup_zone_id_from_domain,
 )
 from ol_infrastructure.lib.fastly import get_fastly_provider
+from ol_infrastructure.lib.k8s_keda import (
+    build_webapp_keda_config,
+    create_webapp_prometheus_trigger_auth,
+)
 from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
     Application,
@@ -542,6 +546,36 @@ mitxonline_granian_workers_max_rss = (
     - GRANIAN_MASTER_OVERHEAD_MIB
 ) // MITXONLINE_GRANIAN_WORKERS
 
+# Horizontal scaling is KEDA-driven on APISIX request rate and p95 latency, with a
+# CPU trigger as a backstop, matching edxapp and mit-learn. CPU alone is a poor
+# saturation signal here: a request blocked on Postgres, edX or HubSpot keeps CPU low
+# while the queue grows, so a CPU-only scaler stays flat through exactly the overload
+# it should react to.
+#
+# The route matcher aggregates every webapp route (direct + prefixed, passauth /
+# reqauth / cart) so total traffic drives scaling rather than a single route. Verified
+# against live metrics -- `count by (route) (apisix_http_status)` returns
+# mitxonline_mitxonline-apisix-route-{direct,prefixed}-production_{passauth,reqauth,cart}.
+webapp_trigger_auth, webapp_trigger_auth_name = create_webapp_prometheus_trigger_auth(
+    application_name="mitxonline",
+    env_name=env_name,
+    namespace=mitxonline_namespace,
+    k8s_global_labels=k8s_app_labels,
+    stack_info=stack_info,
+    vault_k8s_resources=vault_k8s_resources,
+)
+
+mitxonline_webapp_keda_config = build_webapp_keda_config(
+    trigger_auth_name=webapp_trigger_auth_name,
+    route_matcher=(f"mitxonline_mitxonline-apisix-route-.*-{stack_info.env_suffix}_.*"),
+    namespace=mitxonline_namespace,
+    pod_matcher="mitxonline-app-.*",
+    container_name=f"{Services.mitxonline}-app",
+    requests_threshold=mitxonline_config.get("autoscaling_requests_threshold") or "20",
+    latency_threshold=mitxonline_config.get("autoscaling_latency_threshold") or "2000",
+    cpu_threshold=mitxonline_config.get("autoscaling_cpu_threshold") or "60",
+)
+
 mitxonline_k8s_app = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
         project_root=Path(__file__).parent,
@@ -612,15 +646,22 @@ mitxonline_k8s_app = OLApplicationK8s(
         ),
         resource_requests={"cpu": "250m", "memory": mitxonline_web_memory_limit},
         resource_limits={"memory": mitxonline_web_memory_limit},
-        # hpa_scaling_metrics is left at the component default (CPU only). Memory is
-        # managed vertically by the component's webapp VPA; the ceiling below is what
-        # `mitxonline_granian_workers_max_rss` is derived from, so keep the two in
-        # sync if either changes.
+        # Memory is managed vertically by the component's webapp VPA; the ceiling
+        # below is what `mitxonline_granian_workers_max_rss` is derived from, so keep
+        # the two in sync if either changes. Horizontal scaling is KEDA-driven (see
+        # above), so hpa_scaling_metrics is unused -- the component builds a
+        # ScaledObject instead of a native HPA when webapp_keda_config is set.
         webapp_vpa_max_allowed_memory=mitxonline_web_memory_ceiling,
+        webapp_keda_config=mitxonline_webapp_keda_config,
     ),
     opts=ResourceOptions(
-        # Ensure secrets are created before the application deployment
-        depends_on=[mitxonline_app_security_group, *secret_resources]
+        # Ensure secrets and the KEDA trigger authentication are created before the
+        # application deployment; the ScaledObject references the auth by name.
+        depends_on=[
+            mitxonline_app_security_group,
+            webapp_trigger_auth,
+            *secret_resources,
+        ]
     ),
 )
 
