@@ -55,19 +55,19 @@ warn() { echo "  ⚠ $*"; }
 # ---------------------------------------------------------------------------
 log "Stopping Tilt development server..."
 
-# Try graceful shutdown via tilt (preferred)
 if command -v tilt &>/dev/null; then
+    # End any interactive `tilt up` session FIRST: a live Tilt is a
+    # reconciler, so resources deleted by `tilt down` below would race it
+    # re-creating them. SIGTERM lets it shut down cleanly.
+    if pkill -f "tilt up" 2>/dev/null; then
+        sleep 2  # give it time to exit
+        ok "Running tilt session stopped."
+    fi
+    # Then remove the Tilt-managed workloads from the cluster.
     if tilt down 2>/dev/null; then
-        ok "Tilt stopped gracefully."
+        ok "Tilt-managed resources removed."
     else
-        warn "Tilt graceful shutdown failed, trying force stop..."
-        # Force kill tilt processes
-        if pkill -f "tilt serve" 2>/dev/null || pkill -f "tilt up" 2>/dev/null; then
-            sleep 2  # Give processes time to die
-            ok "Tilt processes stopped."
-        else
-            ok "No Tilt processes found running."
-        fi
+        warn "tilt down failed — cluster resources left as-is (pause below still applies)."
     fi
 else
     warn "tilt command not found, skipping tilt shutdown."
