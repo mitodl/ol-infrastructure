@@ -1,4 +1,13 @@
-from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
+from ol_infrastructure.lib.aws.iam_helper import (
+    EKS_DEVELOPER_USERNAMES,
+    IAM_POLICY_VERSION,
+)
+
+# IAM groups that infrastructure/aws/iam/__main__.py provisions at the
+# default "/" path rather than under /ol-applications/* or
+# /ol-infrastructure/*. Kept explicit (not a wildcard) so IAM self-management
+# stays scoped to exactly the resources this worker actually needs to manage.
+_DEFAULT_PATH_MANAGED_GROUP_NAMES = ["Admins", "EKSAdmins", "EKSDevelopers"]
 
 # AWS Permissions Document
 # Least-privilege policy for the infra worker pool, the only pool that runs
@@ -381,6 +390,18 @@ policy_definition = {
                 "arn:aws:iam::*:user/ol-infrastructure/*",
                 "arn:aws:iam::*:group/ol-applications/*",
                 "arn:aws:iam::*:group/ol-infrastructure/*",
+                # infrastructure/aws/iam/__main__.py provisions these specific
+                # users and groups at the default "/" path rather than under
+                # /ol-applications/* or /ol-infrastructure/*. Enumerated
+                # explicitly rather than widening the path patterns above.
+                *[
+                    f"arn:aws:iam::*:user/{username}"
+                    for username in EKS_DEVELOPER_USERNAMES
+                ],
+                *[
+                    f"arn:aws:iam::*:group/{group_name}"
+                    for group_name in _DEFAULT_PATH_MANAGED_GROUP_NAMES
+                ],
             ],
         },
     ],
