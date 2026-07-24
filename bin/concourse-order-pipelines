@@ -1,0 +1,431 @@
+#!/usr/bin/env python3
+# ruff: noqa: T201
+"""Apply a curated, semantic display order to Concourse dashboard tiles.
+
+Concourse 8.2.4 has no folder/tag/grouping primitive for distinct pipelines
+inside a team -- teams are the only hard partition, and instance groups only
+collapse templated variants of the *same* pipeline. The `infrastructure` team
+cannot be split into semantic sub-teams because its privileged EC2 workers are
+registered with `--team infrastructure` and are exclusive to it.
+
+So visual grouping has to be emulated with ordering. `fly order-pipelines` sets
+a display-order field via the API: it touches no pipeline config, no build
+history, no credentials, and no source. Re-running with a different list fully
+reverts. That makes this the zero-risk lever, and this script exists so the
+curated order is a reviewable artifact that can be re-applied idempotently
+rather than one-shot shell history.
+
+See docs/plans/concourse-dashboard-reorganization.md for the full spec and the
+rationale behind each cluster assignment.
+
+Usage:
+    bin/concourse-order-pipelines show
+    bin/concourse-order-pipelines check
+    bin/concourse-order-pipelines check --team infrastructure
+    bin/concourse-order-pipelines apply --dry-run
+    bin/concourse-order-pipelines apply
+    bin/concourse-order-pipelines apply --target odl-qa --order-file my-order.yaml
+
+Pipelines that are live but absent from the curated order are appended to the
+end of their team rather than dropped, so a newly-created pipeline never causes
+a partial ordering -- it just shows up in an `unclustered` bucket at the bottom
+where `check` will flag it for triage.
+"""
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+from typing import Annotated
+
+import cyclopts
+import yaml
+
+app = cyclopts.App(
+    help=(
+        "Apply a curated semantic display order to Concourse dashboard tiles via "
+        "`fly order-pipelines`. Purely display state -- no config, history, or "
+        "credentials are touched, and re-running reverts."
+    )
+)
+
+DEFAULT_TARGET = "odl-prod"
+
+# Bucket that live-but-uncurated pipelines land in, always ordered last.
+UNCLUSTERED = "unclustered"
+
+# The canonical ordering. Dict order is the display order: clusters top to
+# bottom, pipelines within a cluster left to right. Cluster names are for human
+# review and `show`/`check` output only -- Concourse never sees them, since it
+# has no grouping primitive to hang them on.
+PIPELINE_ORDER: dict[str, dict[str, list[str]]] = {
+    "infrastructure": {
+        # The registries that generate everything else, so the dashboard starts
+        # with "where do pipelines come from".
+        "meta": [
+            "pulumi-infrastructure-meta",
+            "simple-pulumi-meta",
+            "k8s-apps-meta",
+            "dagger-pulumi-edxapp-meta-v3",
+            "packer-pulumi-xqwatcher-meta",
+            "xqwatcher-grader-images-meta",
+        ],
+        # AWS substrate, clusters, AMIs, identity, observability, notification.
+        # Keycloak belongs here, not open-edx: it is the org-wide IdP.
+        "core-platform": [
+            "pulumi-aws",
+            "pulumi-aws-ecr",
+            "pulumi-aws-sftp",
+            "pulumi-eks-cluster",
+            "packer-docker-baseline",
+            "packer-pulumi-vault",
+            "packer-pulumi-consul",
+            "packer-pulumi-concourse",
+            "docker-pulumi-keycloak",
+            "pulumi-monitoring",
+            "misc-grafana-management",
+            "pulumi-vector-log-proxy",
+            "pulumi-kubewatch",
+            "pulumi-sentry",
+            "pulumi-rootly",
+            "misc-cloud-custodian",
+            "pulumi-mailgun",
+            "pulumi-fastly-redirector",
+            "pulumi-xpro-partner-dns",
+            "pulumi-celery-monitoring",
+            "pulumi-release-bot",
+            "pulumi-toolhive-operator",
+            "pulumi-toolhive-data",
+            "pulumi-toolhive-apps",
+            "pulumi-toolhive-swe",
+        ],
+        # Warehouse, ingestion, query engines, catalog, notebooks.
+        # ol-analytics-api-pipeline sits here rather than applications despite
+        # being a k8s_apps app -- it reads as part of the data stack.
+        "data-platform": [
+            "pulumi-data_warehouse",
+            "pulumi-airbyte",
+            "docker-pulumi-dagster",
+            "pulumi-clickhouse",
+            "pulumi-starrocks",
+            "pulumi-starrocks-substructure",
+            "pulumi-starburst",
+            "pulumi-open-metadata",
+            "pulumi-open-metadata-substructure",
+            "pulumi-opensearch",
+            "pulumi-qdrant-cloud",
+            "pulumi-mongodb-atlas",
+            "pulumi-tika",
+            "docker-pulumi-superset",
+            "ol-superset-deploy",
+            "ol-analytics-api-pipeline",
+            "pulumi-jupyterhub",
+            "pulumi-jupyterhub-data",
+            "pulumi-marimo-data",
+            "jupyter_notebook_docker_image_build",
+        ],
+        # Grouped by component, then by deployment (master/ulmo/verawood).
+        "open-edx": [
+            "dagger-pulumi-edxapp-global",
+            "dagger-pulumi-codejail-master",
+            "dagger-pulumi-codejail-ulmo",
+            "dagger-pulumi-codejail-verawood",
+            "dagger-pulumi-edx-notes-master",
+            "dagger-pulumi-edx-notes-ulmo",
+            "dagger-pulumi-edx-notes-verawood",
+            "docker-packer-pulumi-xqueue-master",
+            "docker-packer-pulumi-xqueue-ulmo",
+            "docker-packer-pulumi-xqueue-verawood",
+            "docker-pulumi-xqwatcher-master",
+            "docker-pulumi-xqwatcher-ulmo",
+            "docker-pulumi-xqwatcher-verawood",
+            "build-grader-base-image",
+            "build-graders-mit-600x-image",
+            "build-graders-mit-686x-image",
+        ],
+        # Product deploy pipelines. The release_bot-referenced ones come first;
+        # none of them may be renamed without a coordinated bot deploy.
+        "applications": [
+            "mit-learn-pipeline",
+            "mit-learn-nextjs-pipeline",
+            "learn-ai-pipeline",
+            "mitxonline-pipeline",
+            "xpro-pipeline",
+            "micromasters-pipeline",
+            "ocw-studio-pipeline",
+            "odl-video-service-pipeline",
+            "pulumi-ocw-site",
+            "pulumi-open-discussions",
+            "pulumi-digital-credentials",
+            "pulumi-b2b-partners-storage",
+        ],
+        # Parked last pending the Phase 2 archive decision. The three
+        # `-relesae-test` pipelines have no definition anywhere in this repo and
+        # still hold production deploy jobs; the two image pipelines are orphaned
+        # duplicates of the canonical copies on `main`.
+        "deprecated": [
+            "docker-pulumi-micromasters-relesae-test",
+            "docker-pulumi-ovs-relesae-test",
+            "docker-pulumi-xpro-relesae-test",
+            "dcind-resource-image",
+            "docker-google-ads-opt-image",
+        ],
+    },
+    "main": {
+        "meta": [
+            "container-images-meta",
+            "ol-concourse-resource-meta",
+            "ol-api-clients-meta",
+            "publish-python-packages-meta",
+            "mfe-meta-pipeline",
+            "dagger-pulumi-codejail-meta",
+            "dagger-pulumi-edx-notes-meta",
+            "docker-packer-pulumi-xqueue-meta",
+        ],
+        # Resource types and CI images.
+        "concourse-tooling": [
+            "build-ol-concourse-images",
+            "publish-ol-concourse",
+            "build-concourse-resources-rclone",
+            "build-concourse-resources-s3-sync",
+            "docker-concourse-vault-resource",
+            "docker-hashicorp-release-resource-image",
+            "docker-mitodl-concourse-npm-resource",
+            "dcind-resource-image",
+        ],
+        # Shared build/runtime images.
+        "base-images": [
+            "ol-python-base-docker",
+            "ol-infrastructure-docker-container",
+            "docker-openedx-tubular-image",
+            "ocw-course-publisher-image",
+            "ol-superset-image",
+            "build-redash-image",
+            "docker-google-ads-opt-image",
+        ],
+        "package-publishing": [
+            "publish-ol-django-pypi",
+            "publish-open-edx-plugins-pypi",
+            "publish-jupyterhub-extensions-pypi",
+            "mit-learn-api-client",
+            "mitxonline-api-client",
+        ],
+        "apps-misc": [
+            "platform-engineering-site",
+            "edx-sysadmin",
+            "sign-and-verify",
+            "google-ads-optimization",
+        ],
+    },
+}
+
+
+def load_order(order_file: Path | None) -> dict[str, dict[str, list[str]]]:
+    """Return the built-in ordering, or one loaded from a YAML override file."""
+    if order_file is None:
+        return PIPELINE_ORDER
+    return yaml.safe_load(order_file.read_text())
+
+
+def fly(target: str, *args: str) -> str:
+    """Run a `fly` subcommand against a target, exiting on failure."""
+    result = subprocess.run(  # noqa: S603
+        ["fly", "-t", target, *args],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        sys.exit(f"fly {' '.join(args)} failed:\n{result.stderr.strip()}")
+    return result.stdout
+
+
+def live_pipelines(target: str, team: str) -> list[str]:
+    """Live pipeline names for a team, in their current display order.
+
+    The API returns pipelines in display order. Instanced pipelines repeat their
+    name once per instance (`jupyter_notebook_docker_image_build` has 30) but
+    render as a single instance-group tile, so dedupe while preserving
+    first-seen position to get one entry per tile. Archived pipelines have no
+    tile and are excluded.
+    """
+    raw = fly(target, "pipelines", "--team", team, "--json")
+    names: list[str] = []
+    for pipeline in json.loads(raw):
+        name = pipeline["name"]
+        if pipeline.get("archived") or name in names:
+            continue
+        names.append(name)
+    return names
+
+
+def resolve(
+    desired: dict[str, list[str]], live: list[str]
+) -> tuple[dict[str, list[str]], list[str]]:
+    """Reconcile the curated order against what is actually live.
+
+    Returns the curated clusters filtered down to live pipelines (plus an
+    `unclustered` bucket for live pipelines the curation does not mention), and
+    the list of curated names that no longer exist. Passing a nonexistent name
+    to `fly order-pipelines` errors out, so phantoms are dropped rather than
+    sent.
+    """
+    live_set = set(live)
+    curated: set[str] = set()
+    clusters: dict[str, list[str]] = {}
+    phantoms: list[str] = []
+
+    for cluster, names in desired.items():
+        present = []
+        for name in names:
+            if name in live_set:
+                present.append(name)
+                curated.add(name)
+            else:
+                phantoms.append(name)
+        clusters[cluster] = present
+
+    unclustered = [name for name in live if name not in curated]
+    if unclustered:
+        clusters[UNCLUSTERED] = unclustered
+
+    return clusters, phantoms
+
+
+def flatten(clusters: dict[str, list[str]]) -> list[str]:
+    """Collapse clusters into the flat, ordered name list `fly` expects."""
+    return [name for names in clusters.values() for name in names]
+
+
+def teams_to_process(
+    order: dict[str, dict[str, list[str]]], team: str | None
+) -> list[str]:
+    """Resolve the `--team` flag to the list of teams to act on."""
+    if team is None:
+        return list(order)
+    if team not in order:
+        sys.exit(f"No curated ordering defined for team {team!r}. Known: {list(order)}")
+    return [team]
+
+
+@app.command
+def show(
+    *,
+    team: Annotated[str | None, cyclopts.Parameter(help="Limit to one team.")] = None,
+    order_file: Annotated[
+        Path | None,
+        cyclopts.Parameter(help="YAML file overriding the built-in ordering."),
+    ] = None,
+) -> None:
+    """Print the curated ordering without contacting Concourse."""
+    order = load_order(order_file)
+    for team_name in teams_to_process(order, team):
+        clusters = order[team_name]
+        total = sum(len(names) for names in clusters.values())
+        print(f"\n{team_name} ({total} tiles, {len(clusters)} clusters)")
+        for cluster, names in clusters.items():
+            print(f"  {cluster} ({len(names)})")
+            for name in names:
+                print(f"    {name}")
+
+
+@app.command
+def check(
+    *,
+    target: Annotated[
+        str, cyclopts.Parameter(help="fly target name.")
+    ] = DEFAULT_TARGET,
+    team: Annotated[str | None, cyclopts.Parameter(help="Limit to one team.")] = None,
+    order_file: Annotated[
+        Path | None,
+        cyclopts.Parameter(help="YAML file overriding the built-in ordering."),
+    ] = None,
+) -> None:
+    """Report drift between the curated ordering and the live dashboard.
+
+    Exits non-zero if any team is out of order, has live pipelines the curation
+    does not mention, or curates names that no longer exist.
+    """
+    order = load_order(order_file)
+    drifted = False
+
+    for team_name in teams_to_process(order, team):
+        live = live_pipelines(target, team_name)
+        clusters, phantoms = resolve(order[team_name], live)
+        desired = flatten(clusters)
+        unclustered = clusters.get(UNCLUSTERED, [])
+
+        print(f"\n{team_name}: {len(live)} live tiles")
+        if phantoms:
+            drifted = True
+            print(f"  curated but not live ({len(phantoms)}) -- will be skipped:")
+            for name in phantoms:
+                print(f"    {name}")
+        if unclustered:
+            drifted = True
+            print(f"  live but uncurated ({len(unclustered)}) -- ordered last:")
+            for name in unclustered:
+                print(f"    {name}")
+        if desired == live:
+            print("  order: matches curated ordering")
+        else:
+            drifted = True
+            first = next(
+                i for i, (a, b) in enumerate(zip(desired, live, strict=True)) if a != b
+            )
+            print(
+                f"  order: differs, first at position {first} "
+                f"(live {live[first]!r}, curated {desired[first]!r})"
+            )
+
+    if drifted:
+        sys.exit(1)
+
+
+@app.command
+def apply(
+    *,
+    target: Annotated[
+        str, cyclopts.Parameter(help="fly target name.")
+    ] = DEFAULT_TARGET,
+    team: Annotated[str | None, cyclopts.Parameter(help="Limit to one team.")] = None,
+    order_file: Annotated[
+        Path | None,
+        cyclopts.Parameter(help="YAML file overriding the built-in ordering."),
+    ] = None,
+    dry_run: Annotated[
+        bool,
+        cyclopts.Parameter(help="Print the fly invocation without running it."),
+    ] = False,
+) -> None:
+    """Apply the curated ordering via `fly order-pipelines`.
+
+    Idempotent: the full live tile list is sent every time, so re-running is a
+    no-op and running after new pipelines appear simply re-sorts them.
+    """
+    order = load_order(order_file)
+
+    for team_name in teams_to_process(order, team):
+        live = live_pipelines(target, team_name)
+        clusters, phantoms = resolve(order[team_name], live)
+        desired = flatten(clusters)
+
+        for name in phantoms:
+            print(f"{team_name}: skipping curated-but-not-live pipeline {name!r}")
+        for name in clusters.get(UNCLUSTERED, []):
+            print(f"{team_name}: uncurated pipeline {name!r} ordered last")
+
+        args = ["order-pipelines", "--team", team_name]
+        for name in desired:
+            args += ["-p", name]
+
+        if dry_run:
+            print(f"[dry-run] fly -t {target} {' '.join(args)}")
+            continue
+
+        fly(target, *args)
+        print(f"{team_name}: ordered {len(desired)} tiles")
+
+
+if __name__ == "__main__":
+    app()
