@@ -30,32 +30,15 @@ spec:
         ports:
         - containerPort: 3000
           name: http
-        env:
-        - name: PORT
-          value: "3000"
-        - name: HOSTNAME
-          value: "0.0.0.0"
-        - name: NODE_EXTRA_CA_CERTS
-          value: /etc/ssl/local-dev/rootCA.pem
-            # Required by validateEnv at server startup.
-        - name: NEXT_PUBLIC_ORIGIN
-          value: "https://learn.mit.dev"
-        - name: NEXT_PUBLIC_MITOL_API_BASE_URL
-          value: "https://api.learn.mit.dev"
-        - name: NEXT_PUBLIC_SITE_NAME
-          value: "MIT Learn"
-        - name: NEXT_PUBLIC_MITOL_SUPPORT_EMAIL
-          value: "mitlearn-support@mit.edu"
-        - name: NEXT_PUBLIC_CSRF_COOKIE_NAME
-          value: "csrftoken"
-        - name: NEXT_PUBLIC_MITOL_AXIOS_WITH_CREDENTIALS
-          value: "true"
-        - name: NEXT_PUBLIC_MITX_ONLINE_BASE_URL
-          value: "https://api.learn.mit.dev/mitxonline"
-        - name: NEXT_PUBLIC_MITX_ONLINE_LEGACY_BASE_URL
-          value: "https://mitxonline.mit.dev"
-        - name: NEXT_PUBLIC_MITX_ONLINE_CSRF_COOKIE_NAME
-          value: "csrf_mitxonline"
+        envFrom:
+        - configMapRef:
+            name: mitlearn-nextjs-env
+        # Gitignored per-developer overrides; must stay LAST so its keys win
+        # over the tracked ConfigMap above. See "Local Configuration
+        # Overrides" in local-dev/README.md.
+        - configMapRef:
+            name: mitlearn-nextjs-env-local
+            optional: true
         resources:
           requests:
             cpu: 100m

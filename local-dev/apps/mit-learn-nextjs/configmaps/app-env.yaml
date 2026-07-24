@@ -1,0 +1,23 @@
+---
+# Application environment ConfigMap for the mit-learn Next.js frontend.
+# All values are non-secret. NEXT_PUBLIC_* vars are injected at runtime
+# (PublicEnvScript) and validated at server startup — they are NOT build args.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mitlearn-nextjs-env
+  namespace: mit-learn
+data:
+  PORT: "3000"
+  HOSTNAME: "0.0.0.0"
+  NODE_EXTRA_CA_CERTS: /etc/ssl/local-dev/rootCA.pem
+  # Required by validateEnv at server startup.
+  NEXT_PUBLIC_ORIGIN: "https://learn.mit.dev"
+  NEXT_PUBLIC_MITOL_API_BASE_URL: "https://api.learn.mit.dev"
+  NEXT_PUBLIC_SITE_NAME: "MIT Learn"
+  NEXT_PUBLIC_MITOL_SUPPORT_EMAIL: "mitlearn-support@mit.edu"
+  NEXT_PUBLIC_CSRF_COOKIE_NAME: "csrftoken"
+  NEXT_PUBLIC_MITOL_AXIOS_WITH_CREDENTIALS: "true"
+  NEXT_PUBLIC_MITX_ONLINE_BASE_URL: "https://api.learn.mit.dev/mitxonline"
+  NEXT_PUBLIC_MITX_ONLINE_LEGACY_BASE_URL: "https://mitxonline.mit.dev"
+  NEXT_PUBLIC_MITX_ONLINE_CSRF_COOKIE_NAME: "csrf_mitxonline"
