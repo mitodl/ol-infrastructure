@@ -45,6 +45,7 @@ config:
       - m6a.2xlarge
       - m5a.2xlarge
       - m5.2xlarge
+      on_demand_base_capacity: 1
     use_spot_instances: true
   - auto_scale:
       desired: 4
@@ -71,6 +72,7 @@ config:
       - m6a.4xlarge
       - m5a.4xlarge
       - m5.4xlarge
+      on_demand_base_capacity: 1
     use_spot_instances: true
   - auto_scale:
       desired: 4
@@ -93,6 +95,7 @@ config:
       - m6a.xlarge
       - m5a.xlarge
       - m5.xlarge
+      on_demand_base_capacity: 1
     use_spot_instances: true
   consul:address: https://consul-operations-production.odl.mit.edu
   vault:address: https://vault-production.odl.mit.edu

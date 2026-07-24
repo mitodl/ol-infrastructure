@@ -39,6 +39,13 @@ config:
     - pulumi_state
     instance_type: general_purpose_xlarge
     name: ocw
+    spot_options:
+      instance_type_overrides:
+      - m7i.xlarge
+      - m6a.xlarge
+      - m5a.xlarge
+      - m5.xlarge
+      on_demand_base_capacity: 1
   - auto_scale:
       desired: 2
       max: 2
@@ -56,6 +63,11 @@ config:
     - pulumi_state
     instance_type: burstable_medium
     name: infra
+    spot_options:
+      instance_type_overrides:
+      - t3.medium
+      - t2.medium
+      on_demand_base_capacity: 1
   - auto_scale:
       desired: 2
       max: 2
@@ -70,6 +82,11 @@ config:
     - pulumi_state
     instance_type: burstable_medium
     name: generic
+    spot_options:
+      instance_type_overrides:
+      - t3.medium
+      - t2.medium
+      on_demand_base_capacity: 1
   consul:address: https://consul-operations-qa.odl.mit.edu
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa

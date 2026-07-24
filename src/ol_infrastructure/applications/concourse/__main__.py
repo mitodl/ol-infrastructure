@@ -734,6 +734,7 @@ for worker_def in concourse_config.get_object("workers") or []:
             spot_allocation_strategy=spot_config.get(
                 "spot_allocation_strategy", "price-capacity-optimized"
             ),
+            on_demand_base_capacity=spot_config.get("on_demand_base_capacity", 0),
         )
 
     ol_worker_launch_config = OLLaunchTemplateConfig(
