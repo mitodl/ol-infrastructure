@@ -228,10 +228,34 @@ PIPELINE_ORDER: dict[str, dict[str, list[str]]] = {
 
 
 def load_order(order_file: Path | None) -> dict[str, dict[str, list[str]]]:
-    """Return the built-in ordering, or one loaded from a YAML override file."""
+    """Return the built-in ordering, or one loaded from a YAML override file.
+
+    Rejects a pipeline listed under more than one cluster. A duplicate would put
+    the same tile in the order list twice, which makes `apply` pass `-p <name>`
+    twice to `fly` and breaks the "one entry per live tile" invariant the rest of
+    this script depends on. Catching it here keeps that invariant true for both
+    subcommands, and turns a traceback into a message naming the offender.
+    """
     if order_file is None:
-        return PIPELINE_ORDER
-    return yaml.safe_load(order_file.read_text())
+        order, source = PIPELINE_ORDER, "built-in ordering"
+    else:
+        order, source = yaml.safe_load(order_file.read_text()), str(order_file)
+
+    for team, clusters in order.items():
+        placement: dict[str, list[str]] = {}
+        for cluster, names in clusters.items():
+            for name in names:
+                placement.setdefault(name, []).append(cluster)
+        duplicated = {n: c for n, c in placement.items() if len(c) > 1}
+        if duplicated:
+            detail = "; ".join(
+                f"{name} in {', '.join(cs)}" for name, cs in sorted(duplicated.items())
+            )
+            sys.exit(
+                f"{source}: team {team!r} lists the same pipeline under more than "
+                f"one cluster: {detail}"
+            )
+    return order
 
 
 def fly(target: str, *args: str) -> str:
@@ -377,6 +401,9 @@ def check(
             print("  order: matches curated ordering")
         else:
             drifted = True
+            # strict=True is a real invariant, not optimism: `load_order` rejects
+            # duplicates and `resolve` emits every live name exactly once, so a
+            # length mismatch here would mean one of those broke.
             first = next(
                 i for i, (a, b) in enumerate(zip(desired, live, strict=True)) if a != b
             )
