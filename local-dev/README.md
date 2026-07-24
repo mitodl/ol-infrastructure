@@ -9,23 +9,24 @@ A fully local, Kubernetes-based development environment for the MIT Learn applic
 1. [Overview](#overview)
 2. [Prerequisites](#prerequisites)
 3. [Quick Start](#quick-start)
-4. [Architecture](#architecture)
-5. [Directory Structure](#directory-structure)
-6. [How It Works](#how-it-works)
-7. [Working with Apps](#working-with-apps)
-8. [Seeding Data](#seeding-data)
-9. [Configuration Reference](#configuration-reference)
-10. [Adding a New App](#adding-a-new-app)
-11. [Modifying Shared Infrastructure](#modifying-shared-infrastructure)
-12. [Disk Management](#disk-management)
-13. [Teardown](#teardown)
-14. [Troubleshooting](#troubleshooting)
+4. [Starting and Stopping](#starting-and-stopping)
+5. [Architecture](#architecture)
+6. [Directory Structure](#directory-structure)
+7. [How It Works](#how-it-works)
+8. [Working with Apps](#working-with-apps)
+9. [Seeding Data](#seeding-data)
+10. [Configuration Reference](#configuration-reference)
+11. [Adding a New App](#adding-a-new-app)
+12. [Modifying Shared Infrastructure](#modifying-shared-infrastructure)
+13. [Disk Management](#disk-management)
+14. [Teardown](#teardown)
+15. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Overview
 
-This environment runs four applications as Kubernetes workloads inside a local k3d cluster:
+This environment runs the MIT Learn application stack as Kubernetes workloads inside a local k3d cluster:
 
 | App | Local URL | Description |
 |-----|-----------|-------------|
@@ -35,6 +36,7 @@ This environment runs four applications as Kubernetes workloads inside a local k
 | mitxonline | `https://mitxonline.mit.dev` | MITx Online LMS (Django/uwsgi) |
 | odl-video-service | `https://video.odl.mit.dev` | ODL Video Service (Django/uwsgi) |
 | Keycloak SSO | `https://sso.ol.mit.dev` | Identity provider (olapps realm) |
+| Mailpit | `https://mail.mit.dev` | Captured outbound email (web UI) |
 
 All hostnames use a `.dev` TLD that mirrors production (`.edu` → `.dev`), so URLs, CSRF cookies, and OIDC redirect URIs behave identically to deployed environments.
 
@@ -52,9 +54,9 @@ Install these tools before running setup:
 
 | Tool | Version | Install |
 |------|---------|---------|
-| Docker Desktop | ≥ 4.x (8 GB RAM allocated) | https://docs.docker.com/desktop/ |
+| Docker Desktop or OrbStack | 8 GB RAM allocated to the VM | https://docs.docker.com/desktop/ or https://orbstack.dev/ |
 | kubectl | ≥ 1.28 | `brew install kubectl` |
-| k3d | ≥ 5.7 | `brew install k3d` |
+| k3d | ≥ 5.9 (tested; `setup.sh` uses `k3d registry create --image -v`) | `brew install k3d` |
 | Tilt | ≥ 0.33 | https://docs.tilt.dev/install.html |
 | Helm | ≥ 3.14 | `brew install helm` |
 | mkcert | ≥ 1.4 | `brew install mkcert` |
@@ -62,7 +64,7 @@ Install these tools before running setup:
 | bash | ≥ 4 | `brew install bash` (stock macOS ships 3.2; the seeding and prune scripts use `mapfile`) |
 | uv | ≥ 0.9.3 | `brew install uv` |
 
-> **Docker memory:** The cluster runs PostgreSQL, Valkey, APISIX, Keycloak, Qdrant, and up to four Django apps. Allocate at least 8 GB to Docker Desktop (Settings → Resources).
+> **Docker memory:** The cluster runs PostgreSQL, Valkey, APISIX, Keycloak, Qdrant, OpenSearch, Tika, and up to four Django apps. Allocate at least 8 GB to the Docker VM (Docker Desktop: Settings → Resources; OrbStack allocates dynamically).
 
 ### Windows (WSL2)
 
@@ -117,16 +119,10 @@ The easiest way is to use the provided start script, which validates your setup 
 
 This will:
 1. Validate that `setup.sh` has been run (cluster exists, kubeconfig configured, certs present)
-2. Heal any wedged kubelet exec/streaming (see [Troubleshooting](#kubectl-exec-fails-with-a-502-wedged-kubelet-streaming)) — a no-op when healthy
-3. Sync Python dependencies via `uv`
-4. Start Tilt
-
-**Alternative:** If you prefer to start manually without the validation wrapper:
-
-```bash
-uv sync
-tilt up
-```
+2. Restart the k3d cluster if it was paused by `stop.sh`
+3. Heal any wedged kubelet exec/streaming (see [Troubleshooting](#kubectl-exec-fails-with-a-502-wedged-kubelet-streaming)) — a no-op when healthy
+4. Sync Python dependencies via `uv`
+5. Start Tilt
 
 ### 4. Monitor the environment
 
@@ -140,6 +136,36 @@ Open the Tilt UI at `http://localhost:10350` to monitor deployments and trigger 
 
 ---
 
+## Starting and Stopping
+
+The stack has two independently-running halves, and knowing which is which
+answers most lifecycle questions:
+
+- **The cluster** (k3d node containers + every pod inside them) runs
+  *detached*, like `docker compose up -d`. It needs no terminal and survives
+  you closing everything.
+- **Tilt** (`start.sh` / the `tilt up` terminal) is the *dev loop*: the UI at
+  localhost:10350, file-watching and live-sync, automatic rebuilds, and the
+  disk-janitor. It runs in the foreground, on purpose — there is no
+  detached mode.
+
+Day-to-day:
+
+| You want to… | Do this | What happens |
+|---|---|---|
+| Start working | `./local-dev/scripts/start.sh` | Restarts the cluster if paused, heals, syncs deps, runs Tilt |
+| Stop coding but keep apps running | `Ctrl+C` in the Tilt terminal | Apps stay reachable at their `.dev` URLs; edits no longer sync until Tilt runs again |
+| Shut down for the day | `Ctrl+C` Tilt, then `./local-dev/scripts/stop.sh` | Removes Tilt-managed workloads, pauses the cluster; DB data survives |
+| Destroy everything | `./local-dev/scripts/teardown.sh` | Deletes the cluster, Pulumi resources, certs, /etc/hosts entries |
+
+Closing the Tilt terminal (or Ctrl+C) never deletes anything from the
+cluster — pods keep running because Kubernetes, not Tilt, keeps them alive.
+The one thing to remember: with Tilt stopped, a pod that gets recreated
+comes up from its last-built image *without* your live-synced edits; they
+re-sync when Tilt next runs.
+
+---
+
 ## Architecture
 
 ```
@@ -148,8 +174,9 @@ Open the Tilt UI at `http://localhost:10350` to monitor deployments and trigger 
 │                                                               │
 │  ┌──────────┐  ┌──────────────────────────────────────────┐  │
 │  │operations│  │           local-infra                    │  │
-│  │          │  │  PostgreSQL (CNPG)  Valkey  Qdrant         │  │
-│  │  APISIX  │  │  Keycloak  LiteLLM  Mailpit              │  │
+│  │          │  │  PostgreSQL (CNPG)  Valkey  Qdrant       │  │
+│  │  APISIX  │  │  OpenSearch  Tika  Keycloak  LiteLLM     │  │
+│  │          │  │  Mailpit                                 │  │
 │  └────┬─────┘  └──────────────────────────────────────────┘  │
 │       │                                                       │
 │       │  routes traffic by hostname                          │
@@ -174,7 +201,7 @@ Open the Tilt UI at `http://localhost:10350` to monitor deployments and trigger 
 
 **APISIX as ingress:** Traefik is disabled in k3d. APISIX handles all ingress, TLS termination, and OIDC authentication (via the `openid-connect` plugin). Each app's `apisix-routes.yaml` declares its `ApisixRoute` and `ApisixTls` CRDs.
 
-**Shared database cluster:** All apps share one CloudNativePG (CNPG) cluster in the `local-infra` namespace with isolated databases (`mitlearn`, `learnai`, `mitxonline`, `odlvideo`, `keycloak`, `litellm`). This keeps memory usage low. The `per_app_databases` toggle (Phase 6A, not yet implemented) will allow fully isolated CNPG clusters per namespace.
+**Shared database cluster:** All apps share one CloudNativePG (CNPG) cluster in the `local-infra` namespace with isolated databases (`mitlearn`, `learnai`, `mitxonline`, `odlvideo`, `keycloak`, `litellm`). This keeps memory usage low. (A `per_app_databases` config key is declared but not wired to anything yet — setting it has no effect.)
 
 **TLS:** mkcert generates a wildcard certificate for all `.dev` domains. The cert is read by Pulumi at stack evaluation time and stored as `local-dev-tls` Kubernetes Secrets in every app namespace. APISIX's `ApisixTls` CRs reference these secrets.
 
@@ -191,15 +218,22 @@ ol-infrastructure/
 │
 └── local-dev/
     ├── cluster/
-    │   └── k3d-config.yaml           # k3d cluster definition (ports, registry, no Traefik)
+    │   ├── k3d-config.yaml           # k3d cluster definition (ports, registry mirror, no Traefik)
+    │   └── zot-config.json           # Registry retention + GC config (see Disk Management)
     │
     ├── scripts/
-    │   ├── setup.sh                  # One-time bootstrap (cluster, certs, /etc/hosts)
+    │   ├── setup.sh                  # One-time bootstrap (registry, cluster, certs, /etc/hosts)
     │   ├── start.sh                  # Start the environment (validate setup, heal exec, sync deps, tilt up)
-    │   ├── stop.sh                   # Pause the cluster (fast resume via start.sh)
-    │   ├── teardown.sh               # Destroy the cluster
+    │   ├── stop.sh                   # Stop Tilt + pause the cluster (fast resume via start.sh)
+    │   ├── teardown.sh               # Destroy the cluster (incl. pulumi destroy)
     │   ├── seed.sh                   # CLI seeding wrapper (kubectl exec into pods)
+    │   ├── disk-janitor.sh           # Retention for local image tags + build cache (run by Tilt)
+    │   ├── prune-docker.sh           # Break-glass disk cleanup (see Disk Management)
+    │   ├── migrate-kubelet-gc-thresholds.sh  # One-time; for clusters created before 2026-07
     │   ├── heal-exec.sh              # Repair wedged kubelet exec/streaming after sleep
+    │   ├── kc-seed-users.sh          # Seed Keycloak test users (run by Tilt)
+    │   ├── kc-fix-flow-bindings.sh   # Repair Keycloak realm flow bindings (run by Tilt)
+    │   ├── wait-for-keycloak-admin.sh  # Startup ordering helper for the apps_infra stack
     │   └── wakeup.example.sh         # Example sleepwatcher wake hook (macOS auto-heal)
     │
     ├── certs/                        # mkcert output (gitignored)
@@ -230,8 +264,8 @@ ol-infrastructure/
         │       └── nginx.yaml        # nginx sidecar config
         │
         ├── mit-learn-nextjs/         # Next.js frontend manifests
-        │   ├── Tiltfile              # docker_build with NEXT_PUBLIC_* build args
-        │   ├── deployment.yaml
+        │   ├── Tiltfile
+        │   ├── deployment.yaml       # NEXT_PUBLIC_* injected here at runtime
         │   └── apisix-routes.yaml    # Route for learn.mit.dev
         │
         ├── learn-ai/                 # Django AI proxy manifests
@@ -267,7 +301,7 @@ tilt up
   │
   ├── pulumi up (local-dev/infra/)
   │     Deploys: CNPG operator → PostgreSQL cluster → Valkey → cert-manager
-  │              → Qdrant → LiteLLM → Mailpit → APISIX
+  │              → Qdrant → OpenSearch → Tika → LiteLLM → Mailpit → APISIX
   │              → Keycloak operator → Keycloak instance → olapps realm
   │
   └── for each enabled app:
@@ -288,7 +322,7 @@ When `pyproject.toml` or `uv.lock` changes, Tilt runs `uv sync` inside the conta
 
 ### Pre-built image fallback
 
-If an app repo is not cloned on your machine, Tilt uses the pre-built ECR image at the tag listed in `tilt_config.json` under `prebuilt_tags`. You can work on mit-learn without having learn-ai checked out.
+If an app repo is not cloned on your machine, Tilt uses the pre-built Docker Hub image (`mitodl/<app>-app`) at the tag listed in `tilt_config.json` under `prebuilt_tags`. You can work on mit-learn without having learn-ai checked out.
 
 ### Live updates (Next.js frontend)
 
@@ -330,14 +364,14 @@ kubectl logs -n operations deploy/apisix -f
 ### Run management commands
 
 ```bash
-kubectl exec -n mit-learn deploy/mitlearn-webapp -- python manage.py shell
-kubectl exec -n learn-ai deploy/learnai-webapp -- python manage.py dbshell
+kubectl exec -it -n mit-learn deploy/mitlearn-webapp -c app -- python manage.py shell
+kubectl exec -it -n learn-ai deploy/learnai-webapp -c app -- python manage.py dbshell
 ```
 
 ### Connect to PostgreSQL directly
 
 ```bash
-kubectl exec -n local-infra local-pg-1 -- psql -U app -d mitlearn
+kubectl exec -it -n local-infra local-pg-1 -- psql -U app -d mitlearn
 ```
 
 ### Inspect emails (Mailpit)
@@ -375,6 +409,7 @@ tilt trigger seed-mit-learn-fixtures
 | mit-learn | `seed-mit-learn-opensearch` | Recreate OpenSearch index |
 | mit-learn | `seed-mit-learn-ocw` | Backpopulate OCW learning resources |
 | mit-learn | `seed-mit-learn-mitxonline` | Backpopulate MITx Online resources |
+| mit-learn | `seed-mit-learn-featured-lists` | Create dev-only featured lists per offeror channel |
 | learn-ai | `seed-learn-ai-checkpoints` | Backpopulate tutor checkpoints |
 | mitxonline | `seed-mitxonline-instance` | Full instance setup (superuser, courses, products) |
 | mitxonline | `seed-mitxonline-course-data` | Populate test course data |
@@ -391,32 +426,31 @@ tilt trigger seed-mit-learn-fixtures
 {
   "enabled_apps": ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"],
 
-  "per_app_databases": false,
-
   "prebuilt_tags": [
     "mit-learn=0.62.0",
     "mit-learn-nextjs=0.62.0",
     "learn-ai=0.28.3",
     "mitxonline=1.144.5",
     "odl-video-service=0.85.0"
-  ]
+  ],
+
+  "root_domain": "mit.dev"
 }
 ```
 
 | Key | Default | Description |
 |-----|---------|-------------|
 | `enabled_apps` | all four | Apps to deploy. Omit any to skip it entirely. |
-| `per_app_databases` | `false` | `true` deploys isolated CNPG + Valkey per namespace (Phase 6A). |
 | `prebuilt_tags` | see file | `["app=tag"]` list of image tags used when the app repo is not checked out locally. |
+| `root_domain` | `mit.dev` | Root DNS domain all service hostnames derive from. |
+| `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
+| `per_app_databases`, `openedx_mode` | — | Declared but not wired to anything yet; setting them has no effect. |
 
 The rule of thumb for which config surface a knob belongs to: settings that
 change **which/how Tilt runs things** (apps, image tags, domain) go in
 `tilt_config.json`; anything that sets an **env var or secret value inside a
 workload** (API keys, feature flags, endpoints) goes in a gitignored
 `app-env.local.yaml` override ConfigMap — see [Local Configuration Overrides](#local-configuration-overrides).
-(`openai_api_key`, `langsmith_api_key`, and `canvas_ai_token` used to be
-listed here but were never wired to anything and have been removed — delete
-them from your `tilt_config.json` if present, or `config.parse()` will error.)
 
 ### Pulumi stack config
 
@@ -467,27 +501,23 @@ Tiltfile.
 
 ### 2. Add the app database to the CNPG cluster
 
-In `local-dev/infra/__main__.py`, add to `postInitSQL`:
+In `local-dev/infra/modules/database.py`, add to the `postInitSQL` list:
 
 ```python
 "CREATE DATABASE myapp OWNER app;",
 ```
 
-### 3. Copy the TLS secret to the new namespace
+### 3. Register the namespace (TLS secret comes with it)
 
-In `__main__.py`, add:
-
-```python
-tls_secret_myapp = _tls_secret(
-    "local-dev-tls-myapp", "my-app", _app_namespaces["my-app"]
-)
-```
-
-And add `"my-app"` to the namespace loop near the top of `__main__.py`.
+Add `"my-app"` to the `APP_NAMESPACES` tuple in
+`local-dev/infra/modules/namespaces.py`, and to the matching
+`app_namespaces` tuple in `local-dev/infra/modules/tls.py` — the latter's
+loops then create the `local-dev-tls` Secret and mkcert CA ConfigMap in the
+new namespace automatically.
 
 ### 4. Add the Keycloak OIDC client (if needed)
 
-In `local_dev_keycloak.py`, add a new client and call `_make_oidc_secret()` to create the OIDC credentials Secret in the app namespace.
+In `local-dev/infra/modules/keycloak.py`, add a new client and call `_make_oidc_secret()` to create the OIDC credentials Secret in the app namespace.
 
 ### 5. Register in the root Tiltfile
 
@@ -540,7 +570,7 @@ Tilt also runs `pulumi up` automatically when infra files change. You can also t
 
 **Change a Helm chart version:** Edit the version in `infra/core/Pulumi.local-dev.core.Dev.yaml` and run `pulumi up` in `infra/core/`.
 
-**Add a new shared service:** Add it to `infra/core/__main__.py`. Use the existing Qdrant or Valkey blocks as a reference.
+**Add a new shared service:** Add a module under `infra/modules/` and call it from `infra/core/__main__.py`. Use the existing modules (`cache.py`, `search.py`, `ai.py`) as references.
 
 **Modify the Keycloak realm or add a new OIDC client:** Edit `infra/modules/keycloak.py`. On `pulumi up`, pulumi-keycloak will diff the realm state and apply only what changed.
 
@@ -622,7 +652,7 @@ something isn't being reclaimed. To check whether zot is doing its part,
 ./local-dev/scripts/teardown.sh --keep-certs --keep-hosts
 ```
 
-> **Note:** The teardown script now calls `pulumi destroy` automatically to clean up Pulumi-managed resources before deleting the cluster. This ensures no orphaned resources are left behind.
+> **Note:** The teardown script calls `pulumi destroy` automatically to clean up Pulumi-managed resources before deleting the cluster, so no orphaned resources are left behind.
 
 ---
 
@@ -832,7 +862,7 @@ The k3d registry is bound to host port 5001. This avoids the macOS AirPlay Recei
 lsof -i :5001
 ```
 
-Edit `local-dev/cluster/k3d-config.yaml` to change `hostPort` to an unused port and update the mirror entry to match, then re-run `setup.sh`.
+To move it: change the `--port` in `setup.sh`'s `k3d registry create` call and the matching `k3d-registry.localhost:5001` entries in `local-dev/cluster/k3d-config.yaml`, then delete the registry container and re-run `setup.sh`.
 
 ### Linux: inotify limit exceeded
 
