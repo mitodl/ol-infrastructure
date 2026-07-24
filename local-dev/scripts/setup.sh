@@ -244,12 +244,49 @@ fi
 ok "Prerequisites satisfied (Docker ${DOCKER_MEM_GB} GB RAM)"
 
 # ---------------------------------------------------------------------------
-# 2. Create k3d cluster
+# 2. Create local image registry (zot)
+# ---------------------------------------------------------------------------
+# Created here rather than in k3d-config.yaml because zot's config file must
+# be bind-mounted from this checkout. zot enforces image retention (keep the
+# N most recently pushed tags) and GC itself — see zot-config.json — so
+# nothing else has to clean the registry. k3d-config.yaml attaches the
+# registry to the cluster via `registries.use`.
+REGISTRY_NAME="k3d-registry.localhost"
+REGISTRY_IMAGE="ghcr.io/project-zot/zot:v2.1.18"
+ZOT_CONFIG="${REPO_ROOT}/local-dev/cluster/zot-config.json"
+
+log "Setting up local image registry '${REGISTRY_NAME}'..."
+if docker ps -a --format '{{.Names}}' | grep -qx "${REGISTRY_NAME}"; then
+    if docker inspect "${REGISTRY_NAME}" --format '{{.Config.Image}}' | grep -q zot; then
+        docker start "${REGISTRY_NAME}" >/dev/null 2>&1 || true
+        ok "Registry '${REGISTRY_NAME}' already exists — skipping creation."
+    else
+        warn "Registry '${REGISTRY_NAME}' exists but is not zot (pre-2026-07 registry:2)."
+        warn "To migrate:  k3d registry delete ${REGISTRY_NAME}  then re-run setup.sh"
+        warn "(Tilt re-pushes all images on the next build; see local-dev/README.md)"
+    fi
+else
+    # `k3d registry create` prefixes the name with 'k3d-'. The bare
+    # /var/lib/zot mount makes image storage an anonymous volume (zot's image
+    # declares none), so prune-docker.sh can wipe it with the registry
+    # stopped via --volumes-from.
+    k3d registry create "${REGISTRY_NAME#k3d-}" --port 5001 \
+        --image "${REGISTRY_IMAGE}" \
+        -v "${ZOT_CONFIG}:/etc/zot/config.json" \
+        -v /var/lib/zot
+    ok "Registry '${REGISTRY_NAME}' created (zot, retention enabled)."
+fi
+
+# ---------------------------------------------------------------------------
+# 3. Create k3d cluster
 # ---------------------------------------------------------------------------
 log "Setting up k3d cluster '${CLUSTER_NAME}'..."
 
 if k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}"; then
     ok "Cluster '${CLUSTER_NAME}' already exists — skipping creation."
+    # An already-created cluster is not reconfigured by registries.use — make
+    # sure the registry is reachable from the cluster network regardless.
+    docker network connect "k3d-${CLUSTER_NAME}" "${REGISTRY_NAME}" 2>/dev/null || true
 else
     k3d cluster create --config "${K3D_CONFIG}"
     ok "Cluster '${CLUSTER_NAME}' created."
@@ -267,7 +304,7 @@ kubectl config use-context "local-dev"
 ok "kubectl context 'local-dev' registered and active."
 
 # ---------------------------------------------------------------------------
-# 3. TLS certificates via mkcert
+# 4. TLS certificates via mkcert
 # ---------------------------------------------------------------------------
 if $SKIP_CERTS; then
     warn "Skipping certificate generation (--skip-certs)."
@@ -317,7 +354,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 4. /etc/hosts entries
+# 5. /etc/hosts entries
 # ---------------------------------------------------------------------------
 if $SKIP_HOSTS; then
     warn "Skipping /etc/hosts update (--skip-hosts)."
@@ -375,7 +412,7 @@ with open('/etc/hosts', 'w') as f:
 fi
 
 # ---------------------------------------------------------------------------
-# 5. Pulumi stack prerequisites
+# 6. Pulumi stack prerequisites
 # ---------------------------------------------------------------------------
 log "Checking Pulumi stack prerequisites..."
 
