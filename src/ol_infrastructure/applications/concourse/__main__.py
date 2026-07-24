@@ -238,7 +238,7 @@ for iam_policy in iam_policy_names or []:
             "ignore_locations": [{"actions": ["ecr:getauthorizationtoken"]}]
         },
         "PERMISSIONS_MANAGEMENT_ACTIONS": {
-            "ignore_locations": [{"actions": ["ec2:modifysnapshotattributte"]}]
+            "ignore_locations": [{"actions": ["ec2:modifysnapshotattribute"]}]
         },
         "RESOURCE_STAR": {},
     }
