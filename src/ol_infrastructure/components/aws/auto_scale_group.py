@@ -97,6 +97,11 @@ class SpotInstanceOptions(BaseModel):
         "capacity-optimized-prioritized",
         "price-capacity-optimized",
     ] = "price-capacity-optimized"
+    # Guaranteed number of on-demand instances the ASG maintains as a floor,
+    # independent of spot capacity. Only takes effect when instance_type_overrides
+    # is also set (MixedInstancesPolicy is required for on_demand_base_capacity to
+    # apply). Capacity above this floor still fills from spot.
+    on_demand_base_capacity: NonNegativeInt = NonNegativeInt(0)
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("spot_instance_type")
@@ -560,6 +565,7 @@ class OLAutoScaling(pulumi.ComponentResource):
                         overrides=overrides,
                     ),
                     instances_distribution=GroupMixedInstancesPolicyInstancesDistributionArgs(
+                        on_demand_base_capacity=mixed_spot_options.on_demand_base_capacity,
                         on_demand_percentage_above_base_capacity=0,
                         spot_allocation_strategy=mixed_spot_options.spot_allocation_strategy,
                         spot_max_price=mixed_spot_options.max_price,

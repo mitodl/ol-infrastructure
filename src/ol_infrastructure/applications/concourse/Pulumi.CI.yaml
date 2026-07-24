@@ -38,6 +38,11 @@ config:
     - pulumi_state
     instance_type: t3a.medium
     name: ocw
+    spot_options:
+      instance_type_overrides:
+      - t3.medium
+      - t2.medium
+      on_demand_base_capacity: 1
   - auto_scale:
       desired: 1
       max: 2
@@ -55,6 +60,11 @@ config:
     - pulumi_state
     instance_type: t3a.medium
     name: infra
+    spot_options:
+      instance_type_overrides:
+      - t3.medium
+      - t2.medium
+      on_demand_base_capacity: 1
   - auto_scale:
       desired: 1
       max: 2
@@ -62,7 +72,6 @@ config:
       max_instance_lifetime_seconds: 86400
     aws_tags:
       OU: operations
-    desired_capacity: 2
     disk_size_gb: 100
     iam_policies:
     - base
@@ -70,6 +79,11 @@ config:
     - pulumi_state
     instance_type: t3a.medium
     name: generic
+    spot_options:
+      instance_type_overrides:
+      - t3.medium
+      - t2.medium
+      on_demand_base_capacity: 1
   consul:address: https://consul-operations-ci.odl.mit.edu
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
