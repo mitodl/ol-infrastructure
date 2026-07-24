@@ -1168,6 +1168,133 @@ mitlearn_prefix_redirects_dictionary = fastly.ServiceDictionaryItems(
 
 
 five_minutes = 60 * 5
+
+# --- Fastly edge for the API backend (bot-crawl mitigation) ---
+#
+# api.learn.mit.edu currently has no CDN/edge in front of it at all -- it goes
+# straight through APISIX/EKS. A 2026-07-21 bot-crawl surge drove that
+# deployment's KEDA-managed replica count to its max (30/30) and contributed to
+# a Next.js memory-pressure incident on the frontend. This puts a Fastly
+# service in front of the API to absorb/reject that traffic at the edge
+# instead of the origin.
+#
+# Deployment sequencing (deliberately NOT done in this change):
+#   1. This ServiceVcl is created but inert until api_domain's DNS still points
+#      directly at the gateway (api_origin_domain falls back to api_domain
+#      below), so it can be validated via its assigned *.fastly.net testing
+#      hostname before any cutover.
+#   2. Ops must provision a distinct origin-only DNS name for the APISIX
+#      Gateway listener (e.g. origin-api.learn.mit.edu) that keeps resolving
+#      directly to the gateway NLB, and add it to the gateway's TLS cert SANs
+#      -- api_domain's own DNS cannot be repointed at Fastly while Fastly's
+#      backend also targets api_domain, since Fastly's own backend DNS lookup
+#      would then resolve back to Fastly's edge instead of the origin.
+#   3. Set `mitlearn:api_origin_domain` to that new hostname, then flip
+#      `mitlearn:enable_api_fastly_cutover` to move api_domain's DNS onto
+#      Fastly (see the route53.Record below).
+#   4. Fastly Bot Management is a separate paid product from the base Fastly
+#      plan and requires a `contentguard` ID provisioned in the Fastly control
+#      panel first; `mitlearn:bot_management_contentguard_id` must be set
+#      before `enabled=True` will apply cleanly.
+api_origin_domain = mitlearn_config.get("api_origin_domain") or mitlearn_api_domain
+bot_management_contentguard_id = mitlearn_config.get("bot_management_contentguard_id")
+enable_api_fastly_cutover = (
+    mitlearn_config.get_bool("enable_api_fastly_cutover") or False
+)
+
+mitlearn_api_fastly_service = fastly.ServiceVcl(
+    f"fastly-mitlearn-api-{stack_info.env_suffix}",
+    name=f"MIT Learn API {stack_info.env_suffix}",
+    comment="Managed by Pulumi",
+    backends=[
+        fastly.ServiceVclBackendArgs(
+            address=api_origin_domain,
+            name="MIT Learn API Origin",
+            first_byte_timeout=30000,
+            port=DEFAULT_HTTPS_PORT,
+            ssl_cert_hostname=api_origin_domain,
+            ssl_sni_hostname=api_origin_domain,
+            use_ssl=True,
+        ),
+    ],
+    domains=[
+        fastly.ServiceVclDomainArgs(
+            comment=f"mit_learn {stack_info.env_suffix} API",
+            name=mitlearn_api_domain,
+        ),
+    ],
+    gzips=[
+        fastly.ServiceVclGzipArgs(
+            name="enable-gzip-compression",
+            content_types=["application/json", "application/javascript"],
+            extensions=["json", "js"],
+        )
+    ],
+    # Rate limiting is a standard VCL feature (no extra product needed) so it's
+    # fully wired up here. Bot Management needs an account-provisioned
+    # contentguard id -- `enabled` stays False until that config is set so this
+    # doesn't silently no-op (or error) against an unprovisioned product.
+    product_enablement=fastly.ServiceVclProductEnablementArgs(
+        brotli_compression=True,
+        bot_management=(
+            fastly.ServiceVclProductEnablementBotManagementArgs(
+                enabled=True,
+                contentguard=bot_management_contentguard_id,
+            )
+            if bot_management_contentguard_id
+            else None
+        ),
+    ),
+    rate_limiters=[
+        fastly.ServiceVclRateLimiterArgs(
+            name="mitlearn-api-crawler-rate-limit",
+            action="response",
+            client_key="req.http.Fastly-Client-IP",  # pragma: allowlist secret
+            http_methods="GET, HEAD, POST",
+            penalty_box_duration=30,
+            rps_limit=20,
+            window_size=10,
+            response=fastly.ServiceVclRateLimiterResponseArgs(
+                status=429,
+                content_type="application/json",
+                content=json.dumps({"detail": "Too many requests, please slow down."}),
+            ),
+        ),
+    ],
+    logging_https=[
+        fastly.ServiceVclLoggingHttpArgs(
+            url=Output.all(domain=vector_log_proxy_domain).apply(
+                lambda kwargs: f"https://{kwargs['domain']}/fastly"
+            ),
+            name=f"fastly-mitlearn-api-{stack_info.env_suffix}-https-logging-args",
+            content_type="application/json",
+            format=build_fastly_log_format_string(
+                additional_static_fields={"application": "mitlearn-api"}
+            ),
+            header_name="Authorization",
+            header_value=f"Basic {encoded_fastly_proxy_credentials}",
+            json_format="2",
+        )
+    ],
+    opts=fastly_provider,
+)
+
+# Gated behind enable_api_fastly_cutover: see the deployment sequencing note
+# above. Until that's flipped, api_domain's DNS is left exactly as-is
+# (managed by the gateway/APISIX stack), so merging this file has no effect on
+# live traffic.
+if enable_api_fastly_cutover:
+    route53.Record(
+        "ol-mitlearn-api-dns-record",
+        name=mitlearn_api_domain,
+        allow_overwrite=True,
+        type="A",
+        ttl=five_minutes,
+        records=[str(addr) for addr in FASTLY_A_TLS_1_3],
+        zone_id=learn_zone_id,
+        opts=ResourceOptions(delete_before_replace=True),
+    )
+
 route53.Record(
     "ol-mitopen-frontend-dns-record",
     name=mitlearn_config.require("frontend_domain"),
@@ -1377,6 +1504,23 @@ application_labels = k8s_app_labels | {
     "ol.mit.edu/pod-security-group": "learn",
 }
 
+# Network-level companion to the mitlearn-api Fastly service defined below:
+# reject any request that didn't come through Fastly's edge, so bot crawls (or
+# anything else) can't just bypass Fastly's rate limiter/Bot Management by
+# hitting the gateway directly. Applied once via the shared plugin config so
+# it covers every mit-learn API route without touching the shared EKS/APISIX
+# gateway's security group, which other applications also sit behind.
+#
+# Fastly's IP ranges are pulled live from Fastly's API rather than hardcoded,
+# so they stay correct as Fastly's edge network changes.
+_fastly_ip_ranges = fastly.get_fastly_ip_ranges(
+    opts=InvokeOptions(provider=fastly_provider.provider)
+)
+fastly_origin_allowlist = Output.all(
+    ipv4=_fastly_ip_ranges.cidr_blocks,
+    ipv6=_fastly_ip_ranges.ipv6_cidr_blocks,
+).apply(lambda blocks: [*blocks["ipv4"], *blocks["ipv6"]])
+
 learn_external_service_shared_plugins = OLApisixSharedPlugins(
     name="ol-mitlearn-external-service-apisix-plugins",
     plugin_config=OLApisixSharedPluginsConfig(
@@ -1385,6 +1529,21 @@ learn_external_service_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=learn_namespace,
         k8s_labels=application_labels,
         enable_defaults=True,
+        # Gated behind enable_api_fastly_cutover, same as the DNS cutover
+        # below: until api_domain's DNS actually points at Fastly, direct
+        # traffic from browsers/API clients arrives at APISIX from non-Fastly
+        # IPs. Applying this allowlist unconditionally would block all of
+        # that (i.e. all current production traffic) the moment this
+        # deploys, not just bot traffic bypassing Fastly.
+        plugins=[
+            {
+                "name": "ip-restriction",
+                "enable": True,
+                "config": {"whitelist": fastly_origin_allowlist},
+            },
+        ]
+        if enable_api_fastly_cutover
+        else [],
     ),
 )
 
