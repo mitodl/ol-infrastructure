@@ -55,10 +55,47 @@ Only `infrastructure` and `ocw` have dedicated pools. Every other team shares th
 unbound global pool. `src/ol_concourse/lib/jobs/infrastructure.py` (the
 `pulumi_job` / `packer_jobs` factories) uses no step-level `tags:` anywhere.
 
-**Consequence: the `infrastructure` team cannot be split into semantic sub-teams
-without re-registering EC2 workers per new team.** That is a separate, higher-risk
-infrastructure change and is explicitly out of scope. All 84 `infrastructure`
-tiles stay on the `infrastructure` team.
+A worker takes **exactly one** team, or none. There is no multi-team worker:
+concourse/concourse#2633 ("Concourse workers can be associated with multiple
+teams") was closed **"not planned"**. Confirmed against the 8.2.4 worker docs —
+"you can configure a worker to belong to a single team".
+
+Live shape (`fly -t odl-prod workers --json`, 2026-07-24): 18 workers — 7 bound
+to `infrastructure`, 7 to `ocw`, 4 global. **No worker carries any tag today.**
+
+**Revised 2026-07-24 (supersedes the original "out of scope" ruling).** Splitting
+`infrastructure` into semantic teams is now the chosen direction (§Phase 3), on
+the decision that team scoping beats naming prefixes. Since a pool cannot serve
+several teams, that reduces to exactly two implementations:
+
+| | Mechanism | Boundary | Cost |
+| --- | --- | --- | --- |
+| **A (chosen)** | Drop `concourse_team` from the infra pool, tag it, route jobs with step-level `tags:` | IAM boundary becomes a **convention** | none |
+| B | One dedicated ASG per semantic team | Boundary stays **enforced** | min 2 → 8 `m7a.4xlarge`, on-demand floor 1 → 4, burst capacity fragmented |
+
+Option B was rejected on cost and because fragmenting pools partially undoes the
+spot diversification shipped in #5112 — small pools are exactly what made CI
+fragile during the t3a exhaustion.
+
+**What Option A actually costs, stated plainly.** The infra pool's instance
+profile carries `base`, `infra`, `operations`, `cloud_custodian`, `pulumi_state`.
+Any container on those hosts can reach IMDS and assume that role. Today
+`concourse_team: infrastructure` *is* the authorization boundary. Once the pool
+is global, Concourse tags are a **scheduling hint, not authorization** — anyone
+who can set a pipeline in any team can add `tags: [pulumi]` and get that role.
+Tagging does prevent *accidental* scheduling (untagged builds will not land on a
+tagged worker), so the exposure is deliberate misuse, not drift. Accepting this
+implies the set of people who can set pipelines in *any* team is already the set
+trusted with the Pulumi deploy role — which is precisely what Phase 5 (teams as
+code) would make reviewable, and is therefore now a prerequisite rather than an
+independent workstream.
+
+Implementation is smaller than expected: `build_worker_user_data()` in
+`src/ol_infrastructure/applications/concourse/__main__.py` **already** supports
+`concourse_tags` → `/etc/default/concourse-tags` → `CONCOURSE_TAG`. The missing
+half is a `tags:` parameter on `pulumi_job` / `packer_jobs`, which live in the
+separately published `mitodl/ol-concourse` package — a cross-repo change plus a
+version bump here.
 
 ### 2.2 Renames have three-way coupling
 
@@ -82,12 +119,49 @@ Any rename or team move must be checked against:
    registry edit creates a new pipeline and orphans the old build history. A real
    rename is `registry edit + fly rename-pipeline` landed together, ahead of the
    meta pipeline's next git-triggered run.
-3. **Vault credential paths are `{team}/{pipeline}`-scoped.** Concourse's built-in
-   Vault credential manager resolves `((var))` against
-   `/concourse/{{.Team}}/{{.Pipeline}}/{{.Secret}}` (see
-   `src/bilder/components/concourse/models.py`). Moving a pipeline across teams
-   breaks secret injection unless the KV secrets are migrated first. Renames
-   within a team break it the same way.
+3. **Vault credential paths are team-scoped — but by *group*, not per pipeline.**
+   Deployed config (`src/bilder/images/concourse/deploy.py:186`) is
+   `vault_path_prefix="/secret-concourse"`, `vault_shared_path="shared"`, so the
+   lookup chain is `/secret-concourse/{team}/{pipeline}/{secret}` →
+   `/secret-concourse/{team}/{secret}` → `/secret-concourse/shared/{secret}`.
+
+   In practice **nothing uses the pipeline-scoped tier.** References are
+   `((group.key))` — a KV entry per group, fields within it — resolving via the
+   `{team}/{secret}` template. So a team move relocates *groups*, not per-pipeline
+   secrets, which makes the migration far smaller than "83 pipelines × secrets".
+
+   Authoritative inventory, `vault kv list secret-concourse/<team>` against
+   vault-production (KV v2), 2026-07-24:
+
+   | Team | Groups |
+   | --- | --- |
+   | `infrastructure` | cortextool, dbt, dockerhub, eks, fastly, github, github_enterprise, grizzly, mit-github, open_api_clients, superset_qa_service_account, superset_service_account, unified_ecommerce_api_clients (13) |
+   | `main` | consul, dockerhub, fastly, google_ads_optimization, grafana, npm_publish, platform_engineering_site, pypi_creds (8) |
+   | `shared` | fastly, sentry (2) |
+   | `ocw` | api-bearer-token, draft/, fastly_draft, fastly_live, fastly_test, git-private-key, healthchecks-io-{draft,live}-uuid, live/, slack-url |
+   | `mitx` / `mitx-staging` | github |
+   | `mitxonline` / `xpro` | github, tubular_oauth_client |
+
+   **Do not derive this from the SOPS file.** `src/bridge/secrets/concourse/
+   operations.production.yaml` is missing five live groups (§4.5).
+
+   Mapping `infrastructure`'s 13 groups onto the §3 clusters, by which pipeline
+   files reference them:
+
+   - **core-platform** — `cortextool`, `grizzly` (both `grafana_cloud/pipeline.py`)
+   - **data-platform** — `dbt` (`dagster/`), `superset_service_account` +
+     `superset_qa_service_account` (`ol_superset_deploy.py`)
+   - **open-edx** — `github_enterprise`, `open_api_clients` (both
+     `grader_images/build_pipeline.py`)
+   - **promote to `shared`** — `dockerhub` (17 referencing files spanning every
+     cluster) and `github` (`k8s_apps/`, `container_images/jupyter_courses.py`)
+   - **verify before moving** — `eks`, `fastly` (a `shared` copy already exists),
+     `mit-github`, `unified_ecommerce_api_clients`. The last two have **zero**
+     `((...))` references anywhere under `src/ol_concourse` and may be dead.
+
+   So the migration is: 2 groups promoted to `shared`, 5 moved with their
+   cluster, 4 to triage. That is tractable, and it is the strongest argument that
+   the team split is affordable.
 
 ### 2.3 Concourse has no folder/tag primitive
 
@@ -262,15 +336,58 @@ name no longer exists.
 
 See §4 — this is now a *correctness* finding, not just cosmetics.
 
-### Phase 3 — Semantic naming prefixes
+### Phase 3 — Semantic teams on a globally-tagged worker pool
 
-Emulates grouping by making alphabetical/lexical order match semantic order.
-Current naming encodes the *tool* (`pulumi-`, `packer-`, `docker-`,
-`dagger-pulumi-`) rather than the *domain*, which is exactly backwards for
-navigation. Target shape is `<domain>-<component>`, e.g. `data-starrocks`,
-`core-eks-cluster`, `edx-xqwatcher-master`.
+**Direction changed 2026-07-24.** Team scoping replaces naming prefixes as the
+primary grouping mechanism. Teams give real partitioning — separate dashboards,
+separate RBAC, separate secret namespaces — where prefixes only simulate grouping
+through sort order. Prefixes remain available as a *complement* within a team
+(and the rename mechanics below still apply if we take them up), but they are no
+longer the plan.
 
-This is the highest-risk phase because of §2.2. Sequencing rule per pipeline:
+Target teams mirror the §3 clusters: `core-platform`, `data-platform`,
+`open-edx`, `applications`. `meta` and `deprecated` are dispositions rather than
+domains — meta pipelines follow whatever they generate, and the deprecated five
+are resolved by Phase 2 instead of being moved.
+
+Sequence, in dependency order:
+
+1. **Phase 5 first, not in parallel.** Teams-as-code becomes a prerequisite:
+   Option A (§2.1) makes "who can set a pipeline in any team" equivalent to "who
+   can assume the Pulumi deploy role", so team membership must be reviewable
+   before the boundary is relaxed, not after.
+2. **Tag the pool, keep it bound.** Add `concourse_tags` to the infra `worker_def`
+   while `concourse_team: infrastructure` is still set, and confirm existing jobs
+   still schedule. Tagged workers only accept tag-requesting builds, so this step
+   is where that gets proven without giving anything up.
+3. **Add `tags:` to `pulumi_job` / `packer_jobs`** in `mitodl/ol-concourse`,
+   release, bump here, regenerate. Confirm every infra pipeline still lands on the
+   infra pool.
+4. **Drop `concourse_team`** from the infra `worker_def`. This is the step that
+   trades the enforced boundary for a conventional one — land it on its own.
+5. **Move secrets before pipelines.** Promote `dockerhub` and `github` to
+   `shared`; copy each cluster's groups to its new team path (§2.2.3). Copy, don't
+   move — leave the `infrastructure` originals until the move is proven, then
+   clean up.
+6. **Move pipelines per cluster, smallest first.** `open-edx` (2 secret groups) is
+   the best pilot. Per cluster: `fly set-team`, update the meta registry's
+   `SetPipelineStep` team, `fly rename-pipeline`/re-set as needed, re-run
+   `bin/concourse-order-pipelines check`.
+7. **`release_bot` last.** It pins `CONCOURSE_TEAM=infrastructure` plus nine
+   pipeline names (§2.2.1). The `applications` cluster holds eight of the nine, so
+   that cluster cannot move until the bot takes a team-per-pipeline mapping.
+
+Risks specific to this path, beyond §2.1's IAM trade: `ol-analytics-api-pipeline`
+is `release_bot`-referenced but sits in **data-platform**, so the bot's mapping
+must be per-pipeline, not per-cluster. And the `infrastructure` team keeps its
+name and its worker pool throughout — only pipelines leave it — so nothing has to
+be re-registered at any point.
+
+#### Deferred: semantic naming prefixes
+
+Retained for reference. Current naming encodes the *tool* (`pulumi-`, `packer-`,
+`docker-`, `dagger-pulumi-`) rather than the *domain*. If taken up later, the
+target shape is `<domain>-<component>` and the per-pipeline sequencing rule is:
 
 1. Verify the name is not in the `release_bot` nine (or update the bot first, in
    its own deploy).
@@ -310,7 +427,10 @@ pipeline job that applies each file, making the eight teams' membership
 reviewable. Auth backend is already GitHub OAuth, so `roles:` entries map onto
 existing `mitodl:*` GitHub teams.
 
-This is independent of the dashboard work and can proceed in parallel.
+**Reclassified 2026-07-24: this is now a prerequisite for Phase 3, not an
+independent workstream.** Option A (§2.1) makes pipeline-set access in any team
+equivalent to holding the Pulumi deploy role, so team membership has to be
+reviewable before that boundary is relaxed.
 
 ### Phase 6 — Per-pipeline descriptions: wait for upstream, don't ship the SVG workaround
 
@@ -415,6 +535,46 @@ Action: unstick `main/dcind-resource-image` build #1, confirm both `main` copies
 publish successfully, then archive the two `infrastructure` copies. Until then,
 they sit in the **deprecated** cluster at the bottom of the ordering.
 
+### 4.4 `publish-ol-django-pypi` has been failing for six weeks
+
+Found by the §2.2.3 secret inventory — and it is exactly the failure mode a team
+move causes, already present in `main`.
+
+Every job errors in 1–2s since 2026-06-08. `fly watch` on
+`publish-ol-django-pypi/build-common` #29:
+
+```
+failed to interpolate task config: undefined vars: github.odlbot_private_ssh_key
+errored
+```
+
+`src/ol_concourse/pipelines/libraries/ol_django.py:28` passes
+`GIT_SSH_KEY: ((github.odlbot_private_ssh_key))`, but the pipeline runs on `main`
+and `main` has no `github` group — the chain falls through to `shared`, which has
+only `fastly` and `sentry`. `main` holds the same key under `npm_publish`, and the
+sibling `api_clients_pipeline.py` (also `main`) already uses
+`((npm_publish.odlbot_private_ssh_key))`. One-line fix. No `mitol-django-*`
+release has published since.
+
+Tracked as `tk-fix-publish-ol-django-pypi-undefined-var-github--505ae3`.
+
+### 4.5 The Concourse SOPS file is not a complete secret inventory
+
+`src/bridge/secrets/concourse/operations.production.yaml` is how these secrets
+are *populated*, but five live groups have no SOPS entry:
+`infrastructure/{dockerhub,mit-github,unified_ecommerce_api_clients}` and
+`main/{consul,fastly}`.
+
+`infrastructure/dockerhub` is provably load-bearing, not stale:
+`((dockerhub.username))` is referenced from 17 pipeline files, and
+`docker-pulumi-keycloak/build-keycloak-docker-image` #724 and
+`docker-pulumi-superset/build-superset-image` #243 both succeeded on 2026-07-23/24.
+
+Consequence for this project: the SOPS-derived inventory showed `infrastructure`
+with 10 groups when Vault has 13. Any team-split reasoning must come from
+`vault kv list`, not from SOPS. Tracked as
+`tk-reconcile-concourse-sops-secrets-file-against-li-d0f940`.
+
 ### 4.3 Stale `simple_pulumi/README.md`
 
 `src/ol_concourse/pipelines/infrastructure/simple_pulumi/README.md` documents 16
@@ -423,7 +583,7 @@ Trivial doc fix, independent of everything else.
 
 ## 5. Non-goals
 
-- Splitting the `infrastructure` team (§2.1).
+- Re-registering or re-provisioning the `ocw` worker pool.
 - Touching `ocw` (§1 — already correctly organized via instance groups).
 - Renaming any of the nine `release_bot` pipelines without a coordinated bot
   update.
@@ -435,9 +595,9 @@ Trivial doc fix, independent of everything else.
 | --- | --- | --- |
 | 1 | `bin/concourse-order-pipelines` applying the §3 orderings idempotently — **built**, validated end-to-end on `odl-ci`; awaiting an unexpired `odl-prod` token to apply | none |
 | 2 | Archive decision + `fly archive-pipeline` for confirmed-dead tiles | low, reversible |
-| 3 | Naming convention doc + per-pipeline rename runbook | high, deferred |
+| 3 | Semantic teams on a globally-tagged pool: tag pool → `tags:` in ol-concourse → unbind → migrate secrets → move clusters | high; trades an enforced IAM boundary for a conventional one |
 | 4 | `main`-split evaluation memo (execute only if it wins) | medium |
-| 5 | `src/ol_concourse/teams/*.yml` + apply job | low, independent |
+| 5 | `src/ol_concourse/teams/*.yml` + apply job — **now a prerequisite for Phase 3**, not independent | low |
 | 1b | Bookmarkable per-cluster dashboard filter URLs (§2.5), published wherever the team keeps links | none |
 | 6 | Per-pipeline descriptions — de-scoped; track upstream PR concourse/concourse#9661, adopt after it ships | blocked upstream |
 
