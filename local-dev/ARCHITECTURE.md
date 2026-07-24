@@ -56,7 +56,7 @@ The manifests live in `local-dev/apps/*` (Deployments, Services, ConfigMaps, Sec
 
 ### Pulumi — the shared-services installer
 
-Pulumi is an infrastructure-as-code tool (same family as Terraform): you describe resources in a real programming language and `pulumi up` creates or updates the real thing to match. It's what this repo uses to define OL's rc/prod cloud infrastructure — which is why application engineers usually meet it as "the place env vars go to affect rc/prod." In local-dev it plays a much smaller role: a Python program under `local-dev/infra/` that installs the shared in-cluster services every app needs (PostgreSQL, Valkey, Keycloak, APISIX, OpenSearch, …). Tilt runs `pulumi up` for you at startup and whenever the infra files change; the only time you touch it is to change shared infrastructure (see [EXTENDING.md](EXTENDING.md)).
+Pulumi is an infrastructure-as-code tool (same family as Terraform): you describe resources in a real programming language and `pulumi up` creates or updates the real thing to match. It's what this repo uses to define OL's rc/prod cloud infrastructure — which is why application engineers usually meet it as "the place env vars go to affect rc/prod." It does **not** play that role in local-dev: per-developer env vars go in a gitignored [`app-env.local.yaml` override](README.md#local-configuration-overrides) instead. Here Pulumi's job is smaller — a Python program under `local-dev/infra/` installs the shared in-cluster services every app needs (PostgreSQL, Valkey, Keycloak, APISIX, OpenSearch, …). Tilt runs `pulumi up` for you at startup and whenever the infra files change; the only time you touch it is to change shared infrastructure (see [EXTENDING.md](EXTENDING.md)).
 
 ### Tilt — the dev loop
 

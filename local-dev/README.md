@@ -224,13 +224,21 @@ kubectl exec -it -n learn-ai deploy/learnai-webapp -c app -- python manage.py db
 
 ### Run tests
 
-Tests run inside the app containers, against the code Tilt has live-synced — so they see your latest edits:
+Python tests need the app's environment (database, settings), so run them inside the container — they run against the code Tilt has live-synced, so they see your latest edits:
 
 ```bash
-# Python (Django) — pytest, with paths/args as usual
 kubectl exec -it -n mit-learn deploy/mitlearn-webapp -c app -- pytest main/envs_test.py
+```
 
-# JS (frontend) — jest from the workspace root; the argument is a jest pattern
+Frontend (jest) tests don't need the cluster at all — run them from your mit-learn checkout on the host, if you have its JS toolchain set up there (node + corepack + `yarn install`):
+
+```bash
+cd ../mit-learn && yarn test useToggle   # the argument is a jest pattern
+```
+
+No host toolchain? The dev container has everything installed — run them there instead:
+
+```bash
 kubectl exec -it -n mit-learn deploy/mitlearn-nextjs -- sh -c 'cd /app && yarn test useToggle'
 ```
 
