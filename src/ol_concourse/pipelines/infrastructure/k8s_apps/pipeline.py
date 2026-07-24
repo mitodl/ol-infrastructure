@@ -1266,7 +1266,7 @@ def _build_release_resource_app_pipeline(
             },
         ),
     ]
-    prod_post_steps: list[GetStep | PutStep | TaskStep] = [
+    prod_post_steps: list[GetStep | PutStep | TaskStep | TryStep] = [
         # Mark the Production GitHub Deployment as successful.
         PutStep(
             put=deployment_prod.name,
@@ -1277,17 +1277,27 @@ def _build_release_resource_app_pipeline(
             },
         ),
         # Merge the release branch back into the main branch and delete it so
-        # subsequent check calls no longer see a release as in-flight.
-        PutStep(
-            put=release_res.name,
-            params={
-                "action": "finish",
-                "repo_dir": str(main_repo.name),
-                "version_file": f"{release_res.name}/version",
-            },
+        # subsequent check calls no longer see a release as in-flight. Wrapped
+        # in a try since this job can be retriggered by an infra-only merge
+        # (QA re-runs on any change under the watched Pulumi paths, and its
+        # release_issue put edits the already-closed release_gate issue,
+        # which Concourse's version="every" get treats as a new trigger for
+        # this job) with no new app release -- the finish action then tries
+        # to fetch a release branch that a prior successful finish already
+        # deleted, and fails every time. That failure is safe to swallow:
+        # the release was already finished, there's nothing left to do.
+        TryStep(
+            try_=PutStep(
+                put=release_res.name,
+                params={
+                    "action": "finish",
+                    "repo_dir": str(main_repo.name),
+                    "version_file": f"{release_res.name}/version",
+                },
+            )
         ),
     ]
-    additional_post_steps: dict[int, list[GetStep | PutStep | TaskStep]] = {
+    additional_post_steps: dict[int, list[GetStep | PutStep | TaskStep | TryStep]] = {
         0: qa_post_steps,
         1: prod_post_steps,
     }
