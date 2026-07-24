@@ -95,6 +95,11 @@ class OpenEdxVars(BaseModel):
     ) = None
     enable_jumpnav: Literal["true", "false"] | None = None
     enable_ai_drawer_slot: Literal["true", "false"] | None = None
+    # Per-block content feedback drawer (mitxonline). Rides on the AI-drawer
+    # slot (always inline on Learning). Submit/prime URLs derive from
+    # mit_learn_base_url; the cookie name must match mit-learn's
+    # CSRF_COOKIE_NAME for the matching environment.
+    feedback_csrf_cookie_name: str | None = None
     appzi_url: str | None = None
     enable_auto_language_selection: Literal["true", "false"] | None = None
     enable_tagging_taxonomy_pages: Literal["true", "false"] | None = None
@@ -179,6 +184,17 @@ def mfe_params(
         "ENABLE_JUMPNAV": open_edx.enable_jumpnav,
         "ENABLE_AI_DRAWER_SLOT": open_edx.enable_ai_drawer_slot,
         "APPZI_URL": open_edx.appzi_url,
+        "FEEDBACK_CSRF_COOKIE_NAME": open_edx.feedback_csrf_cookie_name,
+        "FEEDBACK_SUBMIT_URL": (
+            f"{open_edx.mit_learn_base_url}/api/v0/content_feedback/"
+            if open_edx.mit_learn_base_url
+            else None
+        ),
+        "FEEDBACK_CSRF_PRIME_URL": (
+            f"{open_edx.mit_learn_base_url}/api/v0/users/me/"
+            if open_edx.mit_learn_base_url
+            else None
+        ),
     }
 
 
