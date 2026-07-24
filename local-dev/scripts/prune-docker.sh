@@ -28,8 +28,8 @@ log()  { echo "▶ $*"; }
 ok()   { echo "  ✓ $*"; }
 warn() { echo "  ⚠ $*"; }
 
-container_running() {
-    docker ps --format '{{.Names}}' | grep -qx "$1"
+container_exists() {
+    docker ps -a --format '{{.Names}}' | grep -qx "$1"
 }
 
 echo "Disk usage before:"
@@ -63,9 +63,9 @@ ok "Local Docker daemon pruned."
 #    incident — "layer already exists" for blobs that were gone). Paths cover
 #    both zot (/var/lib/zot) and pre-migration registry:2 (/var/lib/registry).
 # ---------------------------------------------------------------------------
-if container_running "$REGISTRY_CONTAINER"; then
+if container_exists "$REGISTRY_CONTAINER"; then
     log "Clearing local registry storage (${REGISTRY_CONTAINER})..."
-    docker stop "$REGISTRY_CONTAINER" >/dev/null
+    docker stop "$REGISTRY_CONTAINER" >/dev/null 2>&1 || true    # may already be stopped
     docker run --rm --volumes-from "$REGISTRY_CONTAINER" alpine sh -c \
         'rm -rf /var/lib/zot/* /var/lib/registry/docker/registry/v2/blobs/* /var/lib/registry/docker/registry/v2/repositories/* 2>/dev/null; true'
     if ! docker start "$REGISTRY_CONTAINER" >/dev/null; then
@@ -75,7 +75,7 @@ if container_running "$REGISTRY_CONTAINER"; then
     fi
     ok "Registry storage cleared (wiped stopped, restarted clean)."
 else
-    warn "${REGISTRY_CONTAINER} not running — skipping registry cleanup."
+    warn "${REGISTRY_CONTAINER} does not exist — skipping registry cleanup."
 fi
 
 # ---------------------------------------------------------------------------

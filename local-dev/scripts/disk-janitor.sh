@@ -44,6 +44,17 @@ INTERVAL="${JANITOR_INTERVAL_SECS:-1800}"
 ts() { date "+%Y-%m-%d %H:%M:%S"; }
 log() { echo "[$(ts)] $*"; }
 
+# Non-numeric knobs would misbehave quietly (a bad INTERVAL makes `sleep`
+# fail and the loop spin hot) — fall back to defaults loudly instead.
+if [[ ! "$KEEP_TAGS" =~ ^[0-9]+$ ]]; then
+    log "invalid JANITOR_KEEP_TAGS='${KEEP_TAGS}' — using 3"
+    KEEP_TAGS=3
+fi
+if [[ ! "$INTERVAL" =~ ^[0-9]+$ ]]; then
+    log "invalid JANITOR_INTERVAL_SECS='${INTERVAL}' — using 1800"
+    INTERVAL=1800
+fi
+
 # ---------------------------------------------------------------------------
 # 1. Local daemon: keep newest KEEP_TAGS tags per localhost:5001/* repo.
 # CreatedAt is formatted client-side in the local zone, where lexical sort
@@ -74,6 +85,10 @@ prune_local_tags() {
 # ---------------------------------------------------------------------------
 prune_build_cache() {
     local cap="${JANITOR_BUILDCACHE_MAX_GB:-}"
+    if [[ -n "$cap" && ! "$cap" =~ ^[0-9]+$ ]]; then
+        log "invalid JANITOR_BUILDCACHE_MAX_GB='${cap}' — skipping build-cache prune"
+        return 0
+    fi
     if [[ -z "$cap" ]]; then
         local total_gb
         total_gb="$(df -k / 2>/dev/null | awk 'NR==2 {print int($2/1048576)}')"
