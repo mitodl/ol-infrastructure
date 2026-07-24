@@ -1241,7 +1241,7 @@ def _build_release_resource_app_pipeline(
     )
 
     # Build per-stack additional_post_steps and custom_dependencies for QA+Production
-    qa_post_steps: list[GetStep | PutStep | TaskStep] = [
+    qa_post_steps: list[GetStep | PutStep | TaskStep | TryStep] = [
         # Open a GitHub Release Issue with the checklist from the release resource.
         # title_template embeds the release version (via the image_tag var
         # loaded from release_res earlier in this job's plan) so each release
