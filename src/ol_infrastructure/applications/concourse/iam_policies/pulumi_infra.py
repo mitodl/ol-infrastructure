@@ -375,6 +375,7 @@ policy_definition = {
                 "iam:DeletePolicy",
                 "iam:DeletePolicyVersion",
                 "iam:DeleteUser",
+                "iam:DetachRolePolicy",
                 "iam:DetachUserPolicy",
                 "iam:RemoveUserFromGroup",
                 "iam:UpdateAssumeRolePolicy",
