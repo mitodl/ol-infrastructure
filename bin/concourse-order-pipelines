@@ -204,7 +204,6 @@ PIPELINE_ORDER: dict[str, dict[str, list[str]]] = {
             "docker-google-ads-opt-image",
         ],
         "package-publishing": [
-            "publish-ol-django-pypi",
             "publish-open-edx-plugins-pypi",
             "publish-jupyterhub-extensions-pypi",
             "mit-learn-api-client",
@@ -215,6 +214,14 @@ PIPELINE_ORDER: dict[str, dict[str, list[str]]] = {
             "edx-sysadmin",
             "sign-and-verify",
             "google-ads-optimization",
+        ],
+        # Parked last as a Phase 2 archive candidate. `publish-ol-django-pypi`
+        # has errored on every job since 2026-06-08 on an undefined
+        # `github.odlbot_private_ssh_key`, and the owner's call is that the
+        # pipeline is wrong by design and should be removed or left broken
+        # rather than repaired -- so it stays dead and stays out of the way.
+        "deprecated": [
+            "publish-ol-django-pypi",
         ],
     },
 }
