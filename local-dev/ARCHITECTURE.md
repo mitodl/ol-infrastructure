@@ -26,6 +26,7 @@ The whole stack runs on your laptop. What looks like a Kubernetes "cluster" is j
 | **Docker / BuildKit** | Builds images. Unchanged from what you know. | same |
 | **k3d + k3s** | A real, lightweight Kubernetes cluster running *inside Docker containers* | the "host" your services run on |
 | **k8s manifests + apisix** | Declarative description of what should run + hostname routing | the `docker-compose.yml` + a reverse-proxy container |
+| **Pulumi** | Installs the shared services (Postgres, Keycloak, APISIX, …) into the cluster | the `postgres:` / `redis:` blocks of a compose file, factored out and shared by every app |
 | **Tilt** | The dev loop: builds images, applies manifests, live-syncs code | `docker compose up` + a file-watcher + rebuild orchestration |
 
 ### Docker
@@ -52,6 +53,10 @@ This is the closest thing to Vagrant: Vagrant gave you a disposable VM that beha
 ### k8s manifests + apisix — the declarative "compose file"
 
 The manifests live in `local-dev/apps/*` (Deployments, Services, ConfigMaps, Secrets) and `apisix-routes.yaml`. This is the big conceptual leap from compose; see [Compose → Kubernetes](#docker-compose--kubernetes-translated) below.
+
+### Pulumi — the shared-services installer
+
+Pulumi is an infrastructure-as-code tool (same family as Terraform): you describe resources in a real programming language and `pulumi up` creates or updates the real thing to match. It's what this repo uses to define OL's rc/prod cloud infrastructure — which is why application engineers usually meet it as "the place env vars go to affect rc/prod." In local-dev it plays a much smaller role: a Python program under `local-dev/infra/` that installs the shared in-cluster services every app needs (PostgreSQL, Valkey, Keycloak, APISIX, OpenSearch, …). Tilt runs `pulumi up` for you at startup and whenever the infra files change; the only time you touch it is to change shared infrastructure (see [EXTENDING.md](EXTENDING.md)).
 
 ### Tilt — the dev loop
 
@@ -167,6 +172,8 @@ Inside the cluster, workloads are grouped into namespaces: one per app, plus `lo
     Developer browser / curl
 ```
 
+The shared services in `local-infra`, briefly: **PostgreSQL** (one CNPG-managed cluster, one database per app), **Valkey** (the open-source Redis fork — the apps' Redis cache and Celery broker), **OpenSearch** (search), **Qdrant** (vector database for AI features), **Tika** (document text extraction), **LiteLLM** (proxy in front of LLM APIs), **Keycloak** (SSO), and **Mailpit** (catches all outbound email). In `operations`: **APISIX** (ingress — hostname routing, TLS termination, OIDC).
+
 ## Design decisions
 
 **Ownership boundary:** `setup.sh` owns only the k3d cluster, TLS certificates, and `/etc/hosts`. _All_ in-cluster resources are owned by either Pulumi (shared infra) or Tilt (app manifests). This prevents drift and conflicts.
@@ -227,20 +234,33 @@ What actually crosses the wire is negotiated, not the whole image. An image is a
 
 ## What happens on `tilt up`
 
+Tilt first runs `pulumi up` for the shared infrastructure. The Pulumi program is a dependency graph, not a script — an arrow below means "waits for"; anything not connected deploys in parallel:
+
+```mermaid
+flowchart LR
+    ns[namespaces] --> tls[TLS secrets]
+    ns --> ingress[cert-manager + APISIX]
+    ns --> db[("PostgreSQL (CNPG)")]
+    ns --> valkey[Valkey]
+    ns --> search[OpenSearch]
+    ingress --> dns[in-cluster DNS override]
+    ingress --> mail[Mailpit]
+    tls --> mail
+    db --> ai[Qdrant · Tika · LiteLLM]
+    db --> kc[Keycloak]
+    ingress --> kc
+    tls --> kc
+    kc --> realm["olapps realm + OIDC clients (apps-infra stack)"]
 ```
-tilt up
-  │
-  ├── pulumi up (local-dev/infra/)
-  │     Deploys: CNPG operator → PostgreSQL cluster → Valkey → cert-manager
-  │              → Qdrant → OpenSearch → Tika → LiteLLM → Mailpit → APISIX
-  │              → Keycloak operator → Keycloak instance → olapps realm
-  │
-  └── for each enabled app:
-        ├── docker build (if source repo present, else pull prebuilt image)
-        ├── kubectl apply configmaps/ secrets.yaml deployment.yaml
-        │     initContainer: migrate + collectstatic + data-specific seeds
-        └── kubectl apply apisix-routes.yaml
-              APISIX picks up new routes → app reachable at its .dev URL
+
+Then, for each enabled app (apps deploy independently of each other):
+
+```
+├── docker build (if source repo present, else pull prebuilt image)
+├── kubectl apply configmaps/ secrets.yaml deployment.yaml
+│     initContainer: migrate + collectstatic + data-specific seeds
+└── kubectl apply apisix-routes.yaml
+      APISIX picks up new routes → app reachable at its .dev URL
 ```
 
 ## The raw k8s dev flow (what Tilt automates)
@@ -259,6 +279,5 @@ Tilt collapses all of that into a file-watch + in-container sync, and shows the 
 
 - [README.md](README.md) — setup and day-to-day usage
 - [EXTENDING.md](EXTENDING.md) — adding a new app, modifying shared infrastructure
-- [RESOURCE_OPTIMIZATION.md](RESOURCE_OPTIMIZATION.md) — tuning cluster resource usage
 - `local-dev/apps/*/Tiltfile` — per-app build + live_update config
 - `local-dev/apps/*/deployment.yaml` — per-app k8s manifests

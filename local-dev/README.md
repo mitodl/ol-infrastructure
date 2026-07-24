@@ -44,7 +44,7 @@ All hostnames use a `.dev` TLD that mirrors production (`.edu` → `.dev`), so U
 
 **Design goals:**
 - `setup.sh` does the minimum necessary outside the cluster (k3d, certs, /etc/hosts). Everything else is in-cluster.
-- Pulumi owns all in-cluster shared resources. Tilt owns app deployments.
+- The shared services (database, SSO, ingress, search, …) are installed by Pulumi, the app deployments by Tilt — you don't manage either by hand. (New to Pulumi? See [ARCHITECTURE.md](ARCHITECTURE.md#pulumi--the-shared-services-installer).)
 - Live source sync for Django apps (no container rebuild needed for Python changes).
 - Pre-built image fallback when a source repo is not checked out.
 
@@ -52,11 +52,11 @@ All hostnames use a `.dev` TLD that mirrors production (`.edu` → `.dev`), so U
 
 ## Prerequisites
 
-Install these tools before running setup:
+Install these tools before running setup. The install commands shown are Homebrew (macOS); on Linux, install each tool from your distro's package manager or the linked docs — the stack runs on macOS, Linux, and Windows via WSL2 (see below).
 
 | Tool | Version | Install |
 |------|---------|---------|
-| Docker Desktop or OrbStack | 8 GB RAM allocated to the VM | https://docs.docker.com/desktop/ or https://orbstack.dev/ |
+| Docker Desktop, OrbStack, or Docker Engine (Linux) | 12–16 GB RAM for the VM (see note) | https://docs.docker.com/desktop/ or https://orbstack.dev/ |
 | kubectl | ≥ 1.28 | `brew install kubectl` |
 | k3d | ≥ 5.9 (tested; `setup.sh` uses `k3d registry create --image -v`) | `brew install k3d` |
 | Tilt | ≥ 0.33 | https://docs.tilt.dev/install.html |
@@ -66,7 +66,7 @@ Install these tools before running setup:
 | bash | ≥ 4 | `brew install bash` (stock macOS ships 3.2; the seeding and prune scripts use `mapfile`) |
 | uv | ≥ 0.9.3 | `brew install uv` |
 
-> **Docker memory:** The cluster runs PostgreSQL, Valkey, APISIX, Keycloak, Qdrant, OpenSearch, Tika, and up to four Django apps. Allocate at least 8 GB to the Docker VM (Docker Desktop: Settings → Resources; OrbStack allocates dynamically).
+> **Docker memory:** Allocate at least 12 GB to the Docker VM; 16 GB is comfortable for the full stack (Docker Desktop: Settings → Resources; OrbStack allocates dynamically; Docker Engine on Linux uses host RAM directly — nothing to allocate). Usage scales with how many apps you enable and whether they run from source or prebuilt images: with just mit-learn (from source) and mitxonline enabled, measured pod usage is ~13 GB, the Next.js dev server alone accounting for 3–4 GB. To see what's actually using memory: `kubectl top pods -A | sort -k4 -hr | head`.
 
 ### Windows (WSL2)
 
@@ -124,7 +124,7 @@ This will:
 ### 4. Monitor the environment
 
 Tilt will:
-1. Run `pulumi up` to deploy shared infrastructure (Postgres, Valkey, APISIX, Keycloak, etc.)
+1. Run `pulumi up` to deploy shared infrastructure (Postgres, Keycloak, APISIX, etc.)
 2. Build Docker images for any checked-out app repos
 3. Apply all app manifests (Deployments, Services, ConfigMaps, APISIX routes)
 4. Watch for source changes and sync them live
@@ -222,6 +222,18 @@ kubectl exec -it -n mit-learn deploy/mitlearn-webapp -c app -- python manage.py 
 kubectl exec -it -n learn-ai deploy/learnai-webapp -c app -- python manage.py dbshell
 ```
 
+### Run tests
+
+Tests run inside the app containers, against the code Tilt has live-synced — so they see your latest edits:
+
+```bash
+# Python (Django) — pytest, with paths/args as usual
+kubectl exec -it -n mit-learn deploy/mitlearn-webapp -c app -- pytest main/envs_test.py
+
+# JS (frontend) — jest from the workspace root; the argument is a jest pattern
+kubectl exec -it -n mit-learn deploy/mitlearn-nextjs -- sh -c 'cd /app && yarn test useToggle'
+```
+
 ### Connect to PostgreSQL directly
 
 ```bash
@@ -274,28 +286,12 @@ tilt trigger seed-mit-learn-fixtures
 
 ## Configuration Reference
 
-`tilt_config.json` (copy from `tilt_config.json.example`):
-
-```json
-{
-  "enabled_apps": ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"],
-
-  "prebuilt_tags": [
-    "mit-learn=0.62.0",
-    "mit-learn-nextjs=0.62.0",
-    "learn-ai=0.28.3",
-    "mitxonline=1.144.5",
-    "odl-video-service=0.85.0"
-  ],
-
-  "root_domain": "mit.dev"
-}
-```
+`tilt_config.json` is your copy of [`tilt_config.json.example`](../tilt_config.json.example) — the example file is the canonical starting point (its image tags move over time; this doc doesn't repeat them). Keys:
 
 | Key | Default | Description |
 |-----|---------|-------------|
 | `enabled_apps` | all four | Apps to deploy. Omit any to skip it entirely. |
-| `prebuilt_tags` | see file | `["app=tag"]` list of image tags used when the app repo is not checked out locally. |
+| `prebuilt_tags` | see example file | `["app=tag"]` list of image tags used when the app repo is not checked out locally. |
 | `root_domain` | `mit.dev` | Root DNS domain all service hostnames derive from. |
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
 | `per_app_databases`, `openedx_mode` | — | Declared but not wired to anything yet; setting them has no effect. |
@@ -306,7 +302,7 @@ The rule of thumb for which config surface a knob belongs to: settings that chan
 
 The infrastructure is split across two Pulumi stacks:
 
-**`local-dev/infra/core/Pulumi.local-dev.core.Dev.yaml`** — operators, Keycloak, APISIX, DB, Valkey:
+**`local-dev/infra/core/Pulumi.local-dev.core.Dev.yaml`** — operators, Keycloak, APISIX, database, cache:
 
 | Key | Default | Description |
 |-----|---------|-------------|
@@ -509,7 +505,7 @@ Then restart your browser. The cert was generated with the correct wildcard SANs
 ### Docker image build fails (Next.js)
 
 The Next.js build needs ~4 GB of memory. If it OOMs:
-- Increase Docker Desktop memory to 10+ GB
+- Increase the Docker VM memory allocation (see [Prerequisites](#prerequisites))
 - Or use a prebuilt image by removing `mit-learn` from `enabled_apps` in `tilt_config.json` and letting Tilt use the `prebuilt_tags` value instead
 
 ### `kubectl exec` fails with a 502 (wedged kubelet streaming)
