@@ -630,6 +630,8 @@ superset_chart = kubernetes.helm.v3.Release(
             "secretEnv": {"create": False},
             "extraEnv": {
                 "REDIS_PROTO": "rediss",
+                # Public URL for MCP-generated links (chart previews, etc.)
+                "SUPERSET_MCP_PUBLIC_URL": f"https://{superset_domain}",
             },
             "configOverrides": {
                 "config": Path(__file__)
@@ -705,6 +707,20 @@ superset_chart = kubernetes.helm.v3.Release(
             "supersetCeleryBeat": {
                 "enabled": True,
                 "podLabels": k8s_global_labels,
+            },
+            # MCP server for AI clients (Claude Desktop, Claude Code, etc.) to
+            # interact with dashboards, datasets, and SQL Lab. Shares the same
+            # image, config (via configOverrides), envFromSecret(s), and
+            # service account/IRSA as the rest of the chart. Exposed at /mcp
+            # via the custom Gateway API HTTPRoute below.
+            "supersetMcp": {
+                "enabled": True,
+                "replicaCount": 2,
+                "podLabels": k8s_global_labels | {"ol.mit.edu/process": "mcp"},
+                "resources": {
+                    "limits": {"cpu": "500m", "memory": "512Mi"},
+                    "requests": {"cpu": "100m", "memory": "256Mi"},
+                },
             },
             "serviceAccount": {
                 "create": True,
@@ -800,6 +816,19 @@ gateway_config = OLEKSGatewayConfig(
         ),
     ],
     routes=[
+        # Each OLEKSGatewayRouteConfig becomes a separate HTTPRoute resource;
+        # list order does not affect matching.  Gateway API selects the most
+        # specific matching route by prefix length, so /mcp always wins over /.
+        OLEKSGatewayRouteConfig(
+            backend_service_name="superset-mcp",
+            backend_service_namespace=superset_namespace,
+            backend_service_port=5008,
+            name="superset-mcp-https",
+            listener_name="https-web",
+            hostnames=[superset_domain],
+            port=8443,
+            matches=[{"path": {"type": "PathPrefix", "value": "/mcp"}}],
+        ),
         OLEKSGatewayRouteConfig(
             backend_service_name="superset",
             backend_service_namespace=superset_namespace,
