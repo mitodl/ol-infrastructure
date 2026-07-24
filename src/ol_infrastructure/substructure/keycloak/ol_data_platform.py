@@ -348,6 +348,24 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         opts=resource_options,
     )
 
+    # The realm public key signs every client's tokens, so Superset's JWT auth
+    # (JWT_DECODE_AUDIENCE=ol-superset-client) needs its own client id in the
+    # `aud` claim to distinguish its tokens from those minted for other realm
+    # clients. Keycloak omits the client from `aud` by default, so add it
+    # explicitly for all tokens issued through this client, including the
+    # service-account client_credentials token used for API access.
+    # See https://issues.redhat.com/browse/KEYCLOAK-6638
+    keycloak.openid.AudienceProtocolMapper(
+        "ol-data-platform-superset-audience-mapper",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_superset_client.id,
+        name="audience",
+        included_client_audience=ol_data_platform_superset_client.client_id,
+        add_to_id_token=True,
+        add_to_access_token=True,
+        opts=resource_options,
+    )
+
     keycloak.openid.ClientDefaultScopes(
         "ol-data-platform-superset-client-default-scopes",
         realm_id=ol_data_platform_realm.id,

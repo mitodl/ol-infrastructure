@@ -80,6 +80,16 @@ OAUTH_PROVIDERS = [
 # ----------------------------------------------------------
 JWT_ALGORITHM = "RS256"
 JWT_PUBLIC_KEY = OIDC_REALM_PUBLIC_KEY
+# The realm public key signs the access tokens of EVERY client in the shared
+# ol-data-platform realm, so a signature check alone would accept a token minted
+# for any other client (e.g. the public ol-starrocks-cli PKCE client). Bind
+# acceptance to tokens whose `aud` includes Superset's own OIDC client and whose
+# `iss` is our realm, rejecting cross-client tokens. Requires the Keycloak
+# AudienceProtocolMapper on the Superset client (see
+# substructure/keycloak/ol_data_platform.py) so legitimate Superset tokens carry
+# this client id in `aud`.
+JWT_DECODE_AUDIENCE = OIDC_CLIENT_ID
+JWT_DECODE_ISSUER = OIDC_URL
 
 # Map Keycloak realm roles to Superset roles.
 # ol_platform_admin → built-in Admin (full privileges).
@@ -128,17 +138,14 @@ class CustomSsoSecurityManager(SupersetSecurityManager):
         a role like ``ol_platform_admin`` is expanded to ``["Admin"]`` regardless
         of which authentication flow the user arrives through.
 
-        Any key not present in AUTH_ROLES_MAPPING is passed through unchanged,
-        which allows Superset role names to be placed directly in tokens when
-        needed.
+        Keys not present in AUTH_ROLES_MAPPING are dropped rather than passed
+        through, so only the curated realm role vocabulary can ever resolve to a
+        Superset role. This prevents a token-supplied key from naming a Superset
+        role (e.g. ``Admin``) directly.
         """
         expanded: list[str] = []
         for role_key in role_keys:
-            mapped = AUTH_ROLES_MAPPING.get(role_key)
-            if mapped:
-                expanded.extend(mapped)
-            else:
-                expanded.append(role_key)
+            expanded.extend(AUTH_ROLES_MAPPING.get(role_key, []))
         return expanded
 
     def _get_roles_from_keycloak_roles(self, role_keys: list[str]) -> list[object]:
