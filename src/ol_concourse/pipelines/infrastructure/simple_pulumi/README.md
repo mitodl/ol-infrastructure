@@ -12,30 +12,30 @@ The Simple Pulumi-Only pattern is for applications/services that:
 
 ## Managed Applications
 
-The following applications are currently managed by this meta pipeline:
+`production_app_names` in `meta.py` is the source of truth for what this meta
+pipeline manages on odl-prod. It currently holds 33 applications, each rendered
+as a `pulumi-{app_name}` pipeline on the `infrastructure` team:
 
-1. **airbyte** - Airbyte data integration platform
-2. **digital-credentials** - Digital credentials service
-3. **fastly-redirector** - Fastly redirector service
-4. **kubewatch** - Kubernetes cluster monitoring
-5. **mongodb-atlas** - MongoDB Atlas infrastructure
-6. **ocw-studio** - OCW Studio content management (Pulumi-only)
-7. **open-discussions** - Open Discussions platform (Pulumi-only, QA/Production only)
-8. **open-metadata** - OpenMetadata data catalog
-9. **opensearch** - OpenSearch search and analytics cluster
-10. **tika** - Apache Tika document processing service
-11. **vector-log-proxy** - Vector log proxy service
-12. **toolhive-apps** - ToolHive application-agent MCP workloads namespace bootstrap
-13. **toolhive-data** - ToolHive data-agent MCP workloads namespace bootstrap
-14. **toolhive-operator** - ToolHive Kubernetes operator (Helm charts on the ops EKS cluster)
-15. **toolhive-swe** - ToolHive SWE-agent MCP workloads (VirtualMCPServer, Redis, ingress, Vault wiring)
-16. **xpro-partner-dns** - xPRO partner DNS configuration
+`airbyte`, `aws-ecr`, `aws-sftp`, `b2b-partners-storage`, `celery-monitoring`,
+`clickhouse`, `data_warehouse`, `digital-credentials`, `fastly-redirector`,
+`jupyterhub-data`, `mailgun`, `marimo-data`, `mongodb-atlas`, `monitoring`,
+`ocw-site`, `open-discussions`, `open-metadata`, `open-metadata-substructure`,
+`opensearch`, `qdrant-cloud`, `release-bot`, `rootly`, `sentry`, `starrocks`,
+`starrocks-substructure`, `starburst`, `tika`, `toolhive-apps`, `toolhive-data`,
+`toolhive-operator`, `toolhive-swe`, `vector-log-proxy`, `xpro-partner-dns`
+
+`meta.py` also carries `qa_app_names` (`starrocks-substructure-qa`) and
+`ci_app_names` (`starrocks-substructure-ci`), selected via `--env qa` / `--env ci`
+for the odl-qa and odl-ci Concourse instances respectively.
+
+Note that `pipeline_params` in `pipeline.py` is a superset — an entry there is
+only deployed once its name is also added to the appropriate list in `meta.py`.
 
 ## Files
 
 - **`meta.py`**: Meta pipeline generator that creates/updates individual app pipelines
 - **`definition.json`**: Generated pipeline definition for the meta-pipeline
-- **`simple_pulumi_pipeline.py`**: Template for generating individual app pipelines
+- **`pipeline.py`**: `SimplePulumiParams` definitions plus the template for generating individual app pipelines
 - **`__init__.py`**: Package initialization
 
 ## Usage
@@ -50,7 +50,7 @@ fly -t pr-inf sp -p simple-pulumi-meta -c definition.json
 
 ### Adding a New Application
 
-1. Add configuration to `pipeline_params` in `simple_pulumi_pipeline.py`:
+1. Add configuration to `pipeline_params` in `pipeline.py`:
 
 ```python
 pipeline_params: dict[str, SimplePulumiParams] = {
@@ -87,7 +87,7 @@ fly -t pr-inf sp -p simple-pulumi-meta -c definition.json
 You can test generating a single app pipeline:
 
 ```bash
-python simple_pulumi_pipeline.py tika
+python pipeline.py tika
 ```
 
 This outputs the pipeline definition to both `definition.json` and stdout.
@@ -118,7 +118,7 @@ class SimplePulumiParams(BaseModel):
 1. **Git Resource**: Watches for changes to the meta pipeline code
 2. **Per-App Jobs**: For each app in `app_names`:
    - Fetches pipeline definitions from git
-   - Runs `simple_pulumi_pipeline.py {app_name}`
+   - Runs `pipeline.py {app_name}`
    - Sets the generated pipeline as `pulumi-{app_name}`
 3. **Self-Update Job**: Updates the meta pipeline itself when code changes
 
@@ -144,7 +144,7 @@ If you're migrating an existing pipeline to this pattern:
 
 1. Verify the app follows the simple Pulumi-only pattern (no builds)
 2. Extract parameters from the old pipeline file
-3. Add configuration to `simple_pulumi_pipeline.py`
+3. Add configuration to `pipeline.py`
 4. Add app name to `meta.py`
 5. Deploy meta pipeline
 6. Verify new pipeline works correctly
@@ -154,7 +154,7 @@ If you're migrating an existing pipeline to this pattern:
 
 ### Pipeline not generating
 
-- Check app name is in both `pipeline_params` (simple_pulumi_pipeline.py) and `app_names` (meta.py)
+- Check app name is in both `pipeline_params` (pipeline.py) and `app_names` (meta.py)
 - Verify the pipeline definitions repository is accessible
 - Check Concourse logs for the specific job
 
