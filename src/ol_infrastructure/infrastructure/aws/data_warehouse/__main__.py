@@ -148,9 +148,14 @@ for data_stage in data_stages:
             kms_key_id=s3_kms_key["arn"],
             bucket_key_enabled=True,
             tags=aws_config.merged_tags({"OU": "data"}),
-            # Data lake storage is analytical cold storage: safe for archive tiers.
-            intelligent_tiering_archive_access_days=90,
-            intelligent_tiering_deep_archive_access_days=180,
+            # Archive/deep-archive tiers disabled: StarRocks queries every
+            # stage's Iceberg/Glue catalog directly (data_lake_query_engine
+            # IAM policy grants it uniform read access across all stages),
+            # and archived objects raise InvalidObjectState until explicitly
+            # restored. There's no stage here that's exempt from ad-hoc BI
+            # queries, so none can safely age into an archive tier.
+            intelligent_tiering_archive_access_days=None,
+            intelligent_tiering_deep_archive_access_days=None,
         ),
         opts=ResourceOptions(
             aliases=[
