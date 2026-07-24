@@ -89,6 +89,14 @@ vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
 cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
+# Keycloak is deployed to CI/QA/Production only; the Dev Dagster stack has no
+# counterpart to reference, so its data_loading deployment simply goes without
+# the Keycloak host and that source stays unavailable there.
+keycloak_stack = (
+    make_stack_reference(projects.KEYCLOAK_APP, stack_info.name)
+    if stack_info.env_suffix in ("ci", "qa", "production")
+    else None
+)
 
 # VPC and network configuration
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
@@ -999,6 +1007,17 @@ for location in code_locations:
             {"name": "dagster-postgresql-secret"},
         ],
     }
+
+    # data_loading's dlt database sources connect by host and take their
+    # credentials from Vault at run time, so only the host is passed through
+    # here -- from the owning application's stack, not duplicated in config.
+    if name == "data_loading" and keycloak_stack is not None:
+        deployment["env"].append(
+            {
+                "name": "KEYCLOAK_DB_HOST",
+                "value": keycloak_stack.require_output("keycloak")["rds_host"],
+            }
+        )
 
     # Add higher resources for lakehouse deployment (runs dbt)
     if name == "lakehouse":
