@@ -21,7 +21,13 @@ NODES=(k3d-local-dev-agent-0 k3d-local-dev-agent-1 k3d-local-dev-server-0)
 
 for node in "${NODES[@]}"; do
     echo "▶ ${node}: writing kubelet GC thresholds to /etc/rancher/k3s/config.yaml"
-    docker exec "$node" sh -c 'printf "kubelet-arg:\n  - image-gc-high-threshold=75\n  - image-gc-low-threshold=70\n" > /etc/rancher/k3s/config.yaml'
+    # k3d nodes don't ship this file, but back up any existing one rather
+    # than silently discarding hand-added config.
+    docker exec "$node" sh -c 'if [ -s /etc/rancher/k3s/config.yaml ]; then
+        cp /etc/rancher/k3s/config.yaml /etc/rancher/k3s/config.yaml.pre-gc-thresholds.bak
+        echo "  (existing config.yaml backed up to config.yaml.pre-gc-thresholds.bak — its settings are no longer applied)"
+    fi
+    printf "kubelet-arg:\n  - image-gc-high-threshold=75\n  - image-gc-low-threshold=70\n" > /etc/rancher/k3s/config.yaml'
     echo "▶ ${node}: restarting (pods on this node will restart)"
     docker restart "$node" >/dev/null
     printf "  waiting for %s to be Ready" "$node"
