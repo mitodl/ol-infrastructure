@@ -241,11 +241,22 @@ data stack; it is still `release_bot`-referenced and must not be renamed.
 The canonical ordering lists live in `bin/` (see §6) so they can be re-applied
 idempotently rather than being one-shot shell history.
 
-**Open verification item:** confirm that a meta pipeline's `set_pipeline` on an
-existing pipeline does not reset its display order (expected: order is a separate
-field, only new pipelines get appended). Test on `odl-ci` or `odl-qa` before
-applying to prod. If ordering *is* reset, ordering must be re-applied on a
-schedule, which changes the shape of the deliverable.
+**Verification item — resolved 2026-07-24 on `odl-ci`, outcome as expected.**
+`set_pipeline` does **not** reset display order, so Phase 1 is a run-once
+deliverable rather than a scheduled one.
+
+Method: created three throwaway paused pipelines on `odl-ci`'s `infrastructure`
+team, reordered them to the top via `fly order-pipelines`, then re-set one of
+them with a genuinely *changed* config (confirmed written by diffing
+`fly get-pipeline` — `v2-changed` on the target, `v1` on an untouched sibling).
+The display order was byte-identical before and after. Newly-created pipelines
+were observed appending to the end of the team, never disturbing existing
+positions. Test pipelines were destroyed and the team's original order restored.
+
+Consequence: ordering only needs re-applying when the pipeline *set* changes, not
+on every meta run. `check` is what detects that — it exits non-zero when a live
+pipeline is missing from the curation (it lands in `unclustered`) or a curated
+name no longer exists.
 
 ### Phase 2 — Archive genuinely dead tiles
 
@@ -422,7 +433,7 @@ Trivial doc fix, independent of everything else.
 
 | Phase | Deliverable | Risk |
 | --- | --- | --- |
-| 1 | `bin/concourse-order-pipelines` applying the §3 orderings idempotently | none |
+| 1 | `bin/concourse-order-pipelines` applying the §3 orderings idempotently — **built**, validated end-to-end on `odl-ci`; awaiting an unexpired `odl-prod` token to apply | none |
 | 2 | Archive decision + `fly archive-pipeline` for confirmed-dead tiles | low, reversible |
 | 3 | Naming convention doc + per-pipeline rename runbook | high, deferred |
 | 4 | `main`-split evaluation memo (execute only if it wins) | medium |
@@ -432,10 +443,10 @@ Trivial doc fix, independent of everything else.
 
 ## 7. Verification
 
-- Phase 1: reload the dashboard per team, confirm tile order matches §3; confirm
-  cluster boundaries are visually legible at default zoom. Re-run after the next
-  meta-pipeline git trigger to confirm ordering survives `set_pipeline` (§3 open
-  item).
+- Phase 1: `bin/concourse-order-pipelines check` exits zero; reload the dashboard
+  per team and confirm cluster boundaries are visually legible at default zoom.
+  Ordering surviving `set_pipeline` is already settled (§3) and does not need
+  re-testing per rollout.
 - Phase 2: confirm each archived pipeline's replacement has a green build newer
   than the archived one's last green build.
 - Phase 3: per rename, confirm build history carried over, Vault-backed `((var))`
