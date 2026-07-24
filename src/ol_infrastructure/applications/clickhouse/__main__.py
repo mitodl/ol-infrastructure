@@ -681,6 +681,8 @@ cold_bucket_config = S3BucketConfig(
     sse_algorithm="AES256",
     intelligent_tiering_enabled=True,
     intelligent_tiering_days=1,  # Move to Intelligent-Tiering immediately
+    intelligent_tiering_archive_access_days=None,
+    intelligent_tiering_deep_archive_access_days=None,
     # ClickHouse issues synchronous S3 reads against this disk for any query
     # that touches a cold part, so archive tiers (which require an explicit
     # restore before the object is readable) are not safe here even though
