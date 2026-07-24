@@ -29,7 +29,7 @@ Key wiring decisions (see also ``k8s/README.md`` in the app repo):
   has the vault-secrets-operator sync a static-ish StarRocks credential into a
   K8s Secret), ``core/db/vault_credentials.py`` does a direct ``hvac``
   Kubernetes login using the pod's own ServiceAccount token and reads
-  ``database-starrocks-{env}/creds/app`` at startup.  So there is no DB Secret
+  ``database-starrocks/creds/app`` at startup.  So there is no DB Secret
   to sync here — instead the Vault policy attached to this service's Kubernetes
   auth role must grant read on that dynamic-credentials path.  The Vault role
   name, k8s auth mount, and StarRocks mount are handed to the app as
@@ -155,11 +155,12 @@ cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(APPLICATION_NAMESPACE, ns)
 )
 
-# StarRocks dynamic-credentials mount is environment-specific.  StarRocks only
-# exists on the QA and Production data clusters (setup_starrocks skips CI), and
-# this service fetches its StarRocks creds from Vault at startup, so it is
-# deployed to QA and Production only -- there is no CI stack.
-starrocks_vault_mount_path = f"database-starrocks-{stack_info.env_suffix}"
+# StarRocks exists on the QA and Production data clusters only (setup_starrocks
+# skips CI), so this service is deployed to QA and Production only -- there is
+# no CI stack. The mount name itself is not environment-specific: QA and
+# Production each run their own, entirely separate Vault deployment, so that
+# server (not the mount path) is what scopes the environment.
+starrocks_vault_mount_path = "database-starrocks"
 
 ########################################################################
 # IRSA + Vault Kubernetes auth via OLEKSAuthBinding

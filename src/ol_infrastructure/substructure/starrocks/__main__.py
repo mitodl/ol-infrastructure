@@ -52,7 +52,11 @@ stack_info = parse_stack()
 starrocks_config = Config("starrocks")
 
 env_name = f"data-{stack_info.env_suffix}"
-mount_point = f"database-starrocks-{stack_info.env_suffix}"
+# Each environment (dev/qa/ci/production) runs its own, entirely separate Vault
+# deployment (vault-qa.odl.mit.edu, vault-production.odl.mit.edu, ...), so the
+# mount path itself doesn't need an env suffix -- the Vault server it lives in
+# already provides that scoping.
+mount_point = "database-starrocks"
 
 cluster_stack = make_stack_reference(pulumi_projects.EKS, f"data.{stack_info.name}")
 _kube_config_raw = require_stack_output_value(cluster_stack, "kube_config")

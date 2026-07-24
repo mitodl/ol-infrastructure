@@ -165,10 +165,12 @@ superset_parliament_config: dict[str, Any] = {
 
 _POLICY_DIR = Path(__file__).parent
 
-# StarRocks dynamic DB mount is environment-specific; build the Vault policy
-# text dynamically so the exact mount path is baked in without wildcards.
-# StarRocks only has QA and Production substructure stacks, so skip on CI.
-starrocks_vault_mount_path = f"database-starrocks-{stack_info.env_suffix}"
+# Build the Vault policy text dynamically so the exact mount path is baked in
+# without wildcards. StarRocks only has QA and Production substructure stacks,
+# so skip on CI. The mount name is not environment-specific: QA and Production
+# each run their own, entirely separate Vault deployment, so that server (not
+# the mount path) is what scopes the environment.
+starrocks_vault_mount_path = "database-starrocks"
 if stack_info.name != "CI":
     _base_vault_policy = (_POLICY_DIR / "superset_server_policy.hcl").read_text(
         encoding="utf-8"

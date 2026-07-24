@@ -1,4 +1,4 @@
-path "database-starrocks-production/creds/*" {
+path "database-starrocks/creds/*" {
   capabilities = ["read", "list"]
 }
 
