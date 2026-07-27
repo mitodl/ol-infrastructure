@@ -2,7 +2,6 @@
 
 import argparse
 import logging
-import os
 import sys
 import urllib.parse
 import webbrowser
@@ -10,7 +9,6 @@ from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import hvac
-import requests
 import yaml
 
 # Configure logging
@@ -22,12 +20,6 @@ logging.basicConfig(
     ],
 )
 logger = logging.getLogger(__name__)
-
-# Constants
-HTTP_OK = 200
-HTTP_NOT_FOUND = 404
-REQUEST_TIMEOUT = 10
-
 
 # From hvac OIDC documentation
 OIDC_CALLBACK_PORT = 8250
@@ -106,105 +98,6 @@ def oidc_login(client: hvac.Client, role: str):
     client.token = new_token
 
 
-def check_github_team_membership(token, org, team_slug, required_teams=None):
-    """
-    Check if the GitHub token belongs to a user who is a member of any of the specified team(s).
-
-    Args:
-        token (str): GitHub personal access token
-        org (str): GitHub organization name
-        team_slug (str): GitHub team slug to check membership for (unused, kept for compatibility)
-        required_teams (list): List of team slugs that user can be a member of (OR logic)
-
-    Returns:
-        bool: True if user is a member of at least one required team, False otherwise
-    """
-    if required_teams is None:
-        required_teams = [team_slug]
-
-    headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json",
-    }
-
-    user_teams = []
-    missing_teams = []
-
-    try:
-        # Get current user info
-        user_response = requests.get(
-            "https://api.github.com/user",
-            headers=headers,
-            timeout=REQUEST_TIMEOUT,
-        )
-        user_response.raise_for_status()
-        username = user_response.json()["login"]
-        logger.info("Checking team membership for user: %s", username)
-
-        # Check membership for each required team
-        for team in required_teams:
-            membership_url = (
-                f"https://api.github.com/orgs/{org}/teams/{team}/memberships/{username}"
-            )
-            response = requests.get(
-                membership_url,
-                headers=headers,
-                timeout=REQUEST_TIMEOUT,
-            )
-
-            if response.status_code == HTTP_OK:
-                membership_data = response.json()
-                if membership_data.get("state") == "active":
-                    logger.info(
-                        "User %s is an active member of team: %s", username, team
-                    )
-                    user_teams.append(team)
-                else:
-                    logger.warning(
-                        "User %s has pending membership in team: %s", username, team
-                    )
-                    missing_teams.append(team)
-            elif response.status_code == HTTP_NOT_FOUND:
-                logger.debug("User %s is not a member of team: %s", username, team)
-                missing_teams.append(team)
-            else:
-                logger.error(
-                    "Failed to check membership for team %s: HTTP %s",
-                    team,
-                    response.status_code,
-                )
-                missing_teams.append(team)
-
-        # Check if user is a member of at least one required team (OR logic)
-        if user_teams:
-            logger.info("User %s is a member of teams: %s", username, user_teams)
-            return True
-        else:
-            # Log specific messages for missing team access
-            logger.error(
-                "Access denied: User %s is not a member of any required GitHub teams.",
-                username,
-            )
-            logger.error(
-                "Required teams (need membership in at least one): %s", required_teams
-            )
-            if any(
-                team in ["vault-developer-access", "vault-devops-access"]
-                for team in required_teams
-            ):
-                logger.error(
-                    "Please contact DevOps to be added to the appropriate GitHub teams for Vault access."
-                )
-            return False
-
-    except requests.exceptions.RequestException:
-        logger.exception("Failed to check GitHub team membership")
-        return False
-    except KeyError:
-        logger.exception("Unexpected response format from GitHub API")
-        return False
-
-
 parser = argparse.ArgumentParser(description="EKS Login Helper")
 subparsers = parser.add_subparsers(help="functions")
 
@@ -246,49 +139,22 @@ kubeconfig_parser.add_argument(
 
 args = vars(parser.parse_args())
 
-github_token = os.environ.get("GITHUB_TOKEN")
-
 logger.info("Initializing Vault clients")
 ci_vault_client = hvac.Client(url="https://vault-ci.odl.mit.edu")
 qa_vault_client = hvac.Client(url="https://vault-qa.odl.mit.edu")
 production_vault_client = hvac.Client(url="https://vault-production.odl.mit.edu")
 
-if github_token:
-    # Check GitHub team membership before proceeding
-    logger.info("Verifying GitHub team membership")
-    # Define required teams for access
-    required_teams = ["vault-developer-access", "vault-devops-access"]
-
-    if not check_github_team_membership(
-        github_token, "mitodl", "vault-developer-access", required_teams
-    ):
-        logger.error("Access denied: User is not a member of required GitHub teams")
-        sys.exit(1)
-
-    logger.info("Authenticating with Vault using GitHub token")
-    try:
-        logger.debug("Authenticating with CI Vault...")
-        ci_vault_client.auth.github.login(token=github_token)
-        logger.debug("Authenticating with QA Vault...")
-        qa_vault_client.auth.github.login(token=github_token)
-        logger.debug("Authenticating with Production Vault...")
-        production_vault_client.auth.github.login(token=github_token)
-    except Exception:
-        logger.exception("Failed to authenticate with Vault")
-        sys.exit(1)
-else:
-    logger.info("GITHUB_TOKEN not found, falling back to OIDC authentication.")
-    role = args.get("role", "developer")
-    try:
-        logger.info("Authenticating with CI Vault via OIDC (role: %s)...", role)
-        oidc_login(ci_vault_client, role)
-        logger.info("Authenticating with QA Vault via OIDC (role: %s)...", role)
-        oidc_login(qa_vault_client, role)
-        logger.info("Authenticating with Production Vault via OIDC (role: %s)...", role)
-        oidc_login(production_vault_client, role)
-    except Exception:
-        logger.exception("Failed to authenticate with Vault")
-        sys.exit(1)
+role = args.get("role", "developer")
+try:
+    logger.info("Authenticating with CI Vault via OIDC (role: %s)...", role)
+    oidc_login(ci_vault_client, role)
+    logger.info("Authenticating with QA Vault via OIDC (role: %s)...", role)
+    oidc_login(qa_vault_client, role)
+    logger.info("Authenticating with Production Vault via OIDC (role: %s)...", role)
+    oidc_login(production_vault_client, role)
+except Exception:
+    logger.exception("Failed to authenticate with Vault")
+    sys.exit(1)
 
 # Check authentication status for each client individually
 vault_clients = {
@@ -308,10 +174,9 @@ for client_name, client in vault_clients.items():
 if failed_clients:
     logger.error("Vault authentication failed for: %s", ", ".join(failed_clients))
     logger.error(
-        "Verify you have GITHUB_TOKEN set to a personal access token with read:org permissions"
-    )
-    logger.error(
-        "Also ensure your GitHub account has access to the required teams for Vault authentication"
+        "Re-run and complete the browser login. If it keeps failing, confirm your "
+        "Keycloak account maps to the '%s' Vault OIDC role.",
+        role,
     )
     sys.exit(1)
 

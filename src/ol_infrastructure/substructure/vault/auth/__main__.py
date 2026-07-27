@@ -10,11 +10,10 @@ from pulumi_vault import (
     AuthBackendTuneArgs,
     Policy,
     aws,
-    github,
     jwt,
 )
 
-from bridge.lib.magic_numbers import EIGHT_HOURS_SECONDS, ONE_MONTH_SECONDS
+from bridge.lib.magic_numbers import EIGHT_HOURS_SECONDS
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.ol_types import AWSBase, Environment
 from ol_infrastructure.lib.pulumi_helper import (
@@ -65,14 +64,9 @@ for env in Environment:
         backend=vault_aws_auth.path,
     )
 
-vault_github_auth = github.AuthBackend(
-    "vault-github-auth-backend",
-    organization="mitodl",
-    description="GitHub Auth mount in a Vault server",
-    token_no_default_policy=True,
-    token_ttl=ONE_MONTH_SECONDS,
-    token_max_ttl=ONE_MONTH_SECONDS * 6,
-)
+# The GitHub auth backend was deliberately removed: authenticating to Vault with
+# a GitHub credential couples the two systems, so one stolen token grants both.
+# Keycloak OIDC below is the only interactive path -- do not re-add GitHub auth.
 
 # Enable OIDC auth method and configure it with Keycloak
 vault_oidc_keycloak_auth = jwt.AuthBackend(
@@ -105,12 +99,6 @@ developer_policy = Policy(
     .read_text(),
 )
 
-github.Team(
-    "vault-github-auth-developer",
-    team="vault-developer-access",
-    policies=[readonly_policy.name, developer_policy.name],
-)
-
 # Admin policy definition
 admin_policy = Policy(
     "admin-policy",
@@ -120,14 +108,14 @@ admin_policy = Policy(
     .read_text(),
 )
 
-github.Team(
-    "vault-github-auth-devops", team="vault-devops-access", policies=[admin_policy.name]
-)
-
 # Configure OIDC readonly role
 readonly_role = jwt.AuthBackendRole(
     "readonly-role",
     backend=vault_oidc_keycloak_auth.path,
+    # Pinned rather than inheriting Vault's system default, which is far longer
+    # than a working session needs.
+    token_ttl=EIGHT_HOURS_SECONDS,
+    token_max_ttl=EIGHT_HOURS_SECONDS,
     role_name="readonly",
     token_policies=[readonly_policy.name],
     allowed_redirect_uris=[
@@ -143,6 +131,10 @@ readonly_role = jwt.AuthBackendRole(
 developer_role = jwt.AuthBackendRole(
     "developer-role",
     backend=vault_oidc_keycloak_auth.path,
+    # Pinned rather than inheriting Vault's system default, which is far longer
+    # than a working session needs.
+    token_ttl=EIGHT_HOURS_SECONDS,
+    token_max_ttl=EIGHT_HOURS_SECONDS,
     role_name="developer",
     token_policies=[developer_policy.name],
     allowed_redirect_uris=[
@@ -158,6 +150,10 @@ developer_role = jwt.AuthBackendRole(
 admin_role = jwt.AuthBackendRole(
     "admin-role",
     backend=vault_oidc_keycloak_auth.path,
+    # Pinned rather than inheriting Vault's system default, which is far longer
+    # than a working session needs.
+    token_ttl=EIGHT_HOURS_SECONDS,
+    token_max_ttl=EIGHT_HOURS_SECONDS,
     role_name="admin",
     token_policies=[admin_policy.name],
     allowed_redirect_uris=[
