@@ -1283,21 +1283,6 @@ gh_workflow_secretaccesskey_env_secret = github.ActionsSecret(
     opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
 )
 
-gh_workflow_fastly_api_key_env_secret = github.ActionsSecret(
-    f"learn-ai-gh-workflow-fastly-api-key-env-secret-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"FASTLY_API_KEY_{env_var_suffix}",  # pragma: allowlist secret
-    plaintext_value=read_yaml_secrets(Path("fastly.yaml"))["admin_api_key"],
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_fastly_service_id_env_secret = github.ActionsSecret(
-    f"learn-ai-gh-workflow-fastly-service-id-env-secret-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"FASTLY_SERVICE_ID_{env_var_suffix}",  # pragma: allowlist secret
-    plaintext_value=learn_ai_fastly_service.id,
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-
 gh_workflow_s3_bucket_name_env_secret = github.ActionsVariable(
     f"learn-ai-gh-workflow-s3-bucket-name-env-variable-{stack_info.env_suffix}",
     repository=gh_repo.name,
