@@ -1491,39 +1491,45 @@ webapp_keda_config = build_webapp_keda_config(
     mitlearn_config=mitlearn_config,
 )
 
+
 # Resource requests/limits, configurable per-stack via Pulumi config, falling back
-# to these hard-coded defaults when unset.
-webapp_resource_requests = mitlearn_config.get_object("webapp_resource_requests") or {
-    "cpu": "500m",
-    "memory": "3200Mi",
-}
-webapp_resource_limits = mitlearn_config.get_object("webapp_resource_limits") or {
-    "memory": "3200Mi",
-}
-celery_default_resource_requests = mitlearn_config.get_object(
-    "celery_default_resource_requests"
-) or {"cpu": "200m", "memory": "2400Mi"}
-celery_default_resource_limits = mitlearn_config.get_object(
-    "celery_default_resource_limits"
-) or {"memory": "2400Mi"}
-celery_edx_content_resource_requests = mitlearn_config.get_object(
-    "celery_edx_content_resource_requests"
-) or {"cpu": "200m", "memory": "2400Mi"}
-celery_edx_content_resource_limits = mitlearn_config.get_object(
-    "celery_edx_content_resource_limits"
-) or {"memory": "2400Mi"}
-celery_embeddings_resource_requests = mitlearn_config.get_object(
-    "celery_embeddings_resource_requests"
-) or {"cpu": "200m", "memory": "2400Mi"}
-celery_embeddings_resource_limits = mitlearn_config.get_object(
-    "celery_embeddings_resource_limits"
-) or {"memory": "2400Mi"}
-celery_beat_resource_requests = mitlearn_config.get_object(
-    "celery_beat_resource_requests"
-) or {"cpu": "100m", "memory": "2048Mi"}
-celery_beat_resource_limits = mitlearn_config.get_object(
-    "celery_beat_resource_limits"
-) or {"memory": "2048Mi"}
+# to these hard-coded defaults when unset. Stack overrides are merged onto the
+# defaults (rather than replacing them outright) so a stack that only overrides
+# one key (e.g. `memory`) doesn't silently drop the other (e.g. `cpu`).
+def _resource_config(config_key: str, default: dict[str, str]) -> dict[str, str]:
+    return {**default, **(mitlearn_config.get_object(config_key) or {})}
+
+
+webapp_resource_requests = _resource_config(
+    "webapp_resource_requests", {"cpu": "500m", "memory": "3200Mi"}
+)
+webapp_resource_limits = _resource_config(
+    "webapp_resource_limits", {"memory": "3200Mi"}
+)
+celery_default_resource_requests = _resource_config(
+    "celery_default_resource_requests", {"cpu": "200m", "memory": "2400Mi"}
+)
+celery_default_resource_limits = _resource_config(
+    "celery_default_resource_limits", {"memory": "2400Mi"}
+)
+celery_edx_content_resource_requests = _resource_config(
+    "celery_edx_content_resource_requests", {"cpu": "200m", "memory": "2400Mi"}
+)
+celery_edx_content_resource_limits = _resource_config(
+    "celery_edx_content_resource_limits", {"memory": "2400Mi"}
+)
+celery_embeddings_resource_requests = _resource_config(
+    "celery_embeddings_resource_requests", {"cpu": "200m", "memory": "2400Mi"}
+)
+celery_embeddings_resource_limits = _resource_config(
+    "celery_embeddings_resource_limits", {"memory": "2400Mi"}
+)
+celery_beat_resource_requests = _resource_config(
+    "celery_beat_resource_requests", {"cpu": "100m", "memory": "2048Mi"}
+)
+celery_beat_resource_limits = _resource_config(
+    "celery_beat_resource_limits", {"memory": "2048Mi"}
+)
 
 # Configure and deploy the mitlearn application using OLApplicationK8s
 mitlearn_k8s_app = OLApplicationK8s(
