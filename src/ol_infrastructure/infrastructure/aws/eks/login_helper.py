@@ -101,8 +101,20 @@ def oidc_login(client: hvac.Client, role: str):
 parser = argparse.ArgumentParser(description="EKS Login Helper")
 subparsers = parser.add_subparsers(help="functions")
 
+# Every subcommand authenticates to Vault over OIDC, so the role belongs to all
+# of them rather than just `kubeconfig`.
+vault_auth_parser = argparse.ArgumentParser(add_help=False)
+vault_auth_parser.add_argument(
+    "-r",
+    "--role",
+    help="Set the OIDC role to use for authenticating to Vault (developer or admin)",
+    required=False,
+    default="developer",
+)
+
 aws_creds_parser = subparsers.add_parser(
     "aws_creds",
+    parents=[vault_auth_parser],
     help="Fetch AWS credentials",
     description="Fetches AWS credentials for the shared EKS developer role and echos `export` statements to stdout",
 )
@@ -118,6 +130,7 @@ aws_creds_parser.add_argument(
 
 kubeconfig_parser = subparsers.add_parser(
     "kubeconfig",
+    parents=[vault_auth_parser],
     help="Generate kubeconfig file",
     description="Generates a kubeconfig file for all active EKS clusters and echoes the file to stdout",
 )
@@ -127,14 +140,6 @@ kubeconfig_parser.add_argument(
     "--set-current-context",
     help="Sets a current context in the rendered kubeconfig file",
     required=False,
-)
-
-kubeconfig_parser.add_argument(
-    "-r",
-    "--role",
-    help="Set the OIDC role to use for authenticating to Vault (developer or admin)",
-    required=False,
-    default="developer",
 )
 
 args = vars(parser.parse_args())
