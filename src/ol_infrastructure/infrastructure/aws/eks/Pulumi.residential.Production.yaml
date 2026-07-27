@@ -40,9 +40,9 @@ config:
         ol.mit.edu/gpu_node: false
       node_group_options: {}
       scaling:
-        desired: 3
+        desired: 4
         max: 5
-        min: 3
+        min: 4
       tags:
         cluster: residential-production
       taints: {}

@@ -80,6 +80,28 @@ def create_typesense_resources(
             "adminApiKey": {
                 "name": typesense_bootstrap_key_name,
             },
+            # Pin to the static on-demand core nodegroup instead of the
+            # Karpenter spot fleet: typesense's PVCs are zone-locked once
+            # bound, and spot rebalance-recommendation waves were cordoning
+            # the node a replica's PVC was pinned to faster than the pod
+            # could reach Ready, keeping the StatefulSet permanently
+            # unstable (2026-07-27 TMM).
+            "nodeSelector": {
+                "ol.mit.edu/core_node": "true",
+            },
+            "topologySpreadConstraints": [
+                {
+                    "maxSkew": 1,
+                    "topologyKey": "topology.kubernetes.io/zone",
+                    "whenUnsatisfiable": "ScheduleAnyway",
+                    "labelSelector": {
+                        "matchLabels": {
+                            "app.kubernetes.io/name": "typesense",
+                            "app.kubernetes.io/instance": f"{stack_info.env_prefix}-ts",
+                        },
+                    },
+                },
+            ],
         },
         opts=ResourceOptions(depends_on=[typesense_bootstrap_key]),
     )
