@@ -1491,6 +1491,40 @@ webapp_keda_config = build_webapp_keda_config(
     mitlearn_config=mitlearn_config,
 )
 
+# Resource requests/limits, configurable per-stack via Pulumi config, falling back
+# to these hard-coded defaults when unset.
+webapp_resource_requests = mitlearn_config.get_object("webapp_resource_requests") or {
+    "cpu": "500m",
+    "memory": "3200Mi",
+}
+webapp_resource_limits = mitlearn_config.get_object("webapp_resource_limits") or {
+    "memory": "3200Mi",
+}
+celery_default_resource_requests = mitlearn_config.get_object(
+    "celery_default_resource_requests"
+) or {"cpu": "200m", "memory": "2400Mi"}
+celery_default_resource_limits = mitlearn_config.get_object(
+    "celery_default_resource_limits"
+) or {"memory": "2400Mi"}
+celery_edx_content_resource_requests = mitlearn_config.get_object(
+    "celery_edx_content_resource_requests"
+) or {"cpu": "200m", "memory": "2400Mi"}
+celery_edx_content_resource_limits = mitlearn_config.get_object(
+    "celery_edx_content_resource_limits"
+) or {"memory": "2400Mi"}
+celery_embeddings_resource_requests = mitlearn_config.get_object(
+    "celery_embeddings_resource_requests"
+) or {"cpu": "200m", "memory": "2400Mi"}
+celery_embeddings_resource_limits = mitlearn_config.get_object(
+    "celery_embeddings_resource_limits"
+) or {"memory": "2400Mi"}
+celery_beat_resource_requests = mitlearn_config.get_object(
+    "celery_beat_resource_requests"
+) or {"cpu": "100m", "memory": "2048Mi"}
+celery_beat_resource_limits = mitlearn_config.get_object(
+    "celery_beat_resource_limits"
+) or {"memory": "2048Mi"}
+
 # Configure and deploy the mitlearn application using OLApplicationK8s
 mitlearn_k8s_app = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
@@ -1544,31 +1578,31 @@ mitlearn_k8s_app = OLApplicationK8s(
                 max_replicas=20,
                 redis_host=redis_cache.address,
                 redis_password=redis_config.require("password"),
-                resource_requests={"cpu": "200m", "memory": "2400Mi"},
-                resource_limits={"memory": "2400Mi"},
+                resource_requests=celery_default_resource_requests,
+                resource_limits=celery_default_resource_limits,
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="edx_content",
                 redis_host=redis_cache.address,
                 redis_password=redis_config.require("password"),
-                resource_requests={"cpu": "200m", "memory": "2400Mi"},
-                resource_limits={"memory": "2400Mi"},
+                resource_requests=celery_edx_content_resource_requests,
+                resource_limits=celery_edx_content_resource_limits,
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="embeddings",
                 max_replicas=30,
                 redis_host=redis_cache.address,
                 redis_password=redis_config.require("password"),
-                resource_requests={"cpu": "200m", "memory": "2400Mi"},
-                resource_limits={"memory": "2400Mi"},
+                resource_requests=celery_embeddings_resource_requests,
+                resource_limits=celery_embeddings_resource_limits,
             ),
         ],
         celery_beat_config=OLApplicationK8sCeleryBeatConfig(
-            resource_requests={"cpu": "100m", "memory": "2048Mi"},
-            resource_limits={"memory": "2048Mi"},
+            resource_requests=celery_beat_resource_requests,
+            resource_limits=celery_beat_resource_limits,
         ),
-        resource_requests={"cpu": "500m", "memory": "3200Mi"},
-        resource_limits={"memory": "3200Mi"},
+        resource_requests=webapp_resource_requests,
+        resource_limits=webapp_resource_limits,
         # Preserves the bounds of the hand-rolled mitlearn-webapp-vpa this replaces.
         # The floor is deliberately well below resource_limits (unlike the component
         # default, which pins the floor at the limit) so the VPA can also size these
