@@ -1241,7 +1241,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 # string), but upGrad users log in via a direct kc_idp_hint
                 # link, not domain-based home-realm discovery, so this value
                 # doesn't gate which email domains (e.g. gmail.com) can log in.
-                org_domains=["upgrad.com"],
+                org_domains=[],
                 org_name="upGrad",
                 org_alias="UPGRAD",
                 learn_domain=mitlearn_domain,
