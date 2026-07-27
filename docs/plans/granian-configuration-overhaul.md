@@ -1,6 +1,6 @@
 # Granian configuration overhaul
 
-**Status:** stage 0 (component change) implemented 2026-07-22; stages 1–4 pending
+**Status:** stage 0 merged 2026-07-23 (#5083); stage 1 in review 2026-07-27; stages 2–4 pending
 **Project:** `wp-granian-configuration-overhaul-expose-blocking-t-3debc2`
 **Component:** `src/ol_infrastructure/components/services/k8s.py` — `GranianConfig`
 **Evidence:** witan lessons `les-granianconfig-never-exposes-blocking-threads-bac-874462`,
@@ -212,9 +212,18 @@ Component change lands once; per-app behavior changes as each app's stack is dep
   `workers_max_rss` docstring corrections. No app behavior changes except for any caller
   relying on the `workers` default (none today). Unit tests + `pulumi preview` on one CI
   stack showing zero webapp diffs.
-- **Stage 1 — pilot, lower traffic.** `ocw_studio` and `odl_video_service`. Drop the
-  explicit `workers=2`, let the new defaults apply. Deploy CI → QA → production. Hold
-  ≥ 3 business days at production before proceeding.
+- **Stage 1 — pilot, lower traffic.** `ocw_studio` and `odl_video_service`. Delete each
+  app's holding-pin block, letting the new defaults apply. Deploy CI → QA → production.
+  Hold ≥ 3 business days at production before proceeding.
+
+  Replica pre-raise was evaluated against production and **not** applied. Over the 7 days
+  to 2026-07-27 both webapps sat pinned at `min_replicas=2` with p95 CPU ≈ 3m/pod
+  (≈ 3% of `ocw_studio`'s 100m request, ≈ 1% of `odl_video_service`'s 250m) and 7-day
+  peaks of 26m and 9m. The HPA's 60% target has never been approached in either
+  direction, so there is no scale-down to guard against. Peak working set over the same
+  window — 904MiB of a 3Gi limit (`ocw_studio`) and 423MiB of 1Gi
+  (`odl_video_service`) — stays under the new single-worker RSS caps of 2764MiB and
+  921MiB, so the cap still fires ahead of the cgroup OOM killer.
 - **Stage 2 — mid traffic.** `micromasters`, `xpro`. Same edit. Health-probe split task
   becomes eligible here.
 - **Stage 3 — high traffic.** `mitxonline` (plus removal of the ceiling-based
