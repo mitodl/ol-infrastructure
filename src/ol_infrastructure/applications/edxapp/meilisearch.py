@@ -127,6 +127,13 @@ def create_meilisearch_resources(
                 "memory": meilisearch_config.get("memory_limit") or "512Mi",
             },
         },
+        # Pin to the static on-demand core nodegroup instead of the
+        # Karpenter spot fleet: its PVC is zone-locked once bound, and spot
+        # rebalance-recommendation waves were cordoning nodes faster than
+        # the pod could reach Ready (2026-07-27 TMM).
+        "nodeSelector": {
+            "ol.mit.edu/core_node": "true",
+        },
     }
 
     return kubernetes.helm.v3.Release(
