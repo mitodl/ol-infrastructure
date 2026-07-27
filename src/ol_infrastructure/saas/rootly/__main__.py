@@ -573,6 +573,10 @@ escalation_level_r_75bc919c_824c_46a1_9589_0fc8b85e0d77 = rootly.EscalationLevel
     opts=rootly_opts,
 )
 
+# Was "everyone" -- paged the entire schedule instead of just on-call when
+# position 1 went unacknowledged for 5+10 minutes. Changed to on_call_only to
+# match every other level on this policy; position 3 (specific fallback user)
+# still escalates further if on-call still doesn't respond.
 escalation_level_r_8ee197b2_ffe5_4696_b4a0_760e5c84a343 = rootly.EscalationLevel(
     "r-8ee197b2-ffe5-4696-b4a0-760e5c84a343",
     delay=10,
@@ -585,7 +589,7 @@ escalation_level_r_8ee197b2_ffe5_4696_b4a0_760e5c84a343 = rootly.EscalationLevel
             "type": "schedule",
         }
     ],
-    paging_strategy_configuration_schedule_strategy="everyone",
+    paging_strategy_configuration_schedule_strategy="on_call_only",
     paging_strategy_configuration_strategy="default",
     position=2,
     opts=rootly_opts,
