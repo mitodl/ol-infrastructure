@@ -1,7 +1,6 @@
 # Granian configuration overhaul
 
-**Status:** stage 0 (component change) merged 2026-07-23 (#5083); stage 1 in review as of
-2026-07-27; stages 2–4 pending
+**Status:** stage 0 merged 2026-07-23 (#5083); stage 1 in review 2026-07-27; stages 2–4 pending
 **Project:** `wp-granian-configuration-overhaul-expose-blocking-t-3debc2`
 **Component:** `src/ol_infrastructure/components/services/k8s.py` — `GranianConfig`
 **Evidence:** witan lessons `les-granianconfig-never-exposes-blocking-threads-bac-874462`,
@@ -218,13 +217,13 @@ Component change lands once; per-app behavior changes as each app's stack is dep
   Hold ≥ 3 business days at production before proceeding.
 
   Replica pre-raise was evaluated against production and **not** applied. Over the 7 days
-  to 2026-07-27 both webapps sat pinned at `min_replicas=2` with p95 CPU ≈ 3 m/pod
-  (≈ 3 % of `ocw_studio`'s 100m request, ≈ 1 % of `odl_video_service`'s 250m) and 7-day
-  peaks of 26 m and 9 m. The HPA's 60 % target has never been approached in either
+  to 2026-07-27 both webapps sat pinned at `min_replicas=2` with p95 CPU ≈ 3m/pod
+  (≈ 3% of `ocw_studio`'s 100m request, ≈ 1% of `odl_video_service`'s 250m) and 7-day
+  peaks of 26m and 9m. The HPA's 60% target has never been approached in either
   direction, so there is no scale-down to guard against. Peak working set over the same
-  window — 904 MiB of a 3Gi limit (`ocw_studio`) and 423 MiB of 1Gi
-  (`odl_video_service`) — stays under the new single-worker RSS caps of 2764 MiB and
-  921 MiB, so the cap still fires ahead of the cgroup OOM killer.
+  window — 904MiB of a 3Gi limit (`ocw_studio`) and 423MiB of 1Gi
+  (`odl_video_service`) — stays under the new single-worker RSS caps of 2764MiB and
+  921MiB, so the cap still fires ahead of the cgroup OOM killer.
 - **Stage 2 — mid traffic.** `micromasters`, `xpro`. Same edit. Health-probe split task
   becomes eligible here.
 - **Stage 3 — high traffic.** `mitxonline` (plus removal of the ceiling-based
