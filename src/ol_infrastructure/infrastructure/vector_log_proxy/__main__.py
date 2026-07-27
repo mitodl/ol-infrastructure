@@ -223,7 +223,9 @@ fastly_api_key_secret = OLVaultK8SSecret(
 # Fastly Challenge Server Config #
 ##################################
 
-# Read Fastly API credentials
+# The challenge server only ever calls GET /service to enumerate service IDs,
+# so it gets a separate global:read-scoped token rather than the admin_api_key
+# used elsewhere to manage Fastly service configuration.
 fastly_api_credentials = read_yaml_secrets(Path("fastly.yaml"))
 
 # Store Fastly API key in Vault
@@ -232,7 +234,7 @@ vault.generic.Secret(
     path=vector_log_proxy_secrets_mount.path.apply(
         lambda mount_path: f"{mount_path}/fastly_api_key"
     ),
-    data_json=json.dumps({"api_key": fastly_api_credentials["admin_api_key"]}),
+    data_json=json.dumps({"api_key": fastly_api_credentials["global_read_api_key"]}),
 )
 
 ##################################
