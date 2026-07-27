@@ -117,6 +117,11 @@ class SimplePulumiParams(BaseModel):
                           added so this pipeline gates on the prior stage's deployment
                           issue being closed, preserving the same promotion workflow
                           used within a single chained pipeline.
+        refresh_stack: Whether the Pulumi deploy jobs run `pulumi refresh` before
+                      `up`. Defaults to True. Set False for apps whose Pulumi code
+                      provisions Fastly resources while the Fastly API token is
+                      being rotated -- refresh calls the Fastly API with the old
+                      token and fails the whole job.
     """
 
     app_name: str
@@ -131,6 +136,7 @@ class SimplePulumiParams(BaseModel):
     docker_image: DockerImageConfig | None = None
     build: BuildConfig | None = None
     prior_stage_stack: str | None = None
+    refresh_stack: bool = True
 
     @model_validator(mode="before")
     @classmethod
@@ -333,6 +339,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="fastly-redirector",
         pulumi_project_path="applications/fastly_redirector/",
         pulumi_project_name="ol-application-fastly-redirector",
+        refresh_stack=False,
     ),
     "jupyterhub-data": SimplePulumiParams(
         app_name="jupyterhub-data",
@@ -356,6 +363,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_path="applications/ocw_site/",
         pulumi_project_name="ol-application-ocw-site",
         stages=["QA", "Production"],
+        refresh_stack=False,
     ),
     "open-discussions": SimplePulumiParams(
         app_name="open-discussions",
@@ -743,7 +751,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                 # Create a job chain for this deployment group
                 group_fragment = pulumi_jobs_chain(
                     pulumi_code,
-                    refresh_stack=True,
+                    refresh_stack=params.refresh_stack,
                     project_name=params.pulumi_project_name,
                     stack_names=group_stacks,
                     project_source_path=PULUMI_CODE_PATH.joinpath(
@@ -775,7 +783,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             # Single chain for simple discovered stacks
             pulumi_fragment = pulumi_jobs_chain(
                 pulumi_code,
-                refresh_stack=True,
+                refresh_stack=params.refresh_stack,
                 project_name=params.pulumi_project_name,
                 stack_names=discovered_stacks,
                 project_source_path=PULUMI_CODE_PATH.joinpath(
@@ -812,7 +820,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
 
         pulumi_fragment = pulumi_jobs_chain(
             pulumi_code,
-            refresh_stack=True,
+            refresh_stack=params.refresh_stack,
             project_name=params.pulumi_project_name,
             stack_names=stack_names,
             project_source_path=PULUMI_CODE_PATH.joinpath(params.pulumi_project_path),

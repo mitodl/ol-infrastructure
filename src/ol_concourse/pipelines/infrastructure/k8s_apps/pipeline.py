@@ -115,6 +115,11 @@ class AppPipelineParams(BaseModel):
             source maps to Sentry with an auth token -- the token never enters the
             image build. See :class:`SentrySourcemapsConfig`. Left unset, no source
             maps are uploaded.
+        refresh_stack (bool): Whether the Pulumi deploy jobs run `pulumi refresh`
+            before `up`. Defaults to True. Set False for apps whose Pulumi code
+            provisions Fastly resources while the Fastly API token is being
+            rotated -- refresh calls the Fastly API with the old token and fails
+            the whole job.
     """
 
     app_name: str
@@ -134,6 +139,7 @@ class AppPipelineParams(BaseModel):
     github_repo: str | None = None
     use_release_resource_workflow: bool = False
     sentry_sourcemaps: SentrySourcemapsConfig | None = None
+    refresh_stack: bool = True
 
     @model_validator(mode="after")
     def set_repo_name(self) -> "AppPipelineParams":
@@ -179,8 +185,11 @@ pipeline_params = {
         repo_main_branch=app_repo_main_branch("micromasters"),
         settings_dir="micromasters",
         version_file="VERSION",
+        refresh_stack=False,
     ),
-    "mitxonline": AppPipelineParams(app_name="mitxonline", build_target="production"),
+    "mitxonline": AppPipelineParams(
+        app_name="mitxonline", build_target="production", refresh_stack=False
+    ),
     "mit-learn-nextjs": AppPipelineParams(
         app_name="mit-learn-nextjs",
         # No build_target: use the default `runner` stage, which bakes `yarn build`
@@ -208,7 +217,10 @@ pipeline_params = {
         repo_main_branch=app_repo_main_branch("xpro"),
         build_target="production",
         settings_dir="mitxpro",
+        refresh_stack=False,
     ),
+    "learn-ai": AppPipelineParams(app_name="learn-ai", refresh_stack=False),
+    "mit-learn": AppPipelineParams(app_name="mit-learn", refresh_stack=False),
     "ocw-studio": AppPipelineParams(
         app_name="ocw-studio",
         repo_main_branch=app_repo_main_branch("ocw-studio"),
@@ -679,7 +691,7 @@ def _build_legacy_app_pipeline(
         pulumi_job(
             pulumi_code=ol_infra_repo,
             stack_name="CI",
-            refresh_stack=True,
+            refresh_stack=pipeline_parameters.refresh_stack,
             project_name=f"ol-application-{app_name}",
             project_source_path=(
                 f"src/ol_infrastructure/applications/{app_name.replace('-', '_')}"
@@ -721,7 +733,7 @@ def _build_legacy_app_pipeline(
         additional_post_steps = {0: qa_purge_steps, 1: prod_purge_steps}
 
     qa_and_production_fragment = pulumi_jobs_chain(
-        refresh_stack=True,
+        refresh_stack=pipeline_parameters.refresh_stack,
         pulumi_code=ol_infra_repo,
         stack_names=["QA", "Production"],
         project_name=f"ol-application-{app_name}",
@@ -1215,7 +1227,7 @@ def _build_release_resource_app_pipeline(
     ci_fragment = pulumi_job(
         pulumi_code=ol_infra_repo,
         stack_name="CI",
-        refresh_stack=True,
+        refresh_stack=pipeline_parameters.refresh_stack,
         project_name=f"ol-application-{app_name}",
         project_source_path=(
             f"src/ol_infrastructure/applications/{app_name.replace('-', '_')}"
@@ -1312,7 +1324,7 @@ def _build_release_resource_app_pipeline(
 
     # QA and Production Deployments
     qa_and_production_fragment = pulumi_jobs_chain(
-        refresh_stack=True,
+        refresh_stack=pipeline_parameters.refresh_stack,
         pulumi_code=ol_infra_repo,
         stack_names=["QA", "Production"],
         project_name=f"ol-application-{app_name}",
