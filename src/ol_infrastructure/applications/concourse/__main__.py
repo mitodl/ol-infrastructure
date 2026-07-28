@@ -252,6 +252,24 @@ for iam_policy in iam_policy_names or []:
                 {"actions": ["iam:updateassumerolepolicy"]},
             ]
         }
+        # This worker needs s3:PutBucketPolicy (to author bucket policies for
+        # CloudFront OAI/public-read buckets via OLBucket's
+        # bucket_policy_document) and s3:PutLifecycleConfiguration (created by
+        # every OLBucket by default) at Resource: "*", since bucket names
+        # don't share a common prefix across services. It deliberately does
+        # NOT hold s3:GetObject/PutObject/DeleteObject -- object-level data
+        # access is granted per-service via narrowly scoped IRSA/instance
+        # roles instead (see e.g. the starrocks shared-data-bucket policy).
+        # Parliament's bucket-privesc auditor flags PutBucketPolicy /
+        # PutLifecycleConfiguration without matching object-level actions
+        # unconditionally -- confirmed in its source
+        # (parliament/policy.py:check_bucket_privesc) that this fires per
+        # resource regardless of scoping unless the same resource also has
+        # matching PutObject/GetObject/DeleteObject grants, which we
+        # intentionally don't add here. Blanket-suppressed like RESOURCE_STAR
+        # above rather than via ignore_locations, since this finding type
+        # carries no "actions" location to match against.
+        parliament_config["RESOURCE_POLICY_PRIVILEGE_ESCALATION"] = {}
     # IAM enforces a hard, non-adjustable 6,144 character cap per managed
     # policy document. pulumi_infra's action list is real, CloudTrail-derived
     # usage and doesn't compress -- split across sibling policies (a role can
