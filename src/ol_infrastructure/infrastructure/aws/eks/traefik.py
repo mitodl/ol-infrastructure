@@ -200,7 +200,7 @@ def setup_traefik(
                         "memory": "150Mi",
                     },
                     "limits": {
-                        "memory": "150Mi",
+                        "memory": "512Mi",
                     },
                 },
                 "metrics": {
