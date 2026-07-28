@@ -27,6 +27,7 @@ config:
     csrf_domains:
     - "https://api.learn.mit.edu"
     - "https://learn.mit.edu"
+    - "https://courses.learn.mit.edu"   # MITxOnline courseware MFE (content feedback submit)
     - "https://api.mitopen.odl.mit.edu"   # legacy
     - "https://mitopen.odl.mit.edu"   # legacy
     - "https://draft.ocw.mit.edu"

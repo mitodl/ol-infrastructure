@@ -29,6 +29,7 @@ config:
     csrf_domains:
     - "https://api.ci.learn.mit.edu"
     - "https://ci.learn.mit.edu"
+    - "https://courses.ci.learn.mit.edu"   # MITxOnline courseware MFE (content feedback submit)
     - "https://draft-ci.ocw.mit.edu"
     - "https://live-ci.ocw.mit.edu"
     mailgun_sender_domain: "mail-ci.learn.mit.edu"
