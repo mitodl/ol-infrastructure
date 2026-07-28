@@ -58,6 +58,7 @@ config:
     - cloud_custodian
     - infra
     - pulumi_state
+    - pulumi_infra
     instance_type: t3a.medium
     name: infra
     spot_options:

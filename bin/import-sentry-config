@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Generate Pulumi code and import data for the MIT Open Learning Sentry org."""
 
-# ruff: noqa: C901, E501, PERF401, PLR0912, PLR0913, S101, SLOT000, T201
+# ruff: noqa: PERF401, S101, SLOT000
 
 from __future__ import annotations
 

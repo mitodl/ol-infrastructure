@@ -1,0 +1,211 @@
+#!/usr/bin/env python3
+"""Diff a Concourse worker's real AWS API usage against its granted IAM policy.
+
+Combines two real usage sources -- IAM Access Analyzer's CloudTrail-based
+policy generation (recent, precise) and its "unused access" finding history
+(long-tail, catches low-cadence actions like cert renewal) -- against the
+`policy_definition` in one of this repo's `iam_policies` modules, and reports
+actions that are used but not granted, or granted but never observed.
+
+This is a report-only tool: it never modifies IAM or writes files. It exists
+to make the manual analysis behind PR #4873 (least-privilege replacement for
+the infra worker pool's IAM policy) repeatable, so policy drift can be caught
+on a schedule instead of discovered as a production AccessDenied.
+"""
+
+import importlib
+import json
+import time
+from datetime import UTC, datetime, timedelta
+from typing import Annotated, Any
+
+import boto3
+import cyclopts
+
+app = cyclopts.App(
+    help=(
+        "Diff a role's real AWS API usage (via IAM Access Analyzer) against the "
+        "granted actions in one of this repo's iam_policies modules."
+    )
+)
+
+DEFAULT_ANALYZER_ARN = (
+    "arn:aws:access-analyzer:us-east-1:610119931565:analyzer/"
+    "UnusedAccess-ConsoleAnalyzer-09232024-OL-SecOps"
+)
+DEFAULT_ACCESS_ROLE_ARN = (
+    "arn:aws:iam::610119931565:role/service-role/"
+    "AccessAnalyzerMonitorServiceRole_XELK4E2HVP"  # pragma: allowlist secret
+)
+DEFAULT_TRAIL_ARN = "arn:aws:cloudtrail:us-east-1:610119931565:trail/odl-aws-cloudtrail"
+# StartPolicyGeneration enforces a hard quota on the number of CloudTrail log
+# files it will process for an org-wide multi-region trail; 90 days is the
+# API's own ceiling, but a busy trail can still exceed the quota within that
+# window, so default to a much smaller slice.
+DEFAULT_LOOKBACK_DAYS = 14
+# How far back to paginate "unused access" findings to recover the low-cadence
+# action history. Findings roll over every few days as the analyzer re-scans,
+# so this walks pages until either exhausted or this many results collected.
+MAX_UNUSED_ACCESS_FINDINGS = 200
+
+
+def _load_granted_actions(policy_module: str) -> set[str]:
+    module = importlib.import_module(policy_module)
+    actions: set[str] = set()
+    for statement in module.policy_definition["Statement"]:
+        action = statement["Action"]
+        actions.update([action] if isinstance(action, str) else action)
+    return actions
+
+
+def _generate_policy_from_cloudtrail(
+    client: Any,
+    role_arn: str,
+    trail_arn: str,
+    access_role_arn: str,
+    lookback_days: int,
+    poll_interval_seconds: int,
+    timeout_seconds: int,
+) -> set[str]:
+    end_time = datetime.now(UTC) - timedelta(minutes=1)
+    start_time = end_time - timedelta(days=lookback_days)
+    job_id = client.start_policy_generation(
+        policyGenerationDetails={"principalArn": role_arn},
+        cloudTrailDetails={
+            "trails": [{"cloudTrailArn": trail_arn, "allRegions": True}],
+            "accessRole": access_role_arn,
+            "startTime": start_time,
+            "endTime": end_time,
+        },
+    )["jobId"]
+
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        result = client.get_generated_policy(jobId=job_id)
+        status = result["jobDetails"]["status"]
+        if status == "SUCCEEDED":
+            actions: set[str] = set()
+            for policy in result["generatedPolicyResult"]["generatedPolicies"]:
+                doc = json.loads(policy["policy"])
+                for statement in doc["Statement"]:
+                    action = statement["Action"]
+                    actions.update([action] if isinstance(action, str) else action)
+            return actions
+        if status == "FAILED":
+            error = result["jobDetails"].get("jobError", {})
+            msg = (
+                f"Policy generation failed: {error.get('code')} {error.get('message')}"
+            )
+            raise RuntimeError(msg)
+        time.sleep(poll_interval_seconds)
+    msg = f"Policy generation job {job_id} did not complete within {timeout_seconds}s"
+    raise TimeoutError(msg)
+
+
+def _unused_access_action_history(
+    client: Any, analyzer_arn: str, role_arn: str
+) -> set[str]:
+    """Return every action this role has ever called, per Access Analyzer's
+    per-action lastAccessed data -- including actions now considered "unused"
+    relative to the analyzer's current window, which is exactly the low-cadence
+    history a short CloudTrail lookback misses.
+    """
+    actions: set[str] = set()
+    finding_ids: list[str] = []
+    next_token = None
+    while len(finding_ids) < MAX_UNUSED_ACCESS_FINDINGS:
+        kwargs: dict[str, Any] = {
+            "analyzerArn": analyzer_arn,
+            "filter": {"resource": {"eq": [role_arn]}},
+        }
+        if next_token:
+            kwargs["nextToken"] = next_token
+        page = client.list_findings_v2(**kwargs)
+        finding_ids.extend(f["id"] for f in page["findings"])
+        next_token = page.get("nextToken")
+        if not next_token:
+            break
+
+    for finding_id in finding_ids:
+        detail = client.get_finding_v2(analyzerArn=analyzer_arn, id=finding_id)
+        for entry in detail["findingDetails"]:
+            unused = entry.get("unusedPermissionDetails", {})
+            namespace = unused.get("serviceNamespace")
+            if not namespace:
+                continue
+            for action_entry in unused.get("actions", []):
+                if action_entry.get("lastAccessed"):
+                    actions.add(f"{namespace}:{action_entry['action']}")
+    return actions
+
+
+@app.command
+def analyze(
+    role_arn: Annotated[
+        str, cyclopts.Parameter(help="IAM role ARN to analyze real usage for.")
+    ],
+    policy_module: Annotated[
+        str,
+        cyclopts.Parameter(
+            help=(
+                "Dotted path to the iam_policies module to diff against, e.g. "
+                "ol_infrastructure.applications.concourse.iam_policies.pulumi_infra"
+            )
+        ),
+    ],
+    *,
+    analyzer_arn: str = DEFAULT_ANALYZER_ARN,
+    access_role_arn: str = DEFAULT_ACCESS_ROLE_ARN,
+    trail_arn: str = DEFAULT_TRAIL_ARN,
+    lookback_days: int = DEFAULT_LOOKBACK_DAYS,
+    region: str = "us-east-1",
+    poll_interval_seconds: int = 15,
+    timeout_seconds: int = 300,
+    skip_cloudtrail: bool = False,
+) -> None:
+    """Report actions used-but-ungranted and granted-but-unused for a role.
+
+    Requires accessanalyzer:StartPolicyGeneration, GetGeneratedPolicy,
+    ListFindingsV2, GetFindingV2, and iam:PassRole on --access-role-arn.
+    """
+    client = boto3.client("accessanalyzer", region_name=region)
+
+    granted = _load_granted_actions(policy_module)
+    print(f"Granted actions in {policy_module}: {len(granted)}")
+
+    used: set[str] = set()
+    if not skip_cloudtrail:
+        print(f"Generating policy from {lookback_days}d of CloudTrail history...")
+        used |= _generate_policy_from_cloudtrail(
+            client,
+            role_arn,
+            trail_arn,
+            access_role_arn,
+            lookback_days,
+            poll_interval_seconds,
+            timeout_seconds,
+        )
+    print("Pulling unused-access finding history (catches low-cadence actions)...")
+    used |= _unused_access_action_history(client, analyzer_arn, role_arn)
+    print(f"Total distinct actions observed in use: {len(used)}")
+
+    granted_lower = {a.lower() for a in granted}
+    used_lower = {a.lower() for a in used}
+
+    missing = sorted(a for a in used if a.lower() not in granted_lower)
+    unused = sorted(a for a in granted if a.lower() not in used_lower)
+
+    print(f"\n=== Used but NOT granted ({len(missing)}) ===")
+    for action in missing:
+        print(f"  {action}")
+
+    print(f"\n=== Granted but never observed in use ({len(unused)}) ===")
+    for action in unused:
+        print(f"  {action}")
+
+    if not missing and not unused:
+        print("\nNo drift detected.")
+
+
+if __name__ == "__main__":
+    app()
