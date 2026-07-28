@@ -1426,29 +1426,44 @@ webapp_vpa_min_allowed_memory = (
 webapp_vpa_max_allowed_memory = (
     mitlearn_config.get("webapp_vpa_max_allowed_memory") or "4Gi"
 )
+#
+# request/memory values below are sized from each worker's own VPA
+# recommendation (steady-state target, observed live on
+# applications-production 2026-07-28), and limits are set 2-2.5x request
+# instead of matching it 1:1. request == limit gives the VPA zero burst
+# headroom to work with: make_vpa() below scales the limit proportionally
+# to whatever ratio is declared here (controlledValues="RequestsAndLimits"),
+# so a 1:1 declaration means every VPA resize just moves the same
+# zero-headroom window to a new number instead of fixing it. The embeddings
+# worker was OOMKilling in production under this exact pattern -- VPA target
+# memory (~991Mi) was well within bounds, but request==limit meant any
+# transient spike above that immediately OOMed before the VPA's rolling
+# window had reason to react.
 celery_default_resource_requests = _resource_config(
-    "celery_default_resource_requests", {"cpu": "200m", "memory": "2400Mi"}
+    "celery_default_resource_requests", {"cpu": "600m", "memory": "1280Mi"}
 )
 celery_default_resource_limits = _resource_config(
-    "celery_default_resource_limits", {"memory": "2400Mi"}
+    "celery_default_resource_limits", {"memory": "2560Mi"}
 )
 celery_edx_content_resource_requests = _resource_config(
-    "celery_edx_content_resource_requests", {"cpu": "200m", "memory": "2400Mi"}
+    "celery_edx_content_resource_requests", {"cpu": "400m", "memory": "1536Mi"}
 )
 celery_edx_content_resource_limits = _resource_config(
-    "celery_edx_content_resource_limits", {"memory": "2400Mi"}
+    "celery_edx_content_resource_limits", {"memory": "3072Mi"}
 )
+# CPU request set to 1000m (not the 1311m uncapped VPA target) to match the
+# raised VPA max_allowed below -- see _embeddings_worker_vpa_bounds.
 celery_embeddings_resource_requests = _resource_config(
-    "celery_embeddings_resource_requests", {"cpu": "200m", "memory": "2400Mi"}
+    "celery_embeddings_resource_requests", {"cpu": "1000m", "memory": "1024Mi"}
 )
 celery_embeddings_resource_limits = _resource_config(
-    "celery_embeddings_resource_limits", {"memory": "2400Mi"}
+    "celery_embeddings_resource_limits", {"memory": "2560Mi"}
 )
 celery_beat_resource_requests = _resource_config(
-    "celery_beat_resource_requests", {"cpu": "100m", "memory": "2048Mi"}
+    "celery_beat_resource_requests", {"cpu": "100m", "memory": "768Mi"}
 )
 celery_beat_resource_limits = _resource_config(
-    "celery_beat_resource_limits", {"memory": "2048Mi"}
+    "celery_beat_resource_limits", {"memory": "1536Mi"}
 )
 
 # Configure and deploy the mitlearn application using OLApplicationK8s
@@ -1748,7 +1763,21 @@ _worker_vpa_bounds = {
     "min_allowed": {"cpu": "25m", "memory": "128Mi"},
     "max_allowed": {"cpu": "1000m", "memory": "3Gi"},
 }
+# The embeddings worker runs ML inference (embedding generation), which is
+# more CPU-intensive than the other celery queues' typically I/O-bound tasks.
+# Its uncapped VPA CPU target (1311m, observed on applications-production
+# 2026-07-28) already exceeds the shared 1000m ceiling above, so it gets its
+# own bounds instead of sharing _worker_vpa_bounds with the lighter queues.
+_embeddings_worker_vpa_bounds = {
+    "min_allowed": {"cpu": "25m", "memory": "128Mi"},
+    "max_allowed": {"cpu": "2000m", "memory": "3Gi"},
+}
 for _celery_name in mitlearn_k8s_app.celery_deployment_names:
+    _vpa_bounds = (
+        _embeddings_worker_vpa_bounds
+        if _celery_name.endswith("-embeddings-celery-worker")
+        else _worker_vpa_bounds
+    )
     make_vpa(
         name=f"{_celery_name}-vpa",
         namespace=learn_namespace,
@@ -1756,7 +1785,7 @@ for _celery_name in mitlearn_k8s_app.celery_deployment_names:
         target_name=_celery_name,
         controlled_resources=["cpu", "memory"],
         container_name="celery-worker",
-        **_worker_vpa_bounds,
+        **_vpa_bounds,
         opts=ResourceOptions(depends_on=[mitlearn_k8s_app]),
     )
 if mitlearn_k8s_app.beat_deployment_name:
