@@ -104,6 +104,16 @@ def create(
             # The "and ... spec_replicas > 0" guard excludes deployments deliberately
             # scaled to zero (e.g. a disabled service in a staging namespace) -- those
             # sit at 0/0 available/desired indefinitely, which is not an outage.
+            #
+            # The nonzero-valued clause (spec_replicas > 0) is deliberately written
+            # FIRST. Every rule in this pipeline feeds into a fixed threshold stage
+            # that fires on last(A) > 0 (see base.py's _rule_data), and PromQL's
+            # `and` binary operator carries over the *value* of its left-hand side,
+            # not a boolean 1/0 -- so "available == 0 and spec_replicas > 0" would
+            # return the left side's value, which is 0 by construction, and 0 > 0
+            # never fires. Putting the nonzero clause on the left instead means the
+            # surviving series carries spec_replicas' own (always-positive, since
+            # it's already filtered > 0) value through to the threshold stage.
             alerting.RuleGroupRuleArgs(
                 name="DeploymentUnavailableWarning",
                 condition="C",
@@ -114,9 +124,9 @@ def create(
                     "description": "A deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} is not available for an extended period of time."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, deployment) (kube_deployment_status_replicas_available{cluster=~".*-(ci|qa)"}) == 0'
-                    " and "
                     'sum by (cluster, namespace, deployment) (kube_deployment_spec_replicas{cluster=~".*-(ci|qa)"}) > 0'
+                    " and "
+                    'sum by (cluster, namespace, deployment) (kube_deployment_status_replicas_available{cluster=~".*-(ci|qa)"}) == 0'
                 ),
             ),
             alerting.RuleGroupRuleArgs(
@@ -129,9 +139,9 @@ def create(
                     "description": "A deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} is not available for an extended period of time."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, deployment) (kube_deployment_status_replicas_available{cluster=~".*-(production)"}) == 0'
-                    " and "
                     'sum by (cluster, namespace, deployment) (kube_deployment_spec_replicas{cluster=~".*-(production)"}) > 0'
+                    " and "
+                    'sum by (cluster, namespace, deployment) (kube_deployment_status_replicas_available{cluster=~".*-(production)"}) == 0'
                 ),
             ),
             # --- StatefulSet replicas ---
