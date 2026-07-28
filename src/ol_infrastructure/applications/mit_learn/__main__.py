@@ -8,7 +8,6 @@ from pathlib import Path
 from string import Template
 
 import pulumi_fastly as fastly
-import pulumi_github as github
 import pulumi_qdrant_cloud as qdrant_cloud
 import pulumi_vault as vault
 from pulumi import (
@@ -101,11 +100,6 @@ from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_pr
 
 setup_vault_provider(skip_child_token=True)
 fastly_provider = get_fastly_provider()
-github_provider = github.Provider(
-    "github-provider",
-    owner=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["owner"],
-    token=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["token"],
-)
 
 mitlearn_config = Config("mitlearn")
 vault_config = Config("vault")
@@ -322,67 +316,6 @@ parliament_config = {
     "RESOURCE_EFFECTIVELY_STAR": {},
     "RESOURCE_MISMATCH": {},
 }
-
-################################
-# Remove legacy bucket arns
-################################
-gh_workflow_s3_bucket_permissions = [
-    {
-        "Action": [
-            "s3:ListBucket*",
-        ],
-        "Effect": "Allow",
-        "Resource": [
-            f"arn:aws:s3:::{legacy_app_storage_bucket_name}",
-            f"arn:aws:s3:::{mitlearn_app_storage_bucket_name}",
-        ],
-    },
-    {
-        "Action": [
-            "s3:GetObject*",
-            "s3:PutObject",
-            "s3:PutObjectAcl",
-            "s3:DeleteObject",
-        ],
-        "Effect": "Allow",
-        "Resource": [
-            f"arn:aws:s3:::{legacy_app_storage_bucket_name}/frontend/*",
-            f"arn:aws:s3:::{mitlearn_app_storage_bucket_name}/frontend/*",
-        ],
-    },
-]
-
-gh_workflow_policy_document = {
-    "Version": IAM_POLICY_VERSION,
-    "Statement": gh_workflow_s3_bucket_permissions,
-}
-
-gh_workflow_iam_policy = iam.Policy(
-    f"ol_mitopen_gh_workflow_iam_permissions_{stack_info.env_suffix}",
-    name=f"ol-mitlearn-gh-workflow-permissions-{stack_info.env_suffix}",
-    path=f"/ol-applications/mitlearn/{stack_info.env_suffix}/",
-    policy=lint_iam_policy(
-        gh_workflow_policy_document, stringify=True, parliament_config=parliament_config
-    ),
-)
-
-# Just create a static user for now. Some day refactor to use
-# https://github.com/hashicorp/vault-action
-gh_workflow_user = iam.User(
-    f"ol_mitopen_gh_workflow_user_{stack_info.env_suffix}",
-    name=f"mitopen-gh-workflow-{stack_info.env_suffix}",
-    tags=aws_config.tags,
-)
-iam.PolicyAttachment(
-    f"ol_mitopen_gh_workflow_user_{stack_info.env_suffix}",
-    policy_arn=gh_workflow_iam_policy.arn,
-    users=[gh_workflow_user.name],
-)
-gh_workflow_accesskey = iam.AccessKey(
-    f"ol_mitopen_gh_workflow_accesskey-{stack_info.env_suffix}",
-    user=gh_workflow_user.name,
-    status="Active",
-)
 
 ################################
 # Remove legacy bucket arns
@@ -1350,28 +1283,6 @@ secret_operations_tika_access_token = vault.generic.get_secret_output(
     path="secret-operations/tika/access-token",
     opts=InvokeOptions(parent=mitlearn_vault_iam_role),
 )
-
-# There were a few undiscovered circular dependencies here that wasn't revealed until attempting
-# to build the CI environment. Since we won't even need this in K8S we will just let it be
-# for now behind this conditional
-
-
-match stack_info.env_suffix:
-    case "production":
-        env_var_suffix = "PROD"
-    case "qa":
-        env_var_suffix = "RC"
-    case "ci":
-        env_var_suffix = "CI"
-    case _:
-        env_var_suffix = "INVALID"
-
-mit_learn_posthog_proxy = mitlearn_config.require("posthog_proxy")
-
-gh_repo = github.get_repository(
-    full_name="mitodl/mit-learn", opts=InvokeOptions(provider=github_provider)
-)
-
 
 application_labels = k8s_app_labels | {
     "ol.mit.edu/application": Application.mit_learn,
