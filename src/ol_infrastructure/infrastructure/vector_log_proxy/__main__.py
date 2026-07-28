@@ -778,6 +778,10 @@ vector_gateway = OLEKSGateway(
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
+        # Let the HPA (below) manage replica count without Pulumi reverting
+        # it back to the static replicas=2 on every pulumi up. Same pattern
+        # as applications/xqwatcher/__main__.py.
+        ignore_changes=["spec.replicas"],
     ),
 )
 
@@ -794,6 +798,13 @@ make_vpa(
     container_name="vector",
     min_allowed={"memory": "64Mi"},
     max_allowed={"memory": "4Gi"},
+    # Without this, VPA applies its default behavior to the fastly-challenge
+    # sidecar too -- silently overriding its declared resources, and (more
+    # importantly) still mutating its CPU request, which would reintroduce
+    # the HPA/VPA conflict this split is meant to avoid: HPA CPU utilization
+    # is computed against total pod CPU requests, not just the vector
+    # container's.
+    disable_other_containers=True,
     opts=ResourceOptions(depends_on=[vector_deployment]),
 )
 
