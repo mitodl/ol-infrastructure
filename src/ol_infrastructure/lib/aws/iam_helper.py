@@ -114,6 +114,67 @@ def lint_iam_policy(
     )
 
 
+def split_iam_policy_by_size(
+    policy_definition: dict[str, Any],
+    max_bytes: int = 6144,
+) -> list[dict[str, Any]]:
+    """Split a policy document into multiple documents that each fit max_bytes.
+
+    IAM enforces a hard, non-adjustable 6,144 character cap on a single managed
+    policy document. A role can have several managed policies attached, so a
+    document that would exceed the cap can instead be split into siblings that
+    are all attached to the same role, each carrying its own copy of a
+    statement's Effect/Resource/Condition and a slice of its Action list.
+
+    :param policy_definition: An IAM policy document (Version + Statement).
+    :param max_bytes: The per-document size ceiling to split against.
+
+    :returns: One or more policy documents, each within max_bytes when
+        JSON-serialized, that together grant everything policy_definition does.
+    """
+    version = policy_definition["Version"]
+    envelope_size = len(json.dumps({"Version": version, "Statement": []}))
+    action_budget = max_bytes - envelope_size
+
+    pieces: list[dict[str, Any]] = []
+    for statement in policy_definition["Statement"]:
+        actions = statement["Action"]
+        if isinstance(actions, str):
+            actions = [actions]
+        base = {key: value for key, value in statement.items() if key != "Action"}
+        current: list[str] = []
+        for action in actions:
+            candidate = [*current, action]
+            if (
+                current
+                and len(json.dumps({**base, "Action": candidate})) > action_budget
+            ):
+                pieces.append({**base, "Action": current})
+                current = [action]
+            else:
+                current = candidate
+        pieces.append({**base, "Action": current})
+
+    documents: list[list[dict[str, Any]]] = []
+    for piece in pieces:
+        for document_statements in documents:
+            candidate_size = len(
+                json.dumps(
+                    {"Version": version, "Statement": [*document_statements, piece]}
+                )
+            )
+            if candidate_size <= max_bytes:
+                document_statements.append(piece)
+                break
+        else:
+            documents.append([piece])
+
+    return [
+        {"Version": version, "Statement": document_statements}
+        for document_statements in documents
+    ]
+
+
 def route53_policy_template(zone_id: str) -> dict[str, Any]:
     """Policy definition to allow Caddy to use Route 53 to resolve DNS challenges.
 
