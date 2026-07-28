@@ -1578,6 +1578,16 @@ mitlearn_k8s_app = OLApplicationK8s(
             # together. Dropping to workers=1 without resizing this would cap the sole
             # worker at 1350Mi of a 3Gi pod. See the stage 4 task in
             # docs/plans/granian-configuration-overhaul.md.
+            #
+            # This is one value across all stacks, while the VPA floor it is sized
+            # against is production-only (CI/QA keep the 256Mi default). That is not
+            # the protection gap it looks like: a cap only guards anything when
+            # 2*cap + master fits under the running limit, and no cap derived from
+            # the 3200Mi declared limit fits under a VPA floor of 256Mi. Below a
+            # ~2300Mi limit the cap is inert at 1080 and at 1350 alike, so CI/QA are
+            # no worse off than before. Making it genuinely track the limit the
+            # kernel enforces needs a runtime cgroup read, not a synth-time constant
+            # -- tracked as tk-evaluate-runtime-cgroup-derived-workers-max-rss.
             workers_max_rss=1350,
             enable_metrics=True,
             interface="asginl",
