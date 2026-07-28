@@ -24,6 +24,7 @@ def setup_traefik(
     cluster,
     lb_controller,
     fastly_provider: fastly.Provider,
+    vpa_release: kubernetes.helm.v3.Release,
 ):
     """
     Configure and install the Traefik ingress controller.
@@ -42,6 +43,7 @@ def setup_traefik(
     :param cluster: The EKS cluster object.
     :param lb_controller: The AWS Load Balancer Controller.
     :param fastly_provider: The Fastly provider instance.
+    :param vpa_release: The VPA Helm release; ensures VPA CRDs exist before the VPA object is created.
 
     :return: The Gateway API CRDs.
     """
@@ -78,7 +80,7 @@ def setup_traefik(
     # Ref: https://doc.traefik.io/traefik/providers/kubernetes-gateway/
     #
     # TODO: @Ardiea add the ability to define more ports in config.
-    kubernetes.helm.v3.Release(
+    traefik_helm_release = kubernetes.helm.v3.Release(
         f"{cluster_name}-traefik-gateway-controller-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
             name="traefik-gateway-controller",
@@ -200,7 +202,7 @@ def setup_traefik(
                         "memory": "150Mi",
                     },
                     "limits": {
-                        "memory": "150Mi",
+                        "memory": "512Mi",
                     },
                 },
                 "metrics": {
@@ -254,4 +256,66 @@ def setup_traefik(
             ],
         ),
     )
+
+    # Create a VerticalPodAutoscaler for the Traefik gateway deployment.
+    #
+    # VPA manages memory sizing only; CPU-based horizontal scaling is handled by the
+    # HPA above (autoscaling.metrics, targeting 50% CPU utilization). Splitting
+    # authority this way avoids the known HPA/VPA conflict where VPA-adjusted CPU
+    # requests would distort the CPU utilization percentage the HPA observes. See
+    # apisix_official.py for the same pattern applied to the APISIX gateway.
+    #
+    # Added after an incident where every pod in operations-production OOMKilled
+    # (memory request == limit == 150Mi, zero headroom) and the CPU-only HPA could
+    # not compensate -- adding replicas doesn't help when the bottleneck is a
+    # per-pod memory ceiling; it just means more pods hitting the same wall.
+    #
+    # updateMode "InPlaceOrRecreate" attempts to resize memory without evicting the
+    # pod (K8s 1.33+, VPA 1.6+), falling back to eviction only when an in-place
+    # update is not possible.
+    kubernetes.apiextensions.CustomResource(
+        f"{cluster_name}-traefik-gateway-controller-vpa",
+        api_version="autoscaling.k8s.io/v1",
+        kind="VerticalPodAutoscaler",
+        metadata={
+            "name": "traefik-gateway-controller",
+            "namespace": "operations",
+        },
+        spec={
+            "targetRef": {
+                "apiVersion": "apps/v1",
+                "kind": "Deployment",
+                "name": "traefik-gateway-controller",
+            },
+            "updatePolicy": {
+                "updateMode": "InPlaceOrRecreate",
+            },
+            "resourcePolicy": {
+                "containerPolicies": [
+                    {
+                        "containerName": "traefik-gateway-controller",
+                        # Only control memory so the HPA retains full authority
+                        # over CPU requests and therefore replica count decisions.
+                        "controlledResources": ["memory"],
+                        "controlledValues": "RequestsAndLimits",
+                        "minAllowed": {
+                            "memory": eks_config.get("traefik_memory") or "150Mi",
+                        },
+                        "maxAllowed": {
+                            "memory": eks_config.get("traefik_max_memory") or "1Gi",
+                        },
+                    }
+                ]
+            },
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=operations_namespace,
+            # vpa_release ensures the autoscaling.k8s.io CRDs are installed first.
+            # traefik_helm_release ensures the target Deployment exists before VPA
+            # targets it.
+            depends_on=[vpa_release, traefik_helm_release],
+        ),
+    )
+
     return gateway_api_crds
