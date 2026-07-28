@@ -1026,6 +1026,20 @@ lb_controller = setup_aws_integrations(
     cert_manager=cert_manager_release,
 )
 
+############################################################
+# Install VPA ahead of Traefik/APISIX so both gateways can be
+# configured with vertical autoscaling
+############################################################
+vpa_release = setup_vpa(
+    cluster_name=cluster_name,
+    cluster=cluster,
+    k8s_provider=k8s_provider,
+    node_groups=node_groups,
+    k8s_global_labels=k8s_global_labels,
+    operations_tolerations=operations_tolerations,
+    versions=VERSIONS,
+)
+
 gateway_api_crds = setup_traefik(
     cluster_name=cluster_name,
     k8s_provider=k8s_provider,
@@ -1041,19 +1055,7 @@ gateway_api_crds = setup_traefik(
     cluster=cluster,
     lb_controller=lb_controller,
     fastly_provider=fastly_provider,
-)
-
-############################################################
-# Install VPA and configure APISIX with vertical autoscaling
-############################################################
-vpa_release = setup_vpa(
-    cluster_name=cluster_name,
-    cluster=cluster,
-    k8s_provider=k8s_provider,
-    node_groups=node_groups,
-    k8s_global_labels=k8s_global_labels,
-    operations_tolerations=operations_tolerations,
-    versions=VERSIONS,
+    vpa_release=vpa_release,
 )
 
 setup_apisix(
