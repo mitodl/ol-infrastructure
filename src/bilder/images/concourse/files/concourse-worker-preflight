@@ -7,6 +7,13 @@
 # replaced) since Concourse has no way to know a "running" worker is actually
 # unreachable from the outside. This is wired as a hard dependency of
 # concourse.service via [Unit] Requires=/After= (worker units only).
+#
+# Also writes /etc/default/concourse-name (CONCOURSE_NAME=<instance-id>) here,
+# rather than in a cloud-init runcmd, so it's guaranteed to exist before
+# concourse.service's first start -- cloud-init's runcmd stage has no systemd
+# ordering relative to concourse.service and can race it, letting the worker
+# register once under its hostname and then again under the instance ID after
+# a later restart picks up the file.
 set -uo pipefail
 
 RETRY_BUDGET_SECONDS=${RETRY_BUDGET_SECONDS:-600}
@@ -44,6 +51,21 @@ check_tcp() {
     timeout 5 bash -c "exec 3<>/dev/tcp/${host}/${port}" 2>/dev/null
 }
 
+write_worker_identity() {
+    local token instance_id
+    token=$(get_imds_token)
+    if [ -z "${token}" ]; then
+        log "IMDS token fetch failed; CONCOURSE_NAME will fall back to hostname"
+        return
+    fi
+    instance_id=$(imds_get "instance-id" "${token}")
+    if [ -n "${instance_id}" ]; then
+        echo "CONCOURSE_NAME=${instance_id}" > /etc/default/concourse-name
+    else
+        log "instance-id metadata empty; CONCOURSE_NAME will fall back to hostname"
+    fi
+}
+
 run_checks() {
     local token
     token=$(get_imds_token)
@@ -66,6 +88,7 @@ deadline=$(($(date +%s) + RETRY_BUDGET_SECONDS))
 while true; do
     if run_checks; then
         log "All network preflight checks passed"
+        write_worker_identity
         exit 0
     fi
     if [ "$(date +%s)" -ge "${deadline}" ]; then

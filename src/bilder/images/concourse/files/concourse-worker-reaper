@@ -93,13 +93,14 @@ if ! "${FLY_BIN}" -t "${FLY_TARGET}" workers >/dev/null 2>&1; then
 fi
 
 # --- Gather ground truth: live worker instance IDs and IPs ----------------
-# CONCOURSE_NAME is pinned to the EC2 instance ID (see cloud-init runcmd in
-# ol_infrastructure/applications/concourse/__main__.py), so a stalled worker's
-# name should already be an instance ID -- match it directly against live
-# instances instead of parsing an IP out of it. Older workers that registered
-# before that change (or that fell back to the default IP-derived hostname
-# because the boot-time IMDS call failed) are still matched by IP as a
-# fallback.
+# CONCOURSE_NAME is pinned to the EC2 instance ID (written by
+# concourse-worker-preflight before concourse.service's first start; see
+# bilder/images/concourse/files/concourse-worker-preflight), so a stalled
+# worker's name should already be an instance ID -- match it directly against
+# live instances instead of parsing an IP out of it. Older workers that
+# registered before that change (or that fell back to the default IP-derived
+# hostname because the preflight's IMDS call failed) are still matched by IP
+# as a fallback.
 #
 # Only "pending" and "running" count as live: an instance in stopping/
 # shutting-down is on its way out and will never host a recovering worker, so a
