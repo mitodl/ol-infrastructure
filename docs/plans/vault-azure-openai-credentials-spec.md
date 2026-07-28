@@ -1,10 +1,15 @@
 # Spec: Vault-managed Azure OpenAI credentials (mit-learn, learn-ai, edxapp)
 
-Project: `wp-vault-managed-azure-openai-credentials-for-mit-l-cd2801`
-Source plan: `~/.claude/plans/the-code-mit-apps-maintained-mit-learn-a-rosy-pinwheel.md`
-Phase: spec — this document is the buildable specification derived from that plan,
-with the plan's assumptions verified against the codebase and the gaps it left open
-resolved or flagged.
+Tracked as workflow project `wp-vault-managed-azure-openai-credentials-for-mit-l-cd2801`,
+where the implementation task breakdown and dependency graph live.
+
+**This document is the source of truth.** It supersedes an earlier uncommitted planning
+document, whose assumptions were verified against the codebase here — several did not hold
+(see §2.1) — and whose gaps are resolved or flagged below. That earlier document is not in
+the repo and should not be consulted; anything from it that still matters was carried into
+this spec.
+
+All file references below are repo-relative from the repository root.
 
 ## 1. Goal
 
@@ -26,9 +31,9 @@ Everything below was checked in the working tree, not assumed.
 | `BackendRoleAzureRoleArgs` fields | **Confirmed:** `role_id`, `role_name`, `scope` |
 | `pulumi-azure-native` / `pulumi-azuread` present | **Not installed.** Must be added to `pyproject.toml` + `uv lock && uv sync` |
 | AWS secrets-engine component to mirror | **Confirmed** at `src/ol_infrastructure/components/services/vault.py:238-291` |
-| mit-learn `_create_dynamic_secret` helper + AWS example | **Confirmed** at `applications/mit_learn/k8s_secrets.py:79` and `:313-328` |
-| learn-ai dynamic-secret + `OLVaultK8SResources` block | **Confirmed** at `applications/learn_ai/__main__.py:640-690` |
-| edxapp `VaultSecretBuilder.create_static/create_dynamic` | **Confirmed** at `applications/edxapp/secrets_factory.py:77` (static) and `:121` (dynamic — returns a `Callable` for use with `Output.apply`) |
+| mit-learn `_create_dynamic_secret` helper + AWS example | **Confirmed** at `src/ol_infrastructure/applications/mit_learn/k8s_secrets.py:79` and `:313-328` |
+| learn-ai dynamic-secret + `OLVaultK8SResources` block | **Confirmed** at `src/ol_infrastructure/applications/learn_ai/__main__.py:640-690` |
+| edxapp `VaultSecretBuilder.create_static/create_dynamic` | **Confirmed** at `src/ol_infrastructure/applications/edxapp/secrets_factory.py:77` (static) and `:121` (dynamic — returns a `Callable` for use with `Output.apply`) |
 | Azure is greenfield in this repo | **Confirmed** — no Azure provider config anywhere |
 
 ### 2.1 Deviations from the plan that must be honoured in implementation
@@ -48,13 +53,13 @@ Everything below was checked in the working tree, not assumed.
 
 | Identity | Created by | Permissions | Consumed by |
 | --- | --- | --- | --- |
-| **Pulumi deploy SP** | **Manually, once, out of band** (bootstrap) | `Contributor` + `User Access Administrator` (or `Owner`) on the target subscription — needs to create resource groups, Cognitive Services accounts, app registrations, and role assignments. Plus Graph `Application.ReadWrite.All` to create the Vault root app registration. | `pulumi_azure_native.Provider` / `pulumi_azuread.Provider` in `infrastructure/azure/openai` |
+| **Pulumi deploy SP** | **Manually, once, out of band** (bootstrap) | `Contributor` + `User Access Administrator` (or `Owner`) on the target subscription — needs to create resource groups, Cognitive Services accounts, app registrations, and role assignments. Plus Graph `Application.ReadWrite.All` to create the Vault root app registration. | `pulumi_azure_native.Provider` / `pulumi_azuread.Provider` in `src/ol_infrastructure/infrastructure/azure/openai` |
 | **Vault root SP** | **By Pulumi** (`azuread.Application` + `ServicePrincipal` + `ApplicationPassword`) | Graph `Application.ReadWrite.OwnedBy` (application permission, **requires tenant admin consent**) + `User Access Administrator` scoped **only to the new resource group** | Vault's Azure secrets engine (`azure.Backend` `client_id`/`client_secret`) |
 | **Per-app dynamic SPs** | **By Vault at request time** | `Cognitive Services OpenAI User` scoped to the Cognitive Services account | mit-learn / learn-ai / edxapp pods |
 
 **Bootstrap credential storage.** This repo's established pattern for non-AWS provider
 credentials is SOPS-encrypted YAML read via `bridge.secrets.sops.read_yaml_secrets`
-(see `infrastructure/qdrant_cloud/__main__.py:17` and `infrastructure/mongodb_atlas/__main__.py:64`).
+(see `src/ol_infrastructure/infrastructure/qdrant_cloud/__main__.py:17` and `src/ol_infrastructure/infrastructure/mongodb_atlas/__main__.py:64`).
 Follow it: new files `src/bridge/secrets/pulumi/azure.{ci,qa,production}.yaml` holding
 `tenant_id`, `subscription_id`, `client_id`, `client_secret` for the **Pulumi deploy SP**.
 `.sops.yaml`'s existing `path_regex` rules already cover `*.ci.yaml` / `*.qa.yaml` /
@@ -64,7 +69,7 @@ Follow it: new files `src/bridge/secrets/pulumi/azure.{ci,qa,production}.yaml` h
 
 ### 4.1 `src/ol_infrastructure/infrastructure/azure/openai/`
 
-New standalone Pulumi project. Layout mirrors `infrastructure/qdrant_cloud/`:
+New standalone Pulumi project. Layout mirrors `src/ol_infrastructure/infrastructure/qdrant_cloud/`:
 `Pulumi.yaml` (name `ol-infrastructure-azure-openai`, backend `s3://mitol-pulumi-state/`),
 `Pulumi.{CI,QA,Production}.yaml`, `__init__.py`, `__main__.py`, `README.md`.
 
@@ -96,7 +101,7 @@ successfully without consent; only credential *issuance* (§4.3) fails until it 
 
 Added to `src/ol_infrastructure/components/services/vault.py`, immediately after
 `OLVaultAWSSecretsEngine` (~line 291). Add `azure` to the `from pulumi_vault import ...`
-line at `vault.py:21`.
+line at `src/ol_infrastructure/components/services/vault.py:21`.
 
 ```
 OLVaultAzureRoleConfig(BaseModel)
@@ -122,7 +127,7 @@ OLVaultAzureSecretsEngine(ComponentResource)
 
 New project, sibling to `secrets`/`pki`/`static_mounts`. `Pulumi.yaml` name
 `ol-substructure-vault-azure`; stacks `operations.{CI,QA,Production}` (matching every other
-`substructure/vault/*` project).
+`src/ol_infrastructure/substructure/vault/*` project).
 
 `__main__.py`:
 - `StackReference("…/ol-infrastructure-azure-openai/{env}")`
@@ -135,22 +140,22 @@ New project, sibling to `secrets`/`pki`/`static_mounts`. `Pulumi.yaml` name
 
 ### 5.1 mit-learn
 
-- `applications/mit_learn/mitlearn_policy.hcl`: add
+- `src/ol_infrastructure/applications/mit_learn/mitlearn_policy.hcl`: add
   `azure-openai/creds/ol-mitlearn-openai` and `.../ *` read grants; extend both
   `sys/leases/renew` and `sys/leases/revoke` `allowed_parameters.lease_id` lists with
   `azure-openai/creds/ol-mitlearn-openai/*` (VSO cannot renew/revoke otherwise).
-- `applications/mit_learn/k8s_secrets.py`: one new `_create_dynamic_secret(...)` call —
+- `src/ol_infrastructure/applications/mit_learn/k8s_secrets.py`: one new `_create_dynamic_secret(...)` call —
   `mount="azure-openai"`, `path="creds/ol-mitlearn-openai"`, templates
   `AZURE_OPENAI_CLIENT_ID` ← `client_id`, `AZURE_OPENAI_CLIENT_SECRET` ← `client_secret`.
   Append to `secret_names` / `secret_resources` like the AWS block at `:313`.
-- `applications/mit_learn/__main__.py`: plain (non-secret) container env vars
+- `src/ol_infrastructure/applications/mit_learn/__main__.py`: plain (non-secret) container env vars
   `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_TENANT_ID`, `AZURE_OPENAI_API_VERSION`.
 
 ### 5.2 learn-ai
 
-Same three pieces, in `applications/learn_ai/learn_ai_policy.hcl` (role
+Same three pieces, in `src/ol_infrastructure/applications/learn_ai/learn_ai_policy.hcl` (role
 `ol-learn-ai-openai`) and a new `OLVaultK8SSecret`/`OLVaultK8SDynamicSecretConfig` block in
-`applications/learn_ai/__main__.py` modelled on the db-creds block at `:657-690`. Include
+`src/ol_infrastructure/applications/learn_ai/__main__.py` modelled on the db-creds block at `:657-690`. Include
 `restart_target_kind="Deployment"` / `restart_target_name="learn-ai-app"` so credential
 rotation restarts the app, matching the db-creds secret.
 
@@ -161,11 +166,11 @@ YAMLs) are **not** changed in this pass.
 
 **Finding that changes the plan:** edxapp does not deep-merge its config sources. The init
 container runs `cat /openedx/config-sources/*/*.yaml > /openedx/config/lms.env.yml`
-(`applications/edxapp/k8s_resources.py:639`, `:950`, and the CronJob variants at `:1202`,
+(`src/ol_infrastructure/applications/edxapp/k8s_resources.py:639`, `:950`, and the CronJob variants at `:1202`,
 `:1322`, `:1437`, `:1539`). Files are **concatenated into one YAML document**.
 
 Consequence: the existing `TRANSLATIONS_PROVIDERS:` mapping is emitted by the *static*
-`14-translations-providers-secrets.yaml` secret (`k8s_secrets.py:386-411`). Azure credentials
+`14-translations-providers-secrets.yaml` secret (`src/ol_infrastructure/applications/edxapp/k8s_secrets.py:386-411`). Azure credentials
 come from a *different Vault mount* and therefore a *different* VSO secret and file. A second
 file also emitting a top-level `TRANSLATIONS_PROVIDERS:` key would produce a duplicate key —
 last-one-wins, silently clobbering the deepl/openai/gemini/mistral providers.
@@ -187,21 +192,21 @@ be agreed with the plugin authors before this piece is implemented** (Q3 below).
 and learn-ai pieces have no such dependency and can ship first.
 
 Mechanically: a new mitxonline-only `builder.create_dynamic(...)` call in
-`applications/edxapp/k8s_secrets.py`, a new field on the `EdxappSecrets` dataclass next to
+`src/ol_infrastructure/applications/edxapp/k8s_secrets.py`, a new field on the `EdxappSecrets` dataclass next to
 `translations_providers`, and registration in the `lms_edxapp_config_sources` /
-`cms_edxapp_config_sources` dicts in `k8s_resources.py` so the file is actually mounted.
-Policy grants go in `applications/edxapp/edxapp_mitxonline_policy.hcl` only.
+`cms_edxapp_config_sources` dicts in `src/ol_infrastructure/applications/edxapp/k8s_resources.py` so the file is actually mounted.
+Policy grants go in `src/ol_infrastructure/applications/edxapp/edxapp_mitxonline_policy.hcl` only.
 
 ## 6. Delivery wiring (omitted from the plan, required)
 
 1. `src/ol_infrastructure/lib/pulumi_projects.py` — add
    `VAULT_AZURE = "ol-substructure-vault-azure"` alongside the block at `:50-56`, and
    `VAULT_AZURE: "substructure.vault.azure"` in the path map at `:155-161`. Add the
-   `infrastructure/azure/openai` project to the same registry.
+   `src/ol_infrastructure/infrastructure/azure/openai` project to the same registry.
 2. `src/ol_concourse/pipelines/infrastructure/vault/pipeline.py:69` — add `"azure"` to the
    `for substructure in [...]` list so the mount is deployed CI→QA→Production by the existing
    `packer-pulumi-vault` pipeline.
-3. A pipeline for `infrastructure/azure/openai`. It is not a Vault substructure and does not
+3. A pipeline for `src/ol_infrastructure/infrastructure/azure/openai`. It is not a Vault substructure and does not
    belong in the vault pipeline; add a new
    `src/ol_concourse/pipelines/infrastructure/azure/pipeline.py` using `pulumi_jobs_chain`,
    watching `src/ol_infrastructure/infrastructure/azure/`.
@@ -223,7 +228,7 @@ Policy grants go in `applications/edxapp/edxapp_mitxonline_policy.hcl` only.
   (see §5.3)? Needed before the edxapp piece can be written.
 - **Q4 — Model deployments.** The plan says `gpt-4o` / `gpt-4o-mini` (learn-ai's current
   defaults). But edxapp's translations config already specifies `gpt-5.2` for OpenAI
-  (`k8s_secrets.py:404`). Confirm the deployment list — deploying only 4o-family models makes
+  (`src/ol_infrastructure/applications/edxapp/k8s_secrets.py:404`). Confirm the deployment list — deploying only 4o-family models makes
   Azure unusable as a drop-in for edxapp translations.
 - **Q5 — Environment scope.** One Azure OpenAI account per environment (CI/QA/Production), as
   the plan assumes? That is 3 accounts and 3 admin-consent grants. Alternative: one Production
