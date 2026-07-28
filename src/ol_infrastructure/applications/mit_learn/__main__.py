@@ -1452,7 +1452,7 @@ celery_edx_content_resource_limits = _resource_config(
     "celery_edx_content_resource_limits", {"memory": "3072Mi"}
 )
 # CPU request set to 1000m (not the 1311m uncapped VPA target) to match the
-# raised VPA max_allowed below -- see celery_embeddings_vpa_bounds.
+# raised VPA max_allowed below -- see _embeddings_worker_vpa_bounds.
 celery_embeddings_resource_requests = _resource_config(
     "celery_embeddings_resource_requests", {"cpu": "1000m", "memory": "1024Mi"}
 )
