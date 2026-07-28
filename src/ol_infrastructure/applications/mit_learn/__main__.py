@@ -1506,6 +1506,15 @@ webapp_resource_requests = _resource_config(
 webapp_resource_limits = _resource_config(
     "webapp_resource_limits", {"memory": "3200Mi"}
 )
+# VPA bounds for the webapp's memory. Per-stack because the right floor depends on
+# measured production demand, and CI/QA idle far below it -- a floor sized for
+# production would pin those pods at several GiB each for nothing.
+webapp_vpa_min_allowed_memory = (
+    mitlearn_config.get("webapp_vpa_min_allowed_memory") or "256Mi"
+)
+webapp_vpa_max_allowed_memory = (
+    mitlearn_config.get("webapp_vpa_max_allowed_memory") or "4Gi"
+)
 celery_default_resource_requests = _resource_config(
     "celery_default_resource_requests", {"cpu": "200m", "memory": "2400Mi"}
 )
@@ -1553,10 +1562,33 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
         granian_config=GranianConfig(
             workers=2,
-            # Pin per-worker RSS so it doesn't auto-scale with the memory limit
-            # (floor(limit/workers*0.9)); 2*1080Mi leaves ~1GiB headroom under
-            # the 3200Mi limit for the master process and transient overshoot.
-            workers_max_rss=1080,
+            # Sized against the VPA *floor* (3Gi in production), not the declared
+            # 3200Mi limit, because the floor is the smallest limit a pod can be
+            # running under and therefore the one the cap has to beat. The component's
+            # own floor(limit/workers*0.9) would give 1440, leaving the worker pair at
+            # 2880Mi with almost nothing left for the master under a 3072Mi floor.
+            #
+            # 2*1350 = 2700Mi bounds the pair below the 2774Mi peak container RSS
+            # measured over 14 days, leaving ~370Mi for the master and transient
+            # overshoot. The previous value of 1080 sat *below* the ~1300Mi a worker
+            # legitimately reaches at peak, so it fired during normal operation --
+            # graceful respawns as steady-state behaviour rather than a runaway guard.
+            #
+            # Coupled to `workers` and to the VPA floor: both must be revisited
+            # together. Dropping to workers=1 without resizing this would cap the sole
+            # worker at 1350Mi of a 3Gi pod. See the stage 4 task in
+            # docs/plans/granian-configuration-overhaul.md.
+            #
+            # This is one value across all stacks, while the VPA floor it is sized
+            # against is production-only (CI/QA keep the 256Mi default). That is not
+            # the protection gap it looks like: a cap only guards anything when
+            # 2*cap + master fits under the running limit, and no cap derived from
+            # the 3200Mi declared limit fits under a VPA floor of 256Mi. Below a
+            # ~2300Mi limit the cap is inert at 1080 and at 1350 alike, so CI/QA are
+            # no worse off than before. Making it genuinely track the limit the
+            # kernel enforces needs a runtime cgroup read, not a synth-time constant
+            # -- tracked as tk-evaluate-runtime-cgroup-derived-workers-max-rss.
+            workers_max_rss=1350,
             enable_metrics=True,
             interface="asginl",
             backlog=None,
@@ -1609,12 +1641,14 @@ mitlearn_k8s_app = OLApplicationK8s(
         ),
         resource_requests=webapp_resource_requests,
         resource_limits=webapp_resource_limits,
-        # Preserves the bounds of the hand-rolled mitlearn-webapp-vpa this replaces.
-        # The floor is deliberately well below resource_limits (unlike the component
-        # default, which pins the floor at the limit) so the VPA can also size these
-        # pods back down rather than only up.
-        webapp_vpa_min_allowed_memory="256Mi",
-        webapp_vpa_max_allowed_memory="4Gi",
+        # The component would default this floor to resource_requests["memory"],
+        # which here is the same 3200Mi as the limit. Setting it lower lets the VPA
+        # size these pods back down as well as up. It must still clear measured peak
+        # RSS: a floor below real demand lets the VPA shrink the limit under the
+        # working set and the kernel OOM-kills the container. See
+        # Pulumi.Production.yaml for the production floor.
+        webapp_vpa_min_allowed_memory=webapp_vpa_min_allowed_memory,
+        webapp_vpa_max_allowed_memory=webapp_vpa_max_allowed_memory,
         webapp_keda_config=webapp_keda_config,
     ),
     opts=ResourceOptions(
