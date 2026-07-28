@@ -47,6 +47,14 @@ config:
   mitlearn:posthog_proxy: "ph.ol.mit.edu"
   mitlearn:support_url: "support.learn.mit.edu"
   mitlearn:use_granian: true
+  # Peak webapp container RSS measured 2774Mi over the 14 days to 2026-07-28. The
+  # 256Mi default floor let the VPA shrink the limit to ~2062-2295Mi, below that
+  # peak, and the kernel OOM-killed the container: 24-44 restarts/day whenever the
+  # limit sat at or under ~2553Mi, against 1-3/day whenever it sat at or above
+  # ~2990Mi. 3Gi clears the measured peak by ~11% while staying under the 3200Mi
+  # declared limit, so the VPA can still size these pods down, just not into the
+  # range that kills them.
+  mitlearn:webapp_vpa_min_allowed_memory: 3Gi
   mitlearn:vars:
     AI_MIT_SYLLABUS_URL: "https://api.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.learn.mit.edu/api/v0/vector_content_files_search/"
