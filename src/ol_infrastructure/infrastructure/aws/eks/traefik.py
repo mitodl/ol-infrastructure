@@ -195,6 +195,14 @@ def setup_traefik(
                 "accessLog": {
                     "enabled": True,
                     "format": "json",
+                    "fields": {
+                        "headers": {
+                            "defaultMode": "drop",
+                            "names": {
+                                "User-Agent": "keep",
+                            },
+                        },
+                    },
                 },
                 "resources": {
                     "requests": {
