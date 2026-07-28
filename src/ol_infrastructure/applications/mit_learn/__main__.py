@@ -1087,6 +1087,13 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             priority=10,
         ),
         fastly.ServiceVclSnippetArgs(
+            name="Disable stale-while-revalidate when acting as a shield",
+            content=Path(__file__)
+            .parent.joinpath("snippets/shield_stale_while_revalidate_guard.vcl")
+            .read_text(),
+            type="recv",
+        ),
+        fastly.ServiceVclSnippetArgs(
             name="deliver route dictionary redirect",
             content=Path(__file__)
             .parent.joinpath("snippets/redirect_deliver.vcl")
