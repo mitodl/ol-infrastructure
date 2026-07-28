@@ -1631,11 +1631,12 @@ mitlearn_k8s_app = OLApplicationK8s(
         ),
         resource_requests=webapp_resource_requests,
         resource_limits=webapp_resource_limits,
-        # The floor sits below resource_limits (unlike the component default, which
-        # pins it at the limit) so the VPA can size these pods back down as well as
-        # up. It must still clear measured peak RSS: a floor below real demand lets
-        # the VPA shrink the limit under the working set and the kernel OOM-kills the
-        # container. See Pulumi.Production.yaml for the production floor.
+        # The component would default this floor to resource_requests["memory"],
+        # which here is the same 3200Mi as the limit. Setting it lower lets the VPA
+        # size these pods back down as well as up. It must still clear measured peak
+        # RSS: a floor below real demand lets the VPA shrink the limit under the
+        # working set and the kernel OOM-kills the container. See
+        # Pulumi.Production.yaml for the production floor.
         webapp_vpa_min_allowed_memory=webapp_vpa_min_allowed_memory,
         webapp_vpa_max_allowed_memory=webapp_vpa_max_allowed_memory,
         webapp_keda_config=webapp_keda_config,
