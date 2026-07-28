@@ -156,7 +156,7 @@ def create(
             # mitxonline-ts-sts on 2026-07-27: 2 of 3 replicas went down together and
             # readiness didn't fully recover for ~17 minutes, entirely via normal
             # volume reattachment with no crash-looping or intervention involved --
-            # comfortably past the old 10m threshold. A statefulset genuinely stuck
+            # comfortably past the old 10m threshold. A StatefulSet genuinely stuck
             # (e.g. a corrupted Raft log requiring a manual data wipe, as seen
             # separately on mitx-staging-ts-sts) stays down far longer than 20m
             # either way, so this doesn't meaningfully delay catching a real issue.
