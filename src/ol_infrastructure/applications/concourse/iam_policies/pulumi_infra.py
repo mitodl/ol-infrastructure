@@ -71,6 +71,7 @@ policy_definition = {
                 "backup:GetBackupPlan",
                 "backup:GetBackupSelection",
                 "backup:ListTags",
+                "backup:TagResource",
                 "cloudfront:CreateResponseHeadersPolicy",
                 "cloudfront:GetCloudFrontOriginAccessIdentity",
                 "cloudfront:GetDistribution",
