@@ -189,6 +189,7 @@ lint.ignore = [
   "A005",
   "B008",
   "B905",
+  "CPY001",  # Repo has no copyright-notice policy; ruff 0.16.0 stabilized this out of preview
   "D104",
   "D200",
   "D202",
@@ -199,6 +200,7 @@ lint.ignore = [
   "N806",
   "N999",
   "PIE804",
+  "PLR0917",  # Same many-positional-args pattern already tolerated for PLR0913; ruff 0.16.0 stabilized this out of preview
   "RET505",
   "RET506",
   "RET507",
