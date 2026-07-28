@@ -455,6 +455,10 @@ vector_deployment = kubernetes.apps.v1.Deployment(
                                 value="false",
                             ),
                             kubernetes.core.v1.EnvVarArgs(
+                                name="VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION",
+                                value="true",
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
                                 name="AWS_REGION",
                                 value="us-east-1",
                             ),

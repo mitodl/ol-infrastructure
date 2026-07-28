@@ -150,6 +150,7 @@ def configure_vector(vector_config: VectorConfig):
             "HEROKU_PROXY_PASSWORD": "placeholder",  # pragma: allowlist secret
             "HEROKU_PROXY_USERNAME": "placeholder",
             "VECTOR_STRICT_ENV_VARS": "false",
+            "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION": "true",
         },
     )
 
