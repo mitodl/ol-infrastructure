@@ -50,7 +50,11 @@ from ol_infrastructure.lib.aws.ec2_helper import (
     InstanceTypes,
     default_egress_args,
 )
-from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.aws.iam_helper import (
+    IAM_POLICY_VERSION,
+    lint_iam_policy,
+    split_iam_policy_by_size,
+)
 from ol_infrastructure.lib.consul import get_consul_provider
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import (
@@ -261,26 +265,43 @@ for iam_policy in iam_policy_names or []:
                 {"actions": ["iam:updateassumerolepolicy"]},
             ]
         }
-    iam_policy_object = iam.Policy(
-        f"cicd-iam-permissions-policy-{iam_policy}-{stack_info.env_suffix}",
-        path=f"/ol-infrastructure/iam/cicd-{stack_info.env_suffix}/",
-        policy=lint_iam_policy(
-            policy_module.policy_definition,
-            parliament_config=parliament_config,
-        ),
-        name_prefix=f"cicd-policy-{iam_policy}-{stack_info.env_suffix}",
-        tags=aws_config.tags,
+    # IAM enforces a hard, non-adjustable 6,144 character cap per managed
+    # policy document. pulumi_infra's action list is real, CloudTrail-derived
+    # usage and doesn't compress -- split across sibling policies (a role can
+    # have several attached) rather than trimming it down to fit.
+    policy_chunks = split_iam_policy_by_size(
+        policy_module.policy_definition, max_bytes=6000
     )
-    iam_policy_objects[iam_policy] = iam_policy_object
+    chunk_objects = []
+    for chunk_index, policy_chunk in enumerate(policy_chunks):
+        name_suffix = f"-{chunk_index}" if len(policy_chunks) > 1 else ""
+        chunk_objects.append(
+            iam.Policy(
+                f"cicd-iam-permissions-policy-{iam_policy}-{stack_info.env_suffix}{name_suffix}",
+                path=f"/ol-infrastructure/iam/cicd-{stack_info.env_suffix}/",
+                policy=lint_iam_policy(
+                    policy_chunk,
+                    parliament_config=parliament_config,
+                ),
+                name_prefix=f"cicd-policy-{iam_policy}-{stack_info.env_suffix}{name_suffix}",
+                tags=aws_config.tags,
+            )
+        )
+    iam_policy_objects[iam_policy] = chunk_objects
 
 # Loop through the policy names hooked to web nodes and attach them
 for iam_policy_name in concourse_config.get_object("web_iam_policies") or []:
-    iam_policy_object = iam_policy_objects[iam_policy_name]
-    iam.RolePolicyAttachment(
-        f"concourse-instance-policy-web-policy-{iam_policy_name}-{stack_info.env_suffix}",
-        policy_arn=iam_policy_object.arn,
-        role=concourse_web_instance_role.name,
-    )
+    policy_chunk_objects = iam_policy_objects[iam_policy_name]
+    for chunk_index, iam_policy_object in enumerate(policy_chunk_objects):
+        # Only suffix the resource name when a policy was actually split --
+        # otherwise every already-attached, unsplit policy gets needlessly
+        # replaced (Pulumi diffs by resource name, not by what it points to).
+        name_suffix = f"-{chunk_index}" if len(policy_chunk_objects) > 1 else ""
+        iam.RolePolicyAttachment(
+            f"concourse-instance-policy-web-policy-{iam_policy_name}{name_suffix}-{stack_info.env_suffix}",
+            policy_arn=iam_policy_object.arn,
+            role=concourse_web_instance_role.name,
+        )
 
 # Other, misc IAM policy attachments
 iam.RolePolicyAttachment(
@@ -718,6 +739,26 @@ for worker_def in concourse_config.get_object("workers") or []:
                 if isinstance(action, str):
                     action = [action]
                 infra_worker_boundary_actions.update(action)
+        # The IAM self-escalation guard this boundary exists for (see comment
+        # above) only depends on the iam:* action list, so those stay
+        # enumerated exactly. Every other service is collapsed to a
+        # service-level wildcard: a boundary is intersected with, never
+        # unioned into, the role's actual policies, so widening it here can't
+        # grant anything beyond what those policies already allow -- and
+        # unlike the attached policy itself (split across siblings in the
+        # loop above), a role can only have one permissions boundary, so it
+        # has to fit under IAM's 6,144 character document cap as a single
+        # policy without splitting.
+        boundary_iam_actions = sorted(
+            a for a in infra_worker_boundary_actions if a.startswith("iam:")
+        )
+        boundary_other_services = sorted(
+            {
+                a.split(":")[0]
+                for a in infra_worker_boundary_actions
+                if not a.startswith("iam:")
+            }
+        )
         concourse_infra_worker_permissions_boundary = iam.Policy(
             f"concourse-instance-role-worker-infra-permissions-boundary-{stack_info.env_suffix}",
             path="/ol-security-boundaries/concourse/",
@@ -727,9 +768,16 @@ for worker_def in concourse_config.get_object("workers") or []:
                     "Statement": [
                         {
                             "Effect": "Allow",
-                            "Action": sorted(infra_worker_boundary_actions),
+                            "Action": boundary_iam_actions,
                             "Resource": "*",
-                        }
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                f"{service}:*" for service in boundary_other_services
+                            ],
+                            "Resource": "*",
+                        },
                     ],
                 },
                 parliament_config={
@@ -788,12 +836,17 @@ for worker_def in concourse_config.get_object("workers") or []:
     export(f"{worker_class_name}-instance-role-arn", concourse_worker_instance_role.arn)
 
     for iam_policy_name in worker_def["iam_policies"] or []:
-        iam_policy_object = iam_policy_objects[iam_policy_name]
-        iam.RolePolicyAttachment(
-            f"concourse-instance-policy-worker-{worker_class_name}-policy-{iam_policy_name}-{stack_info.env_suffix}",
-            policy_arn=iam_policy_object.arn,
-            role=concourse_worker_instance_role.name,
-        )
+        policy_chunk_objects = iam_policy_objects[iam_policy_name]
+        for chunk_index, iam_policy_object in enumerate(policy_chunk_objects):
+            # Only suffix the resource name when a policy was actually split --
+            # otherwise every already-attached, unsplit policy gets needlessly
+            # replaced (Pulumi diffs by resource name, not by what it points to).
+            name_suffix = f"-{chunk_index}" if len(policy_chunk_objects) > 1 else ""
+            iam.RolePolicyAttachment(
+                f"concourse-instance-policy-worker-{worker_class_name}-policy-{iam_policy_name}{name_suffix}-{stack_info.env_suffix}",
+                policy_arn=iam_policy_object.arn,
+                role=concourse_worker_instance_role.name,
+            )
 
     # Attach the describe_instances policy to all workers so they can authenticate
     # with ECR and pull images through the ECR pull-through cache.
