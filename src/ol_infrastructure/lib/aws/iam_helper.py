@@ -114,13 +114,61 @@ def lint_iam_policy(
     )
 
 
+def _json_byte_size(document: dict[str, Any]) -> int:
+    """Return the UTF-8 byte size of a document's compact JSON serialization.
+
+    IAM's policy size quota is enforced on the document's byte size, not its
+    character count -- these differ once any non-ASCII character appears.
+    """
+    return len(json.dumps(document).encode("utf-8"))
+
+
+def _split_statement_by_action(
+    base: dict[str, Any],
+    actions: list[str],
+    action_budget: int,
+    max_bytes: int,
+) -> list[dict[str, Any]]:
+    """Split one statement's Action list into pieces that fit action_budget.
+
+    Each returned piece is base (Effect/Resource/Condition) plus a slice of
+    actions, small enough to serialize within action_budget on its own.
+
+    :raises ValueError: If a single action, together with base, is too large
+        to fit on its own -- there's no further way to split it.
+    """
+    pieces: list[dict[str, Any]] = []
+    current: list[str] = []
+    for action in actions:
+        candidate = [*current, action]
+        if _json_byte_size({**base, "Action": candidate}) <= action_budget:
+            current = candidate
+            continue
+        if current:
+            pieces.append({**base, "Action": current})
+            current = []
+        single_size = _json_byte_size({**base, "Action": [action]})
+        if single_size > action_budget:
+            msg = (
+                f"IAM action {action!r} alone (with its statement's "
+                f"Effect/Resource/Condition) is {single_size} bytes, which "
+                f"exceeds the {action_budget}-byte per-statement budget "
+                f"under max_bytes={max_bytes}; it cannot be split further."
+            )
+            raise ValueError(msg)
+        current = [action]
+    if current:
+        pieces.append({**base, "Action": current})
+    return pieces
+
+
 def split_iam_policy_by_size(
     policy_definition: dict[str, Any],
     max_bytes: int = 6144,
 ) -> list[dict[str, Any]]:
     """Split a policy document into multiple documents that each fit max_bytes.
 
-    IAM enforces a hard, non-adjustable 6,144 character cap on a single managed
+    IAM enforces a hard, non-adjustable 6,144 byte cap on a single managed
     policy document. A role can have several managed policies attached, so a
     document that would exceed the cap can instead be split into siblings that
     are all attached to the same role, each carrying its own copy of a
@@ -129,11 +177,15 @@ def split_iam_policy_by_size(
     :param policy_definition: An IAM policy document (Version + Statement).
     :param max_bytes: The per-document size ceiling to split against.
 
+    :raises ValueError: If a single action, together with its statement's
+        Effect/Resource/Condition, is too large to fit in any document on its
+        own -- there's no further way to split it.
+
     :returns: One or more policy documents, each within max_bytes when
         JSON-serialized, that together grant everything policy_definition does.
     """
     version = policy_definition["Version"]
-    envelope_size = len(json.dumps({"Version": version, "Statement": []}))
+    envelope_size = _json_byte_size({"Version": version, "Statement": []})
     action_budget = max_bytes - envelope_size
 
     pieces: list[dict[str, Any]] = []
@@ -142,26 +194,15 @@ def split_iam_policy_by_size(
         if isinstance(actions, str):
             actions = [actions]
         base = {key: value for key, value in statement.items() if key != "Action"}
-        current: list[str] = []
-        for action in actions:
-            candidate = [*current, action]
-            if (
-                current
-                and len(json.dumps({**base, "Action": candidate})) > action_budget
-            ):
-                pieces.append({**base, "Action": current})
-                current = [action]
-            else:
-                current = candidate
-        pieces.append({**base, "Action": current})
+        pieces.extend(
+            _split_statement_by_action(base, actions, action_budget, max_bytes)
+        )
 
     documents: list[list[dict[str, Any]]] = []
     for piece in pieces:
         for document_statements in documents:
-            candidate_size = len(
-                json.dumps(
-                    {"Version": version, "Statement": [*document_statements, piece]}
-                )
+            candidate_size = _json_byte_size(
+                {"Version": version, "Statement": [*document_statements, piece]}
             )
             if candidate_size <= max_bytes:
                 document_statements.append(piece)
