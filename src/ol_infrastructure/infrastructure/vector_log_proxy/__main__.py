@@ -549,13 +549,20 @@ vector_deployment = kubernetes.apps.v1.Deployment(
                             period_seconds=10,
                         ),
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            # Sized from observed usage on operations-production
+                            # (~50-65m CPU, ~580-640Mi memory per pod sustained
+                            # under real Fastly + Heroku log-shipping volume,
+                            # confirmed via `kubectl top` 2026-07-28) rather than
+                            # the original guess. CPU is now HPA-controlled
+                            # (below) so this request is the utilization-percent
+                            # baseline; memory stays VPA-controlled.
                             requests={
-                                "cpu": "500m",
-                                "memory": "512Mi",
+                                "cpu": "100m",
+                                "memory": "1Gi",
                             },
                             limits={
-                                "cpu": "1000m",
-                                "memory": "1Gi",
+                                "cpu": "250m",
+                                "memory": "2Gi",
                             },
                         ),
                     ),
@@ -779,10 +786,53 @@ make_vpa(
     namespace=namespace,
     target_kind="Deployment",
     target_name=application_name,
-    controlled_resources=["cpu", "memory"],
+    # Memory only -- CPU-based horizontal scaling is handled by the HPA below.
+    # Splitting authority this way avoids the known HPA/VPA conflict where
+    # VPA-adjusted CPU requests would distort the utilization percentage the
+    # HPA observes (same pattern used for the Traefik/APISIX gateways).
+    controlled_resources=["memory"],
     container_name="vector",
-    min_allowed={"cpu": "10m", "memory": "64Mi"},
-    max_allowed={"cpu": "2000m", "memory": "4Gi"},
+    min_allowed={"memory": "64Mi"},
+    max_allowed={"memory": "4Gi"},
+    opts=ResourceOptions(depends_on=[vector_deployment]),
+)
+
+# Horizontal scaling for request-volume growth. vector-log-proxy is stateless
+# (each replica independently forwards events to the same downstream sinks),
+# so this is a safe standard scale-out. Added after an incident where the
+# operations-production Traefik gateway in front of this service OOMKilled
+# under sustained log-shipping volume (~1.3M requests/24h to this Service);
+# giving this workload real horizontal headroom reduces the odds that it
+# becomes a slow/saturated backend that holds connections open at the
+# ingress layer during a future volume spike.
+kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
+    f"{application_name}-hpa",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=application_name,
+        namespace=namespace,
+        labels=k8s_global_labels,
+    ),
+    spec=kubernetes.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
+        scale_target_ref=kubernetes.autoscaling.v2.CrossVersionObjectReferenceArgs(
+            api_version="apps/v1",
+            kind="Deployment",
+            name=application_name,
+        ),
+        min_replicas=2,
+        max_replicas=6,
+        metrics=[
+            kubernetes.autoscaling.v2.MetricSpecArgs(
+                type="Resource",
+                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
+                    name="cpu",
+                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
+                        type="Utilization",
+                        average_utilization=70,
+                    ),
+                ),
+            ),
+        ],
+    ),
     opts=ResourceOptions(depends_on=[vector_deployment]),
 )
 
