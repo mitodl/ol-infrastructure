@@ -648,6 +648,12 @@ vector_deployment = kubernetes.apps.v1.Deployment(
             ),
         ),
     ),
+    opts=ResourceOptions(
+        # Let the HPA (below) manage replica count without Pulumi reverting
+        # it back to the static replicas=2 on every pulumi up. Same pattern
+        # as applications/xqwatcher/__main__.py.
+        ignore_changes=["spec.replicas"],
+    ),
 )
 
 ##################################
@@ -778,10 +784,6 @@ vector_gateway = OLEKSGateway(
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
-        # Let the HPA (below) manage replica count without Pulumi reverting
-        # it back to the static replicas=2 on every pulumi up. Same pattern
-        # as applications/xqwatcher/__main__.py.
-        ignore_changes=["spec.replicas"],
     ),
 )
 
