@@ -1,0 +1,16 @@
+# Per-developer overrides for the mit-learn Next.js frontend (gitignored
+# when copied).
+#
+# Copy to app-env.local.yaml and add entries under data: — because this
+# ConfigMap is referenced LAST in the deployment's envFrom, its keys override
+# the tracked app-env ConfigMap. Pods roll automatically when you edit it.
+# See "Local Configuration Overrides" in local-dev/README.md.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mitlearn-nextjs-env-local
+  namespace: mit-learn
+data:
+  # NEXT_PUBLIC_POSTHOG_API_KEY: "phc_your_key"  # pragma: allowlist secret
+  # NEXT_PUBLIC_POSTHOG_API_HOST: "https://us.i.posthog.com"

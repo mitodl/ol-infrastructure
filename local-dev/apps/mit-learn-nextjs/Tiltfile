@@ -4,7 +4,7 @@
 # Source changes are live-synced into the container; Next.js hot-reloads
 # them without an image rebuild or pod restart.
 #
-# NEXT_PUBLIC_* values are injected at runtime from deployment.yaml env vars
+# NEXT_PUBLIC_* values are injected at runtime from the app-env ConfigMap
 # (surfaced to the browser via PublicEnvScript) — they are NOT build args.
 # next.config.js derives allowedDevOrigins from NEXT_PUBLIC_ORIGIN, so the
 # dev server accepts HMR requests proxied through learn.<root-domain>.
@@ -57,12 +57,12 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
     )
 
 k8s_yaml_local([
+    'configmaps/app-env.yaml',
     'deployment.yaml',
     'apisix-routes.yaml',
-])
+], local_overrides='configmaps/app-env.local.yaml')
 
 k8s_resource(
     'mitlearn-nextjs',
-    port_forwards=['3000:3000'],
     labels=['mit-learn'],
 )
