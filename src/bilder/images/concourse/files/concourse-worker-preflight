@@ -52,18 +52,25 @@ check_tcp() {
 }
 
 write_worker_identity() {
-    local token instance_id
-    token=$(get_imds_token)
-    if [ -z "${token}" ]; then
-        log "IMDS token fetch failed; CONCOURSE_NAME will fall back to hostname"
+    # Idempotent and pinned for the life of the box: once a name is written,
+    # later preflight runs (this unit re-runs on every concourse.service
+    # restart, not just first boot) must never overwrite it. Otherwise a
+    # transient IMDS failure on the first run followed by a later success
+    # would still produce two different names for the same worker over its
+    # lifetime -- the exact race this script exists to close.
+    if [ -s /etc/default/concourse-name ]; then
         return
     fi
-    instance_id=$(imds_get "instance-id" "${token}")
-    if [ -n "${instance_id}" ]; then
-        echo "CONCOURSE_NAME=${instance_id}" > /etc/default/concourse-name
-    else
-        log "instance-id metadata empty; CONCOURSE_NAME will fall back to hostname"
+    local token instance_id name
+    token=$(get_imds_token)
+    if [ -n "${token}" ]; then
+        instance_id=$(imds_get "instance-id" "${token}")
     fi
+    name="${instance_id:-$(hostname)}"
+    if [ -z "${instance_id:-}" ]; then
+        log "instance-id metadata unavailable; pinning CONCOURSE_NAME to hostname (${name}) instead"
+    fi
+    echo "CONCOURSE_NAME=${name}" > /etc/default/concourse-name
 }
 
 run_checks() {
