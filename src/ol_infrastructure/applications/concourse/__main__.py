@@ -176,11 +176,12 @@ def build_worker_user_data(
                 "owner": "root:root",
             }
         )
-    # Worker identity is pinned to the instance ID (never reused, unlike the
-    # EC2-hostname-derived default) by concourse-worker-preflight writing
+    # Worker identity is pinned by concourse-worker-preflight writing
     # /etc/default/concourse-name before concourse.service's first start --
     # not here via cloud-init runcmd, which has no systemd ordering relative
-    # to concourse.service and can race it.
+    # to concourse.service and can race it. Preflight prefers the instance ID
+    # (never reused, unlike the EC2-hostname-derived default) but falls back
+    # to hostname if IMDS is unreachable.
     return base64.b64encode(
         "#cloud-config\n{}".format(
             yaml.dump(
