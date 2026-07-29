@@ -229,6 +229,7 @@ def create_mitxonline_k8s_secrets(
                 "MITX_ONLINE_FASTLY_API_KEY": '{{ index .Secrets "fastly" "api_key" }}',
                 "MITX_ONLINE_FASTLY_AUTH_TOKEN": '{{ index .Secrets "fastly" "api_key" }}',
                 "MITX_ONLINE_FASTLY_SERVICE_ID": '{{ index .Secrets "fastly" "service_id" }}',
+                "MIT_LEARN_FASTLY_SERVICE_ID": '{{ index .Secrets "fastly" "mit_learn_service_id" }}',
                 "HUBSPOT_HOME_PAGE_FORM_GUID": '{{ index .Secrets "hubspot" "formId" }}',
                 "HUBSPOT_PORTAL_ID": '{{ index .Secrets "hubspot" "portalId" }}',
                 "MITOL_GOOGLE_SHEETS_DRIVE_API_PROJECT_ID": '{{ index .Secrets "google-sheets" "drive-api-project-id" }}',
