@@ -258,6 +258,10 @@ policy_definition = {
                 "glue:CreateDatabase",
                 "glue:DeleteDatabase",
                 "glue:GetDatabase",
+                # The AWS provider reads tags on every Glue database refresh,
+                # even though CatalogDatabase sets none -- without this, refresh
+                # fails closed and the data-warehouse stacks can't deploy.
+                "glue:GetTags",
                 "glue:UpdateDatabase",
                 "iam:GetGroup",
                 "iam:GetInstanceProfile",
