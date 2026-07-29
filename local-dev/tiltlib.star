@@ -24,9 +24,9 @@ _ROOT_DOMAIN_DEFAULT = "mit.dev"
 _CONFIG_HASH_ANNOTATION = "ol.mit.edu/config-hash"
 
 def _config_fingerprint(paths_and_texts):
-    """Return a stable fingerprint of the combined data/stringData of every
-    ConfigMap and Secret across the given (path, text) pairs (not the raw
-    text, so comment/formatting-only edits don't roll pods)."""
+    """Return a stable fingerprint of the combined data/binaryData/stringData
+    of every ConfigMap and Secret across the given (path, text) pairs (not the
+    raw text, so comment/formatting-only edits don't roll pods)."""
     pairs = []
     for path, text in paths_and_texts:
         docs = [d for d in decode_yaml_stream(text) if d != None]
@@ -34,7 +34,13 @@ def _config_fingerprint(paths_and_texts):
             kind = d.get("kind")
             if kind != "ConfigMap" and kind != "Secret":
                 continue
-            data = d.get("data") or d.get("stringData") or {}
+            # Kubernetes merges all three value fields rather than picking one,
+            # with stringData taking precedence over data on key collisions, so
+            # fingerprint the union — otherwise an edit to a field we skipped
+            # would silently not roll the pods.
+            data = dict(d.get("data") or {})
+            data.update(d.get("binaryData") or {})
+            data.update(d.get("stringData") or {})
             name = d.get("metadata", {}).get("name", "?")
             for k in sorted(data.keys()):
                 v = data[k]
@@ -45,7 +51,7 @@ def _config_fingerprint(paths_and_texts):
                     v = ""
                 elif type(v) != "string":
                     fail(
-                        '%s: %s %s.data.%s must be a YAML string — quote the value (e.g. "True", "8080"); got %s'
+                        '%s: %s %s: key %s must be a YAML string — quote the value (e.g. "True", "8080"); got %s'
                         % (path, kind, name, k, type(v))
                     )
                 pairs.append("%s/%s=%s" % (name, k, v))
