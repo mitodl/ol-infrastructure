@@ -394,6 +394,21 @@ gwarek_app_secrets = OLVaultK8SSecret(
 )
 
 # Dynamic Postgres credentials — "app" role for the running api/worker pods.
+#
+# These templates deliberately emit only DB_USERNAME/DB_PASSWORD (plain
+# Vault Go-template expressions, no Pulumi Output involved) rather than a
+# single DATABASE_URL embedding the RDS host. OLVaultK8SSecret's Vault
+# Secrets Operator manifest builder calls str() on each template value
+# (components/services/vault.py); since gwarek_db.db_instance.address is a
+# real Output[str] not known until the RDS instance exists, str()-ing an
+# .apply() over it would bake Pulumi's "calling __str__ on an Output is not
+# supported" diagnostic into the rendered secret instead of the resolved
+# host. That's a bug in the shared component (used by many other apps), not
+# fixable safely from here, so DB_HOST is instead assembled below as a
+# plain container env var — which is a genuine typed Pulumi resource
+# argument and so handles the Output correctly — and DATABASE_URL is
+# composed from DB_USERNAME/DB_PASSWORD/DB_HOST via Kubernetes' own
+# dependent-env-var $(VAR) substitution (see gwarek_db_env below).
 gwarek_db_endpoint = gwarek_db.db_instance.address
 gwarek_db_app_secret_k8s_name = "gwarek-db-app-creds"  # noqa: S105  # pragma: allowlist secret
 gwarek_db_app_secret = OLVaultK8SSecret(
@@ -409,13 +424,8 @@ gwarek_db_app_secret = OLVaultK8SSecret(
         excludes=[".*"],
         exclude_raw=True,
         templates={
-            "DATABASE_URL": gwarek_db_endpoint.apply(
-                lambda host: (
-                    'postgresql+asyncpg://{{ get .Secrets "username" }}'
-                    ':{{ get .Secrets "password" }}'
-                    f"@{host}/gwarek"
-                )
-            ),
+            "DB_USERNAME": '{{ get .Secrets "username" }}',
+            "DB_PASSWORD": '{{ get .Secrets "password" }}',
         },
         vaultauth=gwarek_vaultauth,
         # Kubernetes does not update a running container's env vars when the
@@ -430,7 +440,9 @@ gwarek_db_app_secret = OLVaultK8SSecret(
 )
 
 # Dynamic Postgres credentials — "admin" role for the one-off migration Job
-# only (alembic upgrade head needs DDL privileges the app role lacks).
+# only (alembic upgrade head needs DDL privileges the app role lacks). Same
+# DB_USERNAME/DB_PASSWORD-only shape and same reason as gwarek_db_app_secret
+# above.
 gwarek_db_admin_secret_k8s_name = "gwarek-db-admin-creds"  # noqa: S105  # pragma: allowlist secret
 gwarek_db_admin_secret = OLVaultK8SSecret(
     f"gwarek-db-admin-creds-{stack_info.env_suffix}",
@@ -445,17 +457,49 @@ gwarek_db_admin_secret = OLVaultK8SSecret(
         excludes=[".*"],
         exclude_raw=True,
         templates={
-            "DATABASE_URL": gwarek_db_endpoint.apply(
-                lambda host: (
-                    'postgresql+asyncpg://{{ get .Secrets "username" }}'
-                    ':{{ get .Secrets "password" }}'
-                    f"@{host}/gwarek"
-                )
-            ),
+            "DB_USERNAME": '{{ get .Secrets "username" }}',
+            "DB_PASSWORD": '{{ get .Secrets "password" }}',
         },
         vaultauth=gwarek_vaultauth,
     ),
 )
+
+
+def _db_env(secret_k8s_name: str) -> list[core.v1.EnvVarArgs]:
+    """Env entries composing DATABASE_URL from a DB secret + the RDS host.
+
+    Must be used via `env=`, not `env_from=` — Kubernetes' $(VAR)
+    dependent-variable substitution only expands references to variables
+    that appear earlier in the same container's explicit `env:` list, not
+    ones merged in from `envFrom:`. DB_HOST is gwarek_db_endpoint (an
+    Output[str]) passed directly as this EnvVarArgs' `value`, a real typed
+    Pulumi resource argument, so it doesn't hit the str()-on-Output bug
+    described above.
+    """
+    return [
+        core.v1.EnvVarArgs(
+            name="DB_USERNAME",
+            value_from=core.v1.EnvVarSourceArgs(
+                secret_key_ref=core.v1.SecretKeySelectorArgs(
+                    name=secret_k8s_name, key="DB_USERNAME"
+                )
+            ),
+        ),
+        core.v1.EnvVarArgs(
+            name="DB_PASSWORD",
+            value_from=core.v1.EnvVarSourceArgs(
+                secret_key_ref=core.v1.SecretKeySelectorArgs(
+                    name=secret_k8s_name, key="DB_PASSWORD"
+                )
+            ),
+        ),
+        core.v1.EnvVarArgs(name="DB_HOST", value=gwarek_db_endpoint),
+        core.v1.EnvVarArgs(
+            name="DATABASE_URL",
+            value="postgresql+asyncpg://$(DB_USERNAME):$(DB_PASSWORD)@$(DB_HOST)/gwarek",
+        ),
+    ]
+
 
 # Redis connection details — plain K8s Secret (matches ocw_studio's
 # redis-creds pattern; Redis has no Vault dynamic secrets engine).
@@ -541,10 +585,10 @@ gwarek_common_env = [
     core.v1.EnvVarArgs(name="SNAPSHOT_S3_BUCKET", value=gwarek_snapshot_bucket_name),
     core.v1.EnvVarArgs(name="WIKI_S3_BUCKET", value=gwarek_wiki_bucket_name),
 ]
+# DATABASE_URL is intentionally not sourced here -- see _db_env() above --
+# since it must come in via named `env:` entries, not `envFrom:`, for
+# Kubernetes' $(VAR) substitution to work.
 gwarek_common_env_from = [
-    core.v1.EnvFromSourceArgs(
-        secret_ref=core.v1.SecretEnvSourceArgs(name=gwarek_db_app_secret_k8s_name)
-    ),
     core.v1.EnvFromSourceArgs(
         secret_ref=core.v1.SecretEnvSourceArgs(name=gwarek_redis_creds_k8s_name)
     ),
@@ -587,7 +631,10 @@ gwarek_api_deployment = apps_v1.Deployment(
                         ports=[
                             core.v1.ContainerPortArgs(container_port=8000, name="http")
                         ],
-                        env=gwarek_common_env,
+                        env=[
+                            *gwarek_common_env,
+                            *_db_env(gwarek_db_app_secret_k8s_name),
+                        ],
                         env_from=gwarek_common_env_from,
                         resources=core.v1.ResourceRequirementsArgs(
                             requests={"cpu": "100m", "memory": "256Mi"},
@@ -670,7 +717,10 @@ gwarek_worker_deployment = apps_v1.Deployment(
                             "arq",
                             "src.jobs.worker.WorkerSettings",
                         ],
-                        env=gwarek_common_env,
+                        env=[
+                            *gwarek_common_env,
+                            *_db_env(gwarek_db_app_secret_k8s_name),
+                        ],
                         env_from=gwarek_common_env_from,
                         resources=core.v1.ResourceRequirementsArgs(
                             requests={"cpu": "100m", "memory": "256Mi"},
@@ -792,13 +842,7 @@ gwarek_migration_job = batch.v1.Job(
                             "upgrade",
                             "head",
                         ],
-                        env_from=[
-                            core.v1.EnvFromSourceArgs(
-                                secret_ref=core.v1.SecretEnvSourceArgs(
-                                    name=gwarek_db_admin_secret_k8s_name
-                                )
-                            ),
-                        ],
+                        env=_db_env(gwarek_db_admin_secret_k8s_name),
                     ),
                 ],
             ),
