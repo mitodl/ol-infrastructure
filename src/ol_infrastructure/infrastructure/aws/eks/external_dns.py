@@ -149,13 +149,18 @@ def setup_external_dns(
                 "txtOwnerId": cluster_name,
                 # Limit the dns zones that external dns knows about
                 "domainFilters": eks_config.require_object("allowed_dns_zones"),
+                # request == limit leaves zero burst headroom: data-qa sat at
+                # 127.6Mi against the 128Mi ceiling and OOMKilled. Memory here
+                # scales with the number of Route53 records external-dns tracks,
+                # which grows as gateway routes are added, so the limit is set to
+                # 2x the request rather than matching it.
                 "resources": {
                     "requests": {
                         "memory": "128Mi",
                         "cpu": "10m",
                     },
                     "limits": {
-                        "memory": "128Mi",
+                        "memory": "256Mi",
                     },
                 },
             },

@@ -30,6 +30,34 @@ MARIMO_OPERATOR_MANIFEST_URL = (
 )
 MARIMO_OPERATOR_NAMESPACE = "marimo-operator-system"
 
+# The upstream manifest ships the controller with memory request == limit == 128Mi.
+# That is too tight once the operator is reconciling real notebooks: on data-qa it
+# reached 117.5Mi against the 128Mi cap and entered an OOMKill/CrashLoopBackOff loop
+# that also took the Deployment unavailable. Raising the limit (leaving the upstream
+# request alone) restores burst headroom without over-reserving on the node.
+MARIMO_OPERATOR_MEMORY_LIMIT = "384Mi"
+
+
+def _patch_controller_memory_limit(doc: dict[str, Any]) -> dict[str, Any]:
+    """Raise the operator controller's memory limit above the upstream default.
+
+    Args:
+        doc: A single Kubernetes resource dict from the install manifest.
+
+    Returns:
+        The same dict, with the controller container's memory limit raised.
+    """
+    if doc.get("kind") != "Deployment":
+        return doc
+    containers = (
+        doc.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [])
+    )
+    for container in containers:
+        if container.get("name") == "manager":
+            limits = container.setdefault("resources", {}).setdefault("limits", {})
+            limits["memory"] = MARIMO_OPERATOR_MEMORY_LIMIT
+    return doc
+
 
 def _fetch_operator_manifests() -> list[dict[str, Any]]:
     """Fetch and parse the marimo operator install YAML.
@@ -39,7 +67,11 @@ def _fetch_operator_manifests() -> list[dict[str, Any]]:
     """
     with urllib.request.urlopen(MARIMO_OPERATOR_MANIFEST_URL) as response:  # noqa: S310
         content = response.read().decode("utf-8")
-    return [doc for doc in pyyaml.safe_load_all(content) if doc is not None]
+    return [
+        _patch_controller_memory_limit(doc)
+        for doc in pyyaml.safe_load_all(content)
+        if doc is not None
+    ]
 
 
 def setup_marimo_operator(

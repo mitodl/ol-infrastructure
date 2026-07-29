@@ -1771,8 +1771,16 @@ learn_external_service_apisix_route = OLApisixRoute(
 # (a KEDA cpu trigger, in mit-learn's case) owns CPU and the VPA owns memory. Bounds
 # come from webapp_vpa_min/max_allowed_memory on the OLApplicationK8sConfig above.
 # Celery workers and beat are scaled via KEDA (Redis queue depth), so CPU+memory VPA is safe.
+# The 128Mi memory floor was too low to be safe. make_vpa() scales the limit
+# proportionally to the declared request:limit ratio, so the floor sets the limit
+# floor too -- at 128Mi the VPA was free to shrink the default worker's request to
+# ~662Mi, which dragged its limit down to 1324Mi. Steady-state use fits there, but
+# bursts hit 1307Mi and OOMKilled just under the cap, which is exactly the failure
+# the 2:1 ratio above was introduced to prevent: the ratio only helps if the request
+# it multiplies cannot collapse. A 1Gi floor keeps the effective limit at or above
+# 2Gi while still leaving the VPA room to trim over-provisioned workers.
 _worker_vpa_bounds = {
-    "min_allowed": {"cpu": "25m", "memory": "128Mi"},
+    "min_allowed": {"cpu": "25m", "memory": "1Gi"},
     "max_allowed": {"cpu": "1000m", "memory": "3Gi"},
 }
 # The embeddings worker runs ML inference (embedding generation), which is
@@ -1781,7 +1789,7 @@ _worker_vpa_bounds = {
 # 2026-07-28) already exceeds the shared 1000m ceiling above, so it gets its
 # own bounds instead of sharing _worker_vpa_bounds with the lighter queues.
 _embeddings_worker_vpa_bounds = {
-    "min_allowed": {"cpu": "25m", "memory": "128Mi"},
+    "min_allowed": {"cpu": "25m", "memory": "1Gi"},
     "max_allowed": {"cpu": "2000m", "memory": "3Gi"},
 }
 for _celery_name in mitlearn_k8s_app.celery_deployment_names:

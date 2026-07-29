@@ -401,9 +401,20 @@ def create_k8s_resources(  # noqa: C901
                     protocol="TCP",
                 ),
             ],
+            # The 96Mi/128Mi rightsizing in #4731 was measured against the
+            # low-volume Open edX deployments and is too tight for the busy ones:
+            # residential-production mitx-openedx pegs at 127.8Mi against the 128Mi
+            # ceiling and has been OOMKilled repeatedly, and mitxonline-openedx peaks
+            # at ~180Mi (it has only escaped so far because that cluster still runs
+            # the pre-#4731 512Mi limit and would start OOMing on its next rollout).
+            # Vector's memory is driven by tracking-log throughput, which varies by
+            # an order of magnitude across deployments, so the limit is sized for the
+            # busiest one. The request stays well under the old 512Mi -- request is
+            # what drives bin-packing and cost, so most of the rightsizing saving is
+            # kept while the limit provides burst headroom instead of a hard kill.
             resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                requests={"cpu": "10m", "memory": "96Mi"},
-                limits={"memory": "128Mi"},
+                requests={"cpu": "10m", "memory": "192Mi"},
+                limits={"memory": "512Mi"},
             ),
             volume_mounts=[
                 kubernetes.core.v1.VolumeMountArgs(

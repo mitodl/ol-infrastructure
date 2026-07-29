@@ -76,12 +76,22 @@ nextjs_config = Config("nextjs")
 # means raising nextjs_memory_limit later hands all of the added memory straight to
 # the heap (the actual thing that needs more room); a percentage would keep skimming
 # an ever-larger, unneeded slice off the top as the limit grows.
-nextjs_memory_limit = "1Gi"
+# The heap budget the container is provisioned around: V8's old-space ceiling is
+# derived from this, and it is also the memory request (what the scheduler reserves).
+nextjs_memory_request = "1Gi"
 NEXTJS_NON_HEAP_OVERHEAD_MIB = 224
 nextjs_max_old_space_size_mib = (
-    int(parse_quantity(nextjs_memory_limit)) // (1024 * 1024)
+    int(parse_quantity(nextjs_memory_request)) // (1024 * 1024)
     - NEXTJS_NON_HEAP_OVERHEAD_MIB
 )
+# The limit sits above the request rather than matching it. With request == limit ==
+# 1Gi, the heap ceiling (800MiB) plus the 224MiB non-heap reserve exactly consumed the
+# whole limit, so there was no margin at all: production pods rode at ~1002Mi against
+# the 1024Mi cap and were OOMKilled whenever non-heap use drifted past its reserve
+# while the heap was near full. The extra headroom here is deliberately NOT given to
+# V8 -- max_old_space_size stays pinned to the request-derived budget above -- so it
+# stays available to absorb non-heap spikes instead of being absorbed into the heap.
+nextjs_memory_limit = "1536Mi"
 
 stay_updated_hubspot_form_ids = {
     "ci": "f201f3af-c2c0-4b7d-b297-ddbb75912cc1",
@@ -246,7 +256,7 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
                         ],
                         image_pull_policy="Always",
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                            requests={"cpu": "100m", "memory": nextjs_memory_limit},
+                            requests={"cpu": "100m", "memory": nextjs_memory_request},
                             limits={"memory": nextjs_memory_limit},
                         ),
                         env=env_vars,
