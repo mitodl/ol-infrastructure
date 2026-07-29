@@ -44,10 +44,10 @@ AWS_NODE_TERMINATION_HANDLER_CHART_VERSION = "0.27.2"
 CERT_MANAGER_CHART_VERSION = "v1.16.1"
 # renovate: datasource=helm depName=dagster packageName=dagster registryUrl=https://dagster-io.github.io/helm
 DAGSTER_CHART_VERSION = "1.13.15"
-# renovate: datasource=aws-eks-addon depName=ebs-csi-driver
-EBS_CSI_DRIVER_VERSION = "v1.40.1-eksbuild.1"
-# renovate: datasource=aws-eks-addon depName=efs-csi-driver
-EFS_CSI_DRIVER_VERSION = "v2.1.6-eksbuild.1"
+# renovate: datasource=aws-eks-addon depName=aws-ebs-csi-driver versioning=aws-eks-addon
+EBS_CSI_DRIVER_VERSION = "v1.63.0-eksbuild.1"
+# renovate: datasource=aws-eks-addon depName=aws-efs-csi-driver versioning=aws-eks-addon
+EFS_CSI_DRIVER_VERSION = "v3.4.1-eksbuild.1"
 # renovate: datasource=helm depName=external-dns packageName=external-dns registryUrl=https://kubernetes-sigs.github.io/external-dns/
 EXTERNAL_DNS_CHART_VERSION = "1.21.1"
 # renovate: datasource=github-releases depName=gateway-api packageName=kubernetes-sigs/gateway-api
