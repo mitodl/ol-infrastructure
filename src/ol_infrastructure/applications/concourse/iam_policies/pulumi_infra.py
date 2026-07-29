@@ -335,6 +335,15 @@ policy_definition = {
                 "s3:GetLifecycleConfiguration",
                 "s3:GetReplicationConfiguration",
                 "s3:ListAllMyBuckets",
+                # The provider reads every aws:s3:Bucket via HeadBucket, which
+                # authorizes as s3:ListBucket. A 403 there has an empty response
+                # body, so it is indistinguishable from a 404: the provider
+                # treats the bucket as gone and refresh silently DELETES it from
+                # state, with no AccessDenied anywhere in the log. The next run
+                # then tries to recreate a bucket that still exists. Only
+                # mitol-pulumi-state and a couple of operations buckets are
+                # covered by ListBucket* elsewhere, so it must be granted here.
+                "s3:ListBucket",
                 "s3:PutBucketCORS",
                 "s3:PutBucketLogging",
                 "s3:PutBucketOwnershipControls",
