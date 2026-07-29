@@ -250,8 +250,17 @@ def fake_repo(monkeypatch):
     return _install
 
 
-async def test_commits_since_last_tag_uses_compare_when_a_tag_exists(fake_repo):
-    """Compares tag..default_branch and maps PyGithub Commit fields."""
+def test_commits_since_last_tag_uses_compare_when_a_tag_exists(fake_repo):
+    """Compares tag..default_branch and maps PyGithub Commit fields.
+
+    Exercises _commits_since_last_tag_sync() directly rather than the public
+    async wrapper -- pytest-asyncio's per-test event loop churn was observed
+    to desync the process-global asyncio event loop that
+    tests/test_example_correct_pattern.py's module-level Pulumi mocks depend
+    on, breaking an unrelated, already-collected test module. The sync
+    helpers carry all the logic under test; the async wrappers are a thin,
+    obviously-correct asyncio.to_thread() passthrough.
+    """
     fake_repo(
         _FakeRepo(
             tags=[_FakeTag("2026.07.01.1"), _FakeTag("not-a-release-tag")],
@@ -260,7 +269,7 @@ async def test_commits_since_last_tag_uses_compare_when_a_tag_exists(fake_repo):
             ),
         )
     )
-    commits = await github.commits_since_last_tag("mitodl/thing")
+    commits = github._commits_since_last_tag_sync("mitodl/thing")
     assert commits == [
         {
             "sha": "abc123",
@@ -271,7 +280,7 @@ async def test_commits_since_last_tag_uses_compare_when_a_tag_exists(fake_repo):
     ]
 
 
-async def test_commits_since_last_tag_diverged_comparison_returns_empty(fake_repo):
+def test_commits_since_last_tag_diverged_comparison_returns_empty(fake_repo):
     """A "diverged" comparison status returns no commits rather than erroring."""
     fake_repo(
         _FakeRepo(
@@ -279,13 +288,11 @@ async def test_commits_since_last_tag_diverged_comparison_returns_empty(fake_rep
             comparison=_FakeComparison("diverged", None),
         )
     )
-    commits = await github.commits_since_last_tag("mitodl/thing")
+    commits = github._commits_since_last_tag_sync("mitodl/thing")
     assert commits == []
 
 
-async def test_commits_since_last_tag_falls_back_to_commit_history_without_a_tag(
-    fake_repo,
-):
+def test_commits_since_last_tag_falls_back_to_commit_history_without_a_tag(fake_repo):
     """No release tag exists -- falls back to plain commit history."""
     fake_repo(
         _FakeRepo(
@@ -293,7 +300,7 @@ async def test_commits_since_last_tag_falls_back_to_commit_history_without_a_tag
             commits=[_FakeCommit("def456", "chore: bump", "me", "https://x/def456")],
         )
     )
-    commits = await github.commits_since_last_tag("mitodl/thing")
+    commits = github._commits_since_last_tag_sync("mitodl/thing")
     assert commits == [
         {
             "sha": "def456",
@@ -304,14 +311,14 @@ async def test_commits_since_last_tag_falls_back_to_commit_history_without_a_tag
     ]
 
 
-async def test_open_release_issues_maps_fields(fake_repo):
+def test_open_release_issues_maps_fields(fake_repo):
     """Maps PyGithub Issue fields to the plain-dict shape bot.py expects."""
     fake_repo(
         _FakeRepo(
             issues=[_FakeIssue(42, "Release app", "## Release 2026.7.2.1", ["release"])]
         )
     )
-    issues = await github.open_release_issues("mitodl/thing")
+    issues = github._open_release_issues_sync("mitodl/thing")
     assert issues == [
         {
             "number": 42,
@@ -323,21 +330,21 @@ async def test_open_release_issues_maps_fields(fake_repo):
     ]
 
 
-async def test_add_issue_label_adds_label_to_the_matching_issue(fake_repo):
+def test_add_issue_label_adds_label_to_the_matching_issue(fake_repo):
     """Adds the label to the issue looked up by number."""
     repo = fake_repo(
         _FakeRepo(issues=[_FakeIssue(42, "Release app", "body", ["release"])])
     )
-    await github.add_issue_label("mitodl/thing", 42, github.PROMOTE_READY_LABEL)
+    github._add_issue_label_sync("mitodl/thing", 42, github.PROMOTE_READY_LABEL)
     assert github.PROMOTE_READY_LABEL in [lbl.name for lbl in repo.get_issue(42).labels]
 
 
-async def test_close_release_issue_comments_and_closes(fake_repo):
+def test_close_release_issue_comments_and_closes(fake_repo):
     """Comments on the issue, then closes it -- both actions, in order."""
     repo = fake_repo(
         _FakeRepo(issues=[_FakeIssue(42, "Release app", "body", ["release"])])
     )
-    await github.close_release_issue("mitodl/thing", 42, "Promoted by @tmacey.")
+    github._close_release_issue_sync("mitodl/thing", 42, "Promoted by @tmacey.")
     issue = repo.get_issue(42)
     assert issue.comments == ["Promoted by @tmacey."]
     assert issue.state == "closed"
