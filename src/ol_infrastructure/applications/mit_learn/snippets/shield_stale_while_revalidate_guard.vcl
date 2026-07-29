@@ -26,11 +26,14 @@
  * `req.max_stale_if_error` is deliberately left alone -- the shield should still
  * serve stale content when the origin is genuinely failing.
  *
- * NOTE: this is a guard rail, not a fix for a live problem. Once MITxOnline switches
- * its surrogate-key purges from soft to hard and the origin sends neither `ETag` nor
- * `Last-Modified`, the three documented trigger conditions should be inactive.
- * It is here so that adding origin validators, rewriting TTLs in VCL, or reaching
- * for a soft purge does not silently reintroduce stale-served-as-fresh content.
+ * NOTE: of the three trigger conditions, soft purge is active today -- MITxOnline
+ * still soft-purges its surrogate keys (mitodl/mitxonline#3792 switches it to hard),
+ * so until that lands this snippet is what keeps a soft purge from being laundered
+ * back into a fresh response. The other two are inactive: nothing here rewrites
+ * TTLs, and the origin sends neither `ETag` nor `Last-Modified`. Once #3792 ships
+ * this becomes a guard rail, kept so that adding origin validators, rewriting TTLs,
+ * or reaching for a soft purge again does not silently reintroduce
+ * stale-served-as-fresh content.
  */
 if (fastly.ff.visits_this_service > 0) {
   set req.max_stale_while_revalidate = 0s;
