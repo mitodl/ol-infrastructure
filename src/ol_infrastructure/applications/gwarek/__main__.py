@@ -289,7 +289,7 @@ def _bucket_arns(bucket_name: str) -> list[str]:
     return [f"arn:aws:s3:::{bucket_name}", f"arn:aws:s3:::{bucket_name}/*"]
 
 
-gwarek_s3_iam_policy_document = {
+gwarek_iam_policy_document = {
     "Version": "2012-10-17",
     "Statement": [
         {
@@ -305,7 +305,22 @@ gwarek_s3_iam_policy_document = {
                 *_bucket_arns(gwarek_snapshot_bucket_name),
                 *_bucket_arns(gwarek_wiki_bucket_name),
             ],
-        }
+        },
+        {
+            # LLM_BACKEND=bedrock (api/src/pipeline/analyzers/llm.py) uses
+            # IAM/IRSA auth instead of a static ANTHROPIC_API_KEY. Scoped to
+            # Anthropic foundation models only, not a specific model ID, so
+            # bumping the app's configured model doesn't require an infra
+            # change too.
+            "Effect": "Allow",
+            "Action": [
+                "bedrock:InvokeModel",
+                "bedrock:InvokeModelWithResponseStream",
+            ],
+            "Resource": (
+                f"arn:aws:bedrock:{aws_config.region}::foundation-model/anthropic.*"
+            ),
+        },
     ],
 }
 
@@ -315,7 +330,7 @@ gwarek_auth_binding = OLEKSAuthBinding(
         namespace=gwarek_namespace,
         stack_info=stack_info,
         aws_config=aws_config,
-        iam_policy_document=gwarek_s3_iam_policy_document,
+        iam_policy_document=gwarek_iam_policy_document,
         vault_policy_path=Path(__file__).parent.joinpath("gwarek_server_policy.hcl"),
         cluster_name=cluster_stack.require_output("cluster_name"),
         cluster_identities=cluster_stack.require_output("cluster_identities"),
@@ -332,20 +347,26 @@ gwarek_vaultauth = gwarek_auth_binding.vault_k8s_resources.auth_name
 # Vault-managed secrets -> Kubernetes Secrets
 # ---------------------------------------------------------------------------
 
-# Static app secrets (Anthropic API key, local Fernet key for credential
-# encryption — see api/src/pipeline/crypto.py's LocalCrypto). Values are set
-# via `pulumi config set --secret` against this stack, not hardcoded here.
+# Static app secrets (local Fernet key for credential encryption — see
+# api/src/pipeline/crypto.py's LocalCrypto). Values are set via
+# `pulumi config set --secret` against this stack, not hardcoded here.
+# anthropic_api_key is optional: production uses LLM_BACKEND=bedrock
+# (IAM/IRSA auth, no static key) -- see the Bedrock IAM statement below --
+# and only needs a real key set here if switched back to the direct API.
 gwarek_secrets_mount = vault.Mount(
     "gwarek-vault-secrets-storage",
     path="secret-gwarek",
     type="kv-v2",
     description="Static secrets storage for the Gwarek application",
 )
+gwarek_anthropic_api_key = gwarek_config.get_secret(
+    "anthropic_api_key"
+) or Output.from_input("")
 vault.generic.Secret(
     "gwarek-vault-secrets",
     path=gwarek_secrets_mount.path.apply("{}/collected".format),
     data_json=Output.all(
-        anthropic_api_key=gwarek_config.require_secret("anthropic_api_key"),
+        anthropic_api_key=gwarek_anthropic_api_key,
         secret_key=gwarek_config.require_secret("secret_key"),
     ).apply(json.dumps),
 )
@@ -500,14 +521,20 @@ gwarek_web_image = cached_image_uri(
 )
 
 # Common env vars shared by the api and worker containers (both run from the
-# same image). Secrets (DATABASE_URL, REDIS_URL, ANTHROPIC_API_KEY,
-# SECRET_KEY) come in via env_from, not listed here.
+# same image). Secrets (DATABASE_URL, REDIS_URL, SECRET_KEY, and
+# ANTHROPIC_API_KEY if set) come in via env_from, not listed here --
+# unused here since LLM_BACKEND=bedrock below.
 gwarek_common_env = [
     core.v1.EnvVarArgs(name="APP_ENV", value="production"),
     core.v1.EnvVarArgs(name="AUTH_ENABLED", value="true"),
     core.v1.EnvVarArgs(name="DEFAULT_ORG_ID", value="gwarek"),
     core.v1.EnvVarArgs(name="DEFAULT_ORG_NAME", value="MIT Open Learning"),
     core.v1.EnvVarArgs(name="KMS_BACKEND", value="local"),
+    # IAM/IRSA auth via the bedrock:InvokeModel* grant above -- no static
+    # ANTHROPIC_API_KEY needed in production.
+    core.v1.EnvVarArgs(name="LLM_BACKEND", value="bedrock"),
+    core.v1.EnvVarArgs(name="BEDROCK_REGION", value=aws_config.region),
+    core.v1.EnvVarArgs(name="BEDROCK_MODEL_ID", value="anthropic.claude-sonnet-5"),
     core.v1.EnvVarArgs(name="STORAGE_BACKEND", value="s3"),
     core.v1.EnvVarArgs(name="STORAGE_BUCKET", value=gwarek_storage_bucket_name),
     core.v1.EnvVarArgs(name="STORAGE_PREFIX", value="analyzed/"),
