@@ -75,7 +75,33 @@ def get_cluster_version(*, use_default: bool = True) -> str:
 
 
 @lru_cache
-def get_eks_addon_version(addon_name: str, cluster_version: str | None = None) -> str:
+def get_eks_addon_version(
+    addon_name: str,
+    cluster_version: str | None = None,
+    pinned_version: str | None = None,
+) -> str:
+    """Resolve the addon version to install, honouring an explicit pin.
+
+    Without ``pinned_version`` this returns the newest version AWS offers for the
+    cluster's Kubernetes version, which means the addon silently tracks latest and
+    can take a major-version jump with no PR, no review, and no staged rollout.
+    Pass ``pinned_version`` (from ``bridge.lib.versions``, where Renovate manages
+    it) so addon upgrades go through code review like every other dependency.
+
+    Args:
+        addon_name: EKS addon name, e.g. ``aws-efs-csi-driver``.
+        cluster_version: Kubernetes version to resolve against. Defaults to the
+            current cluster version.
+        pinned_version: Exact addon version to install. Must be offered by AWS for
+            ``cluster_version``.
+
+    Returns:
+        The addon version to install.
+
+    Raises:
+        ValueError: If ``pinned_version`` is not available for this cluster
+            version, rather than silently falling back to latest.
+    """
     if cluster_version is None:
         cluster_version = get_cluster_version()
     version_info = eks_client.describe_addon_versions(
@@ -83,6 +109,15 @@ def get_eks_addon_version(addon_name: str, cluster_version: str | None = None) -
         addonName=addon_name,
     )["addons"][0]
     versions = [version["addonVersion"] for version in version_info["addonVersions"]]
+    if pinned_version is not None:
+        if pinned_version not in versions:
+            msg = (
+                f"Pinned version {pinned_version} of EKS addon {addon_name} is not "
+                f"available for Kubernetes {cluster_version}. Available versions: "
+                f"{', '.join(sorted(versions, reverse=True))}"
+            )
+            raise ValueError(msg)
+        return pinned_version
     return sorted(versions, reverse=True)[0]
 
 
