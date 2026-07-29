@@ -399,7 +399,7 @@ How it works — plain Kubernetes, visible in each app's `deployment.yaml`: ever
 
 Day-to-day behavior:
 
-- Creating or editing the file mid-session re-applies it — no Tilt restart. Pods roll automatically so new values actually take effect: because Kubernetes does not restart pods on ConfigMap changes, `tiltlib.star` stamps a fingerprint of your overrides onto each Deployment's pod template (the `ol.mit.edu/local-overrides-hash` annotation), which is also the idiomatic production pattern (cf. Helm `checksum/config` annotations).
+- Creating or editing the file mid-session re-applies it — no Tilt restart. Pods roll automatically so new values actually take effect: because Kubernetes does not restart pods on ConfigMap/Secret changes, `tiltlib.star` stamps a fingerprint of every applied ConfigMap's and Secret's data onto each Deployment's pod template (the `ol.mit.edu/config-hash` annotation) — this covers edits to the tracked `app-env.yaml`/`secrets.yaml` too, not just this override file — which is also the idiomatic production pattern (cf. Helm `checksum/config` annotations).
 - Overridden key **names** (never values) are printed in the **Tiltfile resource's log** in the Tilt UI, and your full delta is inspectable in-cluster at any time: `kubectl get cm -n mitxonline mitxonline-env-local -o yaml`
 - Gotchas: the ConfigMap's `metadata.name` must match what `deployment.yaml` references (`<app>-env-local` — copy the example, don't type it), and all `data:` values must be YAML **strings** (quote things like `"True"` and `"8080"`). A typo'd key is applied but ignored by the app. If you *delete* the file mid-session, prefer emptying `data:` instead — the already-applied ConfigMap can linger in-cluster until `tilt down`.
 
