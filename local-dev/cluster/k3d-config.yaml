@@ -39,6 +39,13 @@ ports:
 - port: 443:30443
   nodeFilters:
   - loadbalancer
+# Postgres, for host-run test suites (pytest invoked directly from a checkout
+# instead of via `kubectl exec`) — see local-dev/scripts/test-db-env.sh and the
+# local-pg-host-access Service in infra/modules/database.py. 15432 (not 5432)
+# so this doesn't collide with a Postgres already installed on the host.
+- port: 15432:30432
+  nodeFilters:
+  - loadbalancer
 
 # Disable Traefik — APISIX Ingress Controller replaces it.
 options:

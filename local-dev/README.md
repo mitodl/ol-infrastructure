@@ -242,6 +242,18 @@ No host toolchain? The dev container has everything installed — run them there
 kubectl exec -it -n mit-learn deploy/mitlearn-nextjs -- sh -c 'cd /app && yarn test useToggle'
 ```
 
+### Run tests from the host (worktrees / agents)
+
+`kubectl exec`-ing into the one running pod (above) serializes every test run onto the same database — fine for one person, awkward once agents or multiple worktrees are running tests concurrently. `test-db-env.sh` hands out a `DATABASE_URL` pointed at an isolated, throwaway database instead, so concurrent runs never collide and the interactively-running pods' `mitlearn`/`mitxonline` databases are never touched:
+
+```bash
+eval "$(local-dev/scripts/test-db-env.sh my-branch)"
+MITOL_DB_DISABLE_SSL=True uv run pytest main/envs_test.py       # mit-learn
+MITX_ONLINE_DB_DISABLE_SSL=True uv run pytest ...               # mitxonline
+```
+
+The disable-SSL var is required alongside `DATABASE_URL` — each app's settings.py sets `DATABASES["default"]["OPTIONS"]` from that env var directly, ignoring any `sslmode` in the URL itself. The `<slug>` you pass (e.g. your branch name) becomes part of the database name; each invocation also sweeps away its own stale databases older than `TEST_DB_MAX_AGE_HOURS` (default 2h — see the script's header comment for other knobs). Needs Postgres's NodePort from `cluster/k3d-config.yaml`; re-run `setup.sh` to pick it up if your cluster predates this.
+
 ### Connect to PostgreSQL directly
 
 ```bash
