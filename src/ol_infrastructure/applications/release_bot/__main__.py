@@ -57,6 +57,10 @@ github_secrets = concourse_ops_secrets["pipelines"]["infrastructure/github"]
 github_app_id = github_secrets["issues_resource_app_id"]
 github_app_installation_id = github_secrets["issues_resource_app_installation_id"]
 github_app_private_key = github_secrets["issues_resource_private_ssh_key"]
+# Also wired through as a fallback: github_client._build_auth() prefers the App
+# credentials above but falls back to GITHUB_TOKEN if they're absent/invalid,
+# so this keeps that fallback usable for a quick rollback without a code change.
+github_token = github_secrets["issues_resource_access_token"]
 
 bot_config = Config("release_bot")
 concourse_url = bot_config.get("concourse_url") or "https://cicd.odl.mit.edu"
@@ -121,6 +125,7 @@ bot_secret = kubernetes.core.v1.Secret(
         "github-app-id": str(github_app_id),
         "github-app-installation-id": str(github_app_installation_id),
         "github-app-private-key": github_app_private_key,
+        "github-token": github_token,
     },
 )
 
@@ -185,6 +190,7 @@ bot_deployment = kubernetes.apps.v1.Deployment(
                             _secret_env(
                                 "GITHUB_APP_PRIVATE_KEY", "github-app-private-key"
                             ),
+                            _secret_env("GITHUB_TOKEN", "github-token"),
                             kubernetes.core.v1.EnvVarArgs(
                                 name="CONCOURSE_URL",
                                 value=concourse_url,

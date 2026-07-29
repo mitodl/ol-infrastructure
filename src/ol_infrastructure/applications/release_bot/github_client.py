@@ -32,7 +32,7 @@ _VERSION_HEADER_RE = re.compile(r"^## Release (?P<version>\S+)", re.MULTILINE)
 PROMOTE_READY_LABEL = "promote-ready"
 
 _TAG_SCAN_LIMIT = 100
-_UNTAGGED_COMMIT_LIMIT = 50
+_COMMIT_LIST_LIMIT = 50
 
 _client: Github | None = None
 
@@ -42,8 +42,18 @@ def _build_auth() -> Auth.Auth:
     installation_id = os.environ.get("GITHUB_APP_INSTALLATION_ID", "").strip()
     private_key = os.environ.get("GITHUB_APP_PRIVATE_KEY", "").strip()
     if app_id and installation_id and private_key:
-        return Auth.AppAuth(app_id, private_key).get_installation_auth(
-            int(installation_id)
+        try:
+            app_id_int = int(app_id)
+            installation_id_int = int(installation_id)
+        except ValueError as exc:
+            msg = (
+                "GITHUB_APP_ID and GITHUB_APP_INSTALLATION_ID must be numeric "
+                f"(got GITHUB_APP_ID={app_id!r}, "
+                f"GITHUB_APP_INSTALLATION_ID={installation_id!r})"
+            )
+            raise RuntimeError(msg) from exc
+        return Auth.AppAuth(app_id_int, private_key).get_installation_auth(
+            installation_id_int
         )
     token = os.environ.get("GITHUB_TOKEN", "").strip()
     if not token:
@@ -58,11 +68,11 @@ def _build_auth() -> Auth.Auth:
 def _get_client() -> Github:
     global _client  # noqa: PLW0603
     if _client is None:
-        kwargs = {}
         base_url = os.environ.get("GITHUB_API_BASE_URL", "").strip()
         if base_url:
-            kwargs["base_url"] = base_url
-        _client = Github(auth=_build_auth(), **kwargs)
+            _client = Github(auth=_build_auth(), base_url=base_url)
+        else:
+            _client = Github(auth=_build_auth())
     return _client
 
 
@@ -82,9 +92,13 @@ def _commits_since_last_tag_sync(repo_slug: str) -> list[dict[str, Any]]:
         comparison = repo.compare(latest_tag, repo.default_branch)
         # "diverged" status means the tag is not an ancestor of the branch;
         # GitHub omits commits entirely in that case.
-        raw_commits = [] if comparison.status == "diverged" else comparison.commits
+        raw_commits = (
+            []
+            if comparison.status == "diverged"
+            else itertools.islice(comparison.commits, _COMMIT_LIST_LIMIT)
+        )
     else:
-        raw_commits = itertools.islice(repo.get_commits(), _UNTAGGED_COMMIT_LIMIT)
+        raw_commits = itertools.islice(repo.get_commits(), _COMMIT_LIST_LIMIT)
 
     return [
         {

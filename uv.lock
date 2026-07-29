@@ -1439,6 +1439,7 @@ dev = [
     { name = "mypy" },
     { name = "pip" },
     { name = "pre-commit" },
+    { name = "pygithub" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
@@ -1495,6 +1496,7 @@ dev = [
     { name = "mypy" },
     { name = "pip", specifier = ">=26.0.1" },
     { name = "pre-commit", specifier = ">=4.0.0,<5" },
+    { name = "pygithub", specifier = ">=2.4,<3" },
     { name = "pytest", specifier = ">=9.0.1,<10" },
     { name = "pytest-asyncio", specifier = ">=0.24.0" },
     { name = "pytest-cov", specifier = ">=6.0.0" },
@@ -2243,6 +2245,22 @@ wheels = [
 ]
 
 [[package]]
+name = "pygithub"
+version = "2.9.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyjwt", extra = ["crypto"] },
+    { name = "pynacl" },
+    { name = "requests" },
+    { name = "typing-extensions" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ab/c3/8465a311197e16cf5ab68789fe689535e90f6b61ab524cc32a39e67237ae/pygithub-2.9.1.tar.gz", hash = "sha256:59771d7ff63d54d427be2e7d0dad2208dfffc2b0a045fec959263787739b611c", size = 2594989, upload-time = "2026-04-14T07:26:13.622Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/77/aa/81a5506f089a26338bff17535e4339b3b22049ebd1bcdeff756c4d7a7559/pygithub-2.9.1-py3-none-any.whl", hash = "sha256:2ec78fca30092d51a42d76f4ddb02131b6f0c666a35dfdf364cf302cdda115b9", size = 449710, upload-time = "2026-04-14T07:26:12.382Z" },
+]
+
+[[package]]
 name = "pygments"
 version = "2.20.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2279,6 +2297,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c5/af/fc92d96ebfe7f5235977ada99fd5a294e666d771993f2be4ec5eae884920/pyinfra-3.10.0.tar.gz", hash = "sha256:802d22046eb84937ffd2aadb7dd192a3cc2b830b026f9878617349614076810f", size = 650567, upload-time = "2026-07-27T19:50:55.076Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/17/e3/c2a679d1a951ca4fbd0d3812acaeec17795303c24154a8133e3456c88cda/pyinfra-3.10.0-py3-none-any.whl", hash = "sha256:668268db8df54c23a1e684d260121a6e23330c942f60048138597303227e48fb", size = 325488, upload-time = "2026-07-27T19:50:53.625Z" },
+]
+
+[[package]]
+name = "pyjwt"
+version = "2.13.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/3b/81/58d0ac84e1ef3a3843791d6954d94c0b33d526c75eeb1efbce9d0a4c4077/pyjwt-2.13.0.tar.gz", hash = "sha256:41571c89ca91598c79e8ef18a2d07367d4810fbbd6f637794879baf1b7703423", size = 107515, upload-time = "2026-05-21T19:54:36.618Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a3/5e/ecf12fdb62546d64385c158514e9b2b671f7832108ef2ecd2020ce0af2d1/pyjwt-2.13.0-py3-none-any.whl", hash = "sha256:66adcc2aff09b3f1bbd95fc1e1577df8ac8723c978552fd43304c8a290ac5728", size = 31274, upload-time = "2026-05-21T19:54:35.362Z" },
+]
+
+[package.optional-dependencies]
+crypto = [
+    { name = "cryptography" },
 ]
 
 [[package]]
