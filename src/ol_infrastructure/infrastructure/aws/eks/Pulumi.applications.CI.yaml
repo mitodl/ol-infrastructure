@@ -43,6 +43,16 @@ config:
   - tika-ci.ol.mit.edu
   - video-ci.odl.mit.edu
   - xpro-ci.odl.mit.edu
+  # Coraza WAF spike (ol-infrastructure#5101) -- pre-production only,
+  # low-risk long-horizon soak test before considering it for production.
+  # wasm.enabled loads the coraza-filter plugin globally but nothing
+  # routes through it yet, so this has no effect on live traffic.
+  eks:apisix_custom_image_repository: mitodl/apisix-waf
+  eks:apisix_custom_image_tag: latest
+  eks:apisix_wasm_plugins:
+  - name: coraza-filter
+    priority: 7999
+    file: /usr/local/apisix/coraza-filter.wasm
   eks:developer_role_policy_name: AmazonEKSClusterAdminPolicy
   eks:developer_role_kubernetes_groups:
   - admin

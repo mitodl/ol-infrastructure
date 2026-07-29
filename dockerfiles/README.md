@@ -21,6 +21,22 @@ fly -t <target> set-pipeline \
     -c pipelines/infrastructure/ol_python_base_docker.yaml
 ```
 
+## apisix-waf
+
+[`apisix-waf/`](apisix-waf/) — Spike image layering the [Coraza](https://www.coraza.io/)
+proxy-wasm WAF filter (OWASP Core Rule Set embedded at compile time by the
+upstream `coraza-proxy-wasm` project) onto the stock `apache/apisix` image.
+`wasm-nginx-module`/wasmtime are already compiled into every apisix-base
+build, so this image only needs to copy the plugin binary in.
+
+Published as `mitodl/apisix-waf` (ECR only, not Docker Hub) via the Concourse
+pipeline at
+[`pipelines/container_images/apisix_waf.py`](../src/ol_concourse/pipelines/container_images/apisix_waf.py).
+Deliberately not chained to a Pulumi deploy -- see
+`apisix_custom_image_repository`/`apisix_custom_image_tag` in
+[`apisix_official.py`](../src/ol_infrastructure/infrastructure/aws/eks/apisix_official.py)
+for the opt-in per-cluster config that actually references this image.
+
 ## edX / Open edX
 
 The edX Dockerfiles that previously lived here (`openedx-edxapp`,
