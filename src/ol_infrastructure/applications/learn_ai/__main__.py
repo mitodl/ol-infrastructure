@@ -1291,47 +1291,6 @@ learn_ai_https_apisix_consumer = kubernetes.apiextensions.CustomResource(
     },
 )
 
-# Finally, put the aws access key into the github actions configuration
-
-gh_workflow_access_key_id_env_secret = github.ActionsSecret(
-    f"learn-ai-gh-workflow-access-key-id-env-secret-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"AWS_ACCESS_KEY_ID_{env_var_suffix}",  # pragma: allowlist secret
-    plaintext_value=gh_workflow_accesskey.id,
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_secretaccesskey_env_secret = github.ActionsSecret(
-    f"learn-ai-gh-workflow-secretaccesskey-env-secret-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"AWS_SECRET_ACCESS_KEY_{env_var_suffix}",  # pragma: allowlist secret
-    plaintext_value=gh_workflow_accesskey.secret,
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-
-gh_workflow_s3_bucket_name_env_secret = github.ActionsVariable(
-    f"learn-ai-gh-workflow-s3-bucket-name-env-variable-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"AWS_S3_BUCKET_NAME_{env_var_suffix}",  # pragma: allowlist secret
-    value=learn_ai_app_storage_bucket_name,
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-
-if stack_info.env_suffix != "ci":
-    gh_workflow_posthog_project_api_key_env_secret = github.ActionsSecret(
-        f"learn-ai-gh-workflow-posthog-project-api_key-{stack_info.env_suffix}",
-        repository=gh_repo.name,
-        secret_name=f"POSTHOG_PROJECT_API_KEY_{env_var_suffix}",
-        plaintext_value=mitlearn_posthog_secrets["project_api_key"],
-        opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-    )
-    gh_workflow_posthog_personal_api_key_env_secret = github.ActionsSecret(
-        f"learn-ai-gh-workflow-posthog-personal-api-key-{stack_info.env_suffix}",
-        repository=gh_repo.name,
-        secret_name=f"POSTHOG_PERSONAL_API_KEY_{env_var_suffix}",
-        plaintext_value=mitlearn_posthog_secrets["personal_api_key"],
-        opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-    )
-
 export(
     "learn_ai",
     {
