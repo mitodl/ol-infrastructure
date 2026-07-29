@@ -1020,6 +1020,18 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             priority=10,
         ),
         fastly.ServiceVclSnippetArgs(
+            name="Disable stale-while-revalidate when acting as a shield",
+            content=Path(__file__)
+            .parent.joinpath("snippets/shield_stale_while_revalidate_guard.vcl")
+            .read_text(),
+            type="recv",
+            # After the priority-10 redirect snippets, which exit via `error` and so
+            # never reach a cache lookup, and before the priority-200 S3 routing,
+            # which this is independent of. 100 is Fastly's default, so this only
+            # makes the existing order explicit.
+            priority=100,
+        ),
+        fastly.ServiceVclSnippetArgs(
             name="deliver route dictionary redirect",
             content=Path(__file__)
             .parent.joinpath("snippets/redirect_deliver.vcl")
