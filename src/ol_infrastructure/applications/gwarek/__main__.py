@@ -14,6 +14,7 @@ Concourse promotion pipeline used by larger apps.
 import json
 from pathlib import Path
 
+import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions
 from pulumi_aws import ec2
@@ -44,6 +45,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -110,6 +112,32 @@ gwarek_app_security_group = ec2.SecurityGroup(
     ingress=get_default_psg_ingress_args(k8s_pod_subnet_cidrs=k8s_pod_subnet_cidrs),
     tags=aws_config.tags,
     vpc_id=operations_vpc["id"],
+)
+
+# The security group above only takes effect on pods the VPC CNI actually
+# associates it with, via this SecurityGroupPolicy binding by pod label —
+# OLApplicationK8s creates this automatically for apps that use it, but
+# this project uses plain Deployments, so it must be created explicitly.
+# Pods needing the DB/Redis ingress rules that reference this security
+# group (api, worker) carry POD_SECURITY_GROUP_LABEL below; web does not.
+POD_SECURITY_GROUP_LABEL_KEY = "ol.mit.edu/pod-security-group"
+POD_SECURITY_GROUP_LABEL_VALUE = "gwarek-app"
+POD_SECURITY_GROUP_LABEL = {
+    POD_SECURITY_GROUP_LABEL_KEY: POD_SECURITY_GROUP_LABEL_VALUE
+}
+gwarek_app_security_group_policy = kubernetes.apiextensions.CustomResource(
+    f"gwarek-app-security-group-policy-{stack_info.env_suffix}",
+    api_version="vpcresources.k8s.aws/v1beta1",
+    kind="SecurityGroupPolicy",
+    metadata=meta.v1.ObjectMetaArgs(
+        name=POD_SECURITY_GROUP_LABEL_VALUE,
+        namespace=gwarek_namespace,
+        labels=application_labels,
+    ),
+    spec={
+        "podSelector": {"matchLabels": POD_SECURITY_GROUP_LABEL},
+        "securityGroups": {"groupIds": [gwarek_app_security_group.id]},
+    },
 )
 
 # ---------------------------------------------------------------------------
@@ -251,8 +279,14 @@ gwarek_wiki_bucket = OLBucket(
 gwarek_irsa_service_account_name = "gwarek"
 
 
-def _bucket_arns(bucket: OLBucket) -> list[str | Output[str]]:
-    return [bucket.bucket_v2.arn, bucket.bucket_v2.arn.apply(lambda arn: f"{arn}/*")]
+def _bucket_arns(bucket_name: str) -> list[str]:
+    # Built from the plain bucket name string, not the OLBucket resource's
+    # .bucket_v2.arn Output -- S3 ARNs are fully deterministic from the name
+    # alone, and OLEKSAuthBinding's iam_policy_document is passed straight
+    # to lint_iam_policy's json.dumps(), which cannot serialize an
+    # unresolved Output. Mirrors ocw_studio's own IAM policy, which builds
+    # its bucket ARN the same way for the same reason.
+    return [f"arn:aws:s3:::{bucket_name}", f"arn:aws:s3:::{bucket_name}/*"]
 
 
 gwarek_s3_iam_policy_document = {
@@ -267,9 +301,9 @@ gwarek_s3_iam_policy_document = {
                 "s3:ListBucket",
             ],
             "Resource": [
-                *_bucket_arns(gwarek_storage_bucket),
-                *_bucket_arns(gwarek_snapshot_bucket),
-                *_bucket_arns(gwarek_wiki_bucket),
+                *_bucket_arns(gwarek_storage_bucket_name),
+                *_bucket_arns(gwarek_snapshot_bucket_name),
+                *_bucket_arns(gwarek_wiki_bucket_name),
             ],
         }
     ],
@@ -363,6 +397,14 @@ gwarek_db_app_secret = OLVaultK8SSecret(
             ),
         },
         vaultauth=gwarek_vaultauth,
+        # Kubernetes does not update a running container's env vars when the
+        # backing Secret changes, so without this, pods would keep using
+        # stale DB credentials after VSO rotates the Vault-issued lease
+        # until manually restarted.
+        restart_targets=[
+            OLVaultRestartTarget(kind="Deployment", name="gwarek-api"),
+            OLVaultRestartTarget(kind="Deployment", name="gwarek-worker"),
+        ],
     ),
 )
 
@@ -503,7 +545,11 @@ gwarek_api_deployment = apps_v1.Deployment(
         ),
         template=core.v1.PodTemplateSpecArgs(
             metadata=meta.v1.ObjectMetaArgs(
-                labels={**application_labels, "component": "api"},
+                labels={
+                    **application_labels,
+                    "component": "api",
+                    **POD_SECURITY_GROUP_LABEL,
+                },
             ),
             spec=core.v1.PodSpecArgs(
                 service_account_name=gwarek_irsa_service_account_name,
@@ -576,7 +622,11 @@ gwarek_worker_deployment = apps_v1.Deployment(
         ),
         template=core.v1.PodTemplateSpecArgs(
             metadata=meta.v1.ObjectMetaArgs(
-                labels={**application_labels, "component": "worker"},
+                labels={
+                    **application_labels,
+                    "component": "worker",
+                    **POD_SECURITY_GROUP_LABEL,
+                },
             ),
             spec=core.v1.PodSpecArgs(
                 service_account_name=gwarek_irsa_service_account_name,
