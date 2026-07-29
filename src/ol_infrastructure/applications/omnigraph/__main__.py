@@ -98,6 +98,12 @@ k8s_global_labels = k8s_labels.model_dump()
 # source (secret-operations/witan/actor-tokens), agent-kit ADR-0004 D3.
 ACTOR_TOKENS_SECRET_NAME = "actor-tokens"  # noqa: S105  # pragma: allowlist secret
 ACTOR_TOKENS_SECRET_KEY = "tokens.json"  # noqa: S105  # pragma: allowlist secret
+# Key the map is stored under *inside* the Vault secret, which this stack does
+# not provision (out-of-band, see the module docstring). The VSO template below
+# resolves to an empty Secret — and the app to an empty token map — if the
+# Vault secret uses any other key, so the name is part of the contract:
+# `vault kv put secret-operations/witan/actor-tokens tokens_json=@tokens.json`.
+ACTOR_TOKENS_VAULT_KEY = "tokens_json"  # pragma: allowlist secret
 
 ##############################################
 #   Vault auth binding (IRSA + VSO sync)      #
@@ -118,7 +124,9 @@ omnigraph_auth_binding = OLEKSAuthBinding(
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
         irsa_service_account_name="omnigraph-server",
         create_irsa_service_account=True,
-        vault_sync_service_account_names=["omnigraph-server-vault"],
+        # Must match the ServiceAccount OLVaultK8SResources creates for the VSO
+        # to authenticate with, which is always f"{application_name}-vault".
+        vault_sync_service_account_names=["omnigraph-vault"],
         k8s_labels=k8s_labels,
     )
 )
@@ -137,7 +145,11 @@ actor_tokens_secret = OLVaultK8SSecret(
         path="witan/actor-tokens",
         exclude_raw=True,
         excludes=[".*"],
-        templates={ACTOR_TOKENS_SECRET_KEY: '{{ get .Secrets "tokens_json" }}'},
+        templates={
+            ACTOR_TOKENS_SECRET_KEY: (
+                f'{{{{ get .Secrets "{ACTOR_TOKENS_VAULT_KEY}" }}}}'
+            )
+        },
         refresh_after="15m",
         vaultauth=omnigraph_auth_binding.vault_k8s_resources.auth_name,
     ),

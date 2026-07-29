@@ -165,6 +165,14 @@ WITAN_CI_TOKEN_SECRET_NAME = "witan-ci-token"  # noqa: S105  # pragma: allowlist
 WITAN_CI_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 ACTOR_TOKENS_SECRET_NAME = "actor-tokens"  # noqa: S105  # pragma: allowlist secret
 ACTOR_TOKENS_SECRET_KEY = "tokens.json"  # noqa: S105  # pragma: allowlist secret
+# Keys these maps are stored under *inside* their Vault secrets, which this
+# stack does not provision (out-of-band, see the module docstring). The VSO
+# templates below resolve to empty Secrets — and the apps to empty tokens — if
+# the Vault secrets use any other key, so the names are part of the contract:
+#   vault kv put secret-operations/witan/ci-token token=<raw token>
+#   vault kv put secret-operations/witan/actor-tokens tokens_json=@tokens.json
+WITAN_CI_TOKEN_VAULT_KEY = "token"  # noqa: S105  # pragma: allowlist secret
+ACTOR_TOKENS_VAULT_KEY = "tokens_json"  # pragma: allowlist secret
 
 ##############################################
 #   Vault auth binding (VSO sync only)        #
@@ -205,7 +213,11 @@ witan_ci_token_secret = OLVaultK8SSecret(
         path="witan/ci-token",
         exclude_raw=True,
         excludes=[".*"],
-        templates={WITAN_CI_TOKEN_SECRET_KEY: '{{ get .Secrets "token" }}'},
+        templates={
+            WITAN_CI_TOKEN_SECRET_KEY: (
+                f'{{{{ get .Secrets "{WITAN_CI_TOKEN_VAULT_KEY}" }}}}'
+            )
+        },
         refresh_after="1h",
         vaultauth=witan_auth_binding.vault_k8s_resources.auth_name,
     ),
@@ -229,7 +241,11 @@ actor_tokens_secret = OLVaultK8SSecret(
         path="witan/actor-tokens",
         exclude_raw=True,
         excludes=[".*"],
-        templates={ACTOR_TOKENS_SECRET_KEY: '{{ get .Secrets "tokens_json" }}'},
+        templates={
+            ACTOR_TOKENS_SECRET_KEY: (
+                f'{{{{ get .Secrets "{ACTOR_TOKENS_VAULT_KEY}" }}}}'
+            )
+        },
         refresh_after="15m",
         vaultauth=witan_auth_binding.vault_k8s_resources.auth_name,
     ),
