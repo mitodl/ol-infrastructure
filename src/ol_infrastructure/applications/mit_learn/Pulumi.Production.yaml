@@ -42,7 +42,7 @@ config:
   mitlearn:legacy_api_domain: "api.mitopen.odl.mit.edu"
   mitlearn:legacy_frontend_domain: "mitopen.odl.mit.edu"
   mitlearn:min_replicas: 4
-  mitlearn:max_replicas: 30
+  mitlearn:max_replicas: 50
   mitlearn:nextjs_heroku_domain: "next.learn.mit.edu"
   mitlearn:posthog_proxy: "ph.ol.mit.edu"
   mitlearn:support_url: "support.learn.mit.edu"
