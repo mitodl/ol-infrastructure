@@ -1,0 +1,155 @@
+#!/usr/bin/env python3
+"""Commit whatever a drift check changed in a checkout and open/update its PR.
+
+Companion to `bin/analyze-pulumi-iam-usage propose`, run by the scheduled
+`iam-policy-drift` Concourse pipeline. Kept separate from the analysis so the
+analyzer stays a pure report-and-edit tool with no GitHub credentials in scope.
+
+The whole thing is built to be re-run on a schedule without generating noise:
+one long-lived branch per drift target, no push when the resulting tree matches
+what's already on that branch, and an existing open PR is updated rather than
+duplicated. If a human closes the PR without merging, a re-run that finds the
+same drift leaves it closed rather than reopening the argument.
+"""
+
+import os
+import subprocess
+import sys
+from pathlib import Path
+from typing import Annotated
+
+import cyclopts
+import requests
+
+app = cyclopts.App(
+    help="Commit pending changes in a checkout and open or update a pull request."
+)
+
+GITHUB_API = "https://api.github.com"
+REQUEST_TIMEOUT_SECONDS = 30
+# Expanded by the helper's own shell at call time, so the token never lands in
+# argv, in .git/config, or in a git error message echoing the remote URL.
+CREDENTIAL_HELPER = (
+    '!f() { echo "username=x-access-token"; echo "password=$GITHUB_TOKEN"; }; f'
+)
+
+
+def _git(repo_dir: Path, *args: str) -> str:
+    return subprocess.run(  # noqa: S603
+        ["git", "-C", str(repo_dir), *args],  # noqa: S607
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def _remote_tree(repo_dir: Path, branch: str) -> str | None:
+    """Tree hash currently on the remote branch, or None if it doesn't exist."""
+    if not _git(repo_dir, "ls-remote", "origin", f"refs/heads/{branch}"):
+        return None
+    _git(repo_dir, "fetch", "--quiet", "origin", f"refs/heads/{branch}")
+    return _git(repo_dir, "rev-parse", "FETCH_HEAD^{tree}")
+
+
+def _open_pull_request_number(
+    session: requests.Session, repo: str, branch: str
+) -> int | None:
+    owner = repo.split("/", maxsplit=1)[0]
+    response = session.get(
+        f"{GITHUB_API}/repos/{repo}/pulls",
+        params={"head": f"{owner}:{branch}", "state": "open"},
+        timeout=REQUEST_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    existing = response.json()
+    return existing[0]["number"] if existing else None
+
+
+@app.default
+def open_drift_pr(
+    *,
+    repo_dir: Annotated[
+        Path, cyclopts.Parameter(help="Git checkout holding the pending changes.")
+    ],
+    repo: Annotated[str, cyclopts.Parameter(help="GitHub repository as owner/name.")],
+    branch: Annotated[
+        str,
+        cyclopts.Parameter(
+            help="Branch to push to. Reused across runs, so keep it stable per target."
+        ),
+    ],
+    title: Annotated[str, cyclopts.Parameter(help="Pull request and commit title.")],
+    body_file: Annotated[
+        Path, cyclopts.Parameter(help="File holding the pull request body markdown.")
+    ],
+    base: Annotated[str, cyclopts.Parameter(help="Branch to open the PR against.")] = (
+        "main"
+    ),
+    git_user_name: str = "odl-bot",
+    git_user_email: str = "odl-devops@mit.edu",
+) -> None:
+    """Commit, push, and open or update a pull request. Requires $GITHUB_TOKEN."""
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        msg = "GITHUB_TOKEN must be set to push and open a pull request"
+        raise SystemExit(msg)
+
+    # Concourse checks the repo out as a different uid than the task runs as
+    # often enough that git's ownership check is worth pre-empting.
+    _git(repo_dir, "config", "--global", "--add", "safe.directory", str(repo_dir))
+
+    if not _git(repo_dir, "status", "--porcelain"):
+        print("No drift: working tree is clean, nothing to propose.")
+        return
+
+    _git(repo_dir, "config", "user.name", git_user_name)
+    _git(repo_dir, "config", "user.email", git_user_email)
+    _git(repo_dir, "checkout", "-B", branch)
+    _git(repo_dir, "add", "--all")
+    _git(repo_dir, "commit", "--message", title)
+
+    if _remote_tree(repo_dir, branch) == _git(repo_dir, "rev-parse", "HEAD^{tree}"):
+        print(f"Drift unchanged since the last run on {branch}; not pushing.")
+        return
+
+    _git(
+        repo_dir,
+        "-c",
+        f"credential.helper={CREDENTIAL_HELPER}",
+        "push",
+        "--force",
+        f"https://github.com/{repo}",
+        f"HEAD:refs/heads/{branch}",
+    )
+    print(f"Pushed {branch}")
+
+    session = requests.Session()
+    session.headers.update(
+        {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+    )
+    body = body_file.read_text()
+    number = _open_pull_request_number(session, repo, branch)
+    if number is None:
+        response = session.post(
+            f"{GITHUB_API}/repos/{repo}/pulls",
+            json={"title": title, "body": body, "head": branch, "base": base},
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        print(f"Opened {response.json()['html_url']}")
+    else:
+        response = session.patch(
+            f"{GITHUB_API}/repos/{repo}/pulls/{number}",
+            json={"title": title, "body": body},
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        print(f"Updated {response.json()['html_url']}")
+
+
+if __name__ == "__main__":
+    sys.exit(app())
