@@ -82,6 +82,7 @@ class OpenEdxVars(BaseModel):
     mit_open_learning_site_link: str | None = None
     mit_base_url: str | None = None
     mit_learn_base_url: str | None = None
+    mit_learn_api_url: str | None = None
     privacy_policy_url: str | None = None
     schedule_email_section: str | None = None
     site_name: str
@@ -182,13 +183,13 @@ def mfe_params(
         "APPZI_URL": open_edx.appzi_url,
         "FEEDBACK_CSRF_COOKIE_NAME": open_edx.feedback_csrf_cookie_name,
         "FEEDBACK_SUBMIT_URL": (
-            f"{open_edx.mit_learn_base_url}/api/v0/content_feedback/"
-            if open_edx.mit_learn_base_url
+            f"{open_edx.mit_learn_api_url}/api/v0/content_feedback/"
+            if open_edx.mit_learn_api_url
             else None
         ),
         "FEEDBACK_CSRF_PRIME_URL": (
-            f"{open_edx.mit_learn_base_url}/api/v0/users/me/"
-            if open_edx.mit_learn_base_url
+            f"{open_edx.mit_learn_api_url}/api/v0/users/me/"
+            if open_edx.mit_learn_api_url
             else None
         ),
     }
