@@ -245,6 +245,7 @@ def create_mitxonline_k8s_secrets(
                 "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_PROFILE_ID": '{{ index .Secrets "cybersource" "profile-id" }}',
                 "MITOL_PAYMENT_GATEWAY_CYBERSOURCE_SECURITY_KEY": '{{ index .Secrets "cybersource" "security-key" }}',
                 "MITX_ONLINE_REFINE_OIDC_CONFIG_CLIENT_ID": '{{ index .Secrets "refine-oidc" "client-id" }}',
+                "MAILGUN_WEBHOOK_SIGNING_SECRET": '{{ index .Secrets "mailgun" "webhook-signing-secret" }}',
                 "OIDC_RSA_PRIVATE_KEY": '{{ index .Secrets "refine-oidc" "rsa-private-key" }}',
                 "OPENEDX_API_CLIENT_ID": '{{ index .Secrets "open-edx-api-client" "client-id" }}',
                 "OPENEDX_API_CLIENT_SECRET": '{{ index .Secrets "open-edx-api-client" "client-secret" }}',
