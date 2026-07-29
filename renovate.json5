@@ -10,6 +10,29 @@
         'pulumi{/,}**',
       ],
     },
+    {
+      // The aws-eks-addon datasource requires packageName to be a minified JSON
+      // object rather than a plain string, so it cannot be written directly in the
+      // versions.py marker comment the way every other datasource's can: raw JSON
+      // in a `#` comment trips ruff's ERA001 (commented-out code), and a `# noqa`
+      // appended to silence that would sit between the marker and the assignment
+      // and break the custom manager's regex. Building it here from depName keeps
+      // the comments uniform and lets the one generic manager handle these too.
+      //
+      // Without this, the addons resolved to an unparseable packageName and
+      // Renovate skipped them silently -- which is why EFS_CSI_DRIVER_VERSION sat
+      // at v2.1.6-eksbuild.1 while production had long since moved to v3.4.1.
+      //
+      // kubernetesVersion is deliberately left out of the filter so this does not
+      // silently go stale on every cluster upgrade. The cost is that Renovate may
+      // propose a version not offered for our Kubernetes version;
+      // get_eks_addon_version() validates the pin and raises at preview time, so
+      // that fails loudly in CI rather than reaching a cluster.
+      matchDatasources: [
+        'aws-eks-addon',
+      ],
+      overridePackageName: '{"addonName":"{{{depName}}}"}',
+    },
   ],
   pip_requirements: {
     managerFilePatterns: [
@@ -23,7 +46,7 @@
         '/^src/bridge/lib/versions.py$/',
       ],
       matchStrings: [
-        '# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>.+?)(?: packageName=(?<packageName>.+?))?(?: registryUrl=(?<registryUrl>.+?))?(?: versioning=(?<versioning>[a-z-]+?))?\\s*.+\\s*=\\s*"(?<currentValue>.+?)(-eksbuild.\\d+)?"',
+        '# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>.+?)(?: packageName=(?<packageName>.+?))?(?: registryUrl=(?<registryUrl>.+?))?(?: versioning=(?<versioning>[a-z-]+?))?\\s*.+\\s*=\\s*"(?<currentValue>.+?)"',
       ],
     },
   ],
