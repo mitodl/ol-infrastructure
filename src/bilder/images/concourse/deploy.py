@@ -524,6 +524,30 @@ if host.get_fact(HasSystemd):
                 enabled=True,
                 daemon_reload=worker_services_changed,
             )
+        # register_concourse_service above started concourse.service, which
+        # pulled in concourse-worker-preflight.service as a hard dependency
+        # (Requires=/After=) and ran it for real -- on *this* Packer builder
+        # instance. That run wrote /etc/default/concourse-name using the
+        # builder's own instance-id, and the write is intentionally
+        # idempotent (never overwritten once present). Left in place, every
+        # real worker booted from this AMI would inherit that same stale
+        # identity file, skip writing its own, and register with the TSA
+        # under the builder's identity -- colliding with every other worker
+        # from this image. Stop the service and remove the file so the AMI
+        # ships clean; a real instance's first boot starts concourse.service
+        # fresh (still enabled via WantedBy=multi-user.target) and preflight
+        # pins that instance's own identity.
+        files.file(
+            name="Remove build-time-baked worker identity file",
+            path="/etc/default/concourse-name",
+            present=False,
+        )
+        systemd.service(
+            name="Stop concourse.service after build-time configuration",
+            service="concourse",
+            running=False,
+            enabled=True,
+        )
     service_configuration_watches(
         service_name="concourse",
         watched_files=watched_concourse_files,
