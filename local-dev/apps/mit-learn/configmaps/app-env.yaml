@@ -125,7 +125,10 @@ data:
   XPRO_COURSES_API_URL: "https://xpro.mit.edu/api/courses/"
   # MITx Online runs locally in this stack (apps/mitxonline), so — unlike the
   # other catalogs above, which point at production — these target the
-  # in-cluster instance (same host mit-learn-nextjs uses for it).
+  # in-cluster instance directly, matching mit-learn-nextjs's
+  # NEXT_PUBLIC_MITX_ONLINE_LEGACY_BASE_URL (its primary
+  # NEXT_PUBLIC_MITX_ONLINE_BASE_URL instead routes through the API gateway:
+  # https://api.learn.mit.dev/mitxonline).
   MITX_ONLINE_BASE_URL: "https://mitxonline.mit.dev"
   MITX_ONLINE_COURSES_API_URL: "https://mitxonline.mit.dev/api/v2/courses/"
   MITX_ONLINE_PROGRAMS_API_URL: "https://mitxonline.mit.dev/api/v2/programs/"
