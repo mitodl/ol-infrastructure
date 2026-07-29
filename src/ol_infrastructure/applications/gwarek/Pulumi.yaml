@@ -1,0 +1,7 @@
+---
+name: ol-application-gwarek
+runtime: python
+description: Provision and maintain the infrastructure required to run the Gwarek
+  security-posture dashboard application.
+backend:
+  url: s3://mitol-pulumi-state/

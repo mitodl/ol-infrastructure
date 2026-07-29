@@ -59,6 +59,7 @@ config:
   keycloak_realm:ol-platform-engineering-airbyte-redirect-uris: ["https://airbyte.odl.mit.edu/*"]
   keycloak_realm:ol-platform-engineering-concourse-redirect-uris: ["https://cicd.odl.mit.edu/sky/issuer/callback"]
   keycloak_realm:ol-platform-engineering-dagster-redirect-uris: ["https://pipelines.odl.mit.edu/*"]
+  keycloak_realm:ol-platform-engineering-gwarek-redirect-uris: ["https://gwarek.ol.mit.edu/*"]
   keycloak_realm:ol-platform-engineering-leek-redirect-uris: ["https://celery-monitoring.odl.mit.edu/*"]
   keycloak_realm:ol-platform-engineering-vault-redirect-uris:
   - "https://vault-production.odl.mit.edu/ui/vault/auth/oidc/oidc/callback"
