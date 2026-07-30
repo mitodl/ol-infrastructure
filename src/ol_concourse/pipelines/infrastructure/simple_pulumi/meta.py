@@ -207,6 +207,7 @@ if __name__ == "__main__":
         "open-metadata",
         "open-metadata-substructure",
         "opensearch",
+        "opik",
         "qdrant-cloud",
         "release-bot",
         "rootly",
