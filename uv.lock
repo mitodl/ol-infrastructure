@@ -1379,14 +1379,14 @@ wheels = [
 
 [[package]]
 name = "ol-concourse"
-version = "0.8.13"
+version = "0.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7d/41/0345c9c130454ad081e7de115ba070a54ba46e3d6720835946d25b78af0c/ol_concourse-0.8.13.tar.gz", hash = "sha256:f8dae50420d03f98248e070aa6149eaae2c2e7680f6d72bffea2ab5c0a8df4d2", size = 52646, upload-time = "2026-07-29T17:09:15.947Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9a/13/a1c72ddf3701e42316a29db677a323886bccac6976a4371b101275e07842/ol_concourse-0.9.0.tar.gz", hash = "sha256:ec2f0d895f1bcaa213c74e62cb6571260d8f68cc59513d90f38d296ff1a4abc0", size = 54066, upload-time = "2026-07-30T16:34:16.892Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/77/ec/92608bf4990b1fe230d74bd44a4b408421dde76b3217c8f9be355c71a6f6/ol_concourse-0.8.13-py3-none-any.whl", hash = "sha256:8b774fc1ec5184b155346b99c23fa4440350acef263cf6f20846b2dc21c9d098", size = 51468, upload-time = "2026-07-29T17:09:15.076Z" },
+    { url = "https://files.pythonhosted.org/packages/06/21/deadd443bfced2ffc8c9b736635c47eee72258145b8692713b05f8941d4d/ol_concourse-0.9.0-py3-none-any.whl", hash = "sha256:d1d353b4009db13db8dab829074fc4c279ec1f172d945d2d2d64b5ced639c41e", size = 52389, upload-time = "2026-07-30T16:34:15.819Z" },
 ]
 
 [[package]]
@@ -1458,7 +1458,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28.0,<0.29" },
     { name = "hvac", extras = ["parser"], specifier = ">=2.0.0,<3" },
     { name = "kubernetes", specifier = ">=34.1.0" },
-    { name = "ol-concourse", specifier = ">=0.8.11,<0.9" },
+    { name = "ol-concourse", specifier = ">=0.9.0,<0.10" },
     { name = "ol-parliament", specifier = ">=1.7.0" },
     { name = "packaging", specifier = ">=24.2" },
     { name = "pulumi", specifier = ">=3.39.1,<4" },

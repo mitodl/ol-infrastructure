@@ -853,11 +853,22 @@ def _define_release_resources(
     repo_main_branch: str,
 ) -> tuple[Resource, Resource, Resource, Resource, Resource]:
     """Define the release-flow resources: release resource, gates, issues, and GitHub Deployments."""
+    # Shared GitHub App installation ol-concourse-lib no longer defaults --
+    # every consumer of this library supplies its own credential reference.
+    # Backed by the "shared/github" entry in
+    # bridge/secrets/concourse/operations.production.yaml (Vault path
+    # secret-concourse/shared/github), the same secret the release bot reads.
+    github_app_id = "((github.release_bot_app_id))"
+    github_app_installation_id = "((github.release_bot_app_installation_id))"
+    github_app_private_key = "((github.release_bot_app_pem))"
     release_res = release_resource(
         name=Identifier(f"{app_name}-release"),
         uri=f"https://github.com/{github_repo}",
         branch=repo_main_branch,
-        access_token="((github.release_resource_access_token))",  # noqa: S106
+        auth_method="app",
+        app_id=github_app_id,
+        app_installation_id=github_app_installation_id,
+        private_ssh_key=github_app_private_key,
         repository=github_repo,
         semver_tag_fallback=True,
     )
@@ -869,7 +880,10 @@ def _define_release_resources(
         issue_title_template=f"Release {app_name}",
         issue_state="closed",
         skip_if_labeled=["abandoned"],
-        access_token="((github.release_resource_access_token))",  # noqa: S106
+        auth_method="app",
+        app_id=github_app_id,
+        app_installation_id=github_app_installation_id,
+        private_ssh_key=github_app_private_key,
         gh_host=None,
     )
     # Open release issues are created after each QA deployment.
@@ -880,7 +894,10 @@ def _define_release_resources(
         issue_title_template=f"Release {app_name}",
         issue_state="open",
         labels=["release"],
-        access_token="((github.release_resource_access_token))",  # noqa: S106
+        auth_method="app",
+        app_id=github_app_id,
+        app_installation_id=github_app_installation_id,
+        private_ssh_key=github_app_private_key,
         gh_host=None,
         # A retriggered QA deploy with no new app commit re-runs this put
         # with the same checklist; editing in place (instead of the default
@@ -892,13 +909,19 @@ def _define_release_resources(
         name=Identifier(f"{app_name}-deployment-rc"),
         repository=github_repo,
         environment="RC",
-        access_token="((github.release_resource_access_token))",  # noqa: S106
+        auth_method="app",
+        app_id=github_app_id,
+        app_installation_id=github_app_installation_id,
+        private_ssh_key=github_app_private_key,
     )
     deployment_prod = github_deployment(
         name=Identifier(f"{app_name}-deployment-production"),
         repository=github_repo,
         environment="Production",
-        access_token="((github.release_resource_access_token))",  # noqa: S106
+        auth_method="app",
+        app_id=github_app_id,
+        app_installation_id=github_app_installation_id,
+        private_ssh_key=github_app_private_key,
     )
     return release_res, release_gate, release_issue, deployment_rc, deployment_prod
 
