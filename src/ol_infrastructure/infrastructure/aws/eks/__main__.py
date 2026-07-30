@@ -965,22 +965,20 @@ if eks_config.get_bool("efs_csi_provisioner"):
         # guaranteed CPU share; the probe is widened to ~50s of grace, which still
         # restarts a genuinely wedged driver but not one that is merely slow to
         # answer under node contention.
-        configuration_values=json.dumps(
-            {
-                "node": {
-                    "resources": {
-                        "requests": {"cpu": "25m", "memory": "64Mi"},
-                    },
-                    "livenessProbe": {
-                        "httpGet": {"path": "/healthz", "port": "healthz"},
-                        "initialDelaySeconds": 10,
-                        "periodSeconds": 10,
-                        "timeoutSeconds": 5,
-                        "failureThreshold": 5,
-                    },
+        configuration_values={
+            "node": {
+                "resources": {
+                    "requests": {"cpu": "25m", "memory": "64Mi"},
                 },
-            }
-        ),
+                "livenessProbe": {
+                    "httpGet": {"path": "/healthz", "port": "healthz"},
+                    "initialDelaySeconds": 10,
+                    "periodSeconds": 10,
+                    "timeoutSeconds": 5,
+                    "failureThreshold": 5,
+                },
+            },
+        },
         opts=ResourceOptions(
             parent=cluster,
             # Addons won't install properly if there are not nodes to schedule them on
