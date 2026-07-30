@@ -49,6 +49,7 @@ from ol_concourse.pipelines.constants import (
     PULUMI_CODE_PATH,
     PULUMI_WATCHED_PATHS,
 )
+from ol_concourse.pipelines.ecr import configure_ecr_repository_task
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 
 ENVIRONMENTS = ("CI", "QA", "Production")
@@ -110,6 +111,7 @@ def build_omnigraph_pipeline() -> PipelineFragment:
                 },
             ),
             ensure_ecr_task(IMAGE_NAME),
+            configure_ecr_repository_task(IMAGE_NAME),
             PutStep(
                 put=image_resource.name,
                 params={
