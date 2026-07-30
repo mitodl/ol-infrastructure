@@ -16,11 +16,14 @@ CLI invocation this follows). That file is generated here as a ConfigMap
 rather than hand-authored, so the S3 bucket name/region and graph list stay
 in lockstep with the Pulumi-managed bucket.
 
-No container image is built for ``omnigraph-server`` (or for witan) in either
-repo yet — this stack only provisions the ECR repository and references
-``:latest``, exactly like ``kubewatch_webhook_handler``'s pattern of "image
-built separately, by a Concourse job, before this stack runs." That build
-job does not exist yet; see the follow-up task noted in ``__main__.py``.
+The ``omnigraph-server`` image is built once and promoted unchanged through
+CI -> QA -> Production by the ``omnigraph``/``pulumi-omnigraph`` Concourse
+pipeline, which also owns the ``omnigraph-server`` ECR repository itself
+(idempotent create-if-missing on every build) rather than this stack
+creating it — a single repo can't be owned by three independent per-env
+Pulumi stacks. This stack instead pins the Deployment's image by digest,
+read from ``OMNIGRAPH_DOCKER_SHA`` (set by the build job via the
+pulumi-provisioner's ``env_vars_from_files``).
 """
 
 import json
@@ -36,7 +39,7 @@ from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.vault import OLVaultK8SSecret
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import StackInfo
+from ol_infrastructure.lib.pulumi_helper import StackInfo, format_docker_image_ref
 
 OMNIGRAPH_SERVER_SERVICE_NAME = "omnigraph-server"
 OMNIGRAPH_SERVER_PORT = 8080
@@ -64,7 +67,7 @@ class OmnigraphDataTier(NamedTuple):
     """Handles to the provisioned data-tier resources for depends_on wiring."""
 
     bucket: OLBucket
-    ecr_repository: aws.ecr.Repository
+    image_repository: str
     service: kubernetes.core.v1.Service
     deployment: kubernetes.apps.v1.Deployment
 
@@ -133,43 +136,18 @@ def create_data_tier(  # noqa: PLR0913
         role=auth_binding.irsa_role.name,
     )
 
-    # ECR repository for the omnigraph-server image. Built separately by a
-    # Concourse job (not yet written — see __main__.py's follow-up note),
-    # mirroring kubewatch_webhook_handler's "ECR repo here, image build
-    # elsewhere" split.
-    ecr_repository = aws.ecr.Repository(
-        f"omnigraph-omnigraph-server-ecr-repository-{stack_info.env_suffix}",
-        name=f"omnigraph-server-{stack_info.env_suffix.lower()}",
-        image_tag_mutability="MUTABLE",
-        image_scanning_configuration=aws.ecr.RepositoryImageScanningConfigurationArgs(
-            scan_on_push=True,
-        ),
-        force_delete=True,
-        tags=aws_config.tags,
+    # The ``omnigraph-server`` ECR repository is created (idempotently) by the
+    # Concourse build job on every push, not managed here — see this module's
+    # docstring. One repo is shared across CI/QA/Production (same AWS
+    # account); the image is pinned by digest (OMNIGRAPH_DOCKER_SHA, set by
+    # the build job) so a new push actually changes this stage's Deployment
+    # pod spec.
+    omnigraph_aws_account = aws.get_caller_identity()
+    image_repository = (
+        f"{omnigraph_aws_account.account_id}.dkr.ecr.{aws_config.region}"
+        ".amazonaws.com/omnigraph-server"
     )
-    aws.ecr.LifecyclePolicy(
-        f"omnigraph-omnigraph-server-ecr-lifecycle-{stack_info.env_suffix}",
-        repository=ecr_repository.name,
-        policy=json.dumps(
-            {
-                "rules": [
-                    {
-                        "rulePriority": 1,
-                        "description": "Keep last 10 images",
-                        "selection": {
-                            "tagStatus": "any",
-                            "countType": "imageCountMoreThan",
-                            "countNumber": 10,
-                        },
-                        "action": {"type": "expire"},
-                    }
-                ]
-            }
-        ),
-    )
-    omnigraph_server_image: Output[str] = ecr_repository.repository_url.apply(
-        lambda url: f"{url}:latest"
-    )
+    omnigraph_server_image = format_docker_image_ref(image_repository, "OMNIGRAPH")
 
     # cluster.yaml — the single Layer-1 (memory/task/workflow) graph,
     # organization-wide, plus room for per-repo code graphs added the same
@@ -370,7 +348,7 @@ def create_data_tier(  # noqa: PLR0913
 
     return OmnigraphDataTier(
         bucket=omnigraph_bucket,
-        ecr_repository=ecr_repository,
+        image_repository=image_repository,
         service=omnigraph_service,
         deployment=omnigraph_deployment,
     )
