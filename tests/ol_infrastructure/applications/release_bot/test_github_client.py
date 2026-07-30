@@ -80,7 +80,6 @@ _ENV_VARS = (
     "GITHUB_APP_ID",
     "GITHUB_APP_INSTALLATION_ID",
     "GITHUB_APP_PRIVATE_KEY",
-    "GITHUB_TOKEN",
 )
 
 
@@ -95,27 +94,29 @@ def _clear_github_env(monkeypatch):
 
 
 def test_build_auth_raises_without_any_credentials():
-    """Neither App nor token credentials set -- raises with a clear message."""
+    """No App credentials set -- raises with a clear message."""
     with pytest.raises(RuntimeError, match="GITHUB_APP_ID"):
         github._build_auth()
 
 
-def test_build_auth_uses_token_when_only_token_is_set(monkeypatch):
-    """Falls back to PAT auth when no App credentials are present."""
-    monkeypatch.setenv("GITHUB_TOKEN", "ghp_test")
-    auth = github._build_auth()
-    assert isinstance(auth, Auth.Token)
+def test_build_auth_raises_with_partial_credentials(monkeypatch):
+    """Only some App credentials set -- still raises rather than silently
+    falling back or passing partial creds to PyGithub.
+    """
+    monkeypatch.setenv("GITHUB_APP_ID", "12345")
+    monkeypatch.setenv("GITHUB_APP_INSTALLATION_ID", "67890")
+    with pytest.raises(RuntimeError, match="must all be set"):
+        github._build_auth()
 
 
-def test_build_auth_prefers_app_auth_when_app_credentials_are_set(monkeypatch):
-    """App auth wins over a token when both are set -- not silently ignored."""
+def test_build_auth_uses_app_auth_when_app_credentials_are_set(monkeypatch):
+    """App auth is used when all three App credentials are present."""
     monkeypatch.setenv("GITHUB_APP_ID", "12345")
     monkeypatch.setenv("GITHUB_APP_INSTALLATION_ID", "67890")
     monkeypatch.setenv(
         "GITHUB_APP_PRIVATE_KEY",
         "-----BEGIN RSA PRIVATE KEY-----",  # pragma: allowlist secret
     )
-    monkeypatch.setenv("GITHUB_TOKEN", "ghp_test")
     auth = github._build_auth()
     assert isinstance(auth, Auth.AppInstallationAuth)
 

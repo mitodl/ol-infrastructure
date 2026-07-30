@@ -52,15 +52,14 @@ bot_secrets = read_yaml_secrets(Path("release_bot/secrets.production.yaml"))
 concourse_ops_secrets = read_yaml_secrets(Path("concourse/operations.production.yaml"))
 # Same GitHub App installation Concourse's github-issues resource type can use
 # via auth_method="app" (ol_concourse.lib.resources.github_issues) -- sharing
-# one App instead of each consumer holding its own long-lived PAT.
-github_secrets = concourse_ops_secrets["pipelines"]["infrastructure/github"]
-github_app_id = github_secrets["issues_resource_app_id"]
-github_app_installation_id = github_secrets["issues_resource_app_installation_id"]
-github_app_private_key = github_secrets["issues_resource_private_ssh_key"]
-# Also wired through as a fallback: github_client._build_auth() prefers the App
-# credentials above but falls back to GITHUB_TOKEN if they're absent/invalid,
-# so this keeps that fallback usable for a quick rollback without a code change.
-github_token = github_secrets["issues_resource_access_token"]
+# one App instead of each consumer holding its own long-lived PAT. Backed by
+# the "shared/github" entry, the same Vault-synced secret Concourse pipelines
+# reference as ((github.release_bot_app_id)) etc. (see
+# ol_concourse.lib.constants.GITHUB_APP_ID).
+github_secrets = concourse_ops_secrets["pipelines"]["shared/github"]
+github_app_id = github_secrets["release_bot_app_id"]
+github_app_installation_id = github_secrets["release_bot_app_installation_id"]
+github_app_private_key = github_secrets["release_bot_app_pem"]
 
 bot_config = Config("release_bot")
 concourse_url = bot_config.get("concourse_url") or "https://cicd.odl.mit.edu"
@@ -125,7 +124,6 @@ bot_secret = kubernetes.core.v1.Secret(
         "github-app-id": str(github_app_id),
         "github-app-installation-id": str(github_app_installation_id),
         "github-app-private-key": github_app_private_key,
-        "github-token": github_token,
     },
 )
 
@@ -190,7 +188,6 @@ bot_deployment = kubernetes.apps.v1.Deployment(
                             _secret_env(
                                 "GITHUB_APP_PRIVATE_KEY", "github-app-private-key"
                             ),
-                            _secret_env("GITHUB_TOKEN", "github-token"),
                             kubernetes.core.v1.EnvVarArgs(
                                 name="CONCOURSE_URL",
                                 value=concourse_url,
