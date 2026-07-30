@@ -138,3 +138,5 @@ config:
     secure: v1:xuY2YgyBZnGNLTMy:ZnmyEmcaAOFd8EsiQX+7uG4rBcyP5QmVbI2HI39kkDllxf2TFRovQA==
   keycloak_realm:olapps-ol-analytics-api-client-secret:
     secure: v1:iFYB4lyZL2yEzN9/:zVNvb12vZLSLJBS6rNfuCS0yUnhsexlw4SXM9D1v59Ox2MBtks4WYu/9IdHi7xDuLMcWcTGS7Ds=
+  keycloak_realm:ol-platform-engineering-gwarek-client-secret:
+    secure: v1:YUJQNsDmwoj6hz94:KKCnkZ2K3w4BN6qZTRkOFuu2K1l/NpXDgKL2iMslRJpFnIBj4fdXBO0BDVy+E5Za1sZN

@@ -1,14 +1,13 @@
 ---
-secretsprovider: awskms://alias/infrastructure-secrets-production
 config:
   gwarek:domain: gwarek.ol.mit.edu
   environment:business_unit: operations
   environment:target_vpc: operations_vpc
-# The following secret values must be set with `pulumi config set --secret
-# <key> <value>` (run from this directory, with valid Pulumi/AWS access)
-# before `pulumi preview`/`up` will succeed — doing so populates the
-# `encryptedkey` field this file is currently missing:
-#   pulumi config set --secret gwarek:db_password <generated>
-#   pulumi config set --secret redis:password <generated>
-#   pulumi config set --secret gwarek:anthropic_api_key <value>
-#   pulumi config set --secret gwarek:secret_key <generated>
+  gwarek:db_password:
+    secure: v1:3qK0WfQUdD4/tH3D:2uf2wEIj57TGk38ExZ+TwAgl82m7ljIBTJwwFnRNoLD34dP6W0q9l5oeOzWoibs3hZsn4nNex3Hihwmc
+  redis:password:
+    secure: v1:tQE51C0vGHVZ54Xa:+YZbgk7itpbE/kkuCiVoSU3avOQnaj9zzrzMi1MKXGY1wyeULlC/uMm7T0/pPzyloSZhxpWP5Ff2LIVC
+  gwarek:secret_key:
+    secure: v1:B1Ub6Eb5mlu9ubyj:amj7wGu1njxfwh4mwnDDvH2yLFkMm6a7+c+LcvQuRh+IpLzjiXMnOnVvzwh+JfCaWDY4LppK4iISUsTv
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwFF5xyQvDNs9FJpdVFOktRPAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMx4tF6+6L5AuVFvF8AgEQgDsc1ZGFyRyPmHBdmaUZRG9UD2LglsL6V8hyqLRNKz12lVOGZ4st3hAsPdZUJ4VabufE+zOQiQWJ58JHHw==
