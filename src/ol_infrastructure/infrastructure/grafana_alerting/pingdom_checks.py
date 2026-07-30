@@ -407,6 +407,23 @@ _CHECKS: list[_SMCheck] = [
         alert_sensitivity="high",
         labels={"env": "production", "service": "open-discussions"},
     ),
+    # --- Opik ---
+    _SMCheck(
+        resource_name="opik-production-http",
+        job="Opik Production",
+        target="https://opik.ol.mit.edu/health",
+        frequency=60000,
+        alert_sensitivity="high",
+        labels={"env": "production", "service": "opik"},
+    ),
+    _SMCheck(
+        resource_name="opik-qa-http",
+        job="Opik QA",
+        target="https://opik-qa.ol.mit.edu/health",
+        frequency=60000,
+        alert_sensitivity="low",
+        labels={"env": "qa", "service": "opik"},
+    ),
     # --- SSO (Keycloak) ---
     _SMCheck(
         resource_name="sso-production-olapps-http",
