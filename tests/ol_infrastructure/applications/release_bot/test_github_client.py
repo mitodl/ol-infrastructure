@@ -104,7 +104,8 @@ def test_build_auth_raises_with_partial_credentials(monkeypatch):
     falling back or passing partial creds to PyGithub.
     """
     monkeypatch.setenv("GITHUB_APP_ID", "12345")
-    with pytest.raises(RuntimeError, match="GITHUB_APP_ID"):
+    monkeypatch.setenv("GITHUB_APP_INSTALLATION_ID", "67890")
+    with pytest.raises(RuntimeError, match="must all be set"):
         github._build_auth()
 
 
