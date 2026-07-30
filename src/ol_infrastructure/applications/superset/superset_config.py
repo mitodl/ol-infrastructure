@@ -718,3 +718,52 @@ def DB_CONNECTION_MUTATOR(  # noqa: N802
         database=new_database,
     )
     return uri, params
+
+
+# ---------------------------------------------------
+# STARROCKS DIALECT / SQLALCHEMY 1.4 COMPATIBILITY
+# ---------------------------------------------------
+# Reflecting any StarRocks table with a PARTITION BY clause raises
+# `TypeError: unhashable type: 'ReflectedPartitionInfo'`, which surfaces as an
+# HTTP 500 on every endpoint that has to reflect a new dataset (dataset create,
+# /get_or_create/). In production this blocked three Iceberg-partitioned
+# datasets from ever being created -- organization_administration_report,
+# tfact_problem_events, tfact_studentmodule_problems -- failing the nightly
+# Dagster sync run for 11 runs straight.
+#
+# The collision is between two upstreams, neither of which is wrong alone:
+#
+#   * SQLAlchemy 1.4's @reflection.cache builds its cache key from *every*
+#     kwarg it is handed -- `tuple((k, v) for k, v in kw.items() if k !=
+#     "info_cache")` -- and Inspector.reflect_table merges the dialect's
+#     get_table_options() result into table.dialect_kwargs before splatting
+#     them into get_columns(). (SQLAlchemy 2.0 filters that key by type, so
+#     this only bites on 1.x, which is what Superset 6 pins.)
+#   * The starrocks dialect returns its reflected table options as plain
+#     non-frozen dataclasses, so `__hash__` is None and the key can't be
+#     hashed.
+#
+# Give those dataclasses a hash derived from __str__ -- the dialect's own
+# canonical DDL rendering of the fields, so objects that compare equal always
+# hash equal. Discovered by iteration rather than by name so a dialect upgrade
+# that adds another reflected option is covered too.
+#
+# Remove once the dialect ships hashable reflection objects (or Superset moves
+# to SQLAlchemy 2.0).
+try:
+    import dataclasses
+
+    from starrocks.engine import interfaces as _starrocks_interfaces
+except ImportError:  # dialect absent or restructured -- nothing to patch
+    logging.getLogger(__name__).debug(
+        "starrocks.engine.interfaces not importable; skipping reflection shim"
+    )
+else:
+    for _name in dir(_starrocks_interfaces):
+        _candidate = getattr(_starrocks_interfaces, _name)
+        if (
+            isinstance(_candidate, type)
+            and dataclasses.is_dataclass(_candidate)
+            and _candidate.__hash__ is None
+        ):
+            _candidate.__hash__ = lambda self: hash(str(self))
