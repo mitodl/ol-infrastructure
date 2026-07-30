@@ -13,6 +13,7 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import git_repo, registry_image
 
 from ol_concourse.pipelines.constants import ECR_REGION
+from ol_concourse.pipelines.ecr import configure_ecr_repository_task
 
 ol_data_platform_repo = git_repo(
     name=Identifier("ol-data-platform-repository"),
@@ -60,6 +61,7 @@ docker_pipeline = Pipeline(
                     },
                 ),
                 ensure_ecr_task("mitodl/ol-superset"),
+                configure_ecr_repository_task("mitodl/ol-superset"),
                 PutStep(
                     put=ol_superset_image.name,
                     params={"image": "image/image.tar"},

@@ -19,6 +19,7 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import git_repo, github_release, registry_image
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+from ol_concourse.pipelines.ecr import configure_ecr_repository_task
 
 ol_inf_repo = git_repo(
     name=Identifier("ol-infrastructure-repository"),
@@ -101,6 +102,7 @@ docker_pipeline = Pipeline(
                     },
                 ),
                 ensure_ecr_task("mitodl/dcind"),
+                configure_ecr_repository_task("mitodl/dcind"),
                 PutStep(
                     put=dcind_release_image.name,
                     inputs="detect",
