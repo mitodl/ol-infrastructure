@@ -8,14 +8,12 @@ import textwrap
 from pathlib import Path
 
 import pulumi_fastly as fastly
-import pulumi_github as github
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import (
     ROOT_STACK_RESOURCE,
     Alias,
     Config,
-    InvokeOptions,
     Output,
     ResourceOptions,
     export,
@@ -68,7 +66,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
     get_default_psg_ingress_args,
     setup_k8s_provider,
 )
-from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
@@ -130,26 +128,11 @@ apisix_ingress_class = learn_ai_config.get("apisix_ingress_class") or "apisix"
 
 setup_vault_provider(stack_info)
 fastly_provider = get_fastly_provider()
-github_provider = github.Provider(
-    "github_provider",
-    owner=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["owner"],
-    token=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["token"],
-)
 
 k8s_global_labels = K8sGlobalLabels(
     ou=BusinessUnit.mit_learn, service=Services.mit_learn, stack=stack_info
 ).model_dump()
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
-
-match stack_info.env_suffix:
-    case "production":
-        env_var_suffix = "PROD"
-    case "qa":
-        env_var_suffix = "RC"
-    case "ci":
-        env_var_suffix = "CI"
-    case _:
-        env_var_suffix = "INVALID"
 
 learn_ai_namespace = "learn-ai"
 cluster_stack.require_output("namespaces").apply(
@@ -295,63 +278,6 @@ learn_ai_service_account = kubernetes.core.v1.ServiceAccount(
     automount_service_account_token=False,
 )
 
-
-gh_workflow_s3_bucket_permissions_doc = {
-    "Version": IAM_POLICY_VERSION,
-    "Statement": [
-        {
-            "Action": [
-                "s3:ListBucket*",
-            ],
-            "Effect": "Allow",
-            "Resource": [f"arn:aws:s3:::{learn_ai_app_storage_bucket_name}"],
-        },
-        {
-            "Action": [
-                "s3:GetObject*",
-                "s3:PutObject",
-                "s3:PutObjectAcl",
-                "s3:DeleteObject",
-            ],
-            "Effect": "Allow",
-            "Resource": [f"arn:aws:s3:::{learn_ai_app_storage_bucket_name}/frontend/*"],
-        },
-    ],
-}
-
-gh_workflow_iam_policy = iam.Policy(
-    f"learn-ai-gh-workflow-iam-policy-{stack_info.env_suffix}",
-    name=f"learn-ai-gh-workflow-iam-policy-{stack_info.env_suffix}",
-    policy=lint_iam_policy(
-        gh_workflow_s3_bucket_permissions_doc,
-        stringify=True,
-        parliament_config=parliament_config,
-    ),
-)
-
-################################################
-# Github frontend workflow IAM configuration
-# Just create a static user for now. Some day refactor to use
-# https://github.com/hashicorp/vault-action
-gh_workflow_user = iam.User(
-    f"learn-ai-gh-workflow-user-{stack_info.env_suffix}",
-    name=f"learn-ai-gh-workflow-{stack_info.env_suffix}",
-    tags=aws_config.tags,
-)
-iam.PolicyAttachment(
-    f"learn-ai-gh-workflow-iam-policy-attachment-{stack_info.env_suffix}",
-    policy_arn=gh_workflow_iam_policy.arn,
-    users=[gh_workflow_user.name],
-)
-gh_workflow_accesskey = iam.AccessKey(
-    f"learn-ai-gh-workflow-access-key-{stack_info.env_suffix}",
-    user=gh_workflow_user.name,
-    status="Active",
-)
-gh_repo = github.get_repository(
-    full_name="mitodl/learn-ai",
-    opts=InvokeOptions(provider=github_provider),
-)
 
 ################################################
 # Fastly configuration
