@@ -12,6 +12,7 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import git_repo, registry_image
 
 from ol_concourse.pipelines.constants import ECR_REGION
+from ol_concourse.pipelines.ecr import configure_ecr_repository_task
 
 PYTHON_VERSIONS = ("3.11", "3.12", "3.13", "3.14")
 
@@ -65,6 +66,7 @@ def build_job(python_version: str) -> Job:
                 },
             ),
             ensure_ecr_task("mitodl/ol-python-base"),
+            configure_ecr_repository_task("mitodl/ol-python-base"),
             PutStep(
                 put=image_resources[python_version].name,
                 inputs="detect",
