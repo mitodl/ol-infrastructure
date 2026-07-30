@@ -1613,6 +1613,14 @@ mitlearn_k8s_app_oidc_resources_no_prefix = OLApisixOIDCResources(
         # browser cookie lifetime instead of expiring early (hq#8416).
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
+        # Broadened from the default host-only scope so a logged-in session
+        # cookie is also sent to ol-analytics-api's Learn-scoped host
+        # (analytics.learn.mit.edu et al.), letting its "pass" route recognize
+        # the same session instead of requiring a second login -- see
+        # ol_analytics_api/__main__.py's Learn-scoped OIDC resource, which
+        # shares this same "sso/mitlearn" Vault path/client and mirrors this
+        # cookie domain.
+        oidc_session_cookie_domain=mitlearn_api_domain.removeprefix("api"),
         oidc_use_session_secret=True,
         vault_mount="secret-operations",
         vault_mount_type="kv-v1",
@@ -1629,9 +1637,11 @@ mitlearn_k8s_app_oidc_resources = OLApisixOIDCResources(
         oidc_logout_path="/learn/logout/oidc",
         oidc_post_logout_redirect_uri=f"https://{mitlearn_config.get('api_domain')}/learn/logout/",
         oidc_session_absolute_timeout=60 * 20160,
-        # See the mitlearn-k8s-no-prefix resources above for why these are 0.
+        # See the mitlearn-k8s-no-prefix resources above for why these are 0,
+        # and for the cookie domain below.
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
+        oidc_session_cookie_domain=mitlearn_api_domain.removeprefix("api"),
         oidc_use_session_secret=True,
         vault_mount="secret-operations",
         vault_mount_type="kv-v1",

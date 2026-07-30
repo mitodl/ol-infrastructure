@@ -47,11 +47,19 @@ Key wiring decisions (see also ``k8s/README.md`` in the app repo):
   ``SecurityGroupPolicy`` binding the pods to a dedicated security group (see
   ``ol_analytics_api_application_security_group`` below).
 
-* **APISIX + Keycloak OIDC.**  ``OLApisixRoute`` + ``OLApisixOIDCResources``
-  put the openid-connect plugin in front of the service so APISIX validates the
-  Keycloak session and forwards the decoded claims as the ``X-Userinfo`` header
-  that ``core/auth/userinfo.py`` expects.  This matches the dagster/opik
-  pattern.
+* **APISIX + Keycloak OIDC, two separate clients.**  ``OLApisixRoute`` +
+  ``OLApisixOIDCResources`` put the openid-connect plugin in front of the
+  service so APISIX validates the Keycloak session and forwards the decoded
+  claims as the ``X-Userinfo`` header that ``core/auth/userinfo.py`` expects.
+  The canonical ``domain`` host uses a dedicated ``ol-analytics-api`` client
+  with a full redirect-to-Keycloak flow (matching the dagster/opik pattern).
+  The Learn-scoped ``learn_domain`` host -- the one the MIT Learn frontend
+  actually calls -- uses a second OIDC resource that instead shares
+  mit-learn's own Keycloak client/session (``sso/mitlearn``) with
+  ``unauth_action="pass"``, so a browser already logged into mit-learn is
+  recognized here without a second redirect (a plain fetch() can't follow an
+  OIDC login redirect the way a browser navigation can). See the Learn-scoped
+  OIDC resource below for the full rationale.
 """
 
 import json
@@ -435,20 +443,18 @@ ol_analytics_api_domain = ol_analytics_api_config.require("domain")
 # Additional host(s) that also route to this service beyond the canonical
 # `domain`: the MIT Learn frontend consumes it under a Learn-scoped host
 # (`analytics.learn.mit.edu`) alongside the canonical `analytics.ol.mit.edu`.
-# Each host gets its own APISIX route (same backend + OIDC plugin) rather than
-# being folded into one route's host list, so HOST-based tenant routing or
-# host-specific plugins can be layered on later without restructuring; all
-# hosts share a single SAN certificate. A learn.mit.edu host only provisions
-# once `learn.mit.edu` is in the data cluster's `allowed_dns_zones` -- both the
-# external-dns domainFilter and the cert-manager DNS-01 solver selector read
-# that list (see infrastructure/aws/eks and substructure/aws/eks).
+# Each host gets its own APISIX route with its OWN OIDC resource (see below)
+# rather than being folded into one route's host list, so HOST-based tenant
+# routing or host-specific plugins can be layered on later without
+# restructuring; all hosts share a single SAN certificate. A learn.mit.edu
+# host only provisions once `learn.mit.edu` is in the data cluster's
+# `allowed_dns_zones` -- both the external-dns domainFilter and the
+# cert-manager DNS-01 solver selector read that list (see
+# infrastructure/aws/eks and substructure/aws/eks).
 ol_analytics_api_learn_domain = ol_analytics_api_config.get("learn_domain")
-ol_analytics_api_routes = [("ol-analytics-api", ol_analytics_api_domain)]
+ol_analytics_api_hosts = [ol_analytics_api_domain]
 if ol_analytics_api_learn_domain:
-    ol_analytics_api_routes.append(
-        ("ol-analytics-api-learn", ol_analytics_api_learn_domain)
-    )
-ol_analytics_api_hosts = [host for _, host in ol_analytics_api_routes]
+    ol_analytics_api_hosts.append(ol_analytics_api_learn_domain)
 
 # Shared plugins (redirect http->https, cors, prometheus, opentelemetry, ...).
 ol_analytics_api_shared_plugins = OLApisixSharedPlugins(
@@ -466,7 +472,10 @@ ol_analytics_api_shared_plugins = OLApisixSharedPlugins(
 # OIDC resources: sync the Keycloak client config from Vault and expose the
 # openid-connect plugin config.  The `organization:*` scope (the component
 # default) is required so the org membership claim reaches X-Userinfo, which the
-# b2b_dashboard tenant's auth checks depend on.
+# b2b_dashboard tenant's auth checks depend on.  This resource, with its own
+# dedicated Keycloak client (`ol-analytics-api-client`, see olapps.py), is used
+# only for the canonical `analytics.ol.mit.edu` host below with a full
+# redirect-to-Keycloak flow.
 ol_analytics_api_oidc_resources = OLApisixOIDCResources(
     f"ol-analytics-api-{stack_info.env_suffix}-oidc-resources",
     oidc_config=OLApisixOIDCConfig(
@@ -487,6 +496,52 @@ ol_analytics_api_oidc_resources = OLApisixOIDCResources(
     ),
 )
 
+# A second, separate OIDC resource for the Learn-scoped host
+# (`analytics.learn.mit.edu` et al.): the MIT Learn frontend calls this API
+# with `fetch`, not a browser navigation, so a redirect-to-Keycloak response
+# (what the canonical host's "auth" flow above returns) would show up as a
+# CORS/opaque-redirect failure, not the JSON 401/403 the frontend expects.
+# Rather than minting its own session, this resource reuses mit-learn's own
+# Keycloak client (`sso/mitlearn`, same vault_path mit_learn's and learn_ai's
+# own OIDC resources read -- see mit_learn/__main__.py and
+# learn_ai/__main__.py) so the cookie set when a user logs into mit-learn is
+# recognized here too, mirroring how learn-ai's `/ai/*` route piggybacks on
+# mit-learn's session rather than the JWT-plugin approach that ask implied
+# (this repo has no jwt-auth-plugin route anywhere; the shared-session
+# pass-through IS the established pattern). Sharing the session requires two
+# things beyond the shared client: `unauth_action="pass"` below (never
+# redirects) and a cookie domain broad enough to be sent cross-subdomain --
+# set to the same suffix as mit_learn's own broadened
+# oidc_session_cookie_domain (mitlearn_api_domain.removeprefix("api")) so the
+# exact same browser cookie reaches this host.
+ol_analytics_api_learn_oidc_resources = None
+if ol_analytics_api_learn_domain:
+    ol_analytics_api_learn_oidc_resources = OLApisixOIDCResources(
+        f"ol-analytics-api-{stack_info.env_suffix}-learn-oidc-resources",
+        oidc_config=OLApisixOIDCConfig(
+            application_name=f"{APPLICATION_NAME}-learn",
+            k8s_labels=k8s_global_labels,
+            k8s_namespace=APPLICATION_NAMESPACE,
+            oidc_logout_path="/logout/oidc",
+            oidc_post_logout_redirect_uri=f"https://{ol_analytics_api_learn_domain}/",
+            oidc_session_absolute_timeout=60 * 20160,
+            oidc_session_idling_timeout=0,
+            oidc_session_rolling_timeout=0,
+            oidc_session_cookie_domain=ol_analytics_api_learn_domain.removeprefix(
+                "analytics"
+            ),
+            oidc_use_session_secret=True,
+            vault_mount="secret-operations",
+            vault_mount_type="kv-v1",
+            vault_path="sso/mitlearn",
+            vaultauth=ol_analytics_api_auth_binding.vault_k8s_resources.auth_name,
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            parent=ol_analytics_api_auth_binding.vault_k8s_resources,
+        ),
+    )
+
 # TLS certificate + ApisixTls resource for the service domain.
 ol_analytics_api_cert = OLCertManagerCert(
     f"ol-analytics-api-{stack_info.env_suffix}-cert",
@@ -501,36 +556,66 @@ ol_analytics_api_cert = OLCertManagerCert(
 )
 
 # Route every path to the service behind the openid-connect plugin so APISIX
-# authenticates the Keycloak session and forwards X-Userinfo.  unauth_action
-# "auth" redirects unauthenticated browsers to Keycloak (the MIT Learn frontend
-# calls this API with an established Keycloak session).
-ol_analytics_api_route = OLApisixRoute(
-    f"ol-analytics-api-{stack_info.env_suffix}-route",
-    k8s_namespace=APPLICATION_NAMESPACE,
-    k8s_labels=k8s_global_labels,
-    route_configs=[
+# authenticates the Keycloak session and forwards X-Userinfo.  The canonical
+# host uses unauth_action "auth" (redirects unauthenticated browsers to
+# Keycloak); the Learn-scoped host uses "pass" against the shared mit-learn
+# session instead (see ol_analytics_api_learn_oidc_resources above for why).
+_ol_analytics_api_route_configs = [
+    OLApisixRouteConfig(
+        route_name="ol-analytics-api",
+        priority=10,
+        shared_plugin_config_name=ol_analytics_api_shared_plugins.resource_name,
+        plugins=[
+            OLApisixPluginConfig(
+                **ol_analytics_api_oidc_resources.get_full_oidc_plugin_config(
+                    unauth_action="auth"
+                )
+            ),
+        ],
+        hosts=[ol_analytics_api_domain],
+        paths=["/*"],
+        backend_service_name=ol_analytics_api_k8s.application_lb_service_name,
+        backend_service_port=ol_analytics_api_k8s.application_lb_service_port_name,
+        backend_resolve_granularity="service",
+    )
+]
+if ol_analytics_api_learn_oidc_resources is not None:
+    _ol_analytics_api_route_configs.append(
         OLApisixRouteConfig(
-            route_name=route_name,
+            route_name="ol-analytics-api-learn",
             priority=10,
             shared_plugin_config_name=ol_analytics_api_shared_plugins.resource_name,
             plugins=[
                 OLApisixPluginConfig(
-                    **ol_analytics_api_oidc_resources.get_full_oidc_plugin_config(
-                        unauth_action="auth"
+                    **ol_analytics_api_learn_oidc_resources.get_full_oidc_plugin_config(
+                        unauth_action="pass"
                     )
                 ),
             ],
-            hosts=[host],
+            hosts=[ol_analytics_api_learn_domain],
             paths=["/*"],
             backend_service_name=ol_analytics_api_k8s.application_lb_service_name,
             backend_service_port=ol_analytics_api_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",
         )
-        for route_name, host in ol_analytics_api_routes
-    ],
+    )
+
+ol_analytics_api_route = OLApisixRoute(
+    f"ol-analytics-api-{stack_info.env_suffix}-route",
+    k8s_namespace=APPLICATION_NAMESPACE,
+    k8s_labels=k8s_global_labels,
+    route_configs=_ol_analytics_api_route_configs,
     opts=ResourceOptions(
         delete_before_replace=True,
-        depends_on=[ol_analytics_api_k8s, ol_analytics_api_oidc_resources],
+        depends_on=[
+            ol_analytics_api_k8s,
+            ol_analytics_api_oidc_resources,
+            *(
+                [ol_analytics_api_learn_oidc_resources]
+                if ol_analytics_api_learn_oidc_resources is not None
+                else []
+            ),
+        ],
     ),
 )
 

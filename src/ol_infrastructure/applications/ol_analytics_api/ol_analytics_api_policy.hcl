@@ -21,6 +21,13 @@ path "secret-operations/sso/ol-analytics-api" {
   capabilities = ["read"]
 }
 
+# The Learn-scoped host's OIDC resource reuses mit-learn's own Keycloak
+# client/session so the MIT Learn frontend's existing login is recognized
+# here without a second redirect (see __main__.py).
+path "secret-operations/sso/mitlearn" {
+  capabilities = ["read"]
+}
+
 # Static application secrets (SENTRY_DSN, ...) synced via the
 # vault-secrets-operator into the ol-analytics-api-static-secrets K8s Secret.
 # secret-ol-analytics-api is a kv-v2 mount, so reads go through the /data/
