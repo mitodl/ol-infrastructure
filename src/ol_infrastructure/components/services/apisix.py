@@ -273,10 +273,15 @@ class OLApisixOIDCResources(ComponentResource):
         )
 
         session_config: dict[str, Any] = {}
+        # Flat session.cookie_domain, per the openid-connect plugin's
+        # lua-resty-session 4.x schema on the pinned APISIX 3.17.0 (chart
+        # 2.15.0). The nested session.cookie.domain form was the pre-3.17.0
+        # shape; on 3.17.0+ it is a silent no-op since lua-resty-session 4.x
+        # only reads the flat key.
         if oidc_config.oidc_session_cookie_domain:
-            session_config.setdefault("session", {}).setdefault("cookie", {})[
-                "domain"
-            ] = oidc_config.oidc_session_cookie_domain
+            session_config.setdefault("session", {})["cookie_domain"] = (
+                oidc_config.oidc_session_cookie_domain
+            )
 
         if oidc_config.oidc_session_absolute_timeout:
             session_config.setdefault("session", {})["absolute_timeout"] = (

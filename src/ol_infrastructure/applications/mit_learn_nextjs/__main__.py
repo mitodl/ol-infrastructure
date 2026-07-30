@@ -116,6 +116,12 @@ raw_env_vars = {
     "GTM_COOKIES_WIN": nextjs_config.get("gtm_cookies_win") or "",
     "NEXT_CACHE_S_MAXAGE_SECONDS": nextjs_config.get("cache_s_maxage_seconds") or "",
     # Env vars available on client and server
+    # Optional: ol-analytics-api has no CI deployment (see
+    # applications/ol_analytics_api/__main__.py), so this is left unset there.
+    # The app's own yup schema treats it as optional and reports the B2B
+    # analytics dashboard as unavailable rather than erroring when unset.
+    "NEXT_PUBLIC_ANALYTICS_API_BASE_URL": nextjs_config.get("analytics_api_base_url")
+    or "",
     "NEXT_PUBLIC_APPZI_URL": nextjs_config.require("appzi_url"),
     "NEXT_PUBLIC_CSRF_COOKIE_NAME": nextjs_config.require("csrf_cookie_name"),
     "NEXT_PUBLIC_EMBEDLY_KEY": nextjs_config.require("embedly_key"),

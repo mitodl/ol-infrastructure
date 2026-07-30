@@ -2,6 +2,7 @@
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHjZAY5LtmRWGljev0oiDGn0jR5cRwD4IVXCn50TW5i0qQGFNzbK/uuewL52WbAl1Ff3AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMVGbH/3ut2WFD5RmlAgEQgDsGgjF7DPjcruIeBZ8PGZcxuGFXVOyCCQj+BrJqIWymrfv+iFxrVhhHr7ke+h9J1PrpRroB8E+2oNTtoA==
 config:
+  nextjs:analytics_api_base_url: "https://analytics.rc.learn.mit.edu"
   nextjs:appzi_url:
     secure: v1:BvKYm13EnJavPEmi:Ef5Gf3J3tU+noMVdRHTzhw==
   nextjs:cache_s_maxage_seconds: 900
