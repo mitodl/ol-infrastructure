@@ -1,11 +1,11 @@
 """GitHub API client for the release bot, backed by PyGithub.
 
-Accepts either a personal access token or a GitHub App installation as the
-credential source. The App fields (GITHUB_APP_ID / GITHUB_APP_INSTALLATION_ID /
-GITHUB_APP_PRIVATE_KEY) line up with the same App credentials Concourse's
-`github-issues` resource type accepts via `auth_method="app"` (see
-`ol_concourse.lib.resources.github_issues`), so both consumers can be pointed
-at one GitHub App installation instead of each holding a separate long-lived
+Authenticates as a GitHub App installation only -- no PAT fallback. The App
+fields (GITHUB_APP_ID / GITHUB_APP_INSTALLATION_ID / GITHUB_APP_PRIVATE_KEY)
+line up with the same App credentials Concourse's `github-issues` resource
+type accepts via `auth_method="app"` (see
+`ol_concourse.lib.resources.github_issues`), so both consumers are pointed at
+one GitHub App installation instead of each holding a separate long-lived
 PAT. PyGithub's `AppInstallationAuth` mints and refreshes installation tokens
 on its own, so no manual token-refresh bookkeeping is needed here.
 """
@@ -41,28 +41,25 @@ def _build_auth() -> Auth.Auth:
     app_id = os.environ.get("GITHUB_APP_ID", "").strip()
     installation_id = os.environ.get("GITHUB_APP_INSTALLATION_ID", "").strip()
     private_key = os.environ.get("GITHUB_APP_PRIVATE_KEY", "").strip()
-    if app_id and installation_id and private_key:
-        try:
-            app_id_int = int(app_id)
-            installation_id_int = int(installation_id)
-        except ValueError as exc:
-            msg = (
-                "GITHUB_APP_ID and GITHUB_APP_INSTALLATION_ID must be numeric "
-                f"(got GITHUB_APP_ID={app_id!r}, "
-                f"GITHUB_APP_INSTALLATION_ID={installation_id!r})"
-            )
-            raise RuntimeError(msg) from exc
-        return Auth.AppAuth(app_id_int, private_key).get_installation_auth(
-            installation_id_int
-        )
-    token = os.environ.get("GITHUB_TOKEN", "").strip()
-    if not token:
+    if not (app_id and installation_id and private_key):
         msg = (
-            "Either GITHUB_APP_ID/GITHUB_APP_INSTALLATION_ID/"
-            "GITHUB_APP_PRIVATE_KEY or GITHUB_TOKEN must be set"
+            "GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, and "
+            "GITHUB_APP_PRIVATE_KEY must all be set"
         )
         raise RuntimeError(msg)
-    return Auth.Token(token)
+    try:
+        app_id_int = int(app_id)
+        installation_id_int = int(installation_id)
+    except ValueError as exc:
+        msg = (
+            "GITHUB_APP_ID and GITHUB_APP_INSTALLATION_ID must be numeric "
+            f"(got GITHUB_APP_ID={app_id!r}, "
+            f"GITHUB_APP_INSTALLATION_ID={installation_id!r})"
+        )
+        raise RuntimeError(msg) from exc
+    return Auth.AppAuth(app_id_int, private_key).get_installation_auth(
+        installation_id_int
+    )
 
 
 def _get_client() -> Github:
