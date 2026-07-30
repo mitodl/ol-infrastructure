@@ -22,10 +22,11 @@ into the ``actor-tokens`` Secret (agent-kit ADR-0004 D3). See
 ``docs/adr/0009-deploy-witan-as-shared-multi-tenant-mcp-service.md``.
 
 Follow-up work this stack does NOT cover (tracked separately):
-    - **Container image.** omnigraph-server has no image built in either repo
-      yet; this stack only provisions the ECR repository and references
-      ``:latest`` (the ``omnigraph``/``pulumi-omnigraph`` Concourse pipeline
-      builds and pushes it). ``schema.pg`` (agent-kit repo,
+    - **Container image.** The ``omnigraph``/``pulumi-omnigraph`` Concourse
+      pipeline builds the image once, owns the ECR repository itself
+      (idempotent create-if-missing), and promotes the same image unchanged
+      through CI -> QA -> Production — see ``data_tier.py``'s module
+      docstring. ``schema.pg`` (agent-kit repo,
       ``mcp/servers/witan/schema/schema.pg``) must be baked into the image at
       build time — this Pulumi program has no access to agent-kit's tree.
     - **Keycloak witan-users token sync.** This stack provisions the
@@ -174,7 +175,4 @@ data_tier = create_data_tier(
 
 export("namespace", NAMESPACE)
 export("omnigraph_server_addr", omnigraph_server_addr(NAMESPACE))
-export(
-    "omnigraph_server_ecr_repository_url",
-    data_tier.ecr_repository.repository_url,
-)
+export("omnigraph_server_image_repository", data_tier.image_repository)

@@ -42,9 +42,16 @@ Incoming auth — ToolHive's "External OIDC provider" scenario, NOT
 
 Follow-up work this stack does NOT cover, tracked separately rather than
 silently assumed:
-    - **Container image.** witan has no image built in either repo yet; this
-      stack only creates the ECR repository and references ``:latest``, and
-      the ``witan``/``pulumi-witan`` Concourse pipeline builds and pushes it.
+    - **Container image.** The ``witan``/``pulumi-witan`` Concourse pipeline
+      builds the image once and promotes it unchanged through CI -> QA ->
+      Production. It also owns the ``witan`` ECR repository itself
+      (idempotent create-if-missing on every build), rather than this stack
+      creating it -- a single repo can't be owned by three independent
+      per-env Pulumi stacks. This stack instead pins the Deployment's image
+      by digest, read from ``WITAN_DOCKER_SHA`` (set by the build job via
+      the pulumi-provisioner's ``env_vars_from_files``), so a new push always
+      changes the pod spec and triggers a rollout instead of silently
+      leaving the running pod on a stale image.
     - **Keycloak witan-users token provisioning.** agent-kit ADR-0004 D3
       assigns the job of "walking the Keycloak witan-users group/role
       membership and writing a generated token per user" into the shared
@@ -54,7 +61,6 @@ silently assumed:
       current as Keycloak group membership changes is not yet built.
 """
 
-import json
 from pathlib import Path
 
 import pulumi_aws as aws
@@ -86,6 +92,7 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import (
+    format_docker_image_ref,
     make_stack_reference,
     parse_stack,
     require_stack_output_value,
@@ -256,41 +263,19 @@ actor_tokens_secret = OLVaultK8SSecret(
 )
 
 #########################################
-#   ECR repository for the witan image   #
+#   witan image (built + repo owned by   #
+#   the pulumi-witan Concourse pipeline) #
 #########################################
-# "Repo here, image built separately by a Concourse job" split, mirroring
-# kubewatch_webhook_handler — see this module's docstring.
-witan_ecr_repository = aws.ecr.Repository(
-    f"witan-ecr-repository-{stack_info.env_suffix}",
-    name=f"witan-{stack_info.env_suffix.lower()}",
-    image_tag_mutability="MUTABLE",
-    image_scanning_configuration=aws.ecr.RepositoryImageScanningConfigurationArgs(
-        scan_on_push=True,
-    ),
-    force_delete=True,
-    tags=aws_config.tags,
+# The ``witan`` ECR repository is created (idempotently) by the Concourse
+# build job on every push, not managed here -- see this module's docstring.
+# One repo is shared across CI/QA/Production (same AWS account); the image
+# is pinned by digest (WITAN_DOCKER_SHA, set by the build job) so a new push
+# actually changes this stage's Deployment pod spec.
+witan_aws_account = aws.get_caller_identity()
+witan_image_repository = (
+    f"{witan_aws_account.account_id}.dkr.ecr.{aws_config.region}.amazonaws.com/witan"
 )
-aws.ecr.LifecyclePolicy(
-    f"witan-ecr-lifecycle-{stack_info.env_suffix}",
-    repository=witan_ecr_repository.name,
-    policy=json.dumps(
-        {
-            "rules": [
-                {
-                    "rulePriority": 1,
-                    "description": "Keep last 10 images",
-                    "selection": {
-                        "tagStatus": "any",
-                        "countType": "imageCountMoreThan",
-                        "countNumber": 10,
-                    },
-                    "action": {"type": "expire"},
-                }
-            ]
-        }
-    ),
-)
-witan_image = witan_ecr_repository.repository_url.apply(lambda url: f"{url}:latest")
+witan_image = format_docker_image_ref(witan_image_repository, "WITAN")
 
 #########################################
 #   MCPGroup + witan MCPServer           #
@@ -397,5 +382,5 @@ export("namespace", NAMESPACE)
 export("mcp_group_name", MCP_GROUP_NAME)
 export("vmcp_domain", VMCP_DOMAIN)
 export("vmcp_oidc_issuer", KEYCLOAK_ISSUER)
-export("witan_ecr_repository_url", witan_ecr_repository.repository_url)
+export("witan_image_repository", witan_image_repository)
 export("omnigraph_server_addr", omnigraph_server_addr)
