@@ -43,7 +43,10 @@ from ol_concourse.lib.resource_types import github_issues_resource, rclone
 from ol_concourse.lib.resources import git_repo, github_issues
 
 from bridge.settings.github.team_members import DEVOPS_MIT
-from ol_concourse.pipelines.constants import GH_ISSUES_DEFAULT_REPOSITORY
+from ol_concourse.pipelines.constants import (
+    GH_ISSUES_DEFAULT_REPOSITORY,
+    GH_ISSUES_ENTERPRISE_POLL_FREQUENCY,
+)
 
 LEHRER_URI = "https://github.com/mitodl/lehrer"
 
@@ -115,6 +118,7 @@ def _gh_issues_post(deployment_name: str, stage: str) -> Resource:
         issue_title_template=title,
         issue_prefix=title,
         issue_state="open",
+        poll_frequency=GH_ISSUES_ENTERPRISE_POLL_FREQUENCY,
     )
 
 
@@ -129,6 +133,7 @@ def _gh_issues_trigger(deployment_name: str, stage: str) -> Resource:
         issue_title_template=title,
         issue_prefix=title,
         issue_state="closed",
+        poll_frequency=GH_ISSUES_ENTERPRISE_POLL_FREQUENCY,
     )
 
 
