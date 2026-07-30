@@ -128,6 +128,7 @@ def create_data_tier(  # noqa: PLR0913
     )
     omnigraph_s3_iam_policy = aws.iam.Policy(
         f"omnigraph-s3-iam-policy-{stack_info.env_suffix}",
+        path=f"/ol-data/omnigraph-s3-iam-policy-{stack_info.env_suffix}/",
         policy=omnigraph_s3_policy_json,
     )
     aws.iam.RolePolicyAttachment(
