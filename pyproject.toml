@@ -61,6 +61,7 @@ dev = [
   "mypy",
   "pip>=26.0.1",
   "pre-commit>=4.0.0,<5",
+  "PyGithub>=2.4,<3",
   "pytest>=9.0.1,<10",
   "pytest-asyncio>=0.24.0",
   "pytest-cov>=6.0.0",
