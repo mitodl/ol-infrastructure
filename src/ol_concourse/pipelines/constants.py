@@ -1,6 +1,14 @@
 from pathlib import Path
 
+from ol_concourse.lib.models.pipeline import Duration
+
 GH_ISSUES_DEFAULT_REPOSITORY = "ol-platform-eng/concourse-workflow"
+
+# The github-issues resource defaults to polling the github.mit.edu enterprise
+# appliance (gh_host defaults to https://github.mit.edu/api/v3). That appliance
+# is under heavy load, so pipelines gating on it should poll less often than
+# the resource's own 60m default.
+GH_ISSUES_ENTERPRISE_POLL_FREQUENCY = Duration("4h")
 
 # ECR pull-through cache for Docker Hub — avoids Docker Hub rate limits.
 # Set aws_region (inline dicts) or ecr_region (registry_image()) alongside

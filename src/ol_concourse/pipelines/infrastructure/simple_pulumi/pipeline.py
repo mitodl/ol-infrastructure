@@ -15,7 +15,6 @@ from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
-    Duration,
     GetStep,
     Identifier,
     Input,
@@ -33,6 +32,7 @@ from pydantic import BaseModel, model_validator
 from ol_concourse.pipelines.constants import (
     ECR_REGION,
     GH_ISSUES_DEFAULT_REPOSITORY,
+    GH_ISSUES_ENTERPRISE_POLL_FREQUENCY,
     PULUMI_CODE_PATH,
     PULUMI_WATCHED_PATHS,
     dockerhub_ecr_image_uri,
@@ -687,7 +687,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                 f" {params.prior_stage_stack} deployed."
             ),
             issue_state="closed",
-            poll_frequency=Duration("15m"),
+            poll_frequency=GH_ISSUES_ENTERPRISE_POLL_FREQUENCY,
         )
         cross_env_resources.append(prior_trigger)
         cross_env_custom_deps = {0: [GetStep(get=prior_trigger.name, trigger=True)]}
