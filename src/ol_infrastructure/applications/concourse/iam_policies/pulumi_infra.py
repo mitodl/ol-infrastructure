@@ -20,17 +20,22 @@ _DEFAULT_PATH_MANAGED_GROUP_NAMES = ["Admins", "EKSAdmins", "EKSDevelopers"]
 # builds also run on this pool and are cadence-driven enough that they didn't
 # reliably show up in either usage-history source).
 #
-# IAM self-management actions are scoped to the /ol-applications/* and
-# /ol-infrastructure/* paths this repo provisions under, rather than
-# Resource: "*" -- closing the self-escalation path found via CloudTrail
-# (this role successfully called iam:AttachRolePolicy on itself under its
-# prior AdministratorAccess grant).
+# IAM self-management actions are scoped to the /ol-applications/*,
+# /ol-data/*, and /ol-infrastructure/* paths this repo provisions under,
+# rather than Resource: "*" -- closing the self-escalation path found via
+# CloudTrail (this role successfully called iam:AttachRolePolicy on itself
+# under its prior AdministratorAccess grant).
 policy_definition = {
     "Version": IAM_POLICY_VERSION,
     "Statement": [
         {
             "Effect": "Allow",
             "Action": [
+                "acm-pca:DescribeCertificateAuthority",
+                "acm-pca:GetCertificate",
+                "acm-pca:GetCertificateAuthorityCertificate",
+                "acm-pca:IssueCertificate",
+                "acm-pca:ListTags",
                 "acm:DeleteCertificate",
                 "acm:DescribeCertificate",
                 "acm:ExportCertificate",
@@ -411,20 +416,28 @@ policy_definition = {
                 "iam:CreateInstanceProfile",
                 "iam:CreatePolicy",
                 "iam:CreatePolicyVersion",
+                "iam:CreateRole",
                 "iam:CreateUser",
+                "iam:DeleteAccessKey",
                 "iam:DeleteGroup",
                 "iam:DeletePolicy",
                 "iam:DeletePolicyVersion",
+                "iam:DeleteRole",
                 "iam:DeleteUser",
                 "iam:DetachRolePolicy",
                 "iam:DetachUserPolicy",
                 "iam:RemoveUserFromGroup",
+                "iam:TagRole",
+                "iam:UntagRole",
                 "iam:UpdateAssumeRolePolicy",
+                "iam:UpdateRoleDescription",
             ],
             "Resource": [
                 "arn:aws:iam::*:role/ol-applications/*",
+                "arn:aws:iam::*:role/ol-data/*",
                 "arn:aws:iam::*:role/ol-infrastructure/*",
                 "arn:aws:iam::*:policy/ol-applications/*",
+                "arn:aws:iam::*:policy/ol-data/*",
                 "arn:aws:iam::*:policy/ol-infrastructure/*",
                 "arn:aws:iam::*:instance-profile/ol-applications/*",
                 "arn:aws:iam::*:instance-profile/ol-infrastructure/*",
@@ -443,6 +456,14 @@ policy_definition = {
                 *[
                     f"arn:aws:iam::*:group/{group_name}"
                     for group_name in _DEFAULT_PATH_MANAGED_GROUP_NAMES
+                ],
+                # mit_learn/__main__.py's now-deleted gh_workflow_user (commit
+                # 512678eec removed it from code) was provisioned at the
+                # default "/" path. Enumerated here, same as above, so the
+                # worker can finish deleting it out of Pulumi state.
+                *[
+                    f"arn:aws:iam::*:user/mitopen-gh-workflow-{env}"
+                    for env in ("ci", "qa", "production")
                 ],
             ],
         },
