@@ -53,10 +53,14 @@ concourse_ops_secrets = read_yaml_secrets(Path("concourse/operations.production.
 # Same GitHub App installation Concourse's github-issues resource type can use
 # via auth_method="app" (ol_concourse.lib.resources.github_issues) -- sharing
 # one App instead of each consumer holding its own long-lived PAT. Backed by
-# the "shared/github" entry, the same Vault-synced secret Concourse pipelines
-# reference as ((github.release_bot_app_id)) etc. (see
-# ol_concourse.lib.constants.GITHUB_APP_ID).
-github_secrets = concourse_ops_secrets["pipelines"]["shared/github"]
+# the "shared/github_app" entry, the same Vault-synced secret k8s_apps/
+# pipeline.py references as ((github_app.release_bot_app_id)) etc. Named
+# "github_app" rather than "github" because every Concourse team already has
+# its own team-scoped "github" secret (e.g. secret-concourse/infrastructure/
+# github) -- Concourse's Vault credential manager tries team-scoped paths
+# before the shared fallback, so "github" alone would resolve to the wrong,
+# fieldless secret for any pipeline in a team that already has one.
+github_secrets = concourse_ops_secrets["pipelines"]["shared/github_app"]
 github_app_id = github_secrets["release_bot_app_id"]
 github_app_installation_id = github_secrets["release_bot_app_installation_id"]
 github_app_private_key = github_secrets["release_bot_app_pem"]

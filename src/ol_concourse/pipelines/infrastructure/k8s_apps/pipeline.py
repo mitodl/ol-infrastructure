@@ -855,12 +855,18 @@ def _define_release_resources(
     """Define the release-flow resources: release resource, gates, issues, and GitHub Deployments."""
     # Shared GitHub App installation ol-concourse-lib no longer defaults --
     # every consumer of this library supplies its own credential reference.
-    # Backed by the "shared/github" entry in
+    # Backed by the "shared/github_app" entry in
     # bridge/secrets/concourse/operations.production.yaml (Vault path
-    # secret-concourse/shared/github), the same secret the release bot reads.
-    github_app_id = "((github.release_bot_app_id))"
-    github_app_installation_id = "((github.release_bot_app_installation_id))"
-    github_app_private_key = "((github.release_bot_app_pem))"
+    # secret-concourse/shared/github_app), the same secret the release bot
+    # reads. Deliberately not named "github" -- every Concourse team already
+    # has its own team-scoped "github" secret (e.g. secret-concourse/
+    # infrastructure/github), and Concourse's Vault credential manager tries
+    # team-scoped paths before the shared fallback, so a credential named
+    # plain "github" here would silently resolve against the wrong
+    # (team-scoped, fieldless) secret instead of ever reaching this one.
+    github_app_id = "((github_app.release_bot_app_id))"
+    github_app_installation_id = "((github_app.release_bot_app_installation_id))"
+    github_app_private_key = "((github_app.release_bot_app_pem))"
     release_res = release_resource(
         name=Identifier(f"{app_name}-release"),
         uri=f"https://github.com/{github_repo}",
