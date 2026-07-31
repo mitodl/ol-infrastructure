@@ -83,8 +83,37 @@ def create(
                 ),
             ),
             # --- Deployment availability ---
-            # Fires when the Available condition on a deployment is "false",
-            # meaning the deployment cannot serve traffic.
+            # Fires only when a deployment has zero available replicas -- a genuine
+            # total outage, matching what "is not available" actually implies.
+            #
+            # This used to key off kube_deployment_status_condition's "Available"
+            # condition instead, which is NOT the same thing: that condition goes
+            # false once availableReplicas drops below desiredReplicas -
+            # maxUnavailable, not below 1. maxUnavailable is commonly expressed as a
+            # percentage (e.g. "25%"), and Kubernetes rounds percentage-based
+            # maxUnavailable DOWN, so on a low-replica-count deployment (3 replicas *
+            # 25% = 0.75, rounded down to 0) the condition flips false the moment a
+            # single pod is lost -- e.g. during a slow image pull while a node is
+            # being replaced. Confirmed directly on xpro-production-edxapp-lms-webapp
+            # on 2026-07-27: replicas_available only ever dropped 3 -> 2, never to 0,
+            # yet this alert fired as if the whole deployment were down. Partial
+            # degradation like that is already covered by DeploymentReplicasMissing
+            # above at the appropriate (lower) severity; this rule should only catch
+            # the case its name promises.
+            #
+            # The "and ... spec_replicas > 0" guard excludes deployments deliberately
+            # scaled to zero (e.g. a disabled service in a staging namespace) -- those
+            # sit at 0/0 available/desired indefinitely, which is not an outage.
+            #
+            # The nonzero-valued clause (spec_replicas > 0) is deliberately written
+            # FIRST. Every rule in this pipeline feeds into a fixed threshold stage
+            # that fires on last(A) > 0 (see base.py's _rule_data), and PromQL's
+            # `and` binary operator carries over the *value* of its left-hand side,
+            # not a boolean 1/0 -- so "available == 0 and spec_replicas > 0" would
+            # return the left side's value, which is 0 by construction, and 0 > 0
+            # never fires. Putting the nonzero clause on the left instead means the
+            # surviving series carries spec_replicas' own (always-positive, since
+            # it's already filtered > 0) value through to the threshold stage.
             alerting.RuleGroupRuleArgs(
                 name="DeploymentUnavailableWarning",
                 condition="C",
@@ -95,7 +124,9 @@ def create(
                     "description": "A deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} is not available for an extended period of time."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, deployment, condition, status) (kube_deployment_status_condition{cluster=~".*-(ci|qa)", condition="Available", status="false"}) > 0'
+                    'sum by (cluster, namespace, deployment) (kube_deployment_spec_replicas{cluster=~".*-(ci|qa)"}) > 0'
+                    " and "
+                    'sum by (cluster, namespace, deployment) (kube_deployment_status_replicas_available{cluster=~".*-(ci|qa)"}) == 0'
                 ),
             ),
             alerting.RuleGroupRuleArgs(
@@ -108,15 +139,31 @@ def create(
                     "description": "A deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} is not available for an extended period of time."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, deployment, condition, status) (kube_deployment_status_condition{cluster=~".*-(production)", condition="Available", status="false"}) > 0'
+                    'sum by (cluster, namespace, deployment) (kube_deployment_spec_replicas{cluster=~".*-(production)"}) > 0'
+                    " and "
+                    'sum by (cluster, namespace, deployment) (kube_deployment_status_replicas_available{cluster=~".*-(production)"}) == 0'
                 ),
             ),
             # --- StatefulSet replicas ---
             # Fires when ready replicas / desired replicas < 1.0.
+            #
+            # for_ is 20m, not the more typical 10m, because EBS-backed StatefulSets
+            # (Typesense, etc.) can legitimately drop below full readiness for well
+            # over 10 minutes with no real problem: when Karpenter replaces an
+            # underlying node, more than one pod can be evicted at once, and each one
+            # waits on its EBS volume to detach from the old instance and reattach to
+            # the new one before it can even start. Observed directly on
+            # mitxonline-ts-sts on 2026-07-27: 2 of 3 replicas went down together and
+            # readiness didn't fully recover for ~17 minutes, entirely via normal
+            # volume reattachment with no crash-looping or intervention involved --
+            # comfortably past the old 10m threshold. A StatefulSet genuinely stuck
+            # (e.g. a corrupted Raft log requiring a manual data wipe, as seen
+            # separately on mitx-staging-ts-sts) stays down far longer than 20m
+            # either way, so this doesn't meaningfully delay catching a real issue.
             alerting.RuleGroupRuleArgs(
                 name="StatefulSetReplicasMissingWarning",
                 condition="C",
-                for_="10m",
+                for_="20m",
                 no_data_state="OK",
                 labels={"severity": "warning"},
                 annotations={
@@ -129,7 +176,7 @@ def create(
             alerting.RuleGroupRuleArgs(
                 name="StatefulSetReplicasMissingCritical",
                 condition="C",
-                for_="10m",
+                for_="20m",
                 no_data_state="OK",
                 labels={"severity": "critical"},
                 annotations={
