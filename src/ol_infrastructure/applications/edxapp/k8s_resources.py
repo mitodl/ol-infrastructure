@@ -1475,23 +1475,18 @@ def create_k8s_resources(  # noqa: C901
         ),
     )
 
-    # Keep at least one high_mem worker available across voluntary disruptions (node
-    # drains, cluster upgrades) so a drain cannot take out the only pod running a report.
-    lms_high_mem_celery_pdb = kubernetes.policy.v1.PodDisruptionBudget(
-        f"ol-{stack_info.env_prefix}-edxapp-lms-high-mem-celery-pdb-{stack_info.env_suffix}",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=f"{lms_high_mem_celery_deployment_name}-pdb",
-            namespace=namespace,
-            labels=lms_high_mem_celery_labels,
-        ),
-        spec=kubernetes.policy.v1.PodDisruptionBudgetSpecArgs(
-            min_available=1,
-            selector=kubernetes.meta.v1.LabelSelectorArgs(
-                match_labels=lms_high_mem_celery_selector_labels
-            ),
-        ),
-        opts=pulumi.ResourceOptions(depends_on=[lms_high_mem_celery_deployment]),
-    )
+    # No PodDisruptionBudget here, deliberately. The obvious one -- minAvailable: 1 --
+    # is undrainable: this deployment idles at a single replica, so a budget requiring
+    # one available pod leaves disruptionsAllowed at 0 permanently. Node drains use the
+    # Eviction API, which *does* honour PDBs (unlike the rolling-update path above), so
+    # every eviction would be rejected and `kubectl drain` would block indefinitely,
+    # stalling cluster upgrades until someone deletes the PDB by hand.
+    #
+    # The protection a PDB would have bought is already covered: a drain evicts the
+    # pod, celery warm-shuts-down and finishes the report in flight, and the drain
+    # waits out terminationGracePeriodSeconds before the pod goes away. That bounds a
+    # drain at the grace period rather than blocking it forever, and Karpenter
+    # consolidation is handled separately by the do-not-disrupt annotation.
 
     ############################################
     # Dedicated LMS celery beat deployment
@@ -2017,11 +2012,12 @@ def create_k8s_resources(  # noqa: C901
     # This is not an oversight:
     #
     #   1. make_vpa hardcodes updateMode InPlaceOrRecreate, which falls back to
-    #      *evicting* the pod when a resize cannot be applied in place. Eviction
-    #      mid-report is exactly the disruption this worker exists to avoid. Its PDB
-    #      does block VPA (the Eviction API honours PDBs, unlike rollouts), but only
-    #      while a single replica is running -- once KEDA scales to 2 or 3, a
-    #      minAvailable=1 budget permits evicting the others, report in flight or not.
+    #      *evicting* the pod when a resize cannot be applied in place. Nothing here
+    #      guards against that -- there is no PDB on this deployment, for the reasons
+    #      given at the deployment above. An in-flight report does survive (eviction
+    #      is graceful, so celery finishes the task within the grace period), but the
+    #      pod comes back sized by the recommender rather than by the config, which
+    #      runs straight into (2).
     #   2. VPA sizes from observed usage, and this worker's profile is idle almost
     #      always with rare multi-hour bursts. The recommender would learn the idle
     #      floor and walk the CPU request down toward _worker_vpa_min_allowed's 25m,
