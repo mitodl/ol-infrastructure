@@ -10,6 +10,13 @@ APISIX.
 The data tier — the ``omnigraph-server`` graph service witan reads/writes over
 the cluster network — is a **separate stack** (``applications/omnigraph``),
 reached here via a ``StackReference`` to its ``omnigraph_server_addr`` output.
+
+Migrations are split along that same boundary. **Schema** convergence belongs
+to the omnigraph stack, which runs ``omnigraph cluster apply`` before its
+server restarts — it declares the graphs and bakes their schema files into the
+omnigraph-server image. This stack runs only witan's own **data** backfills
+(``migrations.py``), gated ahead of the MCPServer so a new image never serves
+against a graph its migrations haven't run over.
 ToolHive is only the operator that runs this MCP tier; it is an implementation
 detail of this stack, not part of witan's or omnigraph's identity — hence the
 plain ``witan`` / ``omnigraph`` project and namespace names.
@@ -74,6 +81,7 @@ from ol_infrastructure.applications.witan.mcp_servers import (
     MCP_GROUP_NAME,
     create_mcp_servers,
 )
+from ol_infrastructure.applications.witan.migrations import create_migration_job
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
@@ -284,6 +292,25 @@ witan_image_repository = (
 witan_image = format_docker_image_ref(witan_image_repository, "WITAN")
 
 #########################################
+#   Pre-deploy witan data migrations     #
+#########################################
+# witan's own backfills only — schema convergence belongs to the omnigraph
+# stack's `cluster apply` step, which runs before its server restarts. Gated
+# ahead of the MCPServer below via depends_on, so the new image never serves
+# against a graph its migrations haven't run over. See migrations.py.
+witan_migration_job = create_migration_job(
+    stack_info=stack_info,
+    namespace=NAMESPACE,
+    k8s_global_labels=k8s_global_labels,
+    witan_image=witan_image,
+    omnigraph_server_addr=omnigraph_server_addr,
+    council_graph_id=council_graph_id,
+    witan_ci_token_secret_name=WITAN_CI_TOKEN_SECRET_NAME,
+    witan_ci_token_secret_key=WITAN_CI_TOKEN_SECRET_KEY,
+    witan_ci_token_secret=witan_ci_token_secret,
+)
+
+#########################################
 #   MCPGroup + witan MCPServer           #
 #########################################
 mcp_servers = create_mcp_servers(
@@ -301,6 +328,7 @@ mcp_servers = create_mcp_servers(
     witan_ci_token_secret_name=WITAN_CI_TOKEN_SECRET_NAME,
     witan_ci_token_secret_key=WITAN_CI_TOKEN_SECRET_KEY,
     witan_ci_token_secret=witan_ci_token_secret,
+    migration_job=witan_migration_job,
 )
 
 #########################################
