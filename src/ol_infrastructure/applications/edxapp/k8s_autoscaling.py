@@ -121,7 +121,11 @@ def create_celery_autoscaling_resources(
     lms_high_mem_celery_deployment: kubernetes.apps.v1.Deployment,
     cms_celery_deployment: kubernetes.apps.v1.Deployment,
 ) -> dict[str, Any]:
-    """Create KEDA ScaledObjects for LMS and CMS celery worker deployments.
+    """Create KEDA ScaledObjects for the celery worker deployments.
+
+    Covers three workers: the shared LMS worker (edx.lms.core.default), the
+    dedicated LMS high_mem worker that serves the long instructor-task reports
+    (edx.lms.core.high_mem), and the CMS worker (edx.cms.core.default).
 
     Celery workers use Redis list length triggers (not Prometheus) so they
     remain outside the OLApplicationK8s component.

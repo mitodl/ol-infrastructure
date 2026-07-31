@@ -1338,13 +1338,17 @@ def create_k8s_resources(  # noqa: C901
             selector=kubernetes.meta.v1.LabelSelectorArgs(
                 match_labels=lms_high_mem_celery_selector_labels
             ),
-            # Never run two generations concurrently: a rollout should drain the old
-            # pod (finishing its report) before the replacement starts consuming.
+            # Surge rather than drain-first. The old pod can sit in Terminating for the
+            # whole grace period below while it finishes an in-flight report, so
+            # deleting it before scheduling the replacement would leave
+            # edx.lms.core.high_mem with no consumer for hours during a rollout. Two
+            # generations briefly overlapping is harmless here: each pod runs a single
+            # task at a time and they pull distinct messages off the queue.
             strategy=kubernetes.apps.v1.DeploymentStrategyArgs(
                 type="RollingUpdate",
                 rolling_update=kubernetes.apps.v1.RollingUpdateDeploymentArgs(
-                    max_surge=0,
-                    max_unavailable=1,
+                    max_surge=1,
+                    max_unavailable=0,
                 ),
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
