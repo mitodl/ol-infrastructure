@@ -64,11 +64,10 @@ Key wiring decisions (see also ``k8s/README.md`` in the app repo):
 
 import json
 from pathlib import Path
-from typing import Any
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, InvokeOptions, Output, ResourceOptions, export
+from pulumi import Config, Output, ResourceOptions, export
 from pulumi_aws import ec2
 
 from ol_infrastructure.components.applications.eks import (
@@ -277,66 +276,12 @@ ol_analytics_api_secrets_mount = vault.Mount(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
-# The OAuth2 client-credentials pair the app uses to authenticate its
-# org-manager check to MITx Online (mitodl/mitxonline#3807).  Unlike the Sentry
-# DSN above, no Pulumi stack owns these: the OAuth2 Application record is
-# created by hand in MITx Online's Django admin, so the resulting client id and
-# secret are written once to secret-operations and read back here.  They are
-# merged into the same kv-v2 path as SENTRY_DSN so they reach the pod through
-# the existing envFrom Secret -- the app reads them as
-# OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_{ID,SECRET}.
-#
-# Temporary, along with the round-trip they authenticate: once org-manager
-# status is visible in the Keycloak token (mitodl/hq#10594), the app stops
-# calling MITx Online and these can be deleted along with the Vault entry.
-MITXONLINE_OAUTH_VAULT_PATH = "secret-operations/ol-analytics-api/mitxonline-oauth"
-
-mitxonline_oauth_secrets = vault.generic.get_secret_output(
-    path=MITXONLINE_OAUTH_VAULT_PATH,
-    opts=InvokeOptions(parent=ol_analytics_api_secrets_mount),
-)
-
-
-def _build_static_secrets(secrets: dict[str, Any]) -> str:
-    """Assemble the static-secrets payload, validating the hand-written half.
-
-    The Vault entry behind MITXONLINE_OAUTH_VAULT_PATH is created by an
-    operator rather than by Pulumi, so its shape is a convention and not a
-    guarantee.  Checking here turns a typo'd key into a named, actionable
-    failure at deploy time instead of a bare ``KeyError`` raised from inside
-    this apply.  Empty values are rejected alongside missing ones: reading a
-    blank secret would otherwise deploy an unusable credential that only
-    fails later, in the pod, at the MITx Online token endpoint.
-    """
-    oauth = secrets["mitxonline_oauth"] or {}
-    missing = [key for key in ("client_id", "client_secret") if not oauth.get(key)]
-    if missing:
-        msg = (
-            f"Vault path '{MITXONLINE_OAUTH_VAULT_PATH}' is missing or has an empty "
-            f"value for: {', '.join(missing)}. Create the OAuth2 Application in MITx "
-            "Online (confidential, client-credentials grant, 'b2b:manager-check' "
-            f"scope), then: vault kv put {MITXONLINE_OAUTH_VAULT_PATH} "
-            "client_id=<id> client_secret=<secret>"
-        )
-        raise ValueError(msg)
-    return json.dumps(
-        {
-            "SENTRY_DSN": secrets["sentry_dsn"],
-            "OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_ID": oauth["client_id"],
-            "OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_SECRET": oauth[
-                "client_secret"
-            ],
-        }
-    )
-
-
 ol_analytics_api_static_vault_secrets = vault.generic.Secret(
     f"ol-analytics-api-secrets-{stack_info.env_suffix}",
     path=ol_analytics_api_secrets_mount.path.apply("{}/secrets".format),
-    data_json=Output.all(
-        sentry_dsn=sentry_stack.require_output("ol_analytics_api_sentry_dsn"),
-        mitxonline_oauth=mitxonline_oauth_secrets.data,
-    ).apply(_build_static_secrets),
+    data_json=sentry_stack.require_output("ol_analytics_api_sentry_dsn").apply(
+        lambda dsn: json.dumps({"SENTRY_DSN": dsn})
+    ),
     opts=ResourceOptions(delete_before_replace=True),
 )
 
@@ -362,6 +307,56 @@ static_secrets = OLVaultK8SSecret(
         delete_before_replace=True,
         parent=ol_analytics_api_auth_binding.vault_k8s_resources,
         depends_on=[ol_analytics_api_static_vault_secrets],
+    ),
+)
+
+# The OAuth2 client-credentials pair the app uses to authenticate its
+# org-manager check to MITx Online (mitodl/mitxonline#3807).  Unlike SENTRY_DSN
+# above, no Pulumi stack owns these: the OAuth2 Application record is created by
+# hand in MITx Online's Django admin, and its credentials are written once to
+# secret-operations.
+#
+# Read by the vault-secrets-operator directly at runtime and templated into the
+# env var names the app expects, rather than being pulled into Pulumi with
+# get_secret_output.  That keeps the credential out of Pulumi state entirely and
+# lets a rotation in Vault propagate on the operator's own refresh -- rewriting
+# the Vault entry is enough, with no `pulumi up` in the loop.  Same shape as
+# applications/marimo_data's ol-marimo-app-client secret.
+#
+# Temporary, along with the round-trip it authenticates: once org-manager status
+# is visible in the Keycloak token (mitodl/hq#10594), the app stops calling MITx
+# Online and this can be deleted along with the Vault entry.
+mitxonline_oauth_secret_name = (
+    "ol-analytics-api-mitxonline-oauth"  # pragma: allowlist secret  # noqa: S105
+)
+mitxonline_oauth_secrets = OLVaultK8SSecret(
+    name=f"ol-analytics-api-{stack_info.env_suffix}-mitxonline-oauth-secrets",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name=mitxonline_oauth_secret_name,
+        namespace=APPLICATION_NAMESPACE,
+        labels=k8s_global_labels,
+        dest_secret_name=mitxonline_oauth_secret_name,
+        dest_secret_labels=k8s_global_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="ol-analytics-api/mitxonline-oauth",
+        includes=["client_id", "client_secret"],
+        excludes=[".*"],
+        exclude_raw=True,
+        refresh_after="1h",
+        templates={
+            "OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_ID": (
+                '{{ get .Secrets "client_id" }}'
+            ),
+            "OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_SECRET": (  # pragma: allowlist secret  # noqa: E501
+                '{{ get .Secrets "client_secret" }}'
+            ),
+        },
+        vaultauth=ol_analytics_api_auth_binding.vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        parent=ol_analytics_api_auth_binding.vault_k8s_resources,
     ),
 )
 
@@ -462,7 +457,7 @@ ol_analytics_api_k8s = OLApplicationK8s(
         application_lb_service_name=APPLICATION_NAME,
         application_lb_service_port_name="http",
         k8s_global_labels=k8s_global_labels,
-        env_from_secret_names=[static_secrets_name],
+        env_from_secret_names=[static_secrets_name, mitxonline_oauth_secret_name],
         application_security_group_id=ol_analytics_api_application_security_group.id,
         application_security_group_name=Output.from_input(APPLICATION_NAME),
         application_service_account_name=APPLICATION_NAME,
