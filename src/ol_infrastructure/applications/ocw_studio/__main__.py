@@ -65,6 +65,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
+from ol_infrastructure.lib.github_helper import setup_github_provider
 from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
@@ -87,12 +88,7 @@ setup_vault_provider(skip_child_token=True)
 ocw_studio_config = Config("ocw_studio")
 stack_info = parse_stack()
 
-github_provider = github.Provider(
-    "github-provider",
-    owner=read_yaml_secrets(Path(f"pulumi/github_provider.yaml"))["owner"],  # noqa: F541
-    token=read_yaml_secrets(Path(f"pulumi/github_provider.yaml"))["token"],  # noqa: F541
-)
-github_options = ResourceOptions(provider=github_provider)
+github_provider = setup_github_provider()
 
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 vault_stack = make_stack_reference(
@@ -364,7 +360,6 @@ ocw_starter_webhook = github.RepositoryWebhook(
         content_type="json",
         secret=vault_secrets["github"]["shared_secret"],
     ),
-    opts=github_options,
 )
 
 # Setup AWS MediaConvert Queue
