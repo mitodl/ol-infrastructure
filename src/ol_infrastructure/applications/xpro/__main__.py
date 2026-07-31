@@ -962,8 +962,8 @@ set bereq.http.x-forwarded-host = "{frontend_domain}";""",  # noqa: E501
 
 xpro_tls_configuration = fastly.get_tls_configuration(
     default=False,
-    name="TLS v1.3",
-    tls_protocols=["1.2", "1.3"],
+    name="TLS v1.3+0RTT",
+    tls_protocols=["1.2", "1.3+0RTT"],
     opts=InvokeOptions(provider=fastly_provider.provider),
 )
 
