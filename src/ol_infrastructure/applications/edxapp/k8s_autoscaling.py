@@ -111,14 +111,21 @@ def create_celery_autoscaling_resources(
     replicas_dict: dict[str, Any],
     namespace: str,
     lms_celery_labels: dict[str, str],
+    lms_high_mem_celery_labels: dict[str, str],
     cms_celery_labels: dict[str, str],
     lms_celery_deployment_name: str,
+    lms_high_mem_celery_deployment_name: str,
     cms_celery_deployment_name: str,
     stack_info: StackInfo,
     lms_celery_deployment: kubernetes.apps.v1.Deployment,
+    lms_high_mem_celery_deployment: kubernetes.apps.v1.Deployment,
     cms_celery_deployment: kubernetes.apps.v1.Deployment,
 ) -> dict[str, Any]:
-    """Create KEDA ScaledObjects for LMS and CMS celery worker deployments.
+    """Create KEDA ScaledObjects for the celery worker deployments.
+
+    Covers three workers: the shared LMS worker (edx.lms.core.default), the
+    dedicated LMS high_mem worker that serves the long instructor-task reports
+    (edx.lms.core.high_mem), and the CMS worker (edx.cms.core.default).
 
     Celery workers use Redis list length triggers (not Prometheus) so they
     remain outside the OLApplicationK8s component.
@@ -171,6 +178,73 @@ def create_celery_autoscaling_resources(
         opts=pulumi.ResourceOptions(depends_on=[lms_celery_deployment]),
     )
 
+    # Nothing previously watched edx.lms.core.high_mem, so a queued grade report
+    # produced no scale-up signal at all. Scale on that queue directly.
+    #
+    # listLength is 1: these tasks are minutes-to-hours long and singly-concurrent per
+    # pod, so any queued message means another worker is warranted -- unlike the
+    # default queue where a backlog of 10 short tasks is normal.
+    #
+    # The scale-down guards matter more here than the scale-up ones. A task that has
+    # been picked up no longer counts toward list length, so a lone in-flight report
+    # leaves the queue reading empty; without these the HPA would immediately scale
+    # back toward minReplicaCount and delete the pod running it. The long grace period
+    # on the deployment means such a pod still finishes its task, but there is no
+    # reason to provoke that repeatedly.
+    high_mem_replicas = replicas_dict["celery"].get(
+        "lms_high_mem", {"min": 1, "max": 3}
+    )
+    lms_high_mem_celery_scaledobject = kubernetes.apiextensions.CustomResource(
+        f"ol-{stack_info.env_prefix}-edxapp-lms-high-mem-celery-scaledobject-{stack_info.env_suffix}",
+        api_version="keda.sh/v1alpha1",
+        kind="ScaledObject",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{lms_high_mem_celery_deployment_name}-scaledobject",
+            namespace=namespace,
+            labels=lms_high_mem_celery_labels,
+        ),
+        spec={
+            "scaleTargetRef": {
+                "kind": "Deployment",
+                "name": lms_high_mem_celery_deployment_name,
+            },
+            "pollingInterval": 60,
+            "cooldownPeriod": 1800,
+            "minReplicaCount": high_mem_replicas["min"],
+            "maxReplicaCount": high_mem_replicas["max"],
+            "advanced": {
+                "horizontalPodAutoscalerConfig": {
+                    "behavior": {
+                        "scaleUp": {"stabilizationWindowSeconds": 60},
+                        "scaleDown": {
+                            "stabilizationWindowSeconds": 3600,
+                            "policies": [
+                                {"type": "Pods", "value": 1, "periodSeconds": 1800},
+                            ],
+                        },
+                    }
+                }
+            },
+            "triggers": [
+                {
+                    "type": "redis",
+                    "metadata": {
+                        "address": edxapp_cache.address.apply(
+                            lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
+                        ),
+                        "username": "default",
+                        "databaseIndex": "1",
+                        "password": edxapp_cache.cache_cluster.auth_token,
+                        "listName": "edx.lms.core.high_mem",
+                        "listLength": "1",
+                        "enableTLS": "true",
+                    },
+                }
+            ],
+        },
+        opts=pulumi.ResourceOptions(depends_on=[lms_high_mem_celery_deployment]),
+    )
+
     cms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
         f"ol-{stack_info.env_prefix}-edxapp-cms-celery-scaledobject-{stack_info.env_suffix}",
         api_version="keda.sh/v1alpha1",
@@ -211,5 +285,6 @@ def create_celery_autoscaling_resources(
 
     return {
         "lms_celery_scaledobject": lms_celery_scaledobject,
+        "lms_high_mem_celery_scaledobject": lms_high_mem_celery_scaledobject,
         "cms_celery_scaledobject": cms_celery_scaledobject,
     }
