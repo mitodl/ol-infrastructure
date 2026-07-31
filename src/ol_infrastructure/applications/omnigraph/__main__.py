@@ -29,15 +29,23 @@ Follow-up work this stack does NOT cover (tracked separately):
       docstring. ``schema.pg`` (agent-kit repo,
       ``mcp/servers/witan/schema/schema.pg``) must be baked into the image at
       build time — this Pulumi program has no access to agent-kit's tree.
-    - **Keycloak witan-users token sync.** This stack provisions the
-      ``actor-tokens`` Secret destination but not the job that keeps per-user
-      entries current as Keycloak group membership changes.
+    - **Keycloak witan-users token sync.** This stack writes the Vault
+      ``secret-operations/witan/actor-tokens`` source (below) from a
+      hand-authored SOPS file, and provisions the ``actor-tokens`` Secret
+      destination, but not the job that keeps per-user entries current as
+      Keycloak group membership changes — today the SOPS file only ever
+      carries the one ``svc-witan-ci`` entry.
 """
 
+import json
 from pathlib import Path
+from typing import Any
 
-from pulumi import ResourceOptions, export
+import pulumi_vault as vault
+from pulumi import Output, ResourceOptions, export
 
+from bridge.secrets import sops as _bridge_sops
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.omnigraph.data_tier import (
     create_data_tier,
     omnigraph_server_addr,
@@ -63,6 +71,10 @@ from ol_infrastructure.lib.ol_types import (
 )
 from ol_infrastructure.lib.pulumi_helper import make_stack_reference, parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
+
+# Resolve the bridge secrets directory once at module level using the sops
+# module's own __file__ — the same base path read_yaml_secrets uses internally.
+_BRIDGE_SECRETS_DIR = Path(_bridge_sops.__file__).parent
 
 setup_vault_provider()
 
@@ -99,12 +111,92 @@ k8s_global_labels = k8s_labels.model_dump()
 # source (secret-operations/witan/actor-tokens), agent-kit ADR-0004 D3.
 ACTOR_TOKENS_SECRET_NAME = "actor-tokens"  # noqa: S105  # pragma: allowlist secret
 ACTOR_TOKENS_SECRET_KEY = "tokens.json"  # noqa: S105  # pragma: allowlist secret
-# Key the map is stored under *inside* the Vault secret, which this stack does
-# not provision (out-of-band, see the module docstring). The VSO template below
-# resolves to an empty Secret — and the app to an empty token map — if the
-# Vault secret uses any other key, so the name is part of the contract:
-# `vault kv put secret-operations/witan/actor-tokens tokens_json=@tokens.json`.
+# Key the map is stored under *inside* the Vault secret. Populated below from a
+# SOPS-encrypted, per-environment source file — this is the contract that file
+# must follow (an "actor_tokens" mapping under this key), and the VSO template
+# further down resolves to an empty Secret — and the app to an empty token
+# map — if the Vault secret uses any other key.
 ACTOR_TOKENS_VAULT_KEY = "tokens_json"  # pragma: allowlist secret
+# witan's own module-level fallback OmnigraphClient authenticates as this raw
+# token (WITAN_MEMORY_TOKEN) when a request carries no per-actor JWT — see
+# applications/witan/__main__.py and witan_policy.hcl. Its value must match
+# the "svc-witan-ci" entry of the actor-tokens map above; both come from the
+# same SOPS source record below so they can't drift.
+WITAN_CI_TOKEN_VAULT_KEY = "token"  # noqa: S105  # pragma: allowlist secret
+
+##############################################
+#   Vault secret source (SOPS -> Vault)       #
+##############################################
+# This stack is the sole writer of both Vault paths below — the witan stack
+# (applications/witan) only ever reads them via its own OLVaultK8SSecret. One
+# writer per path avoids two independent Pulumi programs racing to write the
+# same Vault secret. The destination path is deliberately the same literal
+# string in every environment: CI/QA/Production each already have their own
+# physically separate Vault server (vault-<env>.odl.mit.edu, see
+# setup_vault_provider), so environment separation comes from which Vault
+# this stack's provider is pointed at, not from anything in the path itself.
+# Not yet seeded for every environment (bootstrapping is manual), so a
+# *missing* file is read best-effort — that environment just gets neither
+# Vault write, leaving actor_tokens_secret's VSO sync exactly as unfulfilled
+# as it is today rather than hard-failing the rest of this stack's resources
+# (same tolerance open_metadata/__main__.py uses for its own connector
+# secrets). A *present* file is not optional, though: a decrypt failure or
+# missing/mismatched keys fails the whole preview/up rather than silently
+# creating actor_tokens_secret and the Deployment that mounts it against an
+# incomplete or absent Vault source — which would just recreate the
+# ContainerCreating bug this stack exists to fix, with `pulumi up` reporting
+# success.
+_witan_secrets_path = Path(f"omnigraph/secrets.{stack_info.env_suffix}.yaml")
+_witan_secrets_source: dict[str, Any] = {}
+if (_BRIDGE_SECRETS_DIR / _witan_secrets_path).exists():
+    _witan_secrets_source = read_yaml_secrets(_witan_secrets_path)
+    if not isinstance(_witan_secrets_source, dict):
+        msg = (
+            f"Failed to decrypt omnigraph/secrets.{stack_info.env_suffix}.yaml: "
+            f"expected a dict but got {type(_witan_secrets_source).__name__}. "
+            "Check that sops can decrypt the file and that Vault-transit/KMS "
+            "access is available."
+        )
+        raise TypeError(msg)
+
+    _actor_tokens_map = _witan_secrets_source.get("actor_tokens") or {}
+    _witan_ci_token = _witan_secrets_source.get("ci_token")
+    if not _witan_ci_token or not _actor_tokens_map:
+        msg = (
+            f"omnigraph/secrets.{stack_info.env_suffix}.yaml is missing "
+            "required keys: both 'ci_token' and a non-empty 'actor_tokens' "
+            "map are required once the file exists."
+        )
+        raise ValueError(msg)
+    if _actor_tokens_map.get("svc-witan-ci") != _witan_ci_token:
+        msg = (
+            f"omnigraph/secrets.{stack_info.env_suffix}.yaml: ci_token must "
+            "match actor_tokens['svc-witan-ci'] (ADR-0009 decision point 3) "
+            "— they are the same token exposed to two different consumers."
+        )
+        raise ValueError(msg)
+else:
+    _actor_tokens_map = {}
+    _witan_ci_token = None
+
+actor_tokens_vault_secret = None
+if _actor_tokens_map:
+    actor_tokens_vault_secret = vault.generic.Secret(
+        f"omnigraph-actor-tokens-vault-secret-{stack_info.env_suffix}",
+        path="secret-operations/witan/actor-tokens",
+        data_json=Output.secret(
+            json.dumps({ACTOR_TOKENS_VAULT_KEY: json.dumps(_actor_tokens_map)})
+        ),
+    )
+
+if _witan_ci_token:
+    vault.generic.Secret(
+        f"omnigraph-witan-ci-token-vault-secret-{stack_info.env_suffix}",
+        path="secret-operations/witan/ci-token",
+        data_json=Output.secret(
+            json.dumps({WITAN_CI_TOKEN_VAULT_KEY: _witan_ci_token})
+        ),
+    )
 
 ##############################################
 #   Vault auth binding (IRSA + VSO sync)      #
@@ -156,7 +248,10 @@ actor_tokens_secret = OLVaultK8SSecret(
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
-        depends_on=omnigraph_auth_binding.vault_k8s_resources,
+        depends_on=[
+            omnigraph_auth_binding.vault_k8s_resources,
+            *([actor_tokens_vault_secret] if actor_tokens_vault_secret else []),
+        ],
     ),
 )
 
