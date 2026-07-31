@@ -135,24 +135,49 @@ WITAN_CI_TOKEN_VAULT_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 # physically separate Vault server (vault-<env>.odl.mit.edu, see
 # setup_vault_provider), so environment separation comes from which Vault
 # this stack's provider is pointed at, not from anything in the path itself.
-# Not yet seeded for every environment (bootstrapping is manual), so this
-# reads best-effort: an environment without the file yet just gets neither
+# Not yet seeded for every environment (bootstrapping is manual), so a
+# *missing* file is read best-effort — that environment just gets neither
 # Vault write, leaving actor_tokens_secret's VSO sync exactly as unfulfilled
-# as it is today rather than hard-failing the rest of this stack's resources.
+# as it is today rather than hard-failing the rest of this stack's resources
+# (same tolerance open_metadata/__main__.py uses for its own connector
+# secrets). A *present* file is not optional, though: a decrypt failure or
+# missing/mismatched keys fails the whole preview/up rather than silently
+# creating actor_tokens_secret and the Deployment that mounts it against an
+# incomplete or absent Vault source — which would just recreate the
+# ContainerCreating bug this stack exists to fix, with `pulumi up` reporting
+# success.
 _witan_secrets_path = Path(f"omnigraph/secrets.{stack_info.env_suffix}.yaml")
 _witan_secrets_source: dict[str, Any] = {}
 if (_BRIDGE_SECRETS_DIR / _witan_secrets_path).exists():
     _witan_secrets_source = read_yaml_secrets(_witan_secrets_path)
+    if not isinstance(_witan_secrets_source, dict):
+        msg = (
+            f"Failed to decrypt omnigraph/secrets.{stack_info.env_suffix}.yaml: "
+            f"expected a dict but got {type(_witan_secrets_source).__name__}. "
+            "Check that sops can decrypt the file and that Vault-transit/KMS "
+            "access is available."
+        )
+        raise TypeError(msg)
 
-_actor_tokens_map = _witan_secrets_source.get("actor_tokens") or {}
-_witan_ci_token = _witan_secrets_source.get("ci_token")
-if _witan_ci_token and _actor_tokens_map.get("svc-witan-ci") != _witan_ci_token:
-    msg = (
-        f"omnigraph/secrets.{stack_info.env_suffix}.yaml: ci_token must match "
-        "actor_tokens['svc-witan-ci'] (ADR-0009 decision point 3) — they are "
-        "the same token exposed to two different consumers."
-    )
-    raise ValueError(msg)
+    _actor_tokens_map = _witan_secrets_source.get("actor_tokens") or {}
+    _witan_ci_token = _witan_secrets_source.get("ci_token")
+    if not _witan_ci_token or not _actor_tokens_map:
+        msg = (
+            f"omnigraph/secrets.{stack_info.env_suffix}.yaml is missing "
+            "required keys: both 'ci_token' and a non-empty 'actor_tokens' "
+            "map are required once the file exists."
+        )
+        raise ValueError(msg)
+    if _actor_tokens_map.get("svc-witan-ci") != _witan_ci_token:
+        msg = (
+            f"omnigraph/secrets.{stack_info.env_suffix}.yaml: ci_token must "
+            "match actor_tokens['svc-witan-ci'] (ADR-0009 decision point 3) "
+            "— they are the same token exposed to two different consumers."
+        )
+        raise ValueError(msg)
+else:
+    _actor_tokens_map = {}
+    _witan_ci_token = None
 
 actor_tokens_vault_secret = None
 if _actor_tokens_map:
