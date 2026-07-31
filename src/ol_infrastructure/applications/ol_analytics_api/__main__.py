@@ -41,7 +41,7 @@ Key wiring decisions (see also ``k8s/README.md`` in the app repo):
   dry-run reference) means the ``/health/{startup,readiness,liveness}/`` probe
   paths and timings that ``core/health.py`` was built to match come straight
   from the component instead of being maintained in a second place.  The
-  service runs a single uvicorn process on port 8000 with no nginx sidecar, so
+  service runs a single Granian worker on port 8000 with no nginx sidecar, so
   ``import_nginx_config`` is off and the probes are re-pointed at 8000.  This is
   the first data-cluster use of ``OLApplicationK8s``; it creates a
   ``SecurityGroupPolicy`` binding the pods to a dedicated security group (see
@@ -88,6 +88,7 @@ from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.k8s import (
+    GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sConfig,
 )
@@ -117,9 +118,9 @@ from ol_infrastructure.lib.pulumi_helper import (
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 # The container listens on this port (see the app repo's Dockerfile CMD:
-# `uvicorn ol_analytics_api.main:app --host 0.0.0.0 --port 8000`).  No nginx
-# sidecar sits in front, so the Service and the health probes target it
-# directly.
+# `granian --interface asgi --host 0.0.0.0 --port 8000
+# ol_analytics_api.main:app`).  No nginx sidecar sits in front, so the Service
+# and the health probes target it directly.
 APPLICATION_PORT = 8000
 
 APPLICATION_NAME = "ol-analytics-api"
@@ -415,7 +416,33 @@ ol_analytics_api_k8s = OLApplicationK8s(
         application_image_repository="mitodl/ol-analytics-api-app",
         **docker_image_config_kwargs("OL_ANALYTICS_API"),
         application_min_replicas=ol_analytics_api_config.get_int("min_replicas") or 2,
-        # The image's own CMD runs uvicorn on port 8000 -- no command override.
+        # Granian settings come from the shared component rather than being left
+        # to the image's own CMD, so the server config is visible and diffable in
+        # this stack (and picks up the component's metrics/PodMonitor wiring).
+        # The image CMD stays as the local-run default; this supersedes it.
+        granian_config=GranianConfig(
+            # FastAPI is ASGI; Granian's own default interface is RSGI.
+            interface="asgi",
+            # Not DEFAULT_WSGI_PORT: there is no nginx sidecar here, so the
+            # Service and the health probes talk to Granian directly on
+            # APPLICATION_PORT (see import_nginx_config=False below).
+            port=APPLICATION_PORT,
+            # Scale horizontally on replicas rather than workers-per-pod --
+            # this pod is CPU-request-small (100m) and the workload is
+            # IO-bound on StarRocks, not CPU-bound.
+            workers=1,
+            runtime_threads=1,
+            # blocking_threads is deliberately unset: Granian forces it to 1
+            # on the asgi interface and the component rejects an explicit >1.
+            #
+            # No websockets anywhere in this service's surface.
+            no_ws=True,
+            # Matches the app's own LOG_LEVEL=INFO, so Granian's lifecycle
+            # lines land in Loki alongside the app's structured output rather
+            # than being suppressed at the component's "warning" default.
+            log_level="info",
+            application_module="ol_analytics_api.main:app",
+        ),
         application_port=APPLICATION_PORT,
         import_nginx_config=False,
         # Not a Django app: no migrations, no collectstatic, no nginx.
