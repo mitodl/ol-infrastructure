@@ -67,7 +67,7 @@ from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions, export
+from pulumi import Config, InvokeOptions, Output, ResourceOptions, export
 from pulumi_aws import ec2
 
 from ol_infrastructure.components.applications.eks import (
@@ -276,11 +276,41 @@ ol_analytics_api_secrets_mount = vault.Mount(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
+# The OAuth2 client-credentials pair the app uses to authenticate its
+# org-manager check to MITx Online (mitodl/mitxonline#3807).  Unlike the Sentry
+# DSN above, no Pulumi stack owns these: the OAuth2 Application record is
+# created by hand in MITx Online's Django admin, so the resulting client id and
+# secret are written once to secret-operations and read back here.  They are
+# merged into the same kv-v2 path as SENTRY_DSN so they reach the pod through
+# the existing envFrom Secret -- the app reads them as
+# OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_{ID,SECRET}.
+#
+# Temporary, along with the round-trip they authenticate: once org-manager
+# status is visible in the Keycloak token (mitodl/hq#10594), the app stops
+# calling MITx Online and these can be deleted along with the Vault entry.
+mitxonline_oauth_secrets = vault.generic.get_secret_output(
+    path="secret-operations/ol-analytics-api/mitxonline-oauth",
+    opts=InvokeOptions(parent=ol_analytics_api_secrets_mount),
+)
+
 ol_analytics_api_static_vault_secrets = vault.generic.Secret(
     f"ol-analytics-api-secrets-{stack_info.env_suffix}",
     path=ol_analytics_api_secrets_mount.path.apply("{}/secrets".format),
-    data_json=sentry_stack.require_output("ol_analytics_api_sentry_dsn").apply(
-        lambda dsn: json.dumps({"SENTRY_DSN": dsn})
+    data_json=Output.all(
+        sentry_dsn=sentry_stack.require_output("ol_analytics_api_sentry_dsn"),
+        mitxonline_oauth=mitxonline_oauth_secrets.data,
+    ).apply(
+        lambda secrets: json.dumps(
+            {
+                "SENTRY_DSN": secrets["sentry_dsn"],
+                "OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_ID": secrets[
+                    "mitxonline_oauth"
+                ]["client_id"],
+                "OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_SECRET": secrets[
+                    "mitxonline_oauth"
+                ]["client_secret"],
+            }
+        )
     ),
     opts=ResourceOptions(delete_before_replace=True),
 )
