@@ -56,9 +56,11 @@ silently assumed:
       assigns the job of "walking the Keycloak witan-users group/role
       membership and writing a generated token per user" into the shared
       actor-tokens source. This stack only provisions the destination (the
-      Vault-backed ``actor-tokens`` Secret, seeded with at minimum the
-      ``svc-witan-ci`` entry) — the sync job that keeps per-user entries
-      current as Keycloak group membership changes is not yet built.
+      Vault-backed ``actor-tokens`` Secret) — the omnigraph stack
+      (``applications/omnigraph``) writes the Vault source itself from a
+      SOPS file, seeded today with at minimum the ``svc-witan-ci`` entry —
+      the sync job that keeps per-user entries current as Keycloak group
+      membership changes is not yet built.
 """
 
 from pathlib import Path
@@ -172,12 +174,12 @@ WITAN_CI_TOKEN_SECRET_NAME = "witan-ci-token"  # noqa: S105  # pragma: allowlist
 WITAN_CI_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 ACTOR_TOKENS_SECRET_NAME = "actor-tokens"  # noqa: S105  # pragma: allowlist secret
 ACTOR_TOKENS_SECRET_KEY = "tokens.json"  # noqa: S105  # pragma: allowlist secret
-# Keys these maps are stored under *inside* their Vault secrets, which this
-# stack does not provision (out-of-band, see the module docstring). The VSO
-# templates below resolve to empty Secrets — and the apps to empty tokens — if
-# the Vault secrets use any other key, so the names are part of the contract:
-#   vault kv put secret-operations/witan/ci-token token=<raw token>
-#   vault kv put secret-operations/witan/actor-tokens tokens_json=@tokens.json
+# Keys these maps are stored under *inside* their Vault secrets. This stack
+# only reads them (OLVaultK8SSecret/VSO below) — the omnigraph stack
+# (applications/omnigraph/__main__.py) is the sole writer, populating both
+# from a SOPS-encrypted per-environment file. The VSO templates below resolve
+# to empty Secrets — and the apps to empty tokens — if the Vault secrets use
+# any other key, so the names are part of the contract.
 WITAN_CI_TOKEN_VAULT_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 ACTOR_TOKENS_VAULT_KEY = "tokens_json"  # pragma: allowlist secret
 
