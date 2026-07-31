@@ -77,6 +77,16 @@ from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
 )
 
+# Long-running instructor tasks (grade reports, problem grade reports, certificate
+# generation) are routed to edx.lms.core.high_mem via GRADES_DOWNLOAD_ROUTING_KEY. A
+# 5k-learner problem grade report measured ~80 minutes of wall clock, so the high_mem
+# worker gets a grace period comfortably longer than that. On SIGTERM celery performs a
+# warm shutdown: it stops prefetching and finishes the task already in flight, and
+# Kubernetes waits up to terminationGracePeriodSeconds for that to happen. Without this
+# the pod is SIGKILLed after the 30s default and the report dies silently mid-run, which
+# is what mitodl/hq#11978 was.
+HIGH_MEM_CELERY_TERMINATION_GRACE_PERIOD_SECONDS = 4 * 60 * 60
+
 
 def create_k8s_resources(  # noqa: C901
     aws_config: AWSBase,
@@ -98,6 +108,7 @@ def create_k8s_resources(  # noqa: C901
     cms_webapp_deployment_name = f"{env_name}-edxapp-cms-webapp"
 
     lms_celery_deployment_name = f"{env_name}-edxapp-lms-celery"
+    lms_high_mem_celery_deployment_name = f"{env_name}-edxapp-lms-high-mem-celery"
     cms_celery_deployment_name = f"{env_name}-edxapp-cms-celery"
     lms_beat_deployment_name = f"{env_name}-edxapp-lms-beat"
 
@@ -107,6 +118,7 @@ def create_k8s_resources(  # noqa: C901
         "lms-edxapp-app",  # LMS webapp (OLApplicationK8s application_name="lms-edxapp")
         "cms-edxapp-app",  # CMS webapp (OLApplicationK8s application_name="cms-edxapp")
         lms_celery_deployment_name,
+        lms_high_mem_celery_deployment_name,
         cms_celery_deployment_name,
         lms_beat_deployment_name,
         f"{env_name}-edxapp-lms-process-scheduled-emails",
@@ -1236,7 +1248,11 @@ def create_k8s_resources(  # noqa: C901
                                 "--hostname=edx.lms.core.default.%h",
                                 "--max-tasks-per-child",
                                 "100",
-                                "--queues=edx.lms.core.default,edx.lms.core.high,edx.lms.core.high_mem",
+                                # edx.lms.core.high_mem is deliberately absent: it is
+                                # served by the dedicated high-mem deployment below so
+                                # that long instructor-task reports are not killed by
+                                # the scale-down churn this deployment experiences.
+                                "--queues=edx.lms.core.default,edx.lms.core.high",
                                 "--exclude-queues=edx.cms.core.default",
                                 "--concurrency=2",
                                 "--prefetch-multiplier=1",
@@ -1275,6 +1291,202 @@ def create_k8s_resources(  # noqa: C901
         opts=pulumi.ResourceOptions(
             depends_on=[v for v in lms_edxapp_config_sources.values() if v is not None]
         ),
+    )
+
+    ############################################
+    # Dedicated LMS high_mem celery deployment
+    #
+    # Serves only edx.lms.core.high_mem, which is where edx-platform routes the
+    # long-running instructor tasks (calculate_grades_csv,
+    # calculate_problem_grade_report, calculate_problem_responses_csv,
+    # generate_certificates) via GRADES_DOWNLOAD_ROUTING_KEY -> HIGH_MEM_QUEUE.
+    #
+    # These previously ran on the shared LMS worker above, which is scaled by KEDA on
+    # the depth of edx.lms.core.default. Every scale-down of that unrelated queue --
+    # several a day -- deleted pods with only the default 30s grace period, killing
+    # in-flight reports partway through and leaving the instructor dashboard showing
+    # them as perpetually in progress (mitodl/hq#11978).
+    #
+    # The isolation here is what makes a multi-hour report survivable:
+    #   * its own queue, so shared-worker churn cannot touch it
+    #   * a grace period longer than the job, so celery's warm shutdown can finish the
+    #     task in flight instead of being SIGKILLed
+    #   * do-not-disrupt / safe-to-evict=false, so node consolidation leaves it alone
+    #   * concurrency 1 and max-tasks-per-child 1, so one report has the pod to itself
+    #     and its RSS is returned to the OS afterwards rather than accumulating
+    ############################################
+    # Fall back to the shared LMS celery sizing when a stack has not been given
+    # explicit high_mem values, so this deployment works on every stack unmodified.
+    high_mem_resources = resources_dict["celery"].get(
+        "lms_high_mem", resources_dict["celery"]["lms"]
+    )
+    lms_high_mem_celery_selector_labels = k8s_global_labels | {
+        "ol.mit.edu/component": "edxapp-lms-high-mem-celery",
+        "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
+    }
+    lms_high_mem_celery_labels = lms_high_mem_celery_selector_labels | {
+        "ol.mit.edu/edxapp-celery-sg": "true",
+    }
+    lms_high_mem_celery_deployment = kubernetes.apps.v1.Deployment(
+        f"ol-{stack_info.env_prefix}-edxapp-lms-high-mem-celery-deployment-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=lms_high_mem_celery_deployment_name,
+            namespace=namespace,
+            labels=lms_high_mem_celery_labels,
+        ),
+        spec=kubernetes.apps.v1.DeploymentSpecArgs(
+            selector=kubernetes.meta.v1.LabelSelectorArgs(
+                match_labels=lms_high_mem_celery_selector_labels
+            ),
+            # Never run two generations concurrently: a rollout should drain the old
+            # pod (finishing its report) before the replacement starts consuming.
+            strategy=kubernetes.apps.v1.DeploymentStrategyArgs(
+                type="RollingUpdate",
+                rolling_update=kubernetes.apps.v1.RollingUpdateDeploymentArgs(
+                    max_surge=0,
+                    max_unavailable=1,
+                ),
+            ),
+            template=kubernetes.core.v1.PodTemplateSpecArgs(
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    labels=lms_high_mem_celery_labels,
+                    annotations={
+                        # Keep Karpenter and the cluster autoscaler from reclaiming the
+                        # node underneath a running report.
+                        "karpenter.sh/do-not-disrupt": "true",
+                        "cluster-autoscaler.kubernetes.io/safe-to-evict": "false",
+                    },
+                ),
+                spec=kubernetes.core.v1.PodSpecArgs(
+                    termination_grace_period_seconds=HIGH_MEM_CELERY_TERMINATION_GRACE_PERIOD_SECONDS,
+                    affinity=kubernetes.core.v1.AffinityArgs(
+                        pod_anti_affinity=kubernetes.core.v1.PodAntiAffinityArgs(
+                            preferred_during_scheduling_ignored_during_execution=[
+                                kubernetes.core.v1.WeightedPodAffinityTermArgs(
+                                    weight=100,
+                                    pod_affinity_term=kubernetes.core.v1.PodAffinityTermArgs(
+                                        label_selector=kubernetes.meta.v1.LabelSelectorArgs(
+                                            match_labels=lms_high_mem_celery_selector_labels,
+                                        ),
+                                        topology_key="kubernetes.io/hostname",
+                                    ),
+                                ),
+                            ]
+                        )
+                    ),
+                    service_account_name=vault_k8s_resources.service_account_name,
+                    security_context=pod_security_context,
+                    volumes=lms_edxapp_volumes,
+                    init_containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="export-course-repos-mkdir",
+                            image=cached_image_uri("busybox:1.35"),
+                            command=[
+                                "/bin/sh",
+                                "-c",
+                                "mkdir -p /openedx/data/export_course_repos",
+                            ],
+                            volume_mounts=[
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="openedx-data",
+                                    mount_path="/openedx/data",
+                                ),
+                            ],
+                        ),
+                        kubernetes.core.v1.ContainerArgs(
+                            name="config-aggregator",
+                            image=cached_image_uri("busybox:1.35"),
+                            command=["/bin/sh", "-c"],
+                            args=[
+                                "cat /openedx/config-sources/*/*.yaml > /openedx/config/lms.env.yml"
+                            ],
+                            volume_mounts=[
+                                *lms_edxapp_init_volume_mounts,
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="edxapp-config",
+                                    mount_path="/openedx/config",
+                                ),
+                            ],
+                        ),
+                    ],
+                    containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="lms-edxapp",
+                            image=cached_image_uri(
+                                f"mitodl/edxapp@{EDXAPP_DOCKER_IMAGE_DIGEST}"
+                            ),
+                            command=["celery"],
+                            args=[
+                                "--app=lms.celery",
+                                "worker",
+                                "-E",
+                                "--loglevel=info",
+                                "--hostname=edx.lms.core.high_mem.%h",
+                                # One report per process, then recycle, so a report's
+                                # peak RSS is never carried into the next one.
+                                "--max-tasks-per-child",
+                                "1",
+                                "--queues=edx.lms.core.high_mem",
+                                "--exclude-queues=edx.cms.core.default",
+                                "--concurrency=1",
+                                "--prefetch-multiplier=1",
+                            ],
+                            env=[
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="SERVICE_VARIANT", value="lms"
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="DJANGO_SETTINGS_MODULE",
+                                    value="lms.envs.production",
+                                ),
+                                *celery_env_vars,
+                            ],
+                            resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                requests={
+                                    "cpu": high_mem_resources["cpu_request"],
+                                    "memory": high_mem_resources["memory_request"],
+                                    # instructor_task's TemporaryFileReportMixin spills
+                                    # report rows to /tmp, which is the container's
+                                    # writable layer (node disk). Declare it so a large
+                                    # report cannot trigger node disk-pressure eviction.
+                                    "ephemeral-storage": high_mem_resources.get(
+                                        "ephemeral_storage_request", "2Gi"
+                                    ),
+                                },
+                                limits={
+                                    "memory": high_mem_resources["memory_limit"],
+                                    "ephemeral-storage": high_mem_resources.get(
+                                        "ephemeral_storage_limit", "8Gi"
+                                    ),
+                                },
+                            ),
+                            volume_mounts=celery_volume_mounts,
+                        )
+                    ],
+                ),
+            ),
+        ),
+        opts=pulumi.ResourceOptions(
+            depends_on=[v for v in lms_edxapp_config_sources.values() if v is not None]
+        ),
+    )
+
+    # Keep at least one high_mem worker available across voluntary disruptions (node
+    # drains, cluster upgrades) so a drain cannot take out the only pod running a report.
+    lms_high_mem_celery_pdb = kubernetes.policy.v1.PodDisruptionBudget(
+        f"ol-{stack_info.env_prefix}-edxapp-lms-high-mem-celery-pdb-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{lms_high_mem_celery_deployment_name}-pdb",
+            namespace=namespace,
+            labels=lms_high_mem_celery_labels,
+        ),
+        spec=kubernetes.policy.v1.PodDisruptionBudgetSpecArgs(
+            min_available=1,
+            selector=kubernetes.meta.v1.LabelSelectorArgs(
+                match_labels=lms_high_mem_celery_selector_labels
+            ),
+        ),
+        opts=pulumi.ResourceOptions(depends_on=[lms_high_mem_celery_deployment]),
     )
 
     ############################################
@@ -1621,11 +1833,14 @@ def create_k8s_resources(  # noqa: C901
         replicas_dict=replicas_dict,
         namespace=namespace,
         lms_celery_labels=lms_celery_labels,
+        lms_high_mem_celery_labels=lms_high_mem_celery_labels,
         cms_celery_labels=cms_celery_labels,
         lms_celery_deployment_name=lms_celery_deployment_name,
+        lms_high_mem_celery_deployment_name=lms_high_mem_celery_deployment_name,
         cms_celery_deployment_name=cms_celery_deployment_name,
         stack_info=stack_info,
         lms_celery_deployment=lms_celery_deployment,
+        lms_high_mem_celery_deployment=lms_high_mem_celery_deployment,
         cms_celery_deployment=cms_celery_deployment,
     )
 
