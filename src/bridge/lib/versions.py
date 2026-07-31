@@ -32,8 +32,6 @@ AIRBYTE_CHART_VERSION = "2.1.1"
 SUPERSET_CHART_VERSION = "0.22.3"
 # renovate: datasource=helm depName=tika packageName=tika registryUrl=https://apache.jfrog.io/artifactory/tika
 TIKA_CHART_VERSION = "3.2.2"
-# renovate: datasource=helm depName=openlit packageName=openlit registryUrl=https://openlit.github.io/helm
-OPENLIT_CHART_VERSION = "1.24.0"
 # renovate: datasource=helm depName=apisix packageName=apisix registryUrl=https://apache.github.io/apisix-helm-chart
 APISIX_CHART_VERSION = "2.16.0"
 # renovate: datasource=helm depName=aws-load-balancer-controller packageName=aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts

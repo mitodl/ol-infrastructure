@@ -478,11 +478,6 @@ def _create_clickhouse_installation(  # noqa: PLR0913
         "admin/profile": "default",
         "admin/quota": "default",
         "admin/networks/ip": ["::/0", "0.0.0.0/0"],
-        "openlit/password_sha256_hex": _secret_ref("openlit_sha256"),
-        "openlit/profile": "llmops_profile",
-        "openlit/quota": "llmops_quota",
-        "openlit/networks/ip": ["::/0", "0.0.0.0/0"],
-        "openlit/allow_databases/database": "openlit_db",
         "opik/password_sha256_hex": _secret_ref("opik_sha256"),
         "opik/profile": "llmops_profile",
         "opik/quota": "llmops_quota",
@@ -657,11 +652,6 @@ admin_password = _require_password(
     or Output.secret("changeme"),  # pragma: allowlist secret
     "admin",
 )
-openlit_password = _require_password(
-    clickhouse_config.get_secret("openlit_password")
-    or Output.secret("changeme"),  # pragma: allowlist secret
-    "openlit",
-)
 opik_password = _require_password(
     clickhouse_config.get_secret("opik_password")
     or Output.secret("changeme"),  # pragma: allowlist secret
@@ -774,7 +764,6 @@ vault.kv.SecretV2(
     name="credentials",
     data_json=Output.all(
         admin=admin_password,
-        openlit=openlit_password,
         opik=opik_password,
     ).apply(json.dumps),
 )
@@ -794,7 +783,6 @@ vault.kv.SecretV2(
 ############################################################
 USERS_HASH_TEMPLATES = {
     "admin_sha256": '{{ get .Secrets "admin" | sha256sum }}',
-    "openlit_sha256": '{{ get .Secrets "openlit" | sha256sum }}',
     "opik_sha256": '{{ get .Secrets "opik" | sha256sum }}',
 }
 
@@ -881,7 +869,7 @@ clickhouse_installation = _create_clickhouse_installation(
 #     clickhouse-client --user admin --password <admin_password> \
 #     --query "CREATE DATABASE IF NOT EXISTS opik_db"
 #
-# Required databases: openlit_db, opik_db
+# Required databases: opik_db
 ############################################################
 
 ############################################################
@@ -893,9 +881,9 @@ clickhouse_installation = _create_clickhouse_installation(
 #     all healthy ClickHouse replicas via the HTTP (8123) and Native (9000)
 #     ports for intra-cluster LLMOps clients.
 #   • A NetworkPolicy that restricts external access: only pods within the
-#     ``clickhouse`` namespace and the LLMOps namespaces (openlit,
-#     opik) may reach ClickHouse on the data ports; inter-replica and Keeper
-#     traffic is allowed namespace-wide.
+#     ``clickhouse`` namespace and the LLMOps namespaces (opik) may reach
+#     ClickHouse on the data ports; inter-replica and Keeper traffic is
+#     allowed namespace-wide.
 ############################################################
 clickhouse_client_service = kubernetes.core.v1.Service(
     f"clickhouse-client-service-{stack_info.env_suffix}",
@@ -926,7 +914,7 @@ clickhouse_client_service = kubernetes.core.v1.Service(
 # the `eks:namespaces` list in the `infrastructure.aws.eks.data.*` stack
 # configurations. If they are missing, this NetworkPolicy will not allow
 # traffic from LLMOps workloads in those namespaces as intended.
-LLMOPS_NAMESPACES = ["openlit", "opik"]
+LLMOPS_NAMESPACES = ["opik"]
 
 clickhouse_network_policy = kubernetes.networking.v1.NetworkPolicy(
     f"clickhouse-network-policy-{stack_info.env_suffix}",
@@ -1059,7 +1047,7 @@ export(
         ClickHouse Native: clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:9000
         Keeper: keeper-clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:2181
 
-        Tenants: openlit_db, opik_db
+        Tenants: opik_db
         Hot/cold cutoff: {hot_data_days} days (table TTL MOVE expressions)
         Cold storage: s3://{cold_bucket_name}/data/
     """),

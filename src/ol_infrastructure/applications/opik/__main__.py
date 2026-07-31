@@ -152,7 +152,7 @@ opik_app = OLEKSAuthBinding(
 # VSO K8s Secret — ClickHouse credentials as env vars
 #
 # The Vault Secrets Operator renders the templates below into a K8s Secret. Raw
-# Vault keys (admin, tensorzero, openlit, ...) are excluded by default; only the
+# Vault keys (admin, tensorzero, ...) are excluded by default; only the
 # rendered env-var keys are written. Both keys map to the single ``opik`` user
 # password so the backend can use it for runtime queries and migrations alike.
 ############################################################

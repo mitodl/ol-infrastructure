@@ -12,8 +12,6 @@ config:
     secure: v1:WdbOXcL50iy2vPp6:rRjyAS03iI7dAsgQ1OGk+Bre1b3I8xRJt8R/driwT5Mk13U2MBuHHzLbhvOjGBZHO+4glTiZQc0=
   clickhouse:tensorzero_password:
     secure: v1:AMc5gNbfEXdrlMHd:/lGrtFcrSDG2axMxsUGfyapcRo3S6OAXWH7vzU68bXob6lItKMFCPdxVNUPHrz3Jwyed6dkoch0=
-  clickhouse:openlit_password:
-    secure: v1:dE4pfDIUoZOpFiuL:AfR3opDipLCmW/77zJqjqXAxLLydqR+tGAxa8Nq6s1b1vk2mO1UBi8tR0QQX7PeKezhVdf10oBQ=
   clickhouse:opik_password:
     secure: v1:RtackrcicJi2E3h/:/Z6bXECBGn7RaYItxmCnRV6vDorbQZYqsufZ+eWRkLTWO9N4mWRAUlIp4PkyDtI3aaMsIzD9TAU=
 secretsprovider: awskms://alias/infrastructure-secrets-ci
