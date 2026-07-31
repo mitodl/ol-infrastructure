@@ -641,8 +641,10 @@ def _interpolate_env_vars(value: str | None) -> str | None:
 #
 # Requires: fastmcp package in the Superset image (pip install fastmcp).
 
-MCP_SERVICE_HOST = "0.0.0.0"  # noqa: S104 - bind all interfaces in k8s
-MCP_SERVICE_PORT = 5008
+# The bind address and port are not configurable from here: `superset mcp run`
+# takes them as CLI flags, and the chart's supersetMcp.command already passes
+# --host 0.0.0.0 --port {{ supersetMcp.service.port }}.
+#
 # Public-facing base URL for MCP-generated links (e.g. chart preview URLs).
 # Injected at runtime via SUPERSET_MCP_PUBLIC_URL env var set in Pulumi.
 MCP_SERVICE_URL = os.environ.get("SUPERSET_MCP_PUBLIC_URL")
@@ -700,7 +702,9 @@ MCP_CACHE_CONFIG = {
     "read_resource_ttl": 3600,
     "get_prompt_ttl": 3600,
     "call_tool_ttl": 3600,
-    "max_item_size": 1048576,  # 1 MB per cached response
+    # No per-item size cap: upstream documents max_item_size but
+    # _build_caching_settings() never forwards it to FastMCP's
+    # ResponseCachingMiddleware, so setting it would be inert.
     "excluded_tools": [
         "execute_sql",
         "generate_dashboard",
