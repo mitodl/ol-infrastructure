@@ -119,6 +119,10 @@ omnigraph_stack = make_stack_reference(projects.OMNIGRAPH, stack_info.name)
 omnigraph_server_addr = require_stack_output_value(
     omnigraph_stack, "omnigraph_server_addr"
 )
+# The graph id witan addresses on that server (`--graph <id>`), taken from the
+# stack that declares it in cluster.yaml rather than defaulted independently
+# here — see WITAN_MEMORY_GRAPH in mcp_servers.py.
+council_graph_id = require_stack_output_value(omnigraph_stack, "council_graph_id")
 
 NAMESPACE = "witan"
 
@@ -289,6 +293,7 @@ mcp_servers = create_mcp_servers(
     cluster_stack=cluster_stack,
     witan_image=witan_image,
     omnigraph_server_addr=omnigraph_server_addr,
+    council_graph_id=council_graph_id,
     oidc_issuer=KEYCLOAK_ISSUER,
     oidc_audience=WITAN_OIDC_AUDIENCE,
     actor_tokens_secret_name=ACTOR_TOKENS_SECRET_NAME,

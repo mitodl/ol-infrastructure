@@ -1,6 +1,31 @@
 ---
 # See Pulumi.CI.yaml for why `secretsprovider`/`encryptedkey` are omitted.
 config:
+  omnigraph:managed_repos:
+    # Repos with a per-repo `code-<repo>` graph on this cluster. Canonical repo
+    # URIs, matched byte-for-byte against what witan-code detects from a
+    # checkout's git remote. Adding one here needs a `pulumi up` plus an
+    # `omnigraph cluster apply` and a server restart before clients can reach
+    # it — see applications/omnigraph/data_tier.py build_cluster_graphs.
+    #
+    # Seeded from the mitodl repos with the most human-authored commits in the
+    # 90 days to 2026-07-31 (bot commits excluded), cut at >=35. Re-derive
+    # rather than assuming this stays current; a repo nobody works in is a
+    # graph nobody queries.
+  - https://github.com/mitodl/ol-infrastructure
+  - https://github.com/mitodl/mit-learn
+  - https://github.com/mitodl/mitxonline
+  - https://github.com/mitodl/ol-data-platform
+  - https://github.com/mitodl/agent-kit
+  - https://github.com/mitodl/lehrer
+  - https://github.com/mitodl/ocw-studio
+  - https://github.com/mitodl/odl-video-service
+  - https://github.com/mitodl/mitxpro
+  - https://github.com/mitodl/ol-concourse
+  - https://github.com/mitodl/open-edx-plugins
+  - https://github.com/mitodl/learn-ai
+  - https://github.com/mitodl/ocw-hugo-themes
+  - https://github.com/mitodl/ol-django
   aws:region: us-east-1
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production

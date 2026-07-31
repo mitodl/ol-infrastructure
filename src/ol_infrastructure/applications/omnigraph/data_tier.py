@@ -26,7 +26,9 @@ read from ``OMNIGRAPH_DOCKER_SHA`` (set by the build job via the
 pulumi-provisioner's ``env_vars_from_files``).
 """
 
+import hashlib
 import json
+import re
 from typing import NamedTuple
 
 import pulumi_aws as aws
@@ -54,6 +56,104 @@ CLUSTER_CONFIG_DIR = "/etc/omnigraph/cluster"
 ACTOR_TOKENS_MOUNT_PATH = "/etc/omnigraph/actor-tokens"  # pragma: allowlist secret
 ACTOR_TOKENS_FILENAME = "tokens.json"  # pragma: allowlist secret
 
+# Fixed ConfigMap name, referenced both by the ConfigMap's own metadata and by
+# the Deployment's volume. The Deployment uses this constant rather than
+# `cluster_configmap.metadata.name` deliberately: the ConfigMap is replaced on
+# every `data` change, which makes that Output unknown at preview time and
+# reports the Deployment as replaced too — a replacement that would never
+# actually be needed, since the name is pinned and therefore identical across
+# the replacement. `depends_on` still orders the two.
+CLUSTER_CONFIGMAP_NAME = "omnigraph-cluster-config"
+
+# ── Cluster graph ids ────────────────────────────────────────────────────────
+#
+# Graph ids track the owning published package rather than the omnigraph
+# default branch name: omnigraph's default *branch* is `main`, so a graph also
+# called `main` conflates the two. `council` is what witan-council asks for
+# (WITAN_MEMORY_GRAPH, default `council` in agent-kit
+# mcp/servers/witan/witan/config.py) — a cluster that declares anything else
+# serves a graph no client addresses.
+COUNCIL_GRAPH_ID = "council"
+# Layer 2.5 cross-repo bridge, the deployed analogue of witan-code's local
+# `_bridge.omni` store. Fixed id, not derived from any repo.
+BRIDGE_GRAPH_ID = "code-bridge"
+CODE_GRAPH_PREFIX = "code-"
+
+# Schema filenames, all three baked into the omnigraph-server image at
+# CLUSTER_CONFIG_DIR by the image build (agent-kit
+# docker/omnigraph-server.Dockerfile). Not sourced here: this Pulumi program
+# has no access to agent-kit's working tree at apply time.
+COUNCIL_SCHEMA_FILE = "schema.pg"
+CODE_SCHEMA_FILE = "code-schema.pg"
+BRIDGE_SCHEMA_FILE = "bridge-schema.pg"
+
+_GRAPH_ID_MAX_LEN = 64
+
+
+def code_graph_id(repo: str) -> str:
+    """Canonical cluster graph id for ``repo``'s code graph.
+
+    e.g. ``https://github.com/mitodl/ol-django`` ->
+    ``code-github-com-mitodl-ol-django``.
+
+    SHARED CONTRACT — this is a mirror of ``witan_code.config.graph_id``
+    (agent-kit, mcp/servers/witan-code/witan_code/config.py), which is what
+    selects the ``--graph`` id on the *client* side. This function declares the
+    graph the cluster creates. They MUST agree byte-for-byte or a client will
+    address a graph that was never created. Any change has to land in lockstep
+    on both sides — see agent-kit task
+    tk-code-graph-deployment-topology-shared-per-repo-c-cac400.
+
+    Strips the URI scheme, collapses every run of non-alphanumerics to ``-``,
+    lowercases, and prefixes ``code-``. omnigraph graph ids must match
+    ``^[a-zA-Z0-9-]{1,64}$`` (note: no underscores), so ids that would exceed
+    64 characters are truncated and disambiguated with a hash of the full repo
+    URI, keeping distinct long repos from colliding.
+    """
+    body = re.sub(r"(?i)^[a-z][a-z0-9+.-]*://", "", repo)  # strip scheme
+    body = re.sub(r"[^a-zA-Z0-9]+", "-", body).strip("-").lower()
+    candidate = f"{CODE_GRAPH_PREFIX}{body}"
+    if len(candidate) <= _GRAPH_ID_MAX_LEN:
+        return candidate
+    digest = hashlib.sha256(repo.encode()).hexdigest()[:8]
+    keep = _GRAPH_ID_MAX_LEN - len(CODE_GRAPH_PREFIX) - len(digest) - 1
+    return f"{CODE_GRAPH_PREFIX}{body[:keep].strip('-')}-{digest}"
+
+
+def build_cluster_graphs(managed_repos: list[str]) -> dict[str, dict[str, str]]:
+    """Build the ``graphs:`` block of cluster.yaml for ``managed_repos``.
+
+    One graph per repo rather than one shared code graph (ADR-0009 follow-up,
+    decided: option A), matching the per-repo model witan-code already uses
+    locally. Each is a self-contained Lance store under
+    ``s3://<bucket>/graphs/<graph-id>.omni/``, so per-repo isolation costs
+    nothing beyond the entry here, and per-user/per-session WIP branches live
+    inside their own repo's graph.
+
+    Adding a repo is deliberately a config change plus a ``cluster apply`` and
+    a server restart, not ad-hoc self-creation by a client: an unmanaged repo
+    should fail to resolve rather than silently mint a graph nobody provisioned
+    or backs up.
+
+    Raises ``ValueError`` on a duplicate derived id — two repo URIs that
+    normalize to the same graph id would otherwise silently share one store.
+    """
+    graphs: dict[str, dict[str, str]] = {
+        COUNCIL_GRAPH_ID: {"schema": COUNCIL_SCHEMA_FILE},
+        BRIDGE_GRAPH_ID: {"schema": BRIDGE_SCHEMA_FILE},
+    }
+    for repo in managed_repos:
+        graph = code_graph_id(repo)
+        if graph in graphs:
+            msg = (
+                f"Duplicate cluster graph id {graph!r} derived from repo "
+                f"{repo!r}. Two managed repos normalize to the same id, which "
+                "would silently share one store."
+            )
+            raise ValueError(msg)
+        graphs[graph] = {"schema": CODE_SCHEMA_FILE}
+    return graphs
+
 
 def omnigraph_server_addr(namespace: str) -> str:
     """Return the in-cluster HTTP address witan's MCPServer talks to."""
@@ -80,6 +180,7 @@ def create_data_tier(  # noqa: PLR0913
     auth_binding: OLEKSAuthBinding,
     actor_tokens_secret_name: str,
     actor_tokens_secret: OLVaultK8SSecret,
+    managed_repos: list[str],
 ) -> OmnigraphDataTier:
     """Provision the S3 bucket, IRSA policy, ECR repo, ConfigMap, and Deployment."""
     # The bucket is named for its tenant (witan's graphs), not the omnigraph
@@ -150,17 +251,17 @@ def create_data_tier(  # noqa: PLR0913
     )
     omnigraph_server_image = format_docker_image_ref(image_repository, "OMNIGRAPH")
 
-    # cluster.yaml — the single Layer-1 (memory/task/workflow) graph,
-    # organization-wide, plus room for per-repo code graphs added the same
-    # way (`omnigraph graphs` management, per ADR-0009 decision point 2).
-    # `schema.pg` (agent-kit repo, mcp/servers/witan/schema/schema.pg) is NOT
-    # sourced here — this Pulumi program has no access to agent-kit's working
-    # tree at apply time. It must be baked into the omnigraph-server image at
-    # build time, at ``{CLUSTER_CONFIG_DIR}/schema.pg``, by the (not yet
-    # written) image-build job — see the follow-up note in __main__.py. The
-    # ConfigMap volume below is mounted with ``sub_path`` so it overlays only
-    # the single ``cluster.yaml`` file and leaves that baked-in schema.pg
-    # visible alongside it, rather than replacing the whole directory.
+    # cluster.yaml — the Layer-1 (memory/task/workflow) `council` graph,
+    # organization-wide, plus the `code-bridge` graph and one `code-<repo>`
+    # graph per managed repo (see build_cluster_graphs).
+    # None of the three schema files are sourced here — this Pulumi program has
+    # no access to agent-kit's working tree at apply time. All are baked into
+    # the omnigraph-server image at build time under ``{CLUSTER_CONFIG_DIR}``
+    # by agent-kit's docker/omnigraph-server.Dockerfile. The ConfigMap volume
+    # below is mounted with ``sub_path`` so it overlays only the single
+    # ``cluster.yaml`` file and leaves those baked-in schemas visible alongside
+    # it, rather than replacing the whole directory.
+    cluster_graphs = build_cluster_graphs(managed_repos)
     storage_uri: Output[str] = omnigraph_bucket.bucket_v2.bucket.apply(
         lambda name: f"s3://{name}"
     )
@@ -172,7 +273,7 @@ def create_data_tier(  # noqa: PLR0913
                 "metadata": {"name": cluster_name},
                 "state": {"backend": "cluster"},
                 "storage": uri,
-                "graphs": {"main": {"schema": "schema.pg"}},
+                "graphs": cluster_graphs,
             },
             sort_keys=False,
         )
@@ -180,11 +281,25 @@ def create_data_tier(  # noqa: PLR0913
     cluster_configmap = kubernetes.core.v1.ConfigMap(
         f"omnigraph-omnigraph-cluster-config-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="omnigraph-cluster-config",
+            name=CLUSTER_CONFIGMAP_NAME,
             namespace=namespace,
             labels=k8s_global_labels,
         ),
         data={"cluster.yaml": cluster_yaml_content},
+        # pulumi-kubernetes treats a ConfigMap `data` change as force-new, and
+        # normally relies on auto-naming so the replacement can be created
+        # before the old one is deleted. `metadata.name` is pinned here (the
+        # Deployment's volume references it by name), which disables
+        # auto-naming — so the default create-before-delete collides with the
+        # live object and the update fails with "configmaps
+        # omnigraph-cluster-config already exists". Delete first instead.
+        #
+        # Safe despite the Deployment mounting this: the mount uses `sub_path`,
+        # and sub-path volume mounts never receive ConfigMap updates, so the
+        # running pod holds its own copy of cluster.yaml either way. A changed
+        # graph list only reaches the server on the pod restart that the
+        # `cluster apply` step already requires.
+        opts=ResourceOptions(delete_before_replace=True),
     )
 
     omnigraph_pod_labels = {
@@ -299,7 +414,7 @@ def create_data_tier(  # noqa: PLR0913
                         kubernetes.core.v1.VolumeArgs(
                             name="cluster-config",
                             config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
-                                name=cluster_configmap.metadata.name,
+                                name=CLUSTER_CONFIGMAP_NAME,
                             ),
                         ),
                         kubernetes.core.v1.VolumeArgs(

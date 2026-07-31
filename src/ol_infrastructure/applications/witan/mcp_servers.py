@@ -61,6 +61,7 @@ def create_mcp_servers(  # noqa: PLR0913
     cluster_stack: StackReference,
     witan_image: str | Output[str],
     omnigraph_server_addr: str | Output[str],
+    council_graph_id: str | Output[str],
     oidc_issuer: str,
     oidc_audience: str,
     actor_tokens_secret_name: str,
@@ -127,6 +128,17 @@ def create_mcp_servers(  # noqa: PLR0913
                 # Module-level fallback OmnigraphClient's target (ADR-0004
                 # D4) — the omnigraph-server Deployment's in-cluster address.
                 {"name": "WITAN_MEMORY_URI", "value": omnigraph_server_addr},
+                # An http(s) store is addressed as `--server <url> --graph
+                # <id>`, and the graph id is not encoded in WITAN_MEMORY_URI
+                # (a bare server URL), so it comes from here. Sourced from the
+                # omnigraph stack's own `council_graph_id` output rather than
+                # a literal, for the same reason the address is: witan must
+                # ask for exactly the graph that stack declared in cluster.yaml
+                # or it addresses a graph the cluster never created. (It also
+                # happens to equal witan's built-in `council` default, but
+                # relying on two independent defaults agreeing is the failure
+                # mode this avoids.)
+                {"name": "WITAN_MEMORY_GRAPH", "value": council_graph_id},
             ],
             "secrets": [
                 {
