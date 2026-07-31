@@ -42,11 +42,12 @@ from pathlib import Path
 from typing import Any
 
 import pulumi_vault as vault
-from pulumi import Output, ResourceOptions, export
+from pulumi import Config, Output, ResourceOptions, export
 
 from bridge.secrets import sops as _bridge_sops
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.omnigraph.data_tier import (
+    COUNCIL_GRAPH_ID,
     create_data_tier,
     omnigraph_server_addr,
 )
@@ -79,6 +80,18 @@ _BRIDGE_SECRETS_DIR = Path(_bridge_sops.__file__).parent
 setup_vault_provider()
 
 stack_info = parse_stack()
+omnigraph_config = Config("omnigraph")
+
+# Repos that get a per-repo `code-<repo>` graph on this cluster. Canonical repo
+# URIs — the exact strings witan-code detects from a checkout's git remote and
+# runs through witan_code.config.graph_id to pick its `--graph`; data_tier's
+# code_graph_id mirrors that function to declare the same id here.
+#
+# Provisioning a new repo is deliberately explicit: add it here, `pulumi up`,
+# then `omnigraph cluster apply` + restart the server (see data_tier's
+# build_cluster_graphs). A repo that is not listed fails to resolve rather than
+# silently minting a graph nobody provisioned or backs up.
+MANAGED_REPOS: list[str] = omnigraph_config.get_object("managed_repos") or []
 
 cluster_stack = make_stack_reference(projects.EKS, f"operations.{stack_info.name}")
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
@@ -266,8 +279,13 @@ data_tier = create_data_tier(
     auth_binding=omnigraph_auth_binding,
     actor_tokens_secret_name=ACTOR_TOKENS_SECRET_NAME,
     actor_tokens_secret=actor_tokens_secret,
+    managed_repos=MANAGED_REPOS,
 )
 
 export("namespace", NAMESPACE)
 export("omnigraph_server_addr", omnigraph_server_addr(NAMESPACE))
+# The Layer-1 graph id consumers must address (`--graph <id>`). Exported
+# rather than left to each consumer's own default so the witan stack asks
+# for exactly the graph declared in cluster.yaml here.
+export("council_graph_id", COUNCIL_GRAPH_ID)
 export("omnigraph_server_image_repository", data_tier.image_repository)

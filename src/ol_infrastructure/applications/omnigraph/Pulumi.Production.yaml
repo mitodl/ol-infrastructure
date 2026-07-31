@@ -1,6 +1,14 @@
 ---
 # See Pulumi.CI.yaml for why `secretsprovider`/`encryptedkey` are omitted.
 config:
+  omnigraph:managed_repos:
+    # Repos with a per-repo `code-<repo>` graph on this cluster. Canonical repo
+    # URIs, matched byte-for-byte against what witan-code detects from a
+    # checkout's git remote. Adding one here needs a `pulumi up` plus an
+    # `omnigraph cluster apply` and a server restart before clients can reach
+    # it — see applications/omnigraph/data_tier.py build_cluster_graphs.
+  - https://github.com/mitodl/agent-kit
+  - https://github.com/mitodl/ol-infrastructure
   aws:region: us-east-1
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
