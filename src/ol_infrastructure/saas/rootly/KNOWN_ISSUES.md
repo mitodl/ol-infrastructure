@@ -214,7 +214,7 @@ Some resources were deliberately removed from Pulumi state after import because
 Rootly returned no readable state or the provider schema could not model the
 resource without diffs or validation errors.
 
-### Empty state after import
+### Empty state after import (RESOLVED: deleted from Rootly)
 
 The provider returned empty state for these imports, which would make Pulumi plan
 protected replacements if they were modeled in code:
@@ -226,9 +226,11 @@ protected replacements if they were modeled in code:
 - `rootly:index/escalationLevel:EscalationLevel::r-7f50a094-1f88-4e75-9afd-5e56ea8448a9`
 - `rootly:index/alertRoute:AlertRoute::chris-test-route`
 
-These are likely stale/example objects. The cleanest fix is deleting them in
-the Rootly UI (they are test artifacts, not operational resources); otherwise
-re-try only with preview-only imports first.
+These were stale/example objects and were never modeled in Pulumi. Confirmed
+via the Rootly API that they have all been deleted from the Rootly account
+(no `christest`/`chris-test` team, service, functionality, escalation policy,
+escalation level, or alert route remain), so there is nothing left to import
+or clean up here.
 
 ### `IncidentPermissionSetBoolean`
 
