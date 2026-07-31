@@ -117,10 +117,9 @@ from ol_infrastructure.lib.pulumi_helper import (
 )
 from ol_infrastructure.lib.vault import setup_vault_provider
 
-# The container listens on this port (see the app repo's Dockerfile CMD:
-# `granian --interface asgi --host 0.0.0.0 --port 8000
-# ol_analytics_api.main:app`).  No nginx sidecar sits in front, so the Service
-# and the health probes target it directly.
+# The container listens on this port. No nginx sidecar sits in front, so the
+# Service and the health probes target it directly. Keep this aligned with
+# granian_config.port below.
 APPLICATION_PORT = 8000
 
 APPLICATION_NAME = "ol-analytics-api"
@@ -416,10 +415,9 @@ ol_analytics_api_k8s = OLApplicationK8s(
         application_image_repository="mitodl/ol-analytics-api-app",
         **docker_image_config_kwargs("OL_ANALYTICS_API"),
         application_min_replicas=ol_analytics_api_config.get_int("min_replicas") or 2,
-        # Granian settings come from the shared component rather than being left
-        # to the image's own CMD, so the server config is visible and diffable in
-        # this stack (and picks up the component's metrics/PodMonitor wiring).
-        # The image CMD stays as the local-run default; this supersedes it.
+        # Granian settings are declared here via the shared component so server
+        # config is visible and diffable in this stack (and picks up the
+        # component's metrics/PodMonitor wiring).
         granian_config=GranianConfig(
             # FastAPI is ASGI; Granian's own default interface is RSGI.
             interface="asgi",
