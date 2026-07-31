@@ -104,8 +104,8 @@ route53_all_zones_records_policy = iam.Policy(
         )
     ),
     description=(
-        "Grant permissions to create Route53 records across all managed zones "
-        f"({', '.join(app_route53_zones)})"
+        "Grant permissions to manage (create, update, delete) Route53 records "
+        f"across all managed zones ({', '.join(app_route53_zones)})"
     ),
 )
 app_route53_policies["route53_all_zones_records"] = route53_all_zones_records_policy.arn

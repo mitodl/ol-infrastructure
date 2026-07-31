@@ -217,7 +217,7 @@ def split_iam_policy_by_size(
 
 
 def route53_policy_template(zone_id: str | list[str]) -> dict[str, Any]:
-    """Policy definition to allow Caddy to use Route 53 to resolve DNS challenges.
+    """Policy definition granting write access to one or more Route53 zones.
 
     This provides the permissions necessary to modify Route53 records, for example in a
     Caddy configuration that is using the DNS authorization method for Let's Encrypt.
