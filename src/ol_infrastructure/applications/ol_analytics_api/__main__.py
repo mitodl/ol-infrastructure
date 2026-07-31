@@ -64,6 +64,7 @@ Key wiring decisions (see also ``k8s/README.md`` in the app repo):
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
@@ -288,10 +289,46 @@ ol_analytics_api_secrets_mount = vault.Mount(
 # Temporary, along with the round-trip they authenticate: once org-manager
 # status is visible in the Keycloak token (mitodl/hq#10594), the app stops
 # calling MITx Online and these can be deleted along with the Vault entry.
+MITXONLINE_OAUTH_VAULT_PATH = "secret-operations/ol-analytics-api/mitxonline-oauth"
+
 mitxonline_oauth_secrets = vault.generic.get_secret_output(
-    path="secret-operations/ol-analytics-api/mitxonline-oauth",
+    path=MITXONLINE_OAUTH_VAULT_PATH,
     opts=InvokeOptions(parent=ol_analytics_api_secrets_mount),
 )
+
+
+def _build_static_secrets(secrets: dict[str, Any]) -> str:
+    """Assemble the static-secrets payload, validating the hand-written half.
+
+    The Vault entry behind MITXONLINE_OAUTH_VAULT_PATH is created by an
+    operator rather than by Pulumi, so its shape is a convention and not a
+    guarantee.  Checking here turns a typo'd key into a named, actionable
+    failure at deploy time instead of a bare ``KeyError`` raised from inside
+    this apply.  Empty values are rejected alongside missing ones: reading a
+    blank secret would otherwise deploy an unusable credential that only
+    fails later, in the pod, at the MITx Online token endpoint.
+    """
+    oauth = secrets["mitxonline_oauth"] or {}
+    missing = [key for key in ("client_id", "client_secret") if not oauth.get(key)]
+    if missing:
+        msg = (
+            f"Vault path '{MITXONLINE_OAUTH_VAULT_PATH}' is missing or has an empty "
+            f"value for: {', '.join(missing)}. Create the OAuth2 Application in MITx "
+            "Online (confidential, client-credentials grant, 'b2b:manager-check' "
+            f"scope), then: vault kv put {MITXONLINE_OAUTH_VAULT_PATH} "
+            "client_id=<id> client_secret=<secret>"
+        )
+        raise ValueError(msg)
+    return json.dumps(
+        {
+            "SENTRY_DSN": secrets["sentry_dsn"],
+            "OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_ID": oauth["client_id"],
+            "OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_SECRET": oauth[
+                "client_secret"
+            ],
+        }
+    )
+
 
 ol_analytics_api_static_vault_secrets = vault.generic.Secret(
     f"ol-analytics-api-secrets-{stack_info.env_suffix}",
@@ -299,19 +336,7 @@ ol_analytics_api_static_vault_secrets = vault.generic.Secret(
     data_json=Output.all(
         sentry_dsn=sentry_stack.require_output("ol_analytics_api_sentry_dsn"),
         mitxonline_oauth=mitxonline_oauth_secrets.data,
-    ).apply(
-        lambda secrets: json.dumps(
-            {
-                "SENTRY_DSN": secrets["sentry_dsn"],
-                "OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_ID": secrets[
-                    "mitxonline_oauth"
-                ]["client_id"],
-                "OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_SECRET": secrets[
-                    "mitxonline_oauth"
-                ]["client_secret"],
-            }
-        )
-    ),
+    ).apply(_build_static_secrets),
     opts=ResourceOptions(delete_before_replace=True),
 )
 
