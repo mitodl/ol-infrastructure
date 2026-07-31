@@ -36,13 +36,48 @@ from pulumi import Output, Resource, ResourceOptions
 
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
-# One container per migration, run as init containers so they execute strictly
-# in order and the Job fails at the first one that fails. `witan migrate all`
-# is deliberately not used — see the module docstring.
+# One container per migration, executed strictly in order so the Job stops at
+# the first failure. `witan migrate all` is deliberately not used — see the
+# module docstring.
 WITAN_MIGRATIONS: tuple[tuple[str, list[str]], ...] = (
     ("migrate-topics", ["migrate", "topics"]),
     ("migrate-repo-keys", ["migrate", "repo-keys"]),
 )
+
+# omnigraph-server is a single-replica `Recreate` Deployment in a *separate*
+# stack, so it has a genuine downtime window on every one of its deploys — and
+# since its pod template now carries a config hash, that is every deploy, not
+# only the ones that change its image. Two stacks deploying at once can
+# therefore land this Job inside that window, where it fails to connect.
+#
+# Kubernetes' own Job backoff is the retry loop for that: attempts are spaced
+# 10s, 20s, 40s, … so 6 retries span roughly ten minutes, comfortably longer
+# than a single-pod Recreate rollout (image pull + readiness probe). Each
+# attempt re-runs the migration from scratch, which is safe because both are
+# idempotent.
+#
+# A cross-stack `depends_on` — the obvious-looking alternative — is not
+# available: a StackReference yields the other stack's *outputs*, not resource
+# handles, so there is nothing to order against and no way to make one stack's
+# deploy wait on another's rollout.
+MIGRATION_BACKOFF_LIMIT = 6
+
+
+def _migration_container(
+    name: str,
+    args: list[str],
+    witan_image: str | Output[str],
+    env: list[kubernetes.core.v1.EnvVarArgs],
+    resources: kubernetes.core.v1.ResourceRequirementsArgs,
+) -> kubernetes.core.v1.ContainerArgs:
+    """One migration step. Identical whether it lands in init or main position."""
+    return kubernetes.core.v1.ContainerArgs(
+        name=name,
+        image=witan_image,
+        args=args,
+        env=env,
+        resources=resources,
+    )
 
 
 def create_migration_job(  # noqa: PLR0913
@@ -100,7 +135,7 @@ def create_migration_job(  # noqa: PLR0913
             labels=k8s_global_labels,
         ),
         spec=kubernetes.batch.v1.JobSpecArgs(
-            backoff_limit=2,
+            backoff_limit=MIGRATION_BACKOFF_LIMIT,
             ttl_seconds_after_finished=86400,
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -113,32 +148,24 @@ def create_migration_job(  # noqa: PLR0913
                     restart_policy="Never",
                     # initContainers run to completion in declaration order and
                     # short-circuit the pod on the first failure, which is the
-                    # ordering guarantee these migrations want. The final
-                    # container is a no-op so the Job has something to
-                    # "complete" as.
+                    # ordering guarantee these migrations want. A Job also needs
+                    # at least one non-init container to complete as, so the
+                    # *last* migration is that container rather than a
+                    # placeholder: every container here does real work, and
+                    # nothing depends on a stub binary being present in an image
+                    # this repo doesn't build.
                     init_containers=[
-                        kubernetes.core.v1.ContainerArgs(
-                            name=name,
-                            image=witan_image,
-                            args=args,
-                            env=migration_env,
-                            resources=migration_resources,
+                        _migration_container(
+                            name, args, witan_image, migration_env, migration_resources
                         )
-                        for name, args in WITAN_MIGRATIONS
+                        for name, args in WITAN_MIGRATIONS[:-1]
                     ],
-                    # A Job needs at least one non-init container to complete
-                    # as. Every migration is an initContainer (above) so they
-                    # run in a guaranteed order, which leaves nothing for this
-                    # one to do — `/bin/true` rather than a witan invocation so
-                    # a deploy can never be blocked by the exit status of a
-                    # command that exists only to be a placeholder. `command`
-                    # overrides the image's `witan` ENTRYPOINT.
                     containers=[
-                        kubernetes.core.v1.ContainerArgs(
-                            name="done",
-                            image=witan_image,
-                            command=["/bin/true"],
-                            resources=migration_resources,
+                        _migration_container(
+                            *WITAN_MIGRATIONS[-1],
+                            witan_image,
+                            migration_env,
+                            migration_resources,
                         )
                     ],
                 ),

@@ -25,7 +25,7 @@ against the deployed graph. The server only serves the converged revision after
 a restart, hence Job-then-Deployment ordering.
 
 The Job and the Deployment's pod template carry the same
-``omnigraph.mit.edu/config-hash`` (cluster.yaml + image digest), which is what
+``ol.mit.edu/config-hash`` (cluster.yaml + image digest), which is what
 keeps converge and restart in lockstep: any change the Job acts on also
 restarts the server into it, including a cluster.yaml-only edit that leaves the
 image untouched. That makes a config change a brief data-tier outage — this is
@@ -351,12 +351,15 @@ def create_data_tier(  # noqa: PLR0913
     # rather than once per pod restart (crashloop, eviction, node drain), and so
     # a convergence failure surfaces as a failed Job that blocks the rollout
     # instead of a pod stuck in Init.
+    # Full digest, matching the `ol.mit.edu/config-hash` convention in
+    # components/services/k8s.py — an annotation value has no length pressure,
+    # so there is nothing to buy by truncating.
     cluster_apply_hash: Output[str] = Output.all(
         cluster_yaml=cluster_yaml_content, image=omnigraph_server_image
     ).apply(
         lambda args: hashlib.sha256(
             f"{args['cluster_yaml']}\n{args['image']}".encode()
-        ).hexdigest()[:12]
+        ).hexdigest()
     )
     cluster_apply_job = kubernetes.batch.v1.Job(
         f"omnigraph-cluster-apply-{stack_info.env_suffix}",
@@ -384,7 +387,7 @@ def create_data_tier(  # noqa: PLR0913
                     # image (and therefore the baked schemas) changes. Without
                     # it, adding a repo to cluster.yaml would leave this Job's
                     # spec byte-identical and the graph would never be created.
-                    annotations={"omnigraph.mit.edu/config-hash": cluster_apply_hash},
+                    annotations={"ol.mit.edu/config-hash": cluster_apply_hash},
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
                     restart_policy="Never",
@@ -494,7 +497,7 @@ def create_data_tier(  # noqa: PLR0913
                     # consistency is worth the restart: this Deployment is
                     # single-replica `Recreate`, so a config change is a brief
                     # data-tier outage by construction.
-                    annotations={"omnigraph.mit.edu/config-hash": cluster_apply_hash},
+                    annotations={"ol.mit.edu/config-hash": cluster_apply_hash},
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
                     service_account_name=OMNIGRAPH_SERVICE_ACCOUNT_NAME,
