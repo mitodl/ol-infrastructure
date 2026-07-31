@@ -122,6 +122,31 @@ io_optimized_node_affinity = {
 # available rather than the Karpenter spot/on-demand fleet that BE/CN use.
 core_node_selector = {"ol.mit.edu/core_node": "true"}
 
+# Incident 2026-07-30 (QA + prod): core nodes have no taint, so ordinary
+# Deployments (Airbyte, Dagster, JupyterHub, etc.) land there freely and can
+# fill a core node before an FE pod needs to reschedule onto it, leaving FE
+# Pending indefinitely with no automatic recovery. A hard taint would fix this
+# but would waste core-node capacity whenever FE isn't using it. A PriorityClass
+# instead lets other workloads use the spare capacity while letting the
+# scheduler preempt them if FE ever needs the room. Value is well below the
+# reserved system-* range (2,000,000,000+) but far above the default (0) used
+# by everything else on these clusters.
+starrocks_fe_priority_class_name = f"{stack_info.env_prefix}-starrocks-fe"
+starrocks_fe_priority_class = kubernetes.scheduling.v1.PriorityClass(
+    f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-fe-priority-class",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=starrocks_fe_priority_class_name,
+        labels=k8s_app_labels.model_dump(),
+    ),
+    value=1000000,
+    global_default=False,
+    description=(
+        "StarRocks FE pods on the shared core nodegroup. Allows preempting "
+        "lower-priority pods (Airbyte, Dagster, JupyterHub, etc.) that would "
+        "otherwise starve FE of scheduling room on core nodes."
+    ),
+)
+
 
 def _starrocks_pod_anti_affinity(component: str, *, required: bool) -> dict[str, Any]:
     """Spread replicas of one StarRocks pod type across distinct nodes.
@@ -414,6 +439,7 @@ starrocks_values: dict[str, Any] = {
         "serviceAccount": "starrocks",
         "runAsNonRoot": True,
         "nodeSelector": core_node_selector,
+        "priorityClassName": starrocks_fe_priority_class_name,
         "affinity": _starrocks_pod_anti_affinity("fe", required=True),
         "service": {
             "type": "ClusterIP",
@@ -889,7 +915,11 @@ starrocks_release = kubernetes.helm.v3.Release(
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
-        depends_on=[starrocks_root_password_secret, starrocks_auth_binding],
+        depends_on=[
+            starrocks_root_password_secret,
+            starrocks_auth_binding,
+            starrocks_fe_priority_class,
+        ],
     ),
 )
 
