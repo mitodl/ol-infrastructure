@@ -24,6 +24,14 @@ with — so without this step an image whose code reads a newly-added field fail
 against the deployed graph. The server only serves the converged revision after
 a restart, hence Job-then-Deployment ordering.
 
+The Job and the Deployment's pod template carry the same
+``omnigraph.mit.edu/config-hash`` (cluster.yaml + image digest), which is what
+keeps converge and restart in lockstep: any change the Job acts on also
+restarts the server into it, including a cluster.yaml-only edit that leaves the
+image untouched. That makes a config change a brief data-tier outage — this is
+a single-replica ``Recreate`` Deployment — which is the deliberate trade for
+never serving a config the store has already moved past.
+
 The ``omnigraph-server`` image is built once and promoted unchanged through
 CI -> QA -> Production by the ``omnigraph``/``pulumi-omnigraph`` Concourse
 pipeline, which also owns the ``omnigraph-server`` ECR repository itself
@@ -146,10 +154,13 @@ def build_cluster_graphs(managed_repos: list[str]) -> dict[str, dict[str, str]]:
     nothing beyond the entry here, and per-user/per-session WIP branches live
     inside their own repo's graph.
 
-    Adding a repo is deliberately a config change plus a ``cluster apply`` and
-    a server restart, not ad-hoc self-creation by a client: an unmanaged repo
-    should fail to resolve rather than silently mint a graph nobody provisioned
-    or backs up.
+    Adding a repo is deliberately a config change rather than ad-hoc
+    self-creation by a client: an unmanaged repo should fail to resolve rather
+    than silently mint a graph nobody provisioned or backs up. The
+    ``cluster apply`` and server restart it requires are both automatic — the
+    converge Job and the Deployment's pod template share one config hash, so
+    editing this list creates the graph and restarts the server into it in the
+    same deploy.
 
     Raises ``ValueError`` on a duplicate derived id — two repo URIs that
     normalize to the same graph id would otherwise silently share one store.
@@ -314,8 +325,9 @@ def create_data_tier(  # noqa: PLR0913
         # Safe despite the Deployment mounting this: the mount uses `sub_path`,
         # and sub-path volume mounts never receive ConfigMap updates, so the
         # running pod holds its own copy of cluster.yaml either way. A changed
-        # graph list only reaches the server on the pod restart that the
-        # `cluster apply` step already requires.
+        # graph list reaches the server on the pod restart that the config-hash
+        # annotation on the Deployment's pod template forces — same hash the
+        # converge Job carries, so apply and restart always move together.
         opts=ResourceOptions(delete_before_replace=True),
     )
 
@@ -467,7 +479,23 @@ def create_data_tier(  # noqa: PLR0913
                 match_labels={"app.kubernetes.io/name": OMNIGRAPH_SERVER_SERVICE_NAME}
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=omnigraph_pod_labels),
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    labels=omnigraph_pod_labels,
+                    # The same hash the converge Job carries, so the server is
+                    # restarted by any change the Job acted on — not just the
+                    # ones that happen to change the image.
+                    #
+                    # omnigraph serves the revision it read at boot, and the
+                    # cluster.yaml mount is a sub_path (which never receives
+                    # ConfigMap updates), so without this a deploy that only
+                    # edits cluster.yaml — adding a managed repo, say — would
+                    # converge the new graph into S3 and then keep serving a
+                    # config that has never heard of it. Deploy-time
+                    # consistency is worth the restart: this Deployment is
+                    # single-replica `Recreate`, so a config change is a brief
+                    # data-tier outage by construction.
+                    annotations={"omnigraph.mit.edu/config-hash": cluster_apply_hash},
+                ),
                 spec=kubernetes.core.v1.PodSpecArgs(
                     service_account_name=OMNIGRAPH_SERVICE_ACCOUNT_NAME,
                     containers=[
