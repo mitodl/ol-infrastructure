@@ -504,7 +504,12 @@ ol_analytics_api_k8s = OLApplicationK8s(
         delete_before_replace=True,
         depends_on=[
             ol_analytics_api_auth_binding,
+            # Every Secret named in env_from_secret_names belongs here: the
+            # Deployment mounts them via envFrom, so a pod scheduled before
+            # the operator has materialized one crash-loops on a missing
+            # secret rather than waiting for it.
             static_secrets,
+            mitxonline_oauth_secrets,
             ol_analytics_api_application_security_group,
         ],
     ),
