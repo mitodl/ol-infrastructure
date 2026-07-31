@@ -16,6 +16,22 @@ CLI invocation this follows). That file is generated here as a ConfigMap
 rather than hand-authored, so the S3 bucket name/region and graph list stay
 in lockstep with the Pulumi-managed bucket.
 
+A pre-deploy ``omnigraph cluster apply`` Job runs ahead of the Deployment on
+every deploy, creating newly-declared graphs and applying schema updates to
+existing ones from the schemas baked into the image. Nothing else reconciles a
+live graph with a changed schema — a graph keeps whatever schema it was created
+with — so without this step an image whose code reads a newly-added field fails
+against the deployed graph. The server only serves the converged revision after
+a restart, hence Job-then-Deployment ordering.
+
+The Job and the Deployment's pod template carry the same
+``ol.mit.edu/config-hash`` (cluster.yaml + image digest), which is what
+keeps converge and restart in lockstep: any change the Job acts on also
+restarts the server into it, including a cluster.yaml-only edit that leaves the
+image untouched. That makes a config change a brief data-tier outage — this is
+a single-replica ``Recreate`` Deployment — which is the deliberate trade for
+never serving a config the store has already moved past.
+
 The ``omnigraph-server`` image is built once and promoted unchanged through
 CI -> QA -> Production by the ``omnigraph``/``pulumi-omnigraph`` Concourse
 pipeline, which also owns the ``omnigraph-server`` ECR repository itself
@@ -55,6 +71,14 @@ OMNIGRAPH_SERVICE_ACCOUNT_NAME = "omnigraph-server"
 CLUSTER_CONFIG_DIR = "/etc/omnigraph/cluster"
 ACTOR_TOKENS_MOUNT_PATH = "/etc/omnigraph/actor-tokens"  # pragma: allowlist secret
 ACTOR_TOKENS_FILENAME = "tokens.json"  # pragma: allowlist secret
+
+# Actor recorded in the commit ledger for the converge job's direct-engine
+# writes. cluster.yaml declares no `policy:` block today, so omnigraph does not
+# *require* an actor — this is passed for an attributable audit trail, and so
+# that if a policy bundle is added later the job fails loudly (denied) rather
+# than silently writing as nobody. Matches the break-glass identity in
+# agent-kit ADR-0005 path (b).
+CLUSTER_APPLY_ACTOR = "svc-witan-admin"
 
 # Fixed ConfigMap name, referenced both by the ConfigMap's own metadata and by
 # the Deployment's volume. The Deployment uses this constant rather than
@@ -130,10 +154,13 @@ def build_cluster_graphs(managed_repos: list[str]) -> dict[str, dict[str, str]]:
     nothing beyond the entry here, and per-user/per-session WIP branches live
     inside their own repo's graph.
 
-    Adding a repo is deliberately a config change plus a ``cluster apply`` and
-    a server restart, not ad-hoc self-creation by a client: an unmanaged repo
-    should fail to resolve rather than silently mint a graph nobody provisioned
-    or backs up.
+    Adding a repo is deliberately a config change rather than ad-hoc
+    self-creation by a client: an unmanaged repo should fail to resolve rather
+    than silently mint a graph nobody provisioned or backs up. The
+    ``cluster apply`` and server restart it requires are both automatic — the
+    converge Job and the Deployment's pod template share one config hash, so
+    editing this list creates the graph and restarts the server into it in the
+    same deploy.
 
     Raises ``ValueError`` on a duplicate derived id — two repo URIs that
     normalize to the same graph id would otherwise silently share one store.
@@ -170,6 +197,7 @@ class OmnigraphDataTier(NamedTuple):
     image_repository: str
     service: kubernetes.core.v1.Service
     deployment: kubernetes.apps.v1.Deployment
+    cluster_apply_job: kubernetes.batch.v1.Job
 
 
 def create_data_tier(  # noqa: PLR0913
@@ -297,9 +325,130 @@ def create_data_tier(  # noqa: PLR0913
         # Safe despite the Deployment mounting this: the mount uses `sub_path`,
         # and sub-path volume mounts never receive ConfigMap updates, so the
         # running pod holds its own copy of cluster.yaml either way. A changed
-        # graph list only reaches the server on the pod restart that the
-        # `cluster apply` step already requires.
+        # graph list reaches the server on the pod restart that the config-hash
+        # annotation on the Deployment's pod template forces — same hash the
+        # converge Job carries, so apply and restart always move together.
         opts=ResourceOptions(delete_before_replace=True),
+    )
+
+    # ── Pre-deploy schema convergence ────────────────────────────────────────
+    #
+    # `omnigraph cluster apply` creates any newly-declared graph and applies
+    # schema updates to the existing ones, from the schemas baked into this very
+    # image. It is the *only* thing that reconciles a live graph with a changed
+    # schema: a graph is created with whatever schema it was born with, and
+    # nothing re-reads the file afterwards. Without this, adding a field in
+    # agent-kit (e.g. `WorkflowSession.superseded_by`) ships an image whose code
+    # selects a column the store has never heard of, and every read of that type
+    # fails against the deployed graph.
+    #
+    # Ordered before the Deployment (its depends_on, below) because omnigraph
+    # only picks up the applied revision on an `omnigraph-server --cluster`
+    # restart — converge first, then let the rollout restart into it. This is
+    # the "cluster apply step" the ConfigMap comment above already refers to.
+    #
+    # Runs as a Job rather than an initContainer so it executes once per deploy
+    # rather than once per pod restart (crashloop, eviction, node drain), and so
+    # a convergence failure surfaces as a failed Job that blocks the rollout
+    # instead of a pod stuck in Init.
+    # Full digest, matching the `ol.mit.edu/config-hash` convention in
+    # components/services/k8s.py — an annotation value has no length pressure,
+    # so there is nothing to buy by truncating.
+    cluster_apply_hash: Output[str] = Output.all(
+        cluster_yaml=cluster_yaml_content, image=omnigraph_server_image
+    ).apply(
+        lambda args: hashlib.sha256(
+            f"{args['cluster_yaml']}\n{args['image']}".encode()
+        ).hexdigest()
+    )
+    cluster_apply_job = kubernetes.batch.v1.Job(
+        f"omnigraph-cluster-apply-{stack_info.env_suffix}",
+        # Deliberately unnamed (Pulumi auto-naming): a Job's pod template is
+        # immutable, so every change here is a replacement, and auto-naming lets
+        # the new Job be created before the old one is removed.
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+        spec=kubernetes.batch.v1.JobSpecArgs(
+            # Converging is idempotent, so a couple of retries costs nothing and
+            # rides out a transient S3 or IRSA-credential hiccup.
+            backoff_limit=2,
+            # Keep a completed Job around for a day so its logs are readable
+            # after a deploy, then let the TTL controller reap it.
+            ttl_seconds_after_finished=86400,
+            template=kubernetes.core.v1.PodTemplateSpecArgs(
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    labels={
+                        **k8s_global_labels,
+                        "app.kubernetes.io/name": "omnigraph-cluster-apply",
+                    },
+                    # Forces a new Job whenever the declared graph list OR the
+                    # image (and therefore the baked schemas) changes. Without
+                    # it, adding a repo to cluster.yaml would leave this Job's
+                    # spec byte-identical and the graph would never be created.
+                    annotations={"ol.mit.edu/config-hash": cluster_apply_hash},
+                ),
+                spec=kubernetes.core.v1.PodSpecArgs(
+                    restart_policy="Never",
+                    # Same IRSA identity as the server: this writes the graphs'
+                    # Lance stores directly in S3, not through the server.
+                    service_account_name=OMNIGRAPH_SERVICE_ACCOUNT_NAME,
+                    containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="cluster-apply",
+                            image=omnigraph_server_image,
+                            # Override the image's server entrypoint script —
+                            # this runs the `omnigraph` CLI baked alongside it.
+                            command=["omnigraph"],
+                            args=[
+                                "cluster",
+                                "apply",
+                                "--config",
+                                CLUSTER_CONFIG_DIR,
+                                "--as",
+                                CLUSTER_APPLY_ACTOR,
+                            ],
+                            env=[
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="AWS_REGION", value=aws_config.region
+                                ),
+                            ],
+                            resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                requests={"cpu": "100m", "memory": "256Mi"},
+                                limits={"cpu": "1", "memory": "1Gi"},
+                            ),
+                            volume_mounts=[
+                                # sub_path for the same reason the Deployment
+                                # uses it: overlay only cluster.yaml and leave
+                                # the image's baked-in schema files visible
+                                # alongside it. `cluster apply` reads both.
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="cluster-config",
+                                    mount_path=f"{CLUSTER_CONFIG_DIR}/cluster.yaml",
+                                    sub_path="cluster.yaml",
+                                    read_only=True,
+                                ),
+                            ],
+                        )
+                    ],
+                    volumes=[
+                        kubernetes.core.v1.VolumeArgs(
+                            name="cluster-config",
+                            config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                                name=CLUSTER_CONFIGMAP_NAME,
+                            ),
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        opts=ResourceOptions(
+            depends_on=[
+                cluster_configmap,
+                *auth_binding.irsa_service_accounts,
+            ]
+        ),
     )
 
     omnigraph_pod_labels = {
@@ -333,7 +482,23 @@ def create_data_tier(  # noqa: PLR0913
                 match_labels={"app.kubernetes.io/name": OMNIGRAPH_SERVER_SERVICE_NAME}
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=omnigraph_pod_labels),
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    labels=omnigraph_pod_labels,
+                    # The same hash the converge Job carries, so the server is
+                    # restarted by any change the Job acted on — not just the
+                    # ones that happen to change the image.
+                    #
+                    # omnigraph serves the revision it read at boot, and the
+                    # cluster.yaml mount is a sub_path (which never receives
+                    # ConfigMap updates), so without this a deploy that only
+                    # edits cluster.yaml — adding a managed repo, say — would
+                    # converge the new graph into S3 and then keep serving a
+                    # config that has never heard of it. Deploy-time
+                    # consistency is worth the restart: this Deployment is
+                    # single-replica `Recreate`, so a config change is a brief
+                    # data-tier outage by construction.
+                    annotations={"ol.mit.edu/config-hash": cluster_apply_hash},
+                ),
                 spec=kubernetes.core.v1.PodSpecArgs(
                     service_account_name=OMNIGRAPH_SERVICE_ACCOUNT_NAME,
                     containers=[
@@ -431,6 +596,10 @@ def create_data_tier(  # noqa: PLR0913
             depends_on=[
                 cluster_configmap,
                 actor_tokens_secret,
+                # Converge the graphs' schemas before the server restarts into
+                # them — omnigraph only serves the applied revision after a
+                # restart, so this ordering is what makes the new schema live.
+                cluster_apply_job,
                 # The pod's service_account_name is the IRSA SA this stack
                 # creates via auth_binding (create_irsa_service_account=True);
                 # wait for it so the initial apply doesn't transiently fail
@@ -467,4 +636,5 @@ def create_data_tier(  # noqa: PLR0913
         image_repository=image_repository,
         service=omnigraph_service,
         deployment=omnigraph_deployment,
+        cluster_apply_job=cluster_apply_job,
     )

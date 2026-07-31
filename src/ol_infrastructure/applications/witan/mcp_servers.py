@@ -69,6 +69,7 @@ def create_mcp_servers(  # noqa: PLR0913
     witan_ci_token_secret_name: str,
     witan_ci_token_secret_key: str,
     witan_ci_token_secret: Resource,
+    migration_job: Resource,
 ) -> WitanMCPServers:
     """Provision the witan-tools MCPGroup and the witan MCPServer backend."""
     witan_mcpgroup = kubernetes.apiextensions.CustomResource(
@@ -188,8 +189,18 @@ def create_mcp_servers(  # noqa: PLR0913
         # spec.secrets, actor-tokens via podTemplateSpec) so the operator
         # doesn't reconcile it into a pending pod before they exist — the same
         # secret-in-depends_on wiring toolhive_swe uses for its backends.
+        #
+        # `migration_job` makes the data migrations a genuine pre-deploy gate:
+        # pulumi-kubernetes awaits a Job's completion, so the operator is not
+        # handed the new image until the backfills for it have succeeded, and a
+        # failed migration blocks the rollout instead of half-applying it.
         opts=ResourceOptions(
-            depends_on=[witan_mcpgroup, witan_ci_token_secret, actor_tokens_secret]
+            depends_on=[
+                witan_mcpgroup,
+                witan_ci_token_secret,
+                actor_tokens_secret,
+                migration_job,
+            ]
         ),
     )
 
