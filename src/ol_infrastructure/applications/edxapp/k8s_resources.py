@@ -2013,6 +2013,21 @@ def create_k8s_resources(  # noqa: C901
         },
         opts=ResourceOptions(depends_on=[cms_celery_deployment]),
     )
+    # The lms_high_mem celery worker deliberately has NO VPA, unlike the two above.
+    # This is not an oversight:
+    #
+    #   1. make_vpa hardcodes updateMode InPlaceOrRecreate, which falls back to
+    #      *evicting* the pod when a resize cannot be applied in place. Eviction
+    #      mid-report is exactly the disruption this worker exists to avoid. Its PDB
+    #      does block VPA (the Eviction API honours PDBs, unlike rollouts), but only
+    #      while a single replica is running -- once KEDA scales to 2 or 3, a
+    #      minAvailable=1 budget permits evicting the others, report in flight or not.
+    #   2. VPA sizes from observed usage, and this worker's profile is idle almost
+    #      always with rare multi-hour bursts. The recommender would learn the idle
+    #      floor and walk the CPU request down toward _worker_vpa_min_allowed's 25m,
+    #      undoing the deliberate 1000m request that the serial, DB-bound compile
+    #      loop in instructor_task needs. Static sizing is the right call for a
+    #      bursty workload whose whole purpose is finishing one long job promptly.
 
     return {
         "edxapp_k8s_app_security_group_id": edxapp_k8s_app_security_group.id,
