@@ -122,7 +122,9 @@ operator_stack = make_stack_reference(projects.TOOLHIVE_OPERATOR, stack_info.nam
 require_stack_output_value(operator_stack, "toolhive_namespace")
 
 # Fail fast if the omnigraph data-tier stack hasn't been deployed yet — witan's
-# MCPServer points WITAN_MEMORY_URI at its in-cluster address (below).
+# MCPServer points both WITAN_MEMORY_URI (the `council` graph) and
+# WITAN_CODE_SERVER (the per-repo `code-<repo>` graphs) at its in-cluster
+# address (below).
 omnigraph_stack = make_stack_reference(projects.OMNIGRAPH, stack_info.name)
 omnigraph_server_addr = require_stack_output_value(
     omnigraph_stack, "omnigraph_server_addr"
@@ -184,6 +186,21 @@ WITAN_OIDC_AUDIENCE = witan_config.get("oidc_audience") or "witan"
 # Vault source in its own namespace (see applications/omnigraph).
 WITAN_CI_TOKEN_SECRET_NAME = "witan-ci-token"  # noqa: S105  # pragma: allowlist secret
 WITAN_CI_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
+# The MCP tier's own credential against the code graphs (WITAN_CODE_TOKEN, see
+# mcp_servers.py). A SEPARATE Secret holding the same Vault value rather than a
+# second `spec.secrets` entry against witan-ci-token: that list is keyed by
+# secret name, so two entries naming one Secret are rejected outright
+# (`.spec.secrets: duplicate entries for key [name="witan-ci-token"]`).
+#
+# Which is the right shape anyway — these are two identities that happen to
+# share a token today. witan's Cedar bundle models a distinct
+# `witan-service`/`act-svc-witan` account for the tier's graph enumeration, and
+# when one is provisioned this Secret's `path` moves to it while the MCPServer
+# spec stays as it is.
+WITAN_CODE_TOKEN_SECRET_NAME = (  # pragma: allowlist secret
+    "witan-code-token"  # noqa: S105
+)
+WITAN_CODE_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 ACTOR_TOKENS_SECRET_NAME = "actor-tokens"  # noqa: S105  # pragma: allowlist secret
 ACTOR_TOKENS_SECRET_KEY = "tokens.json"  # noqa: S105  # pragma: allowlist secret
 # Keys these maps are stored under *inside* their Vault secrets. This stack
@@ -236,6 +253,37 @@ witan_ci_token_secret = OLVaultK8SSecret(
         excludes=[".*"],
         templates={
             WITAN_CI_TOKEN_SECRET_KEY: (
+                f'{{{{ get .Secrets "{WITAN_CI_TOKEN_VAULT_KEY}" }}}}'
+            )
+        },
+        refresh_after="1h",
+        vaultauth=witan_auth_binding.vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=witan_auth_binding.vault_k8s_resources,
+    ),
+)
+
+# Same Vault path as witan_ci_token_secret above — see
+# WITAN_CODE_TOKEN_SECRET_NAME for why this is its own Secret and not a second
+# reference to that one.
+witan_code_token_secret = OLVaultK8SSecret(
+    f"witan-code-token-secret-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name=WITAN_CODE_TOKEN_SECRET_NAME,
+        namespace=NAMESPACE,
+        labels=k8s_global_labels,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name=WITAN_CODE_TOKEN_SECRET_NAME,
+        dest_secret_type="Opaque",  # pragma: allowlist secret  # noqa: S106
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="witan/ci-token",
+        exclude_raw=True,
+        excludes=[".*"],
+        templates={
+            WITAN_CODE_TOKEN_SECRET_KEY: (
                 f'{{{{ get .Secrets "{WITAN_CI_TOKEN_VAULT_KEY}" }}}}'
             )
         },
@@ -328,6 +376,9 @@ mcp_servers = create_mcp_servers(
     witan_ci_token_secret_name=WITAN_CI_TOKEN_SECRET_NAME,
     witan_ci_token_secret_key=WITAN_CI_TOKEN_SECRET_KEY,
     witan_ci_token_secret=witan_ci_token_secret,
+    witan_code_token_secret_name=WITAN_CODE_TOKEN_SECRET_NAME,
+    witan_code_token_secret_key=WITAN_CODE_TOKEN_SECRET_KEY,
+    witan_code_token_secret=witan_code_token_secret,
     migration_job=witan_migration_job,
 )
 

@@ -69,6 +69,9 @@ def create_mcp_servers(  # noqa: PLR0913
     witan_ci_token_secret_name: str,
     witan_ci_token_secret_key: str,
     witan_ci_token_secret: Resource,
+    witan_code_token_secret_name: str,
+    witan_code_token_secret_key: str,
+    witan_code_token_secret: Resource,
     migration_job: Resource,
 ) -> WitanMCPServers:
     """Provision the witan-tools MCPGroup and the witan MCPServer backend."""
@@ -140,13 +143,68 @@ def create_mcp_servers(  # noqa: PLR0913
                 # relying on two independent defaults agreeing is the failure
                 # mode this avoids.)
                 {"name": "WITAN_MEMORY_GRAPH", "value": council_graph_id},
+                # The code-graph data tier — the same omnigraph-server, whose
+                # `code-<repo>` graphs data_tier.py declares alongside
+                # `council`. Without it the tier serves code-graph reads out of
+                # whatever `code_dir` the container has (nothing) and can serve
+                # no cluster writes at all, so the `code_store_*` tools it
+                # registers for remote indexers (agent-kit ADR-0005 path c)
+                # have nowhere to write.
+                #
+                # No graph id counterpart to WITAN_MEMORY_GRAPH here: a code
+                # graph is addressed per repo, and witan-code derives the id
+                # from the canonical repo URI the caller names
+                # (`witan_code.config.graph_id`, the byte-for-byte mirror of
+                # `data_tier.code_graph_id`). A graph this cluster does not
+                # declare fails loudly on the first store call.
+                #
+                # WITAN_CODE_INDEX_ROLE is deliberately left at its default
+                # (`client`). It is what keeps a write arriving through the MCP
+                # boundary from claiming a graph's shared default-branch view;
+                # only the in-cluster CI indexer Job declares itself `ci`.
+                {"name": "WITAN_CODE_SERVER", "value": omnigraph_server_addr},
             ],
             "secrets": [
                 {
                     "name": witan_ci_token_secret_name,
                     "key": witan_ci_token_secret_key,
                     "targetEnvName": "WITAN_MEMORY_TOKEN",
-                }
+                },
+                # The tier's own credential against the code graphs, for the
+                # questions asked *about* the server rather than of a graph:
+                # `omnigraph graphs list`, which `ensure_store` runs to check
+                # the cluster actually declares a graph before a write starts
+                # (a provisioning gap becomes one clear refusal instead of an
+                # error per record), and which backs `code_indexed_repos`. That
+                # listing is server-scoped (Cedar `graph_list`) and belongs to
+                # no actor, so it authenticates as the service or not at all —
+                # and omnigraph-server, booted with a bearer-tokens file,
+                # resolves no actor from an absent token and denies it.
+                #
+                # It is NOT what a caller's records are written under.
+                # `witan_code.ingest._client` resolves the actor from the
+                # request's JWT and swaps in that actor's token from
+                # WITAN_ACTOR_TOKENS_FILE before any read or mutation, refusing
+                # outright when the actor has none — serving a caller under the
+                # service identity is what that layer exists to prevent
+                # (agent-kit ADR-0005 path c).
+                #
+                # Its own Secret rather than a second entry against
+                # witan-ci-token, whose value it currently duplicates: this
+                # list is keyed by secret name and rejects two entries naming
+                # one Secret. See WITAN_CODE_TOKEN_SECRET_NAME in __main__.py —
+                # svc-witan-ci is borrowed here, the same way migrations.py
+                # borrows it, until the `witan-service`/`act-svc-witan` account
+                # witan's Cedar bundle already models is provisioned. Sharing
+                # it grants the tier no write it could not otherwise make: the
+                # actor swap above is unconditional, and WITAN_CODE_INDEX_ROLE
+                # stays `client`, so the CI role's one real privilege — writing
+                # a graph's shared default-branch view — stays unreachable.
+                {
+                    "name": witan_code_token_secret_name,
+                    "key": witan_code_token_secret_key,
+                    "targetEnvName": "WITAN_CODE_TOKEN",
+                },
             ],
             # No outbound network needed beyond the in-cluster omnigraph-server
             # Service and the Keycloak JWKS endpoint (JWT validation).
@@ -185,8 +243,9 @@ def create_mcp_servers(  # noqa: PLR0913
                 }
             },
         },
-        # Wait for the secrets this MCPServer consumes (witan-ci-token via
-        # spec.secrets, actor-tokens via podTemplateSpec) so the operator
+        # Wait for the secrets this MCPServer consumes (witan-ci-token and
+        # witan-code-token via spec.secrets, actor-tokens via podTemplateSpec)
+        # so the operator
         # doesn't reconcile it into a pending pod before they exist — the same
         # secret-in-depends_on wiring toolhive_swe uses for its backends.
         #
@@ -198,6 +257,7 @@ def create_mcp_servers(  # noqa: PLR0913
             depends_on=[
                 witan_mcpgroup,
                 witan_ci_token_secret,
+                witan_code_token_secret,
                 actor_tokens_secret,
                 migration_job,
             ]
