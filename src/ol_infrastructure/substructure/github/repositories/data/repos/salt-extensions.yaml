@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: Plugins and extension modules for use with SaltStack that are generally
+  useful outside of a given environment.
+name: salt-extensions
+teams:
+  devops: admin

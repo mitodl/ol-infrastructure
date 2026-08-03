@@ -1,0 +1,14 @@
+---
+_actions_secret_names:
+- HEROKU_API_KEY
+- HEROKU_EMAIL
+- OL_HQ_PROJECT_SECRET
+_excluded_environments: 412
+allow_auto_merge: false
+archetype: application
+dependabot_security_updates: false
+name: mitxonline
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin
+web_commit_signoff_required: false

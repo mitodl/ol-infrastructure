@@ -1,0 +1,8 @@
+---
+archetype: archived
+description: MITOL Fork of ckeditor5 for our ocw-studio resource link plugin
+homepage: https://ckeditor.com/ckeditor-5
+name: ckeditor5
+teams:
+  devops: admin
+  odl-engineering: push

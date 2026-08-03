@@ -1,0 +1,8 @@
+---
+archetype: archived
+description: A basic Javascript library that generates a login button pointing at
+  an instance of MIT Open
+name: mit-open-login-button
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin

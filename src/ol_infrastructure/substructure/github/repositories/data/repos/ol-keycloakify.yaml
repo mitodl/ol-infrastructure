@@ -1,0 +1,13 @@
+---
+_excluded_environments: 2
+allow_auto_merge: false
+archetype: application
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: Customization of the theme and UX for OL SSO
+has_wiki: true
+name: ol-keycloakify
+teams:
+  devops: admin
+  odl-engineering: maintain
+web_commit_signoff_required: false

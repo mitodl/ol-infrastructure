@@ -1,0 +1,5 @@
+---
+archetype: archived
+description: Salt formula to install and configure the Shibboleth Service Provider
+  for use with Nginx
+name: nginx-shibboleth-formula

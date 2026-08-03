@@ -1,0 +1,8 @@
+---
+archetype: archived
+description: xbundle tool for edX courses
+name: xbundle
+teams:
+  arbisoft-contractors: push
+  odl-engineering: admin
+  odl-engineering-owners: admin

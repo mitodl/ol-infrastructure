@@ -1,0 +1,8 @@
+---
+archetype: archived
+description: 'Discern allows anyone to use machine learning based automated textual
+  classification as an API service. '
+homepage: http://code.edx.org/discern/
+name: discern
+teams:
+  odl-engineering-owners: admin

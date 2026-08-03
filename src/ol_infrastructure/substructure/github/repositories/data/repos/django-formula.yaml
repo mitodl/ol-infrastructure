@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: SaltStack formula for deploying and maintaining Django web applications
+  with uWSGI
+name: django-formula
+teams:
+  devops: pull

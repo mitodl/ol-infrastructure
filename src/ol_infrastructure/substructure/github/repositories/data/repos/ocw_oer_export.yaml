@@ -1,0 +1,13 @@
+---
+_actions_secret_names:
+- SLACK_WEBHOOK
+allow_auto_merge: false
+archetype: library
+delete_branch_on_merge: false
+dependabot_security_updates: false
+has_wiki: true
+name: ocw_oer_export
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin
+web_commit_signoff_required: false

@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: Script for validating/testing Open Learning XML courses for the edx-platform
+  using a docker container
+name: openedx-course-test
+teams:
+  odl-engineering-owners: admin

@@ -1,0 +1,11 @@
+---
+allow_auto_merge: false
+allow_rebase_merge: true
+archetype: fork
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: A python package that communicates with 3rd party taxonomy vendors
+name: taxonomy-connector
+teams: {}
+web_commit_signoff_required: false

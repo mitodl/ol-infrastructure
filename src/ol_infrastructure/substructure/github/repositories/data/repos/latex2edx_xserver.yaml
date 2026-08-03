@@ -1,0 +1,6 @@
+---
+archetype: archived
+description: latex2edx xserver for studio connection
+name: latex2edx_xserver
+teams:
+  odl-engineering-owners: admin

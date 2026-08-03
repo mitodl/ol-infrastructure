@@ -1,0 +1,14 @@
+---
+_excluded_environments: 2
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+archetype: application
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: Structured, typed, auditable Django settings management powered by Pydantic
+has_wiki: true
+homepage: https://github.com/mitodl/django-aqueduct
+name: django-aqueduct
+teams: {}
+web_commit_signoff_required: false

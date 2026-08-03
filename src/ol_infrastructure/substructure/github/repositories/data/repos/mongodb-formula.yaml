@@ -1,0 +1,6 @@
+---
+archetype: archived
+description: '  SaltStack formula for building a MongoDB replica set with access controls.'
+name: mongodb-formula
+teams:
+  devops: admin

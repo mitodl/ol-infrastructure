@@ -1,0 +1,6 @@
+---
+archetype: archived
+description: templates for the micromasters application, https://github.com/mitodl/micromasters
+name: micromasters-templates
+teams:
+  odl-engineering: admin

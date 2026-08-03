@@ -1,0 +1,13 @@
+---
+_excluded_environments: 1
+allow_auto_merge: false
+archetype: application
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: A collection of Hugo project templates for different types of OCW websites
+has_wiki: true
+name: ocw-hugo-projects
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin
+web_commit_signoff_required: false

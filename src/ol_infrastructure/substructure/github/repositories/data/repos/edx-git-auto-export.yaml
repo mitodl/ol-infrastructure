@@ -1,0 +1,8 @@
+---
+archetype: archived
+description: If the Git auto-export feature is enabled then push the OLX changes to
+  Git from edX platform
+name: edx-git-auto-export
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin

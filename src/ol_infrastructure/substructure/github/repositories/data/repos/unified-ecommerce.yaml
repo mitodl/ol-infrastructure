@@ -1,0 +1,8 @@
+---
+_excluded_environments: 1
+archetype: archived
+description: An ecommerce system for OL Web applications.
+name: unified-ecommerce
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin

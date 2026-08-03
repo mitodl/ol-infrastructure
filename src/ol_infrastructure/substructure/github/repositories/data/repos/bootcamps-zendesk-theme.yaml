@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: The default theme for Zendesk Guide
+name: bootcamps-zendesk-theme
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin

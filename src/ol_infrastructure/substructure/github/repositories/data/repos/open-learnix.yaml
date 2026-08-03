@@ -1,0 +1,7 @@
+---
+archetype: library
+dependabot_security_updates: false
+description: Nix tooling to work with our repositories under Nixos
+name: open-learnix
+teams: {}
+web_commit_signoff_required: false

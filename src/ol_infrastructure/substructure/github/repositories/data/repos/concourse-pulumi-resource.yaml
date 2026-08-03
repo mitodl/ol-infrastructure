@@ -1,0 +1,7 @@
+---
+_excluded_environments: 1
+archetype: archived
+description: A Concourse resource for Pulumi
+name: concourse-pulumi-resource
+teams:
+  devops-contractors: admin

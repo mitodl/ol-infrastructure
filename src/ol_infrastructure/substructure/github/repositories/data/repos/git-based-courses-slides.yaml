@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: Slides for the "Git-based Courses" talk by Carson Gee and Peter Pinch
+  at the 2014 Open edX conference
+name: git-based-courses-slides
+teams:
+  odl-engineering-owners: admin

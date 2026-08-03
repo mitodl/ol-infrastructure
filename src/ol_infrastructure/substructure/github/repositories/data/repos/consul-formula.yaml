@@ -1,0 +1,6 @@
+---
+archetype: archived
+description: Formula to launch and manage Hashicorp Consul agents.
+name: consul-formula
+teams:
+  devops: admin

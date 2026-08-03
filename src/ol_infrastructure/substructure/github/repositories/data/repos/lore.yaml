@@ -1,0 +1,10 @@
+---
+_excluded_environments: 3
+archetype: archived
+description: Learning Object Repository for Education
+homepage: https://goo.gl/nDVx4D
+name: lore
+teams:
+  arbisoft-contractors: push
+  odl-engineering: admin
+  odl-engineering-owners: admin

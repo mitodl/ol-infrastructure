@@ -1,0 +1,17 @@
+---
+allow_auto_merge: false
+allow_rebase_merge: true
+archetype: fork
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: server side of the comment service
+has_issues: true
+has_wiki: true
+name: cs_comments_service
+teams:
+  devops: admin
+  odl-engineering: push
+  odl-engineering-owners: admin
+vulnerability_alerts: false
+web_commit_signoff_required: false

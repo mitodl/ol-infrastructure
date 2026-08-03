@@ -1,0 +1,9 @@
+---
+archetype: archived
+description: Cookie cutter template for starting a new django application
+name: cookiecutter-djangoapp
+teams:
+  odl-engineering: admin
+  odl-engineering-owners: admin
+topics:
+- django

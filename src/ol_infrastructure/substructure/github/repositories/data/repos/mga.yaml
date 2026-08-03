@@ -1,0 +1,8 @@
+---
+_excluded_environments: 1
+archetype: archived
+description: mga
+name: mga
+teams:
+  arbisoft-contractors: pull
+  odl-engineering: admin

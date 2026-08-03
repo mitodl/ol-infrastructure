@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: Django + AWS Elastic Transcoder
+name: django-elastic-transcoder
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin

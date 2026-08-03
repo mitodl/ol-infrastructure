@@ -1,0 +1,25 @@
+---
+_actions_secret_names:
+- KNOWN_HOSTS
+- MIT_LEARN_API_BASE_URL
+- MIT_LEARN_BASE_URL
+- NETLIFY_AUTH_TOKEN
+- NETLIFY_SITE_ID
+- OCW_IMPORT_STARTER_SLUG
+- OCW_STUDIO_BASE_URL
+- RESOURCE_BASE_URL
+- RESOURCE_BASE_URL_V3
+- SEARCH_API_URL
+- SSH_KEY
+- STATIC_API_BASE_URL
+_excluded_environments: 3
+allow_auto_merge: false
+archetype: application
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: A Hugo theme for building OCW websites
+has_wiki: true
+name: ocw-hugo-themes
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin

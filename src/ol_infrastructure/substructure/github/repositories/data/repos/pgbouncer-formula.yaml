@@ -1,0 +1,6 @@
+---
+archetype: archived
+description: SaltStack formula for installing and configuring PGBouncer
+name: pgbouncer-formula
+teams:
+  devops: admin

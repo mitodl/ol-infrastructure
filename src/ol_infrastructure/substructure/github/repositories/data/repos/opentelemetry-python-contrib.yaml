@@ -1,0 +1,11 @@
+---
+allow_auto_merge: false
+allow_rebase_merge: true
+archetype: fork
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: OpenTelemetry instrumentation for Python modules
+homepage: https://opentelemetry.io
+name: opentelemetry-python-contrib
+teams: {}
+web_commit_signoff_required: false

@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: Python scripts to create a "course axis" from an edX course XML dump
+name: edx2course_axis
+teams:
+  odl-engineering: admin
+  odl-engineering-owners: admin

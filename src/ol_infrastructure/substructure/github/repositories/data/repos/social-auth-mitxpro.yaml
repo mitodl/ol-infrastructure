@@ -1,0 +1,6 @@
+---
+archetype: archived
+name: social-auth-mitxpro
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin

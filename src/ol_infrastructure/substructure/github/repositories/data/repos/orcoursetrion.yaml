@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: 'Automatic course provisioning for the edx-platform using github '
+homepage: http://orcoursetrion.rtfd.org
+name: orcoursetrion
+teams:
+  odl-engineering-owners: admin

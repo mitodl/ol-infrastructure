@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: SaltStack Formula to install and configure certbot to manage Let's Encrypt
+  certificates and renewal.
+name: letsencrypt-formula
+teams:
+  devops: admin

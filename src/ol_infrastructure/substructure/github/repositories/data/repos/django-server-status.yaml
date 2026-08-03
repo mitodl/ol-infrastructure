@@ -1,0 +1,10 @@
+---
+archetype: archived
+description: Monitor server status for health checks.
+name: django-server-status
+teams:
+  arbisoft-contractors: push
+  odl-engineering: admin
+  odl-engineering-owners: admin
+topics:
+- django

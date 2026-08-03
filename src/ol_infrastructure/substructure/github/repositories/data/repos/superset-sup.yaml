@@ -1,0 +1,11 @@
+---
+allow_auto_merge: false
+allow_rebase_merge: true
+archetype: fork
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: a modern CLI for Apache Superset and Preset workspaces
+has_wiki: true
+name: superset-sup
+teams: {}
+web_commit_signoff_required: false

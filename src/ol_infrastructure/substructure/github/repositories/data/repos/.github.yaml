@@ -1,0 +1,15 @@
+---
+_actions_secret_names:
+- GH_PROJECT_AUTOMATION_TOKEN
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+archetype: library
+dependabot_security_updates: false
+description: Common configuration for GitHub across the organization
+has_wiki: true
+name: .github
+teams:
+  odl-engineering: maintain
+  odl-engineering-owners: admin
+web_commit_signoff_required: false

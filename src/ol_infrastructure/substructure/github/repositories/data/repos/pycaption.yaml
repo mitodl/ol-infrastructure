@@ -1,0 +1,4 @@
+---
+archetype: archived
+description: Python module to read/write popular video caption formats
+name: pycaption

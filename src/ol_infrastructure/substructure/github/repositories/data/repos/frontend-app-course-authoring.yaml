@@ -1,0 +1,14 @@
+---
+allow_auto_merge: false
+allow_rebase_merge: true
+archetype: fork
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: The micro-frontend for course authoring in Open edX.  Frontend interfaces
+  that currently live in Studio/CMS should eventually live here.
+name: frontend-app-course-authoring
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin
+web_commit_signoff_required: false

@@ -1,0 +1,16 @@
+---
+_excluded_environments: 1
+allow_auto_merge: false
+allow_rebase_merge: true
+archetype: fork
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: Codebase for semantic search of MIT Open Courseware (AI-powered Search
+  and Chat for MIT Open Courseware)
+has_issues: true
+has_wiki: true
+name: semantic-mitopen
+teams:
+  odl-engineering: admin
+vulnerability_alerts: false
+web_commit_signoff_required: false

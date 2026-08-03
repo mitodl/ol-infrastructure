@@ -1,0 +1,11 @@
+---
+_excluded_environments: 1
+allow_auto_merge: false
+allow_rebase_merge: true
+archetype: fork
+dependabot_security_updates: false
+description: AWS IAM linting library
+has_wiki: true
+name: ol-parliament
+teams: {}
+web_commit_signoff_required: false

@@ -1,0 +1,14 @@
+---
+_excluded_environments: 1
+allow_auto_merge: false
+allow_rebase_merge: true
+archetype: fork
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: AI tutor MIT open Learning
+has_issues: true
+has_wiki: true
+name: open-learning-ai-tutor
+teams:
+  odl-engineering: admin
+web_commit_signoff_required: false

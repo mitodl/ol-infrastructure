@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: A command line utility for taking master.json output from ocw-data-parser
+  and producing markdown for use with hugo-course-publisher
+name: ocw-to-hugo
+teams:
+  odl-engineering: admin

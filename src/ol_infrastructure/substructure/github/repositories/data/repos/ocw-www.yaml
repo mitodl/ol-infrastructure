@@ -1,0 +1,11 @@
+---
+_actions_secret_names:
+- NETLIFY_AUTH_TOKEN
+- NETLIFY_SITE_ID
+- OCW_STUDIO_BASE_URL
+- SEARCH_API_URL
+_excluded_environments: 3
+archetype: archived
+name: ocw-www
+teams:
+  odl-engineering: push

@@ -1,0 +1,11 @@
+---
+_actions_secret_names:
+- HEROKU_API_KEY
+- HEROKU_EMAIL
+_excluded_environments: 683
+archetype: archived
+description: MIT Bootcamp e-commerce
+name: bootcamp-ecommerce
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin

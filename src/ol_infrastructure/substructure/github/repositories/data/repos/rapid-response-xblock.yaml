@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: 'a django app plug-in for edx-platform '
+name: rapid-response-xblock
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin

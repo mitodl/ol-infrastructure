@@ -1,0 +1,4 @@
+---
+archetype: archived
+description: Formula for setting up a salt master with a web ui and unit tests.
+name: master-formula

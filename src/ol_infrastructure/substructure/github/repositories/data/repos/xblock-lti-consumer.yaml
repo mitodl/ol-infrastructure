@@ -1,0 +1,10 @@
+---
+allow_auto_merge: false
+allow_rebase_merge: true
+archetype: fork
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+name: xblock-lti-consumer
+teams: {}
+web_commit_signoff_required: false

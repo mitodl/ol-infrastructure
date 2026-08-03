@@ -1,0 +1,5 @@
+---
+archetype: archived
+name: copier-djangoapp
+teams:
+  odl-engineering: admin

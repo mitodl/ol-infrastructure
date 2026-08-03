@@ -1,0 +1,15 @@
+---
+_excluded_environments: 2
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+archetype: application
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: Scripts to automate the release process, aka "Doof"
+has_wiki: true
+name: release-script
+teams:
+  odl-engineering: admin
+web_commit_signoff_required: false

@@ -1,0 +1,6 @@
+---
+archetype: archived
+description: A Concourse resource for Vault
+name: concourse-vault-resource
+teams:
+  devops: admin

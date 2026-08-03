@@ -1,0 +1,5 @@
+---
+archetype: archived
+description: Nginx Salt Formula
+homepage: http://docs.saltstack.com/en/latest/topics/development/conventions/formulas.html
+name: nginx-formula

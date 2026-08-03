@@ -1,0 +1,5 @@
+---
+archetype: archived
+description: Salt formula to install the Reddit open source application in a production
+  environment
+name: reddit-formula

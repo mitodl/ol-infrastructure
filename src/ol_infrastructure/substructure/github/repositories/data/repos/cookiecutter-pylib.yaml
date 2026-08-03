@@ -1,0 +1,6 @@
+---
+archetype: archived
+description: Cookiecutter template for pure python libs
+name: cookiecutter-pylib
+teams:
+  odl-engineering: admin

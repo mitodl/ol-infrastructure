@@ -1,0 +1,10 @@
+---
+archetype: archived
+description: Flask application for proxying requests to the MIT Learning Modules API
+  from edx-platform
+name: lmod_proxy
+teams:
+  odl-engineering: admin
+  odl-engineering-owners: admin
+topics:
+- edx-platform

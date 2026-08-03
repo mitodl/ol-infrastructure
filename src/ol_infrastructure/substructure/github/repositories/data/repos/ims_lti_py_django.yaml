@@ -1,0 +1,6 @@
+---
+archetype: archived
+description: 'Example of how to setup LTI producer '
+name: ims_lti_py_django
+teams:
+  odl-engineering-owners: admin

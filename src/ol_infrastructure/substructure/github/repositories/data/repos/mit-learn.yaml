@@ -1,0 +1,18 @@
+---
+_actions_secret_names:
+- HEROKU_API_KEY
+- HEROKU_EMAIL
+- MITOL_LEARN_DOCKERHUB_PASSWORD
+- MITOL_LEARN_DOCKERHUB_USER
+- MITX_ONLINE_BASE_URL_PROD
+- MITX_ONLINE_BASE_URL_RC
+_excluded_environments: 44
+allow_auto_merge: false
+archetype: application
+dependabot_security_updates: false
+name: mit-learn
+teams:
+  arbisoft-contractors: triage
+  odl-engineering: admin
+  odl-engineering-owners: admin
+web_commit_signoff_required: false

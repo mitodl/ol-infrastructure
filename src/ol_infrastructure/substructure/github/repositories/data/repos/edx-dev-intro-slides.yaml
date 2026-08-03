@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: 'Getting started slides for developing on edX Platform: http://mitodl.github.io/edx-dev-intro-slides/#1'
+name: edx-dev-intro-slides
+teams:
+  odl-engineering: admin
+  odl-engineering-owners: admin

@@ -1,0 +1,19 @@
+---
+_actions_secret_names:
+- HEROKU_API_KEY
+- HEROKU_EMAIL
+_excluded_environments: 5
+allow_auto_merge: false
+archetype: application
+default_branch: master
+dependabot_security_updates: false
+description: Open Source Courseware authoring tool
+has_wiki: true
+name: ocw-studio
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin
+topics:
+- ocw
+- opencourseware
+web_commit_signoff_required: false

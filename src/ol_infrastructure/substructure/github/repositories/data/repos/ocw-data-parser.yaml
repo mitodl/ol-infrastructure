@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: A parsing script for MIT OpenCourseWare course data
+name: ocw-data-parser
+teams:
+  odl-engineering: admin
+  odl-engineering-owners: admin

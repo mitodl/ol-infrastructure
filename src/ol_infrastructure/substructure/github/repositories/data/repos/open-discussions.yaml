@@ -1,0 +1,20 @@
+---
+_actions_secret_names:
+- HEROKU_API_KEY
+- HEROKU_EMAIL
+_excluded_environments: 1723
+allow_auto_merge: false
+archetype: application
+default_branch: master
+dependabot_security_updates: false
+has_wiki: true
+name: open-discussions
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin
+  owners-mit-open: admin
+topics:
+- community
+- mit
+- mm
+web_commit_signoff_required: false

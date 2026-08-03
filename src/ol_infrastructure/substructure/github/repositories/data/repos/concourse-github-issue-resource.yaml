@@ -1,0 +1,6 @@
+---
+archetype: archived
+description: A Concourse resource for Github Issues
+name: concourse-github-issue-resource
+teams:
+  devops: admin

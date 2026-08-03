@@ -1,0 +1,8 @@
+---
+_excluded_environments: 1
+archetype: archived
+description: A Concourse custom resource for Packer
+name: concourse-packer-resource
+teams:
+  devops-contractors: admin
+  odl-engineering: push

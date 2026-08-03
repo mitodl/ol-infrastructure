@@ -1,0 +1,8 @@
+---
+archetype: archived
+description: Tracking for internal (private) issues
+name: internal
+teams:
+  arbisoft-contractors: push
+  odl-engineering: push
+  odl-engineering-owners: admin

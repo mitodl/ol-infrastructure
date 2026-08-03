@@ -1,0 +1,6 @@
+---
+archetype: archived
+description: edx-notes-api
+name: edx-notes-api
+teams:
+  odl-engineering: admin

@@ -1,0 +1,5 @@
+---
+archetype: archived
+description: SaltStack formula for installing and configuring uWSGI to manage web
+  applications
+name: uwsgi-formula

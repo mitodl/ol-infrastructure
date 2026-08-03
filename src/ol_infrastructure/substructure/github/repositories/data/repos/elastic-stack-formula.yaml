@@ -1,0 +1,4 @@
+---
+archetype: archived
+description: Salt formula for managing the various components of the elastic stack
+name: elastic-stack-formula

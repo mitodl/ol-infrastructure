@@ -1,0 +1,6 @@
+---
+archetype: archived
+description: A Hugo starter template for an OCW course
+name: ocw-course-hugo-starter
+teams:
+  odl-engineering: admin

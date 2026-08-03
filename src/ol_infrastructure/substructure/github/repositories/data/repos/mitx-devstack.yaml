@@ -1,0 +1,5 @@
+---
+archetype: archived
+description: Automation for building a distributable environment for use in course
+  authoring
+name: mitx-devstack

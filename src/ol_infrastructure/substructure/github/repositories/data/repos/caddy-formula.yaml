@@ -1,0 +1,4 @@
+---
+archetype: archived
+description: SaltStack formula for installing and configuring a Caddy service
+name: caddy-formula

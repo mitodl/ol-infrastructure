@@ -1,0 +1,15 @@
+---
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+archetype: library
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: Customizations for the NYTimes Library application to fit the needs of
+  MIT Open Learning
+has_wiki: true
+name: ol-customizations-nytimes-library
+teams:
+  odl-engineering: push
+  odl-engineering-owners: admin
+web_commit_signoff_required: false

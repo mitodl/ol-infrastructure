@@ -1,0 +1,8 @@
+---
+archetype: archived
+description: PyLTI implementation
+name: pylti
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: push
+  odl-engineering-owners: admin

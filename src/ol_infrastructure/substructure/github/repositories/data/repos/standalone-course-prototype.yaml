@@ -1,0 +1,5 @@
+---
+archetype: archived
+description: This is a prototype of a Hugo site that uses [hugo-course-publisher](https://github.com/mitodl/hugo-course-publisher)
+  as a theme to render a single course page.
+name: standalone-course-prototype

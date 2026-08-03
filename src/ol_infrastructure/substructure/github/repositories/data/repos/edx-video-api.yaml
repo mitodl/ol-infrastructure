@@ -1,0 +1,8 @@
+---
+archetype: archived
+description: A django app plugin for edx-platform that adds HTTP API endpoints for
+  interacting with video object
+name: edx-video-api
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin

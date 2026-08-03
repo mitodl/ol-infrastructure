@@ -1,0 +1,6 @@
+---
+archetype: archived
+name: django-cas
+teams:
+  arbisoft-contractors: admin
+  devops: admin

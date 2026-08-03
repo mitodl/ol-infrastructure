@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: A set of scripts to update usernames in Open edX (and other apps that
+  log into Open edX via OAuth)
+name: edx-username-updater
+teams:
+  odl-engineering: admin

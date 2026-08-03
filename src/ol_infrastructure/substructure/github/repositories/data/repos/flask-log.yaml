@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: This is a handy flask extension for setting up logging for your application
+  that is super simple to setup.
+name: flask-log
+teams:
+  odl-engineering-owners: admin

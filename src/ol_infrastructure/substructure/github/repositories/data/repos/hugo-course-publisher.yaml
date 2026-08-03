@@ -1,0 +1,18 @@
+---
+_actions_secret_names:
+- AWS_BUCKET_NAME
+- ENV_ACCESS_KEY
+- ENV_DEFAULT_REGION
+- ENV_SECRET_ACCESS_KEY
+- NETLIFY_AUTH_TOKEN
+- NETLIFY_SITE_ID
+- SEARCH_API_URL
+- ZAP_PROD_TARGET
+- ZAP_RC_TARGET
+_excluded_environments: 2
+archetype: archived
+description: hugo research
+name: hugo-course-publisher
+teams:
+  odl-engineering: admin
+  odl-engineering-owners: admin

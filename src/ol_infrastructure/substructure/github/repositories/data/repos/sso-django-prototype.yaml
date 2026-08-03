@@ -1,0 +1,6 @@
+---
+_excluded_environments: 1
+archetype: archived
+name: sso-django-prototype
+teams:
+  odl-engineering: admin

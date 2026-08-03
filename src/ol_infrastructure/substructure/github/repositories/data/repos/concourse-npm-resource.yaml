@@ -1,0 +1,4 @@
+---
+archetype: archived
+description: Check NPM packages from Concourse
+name: concourse-npm-resource

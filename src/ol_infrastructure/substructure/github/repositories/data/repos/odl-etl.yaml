@@ -1,0 +1,6 @@
+---
+archetype: archived
+description: Repository to use for extract, transform, and load tasks
+name: odl-etl
+teams:
+  devops: admin

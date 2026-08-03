@@ -1,0 +1,16 @@
+---
+allow_auto_merge: false
+allow_rebase_merge: true
+archetype: fork
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: Make Your Company Data Driven. Connect to any data source, easily visualize
+  and share your data.
+has_issues: true
+homepage: http://redash.io/
+name: redash
+teams:
+  odl-engineering: admin
+vulnerability_alerts: false
+web_commit_signoff_required: false

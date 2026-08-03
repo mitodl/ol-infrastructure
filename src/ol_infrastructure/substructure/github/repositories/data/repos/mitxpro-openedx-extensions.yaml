@@ -1,0 +1,6 @@
+---
+archetype: archived
+name: mitxpro-openedx-extensions
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin

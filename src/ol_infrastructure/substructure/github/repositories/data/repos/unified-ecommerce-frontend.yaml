@@ -1,0 +1,6 @@
+---
+_excluded_environments: 1
+archetype: archived
+name: unified-ecommerce-frontend
+teams:
+  odl-engineering: admin

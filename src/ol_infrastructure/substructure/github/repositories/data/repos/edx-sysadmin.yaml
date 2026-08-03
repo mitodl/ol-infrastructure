@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: A plugin for SysAdmin panel of Open edX
+name: edx-sysadmin
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin

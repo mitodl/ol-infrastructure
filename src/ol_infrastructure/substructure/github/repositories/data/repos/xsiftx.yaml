@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: Repo for running data collection scripts against courses and putting
+  the results in the instructor dashboard
+name: xsiftx
+teams:
+  odl-engineering: admin

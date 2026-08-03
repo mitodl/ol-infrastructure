@@ -1,0 +1,7 @@
+---
+archetype: archived
+name: PyLmod
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin
+  odl-engineering-owners: admin

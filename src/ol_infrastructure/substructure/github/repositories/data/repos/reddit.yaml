@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: the code that powers reddit.com
+homepage: https://www.reddit.com/r/redditdev
+name: reddit
+teams:
+  odl-engineering: admin

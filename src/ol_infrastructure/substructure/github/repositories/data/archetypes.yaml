@@ -1,0 +1,76 @@
+---
+# Shared repository shapes for the mitodl fleet.
+#
+# A repo's YAML in data/repos/ declares ONLY what it deviates from its archetype on, so a
+# `git diff` over that directory shows exactly the drift and nothing else. See
+# docs/plans/github-org-pulumi-import.md §3.2.
+#
+# IMPORTANT: these are the TARGET values, not current reality. During phases 1-3 the
+# per-repo files record what each repo actually is today, deviations and all -- including
+# where today's value is wrong. Making a wrong value explicit is what turns it into an
+# auditable finding in phase 4 rather than an invisible one (§6). Nothing here is applied
+# to GitHub until phase 5.
+#
+# No branch-protection block appears in any archetype. Since the C6c probe, protection is
+# enforced by org rulesets targeting the `tier` custom property (§5.4), not by per-repo
+# resources. Only `required_status_checks` stays per-repo, because check names differ.
+
+archetypes:
+  # Every non-archived repo inherits this.
+  base:
+    tier: standard
+    delete_branch_on_merge: true
+    allow_squash_merge: true
+    allow_merge_commit: false
+    allow_rebase_merge: false
+    allow_auto_merge: true
+    has_issues: true
+    has_wiki: false
+    web_commit_signoff_required: true
+    vulnerability_alerts: true
+    dependabot_security_updates: true
+    secret_scanning: enabled  # pragma: allowlist secret
+    secret_scanning_push_protection: enabled  # pragma: allowlist secret
+    default_branch: main
+    teams:
+      odl-engineering: push
+      odl-engineering-owners: admin
+
+  # Deployed services: mit-learn, mitxonline, ocw-studio, ...
+  application:
+    extends: base
+    tier: tier-1
+    visibility: public
+
+  # Published packages and shared libraries: ol-django, smoot-design, ...
+  library:
+    extends: base
+    tier: tier-1
+
+  # ol-infrastructure, ol-concourse, dagster.
+  infrastructure:
+    extends: base
+    tier: tier-1
+    teams:
+      devops: push
+      odl-engineering-owners: admin
+
+  # Upstream forks: edx-platform, XBlock, tutor, frontend-app-*, ...
+  #
+  # `tier: unmanaged` is deliberate and load-bearing: no org ruleset targets that value,
+  # so forks are explicitly untargeted rather than accidentally unprotected. That
+  # distinction is what stops CON-09 from reporting ~115 repos it cannot act on (§9.2).
+  # default_branch is NOT pinned here -- 102 active repos still use `master`, almost all
+  # of them forks, where it is upstream's choice and not ours to change.
+  fork:
+    extends: base
+    tier: unmanaged
+    has_issues: false
+    allow_merge_commit: true    # rebasing against upstream needs it
+
+  # The 138 archived repos. Deliberately almost empty: GitHub rejects most writes to an
+  # archived repo, so anything more here produces failed applies rather than policy.
+  # They are imported rather than ignored so that nothing stops someone re-adding one
+  # later with a full config -- see §4.4.
+  archived:
+    archived: true

@@ -1,0 +1,12 @@
+---
+archetype: archived
+description: a sample LTI provider using the PyLTI library and the Flask framework
+name: mit_lti_flask_sample
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin
+  odl-engineering-owners: admin
+topics:
+- flask
+- lti-provider
+- python

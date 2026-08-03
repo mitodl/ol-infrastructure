@@ -1,0 +1,4 @@
+---
+archetype: archived
+description: Cookiecutter template for well-structured SaltStack formulas
+name: saltstack-formula-cookiecutter

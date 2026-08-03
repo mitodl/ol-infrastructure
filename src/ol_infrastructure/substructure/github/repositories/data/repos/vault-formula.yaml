@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: SaltStack formula for building and configuring Vault from Hashicorp
+name: vault-formula
+teams:
+  devops: push
+  odl-engineering: push

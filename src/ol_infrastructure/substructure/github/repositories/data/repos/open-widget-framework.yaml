@@ -1,0 +1,11 @@
+---
+archetype: archived
+description: A django + react app for managing user-configurable widgets
+name: open-widget-framework
+teams:
+  odl-engineering: admin
+  odl-engineering-owners: admin
+topics:
+- django
+- react
+- widgets

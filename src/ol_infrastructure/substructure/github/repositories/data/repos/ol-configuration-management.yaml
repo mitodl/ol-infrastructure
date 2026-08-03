@@ -1,0 +1,4 @@
+---
+archetype: archived
+description: Configuration management code for building systems used at MIT Open Learning
+name: ol-configuration-management

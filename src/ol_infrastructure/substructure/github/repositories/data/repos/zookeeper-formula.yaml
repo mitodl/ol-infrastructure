@@ -1,0 +1,4 @@
+---
+archetype: archived
+homepage: http://docs.saltstack.com/en/latest/topics/development/conventions/formulas.html
+name: zookeeper-formula

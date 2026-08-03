@@ -1,0 +1,12 @@
+---
+allow_auto_merge: false
+allow_rebase_merge: true
+archetype: fork
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: Python bindings to the Tree-sitter parsing library
+homepage: https://tree-sitter.github.io/py-tree-sitter/
+name: py-tree-sitter
+teams: {}
+web_commit_signoff_required: false

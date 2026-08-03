@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: Export Django settings to templates
+homepage: https://pypi.python.org/pypi/django-settings-export
+name: django-settings-export
+teams:
+  odl-engineering-owners: admin

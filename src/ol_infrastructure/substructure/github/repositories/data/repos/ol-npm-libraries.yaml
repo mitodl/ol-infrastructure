@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: Monorepo for Open Learning Engineering's node libraries
+name: ol-npm-libraries
+topics:
+- typescript
+- typescript-library

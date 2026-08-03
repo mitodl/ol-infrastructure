@@ -1,0 +1,6 @@
+---
+archetype: archived
+description: Custom Keycloak theme used for MIT ODL
+name: ol-keycloak-customization
+teams:
+  odl-engineering: admin

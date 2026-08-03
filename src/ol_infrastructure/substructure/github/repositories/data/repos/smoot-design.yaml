@@ -1,0 +1,14 @@
+---
+_actions_secret_names:
+- SEMANTIC_RELEASE_GITHUB_TOKEN
+_excluded_environments: 2
+allow_auto_merge: false
+archetype: application
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: Design system components for MITODL Projects
+has_wiki: true
+name: smoot-design
+teams:
+  odl-engineering: maintain
+web_commit_signoff_required: false

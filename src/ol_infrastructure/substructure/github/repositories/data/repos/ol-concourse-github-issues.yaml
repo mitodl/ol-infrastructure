@@ -1,0 +1,4 @@
+---
+archetype: archived
+description: A Concourse resource to manipulate Github Issues
+name: ol-concourse-github-issues

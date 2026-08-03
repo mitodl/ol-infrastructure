@@ -1,0 +1,6 @@
+---
+archetype: archived
+name: open-discussions-client
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin

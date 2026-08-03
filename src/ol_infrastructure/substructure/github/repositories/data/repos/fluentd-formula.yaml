@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: SaltStack formula for building a FluentD server
+name: fluentd-formula
+teams:
+  devops: admin
+  odl-engineering: push

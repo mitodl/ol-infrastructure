@@ -1,0 +1,6 @@
+---
+archetype: archived
+description: Tool to convert & load data from edX platform into BigQuery
+name: edx2bigquery
+teams:
+  odl-engineering-owners: admin

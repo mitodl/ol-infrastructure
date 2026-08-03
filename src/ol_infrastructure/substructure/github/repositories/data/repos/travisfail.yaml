@@ -1,0 +1,5 @@
+---
+archetype: archived
+description: A silly little CLI to quickly see the output of a failed Travis build
+  and understand what parts of the build are failing.
+name: travisfail

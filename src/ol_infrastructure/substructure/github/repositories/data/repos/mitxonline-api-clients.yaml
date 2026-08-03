@@ -1,0 +1,15 @@
+---
+_excluded_environments: 1
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+archetype: application
+delete_branch_on_merge: false
+dependabot_security_updates: false
+has_wiki: true
+name: mitxonline-api-clients
+teams:
+  arbisoft-contractors: push
+  odl-engineering: maintain
+  odl-engineering-owners: admin
+web_commit_signoff_required: false

@@ -1,0 +1,7 @@
+---
+archetype: archived
+description: Locust client scripts for load-testing applications
+name: locust-tests
+teams:
+  devops: admin
+  odl-engineering: admin

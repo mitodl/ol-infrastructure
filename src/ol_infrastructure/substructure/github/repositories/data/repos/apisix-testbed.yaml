@@ -1,0 +1,14 @@
+---
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+archetype: library
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: 'APISIX/OIDC testbed '
+has_wiki: true
+name: apisix-testbed
+secret_scanning: disabled
+secret_scanning_push_protection: disabled
+teams: {}
+web_commit_signoff_required: false

@@ -1,0 +1,15 @@
+---
+allow_auto_merge: false
+allow_rebase_merge: true
+archetype: fork
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: A demo course with as many features turned on as possible
+has_wiki: true
+name: demo-test-course
+teams:
+  arbisoft-contractors: push
+  odl-engineering: push
+vulnerability_alerts: false
+web_commit_signoff_required: false

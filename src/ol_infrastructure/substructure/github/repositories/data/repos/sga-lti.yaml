@@ -1,0 +1,8 @@
+---
+_excluded_environments: 29
+archetype: archived
+description: an LTI implementation of Staff Graded Assignments, for use with edX
+name: sga-lti
+teams:
+  odl-engineering: pull
+  odl-engineering-owners: admin

@@ -1,0 +1,4 @@
+---
+archetype: archived
+description: Ansible role for bootstrapping Salt minions.
+name: ansible-salt-bootstrap

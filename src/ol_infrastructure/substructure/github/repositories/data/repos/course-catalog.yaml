@@ -1,0 +1,6 @@
+---
+archetype: archived
+description: MIT ODL course catalog
+name: course-catalog
+teams:
+  odl-engineering: push

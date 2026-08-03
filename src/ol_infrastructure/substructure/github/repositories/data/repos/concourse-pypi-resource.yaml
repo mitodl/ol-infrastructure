@@ -1,0 +1,4 @@
+---
+archetype: archived
+description: A Concourse CI resource for Python PyPI packages.
+name: concourse-pypi-resource

@@ -1,0 +1,15 @@
+---
+allow_auto_merge: false
+allow_rebase_merge: true
+archetype: fork
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: XQueue defines an interface for the LMS to communicate with external
+  grader services.
+has_issues: true
+has_wiki: true
+name: xqueue
+teams: {}
+vulnerability_alerts: false
+web_commit_signoff_required: false
