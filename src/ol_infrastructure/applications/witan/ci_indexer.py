@@ -176,6 +176,12 @@ def create_ci_indexer(  # noqa: PLR0913
                         ),
                         spec=kubernetes.core.v1.PodSpecArgs(
                             restart_policy="Never",
+                            # This pod talks to omnigraph-server and to GitHub,
+                            # never to the Kubernetes API, so the default
+                            # projected service-account token would be a
+                            # cluster credential sitting inside a container
+                            # that clones and parses arbitrary repo content.
+                            automount_service_account_token=False,
                             # The image runs as uid/gid 1000 (`witan`); an
                             # emptyDir is root-owned without this, and the
                             # clone would fail on a directory it cannot write.
