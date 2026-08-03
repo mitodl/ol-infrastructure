@@ -137,6 +137,7 @@ ocw_site_buckets = ocw_site_stack.require_output("ocw_site_buckets")
 qdrant_cloud_stack = make_stack_reference(
     projects.QDRANT_CLOUD, f"mitlearn.{stack_info.name}"
 )
+sentry_stack = make_stack_reference(projects.SENTRY, "Production")
 
 qdrant_secrets = read_yaml_secrets(Path("qdrant_cloud/account.yaml"))
 qdrant_provider = qdrant_cloud.Provider(
@@ -408,11 +409,18 @@ mitlearn_vault_secrets = read_yaml_secrets(
 mitlearn_vault_static_secrets = vault.generic.Secret(
     f"ol-mitlearn-configuration-secrets-{stack_info.env_suffix}",
     path=mitlearn_vault_mount.path.apply("{}/secrets".format),
-    data_json=qdrant_api_key.key.apply(
-        lambda key: json.dumps(
+    data_json=Output.all(
+        qdrant_api_key=qdrant_api_key.key,
+        sentry_dsn=sentry_stack.require_output("open_next_sentry_dsn"),
+    ).apply(
+        lambda args: json.dumps(
             {
                 **mitlearn_vault_secrets,
-                "qdrant": {**mitlearn_vault_secrets["qdrant"], "api_key_v2": key},
+                "qdrant": {
+                    **mitlearn_vault_secrets["qdrant"],
+                    "api_key_v2": args["qdrant_api_key"],
+                },
+                "sentry_dsn": args["sentry_dsn"],
             }
         )
     ),
