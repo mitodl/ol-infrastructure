@@ -12,6 +12,7 @@ import pulumi_fastly as fastly
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
+from bridge.lib.constants import mit_learn_session_cookie_name
 from bridge.lib.magic_numbers import AWS_LOAD_BALANCER_NAME_MAX_LENGTH
 from ol_infrastructure.lib.aws.eks_helper import (
     cached_image_uri,
@@ -211,9 +212,15 @@ def setup_apisix(
     """
     apisix_domains = eks_config.get_object("apisix_domains") or []
 
-    session_cookie_name = f"{stack_info.env_suffix}_gateway_session".removeprefix(
-        "production"
-    ).strip("_")
+    # Name of the OIDC session cookie the $oidc_session_bytes access-log field
+    # (and the apisix_oidc_session_cookie_bytes dashboard built on it) measures.
+    # There is one such variable per gateway but several OIDC-protected
+    # applications behind it, so it tracks the largest and most-watched session
+    # on the cluster: MIT Learn's, whose cookie is shared by learn-ai and
+    # ol-analytics-api. Purely observational -- lua-resty-session 4.x ignores
+    # these nginx variables, the cookie name itself is set per-application via
+    # OLApisixOIDCConfig.oidc_session_cookie_name.
+    session_cookie_name = mit_learn_session_cookie_name(stack_info.env_suffix)
 
     # APISIX chart uses a different chart version scheme
     # Chart version 2.16.x contains APISIX 3.17.x

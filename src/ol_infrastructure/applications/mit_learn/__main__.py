@@ -21,7 +21,11 @@ from pulumi import (
 from pulumi.output import Output
 from pulumi_aws import ec2, iam, route53, s3
 
-from bridge.lib.constants import FASTLY_A_TLS_1_3, FASTLY_CNAME_TLS_1_3
+from bridge.lib.constants import (
+    FASTLY_A_TLS_1_3,
+    FASTLY_CNAME_TLS_1_3,
+    mit_learn_session_cookie_name,
+)
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
@@ -1621,6 +1625,15 @@ mitlearn_k8s_app_oidc_resources_no_prefix = OLApisixOIDCResources(
         # shares this same "sso/mitlearn" Vault path/client and mirrors this
         # cookie domain.
         oidc_session_cookie_domain=mitlearn_api_domain.removeprefix("api"),
+        # Environment-scoped name instead of lua-resty-session's default
+        # "session". Required because of the broadened cookie domain above:
+        # a *.learn.mit.edu cookie is also sent to the RC and CI hosts, where
+        # a same-named cookie from another environment cannot be decrypted.
+        # Shared with learn-ai and ol-analytics-api -- see the helper's
+        # docstring.
+        oidc_session_cookie_name=mit_learn_session_cookie_name(
+            stack_info.env_suffix,
+        ),
         oidc_use_session_secret=True,
         vault_mount="secret-operations",
         vault_mount_type="kv-v1",
@@ -1638,10 +1651,13 @@ mitlearn_k8s_app_oidc_resources = OLApisixOIDCResources(
         oidc_post_logout_redirect_uri=f"https://{mitlearn_config.get('api_domain')}/learn/logout/",
         oidc_session_absolute_timeout=60 * 20160,
         # See the mitlearn-k8s-no-prefix resources above for why these are 0,
-        # and for the cookie domain below.
+        # and for the cookie domain and name below.
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
         oidc_session_cookie_domain=mitlearn_api_domain.removeprefix("api"),
+        oidc_session_cookie_name=mit_learn_session_cookie_name(
+            stack_info.env_suffix,
+        ),
         oidc_use_session_secret=True,
         vault_mount="secret-operations",
         vault_mount_type="kv-v1",

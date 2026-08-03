@@ -20,7 +20,7 @@ from pulumi import (
 )
 from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
 
-from bridge.lib.constants import FASTLY_A_TLS_1_3
+from bridge.lib.constants import FASTLY_A_TLS_1_3, mit_learn_session_cookie_name
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_REDIS_PORT,
@@ -927,6 +927,14 @@ learn_ai_oidc_resources = OLApisixOIDCResources(
         oidc_post_logout_redirect_uri="/",
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
+        # The /ai/* routes below are served from mit-learn's own host
+        # (api.<env>.learn.mit.edu) and their unauth_action="pass" plugins
+        # recognize the session mit-learn's login flow set, which is only
+        # possible while both name the cookie identically -- so this must
+        # track mit_learn/__main__.py's oidc_session_cookie_name.
+        oidc_session_cookie_name=mit_learn_session_cookie_name(
+            stack_info.env_suffix,
+        ),
         oidc_use_session_secret=True,
         vault_mount="secret-operations",
         vault_mount_type="kv-v1",

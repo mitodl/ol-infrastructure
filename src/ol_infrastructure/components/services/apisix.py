@@ -209,6 +209,11 @@ class OLApisixOIDCConfig(BaseModel):
         "user": True,
     }
     oidc_session_cookie_domain: str | None = None
+    # None leaves lua-resty-session's default cookie name ("session") in
+    # place. Applications that share a parent domain with other environments
+    # or other applications should set an explicit, environment-scoped name so
+    # their session cookies stay distinct in the browser's cookie jar.
+    oidc_session_cookie_name: str | None = None
     oidc_session_absolute_timeout: NonNegativeInt = 0
     # None leaves lua-resty-session's compiled-in defaults (900s idling /
     # 3600s rolling) untouched for callers that haven't opted in. 0
@@ -281,6 +286,13 @@ class OLApisixOIDCResources(ComponentResource):
         if oidc_config.oidc_session_cookie_domain:
             session_config.setdefault("session", {})["cookie_domain"] = (
                 oidc_config.oidc_session_cookie_domain
+            )
+
+        # Flat session.cookie_name, same lua-resty-session 4.x schema as
+        # cookie_domain above. Defaults to "session" in the plugin when unset.
+        if oidc_config.oidc_session_cookie_name:
+            session_config.setdefault("session", {})["cookie_name"] = (
+                oidc_config.oidc_session_cookie_name
             )
 
         if oidc_config.oidc_session_absolute_timeout:

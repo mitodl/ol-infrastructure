@@ -70,6 +70,7 @@ import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, export
 from pulumi_aws import ec2
 
+from bridge.lib.constants import mit_learn_session_cookie_name
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
@@ -554,6 +555,12 @@ if ol_analytics_api_learn_domain:
             oidc_session_rolling_timeout=0,
             oidc_session_cookie_domain=ol_analytics_api_learn_domain.removeprefix(
                 "analytics"
+            ),
+            # Same reason as the cookie domain above: this host reads the
+            # cookie mit-learn's login flow set, so the name has to match
+            # mit_learn/__main__.py's oidc_session_cookie_name exactly.
+            oidc_session_cookie_name=mit_learn_session_cookie_name(
+                stack_info.env_suffix,
             ),
             oidc_use_session_secret=True,
             vault_mount="secret-operations",
