@@ -334,3 +334,8 @@ export("omnigraph_server_addr", omnigraph_server_addr(NAMESPACE))
 # for exactly the graph declared in cluster.yaml here.
 export("council_graph_id", COUNCIL_GRAPH_ID)
 export("omnigraph_server_image_repository", data_tier.image_repository)
+# The repos whose `code-<repo>` graphs this cluster serves. Exported so the
+# witan stack's CI indexer sweeps exactly the set of graphs declared here: the
+# writer's repo list and the cluster's graph list are the same list, and a
+# second copy of it in another stack's config could only ever drift.
+export("managed_repos", MANAGED_REPOS)

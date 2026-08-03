@@ -76,6 +76,10 @@ import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, ResourceOptions, export
 
+from ol_infrastructure.applications.witan.ci_indexer import (
+    DEFAULT_INDEX_SCHEDULE,
+    create_ci_indexer,
+)
 from ol_infrastructure.applications.witan.ingress import create_ingress_resources
 from ol_infrastructure.applications.witan.mcp_servers import (
     MCP_GROUP_NAME,
@@ -104,6 +108,7 @@ from ol_infrastructure.lib.ol_types import (
 from ol_infrastructure.lib.pulumi_helper import (
     format_docker_image_ref,
     make_stack_reference,
+    optional_stack_output_value,
     parse_stack,
     require_stack_output_value,
 )
@@ -133,6 +138,19 @@ omnigraph_server_addr = require_stack_output_value(
 # stack that declares it in cluster.yaml rather than defaulted independently
 # here — see WITAN_MEMORY_GRAPH in mcp_servers.py.
 council_graph_id = require_stack_output_value(omnigraph_stack, "council_graph_id")
+# The repos with a `code-<repo>` graph on that server. The CI indexer below is
+# the single entitled writer of each of their default views, so it sweeps the
+# list the cluster declares rather than one of this stack's own — see
+# ci_indexer.py. Resolved eagerly (not via `.apply`) because it decides whether
+# the CronJob is declared at all.
+#
+# Optional, unlike the two outputs above: this output is newer than the
+# omnigraph stack's last deploy in every environment, and the two stacks are
+# separate Concourse pipelines with no ordering between them, so requiring it
+# would block every witan deploy until omnigraph happens to run. Absent means
+# the same thing an empty list means — no code graphs to index yet, so no
+# indexer — and the next omnigraph deploy supplies it.
+managed_repos = optional_stack_output_value(omnigraph_stack, "managed_repos") or []
 
 NAMESPACE = "witan"
 
@@ -179,6 +197,14 @@ MCP_OIDC_CONFIG_NAME = "witan-vmcp-oidc"
 # per stack in case the eventual Keycloak client/audience-mapper work lands a
 # different value; defaults to a plain "witan" audience.
 WITAN_OIDC_AUDIENCE = witan_config.get("oidc_audience") or "witan"
+
+# How often the CI indexer sweeps every managed repo's default branch onto its
+# shared code graph. Per-stack so a lower environment can be turned down (or
+# up, to shake the job out) without touching the default — see ci_indexer.py
+# for why the interval is what bounds staleness of the shared view.
+WITAN_CI_INDEX_SCHEDULE = (
+    witan_config.get("ci_index_schedule") or DEFAULT_INDEX_SCHEDULE
+)
 
 # Vault-synced secrets: the svc-witan-ci raw token (ADR-0009 decision point 3)
 # and the {actor_id: token} JSON map witan reads (WITAN_ACTOR_TOKENS_FILE,
@@ -479,8 +505,28 @@ vmcp_cert, vmcp_httproute = create_ingress_resources(
     witan_virtualmcpserver=witan_virtualmcpserver,
 )
 
+#########################################
+#   CI code-graph indexer (CronJob)      #
+#########################################
+# The single entitled writer of every managed repo's shared code graph. Not
+# gated on the vMCP or the MCPServer: it writes the data tier directly and is
+# useful — arguably most useful — while the serving tier is still rolling.
+witan_ci_indexer = create_ci_indexer(
+    stack_info=stack_info,
+    namespace=NAMESPACE,
+    k8s_global_labels=k8s_global_labels,
+    witan_image=witan_image,
+    omnigraph_server_addr=omnigraph_server_addr,
+    managed_repos=managed_repos,
+    schedule=WITAN_CI_INDEX_SCHEDULE,
+    witan_ci_token_secret_name=WITAN_CI_TOKEN_SECRET_NAME,
+    witan_ci_token_secret_key=WITAN_CI_TOKEN_SECRET_KEY,
+    witan_ci_token_secret=witan_ci_token_secret,
+)
+
 export("namespace", NAMESPACE)
 export("mcp_group_name", MCP_GROUP_NAME)
+export("ci_indexer_schedule", WITAN_CI_INDEX_SCHEDULE if witan_ci_indexer else None)
 export("vmcp_domain", VMCP_DOMAIN)
 export("vmcp_oidc_issuer", KEYCLOAK_ISSUER)
 export("witan_image_repository", witan_image_repository)
