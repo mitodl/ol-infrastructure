@@ -29,11 +29,14 @@ path "secret-operations/data/witan/actor-tokens" {
 # src/bridge/secrets/witan/secrets.<env>.yaml by this stack, which is the sole
 # writer of this path. Absent in environments with no App registered, where the
 # indexer clones anonymously and this path is simply never read.
+# No `secret-operations/data/witan/github-app` twin, unlike the two paths
+# above. That form is the kv-v2 read path, and this mount is kv-v1 (see
+# `mount_type="kv-v1"` on every OLVaultK8SStaticSecretConfig in __main__.py) —
+# under kv-v1 `data/...` is not an indirection but a literal, different path,
+# so granting read on it grants read on whatever someone stores there later.
+# The two above predate this and are left alone rather than changed blind;
+# they are dead grants by the same argument and worth removing separately.
 path "secret-operations/witan/github-app" {
-  capabilities = ["read"]
-}
-
-path "secret-operations/data/witan/github-app" {
   capabilities = ["read"]
 }
 
