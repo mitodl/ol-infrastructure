@@ -23,7 +23,6 @@ from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
 )
 from bridge.lib.versions import AIRBYTE_CHART_VERSION
-from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.eks import (
     OLEKSTrustRole,
@@ -88,6 +87,7 @@ vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
 cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
+sentry_stack = make_stack_reference(projects.SENTRY, "Production")
 
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 
@@ -437,14 +437,12 @@ vault.aws.SecretBackendRole(
     policy_arns=[s3_source_policy.arn],
 )
 
-airbyte_vault_secrets = read_yaml_secrets(
-    Path(f"airbyte/data.{stack_info.env_suffix}.yaml")
-)
-
 vault.generic.Secret(
     "airbyte-server-configuration-sentry-secrets",
     path=airbyte_vault_mount.path.apply("{}/sentry-dsn".format),
-    data_json=json.dumps(airbyte_vault_secrets["sentry-dsn"]),
+    data_json=sentry_stack.require_output("airbyte_sentry_dsn").apply(
+        lambda dsn: json.dumps({"value": dsn})
+    ),
 )
 ##################################
 #     Network Access Control     #
