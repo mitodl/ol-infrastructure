@@ -68,14 +68,31 @@ silently assumed:
       SOPS file, seeded today with at minimum the ``svc-witan-ci`` entry —
       the sync job that keeps per-user entries current as Keycloak group
       membership changes is not yet built.
+    - **GitHub App registration.** The CI indexer can clone private repos as a
+      GitHub App installation (``ci_indexer.py``). Registering that App on the
+      org, granting it ``contents: read``, and installing it on the repos it
+      may read are org-admin steps done by hand; the resulting id, installation
+      id, and one-time-downloadable private key then go into
+      ``src/bridge/secrets/witan/secrets.<env>.yaml`` (SOPS), which this stack
+      reads and writes to Vault. Until that file exists the indexer clones
+      anonymously — correct while every managed repo is public.
 """
 
+import json
 from pathlib import Path
+from typing import Any
 
 import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, ResourceOptions, export
+import pulumi_vault as vault
+from pulumi import Config, Output, ResourceOptions, export
 
+from bridge.secrets import sops as _bridge_sops
+from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.applications.witan.ci_indexer import (
+    DEFAULT_INDEX_SCHEDULE,
+    create_ci_indexer,
+)
 from ol_infrastructure.applications.witan.ingress import create_ingress_resources
 from ol_infrastructure.applications.witan.mcp_servers import (
     MCP_GROUP_NAME,
@@ -104,10 +121,15 @@ from ol_infrastructure.lib.ol_types import (
 from ol_infrastructure.lib.pulumi_helper import (
     format_docker_image_ref,
     make_stack_reference,
+    optional_stack_output_value,
     parse_stack,
     require_stack_output_value,
 )
 from ol_infrastructure.lib.vault import setup_vault_provider
+
+# Resolve the bridge secrets directory once from the sops module's own
+# __file__ — the same base path read_yaml_secrets uses internally.
+_BRIDGE_SECRETS_DIR = Path(_bridge_sops.__file__).parent
 
 setup_vault_provider()
 
@@ -133,6 +155,19 @@ omnigraph_server_addr = require_stack_output_value(
 # stack that declares it in cluster.yaml rather than defaulted independently
 # here — see WITAN_MEMORY_GRAPH in mcp_servers.py.
 council_graph_id = require_stack_output_value(omnigraph_stack, "council_graph_id")
+# The repos with a `code-<repo>` graph on that server. The CI indexer below is
+# the single entitled writer of each of their default views, so it sweeps the
+# list the cluster declares rather than one of this stack's own — see
+# ci_indexer.py. Resolved eagerly (not via `.apply`) because it decides whether
+# the CronJob is declared at all.
+#
+# Optional, unlike the two outputs above: this output is newer than the
+# omnigraph stack's last deploy in every environment, and the two stacks are
+# separate Concourse pipelines with no ordering between them, so requiring it
+# would block every witan deploy until omnigraph happens to run. Absent means
+# the same thing an empty list means — no code graphs to index yet, so no
+# indexer — and the next omnigraph deploy supplies it.
+managed_repos = optional_stack_output_value(omnigraph_stack, "managed_repos") or []
 
 NAMESPACE = "witan"
 
@@ -179,6 +214,90 @@ MCP_OIDC_CONFIG_NAME = "witan-vmcp-oidc"
 # per stack in case the eventual Keycloak client/audience-mapper work lands a
 # different value; defaults to a plain "witan" audience.
 WITAN_OIDC_AUDIENCE = witan_config.get("oidc_audience") or "witan"
+
+# How often the CI indexer sweeps every managed repo's default branch onto its
+# shared code graph. Per-stack so a lower environment can be turned down (or
+# up, to shake the job out) without touching the default — see ci_indexer.py
+# for why the interval is what bounds staleness of the shared view.
+WITAN_CI_INDEX_SCHEDULE = (
+    witan_config.get("ci_index_schedule") or DEFAULT_INDEX_SCHEDULE
+)
+
+# The GitHub App the CI indexer clones as, when one is configured. All three
+# values come from one SOPS file rather than splitting the ids into plain
+# Pulumi config: they are obtained together, in one sitting, when the App is
+# registered, and a split invites setting the ids while forgetting the key —
+# which mounts a Secret that never fulfills. This mirrors the shared
+# release_bot App, whose id/installation-id/PEM likewise sit together in
+# `concourse/operations.<env>.yaml`.
+#
+# A dedicated App, NOT that shared one (`shared/github_app`): release_bot is
+# Concourse's and carries the issue/PR write it needs, where this needs only
+# `contents: read`. Its own App also makes the *installation* the list of repos
+# the indexer can read, set by an org admin rather than by this repo — so a
+# private repo cannot enter a shared graph on a Pulumi change alone.
+GITHUB_APP_SECRET_NAME = "witan-github-app"  # noqa: S105  # pragma: allowlist secret
+GITHUB_APP_SECRET_KEY = "private-key.pem"  # noqa: S105  # pragma: allowlist secret
+GITHUB_APP_VAULT_KEY = "private_key"  # pragma: allowlist secret
+
+##############################################
+#   GitHub App source (SOPS -> Vault)         #
+##############################################
+# Same tolerance the omnigraph stack applies to its own SOPS source, and for
+# the same reason: an environment with no App registered yet has no file, and
+# that must not fail the rest of the stack — the indexer simply clones
+# anonymously, which is correct while every managed repo is public.
+#
+# A file that IS present, though, is not optional. A decrypt failure or a
+# missing key fails the whole preview rather than quietly provisioning a
+# CronJob that mounts a Secret Vault will never fulfill, whose only symptom
+# would be every private repo failing to clone once every four hours.
+_github_app_path = Path(f"witan/secrets.{stack_info.env_suffix}.yaml")
+_github_app_source: dict[str, Any] = {}
+if (_BRIDGE_SECRETS_DIR / _github_app_path).exists():
+    _github_app_source = read_yaml_secrets(_github_app_path)
+    if not isinstance(_github_app_source, dict):
+        msg = (
+            f"Failed to decrypt witan/secrets.{stack_info.env_suffix}.yaml: "
+            f"expected a dict but got {type(_github_app_source).__name__}. "
+            "Check that sops can decrypt the file and that Vault-transit/KMS "
+            "access is available."
+        )
+        raise TypeError(msg)
+
+    _missing = [
+        key
+        for key in ("app_id", "installation_id", "private_key")
+        if not _github_app_source.get(key)
+    ]
+    if _missing:
+        msg = (
+            f"witan/secrets.{stack_info.env_suffix}.yaml is missing required "
+            f"keys: {', '.join(_missing)}. All of app_id, installation_id and "
+            "private_key are required once the file exists — a partial set "
+            "would clone anonymously and fail on exactly the private repos the "
+            "App was added for."
+        )
+        raise ValueError(msg)
+
+# Ids are read as strings: a bare numeric App id in YAML parses as an int, and
+# both the JWT `iss` claim and the installation URL want it as text.
+WITAN_GITHUB_APP_ID = str(_github_app_source["app_id"]) if _github_app_source else None
+WITAN_GITHUB_APP_INSTALLATION_ID = (
+    str(_github_app_source["installation_id"]) if _github_app_source else None
+)
+
+# This stack is the sole writer of this Vault path — unlike the two below,
+# which the omnigraph stack owns. No race: nothing else reads or writes it.
+github_app_vault_secret = None
+if _github_app_source:
+    github_app_vault_secret = vault.generic.Secret(
+        f"witan-github-app-vault-secret-{stack_info.env_suffix}",
+        path="secret-operations/witan/github-app",
+        data_json=Output.secret(
+            json.dumps({GITHUB_APP_VAULT_KEY: _github_app_source["private_key"]})
+        ),
+    )
 
 # Vault-synced secrets: the svc-witan-ci raw token (ADR-0009 decision point 3)
 # and the {actor_id: token} JSON map witan reads (WITAN_ACTOR_TOKENS_FILE,
@@ -332,6 +451,47 @@ actor_tokens_secret = OLVaultK8SSecret(
     ),
 )
 
+# The App's private key, synced into the namespace from the Vault path this
+# stack wrote above. Same SOPS -> Vault -> VSO shape the omnigraph stack uses
+# for the actor tokens, so the encrypted source is version-controlled and a
+# rebuilt Vault can be repopulated by a `pulumi up` rather than by finding
+# whoever still has the PEM — GitHub only lets it be downloaded once.
+github_app_secret = None
+if github_app_vault_secret is not None:
+    github_app_secret = OLVaultK8SSecret(
+        f"witan-github-app-secret-{stack_info.env_suffix}",
+        resource_config=OLVaultK8SStaticSecretConfig(
+            name=GITHUB_APP_SECRET_NAME,
+            namespace=NAMESPACE,
+            labels=k8s_global_labels,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=GITHUB_APP_SECRET_NAME,
+            dest_secret_type="Opaque",  # pragma: allowlist secret  # noqa: S106
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="witan/github-app",
+            exclude_raw=True,
+            excludes=[".*"],
+            templates={
+                GITHUB_APP_SECRET_KEY: (
+                    f'{{{{ get .Secrets "{GITHUB_APP_VAULT_KEY}" }}}}'
+                )
+            },
+            # The key itself never rotates on a schedule; this only needs to
+            # pick up a deliberate re-issue, so it is checked far less often
+            # than the per-user token map next door.
+            refresh_after="24h",
+            vaultauth=witan_auth_binding.vault_k8s_resources.auth_name,
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=[
+                witan_auth_binding.vault_k8s_resources,
+                github_app_vault_secret,
+            ],
+        ),
+    )
+
 #########################################
 #   witan image (built + repo owned by   #
 #   the pulumi-witan Concourse pipeline) #
@@ -479,8 +639,34 @@ vmcp_cert, vmcp_httproute = create_ingress_resources(
     witan_virtualmcpserver=witan_virtualmcpserver,
 )
 
+#########################################
+#   CI code-graph indexer (CronJob)      #
+#########################################
+# The single entitled writer of every managed repo's shared code graph. Not
+# gated on the vMCP or the MCPServer: it writes the data tier directly and is
+# useful — arguably most useful — while the serving tier is still rolling.
+witan_ci_indexer = create_ci_indexer(
+    stack_info=stack_info,
+    namespace=NAMESPACE,
+    k8s_global_labels=k8s_global_labels,
+    witan_image=witan_image,
+    omnigraph_server_addr=omnigraph_server_addr,
+    managed_repos=managed_repos,
+    schedule=WITAN_CI_INDEX_SCHEDULE,
+    witan_ci_token_secret_name=WITAN_CI_TOKEN_SECRET_NAME,
+    witan_ci_token_secret_key=WITAN_CI_TOKEN_SECRET_KEY,
+    witan_ci_token_secret=witan_ci_token_secret,
+    github_app_id=WITAN_GITHUB_APP_ID if github_app_secret else None,
+    github_app_installation_id=(
+        WITAN_GITHUB_APP_INSTALLATION_ID if github_app_secret else None
+    ),
+    github_app_secret_name=GITHUB_APP_SECRET_NAME if github_app_secret else None,
+    github_app_secret=github_app_secret,
+)
+
 export("namespace", NAMESPACE)
 export("mcp_group_name", MCP_GROUP_NAME)
+export("ci_indexer_schedule", WITAN_CI_INDEX_SCHEDULE if witan_ci_indexer else None)
 export("vmcp_domain", VMCP_DOMAIN)
 export("vmcp_oidc_issuer", KEYCLOAK_ISSUER)
 export("witan_image_repository", witan_image_repository)

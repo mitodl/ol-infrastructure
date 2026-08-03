@@ -177,6 +177,30 @@ def require_stack_output_value(
     raise ValueError(msg)
 
 
+def optional_stack_output_value(
+    stack_reference: StackReference, output_name: str, default: Any = None
+) -> Any:
+    """``require_stack_output_value``, but ``default`` when the output is absent.
+
+    For an output a consumer can do without — typically one newer than the
+    producing stack's last deployment, where requiring it would block the
+    consumer's deploy on an unrelated stack's next run. Every caveat on
+    ``require_stack_output_value`` (private API, secrets losing their
+    secret-ness) applies here too.
+
+    An output that exists but is ``null`` is indistinguishable from a missing
+    one and also yields *default*.
+    """
+    output_details = sync_await._sync_await(  # noqa: SLF001
+        stack_reference.get_output_details(output_name)
+    )
+    if output_details.value is not None:
+        return output_details.value
+    if output_details.secret_value is not None:
+        return output_details.secret_value
+    return default
+
+
 def merge_otel_resource_attributes(
     env_vars: dict[str, Any],
     k8s_labels: dict[str, str],
