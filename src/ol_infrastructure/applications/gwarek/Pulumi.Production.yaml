@@ -4,9 +4,9 @@ config:
   environment:business_unit: operations
   environment:target_vpc: operations_vpc
   gwarek:db_password:
-    secure: v1:3qK0WfQUdD4/tH3D:2uf2wEIj57TGk38ExZ+TwAgl82m7ljIBTJwwFnRNoLD34dP6W0q9l5oeOzWoibs3hZsn4nNex3Hihwmc
+    secure: v1:SZHEdJhuPLXfdSzV:qE2qFJ52c3ihPcd8i5xy0P7cXVD25s8U54O72udxyncxHAJ2PPI2N3p1zEkNB/fiX6KDkwghdYtjjQo=
   redis:password:
-    secure: v1:tQE51C0vGHVZ54Xa:+YZbgk7itpbE/kkuCiVoSU3avOQnaj9zzrzMi1MKXGY1wyeULlC/uMm7T0/pPzyloSZhxpWP5Ff2LIVC
+    secure: v1:o6jpj8V0XkT+MSSf:V2t7GWzsCVDN6tumzcth9bC+224jIgK1CDSDOdMq+3Pn8zjlqEH8sErwrZ0yF44vcaoqp19rXEWcTPw=
   gwarek:secret_key:
     secure: v1:B1Ub6Eb5mlu9ubyj:amj7wGu1njxfwh4mwnDDvH2yLFkMm6a7+c+LcvQuRh+IpLzjiXMnOnVvzwh+JfCaWDY4LppK4iISUsTv
 secretsprovider: awskms://alias/infrastructure-secrets-production
