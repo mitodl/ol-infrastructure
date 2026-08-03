@@ -125,6 +125,7 @@ network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
+sentry_stack = make_stack_reference(projects.SENTRY, "Production")
 operations_vpc = network_stack.require_output("operations_vpc")
 mitxonline_environment = f"mitxonline-{stack_info.env_suffix}"
 
@@ -416,6 +417,16 @@ mitxonline_vault_collected_static_secrets = vault.generic.Secret(
     path="secret-mitxonline/collected-static-secrets",
     data_json=json.dumps(mitxonline_collected_secrets),
     opts=ResourceOptions(depends_on=[mitxonline_vault_mount]),
+)
+# Dedicated single-purpose path also read by the mitxonline edxapp deployment's
+# k8s secrets (see applications/mitxonline/k8s_secrets.py); previously a
+# hard-coded secret, now sourced from the ol-infrastructure-sentry stack output.
+mitxonline_operations_sentry_dsn = vault.generic.Secret(
+    f"mitxonline-operations-sentry-dsn-{stack_info.env_suffix}",
+    path="secret-operations/global/mitxonline/sentry-dsn",
+    data_json=sentry_stack.require_output("mitxonline_sentry_dsn").apply(
+        lambda dsn: json.dumps({"value": dsn})
+    ),
 )
 
 mitxonline_vault_policy = vault.Policy(
