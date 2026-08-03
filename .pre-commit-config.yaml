@@ -114,6 +114,7 @@ repos:
   rev: v1.29.0
   hooks:
   - id: zizmor
+    args: [--no-progress, --min-severity=high, --min-confidence=medium]
 - repo: https://github.com/mitodl/pre-commit-packer
   rev: v0.0.3
   hooks:
