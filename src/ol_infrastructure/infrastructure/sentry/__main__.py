@@ -3715,3 +3715,78 @@ key_dagster = sentry.SentryKey(
 )
 
 pulumi.export("dagster_sentry_dsn", key_dagster.dsn_public)
+
+# Hand-added stack outputs (not produced by bin/import-sentry-config) exposing
+# each project's DSN so consuming stacks can read it via
+# sentry_stack.require_output(...) instead of a hard-coded/SOPS/Vault secret.
+# See ol-infrastructure#5004. Naming convention: `<project_slug>_sentry_dsn`,
+# with a name-suffixed variant for projects that have more than one key.
+pulumi.export(
+    "airbyte_sentry_dsn",
+    key_airbyte_default_0e552f29a3594a6a972cf2d73dfa140b.dsn_public,
+)
+pulumi.export(
+    "learn_ai_sentry_dsn",
+    key_learn_ai_default_5e497d1f33127fc35dfc811b290747c7.dsn_public,
+)
+pulumi.export(
+    "micromasters_sentry_dsn",
+    key_micromasters_default_6134fa8f62f74ba49d3892f9eb8c2fb7.dsn_public,
+)
+pulumi.export(
+    "mitxonline_sentry_dsn",
+    key_mitxonline_default_8ba006dc817541a0865033722f8289ad.dsn_public,
+)
+pulumi.export(
+    "ocw_next_sentry_dsn",
+    key_ocw_next_default_eee58f41dda54d2b814296e12dced4b7.dsn_public,
+)
+pulumi.export(
+    "ocw_studio_sentry_dsn",
+    key_ocw_studio_default_ba06ef0080e342db9b9ae1db53944f1a.dsn_public,
+)
+pulumi.export(
+    "odl_video_service_sentry_dsn",
+    key_odl_video_service_default_f75d3b6abb8f4a30b95769f8f9644ee3.dsn_public,
+)
+pulumi.export(
+    "odl_video_service_eternal_mink_sentry_dsn",
+    key_odl_video_service_eternal_mink_7e70a5f1227743959ba1cb1e8db1240f.dsn_public,
+)
+pulumi.export(
+    "open_sentry_dsn", key_open_default_005a98ba45c3472dbb4c12405d814557.dsn_public
+)
+pulumi.export(
+    "open_next_sentry_dsn",
+    key_open_next_default_8131564a9b9e31ac3cbcf7952f0fea80.dsn_public,
+)
+pulumi.export(
+    "openedx_mitxonline_sentry_dsn",
+    key_openedx_mitxonline_default_8807f1e77ff44d91beeb2580507ad84a.dsn_public,
+)
+pulumi.export(
+    "openedx_mitxpro_sentry_dsn",
+    key_openedx_mitxpro_default_3b523a8e89c040f0a46ddc90a64f9d14.dsn_public,
+)
+pulumi.export(
+    "openedx_residential_sentry_dsn",
+    key_openedx_residential_default_3741f5e8334b429eaa048bec1e3daa30.dsn_public,
+)
+pulumi.export(
+    "python_sentry_dsn", key_python_default_7cc91e53ac70f26e91a2e788288be63d.dsn_public
+)
+pulumi.export(
+    "release_script_sentry_dsn",
+    key_release_script_default_67d74d4e5121a4ca332f1523ff8affdd.dsn_public,
+)
+pulumi.export(
+    "sandbox_sentry_dsn",
+    key_sandbox_default_8c6395a9422040c999373e204b15bd8b.dsn_public,
+)
+pulumi.export(
+    "unified_ecommerce_sentry_dsn",
+    key_unified_ecommerce_default_734c791eb3c83eb35db04c1b753ff67e.dsn_public,
+)
+pulumi.export(
+    "xpro_sentry_dsn", key_xpro_default_c9f9886a461647708cd0c0c551166866.dsn_public
+)

@@ -75,3 +75,13 @@ configuration, then `pulumi import --file sentry_imports.json` followed by
   `dagster_sentry_dsn` stack output is consumed by the Dagster application
   stack, which writes it to Vault at `secret-data/dagster/sentry`. The same
   naming-convergence caveat as above applies to `key_dagster`.
+- `*_sentry_dsn` stack outputs for every other generated `key_*` resource
+  (see ol-infrastructure#5004): hand-added `pulumi.export(...)` calls at the
+  end of the file, exposing each project's DSN as `<project_slug>_sentry_dsn`
+  (name-suffixed for projects with more than one key, e.g.
+  `odl_video_service_eternal_mink_sentry_dsn`) so consuming Pulumi stacks can
+  read the DSN via `sentry_stack.require_output(...)` instead of a
+  hard-coded/SOPS/Vault secret. Like the `ol_analytics_api` exception, these
+  are not part of the generator's output template -- if `bin/import-sentry-config`
+  is re-run and a key's generated variable name changes (e.g. its numeric
+  suffix), update the matching export line by hand.
