@@ -4601,3 +4601,21 @@ alert_route_sentry_service_route = rootly.AlertRoute(
     ],
     opts=rootly_imported_route_opts("57544c42-bef8-40f2-99bb-9e5041c0927f"),
 )
+
+# Adopted ONLY so that Pulumi can destroy it. "sh-test" is leftover scratch
+# config from 2026-07-22 with zero rules, which makes it inert -- its source
+# (Grafana Prometheus - CI) is still routed by the Slack Warnings Route above.
+# Pulumi cannot delete a resource it does not manage, so removing it takes two
+# applies: this one adopts it, then a follow-up drops this block and the next
+# apply destroys it. Delete this resource, do not extend it.
+alert_route_sh_test = rootly.AlertRoute(
+    "sh-test",
+    alerts_source_ids=[alerts_source_grafana_prometheus_ci.id],
+    enabled=True,
+    name="sh-test",
+    owning_team_ids=[
+        "9f00e9f1-2f13-470e-a856-50ab5003f260",
+    ],
+    rules=[],
+    opts=rootly_imported_route_opts("08b6b334-1bb4-4f93-830a-0cb99b9b270d"),
+)
