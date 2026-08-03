@@ -111,6 +111,7 @@ operations_vpc = network_stack.require_output("operations_vpc")
 vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
+sentry_stack = make_stack_reference(projects.SENTRY, "Production")
 aws_config = AWSBase(
     tags={
         "OU": "mitxpro",
@@ -315,6 +316,8 @@ xpro_vault_secrets = read_yaml_secrets(
 )
 
 for key, data in xpro_vault_secrets.items():
+    if key == "sentry":
+        continue
     vault.kv.Secret(
         f"xpro-vault-secrets-{key}",
         # This mount is created already as part of the edxapp Pulumi project. See note
@@ -322,6 +325,16 @@ for key, data in xpro_vault_secrets.items():
         path=f"secret-xpro/{key}",
         data_json=json.dumps(data),
     )
+
+# Previously a hard-coded SOPS secret; now sourced from the
+# ol-infrastructure-sentry stack output.
+vault.kv.Secret(
+    "xpro-vault-secrets-sentry",
+    path="secret-xpro/sentry",
+    data_json=sentry_stack.require_output("xpro_sentry_dsn").apply(
+        lambda dsn: json.dumps({**xpro_vault_secrets["sentry"], "dsn": dsn})
+    ),
+)
 
 # env_name is 'ci' 'rc' or 'production'
 env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
