@@ -11,6 +11,7 @@ config:
   - ol.mit.edu
   eks:apisix_domains:
   - celery-monitoring.odl.mit.edu
+  - gwarek.ol.mit.edu
   - toolhive-swe.ol.mit.edu
   - witan.ol.mit.edu
   eks:backup: true
