@@ -43,13 +43,20 @@ def apisix_oidc_session_cookie_name(application: str, env_suffix: str) -> str:
       session secret).  Giving every environment its own name keeps them
       distinct in the browser's cookie jar.
 
-    Production is unsuffixed (``mitlearn_session``) to match how the rest of
-    the codebase names user-visible, environment-scoped strings -- compare the
-    ``learn_csrftoken`` / ``learn_rc_csrftoken`` pair.  That is safe precisely
-    because the non-production names *are* suffixed: a Production
-    ``.learn.mit.edu`` cookie riding along to ``api.rc.learn.mit.edu`` is
-    called ``mitlearn_session`` there, which is not the name the RC gateway
-    reads (``mitlearn_session_qa``), so the two never contend.
+    The ``apisix`` segment names the gateway as the owner.  The application
+    behind it sets cookies of its own on the same host -- mit-learn's Django
+    app is the obvious case -- and when the question in front of you is which
+    component wrote an oversized Cookie header, ``mitlearn_apisix_session``
+    answers it and ``mitlearn_session`` does not.
+
+    Production is unsuffixed (``mitlearn_apisix_session``) to match how the
+    rest of the codebase names user-visible, environment-scoped strings --
+    compare the ``learn_csrftoken`` / ``learn_rc_csrftoken`` pair.  That is
+    safe precisely because the non-production names *are* suffixed: a
+    Production ``.learn.mit.edu`` cookie riding along to
+    ``api.rc.learn.mit.edu`` is called ``mitlearn_apisix_session`` there, which
+    is not the name the RC gateway reads (``mitlearn_apisix_session_qa``), so
+    the two never contend.
 
     :param application: Slug of the application owning the session, e.g.
         ``"mitlearn"``.  Hyphens are normalised to underscores.
@@ -58,7 +65,7 @@ def apisix_oidc_session_cookie_name(application: str, env_suffix: str) -> str:
     :returns: The session cookie name for that application and environment.
     :rtype: str
     """
-    base = f"{application.replace('-', '_')}_session"
+    base = f"{application.replace('-', '_')}_apisix_session"
     env = env_suffix.lower()
     return base if env == "production" else f"{base}_{env}"
 
