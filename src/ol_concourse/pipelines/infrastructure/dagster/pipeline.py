@@ -48,6 +48,18 @@ def build_dagster_docker_pipeline() -> Pipeline:
         {"name": "k8s", "module": None},  # dagster-k8s base image
     ]
 
+    # Trees an image's Dockerfile COPYs from outside its own dg_projects/<name>/
+    # directory. These MUST stay in sync with the COPY lines in each Dockerfile:
+    # a tree that is copied but not watched produces no new resource version when
+    # it changes, so the build never triggers and the image silently freezes at
+    # an older commit while the repo looks up to date. data_loading served
+    # pre-#2492 ol_dlt code in production for days because of exactly this.
+    extra_watched_paths = {
+        "data_loading": ["src/ol_dlt/"],
+        "lakehouse": ["src/ol_dbt/"],
+        "k8s": ["dg_deployments/reconcile_edxorg_partitions.py"],
+    }
+
     # Create git resources for each code location with specific path filters
     code_location_repos = {}
     for location in code_locations:
@@ -63,9 +75,7 @@ def build_dagster_docker_pipeline() -> Pipeline:
                 f"dg_projects/{name}/",
                 "packages/ol-orchestrate-lib/",
             ]
-            # Lakehouse also needs the dbt project
-            if name == "lakehouse":
-                paths.append("src/ol_dbt/")
+        paths.extend(extra_watched_paths.get(name, []))
 
         code_location_repos[name] = git_repo(
             name=Identifier(f"ol-data-platform-{name}"),
