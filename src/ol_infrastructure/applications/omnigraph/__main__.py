@@ -34,7 +34,13 @@ Follow-up work this stack does NOT cover (tracked separately):
       hand-authored SOPS file, and provisions the ``actor-tokens`` Secret
       destination, but not the job that keeps per-user entries current as
       Keycloak group membership changes — today the SOPS file only ever
-      carries the one ``svc-witan-ci`` entry.
+      carries the one ``svc-witan-ci`` entry. What this stack DOES now cover
+      is the other half of "add a user": the ``actor-tokens`` secret carries
+      ``restart_targets`` so the Vault Secrets Operator bounces
+      omnigraph-server whenever the token map changes (it only reads the map
+      at boot). Whatever eventually writes that Vault path — the sync job, a
+      break-glass ``vault kv put``, or this stack — gets the restart for free
+      and does not need to orchestrate one itself.
 """
 
 import json
@@ -48,6 +54,7 @@ from bridge.secrets import sops as _bridge_sops
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.omnigraph.data_tier import (
     COUNCIL_GRAPH_ID,
+    OMNIGRAPH_SERVER_SERVICE_NAME,
     create_data_tier,
     omnigraph_server_addr,
 )
@@ -58,6 +65,7 @@ from ol_infrastructure.components.applications.eks import (
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -257,6 +265,43 @@ actor_tokens_secret = OLVaultK8SSecret(
             )
         },
         refresh_after="15m",
+        # omnigraph-server SHA-256-hashes the token map once at boot and never
+        # re-reads the file (upstream docs/user/operations/server.md "Auth
+        # model"; there is no SIGHUP, admin endpoint, or runtime registration
+        # — see the upstream ask filed alongside this). So syncing a new token
+        # into the Secret is only half of "add a user": without a restart the
+        # server keeps 401-ing that bearer token indefinitely, even though
+        # witan's own ActorTokenResolver — reading the SAME file — picks it up
+        # on the very next request. The two halves have to be one operation.
+        #
+        # Making that one operation the VSO's job, rather than the (not yet
+        # built) Keycloak token-sync job's, is deliberate:
+        #   - it holds for EVERY writer of the Vault path, not just that job —
+        #     this stack's own SOPS-sourced write, a break-glass `vault kv
+        #     put`, and the sync job alike;
+        #   - the sync job would otherwise need RBAC to patch a Deployment in
+        #     a namespace it has no other business in, and "write Vault" and
+        #     "restart the server" would be two independently-failing steps
+        #     with a silently-stale server as the failure mode;
+        #   - the VSO already owns "Vault content changed -> Secret updated",
+        #     so it is the one controller that can observe the change.
+        # A restart fires only when the rendered Secret content actually
+        # changes, not on every `refresh_after` poll, so steady state is
+        # quiet; 15m is the resulting worst-case onboarding latency.
+        #
+        # BLAST RADIUS, deliberately accepted: the data tier is replicas=1 +
+        # strategy=Recreate (see data_tier.py — its storage is
+        # strict-single-version, so two binaries must never hold the same S3
+        # store), which makes this a hard ~10-30s outage of the graph, not a
+        # rolling one. Every witan MCP call in that window would fail, so it
+        # is paired with connect-failure retry in the client that absorbs the
+        # gap (agent-kit packages/witan-core/witan_core/omnigraph.py,
+        # _UNAVAILABLE_MARKERS: a ~42s budget, connection-ESTABLISHMENT
+        # failures only). Do not shorten refresh_after below the point where
+        # two restarts could overlap that retry budget.
+        restart_targets=[
+            OLVaultRestartTarget(kind="Deployment", name=OMNIGRAPH_SERVER_SERVICE_NAME)
+        ],
         vaultauth=omnigraph_auth_binding.vault_k8s_resources.auth_name,
     ),
     opts=ResourceOptions(
