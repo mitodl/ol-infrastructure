@@ -1170,6 +1170,7 @@ def _build_abandon_release_job(
                     "repo_dir": str(main_repo.name),
                     "version_file": f"{release_res.name}/version",
                 },
+                no_get=True,
             ),
         ],
     )
