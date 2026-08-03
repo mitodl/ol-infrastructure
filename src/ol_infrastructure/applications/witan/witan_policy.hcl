@@ -24,6 +24,20 @@ path "secret-operations/data/witan/actor-tokens" {
   capabilities = ["read"]
 }
 
+# PEM private key of the GitHub App the CI indexer clones as, letting it reach
+# private repos (agent-kit witan_code/github_app.py). Written to Vault by hand
+# when the App is registered — GitHub lets the key be downloaded exactly once,
+# at creation, so unlike the tokens above there is no SOPS source to seed it
+# from. Absent in environments with no App configured, where the indexer clones
+# anonymously and this path is simply never read.
+path "secret-operations/witan/github-app" {
+  capabilities = ["read"]
+}
+
+path "secret-operations/data/witan/github-app" {
+  capabilities = ["read"]
+}
+
 path "sys/leases/renew" {
   capabilities = ["update"]
 }

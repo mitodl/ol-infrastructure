@@ -48,6 +48,13 @@ from ol_infrastructure.lib.pulumi_helper import StackInfo
 # filesystem so the sweep's disk use is bounded and declared, and mounted at
 # its parent rather than at the work dir itself: the entrypoint clears its work
 # dir with `rm -rf` on start, which fails with EBUSY against a mount point.
+# Mount path for the GitHub App private key, when one is configured. A file
+# rather than an env var: a PEM is multi-line, and this matches how every other
+# secret in this deployment reaches a container (WITAN_ACTOR_TOKENS_FILE,
+# OMNIGRAPH_SERVER_BEARER_TOKENS_FILE).
+GITHUB_APP_MOUNT_PATH = "/etc/witan/github-app"
+GITHUB_APP_KEY_FILENAME = "private-key.pem"
+
 SCRATCH_MOUNT_PATH = "/scratch"
 SCRATCH_WORKDIR = f"{SCRATCH_MOUNT_PATH}/witan-ci-index"
 # One shallow checkout is live at a time (the entrypoint removes each before
@@ -85,6 +92,10 @@ def create_ci_indexer(  # noqa: PLR0913
     witan_ci_token_secret_name: str,
     witan_ci_token_secret_key: str,
     witan_ci_token_secret: Resource,
+    github_app_id: str | None = None,
+    github_app_installation_id: str | None = None,
+    github_app_secret_name: str | None = None,
+    github_app_secret: Resource | None = None,
 ) -> kubernetes.batch.v1.CronJob | None:
     """Provision the CronJob that indexes each repo's default branch.
 
@@ -92,9 +103,36 @@ def create_ci_indexer(  # noqa: PLR0913
     declares no code graphs has nothing for this job to write, and a CronJob
     whose sweep list is empty would fail on the entrypoint's own required-env
     check every interval.
+
+    The four ``github_app_*`` arguments are all-or-none and optional: with them
+    the indexer clones as a GitHub App installation and can reach private
+    repos; without them it clones anonymously, which is correct while every
+    managed repo is public. See ``witan_code/github_app.py`` for why an App
+    rather than a deploy key or a PAT.
     """
     if not managed_repos:
         return None
+
+    github_app = (
+        github_app_id,
+        github_app_installation_id,
+        github_app_secret_name,
+        github_app_secret,
+    )
+    # Rejected rather than partially applied, for the same reason the
+    # entrypoint rejects a partial environment: half-configured would clone
+    # anonymously and fail on exactly the private repos the App was added for,
+    # which reads as a GitHub-side permissions problem rather than as this.
+    if any(part is not None for part in github_app) and not all(
+        part is not None for part in github_app
+    ):
+        msg = (
+            "create_ci_indexer: github_app_id, github_app_installation_id, "
+            "github_app_secret_name and github_app_secret must be given "
+            "together or not at all."
+        )
+        raise ValueError(msg)
+    use_github_app = all(part is not None for part in github_app)
 
     indexer_env = [
         # The data tier, addressed directly. `code_server` being set is what
@@ -138,6 +176,65 @@ def create_ci_indexer(  # noqa: PLR0913
         # the one its bearer-token map maps WITAN_CODE_TOKEN to, which is
         # svc-witan-ci either way.
     ]
+
+    # All three or none — the entrypoint refuses a partial set, and the
+    # all-or-none check above is what keeps this from producing one.
+    if use_github_app:
+        indexer_env += [
+            kubernetes.core.v1.EnvVarArgs(
+                name="WITAN_CODE_GITHUB_APP_ID", value=github_app_id
+            ),
+            kubernetes.core.v1.EnvVarArgs(
+                name="WITAN_CODE_GITHUB_APP_INSTALLATION_ID",
+                value=github_app_installation_id,
+            ),
+            kubernetes.core.v1.EnvVarArgs(
+                name="WITAN_CODE_GITHUB_APP_KEY_FILE",
+                value=f"{GITHUB_APP_MOUNT_PATH}/{GITHUB_APP_KEY_FILENAME}",
+            ),
+        ]
+
+    volume_mounts = [
+        kubernetes.core.v1.VolumeMountArgs(
+            name="scratch",
+            mount_path=SCRATCH_MOUNT_PATH,
+        )
+    ]
+    volumes = [
+        kubernetes.core.v1.VolumeArgs(
+            name="scratch",
+            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(
+                size_limit=SCRATCH_SIZE_LIMIT,
+            ),
+        )
+    ]
+    depends_on: list[Resource] = [witan_ci_token_secret]
+
+    if use_github_app:
+        volume_mounts.append(
+            kubernetes.core.v1.VolumeMountArgs(
+                name="github-app",
+                mount_path=GITHUB_APP_MOUNT_PATH,
+                read_only=True,
+            )
+        )
+        volumes.append(
+            kubernetes.core.v1.VolumeArgs(
+                name="github-app",
+                secret=kubernetes.core.v1.SecretVolumeSourceArgs(
+                    secret_name=github_app_secret_name,
+                    # 0440, not the default 0644 — and not 0400 either. With
+                    # fsGroup set, kubelet makes the file root-owned and
+                    # group-owned by fsGroup, so 0400 grants read to root and
+                    # denies it to the uid-1000 process that needs it. kubelet
+                    # happens to widen an over-tight mode on a read-only volume,
+                    # but relying on that to make the key readable would be
+                    # relying on an implementation detail to undo a mistake.
+                    default_mode=0o440,
+                ),
+            )
+        )
+        depends_on.append(github_app_secret)
 
     return kubernetes.batch.v1.CronJob(
         f"witan-ci-indexer-{stack_info.env_suffix}",
@@ -197,12 +294,7 @@ def create_ci_indexer(  # noqa: PLR0913
                                     # subcommand.
                                     command=["witan-ci-index"],
                                     env=indexer_env,
-                                    volume_mounts=[
-                                        kubernetes.core.v1.VolumeMountArgs(
-                                            name="scratch",
-                                            mount_path=SCRATCH_MOUNT_PATH,
-                                        )
-                                    ],
+                                    volume_mounts=volume_mounts,
                                     # Tree-sitter parsing is single-process and
                                     # CPU-bound; the memory ceiling covers the
                                     # largest repo's record batch, which is
@@ -213,18 +305,11 @@ def create_ci_indexer(  # noqa: PLR0913
                                     ),
                                 )
                             ],
-                            volumes=[
-                                kubernetes.core.v1.VolumeArgs(
-                                    name="scratch",
-                                    empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(
-                                        size_limit=SCRATCH_SIZE_LIMIT,
-                                    ),
-                                )
-                            ],
+                            volumes=volumes,
                         ),
                     ),
                 ),
             ),
         ),
-        opts=ResourceOptions(depends_on=[witan_ci_token_secret]),
+        opts=ResourceOptions(depends_on=depends_on),
     )

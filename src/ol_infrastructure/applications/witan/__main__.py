@@ -68,6 +68,14 @@ silently assumed:
       SOPS file, seeded today with at minimum the ``svc-witan-ci`` entry —
       the sync job that keeps per-user entries current as Keycloak group
       membership changes is not yet built.
+    - **GitHub App registration.** The CI indexer can clone private repos as a
+      GitHub App installation (``ci_indexer.py``), but registering that App on
+      the org, granting it ``contents: read``, installing it on the repos it
+      may read, and writing its one-time-downloadable private key to Vault at
+      ``secret-operations/witan/github-app`` are org-admin steps done by hand.
+      Until ``witan:github_app_id`` and ``witan:github_app_installation_id``
+      are set, the indexer clones anonymously — correct while every managed
+      repo is public.
 """
 
 from pathlib import Path
@@ -205,6 +213,22 @@ WITAN_OIDC_AUDIENCE = witan_config.get("oidc_audience") or "witan"
 WITAN_CI_INDEX_SCHEDULE = (
     witan_config.get("ci_index_schedule") or DEFAULT_INDEX_SCHEDULE
 )
+
+# The GitHub App the CI indexer clones as, when one is configured. Both ids are
+# plain config (they are not secrets); the private key is the Vault-synced part
+# below. Unset means the indexer clones anonymously, which is correct while
+# every managed repo is public — see ci_indexer.py.
+#
+# A dedicated App, NOT the shared release_bot one (`shared/github_app`): that
+# App is Concourse's, carrying the issue/PR write it needs, where this needs
+# only `contents: read`. Its own App also makes the *installation* the list of
+# repos the indexer can read, set by an org admin rather than by this config —
+# so a private repo cannot enter a shared graph on a Pulumi change alone.
+WITAN_GITHUB_APP_ID = witan_config.get("github_app_id")
+WITAN_GITHUB_APP_INSTALLATION_ID = witan_config.get("github_app_installation_id")
+GITHUB_APP_SECRET_NAME = "witan-github-app"  # noqa: S105  # pragma: allowlist secret
+GITHUB_APP_SECRET_KEY = "private-key.pem"  # noqa: S105  # pragma: allowlist secret
+GITHUB_APP_VAULT_KEY = "private_key"  # pragma: allowlist secret
 
 # Vault-synced secrets: the svc-witan-ci raw token (ADR-0009 decision point 3)
 # and the {actor_id: token} JSON map witan reads (WITAN_ACTOR_TOKENS_FILE,
@@ -357,6 +381,44 @@ actor_tokens_secret = OLVaultK8SSecret(
         depends_on=witan_auth_binding.vault_k8s_resources,
     ),
 )
+
+# The App's private key, synced from Vault only when an App is configured.
+# Written to the Vault path out-of-band (it is created once, by hand, when the
+# App is registered) rather than by this stack, unlike the actor-tokens the
+# omnigraph stack seeds from SOPS: an App private key is downloadable exactly
+# once from GitHub at creation and is not derivable from anything in the repo.
+github_app_secret = None
+if WITAN_GITHUB_APP_ID and WITAN_GITHUB_APP_INSTALLATION_ID:
+    github_app_secret = OLVaultK8SSecret(
+        f"witan-github-app-secret-{stack_info.env_suffix}",
+        resource_config=OLVaultK8SStaticSecretConfig(
+            name=GITHUB_APP_SECRET_NAME,
+            namespace=NAMESPACE,
+            labels=k8s_global_labels,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=GITHUB_APP_SECRET_NAME,
+            dest_secret_type="Opaque",  # pragma: allowlist secret  # noqa: S106
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="witan/github-app",
+            exclude_raw=True,
+            excludes=[".*"],
+            templates={
+                GITHUB_APP_SECRET_KEY: (
+                    f'{{{{ get .Secrets "{GITHUB_APP_VAULT_KEY}" }}}}'
+                )
+            },
+            # The key itself never rotates on a schedule; this only needs to
+            # pick up a deliberate re-issue, so it is checked far less often
+            # than the per-user token map next door.
+            refresh_after="24h",
+            vaultauth=witan_auth_binding.vault_k8s_resources.auth_name,
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=witan_auth_binding.vault_k8s_resources,
+        ),
+    )
 
 #########################################
 #   witan image (built + repo owned by   #
@@ -522,6 +584,12 @@ witan_ci_indexer = create_ci_indexer(
     witan_ci_token_secret_name=WITAN_CI_TOKEN_SECRET_NAME,
     witan_ci_token_secret_key=WITAN_CI_TOKEN_SECRET_KEY,
     witan_ci_token_secret=witan_ci_token_secret,
+    github_app_id=WITAN_GITHUB_APP_ID if github_app_secret else None,
+    github_app_installation_id=(
+        WITAN_GITHUB_APP_INSTALLATION_ID if github_app_secret else None
+    ),
+    github_app_secret_name=GITHUB_APP_SECRET_NAME if github_app_secret else None,
+    github_app_secret=github_app_secret,
 )
 
 export("namespace", NAMESPACE)
