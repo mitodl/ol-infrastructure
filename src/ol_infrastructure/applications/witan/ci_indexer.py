@@ -210,7 +210,10 @@ def create_ci_indexer(  # noqa: PLR0913
     ]
     depends_on: list[Resource] = [witan_ci_token_secret]
 
-    if use_github_app:
+    # Narrowed on the Resource itself rather than on `use_github_app`: the
+    # all-or-none check above already makes the two equivalent, and this is the
+    # form that tells the type checker so.
+    if github_app_secret is not None:
         volume_mounts.append(
             kubernetes.core.v1.VolumeMountArgs(
                 name="github-app",
