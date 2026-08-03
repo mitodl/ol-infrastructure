@@ -447,7 +447,14 @@ witan_virtualmcpserver = kubernetes.apiextensions.CustomResource(
             mcp_servers.group,
             *mcp_servers.servers,
             mcp_oidc_config,
+            # Every Secret the backend MCPServer consumes, restated here even
+            # though `*mcp_servers.servers` already carries them: Pulumi orders
+            # transitively, so this changes nothing the engine does. It is kept
+            # so the list reads as the complete set of things that must exist
+            # before the aggregator does — a Secret missing from it looks like
+            # an oversight rather than a deliberate omission.
             witan_ci_token_secret,
+            witan_code_token_secret,
             actor_tokens_secret,
         ]
     ),
