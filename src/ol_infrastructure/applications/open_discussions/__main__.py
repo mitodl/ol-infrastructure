@@ -1,5 +1,7 @@
 # ruff: noqa: E501
 
+import json
+
 import pulumi_vault as vault
 import pulumiverse_heroku as heroku
 from pulumi import (
@@ -15,15 +17,17 @@ from pulumi_aws import iam, s3
 from pulumi_vault import aws
 
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.heroku import setup_heroku_provider
 from ol_infrastructure.lib.ol_types import AWSBase
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import make_stack_reference, parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 stack_info = parse_stack()
 setup_vault_provider(stack_info, skip_child_token=True)
 setup_heroku_provider()
+sentry_stack = make_stack_reference(projects.SENTRY, "Production")
 
 mit_open_config = Config("mit_open")
 heroku_config = Config("heroku")
@@ -347,6 +351,16 @@ secret_global_mailgun_api_key = vault.generic.get_secret_output(
 secret_operations_global_mit_smtp = vault.generic.get_secret_output(
     path="secret-operations/global/mit-smtp",
     opts=InvokeOptions(parent=mit_open_vault_iam_role),
+)
+# Previously a hard-coded/manually-populated Vault secret; now sourced from
+# the ol-infrastructure-sentry stack output.
+vault.generic.Secret(
+    "mit-open-operations-sentry-dsn",
+    path="secret-operations/global/mit-open/sentry-dsn",
+    data_json=sentry_stack.require_output("open_sentry_dsn").apply(
+        lambda dsn: json.dumps({"value": dsn})
+    ),
+    opts=ResourceOptions(parent=mit_open_vault_iam_role),
 )
 secret_operations_global_mit_open_sentry_dsn = vault.generic.get_secret_output(
     path="secret-operations/global/mit-open/sentry-dsn",
