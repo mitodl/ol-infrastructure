@@ -1,12 +1,18 @@
+# Vault policy for the witan namespace's VSO sync.
+#
+# Every path below is the kv-v1 form. `secret-operations` is a kv version 1
+# mount (confirmed against vault-ci: `type=kv options={"version":"1"}`), and
+# every OLVaultK8SStaticSecretConfig in __main__.py sets `mount_type="kv-v1"`
+# to match. There are deliberately no `secret-operations/data/...` twins: that
+# is the kv-v2 read path, and under kv-v1 `data/` is not an indirection but a
+# literal path segment — a grant on it reads nothing the app uses, and would
+# grant read on whatever anyone stored there later.
+
 # svc-witan-ci: the single shared bearer token used for automated
 # main-branch code-graph writes (ADR-0009 decision point 3). Also the value
 # witan's own module-level fallback OmnigraphClient authenticates as
 # (WITAN_MEMORY_TOKEN) when a request has no per-actor JWT in scope.
 path "secret-operations/witan/ci-token" {
-  capabilities = ["read"]
-}
-
-path "secret-operations/data/witan/ci-token" {
   capabilities = ["read"]
 }
 
@@ -20,22 +26,11 @@ path "secret-operations/witan/actor-tokens" {
   capabilities = ["read"]
 }
 
-path "secret-operations/data/witan/actor-tokens" {
-  capabilities = ["read"]
-}
-
 # PEM private key of the GitHub App the CI indexer clones as, letting it reach
 # private repos (agent-kit witan_code/github_app.py). Seeded from
 # src/bridge/secrets/witan/secrets.<env>.yaml by this stack, which is the sole
 # writer of this path. Absent in environments with no App registered, where the
 # indexer clones anonymously and this path is simply never read.
-# No `secret-operations/data/witan/github-app` twin, unlike the two paths
-# above. That form is the kv-v2 read path, and this mount is kv-v1 (see
-# `mount_type="kv-v1"` on every OLVaultK8SStaticSecretConfig in __main__.py) —
-# under kv-v1 `data/...` is not an indirection but a literal, different path,
-# so granting read on it grants read on whatever someone stores there later.
-# The two above predate this and are left alone rather than changed blind;
-# they are dead grants by the same argument and worth removing separately.
 path "secret-operations/witan/github-app" {
   capabilities = ["read"]
 }
