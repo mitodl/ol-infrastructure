@@ -39,8 +39,16 @@ def rootly_imported_route_opts(route_id: str) -> ResourceOptions:
 
     The Service Routes below were built in the Rootly UI and carry the real
     payload-to-service mappings, so they are adopted rather than created --
-    `import_` makes Pulumi refuse the apply if the declared rules don't match
-    what is live, instead of silently creating a duplicate route alongside it.
+    without `import_` Pulumi would create a second, duplicate route alongside
+    the live one instead of taking ownership of it.
+
+    Note what `import_` does NOT do: it does not refuse an apply when the
+    declared rules disagree with what is live. Pulumi adopts the resource and
+    then plans an update to force the live route to match this file, so a
+    mistake here silently rewrites production routing rather than erroring.
+    Diff the preview before applying; the rule bodies were generated from
+    `GET /v1/alert_routes` precisely so the declared state starts out matching.
+
     Safe to drop back to `rootly_opts` once every stack has applied this.
     """
     return ResourceOptions.merge(rootly_opts, ResourceOptions(import_=route_id))
