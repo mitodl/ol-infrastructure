@@ -316,6 +316,14 @@ actor_tokens_secret = OLVaultK8SSecret(
             )
         },
         refresh_after="15m",
+        # Deliberately NO restart_targets here, unlike the omnigraph stack's
+        # copy of this same secret. The asymmetry is real, not an omission:
+        # witan's ActorTokenResolver (agent-kit
+        # packages/witan-core/witan_core/identity.py) re-stats this file and
+        # reloads it on any cache miss, so a newly-synced actor's token is
+        # live on that actor's very next request with no restart. It is
+        # omnigraph-server that hashes the map once at boot and never looks
+        # again, which is why only that Deployment needs bouncing.
         vaultauth=witan_auth_binding.vault_k8s_resources.auth_name,
     ),
     opts=ResourceOptions(
