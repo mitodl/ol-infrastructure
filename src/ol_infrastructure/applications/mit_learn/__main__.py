@@ -54,6 +54,7 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    stale_session_cookie_cleanup_plugin,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -1313,6 +1314,23 @@ learn_external_service_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=learn_namespace,
         k8s_labels=application_labels,
         enable_defaults=True,
+        plugins=[
+            # Everyone currently logged in is holding a session cookie under
+            # lua-resty-session's old default name, which the renamed plugins
+            # below now ignore -- it would otherwise sit in their browser
+            # unread until they fully quit it.  Both variants have to go: the
+            # host-only one predates the move to a parent-domain cookie in
+            # #5182 (and is also what mitxonline's /mitxonline/* routes on this
+            # host used to set), and the domain-scoped one is what #5182
+            # replaced it with.  Every route on this host references this
+            # shared config, and clearing the .learn.mit.edu entry from here
+            # also clears it for analytics.<env>.learn.mit.edu, since a
+            # domain-scoped cookie is a single entry in the browser's jar.
+            # Safe to delete once the old cookies have aged out of circulation.
+            stale_session_cookie_cleanup_plugin(
+                cookie_domains=[mitlearn_api_domain.removeprefix("api")],
+            ),
+        ],
     ),
 )
 

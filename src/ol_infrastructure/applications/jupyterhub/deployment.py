@@ -8,6 +8,7 @@ import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions, StackReference
 
+from bridge.lib.constants import apisix_oidc_session_cookie_name
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.lib.versions import JUPYTERHUB_CHART_VERSION
 from ol_infrastructure.applications.jupyterhub.values import (
@@ -22,6 +23,7 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    stale_session_cookie_cleanup_plugin,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -176,6 +178,15 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
             k8s_namespace=namespace,
             k8s_labels=application_labels,
             enable_defaults=True,
+            plugins=[
+                # Evict the host-only cookie the OIDC resource below used to
+                # set under lua-resty-session's default name.  No cookie_domains
+                # here: this deployment's cookie was never scoped to a parent
+                # domain, and the .learn.mit.edu entry that also reaches this
+                # host belongs to mit-learn, which clears it from its own
+                # routes.  Safe to delete once the old cookies have aged out.
+                stale_session_cookie_cleanup_plugin(),
+            ],
         ),
     )
 
@@ -205,6 +216,16 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
             oidc_logout_path="hub/logout",
             oidc_post_logout_redirect_uri=f"https://{domain_name}/hub/login",
             oidc_session_absolute_timeout=60 * 20160,
+            # Named rather than left on lua-resty-session's default "session".
+            # This host sits under .learn.mit.edu, so the browser also delivers
+            # mit-learn's parent-domain session cookie here; while both were
+            # called "session" the gateway was picking whichever of the two the
+            # browser happened to send first.  Per deployment, since
+            # nb. and authoring.nb. are separate hosts with separate logins.
+            oidc_session_cookie_name=apisix_oidc_session_cookie_name(
+                base_name,
+                stack_info.env_suffix,
+            ),
             oidc_session_idling_timeout=0,
             oidc_session_rolling_timeout=0,
             oidc_use_session_secret=True,
