@@ -311,6 +311,56 @@ static_secrets = OLVaultK8SSecret(
     ),
 )
 
+# The OAuth2 client-credentials pair the app uses to authenticate its
+# org-manager check to MITx Online (mitodl/mitxonline#3807).  Unlike SENTRY_DSN
+# above, no Pulumi stack owns these: the OAuth2 Application record is created by
+# hand in MITx Online's Django admin, and its credentials are written once to
+# secret-operations.
+#
+# Read by the vault-secrets-operator directly at runtime and templated into the
+# env var names the app expects, rather than being pulled into Pulumi with
+# get_secret_output.  That keeps the credential out of Pulumi state entirely and
+# lets a rotation in Vault propagate on the operator's own refresh -- rewriting
+# the Vault entry is enough, with no `pulumi up` in the loop.  Same shape as
+# applications/marimo_data's ol-marimo-app-client secret.
+#
+# Temporary, along with the round-trip it authenticates: once org-manager status
+# is visible in the Keycloak token (mitodl/hq#10594), the app stops calling MITx
+# Online and this can be deleted along with the Vault entry.
+mitxonline_oauth_secret_name = (
+    "ol-analytics-api-mitxonline-oauth"  # pragma: allowlist secret  # noqa: S105
+)
+mitxonline_oauth_secrets = OLVaultK8SSecret(
+    name=f"ol-analytics-api-{stack_info.env_suffix}-mitxonline-oauth-secrets",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name=mitxonline_oauth_secret_name,
+        namespace=APPLICATION_NAMESPACE,
+        labels=k8s_global_labels,
+        dest_secret_name=mitxonline_oauth_secret_name,
+        dest_secret_labels=k8s_global_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="ol-analytics-api/mitxonline-oauth",
+        includes=["client_id", "client_secret"],
+        excludes=[".*"],
+        exclude_raw=True,
+        refresh_after="1h",
+        templates={
+            "OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_ID": (
+                '{{ get .Secrets "client_id" }}'
+            ),
+            "OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_SECRET": (  # pragma: allowlist secret  # noqa: E501
+                '{{ get .Secrets "client_secret" }}'
+            ),
+        },
+        vaultauth=ol_analytics_api_auth_binding.vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        parent=ol_analytics_api_auth_binding.vault_k8s_resources,
+    ),
+)
+
 ########################################################################
 # Application environment
 ########################################################################
@@ -408,7 +458,7 @@ ol_analytics_api_k8s = OLApplicationK8s(
         application_lb_service_name=APPLICATION_NAME,
         application_lb_service_port_name="http",
         k8s_global_labels=k8s_global_labels,
-        env_from_secret_names=[static_secrets_name],
+        env_from_secret_names=[static_secrets_name, mitxonline_oauth_secret_name],
         application_security_group_id=ol_analytics_api_application_security_group.id,
         application_security_group_name=Output.from_input(APPLICATION_NAME),
         application_service_account_name=APPLICATION_NAME,
@@ -455,7 +505,12 @@ ol_analytics_api_k8s = OLApplicationK8s(
         delete_before_replace=True,
         depends_on=[
             ol_analytics_api_auth_binding,
+            # Every Secret named in env_from_secret_names belongs here: the
+            # Deployment mounts them via envFrom, so a pod scheduled before
+            # the operator has materialized one crash-loops on a missing
+            # secret rather than waiting for it.
             static_secrets,
+            mitxonline_oauth_secrets,
             ol_analytics_api_application_security_group,
         ],
     ),
