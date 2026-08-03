@@ -11,6 +11,7 @@ config:
   - ol.mit.edu
   eks:apisix_domains:
   - celery-monitoring.odl.mit.edu
+  - gwarek.ol.mit.edu
   - toolhive-swe.ol.mit.edu
   - witan.ol.mit.edu
   eks:backup: true
@@ -20,6 +21,7 @@ config:
   eks:efs_csi_provisioner: true
   eks:gateway_release_channel: experimental
   eks:namespaces:
+  - gwarek
   - keycloak
   - kubewatch
   - toolhive-operator

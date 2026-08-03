@@ -68,6 +68,7 @@ class Services(StrEnum):
     digital_credentials = "digital-credentials"
     edx_notes = "edx-notes"
     edxapp = "edxapp"
+    gwarek = "gwarek"
     jupyterhub = "jupyterhub"
     keycloak = "keycloak"
     kubewatch = "kubewatch"
