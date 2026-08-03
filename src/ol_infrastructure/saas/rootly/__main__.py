@@ -59,6 +59,32 @@ CLOUDWATCH_NON_PROD_URGENCY_RULES = [
     },
 ]
 
+# CloudWatch alarms publish both the breach and the ALARM->OK recovery to the
+# same SNS topic (ok_actions in src/ol_infrastructure/components/aws/cloudwatch.py).
+# Rootly otherwise treats every SNS notification as a brand new alert: repeated
+# breach notifications pile up as duplicates, and the recovery never closes
+# anything, so a blip that self-clears in minutes stays open indefinitely and
+# reads as an ongoing incident.
+#
+# AlarmName is the stable identity of a CloudWatch alarm, so keying on it
+# collapses every notification for one alarm onto a single alert, and the
+# resolution rule closes that alert when NewStateValue flips to OK.
+CLOUDWATCH_DEDUPLICATION_KEY_PATH = "$.Message.AlarmName"
+CLOUDWATCH_RESOLUTION_RULE_ATTRIBUTES = {
+    "conditionType": "all",
+    "conditionsAttributes": [
+        {
+            "field": "$.Message.NewStateValue",
+            "kind": "payload",
+            "operator": "is",
+            "value": "OK",
+        },
+    ],
+    "enabled": True,
+    "identifierJsonPath": "$.Message.AlarmName",
+    "identifierReferenceKind": "payload",
+}
+
 # Foundation resources imported from the existing Rootly account.
 role_admin = rootly.Role(
     "admin",
@@ -2808,7 +2834,10 @@ alerts_source_cloudwatch_critical = rootly.AlertsSource(
     ],
     alert_source_urgency_rules_attributes=CLOUDWATCH_NON_PROD_URGENCY_RULES,
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
+    deduplicate_alerts_by_key=True,
     deduplication_key_kind="payload",
+    deduplication_key_path=CLOUDWATCH_DEDUPLICATION_KEY_PATH,
+    resolution_rule_attributes=CLOUDWATCH_RESOLUTION_RULE_ATTRIBUTES,
     name="Cloudwatch - Critical",
     owner_group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     secret=Output.secret(rootly_secrets["alert_source_secrets"]["cloudwatch_critical"]),
@@ -2827,7 +2856,10 @@ alerts_source_cloudwatch_warning = rootly.AlertsSource(
     ],
     alert_source_urgency_rules_attributes=CLOUDWATCH_NON_PROD_URGENCY_RULES,
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
+    deduplicate_alerts_by_key=True,
     deduplication_key_kind="payload",
+    deduplication_key_path=CLOUDWATCH_DEDUPLICATION_KEY_PATH,
+    resolution_rule_attributes=CLOUDWATCH_RESOLUTION_RULE_ATTRIBUTES,
     name="Cloudwatch - Warning",
     owner_group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     secret=Output.secret(rootly_secrets["alert_source_secrets"]["cloudwatch_warning"]),
