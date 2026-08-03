@@ -3754,7 +3754,8 @@ pulumi.export(
     key_odl_video_service_eternal_mink_7e70a5f1227743959ba1cb1e8db1240f.dsn_public,
 )
 pulumi.export(
-    "open_sentry_dsn", key_open_default_005a98ba45c3472dbb4c12405d814557.dsn_public
+    "open_sentry_dsn",
+    key_open_default_005a98ba45c3472dbb4c12405d814557.dsn_public,
 )
 pulumi.export(
     "open_next_sentry_dsn",
@@ -3773,7 +3774,8 @@ pulumi.export(
     key_openedx_residential_default_3741f5e8334b429eaa048bec1e3daa30.dsn_public,
 )
 pulumi.export(
-    "python_sentry_dsn", key_python_default_7cc91e53ac70f26e91a2e788288be63d.dsn_public
+    "python_sentry_dsn",
+    key_python_default_7cc91e53ac70f26e91a2e788288be63d.dsn_public,
 )
 pulumi.export(
     "release_script_sentry_dsn",
@@ -3788,5 +3790,6 @@ pulumi.export(
     key_unified_ecommerce_default_734c791eb3c83eb35db04c1b753ff67e.dsn_public,
 )
 pulumi.export(
-    "xpro_sentry_dsn", key_xpro_default_c9f9886a461647708cd0c0c551166866.dsn_public
+    "xpro_sentry_dsn",
+    key_xpro_default_c9f9886a461647708cd0c0c551166866.dsn_public,
 )
