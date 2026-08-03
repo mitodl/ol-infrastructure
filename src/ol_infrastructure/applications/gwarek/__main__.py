@@ -800,12 +800,16 @@ gwarek_web_deployment = apps_v1.Deployment(
                             limits={"memory": "512Mi"},
                         ),
                         liveness_probe=core.v1.ProbeArgs(
-                            http_get=core.v1.HTTPGetActionArgs(path="/", port=3000),
+                            http_get=core.v1.HTTPGetActionArgs(
+                                path="/health", port=3000
+                            ),
                             initial_delay_seconds=15,
                             period_seconds=10,
                         ),
                         readiness_probe=core.v1.ProbeArgs(
-                            http_get=core.v1.HTTPGetActionArgs(path="/", port=3000),
+                            http_get=core.v1.HTTPGetActionArgs(
+                                path="/health", port=3000
+                            ),
                             initial_delay_seconds=5,
                             period_seconds=5,
                         ),
