@@ -110,6 +110,10 @@ repos:
   - id: actionlint
     name: actionlint
     description: Runs actionlint to lint GitHub Actions workflow files
+- repo: https://github.com/zizmorcore/zizmor-pre-commit
+  rev: v1.29.0
+  hooks:
+  - id: zizmor
 - repo: https://github.com/mitodl/pre-commit-packer
   rev: v0.0.3
   hooks:
