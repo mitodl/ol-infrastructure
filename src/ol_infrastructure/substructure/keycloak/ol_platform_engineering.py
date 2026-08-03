@@ -506,6 +506,28 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         opts=resource_options,
     )
 
+    # The built-in realm-roles mapper (part of the default "roles" client
+    # scope) adds realm_access.roles to the ID/access token, but not to the
+    # /userinfo endpoint response -- and APISIX's openid-connect plugin
+    # builds X-Userinfo from a live /userinfo call (session_contents.user
+    # in components/services/apisix.py), not from token claims. Without
+    # this, gwarek's get_role/require_admin never see any roles regardless
+    # of what's assigned in Keycloak. Mirrors Concourse's realm-role mapper
+    # above, but keeps the standard realm_access.roles claim shape gwarek's
+    # backend already reads instead of remapping to a custom claim.
+    keycloak.openid.UserRealmRoleProtocolMapper(
+        "ol-platform-engineering-gwarek-realm-role-userinfo-mapper",
+        realm_id=ol_platform_engineering_gwarek_client.realm_id,
+        client_id=ol_platform_engineering_gwarek_client.id,
+        name="Realm Roles Userinfo Mapper",
+        claim_name="realm_access.roles",
+        multivalued=True,
+        add_to_id_token=True,
+        add_to_access_token=True,
+        add_to_userinfo=True,
+        opts=resource_options,
+    )
+
     vault.generic.Secret(
         "ol-platform-engineering-gwarek-client-vault-oidc-credentials",
         path="secret-operations/sso/gwarek",
