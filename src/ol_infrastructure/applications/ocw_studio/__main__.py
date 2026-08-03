@@ -94,6 +94,7 @@ network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
+sentry_stack = make_stack_reference(projects.SENTRY, "Production")
 apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
@@ -341,7 +342,9 @@ vault_secrets = read_yaml_secrets(
 vault.generic.Secret(
     "ocw-studio-vault-secrets",
     path=ocw_studio_secrets.path.apply("{}/collected".format),
-    data_json=json.dumps(vault_secrets),
+    data_json=sentry_stack.require_output("ocw_studio_sentry_dsn").apply(
+        lambda dsn: json.dumps({**vault_secrets, "sentry_dsn": dsn})
+    ),
 )
 
 
