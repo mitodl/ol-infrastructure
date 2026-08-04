@@ -1126,6 +1126,14 @@ metrics_server_release = kubernetes.helm.v3.Release(
         values={
             "commonLabels": k8s_global_labels,
             "tolerations": operations_tolerations,
+            # Every HPA in the cluster depends on metrics-server for resource
+            # metrics. A single replica means any restart or node drain leaves
+            # all HPAs blind until it comes back.
+            "replicas": 2,
+            "podDisruptionBudget": {
+                "enabled": True,
+                "minAvailable": 1,
+            },
             "resources": {
                 "requests": {
                     "memory": "100Mi",

@@ -206,7 +206,11 @@ def setup_traefik(
                 },
                 "resources": {
                     "requests": {
-                        "cpu": "100m",
+                        # The HPA above scales on CPU utilization as a percentage of
+                        # this request. Keep it near observed per-pod burst usage or
+                        # every minor traffic burst pins the deployment at
+                        # maxReplicas.
+                        "cpu": eks_config.get("traefik_cpu_request") or "500m",
                         "memory": "150Mi",
                     },
                     "limits": {
