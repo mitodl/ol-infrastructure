@@ -632,8 +632,9 @@ def test_execute_uses_the_exact_confirmed_discovery(offboard_module: Any) -> Non
     assert provider.discover_count == 1
     assert provider.execute_values == [False, True]
     assert dry_run[0].target_id == executed[0].target_id == "user-id"
-    assert "https://sso.example.invalid" in offboard_module.confirmation_summary(
-        dry_run
+    assert offboard_module.confirmation_summary(dry_run).splitlines()[1] == (
+        "- user@example.com: keycloak "
+        "[https://sso.example.invalid realm=realm] -> user@example.com (disable user)"
     )
 
 
