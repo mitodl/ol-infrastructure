@@ -197,11 +197,6 @@ def build_base_general_config() -> ConfigDict:
         "MEDIA_ROOT": "media/",
         "MEDIA_URL": "/media/",
         "MICROSITE_CONFIGURATION": {},
-        "MKTG_URL_LINK_MAP": {
-            "TOS": "tos",
-            "ABOUT": "about",
-            "ACCESSIBILITY": "accessibility",
-        },
         "MOBILE_STORE_URLS": {},
         "NOTIFICATION_TYPE_ICONS": {},
         "DEFAULT_NOTIFICATION_ICON_URL": "",
@@ -448,6 +443,11 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
         # Module-level settings overrides for residential
         "DISABLE_START_DATES": False,
         "ENABLE_MKTG_SITE": False,  # Extracted to module-level
+        "MKTG_URL_LINK_MAP": {
+            "TOS": "tos",
+            "ABOUT": "about",
+            "ACCESSIBILITY": "accessibility",
+        },
         # FEATURES overrides for residential (only non-module-level flags)
         "FEATURES": {
             "ALLOW_PUBLIC_ACCOUNT_CREATION": True,
@@ -492,6 +492,11 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
             "EMAIL_HOST": "smtp.mailgun.org",
             "EMAIL_PORT": 587,
             "EMAIL_USE_TLS": True,
+            "MKTG_URL_LINK_MAP": {
+                "TOS": "tos",
+                "ABOUT": "about",
+                "ACCESSIBILITY": "accessibility",
+            },
             "COURSE_MODE_DEFAULTS": {
                 "name": "Professional",
                 "android_sku": None,
@@ -550,6 +555,7 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
                 "^/courses/.*/courseware-navigation-sidebar/toggles/?$",
                 "^/courses/.*/courseware-search/enabled/?$",
             ],
+            "MKTG_URL_LINK_MAP": {},
             "SYSADMIN_DEFAULT_BRANCH": "live",
             "EMAIL_BACKEND": "django_ses.SESBackend",
             "MIT_BASE_URL": "https://web.mit.edu",
