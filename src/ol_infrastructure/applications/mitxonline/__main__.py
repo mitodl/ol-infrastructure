@@ -873,6 +873,7 @@ mitxonline_apisix_route_direct = OLApisixRoute(
             paths=[
                 "/checkout/anonymous",
                 "/checkout/anonymous/",
+                "/checkout/anonymous/*",
             ],
             plugins=[
                 mitxonline_direct_oidc.get_full_oidc_plugin_config(
