@@ -18,8 +18,8 @@ Nothing keeps the two in sync automatically.  When a URL changes in the Pulumi
 stack config, change it here too.
 
 ``bucket`` and ``fastly_domain`` come from ``learn_ai/__main__.py`` --
-``ol-mit-learn-ai-{env_suffix}`` (line 146) and ``learn_ai:frontend_domain``
-respectively.  The Fastly service fronting each bucket rewrites all requests
+the bucket name is ``ol-mit-learn-ai-{env_suffix}``, and the domain comes from
+``learn_ai:frontend_domain``.
 under a ``/frontend/`` key prefix (``files/frontend_path_prefix.vcl``), so the
 build output is synced to ``s3://<bucket>/frontend/`` rather than the root.
 """
