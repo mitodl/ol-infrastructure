@@ -1,0 +1,469 @@
+#!/usr/bin/env python3
+"""Show which deployment pipeline stages a GitHub PR has reached.
+
+Maps a PR's GitHub repo to its ol-infrastructure Concourse pipeline via the
+canonical app registry (``bridge.settings.apps``), then checks git ancestry
+of the PR's merge commit against that pipeline's stage branches:
+
+* ``main`` -> CI (deployed automatically on every merge)
+* ``release-candidate`` -> RC / QA
+* ``release`` -> Production
+
+These are the branch names used by every app on the legacy release-candidate
+pipeline shape (``k8s_apps/pipeline.py``'s ``AppPipelineParams`` defaults;
+none of the current per-app overrides change them). Apps on the newer
+GitHub Deployment-based pipeline shape (``use_release_resource_workflow``)
+don't have these branches, so those stages are skipped for those apps, but
+their GitHub Deployments are checked instead.
+
+Ancestry is checked via GitHub's compare API rather than a local clone, so
+no repo checkout is needed for the target app.
+
+When `fly` is logged in to the "infrastructure" Concourse team, each
+stage's *last successful build* is also inspected directly (via `fly curl`
+against Concourse's API) to find the exact commit it deployed -- this is
+strictly more precise than the branch-tip check, since a branch can move
+ahead of what was actually last deployed. That live check is used when
+available; the branch-tip check is the fallback otherwise.
+
+PRs against ol-infrastructure itself are handled differently: rather than
+mapping the *repo* to an app, the PR's *changed files* are inspected to
+find which apps' Pulumi code (``src/ol_infrastructure/applications/{app}/``)
+or shared infrastructure code (``PULUMI_WATCHED_PATHS`` -- consumed by every
+app's ``ol-infra-{app}`` pipeline resource) it touches, and each affected
+app pipeline's stages are checked for whether they've picked up this commit.
+"""
+
+import json
+import re
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import cyclopts
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+from bridge.settings.apps import APPS, github_repo, repo_main_branch
+from ol_concourse.pipelines.constants import PULUMI_WATCHED_PATHS
+
+app = cyclopts.App(
+    help="Show which ol-infrastructure deployment pipeline stages a GitHub PR has reached."
+)
+
+CONCOURSE_URL = "https://cicd.odl.mit.edu"
+CONCOURSE_TEAM = "infrastructure"
+RC_BRANCH = "release-candidate"
+RELEASE_BRANCH = "release"
+COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+OL_INFRA_REPO = "mitodl/ol-infrastructure"
+
+# app_name.replace("-", "_") -> app_name, matching the applications/{dir}
+# naming AppPipelineParams.project_source_path assumes for every app.
+APP_DIR_TO_NAME = {name.replace("-", "_"): name for name in APPS}
+APPLICATIONS_DIR_RE = re.compile(r"^src/ol_infrastructure/applications/([^/]+)/")
+
+PR_URL_RE = re.compile(
+    r"github\.com/(?P<owner>[^/]+)/(?P<repo>[^/]+)/pull/(?P<number>\d+)"
+)
+
+
+@dataclass
+class PullRequest:
+    """A GitHub PR's identity, merge state, and the commit to check ancestry against."""
+
+    owner: str
+    repo: str
+    number: int
+    title: str
+    state: str
+    merged: bool
+    commit: str
+    merged_at: str | None
+
+
+def _gh_json(*args: str) -> Any:
+    result = subprocess.run(  # noqa: S603
+        ["gh", *args],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return json.loads(result.stdout)
+
+
+def _compare_status(owner: str, repo: str, base: str, head: str) -> str | None:
+    """Return the compare status of `head` relative to `base`.
+
+    Returns None if either ref can't be resolved (e.g. a branch that doesn't
+    exist for this app's pipeline shape), rather than raising.
+    """
+    try:
+        data = _gh_json("api", f"repos/{owner}/{repo}/compare/{base}...{head}")
+    except subprocess.CalledProcessError:
+        return None
+    return data["status"]
+
+
+def _is_ancestor(status: str | None) -> bool | None:
+    """Interpret a compare status as "is base an ancestor of (or equal to) head"."""
+    if status is None:
+        return None
+    return status in {"ahead", "identical"}
+
+
+_fly_ready_cache: bool | None = None
+
+
+def _fly_ready() -> bool:
+    """Whether `fly` is logged in to CONCOURSE_TEAM, checked once per run."""
+    global _fly_ready_cache  # noqa: PLW0603
+    if _fly_ready_cache is None:
+        try:
+            result = subprocess.run(  # noqa: S603
+                ["fly", "-t", CONCOURSE_TEAM, "status"],  # noqa: S607
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            _fly_ready_cache = False
+        else:
+            _fly_ready_cache = result.returncode == 0
+    return _fly_ready_cache
+
+
+def _fly_curl(path: str) -> Any | None:
+    """GET a Concourse API path via `fly curl`, or None on any failure."""
+    try:
+        result = subprocess.run(  # noqa: S603
+            ["fly", "-t", CONCOURSE_TEAM, "curl", path, "--", "-s"],  # noqa: S607
+            capture_output=True,
+            text=True,
+            timeout=20,
+            check=True,
+        )
+        return json.loads(result.stdout)
+    except (
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+        json.JSONDecodeError,
+    ):
+        return None
+
+
+def _latest_successful_build(pipeline: str, job: str) -> dict[str, Any] | None:
+    builds = _fly_curl(
+        f"/api/v1/teams/{CONCOURSE_TEAM}/pipelines/{pipeline}/jobs/{job}/builds?limit=10"
+    )
+    if not builds:
+        return None
+    return next((b for b in builds if b.get("status") == "succeeded"), None)
+
+
+def _build_resource_commit(build_id: int, candidate_resources: list[str]) -> str | None:
+    """Return the deployed commit sha for the first matching resource input."""
+    data = _fly_curl(f"/api/v1/builds/{build_id}/resources")
+    if not data:
+        return None
+    by_name = {i["name"]: i["version"] for i in data.get("inputs", [])}
+    for name in candidate_resources:
+        version = by_name.get(name)
+        if not version:
+            continue
+        commit = version.get("commit") or version.get("ref")
+        if commit and COMMIT_SHA_RE.match(commit):
+            return commit
+    return None
+
+
+@dataclass
+class LiveStage:
+    """The exact commit last successfully deployed to a Concourse job's stage."""
+
+    reached: bool | None
+    build_name: str
+    end_time: int | None
+    deployed_commit: str
+
+
+def _live_stage(
+    pr: PullRequest, pipeline: str, job: str, candidate_resources: list[str]
+) -> LiveStage | None:
+    build = _latest_successful_build(pipeline, job)
+    if build is None:
+        return None
+    commit = _build_resource_commit(build["id"], candidate_resources)
+    if commit is None:
+        return None
+    return LiveStage(
+        reached=_is_ancestor(_compare_status(pr.owner, pr.repo, pr.commit, commit)),
+        build_name=build["name"],
+        end_time=build.get("end_time"),
+        deployed_commit=commit,
+    )
+
+
+def _parse_pr_url(url: str) -> tuple[str, str, int]:
+    match = PR_URL_RE.search(url)
+    if not match:
+        msg = f"Not a GitHub PR URL: {url}"
+        raise ValueError(msg)
+    return match["owner"], match["repo"], int(match["number"])
+
+
+def _fetch_pr(url: str) -> PullRequest:
+    owner, repo, number = _parse_pr_url(url)
+    data = _gh_json(
+        "pr",
+        "view",
+        url,
+        "--json",
+        "number,title,state,mergedAt,mergeCommit,headRefOid",
+    )
+    merged = data["state"] == "MERGED"
+    commit = data["mergeCommit"]["oid"] if merged else data["headRefOid"]
+    return PullRequest(
+        owner=owner,
+        repo=repo,
+        number=number,
+        title=data["title"],
+        state=data["state"],
+        merged=merged,
+        commit=commit,
+        merged_at=data.get("mergedAt"),
+    )
+
+
+def _matching_apps(owner: str, repo: str) -> list[str]:
+    target = f"{owner}/{repo}".lower()
+    return sorted(name for name in APPS if github_repo(name).lower() == target)
+
+
+# The only environment names the release-resource pipeline shape
+# (k8s_apps/pipeline.py's github_deployment() calls) ever creates. Querying
+# by exact environment server-side avoids scanning a repo's full deployment
+# history, which for apps with per-PR review-app deployments can be
+# thousands of unrelated entries (e.g. "mitxonline-ci-pr-2528").
+DEPLOYMENT_ENVIRONMENTS = ("RC", "Production")
+
+
+def _matching_deployments(owner: str, repo: str, commit: str) -> list[dict[str, Any]]:
+    """Find the most recent matching GitHub Deployment per environment.
+
+    Only relevant for apps on the release-resource pipeline shape, which
+    records deployments via the GitHub Deployments API instead of
+    RC/release branches.
+    """
+    matches = []
+    for env in DEPLOYMENT_ENVIRONMENTS:
+        try:
+            deployments = _gh_json(
+                "api", f"repos/{owner}/{repo}/deployments?environment={env}&per_page=1"
+            )
+        except subprocess.CalledProcessError:
+            continue
+        if not deployments:
+            continue
+        deployment = deployments[0]
+        if _is_ancestor(_compare_status(owner, repo, commit, deployment["sha"])):
+            matches.append(deployment)
+    return matches
+
+
+def _changed_files(owner: str, repo: str, number: int) -> list[str]:
+    files = _gh_json("api", "--paginate", f"repos/{owner}/{repo}/pulls/{number}/files")
+    return [f["filename"] for f in files]
+
+
+def _impacted_apps(paths: list[str]) -> tuple[set[str], bool, list[str]]:
+    """Map an ol-infrastructure PR's changed files to affected app pipelines.
+
+    Returns (directly modified apps, whether shared infra code was touched,
+    changed files that don't map to any known app pipeline).
+    """
+    direct: set[str] = set()
+    shared_hit = False
+    other: list[str] = []
+    for path in paths:
+        match = APPLICATIONS_DIR_RE.match(path)
+        if match and match.group(1) in APP_DIR_TO_NAME:
+            direct.add(APP_DIR_TO_NAME[match.group(1)])
+            continue
+        if any(path.startswith(prefix) for prefix in PULUMI_WATCHED_PATHS):
+            shared_hit = True
+            continue
+        other.append(path)
+    return direct, shared_hit, other
+
+
+def _report_ol_infra_app(pr: PullRequest, app_name: str) -> None:
+    """Check whether an app pipeline's stages have picked up this ol-infra commit.
+
+    Every app's ``ol-infra-{app_name}`` resource always tracks ol-infrastructure's
+    main branch (there's no RC/release lifecycle for infra code itself), so this
+    only makes sense as a live build check -- there's no meaningful branch-tip
+    fallback beyond "is it merged to main", which is checked once already.
+    """
+    pipeline = f"{app_name}-pipeline"
+    print(f"\n=== {app_name} ({pipeline}) ===")
+    print(f"    {CONCOURSE_URL}/teams/{CONCOURSE_TEAM}/pipelines/{pipeline}")
+
+    if not _fly_ready():
+        print(
+            "    ?  fly not logged in to 'infrastructure' -- can't verify live builds"
+        )
+        return
+
+    resource = f"ol-infra-{app_name}"
+    for label, job in (
+        ("CI", f"deploy-ol-application-{app_name}-ci"),
+        ("RC / QA", f"deploy-ol-application-{app_name}-qa"),
+        ("Production", f"deploy-ol-application-{app_name}-production"),
+    ):
+        live = _live_stage(pr, pipeline, job, [resource])
+        if live is None:
+            print(f"    ?  {label:<12} no successful build found for {job}")
+            continue
+        print(
+            _format_stage(
+                label,
+                live.reached,
+                f"build #{live.build_name} used ol-infra {live.deployed_commit[:8]}",
+            )
+        )
+
+
+def _report_ol_infrastructure_pr(pr: PullRequest) -> None:
+    paths = _changed_files(pr.owner, pr.repo, pr.number)
+    direct, shared_hit, other = _impacted_apps(paths)
+    impacted = direct | (set(APPS) if shared_hit else set())
+
+    if direct:
+        print(f"\nDirectly modified app dirs: {', '.join(sorted(direct))}")
+    if shared_hit:
+        print(
+            "\nShared infrastructure code changed (one of "
+            f"{', '.join(PULUMI_WATCHED_PATHS)}) -- every app pipeline's "
+            "ol-infra-{app} resource picks this up."
+        )
+    if not impacted:
+        print("\nNo changed files map to a known app pipeline.")
+
+    for app_name in sorted(impacted):
+        _report_ol_infra_app(pr, app_name)
+
+    if other:
+        print("\nOther changed files (no known app pipeline mapping):")
+        for path in other:
+            print(f"    {path}")
+
+
+def _format_stage(label: str, reached: bool | None, detail: str) -> str:
+    if reached is None:
+        return f"    ?  {label:<12} {detail}"
+    marker = "\u2713" if reached else "\u2717"
+    verb = "reached" if reached else "not yet reached"
+    return f"    {marker}  {label:<12} {verb} ({detail})"
+
+
+def _report_app(pr: PullRequest, app_name: str) -> None:
+    pipeline = f"{app_name}-pipeline"
+    print(f"\n=== {app_name} ({pipeline}) ===")
+    print(f"    {CONCOURSE_URL}/teams/{CONCOURSE_TEAM}/pipelines/{pipeline}")
+
+    stages = (
+        (
+            "CI",
+            repo_main_branch(app_name),
+            f"build-{app_name}-image-from-main",
+            [
+                f"{app_name}-{repo_main_branch(app_name)}",
+            ],
+        ),
+        (
+            "RC / QA",
+            RC_BRANCH,
+            f"deploy-ol-application-{app_name}-qa",
+            [
+                f"{app_name}-release-candidate",
+                f"{app_name}-release",
+            ],
+        ),
+        (
+            "Production",
+            RELEASE_BRANCH,
+            f"deploy-ol-application-{app_name}-production",
+            [
+                f"{app_name}-release",
+            ],
+        ),
+    )
+    for label, branch, job, candidate_resources in stages:
+        live = (
+            _live_stage(pr, pipeline, job, candidate_resources)
+            if _fly_ready()
+            else None
+        )
+        if live is not None:
+            print(
+                _format_stage(
+                    label,
+                    live.reached,
+                    f"build #{live.build_name} deployed {live.deployed_commit[:8]}",
+                )
+            )
+            continue
+        reached = _is_ancestor(_compare_status(pr.owner, pr.repo, pr.commit, branch))
+        if reached is None:
+            print(f"    ?  {label:<12} branch {branch!r} not used by this pipeline")
+        else:
+            print(_format_stage(label, reached, branch))
+
+    for deployment in sorted(
+        _matching_deployments(pr.owner, pr.repo, pr.commit),
+        key=lambda d: d["created_at"],
+    ):
+        print(
+            f"    \u2713  {deployment['environment']:<12} "
+            f"deployment {deployment['ref']} @ {deployment['created_at']}"
+        )
+
+
+@app.default
+def where_is_my_pr(pr_url: str) -> None:
+    """Show which ol-infrastructure deployment pipeline stages a GitHub PR has reached.
+
+    Parameters
+    ----------
+    pr_url:
+        A GitHub pull request URL, e.g. https://github.com/mitodl/mitxonline/pull/3801
+    """
+    pr = _fetch_pr(pr_url)
+    print(f"PR #{pr.number} - {pr.owner}/{pr.repo}: {pr.title}")
+    if pr.merged:
+        print(f"Merged {pr.merged_at} (commit {pr.commit[:8]})")
+    else:
+        print(f"State: {pr.state} (not merged; checking head commit {pr.commit[:8]})")
+
+    if f"{pr.owner}/{pr.repo}".lower() == OL_INFRA_REPO:
+        _report_ol_infrastructure_pr(pr)
+        return
+
+    matching = _matching_apps(pr.owner, pr.repo)
+    if not matching:
+        known = ", ".join(f"{name} ({github_repo(name)})" for name in sorted(APPS))
+        print(
+            f"\nNo known deployment pipeline maps to {pr.owner}/{pr.repo}.\n"
+            f"Known app repos: {known}"
+        )
+        return
+
+    for app_name in matching:
+        _report_app(pr, app_name)
+
+
+if __name__ == "__main__":
+    app()
