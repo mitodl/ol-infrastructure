@@ -7,6 +7,7 @@ import importlib.util
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import pytest
 
@@ -897,11 +898,12 @@ def test_manual_tail_console_urls_are_real_consoles(offboard_module: Any) -> Non
         if finding.human_action.console_url
     ]
 
+    parsed = [urlparse(console) for console in consoles]
+
     assert consoles
-    assert all(console.startswith("https://") for console in consoles)
-    assert not any(
-        "runbook" in console or "github.mit.edu" in console for console in consoles
-    )
+    assert all(url.scheme == "https" for url in parsed)
+    assert all(url.hostname != "github.mit.edu" for url in parsed)
+    assert not any("runbook" in url.path for url in parsed)
 
 
 @pytest.mark.unit
