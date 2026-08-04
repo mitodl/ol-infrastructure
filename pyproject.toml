@@ -20,7 +20,9 @@ dependencies = [
   "pulumi>=3.39.1,<4",
   "pulumi-aws>=7.1,<8",
   "pulumi-docker>=5,<6",
-  "pulumi-fastly>=12,<13",
+  # 12.4.0 turns historical TLS activation state drift into unsafe API updates.
+  # Remove this cap after the read-path regression exposed by upstream #1353 is fixed.
+  "pulumi-fastly>=12,<12.4",
   "pulumi-github>=6.0.0,<7",
   "pulumi-mailgun>=3.0.0,<4",
   "pulumi-tls>=5.0.0,<6",
