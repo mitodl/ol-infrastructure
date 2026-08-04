@@ -23,7 +23,7 @@ a reader following instructions is exactly the failure mode we need to design ag
 clients, all of which federate interactive login from it:
 
 | Keycloak client | Service |
-|---|---|
+| --- | --- |
 | `ol-vault-client` | Vault |
 | `ol-grafana-client` | Grafana (with role mapper → admin/editor/viewer client roles) |
 | `ol-concourse-client` | Concourse |
@@ -160,17 +160,19 @@ which is the only way it stays true as `iam_helper.py` and the Rootly user IDs c
 
 - Dry-run is the **default**. Mutation requires an explicit `--execute`.
 - `--execute` additionally requires interactive confirmation echoing the resolved human identity
-  per service, unless `--yes` is passed.
+  per service, unless `--yes` is passed. The prompt explicitly lists incomplete provider discovery.
+- AWS execution additionally requires `--aws-account-id`; the discovered IAM user's ARN must match
+  that explicitly confirmed 12-digit account before any credential can be revoked.
 - `--only` / `--skip` accept service names, so a partial or resumed run is possible.
-- A missing credential for one service degrades that provider to skipped-with-a-warning; it does
-  not abort the run.
+- A missing credential or unresolved identity for one service is reported as incomplete and returns
+  a non-zero exit status, but it does not prevent known urgent containment actions in other services.
 
 **Per-service plan.**
 
 | Service | `REVOKED_VIA_API` | `NEEDS_CODE_CHANGE` | `NEEDS_HUMAN` |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Keycloak (`ol-platform-engineering`) | disable user, kill sessions, drop realm/client role mappings, drop federated identities — cascades to all ten clients | — | — |
-| Vault | revoke the OIDC entity's live token accessors (closes the ≤8h `token_ttl` window Keycloak alone leaves open) | — | — |
+| Vault | revoke the OIDC entity's live token accessors (closes the ≤8h `token_ttl` window Keycloak alone leaves open), then disable the entity while preserving aliases for audit and safe retries | — | — |
 | AWS IAM | ephemeral credentials only: access keys, console login profile, MFA devices | remove from the relevant `iam_helper.py` list + `pulumi up` on `aws/iam`, `aws/eks`, `aws/opensearch`, `concourse` | — |
 | Rootly | user deactivation, **if** the API supports it (open question below) | remove `user_id` from `saas/rootly/__main__.py` team membership and escalation positions + `pulumi up` | reassign open incidents |
 | GitHub org | — | — | org/team membership removal |
@@ -236,7 +238,8 @@ request construction, plus read-only `discover()` runs against QA. No test may m
   Rootly and the residual doc follow.
 - **Risk Level:** High blast radius by nature, mitigated by dry-run-default and by never mutating
   Pulumi-managed resources.
-- **Dependencies:** Keycloak admin credentials, a Vault token, an AWS profile, a Rootly API token.
+- **Dependencies:** Keycloak admin credentials, a Vault token, an AWS profile and explicitly
+  confirmed account ID for execution, and a Rootly API token.
 - **Migration Path:** N/A — new tooling. The residual doc replaces the runbook ask in #5235.
 
 ## Related Decisions
@@ -258,7 +261,7 @@ request construction, plus read-only `discover()` runs against QA. No test may m
 **Review History:**
 
 | Date | Reviewer | Decision | Notes |
-|------|----------|----------|-------|
-| | | | |
+| --- | --- | --- | --- |
+|  |  |  |  |
 
 **Last Updated:** 2026-08-04

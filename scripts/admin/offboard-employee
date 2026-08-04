@@ -74,6 +74,7 @@ class ActionStatus(StrEnum):
     WOULD_REVOKE = "would_revoke"
     REVOKED = "revoked"
     REPORTED = "reported"
+    INCOMPLETE = "incomplete"
     SKIPPED = "skipped"
     ERROR = "error"
 
@@ -198,10 +199,12 @@ class KeycloakProvider:
         self.client = client or httpx.Client(timeout=30)
         self._token: str | None = None
 
-    def _token_headers(self) -> dict[str, str]:
+    def _token_headers(self, *, force_refresh: bool = False) -> dict[str, str]:
         if not self.password:
             msg = "set OFFBOARD_KEYCLOAK_PASSWORD or pass --keycloak-password"
             raise OffboardingError(msg)
+        if force_refresh:
+            self._token = None
         if self._token is None:
             response = self.client.post(
                 f"{self.base_url}/realms/{self.auth_realm}"
@@ -232,6 +235,12 @@ class KeycloakProvider:
             if str(user.get("email", "")).lower() == identity.email.lower()
             or str(user.get("username", "")).lower() == identity.email.lower()
         ]
+        if not users:
+            return [
+                keycloak_unresolved_identity_finding(
+                    identity, self.base_url, self.realm
+                )
+            ]
         return [
             Finding(
                 service=self.name,
@@ -260,19 +269,16 @@ class KeycloakProvider:
 
     def revoke(self, finding: Finding, *, execute: bool) -> ActionRecord:
         """Disable the user and remove session/role/federation state."""
+        if finding.outcome is not FindingOutcome.REVOKED_VIA_API:
+            return report_record(finding, execute=execute)
         if not execute:
             return api_record(finding, execute=False, status=ActionStatus.WOULD_REVOKE)
-        headers = self._token_headers()
+        headers = self._token_headers(force_refresh=True)
         user_url = (
             f"{self.base_url}/admin/realms/{self.realm}/users/{finding.target_id}"
         )
-        user_representation = dict(finding.metadata.get("user", {}))
-        if not user_representation:
-            msg = "Keycloak discovery did not preserve the user representation"
-            raise OffboardingError(msg)
-        user_representation["enabled"] = False
         disable_response = self.client.put(
-            user_url, headers=headers, json=user_representation
+            user_url, headers=headers, json={"enabled": False}
         )
         disable_response.raise_for_status()
         logout_url = f"{user_url}/logout"
@@ -445,12 +451,13 @@ class VaultProvider:
                 identity=identity,
                 target_id=entity_id,
                 target_label=f"Vault OIDC identity entity for {identity.email}",
-                verb="delete OIDC entity, aliases, and group memberships",
+                verb="disable OIDC entity while preserving aliases for audit and retries",
                 outcome=FindingOutcome.REVOKED_VIA_API,
                 scope=address,
                 request={
-                    "method": "DELETE",
+                    "method": "POST",
                     "path": f"/v1/identity/entity/id/{entity_id}",
+                    "json": {"disabled": True},
                     "order": 20,
                 },
             )
@@ -505,11 +512,12 @@ class VaultProvider:
             )
             message = "Revoked Vault token accessor and its associated child tokens and leases."
         else:
-            response = self.client.delete(
+            response = self.client.post(
                 f"{address}/v1/identity/entity/id/{finding.target_id}",
                 headers=headers,
+                json={"disabled": True},
             )
-            message = "Deleted Vault OIDC entity, aliases, and group memberships."
+            message = "Disabled Vault OIDC entity and preserved aliases for audit and retries."
         response.raise_for_status()
         return api_record(
             finding,
@@ -538,10 +546,17 @@ class AWSProvider:
 
     name = "aws"
 
-    def __init__(self, *, repo_root: Path, profile: str | None = None):
-        """Initialize AWS access with the repository root and optional profile."""
+    def __init__(
+        self,
+        *,
+        repo_root: Path,
+        profile: str | None = None,
+        expected_account_id: str | None = None,
+    ):
+        """Initialize AWS access with the repository root and target account guard."""
         self.repo_root = repo_root
         self.profile = profile
+        self.expected_account_id = expected_account_id
 
     def _iam_client(self) -> Any:
         if self.profile:
@@ -709,6 +724,12 @@ class AWSEphemeralCredentialProvider(AWSProvider):
             raise OffboardingError(msg) from exc
         arn = str(user_response.get("User", {}).get("Arn", ""))
         account_id = arn.split(":")[4] if arn.count(":") >= 4 else "unknown"
+        if self.expected_account_id and account_id != self.expected_account_id:
+            msg = (
+                f"AWS caller resolved account {account_id}, not explicitly confirmed "
+                f"account {self.expected_account_id}; refusing credential discovery"
+            )
+            raise OffboardingError(msg)
         scope = f"AWS account={account_id} profile={self.profile or 'default'}"
         return self._ephemeral_credential_findings(identity, iam, scope=scope)
 
@@ -775,7 +796,13 @@ class RootlyProvider:
             headers={"Authorization": f"Bearer {self.token}"},
         )
         response.raise_for_status()
-        users = response.json().get("data", [])
+        users = [
+            user
+            for user in response.json().get("data", [])
+            if rootly_user_email(user).lower() == identity.email.lower()
+        ]
+        if not users:
+            return [rootly_unresolved_identity_finding(identity, self.base_url)]
         findings: list[Finding] = []
         for user in users:
             user_id = str(user.get("id"))
@@ -808,8 +835,7 @@ class RootlyProvider:
 
     def _code_change_findings(self, identity: Identity, user_id: str) -> list[Finding]:
         rootly_path = self.repo_root / "src/ol_infrastructure/saas/rootly/__main__.py"
-        source_lines = rootly_path.read_text().splitlines()
-        lines = matching_numeric_literal_lines(rootly_path, user_id)
+        references = matching_numeric_literal_references(rootly_path, user_id)
         stacks = pulumi_stack_targets(
             self.repo_root, ("src/ol_infrastructure/saas/rootly",)
         )
@@ -824,15 +850,13 @@ class RootlyProvider:
                 scope=str(rootly_path.relative_to(self.repo_root)),
                 code_change=CodeChange(
                     path=str(rootly_path.relative_to(self.repo_root)),
-                    symbol=rootly_reference_symbol(source_lines[line - 1]),
+                    symbol=rootly_reference_symbol(context),
                     line=line,
                     stacks=stacks,
-                    instruction=rootly_reference_instruction(
-                        source_lines[line - 1], user_id
-                    ),
+                    instruction=rootly_reference_instruction(context, user_id),
                 ),
             )
-            for line in lines
+            for line, context in references
         ]
 
     def _incident_handoff_finding(
@@ -1008,6 +1032,32 @@ class ManualTailProvider:
         return report_record(finding, execute=execute)
 
 
+def finding_record(
+    finding: Finding,
+    *,
+    execute: bool,
+    status: ActionStatus,
+    message: str,
+    preserve_followup: bool = False,
+) -> ActionRecord:
+    """Build an action record from fields shared by every finding disposition."""
+    return ActionRecord(
+        service=finding.service,
+        identity=finding.identity.email,
+        target_id=finding.target_id,
+        target_label=finding.target_label,
+        verb=finding.verb,
+        scope=finding.scope,
+        outcome=finding.outcome,
+        status=status,
+        execute=execute,
+        request=finding.request,
+        message=message,
+        code_change=finding.code_change if preserve_followup else None,
+        human_action=finding.human_action if preserve_followup else None,
+    )
+
+
 def api_record(
     finding: Finding,
     *,
@@ -1022,37 +1072,27 @@ def api_record(
             if status is ActionStatus.WOULD_REVOKE
             else f"{finding.verb}."
         )
-    return ActionRecord(
-        service=finding.service,
-        identity=finding.identity.email,
-        target_id=finding.target_id,
-        target_label=finding.target_label,
-        verb=finding.verb,
-        scope=finding.scope,
-        outcome=finding.outcome,
-        status=status,
+    return finding_record(
+        finding,
         execute=execute,
-        request=finding.request,
+        status=status,
         message=message,
     )
 
 
 def report_record(finding: Finding, *, execute: bool) -> ActionRecord:
     """Build a non-mutating report record from a finding."""
-    return ActionRecord(
-        service=finding.service,
-        identity=finding.identity.email,
-        target_id=finding.target_id,
-        target_label=finding.target_label,
-        verb=finding.verb,
-        scope=finding.scope,
-        outcome=finding.outcome,
-        status=ActionStatus.REPORTED,
+    status = (
+        ActionStatus.INCOMPLETE
+        if finding.metadata.get("discovery_incomplete")
+        else ActionStatus.REPORTED
+    )
+    return finding_record(
+        finding,
         execute=execute,
-        request=finding.request,
+        status=status,
         message=finding.verb,
-        code_change=finding.code_change,
-        human_action=finding.human_action,
+        preserve_followup=True,
     )
 
 
@@ -1075,20 +1115,12 @@ def skipped_record(service: str, identity: Identity, reason: str) -> ActionRecor
 
 def error_record(finding: Finding, reason: str, *, execute: bool) -> ActionRecord:
     """Build a provider action error record without aborting the whole run."""
-    return ActionRecord(
-        service=finding.service,
-        identity=finding.identity.email,
-        target_id=finding.target_id,
-        target_label=finding.target_label,
-        verb=finding.verb,
-        scope=finding.scope,
-        outcome=finding.outcome,
-        status=ActionStatus.ERROR,
+    return finding_record(
+        finding,
         execute=execute,
-        request=finding.request,
+        status=ActionStatus.ERROR,
         message=reason,
-        code_change=finding.code_change,
-        human_action=finding.human_action,
+        preserve_followup=True,
     )
 
 
@@ -1138,6 +1170,30 @@ def has_login_profile(iam: Any, username: str) -> bool:
     return True
 
 
+def keycloak_unresolved_identity_finding(
+    identity: Identity, base_url: str, realm: str
+) -> Finding:
+    """Build an incomplete Keycloak identity-discovery finding."""
+    return Finding(
+        service="keycloak",
+        identity=identity,
+        target_id=identity.email,
+        target_label=f"Keycloak user for {identity.email}",
+        verb="verify Keycloak user identity before completing offboarding",
+        outcome=FindingOutcome.NEEDS_HUMAN,
+        scope=f"{base_url} realm={realm}",
+        human_action=HumanAction(
+            console_url=f"{base_url}/admin/{realm}/console/#/{realm}/users",
+            owning_team="Platform Engineering",
+            instruction=(
+                "Keycloak did not return an exact email or username match. Resolve "
+                "the account manually; SSO containment is incomplete until it is disabled."
+            ),
+        ),
+        metadata={"discovery_incomplete": True},
+    )
+
+
 def vault_unresolved_identity_finding(identity: Identity, address: str) -> Finding:
     """Build the read-only unresolved Vault OIDC entity finding."""
     return Finding(
@@ -1155,6 +1211,7 @@ def vault_unresolved_identity_finding(identity: Identity, address: str) -> Findi
                 "the user has ever logged in and manually inspect live tokens if needed."
             ),
         ),
+        metadata={"discovery_incomplete": True},
     )
 
 
@@ -1177,22 +1234,65 @@ def aws_unresolved_identity_finding(identity: Identity) -> Finding:
                 "complete."
             ),
         ),
+        metadata={"discovery_incomplete": True},
     )
 
 
-def matching_numeric_literal_lines(path: Path, value: str) -> list[int]:
-    """Return exact AST literal locations for a numeric Rootly user id."""
-    tree = ast.parse(path.read_text())
-    numeric_value = int(value)
-    return sorted(
-        {
-            node.lineno
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Constant)
+def rootly_unresolved_identity_finding(identity: Identity, base_url: str) -> Finding:
+    """Build an incomplete Rootly identity-discovery finding."""
+    return Finding(
+        service="rootly",
+        identity=identity,
+        target_id=identity.email,
+        target_label=f"Rootly user for {identity.email}",
+        verb="verify Rootly user identity before completing offboarding",
+        outcome=FindingOutcome.NEEDS_HUMAN,
+        scope=base_url,
+        human_action=HumanAction(
+            console_url="https://app.rootly.com/account/users",
+            owning_team="Platform Engineering",
+            instruction=(
+                "Rootly did not return an exact email match. Resolve the account "
+                "manually; deactivation and on-call cleanup remain incomplete."
+            ),
+        ),
+        metadata={"discovery_incomplete": True},
+    )
+
+
+def matching_numeric_literal_references(
+    path: Path, value: str
+) -> list[tuple[int, str]]:
+    """Return Rootly user-id lines and enclosing AST source, independent of layout."""
+    source = path.read_text()
+    tree = ast.parse(source)
+    try:
+        numeric_value = int(value)
+    except ValueError:
+        return []
+    references: set[tuple[int, str]] = set()
+
+    def visit(node: ast.AST, ancestors: tuple[ast.AST, ...]) -> None:
+        if (
+            isinstance(node, ast.Constant)
             and not isinstance(node.value, bool)
             and (node.value == numeric_value or node.value == value)
-        }
-    )
+        ):
+            context = source.splitlines()[node.lineno - 1]
+            for ancestor in reversed(ancestors):
+                segment = ast.get_source_segment(source, ancestor)
+                if (
+                    segment
+                    and rootly_reference_symbol(segment) != "Rootly user_id reference"
+                ):
+                    context = segment
+                    break
+            references.add((node.lineno, context))
+        for child in ast.iter_child_nodes(node):
+            visit(child, (*ancestors, node))
+
+    visit(tree, ())
+    return sorted(references)
 
 
 def rootly_reference_symbol(line: str) -> str:
@@ -1264,14 +1364,22 @@ def scan_repo_for_text(repo_root: Path, needle: str) -> Iterable[tuple[Path, int
                 yield path, index, line
 
 
+def rootly_user_email(user: dict[str, Any]) -> str:
+    """Return the email from a JSON:API-ish Rootly user response."""
+    attrs = (
+        user.get("attributes", {}) if isinstance(user.get("attributes"), dict) else {}
+    )
+    return str(attrs.get("email") or user.get("email") or "")
+
+
 def rootly_user_label(user: dict[str, Any]) -> str:
     """Return a readable Rootly user label from JSON:API-ish responses."""
     attrs = (
         user.get("attributes", {}) if isinstance(user.get("attributes"), dict) else {}
     )
-    email = attrs.get("email") or user.get("email") or user.get("id")
+    email = rootly_user_email(user) or str(user.get("id"))
     name = attrs.get("name") or attrs.get("full_name") or user.get("name")
-    return f"{name} <{email}>" if name else str(email)
+    return f"{name} <{email}>" if name else email
 
 
 def parse_service_filter(value: Sequence[str] | None) -> set[str]:
@@ -1313,6 +1421,7 @@ def build_providers(
     vault_addr: str | None,
     vault_token: str | None,
     aws_profile: str | None,
+    aws_account_id: str | None,
     rootly_token: str | None,
 ) -> list[Provider]:
     """Construct providers in containment-first output order."""
@@ -1330,8 +1439,16 @@ def build_providers(
     return [
         *keycloak_providers,
         VaultProvider(address=vault_addr, token=vault_token),
-        AWSProvider(repo_root=repo_root, profile=aws_profile),
-        AWSEphemeralCredentialProvider(repo_root=repo_root, profile=aws_profile),
+        AWSProvider(
+            repo_root=repo_root,
+            profile=aws_profile,
+            expected_account_id=aws_account_id,
+        ),
+        AWSEphemeralCredentialProvider(
+            repo_root=repo_root,
+            profile=aws_profile,
+            expected_account_id=aws_account_id,
+        ),
         RootlyProvider(repo_root=repo_root, token=rootly_token),
         RepoCodeProvider(repo_root=repo_root),
         ManualTailProvider(),
@@ -1411,6 +1528,12 @@ def confirmation_summary(records: Sequence[ActionRecord]) -> str:
     api_records = [
         record for record in records if record.outcome is FindingOutcome.REVOKED_VIA_API
     ]
+    incomplete_records = [
+        record
+        for record in records
+        if record.status
+        in {ActionStatus.INCOMPLETE, ActionStatus.SKIPPED, ActionStatus.ERROR}
+    ]
     lines = ["The following API revocations will execute:"]
     lines.extend(
         f"- {record.identity}: {record.service} [{record.scope or 'scope unavailable'}] "
@@ -1419,7 +1542,14 @@ def confirmation_summary(records: Sequence[ActionRecord]) -> str:
     )
     if not api_records:
         lines.append("- none")
-    lines.append("Type EXECUTE to continue: ")
+    lines.append("Discovery is incomplete for these providers/identities:")
+    lines.extend(
+        f"- [{record.status}] {record.identity}: {record.service} -> {record.message}"
+        for record in incomplete_records
+    )
+    if not incomplete_records:
+        lines.append("- none")
+    lines.append("Type EXECUTE to continue with the known revocations: ")
     return "\n".join(lines)
 
 
@@ -1522,6 +1652,18 @@ def validate_execution_targets(providers: Sequence[Provider]) -> None:
             target = provider.base_url
         elif isinstance(provider, AWSEphemeralCredentialProvider):
             target = provider.profile or ""
+            if not provider.expected_account_id:
+                msg = (
+                    "Refusing --execute for AWS without --aws-account-id; explicitly "
+                    "confirm the 12-digit account that may be mutated."
+                )
+                raise RuntimeError(msg)
+            if not (
+                len(provider.expected_account_id) == 12
+                and provider.expected_account_id.isdecimal()
+            ):
+                msg = "--aws-account-id must be a 12-digit AWS account ID"
+                raise RuntimeError(msg)
         normalized = target.lower()
         nonproduction_markers = ("-qa.", "-ci.", ".qa.", ".ci.", "qa-", "ci-")
         if normalized and any(marker in normalized for marker in nonproduction_markers):
@@ -1536,7 +1678,10 @@ def records_exit_code(records: Sequence[ActionRecord], *, execute: bool) -> int:
     """Return a machine-readable failure code for incomplete offboarding runs."""
     if any(record.status is ActionStatus.ERROR for record in records):
         return 1
-    if any(record.status is ActionStatus.SKIPPED for record in records):
+    if any(
+        record.status in {ActionStatus.INCOMPLETE, ActionStatus.SKIPPED}
+        for record in records
+    ):
         return 2
     if execute and any(
         record.outcome is FindingOutcome.REVOKED_VIA_API
@@ -1570,6 +1715,12 @@ def main(
     vault_addr: str | None = None,
     vault_token: str | None = None,
     aws_profile: str | None = None,
+    aws_account_id: Annotated[
+        str | None,
+        cyclopts.Parameter(
+            help="Required with --execute for AWS; confirms the 12-digit target account."
+        ),
+    ] = None,
     rootly_token: str | None = None,
 ) -> None:
     """Plan or execute employee offboarding for one or more email addresses."""
@@ -1596,6 +1747,7 @@ def main(
             vault_addr=vault_addr,
             vault_token=vault_token,
             aws_profile=aws_profile,
+            aws_account_id=aws_account_id,
             rootly_token=rootly_token,
         ),
         parse_service_filter(only),

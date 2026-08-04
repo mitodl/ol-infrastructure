@@ -36,6 +36,13 @@ def offboard_module() -> Any:
     return load_offboard_module()
 
 
+def write_iam_helper(repo_root: Path, username: str) -> None:
+    """Write a minimal IAM helper fixture containing one managed username."""
+    helper_path = repo_root / "src/ol_infrastructure/lib/aws/iam_helper.py"
+    helper_path.parent.mkdir(parents=True)
+    helper_path.write_text(f"ADMIN_USERNAMES = [{username!r}]\n")
+
+
 class FakeProvider:
     """Provider test double that records whether revoke would execute."""
 
@@ -143,6 +150,7 @@ def test_selected_providers_support_comma_filters(offboard_module: Any) -> None:
         vault_addr=None,
         vault_token=None,
         aws_profile=None,
+        aws_account_id=None,
         rootly_token=None,
     )
 
@@ -154,19 +162,19 @@ def test_selected_providers_support_comma_filters(offboard_module: Any) -> None:
 
 @pytest.mark.unit
 def test_aws_code_change_discovery_reports_exact_iam_helper_symbol(
-    offboard_module: Any,
+    offboard_module: Any, tmp_path: Path
 ) -> None:
     """AWS Pulumi-managed access is reported as code cleanup, not API deletion."""
-    provider = offboard_module.AWSProvider(repo_root=Path.cwd())
-    identity = offboard_module.Identity("cpatti@mit.edu")
+    write_iam_helper(tmp_path, "testuser")
+    provider = offboard_module.AWSProvider(repo_root=tmp_path)
+    identity = offboard_module.Identity("testuser@mit.edu")
 
     findings = provider._code_change_findings(identity)
 
     symbols = {
         finding.code_change.symbol for finding in findings if finding.code_change
     }
-    assert "ADMIN_USERNAMES" in symbols
-    assert "DEVOPS_ADMIN_USERNAMES" in symbols
+    assert symbols == {"ADMIN_USERNAMES"}
     assert all(
         finding.outcome is offboard_module.FindingOutcome.NEEDS_CODE_CHANGE
         for finding in findings
@@ -267,9 +275,7 @@ def test_keycloak_execute_revokes_user_mappings_and_federated_identities(  # noq
             "/users/keycloak-user-id"
         ):
             payload = offboard_module.json.loads(request.content)
-            assert payload["email"] == "user@example.com"
-            assert payload["username"] == "user@example.com"
-            assert payload["enabled"] is False
+            assert payload == {"enabled": False}
             return offboard_module.httpx.Response(204)
         if request.method == "POST" and request.url.path.endswith(
             "/users/keycloak-user-id/logout"
@@ -337,6 +343,7 @@ def test_keycloak_execute_revokes_user_mappings_and_federated_identities(  # noq
     record = provider.revoke(findings[0], execute=True)
 
     assert record.status is offboard_module.ActionStatus.REVOKED
+    assert seen.count(("POST", "/realms/master/protocol/openid-connect/token")) == 2
     assert (
         "PUT",
         "/admin/realms/ol-platform-engineering/users/keycloak-user-id",
@@ -390,9 +397,10 @@ def test_vault_discover_and_revoke_live_oidc_token_accessors(
         ):
             return offboard_module.httpx.Response(204)
         if (
-            request.method == "DELETE"
+            request.method == "POST"
             and request.url.path == "/v1/identity/entity/id/entity-1"
         ):
+            assert offboard_module.json.loads(request.content) == {"disabled": True}
             return offboard_module.httpx.Response(204)
         return offboard_module.httpx.Response(
             500, json={"unexpected": f"{request.method} {request.url.path}"}
@@ -421,7 +429,7 @@ def test_vault_discover_and_revoke_live_oidc_token_accessors(
     assert execute_record.status is offboard_module.ActionStatus.REVOKED
     assert entity_record.status is offboard_module.ActionStatus.REVOKED
     assert ("POST", "/v1/auth/token/revoke-accessor") in seen
-    assert ("DELETE", "/v1/identity/entity/id/entity-1") in seen
+    assert ("POST", "/v1/identity/entity/id/entity-1") in seen
 
 
 @pytest.mark.unit
@@ -434,9 +442,15 @@ def test_rootly_discovers_api_deactivation_code_change_and_handoff(
     )
     rootly_file.parent.mkdir(parents=True)
     rootly_file.write_text(
-        "user_ids=[99415]\n"
-        'schedule_rotation_members=[{"memberId": "99415", "position": 1}]\n'
-        'notification_target_params=[{"id": "99415", "type": "user"}]\n'
+        "user_ids=[\n"
+        "    99415,\n"
+        "]\n"
+        "schedule_rotation_members=[\n"
+        '    {"memberId": "99415", "position": 1},\n'
+        "]\n"
+        "notification_target_params=[\n"
+        '    {"id": "99415", "type": "user"},\n'
+        "]\n"
     )
     seen: list[tuple[str, str]] = []
 
@@ -453,7 +467,14 @@ def test_rootly_discovers_api_deactivation_code_change_and_handoff(
                                 "email": "user@example.com",
                                 "name": "Example User",
                             },
-                        }
+                        },
+                        {
+                            "id": "99999",
+                            "attributes": {
+                                "email": "unrelated@example.com",
+                                "name": "Unrelated User",
+                            },
+                        },
                     ]
                 },
             )
@@ -501,6 +522,7 @@ def test_rootly_discovers_api_deactivation_code_change_and_handoff(
 
     assert dry_run_record.status is offboard_module.ActionStatus.WOULD_REVOKE
     assert execute_record.status is offboard_module.ActionStatus.REVOKED
+    assert not any(finding.target_id == "99999" for finding in findings)
     assert {finding.outcome for finding in findings} == {
         offboard_module.FindingOutcome.REVOKED_VIA_API,
         offboard_module.FindingOutcome.NEEDS_CODE_CHANGE,
@@ -518,6 +540,29 @@ def test_rootly_discovers_api_deactivation_code_change_and_handoff(
     assert any("REFUSE" in change.instruction for change in code_changes)
     assert ("PATCH", "/v1/users/99415") in seen
     assert ("GET", "/v1/users/99415") in seen
+
+
+@pytest.mark.unit
+def test_non_mit_email_never_derives_an_aws_revocation_target(
+    offboard_module: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A contractor email remains manual and never reaches the AWS API."""
+    provider = offboard_module.AWSEphemeralCredentialProvider(repo_root=tmp_path)
+    monkeypatch.setattr(
+        provider,
+        "_iam_client",
+        lambda: pytest.fail("non-MIT identity called the AWS API"),
+    )
+
+    findings = provider.discover(
+        offboard_module.Identity("arslan.abdulrauf@arbisoft.com")
+    )
+    record = provider.revoke(findings[0], execute=False)
+
+    assert findings[0].outcome is offboard_module.FindingOutcome.NEEDS_HUMAN
+    assert record.status is offboard_module.ActionStatus.INCOMPLETE
+    assert record.target_id == "arslan.abdulrauf"
+    assert offboard_module.records_exit_code([record], execute=False) == 2
 
 
 @pytest.mark.unit
@@ -579,17 +624,18 @@ def test_aws_virtual_mfa_is_deactivated_and_deleted(
 
 @pytest.mark.unit
 def test_aws_code_change_revoke_never_calls_iam(
-    offboard_module: Any, monkeypatch: pytest.MonkeyPatch
+    offboard_module: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """Pulumi-managed AWS findings remain reports even in execute mode."""
-    provider = offboard_module.AWSProvider(repo_root=Path.cwd())
+    write_iam_helper(tmp_path, "testuser")
+    provider = offboard_module.AWSProvider(repo_root=tmp_path)
     monkeypatch.setattr(
         provider,
         "_iam_client",
         lambda: pytest.fail("Pulumi-managed finding called IAM"),
     )
     finding = provider._code_change_findings(
-        offboard_module.Identity("cpatti@mit.edu")
+        offboard_module.Identity("testuser@mit.edu")
     )[0]
 
     record = provider.revoke(finding, execute=True)
@@ -639,6 +685,43 @@ def test_execute_uses_the_exact_confirmed_discovery(offboard_module: Any) -> Non
 
 
 @pytest.mark.unit
+def test_keycloak_no_exact_match_is_incomplete(offboard_module: Any) -> None:
+    """A missing Keycloak identity cannot silently disappear from the report."""
+
+    def handler(request: Any) -> Any:
+        if request.url.path.endswith("/protocol/openid-connect/token"):
+            return offboard_module.httpx.Response(200, json={"access_token": "token"})
+        return offboard_module.httpx.Response(
+            200,
+            json=[
+                {
+                    "id": "wrong-user",
+                    "email": "other@example.com",
+                    "username": "other@example.com",
+                }
+            ],
+        )
+
+    provider = offboard_module.KeycloakProvider(
+        base_url="https://sso.example.invalid",
+        realm="ol-platform-engineering",
+        auth_realm="master",
+        username="admin",
+        password="password",  # pragma: allowlist secret
+        client=offboard_module.httpx.Client(
+            transport=offboard_module.httpx.MockTransport(handler)
+        ),
+    )
+
+    finding = provider.discover(offboard_module.Identity("user@example.com"))[0]
+    record = provider.revoke(finding, execute=False)
+
+    assert finding.outcome is offboard_module.FindingOutcome.NEEDS_HUMAN
+    assert record.status is offboard_module.ActionStatus.INCOMPLETE
+    assert offboard_module.records_exit_code([record], execute=False) == 2
+
+
+@pytest.mark.unit
 def test_nonproduction_keycloak_cannot_execute(offboard_module: Any) -> None:
     """QA remains a read-only discovery target even with --execute."""
     provider = offboard_module.KeycloakProvider(
@@ -651,6 +734,46 @@ def test_nonproduction_keycloak_cannot_execute(offboard_module: Any) -> None:
 
     with pytest.raises(RuntimeError, match="Refusing --execute"):
         offboard_module.validate_execution_targets([provider])
+
+
+@pytest.mark.unit
+def test_aws_execute_requires_explicit_account_id(
+    offboard_module: Any, tmp_path: Path
+) -> None:
+    """Ambient AWS credentials cannot mutate an unconfirmed account."""
+    provider = offboard_module.AWSEphemeralCredentialProvider(repo_root=tmp_path)
+
+    with pytest.raises(RuntimeError, match="--aws-account-id"):
+        offboard_module.validate_execution_targets([provider])
+
+    provider.expected_account_id = "not-an-account"
+    with pytest.raises(RuntimeError, match="12-digit"):
+        offboard_module.validate_execution_targets([provider])
+
+    provider.expected_account_id = "123456789012"
+    offboard_module.validate_execution_targets([provider])
+
+
+@pytest.mark.unit
+def test_aws_discovery_rejects_an_unexpected_account(
+    offboard_module: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Discovery fails closed when ambient credentials target another AWS account."""
+
+    class FakeIAM:
+        def get_user(self, **_kwargs: Any) -> dict[str, Any]:
+            return {"User": {"Arn": "arn:aws:iam::999999999999:user/testuser"}}
+
+    provider = offboard_module.AWSEphemeralCredentialProvider(
+        repo_root=tmp_path,
+        expected_account_id="123456789012",
+    )
+    monkeypatch.setattr(provider, "_iam_client", FakeIAM)
+
+    with pytest.raises(
+        offboard_module.OffboardingError, match="not explicitly confirmed"
+    ):
+        provider.discover(offboard_module.Identity("testuser@mit.edu"))
 
 
 @pytest.mark.unit
@@ -685,5 +808,42 @@ def test_records_exit_nonzero_when_provider_is_incomplete(offboard_module: Any) 
     )
     failed = offboard_module.error_record(finding, "request failed", execute=True)
 
+    incomplete = offboard_module.report_record(
+        offboard_module.vault_unresolved_identity_finding(
+            identity, "https://vault.example.invalid"
+        ),
+        execute=False,
+    )
+
     assert offboard_module.records_exit_code([skipped], execute=False) == 2
+    assert offboard_module.records_exit_code([incomplete], execute=False) == 2
     assert offboard_module.records_exit_code([failed], execute=True) == 1
+
+
+@pytest.mark.unit
+def test_confirmation_warns_about_incomplete_discovery(offboard_module: Any) -> None:
+    """The destructive prompt makes unchecked providers explicit."""
+    identity = offboard_module.Identity("user@example.com")
+    incomplete = offboard_module.report_record(
+        offboard_module.rootly_unresolved_identity_finding(
+            identity, "https://api.rootly.example.invalid"
+        ),
+        execute=False,
+    )
+
+    summary = offboard_module.confirmation_summary([incomplete])
+
+    assert "Discovery is incomplete" in summary
+    assert "[incomplete] user@example.com: rootly" in summary
+    assert "known revocations" in summary
+
+
+@pytest.mark.unit
+def test_confirmation_must_match_exactly(
+    offboard_module: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A mistyped destructive confirmation aborts before execution."""
+    monkeypatch.setattr("builtins.input", lambda: "execute")
+
+    with pytest.raises(RuntimeError, match="aborting without mutations"):
+        offboard_module.require_confirmation([])
