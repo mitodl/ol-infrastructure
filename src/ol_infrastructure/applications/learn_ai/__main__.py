@@ -20,7 +20,11 @@ from pulumi import (
 )
 from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
 
-from bridge.lib.constants import FASTLY_A_TLS_1_3, mit_learn_session_cookie_name
+from bridge.lib.constants import (
+    FASTLY_A_TLS_1_3,
+    apisix_oidc_session_cookie_name,
+    mit_learn_session_cookie_name,
+)
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_REDIS_PORT,
@@ -40,6 +44,7 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    stale_session_cookie_cleanup_plugin,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -910,29 +915,55 @@ learn_ai_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=learn_ai_namespace,
         k8s_labels=k8s_global_labels,
         enable_defaults=True,
+        plugins=[
+            # Both of learn-ai's OIDC resources have now moved off
+            # lua-resty-session's default "session" name, so every current user
+            # has a dead one of those in their browser: on the legacy host from
+            # this file's own rename, and on api.<env>.learn.mit.edu from the
+            # rename in #5219.  Nothing else evicts them -- #5219 attached no
+            # cleanup to learn-ai, and mit-learn's cleanup only fires on
+            # responses from mit-learn's own routes, not from /ai/*.
+            #
+            # No cookie_domains: this config is referenced from both hosts, and a
+            # Domain=.learn.mit.edu deletion emitted from api-learn-ai.ol.mit.edu
+            # would just be rejected by the browser.  Host-only is also the only
+            # scope learn-ai ever wrote a "session" cookie at, on either host.
+            # Safe to delete once the old cookies have aged out of circulation.
+            stale_session_cookie_cleanup_plugin(),
+        ],
     ),
     opts=ResourceOptions(delete_before_replace=True),
 )
 
-# Instantiate OIDC resources component for mit-learn domain
+# Instantiate OIDC resources component for learn-ai's own legacy host.
+#
+# This one deliberately sets no cookie domain: the legacy host is not under
+# learn.mit.edu, so a Domain=.learn.mit.edu cookie would be rejected there
+# outright.  A host-only cookie is correct for it -- there is no mit-learn
+# session on that host to share.  The routes served from mit-learn's own host
+# use the separate resource below.
 learn_ai_oidc_resources = OLApisixOIDCResources(
     f"learn-ai-{stack_info.env_suffix}-oidc-resources",
     oidc_config=OLApisixOIDCConfig(
         application_name="learn-ai",
         k8s_labels=k8s_global_labels,
         k8s_namespace=learn_ai_namespace,
-        oidc_scope="openid profile email",  # Default scope from component
+        # Narrower than the component default, which adds organization:*.  Safe
+        # on this host: its session is not shared with mit-learn, and learn-ai's
+        # own APISIX_USERDATA_MAP reads no organization claim.
+        oidc_scope="openid profile email",
         oidc_introspection_endpoint_auth_method="client_secret_basic",  # Default
         oidc_logout_path="/logout",
         oidc_post_logout_redirect_uri="/",
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
-        # The /ai/* routes below are served from mit-learn's own host
-        # (api.<env>.learn.mit.edu) and their unauth_action="pass" plugins
-        # recognize the session mit-learn's login flow set, which is only
-        # possible while both name the cookie identically -- so this must
-        # track mit_learn/__main__.py's oidc_session_cookie_name.
-        oidc_session_cookie_name=mit_learn_session_cookie_name(
+        # Its own name, not the shared MIT Learn one: this host is not under
+        # learn.mit.edu, so no mit-learn cookie is ever sent here and there is no
+        # session to share -- naming it after mit-learn would only mislead
+        # whoever next reads a Cookie header from this host.  The resource below
+        # is the one that actually participates in the shared MIT Learn session.
+        oidc_session_cookie_name=apisix_oidc_session_cookie_name(
+            "learn-ai",
             stack_info.env_suffix,
         ),
         oidc_use_session_secret=True,
@@ -946,6 +977,59 @@ learn_ai_oidc_resources = OLApisixOIDCResources(
 
 learn_ai_api_domain = learn_ai_config.require("backend_domain")  # Legacy domain
 learn_api_domain = learn_ai_config.require("learn_backend_domain")  # New domain
+
+# Instantiate a second OIDC resource for the /ai/* routes served from mit-learn's
+# own host (api.<env>.learn.mit.edu).
+#
+# Identical to the legacy-host resource above apart from the cookie domain,
+# which is why it has to be a separate resource rather than one shared config:
+# the domain lives on the plugin config, and a single config cannot be both
+# host-only on api-learn-ai.ol.mit.edu and domain-scoped on
+# api.<env>.learn.mit.edu.  ol_analytics_api/__main__.py splits its own
+# .ol.mit.edu and .learn.mit.edu hosts into "<app>" and "<app>-learn" resources
+# for the same reason.
+#
+# The domain is what matters here.  These routes' unauth_action="pass" plugins
+# recognize the session mit-learn's login flow set, which requires the cookie
+# name to match -- but the "reqauth" route below performs a real login
+# (unauth_action="auth" on /ai/http/login/, which the learn-ai frontend uses as
+# its log-in link).  Without a matching domain that login writes a *host-only*
+# cookie on api.<env>.learn.mit.edu under the shared name: a second, separate
+# entry in the browser's jar that shadows mit-learn's .learn.mit.edu cookie,
+# since a cookie's identity includes whether it is host-only.  Both are then
+# sent on every request and the gateway reads whichever comes first, so an OIDC
+# callback can be handed a session envelope with no state for the flow in
+# progress.  With the domain set, all of them read and write the one shared
+# cookie.
+learn_ai_mit_learn_oidc_resources = OLApisixOIDCResources(
+    f"learn-ai-mit-learn-{stack_info.env_suffix}-oidc-resources",
+    oidc_config=OLApisixOIDCConfig(
+        application_name="learn-ai-mit-learn",
+        k8s_labels=k8s_global_labels,
+        k8s_namespace=learn_ai_namespace,
+        # No oidc_scope override, unlike the legacy-host resource above: the
+        # "reqauth" route below writes the shared session, so it has to request
+        # the same claims mit-learn's own login does.  The component default
+        # adds organization:*, which mit-learn maps to users.User.organizations
+        # via APISIX_USERDATA_MAP and reads to decide whether to skip onboarding.
+        oidc_introspection_endpoint_auth_method="client_secret_basic",  # Default
+        oidc_logout_path="/logout",
+        oidc_post_logout_redirect_uri="/",
+        oidc_session_idling_timeout=0,
+        oidc_session_rolling_timeout=0,
+        oidc_session_cookie_domain=learn_api_domain.removeprefix("api"),
+        # Must track mit_learn/__main__.py's oidc_session_cookie_name exactly.
+        oidc_session_cookie_name=mit_learn_session_cookie_name(
+            stack_info.env_suffix,
+        ),
+        oidc_use_session_secret=True,
+        vault_mount="secret-operations",
+        vault_mount_type="kv-v1",
+        vault_path="sso/mitlearn",  # Use mitlearn SSO config
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(delete_before_replace=True, parent=vault_k8s_resources),
+)
 
 # ApisixUpstream resources don't seem to work but we don't really need them?
 # Ref: https://github.com/apache/apisix-ingress-controller/issues/1655
@@ -999,7 +1083,9 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
                 proxy_rewrite_plugin,
                 # Use helper from OIDC component instance
                 OLApisixPluginConfig(
-                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("pass")
+                    **learn_ai_mit_learn_oidc_resources.get_full_oidc_plugin_config(
+                        "pass"
+                    )
                 ),
             ],
             hosts=[learn_api_domain],
@@ -1035,7 +1121,9 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
             plugins=[
                 proxy_rewrite_plugin,
                 OLApisixPluginConfig(
-                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("auth")
+                    **learn_ai_mit_learn_oidc_resources.get_full_oidc_plugin_config(
+                        "auth"
+                    )
                 ),
             ],
             hosts=[learn_api_domain],
@@ -1059,7 +1147,9 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
             plugins=[
                 proxy_rewrite_plugin,
                 OLApisixPluginConfig(
-                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("pass")
+                    **learn_ai_mit_learn_oidc_resources.get_full_oidc_plugin_config(
+                        "pass"
+                    )
                 ),
             ],
             hosts=[learn_api_domain],
@@ -1073,7 +1163,7 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
     ],
     opts=ResourceOptions(
         delete_before_replace=True,
-        depends_on=[learn_ai_app_k8s, learn_ai_oidc_resources],
+        depends_on=[learn_ai_app_k8s, learn_ai_mit_learn_oidc_resources],
     ),
 )
 
