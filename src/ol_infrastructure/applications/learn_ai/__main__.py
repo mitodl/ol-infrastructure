@@ -20,7 +20,11 @@ from pulumi import (
 )
 from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
 
-from bridge.lib.constants import FASTLY_A_TLS_1_3, mit_learn_session_cookie_name
+from bridge.lib.constants import (
+    FASTLY_A_TLS_1_3,
+    apisix_oidc_session_cookie_name,
+    mit_learn_session_cookie_name,
+)
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_REDIS_PORT,
@@ -40,6 +44,7 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    stale_session_cookie_cleanup_plugin,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -910,6 +915,22 @@ learn_ai_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=learn_ai_namespace,
         k8s_labels=k8s_global_labels,
         enable_defaults=True,
+        plugins=[
+            # Both of learn-ai's OIDC resources have now moved off
+            # lua-resty-session's default "session" name, so every current user
+            # has a dead one of those in their browser: on the legacy host from
+            # this file's own rename, and on api.<env>.learn.mit.edu from the
+            # rename in #5219.  Nothing else evicts them -- #5219 attached no
+            # cleanup to learn-ai, and mit-learn's cleanup only fires on
+            # responses from mit-learn's own routes, not from /ai/*.
+            #
+            # No cookie_domains: this config is referenced from both hosts, and a
+            # Domain=.learn.mit.edu deletion emitted from api-learn-ai.ol.mit.edu
+            # would just be rejected by the browser.  Host-only is also the only
+            # scope learn-ai ever wrote a "session" cookie at, on either host.
+            # Safe to delete once the old cookies have aged out of circulation.
+            stale_session_cookie_cleanup_plugin(),
+        ],
     ),
     opts=ResourceOptions(delete_before_replace=True),
 )
@@ -933,10 +954,13 @@ learn_ai_oidc_resources = OLApisixOIDCResources(
         oidc_post_logout_redirect_uri="/",
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
-        # Shares the mit-learn cookie name so that both resources read and write
-        # the same name -- see the resource below, which is the one that
-        # actually participates in the shared MIT Learn session.
-        oidc_session_cookie_name=mit_learn_session_cookie_name(
+        # Its own name, not the shared MIT Learn one: this host is not under
+        # learn.mit.edu, so no mit-learn cookie is ever sent here and there is no
+        # session to share -- naming it after mit-learn would only mislead
+        # whoever next reads a Cookie header from this host.  The resource below
+        # is the one that actually participates in the shared MIT Learn session.
+        oidc_session_cookie_name=apisix_oidc_session_cookie_name(
+            "learn-ai",
             stack_info.env_suffix,
         ),
         oidc_use_session_secret=True,
