@@ -399,6 +399,13 @@ def create(
                     'sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{cluster=~".*-(ci|qa)"}) >= sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{cluster=~".*-(ci|qa)"}) and sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{cluster=~".*-(ci|qa)"}) != sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_min_replicas{cluster=~".*-(ci|qa)"})'
                 ),
             ),
+            # Also excludes the mitxonline hubspot-sync celery worker HPA:
+            # a scheduled certificate-generation task enqueues ~20k contact
+            # sync tasks every 6 hours, and the worker legitimately sits at
+            # max replicas for ~20 minutes while draining, throughput-capped
+            # by the HubSpot API rate limiter rather than replica count.
+            # Remove the exclusion once the producer stops enqueueing no-op
+            # syncs: https://github.com/mitodl/hq/issues/12701
             alerting.RuleGroupRuleArgs(
                 name="HPAAtMaxReplicasCritical",
                 condition="C",
@@ -409,7 +416,7 @@ def create(
                     "description": "HPA {{ $labels.horizontalpodautoscaler }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been at its maximum replica count for 15 minutes. The workload may be unable to scale further under load."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{cluster=~".*-(production)"}) >= sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{cluster=~".*-(production)"}) and sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{cluster=~".*-(production)"}) != sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_min_replicas{cluster=~".*-(production)"})'
+                    'sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{cluster=~".*-(production)", horizontalpodautoscaler!="keda-hpa-mitxonline-hubspot-sync-celery-worker"}) >= sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{cluster=~".*-(production)"}) and sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{cluster=~".*-(production)"}) != sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_min_replicas{cluster=~".*-(production)"})'
                 ),
             ),
         ],
