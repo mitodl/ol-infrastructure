@@ -17,7 +17,7 @@ from pathlib import Path
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions
-from pulumi_aws import ec2
+from pulumi_aws import ec2, get_caller_identity
 from pulumi_kubernetes import batch, core, meta
 from pulumi_kubernetes.apps import v1 as apps_v1
 
@@ -73,6 +73,7 @@ stack_info = parse_stack()
 setup_vault_provider(stack_info)
 gwarek_config = Config("gwarek")
 redis_config = Config("redis")
+aws_account = get_caller_identity()
 
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 vault_stack = make_stack_reference(
@@ -318,17 +319,29 @@ gwarek_iam_policy_document = {
         {
             # LLM_BACKEND=bedrock (api/src/pipeline/analyzers/llm.py) uses
             # IAM/IRSA auth instead of a static ANTHROPIC_API_KEY. Scoped to
-            # Anthropic foundation models only, not a specific model ID, so
-            # bumping the app's configured model doesn't require an infra
-            # change too.
+            # Anthropic foundation models/inference profiles only, not a
+            # specific model ID, so bumping the app's configured model
+            # doesn't require an infra change too.
+            #
+            # Claude Sonnet 5 (and other newer models) can't be invoked by
+            # bare foundation-model ID on on-demand throughput -- Bedrock
+            # requires a cross-Region inference profile ID/ARN instead
+            # (BEDROCK_MODEL_ID=us.anthropic.claude-sonnet-5). Per AWS's own
+            # docs, granting an inference-profile resource ARN additionally
+            # requires granting the underlying foundation-model ARN in
+            # *every* Region the profile can route to -- a region wildcard
+            # covers that without hardcoding the profile's current
+            # us-east-1/us-east-2/us-west-2 destination list, which AWS can
+            # change.
             "Effect": "Allow",
             "Action": [
                 "bedrock:InvokeModel",
                 "bedrock:InvokeModelWithResponseStream",
             ],
-            "Resource": (
-                f"arn:aws:bedrock:{aws_config.region}::foundation-model/anthropic.*"
-            ),
+            "Resource": [
+                "arn:aws:bedrock:*::foundation-model/anthropic.*",
+                f"arn:aws:bedrock:*:{aws_account.account_id}:inference-profile/*anthropic*",
+            ],
         },
     ],
 }
@@ -349,9 +362,11 @@ gwarek_auth_binding = OLEKSAuthBinding(
         vault_sync_service_account_names=["gwarek-vault"],
         k8s_labels=k8s_global_labels,
         # Parliament's RESOURCE_MISMATCH flags bedrock:InvokeModel* for not
-        # also covering inference-profile/custom-model-deployment/etc. ARN
-        # types -- those don't apply here, we only ever invoke a
-        # foundation-model directly. An ignore_locations/actions filter
+        # also covering every ARN type the action supports (e.g.
+        # custom-model-deployment, provisioned-model) -- those don't apply
+        # here; foundation-model and inference-profile are the only two
+        # actually invoked (see gwarek_iam_policy_document above). An
+        # ignore_locations/actions filter
         # would be more surgical, but _is_parliament_finding_filtered
         # (lib/aws/iam_helper.py) indexes finding.location["actions"]
         # unconditionally, and RESOURCE_MISMATCH findings don't carry that
@@ -598,7 +613,7 @@ gwarek_common_env = [
     # ANTHROPIC_API_KEY needed in production.
     core.v1.EnvVarArgs(name="LLM_BACKEND", value="bedrock"),
     core.v1.EnvVarArgs(name="BEDROCK_REGION", value=aws_config.region),
-    core.v1.EnvVarArgs(name="BEDROCK_MODEL_ID", value="anthropic.claude-sonnet-5"),
+    core.v1.EnvVarArgs(name="BEDROCK_MODEL_ID", value="us.anthropic.claude-sonnet-5"),
     core.v1.EnvVarArgs(name="STORAGE_BACKEND", value="s3"),
     core.v1.EnvVarArgs(name="STORAGE_BUCKET", value=gwarek_storage_bucket_name),
     core.v1.EnvVarArgs(name="STORAGE_PREFIX", value="analyzed/"),
