@@ -83,25 +83,46 @@ class PullRequest:
     merged_at: str | None
 
 
+class GhNotFoundError(Exception):
+    """The requested GitHub ref/resource doesn't exist (HTTP 404)."""
+
+
 def _gh_json(*args: str) -> Any:
+    """Run `gh <args>` and parse its stdout as JSON.
+
+    Raises GhNotFoundError specifically for an HTTP 404 (e.g. a branch that
+    doesn't exist for a given app's pipeline shape), so callers can treat
+    that one expected case differently from a genuine failure (auth, rate
+    limit, network) -- which raises a plain RuntimeError and is left to
+    surface loudly rather than being silently swallowed the same way, which
+    would otherwise misreport a stage as "not applicable" instead of "GitHub
+    was unreachable".
+    """
     result = subprocess.run(  # noqa: S603
         ["gh", *args],  # noqa: S607
         capture_output=True,
         text=True,
-        check=True,
+        check=False,
     )
+    if result.returncode != 0:
+        if "HTTP 404" in result.stderr:
+            raise GhNotFoundError(result.stderr.strip())
+        msg = f"gh {' '.join(args)} failed: {result.stderr.strip()}"
+        raise RuntimeError(msg)
     return json.loads(result.stdout)
 
 
 def _compare_status(owner: str, repo: str, base: str, head: str) -> str | None:
     """Return the compare status of `head` relative to `base`.
 
-    Returns None if either ref can't be resolved (e.g. a branch that doesn't
-    exist for this app's pipeline shape), rather than raising.
+    Returns None only when `head` doesn't resolve to a ref (HTTP 404) -- e.g.
+    a release-candidate branch that a release-resource-workflow app never
+    had. Any other failure raises (see _gh_json) instead of being treated
+    the same way.
     """
     try:
         data = _gh_json("api", f"repos/{owner}/{repo}/compare/{base}...{head}")
-    except subprocess.CalledProcessError:
+    except GhNotFoundError:
         return None
     return data["status"]
 
@@ -263,7 +284,7 @@ def _matching_deployments(owner: str, repo: str, commit: str) -> list[dict[str, 
             deployments = _gh_json(
                 "api", f"repos/{owner}/{repo}/deployments?environment={env}&per_page=1"
             )
-        except subprocess.CalledProcessError:
+        except GhNotFoundError:
             continue
         if not deployments:
             continue
