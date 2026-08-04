@@ -11,6 +11,7 @@ An **Architecture Decision** (AD) is a software design choice that addresses a s
 An **Architecture Decision Log** (ADL) is the collection of all ADRs created and maintained for a particular project (or organization).
 
 **Key characteristics:**
+
 - Documents the "why" behind important decisions
 - Captures context at the time of decision
 - Records consequences (both positive and negative)
@@ -22,6 +23,7 @@ An **Architecture Decision Log** (ADL) is the collection of all ADRs created and
 Create an ADR when making decisions that:
 
 ### Infrastructure & Architecture
+
 - ✅ Change fundamental infrastructure patterns (e.g., ingress controller migration)
 - ✅ Introduce new core technologies or platforms
 - ✅ Modify deployment strategies or CI/CD patterns
@@ -30,18 +32,21 @@ Create an ADR when making decisions that:
 - ✅ Impact multiple applications or teams
 
 ### Complexity & Risk
+
 - ✅ Have significant complexity or risk
 - ✅ Require substantial effort (>8 hours) to implement or reverse
 - ✅ Affect system reliability, performance, or scalability
 - ✅ Create technical debt or constraints for future decisions
 
 ### Team & Organizational
+
 - ✅ Need buy-in from multiple stakeholders
 - ✅ Will affect future developers' understanding
 - ✅ Set precedents for future similar decisions
 - ✅ Resolve disagreements or debates within the team
 
 ### Cost & Resources
+
 - ✅ Have significant financial implications
 - ✅ Require resource allocation (time, budget, tooling)
 
@@ -114,16 +119,19 @@ NNNN-title-with-dashes.md
 ```
 
 Examples:
+
 - `0001-use-pulumi-for-infrastructure.md`
 - `0002-migrate-to-gateway-api-httproute.md`
 - `0003-adopt-eks-for-container-orchestration.md`
 
 **Numbering:**
+
 - Start at `0001`
 - Use 4-digit zero-padded numbers
 - Numbers are permanent (don't renumber when superseding)
 
 **Titles:**
+
 - Use lowercase with dashes
 - Be concise but descriptive
 - Start with a verb (use, adopt, migrate, implement, etc.)
@@ -167,6 +175,8 @@ graph LR
 | [0007](0007-clickhouse-llmops-multi-tenant.md) | Multi-Tenant ClickHouse Cluster for LLMOps on Data EKS | Accepted | 2026-02-25 |
 | [0008](0008-concourse-spot-worker-graceful-drain-no-ephemeral.md) | Concourse Spot Worker Graceful Drain Without Ephemeral Mode | Accepted | 2026-04-08 |
 | [0009](0009-deploy-witan-as-shared-multi-tenant-mcp-service.md) | Deploy witan as a Shared, Multi-Tenant MCP Service | Accepted | 2026-07-07 |
+| [0010](0010-pingdom-checks-unmanaged-in-pulumi-state.md) | Pingdom Checks Unmanaged in Pulumi State | Proposed | 2026-07-20 |
+| [0011](0011-executable-offboarding-script-over-runbook.md) | Executable Offboarding Script Over a Prose Runbook | Proposed | 2026-08-04 |
 
 ## Creating a New ADR
 
@@ -253,12 +263,14 @@ When AI agents make architectural decisions:
 ## Reviewing Old ADRs
 
 **Monthly ADR Review** (recommended):
+
 - Review recent ADRs (last 1-3 months)
 - Compare predictions vs reality
 - Document learnings in ADR comments or new ADRs
 - Update status if needed (Accepted → Deprecated)
 
 **Annual ADR Audit**:
+
 - Review all active ADRs
 - Identify deprecated or superseded decisions
 - Archive or update ADRs as needed
@@ -269,6 +281,7 @@ When AI agents make architectural decisions:
 ### Pulumi Changes
 
 When making Pulumi infrastructure changes:
+
 1. Small changes (< 2 hours) - No ADR needed
 2. Medium changes (2-8 hours) - Consider ADR for reusable patterns
 3. Large changes (> 8 hours) - ADR required
@@ -276,6 +289,7 @@ When making Pulumi infrastructure changes:
 ### Multi-Stack Changes
 
 When changes affect multiple Pulumi stacks:
+
 - Always create an ADR
 - Document migration strategy
 - Link to planning docs (like `gateway-api-migration-plan.md`)
@@ -283,6 +297,7 @@ When changes affect multiple Pulumi stacks:
 ### Breaking Changes
 
 Any breaking change requires an ADR documenting:
+
 - What is breaking
 - Why the break is necessary
 - Migration path for affected users
@@ -305,6 +320,7 @@ Any breaking change requires an ADR documenting:
 ## Questions?
 
 If you're unsure whether something needs an ADR:
+
 1. Ask yourself: "Will this decision matter in 6 months?"
 2. Consult with the platform team
 3. When in doubt, write it out - better to have too many than too few
