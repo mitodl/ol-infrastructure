@@ -1,0 +1,19 @@
+# Pulumi's `awskms://` secrets provider stores ciphertext in stack files by design:
+# `encryptedkey` is a KMS-wrapped data encryption key and `secure` values are the
+# config entries it protects. Both are inert without `kms:Decrypt` on the alias named
+# in `secretsprovider`, so they are not credentials and cannot be rotated by editing
+# source. Their high entropy otherwise trips the generic-api-key heuristic on all ~300
+# stack files. This mirrors the identical exclusion already applied to detect-secrets
+# in .pre-commit-config.yaml.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Pulumi KMS/SOPS ciphertext committed by design"
+regexTarget = "line"
+regexes = [
+  '''^\s*encryptedkey:\s''',
+  '''^\s*secure:\s''',
+  '''^\s*secretsprovider:\s''',
+]
