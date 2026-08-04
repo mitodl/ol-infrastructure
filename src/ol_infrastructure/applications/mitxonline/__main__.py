@@ -558,9 +558,11 @@ mitxonline_granian_workers_max_rss = (
 # it should react to.
 #
 # The route matcher aggregates every webapp route (direct + prefixed, passauth /
-# reqauth / cart) so total traffic drives scaling rather than a single route. Verified
-# against live metrics -- `count by (route) (apisix_http_status)` returns
-# mitxonline_mitxonline-apisix-route-{direct,prefixed}-production_{passauth,reqauth,cart}.
+# reqauth / checkout-anonymous) so total traffic drives scaling rather than a single
+# route. Verified against live metrics -- `count by (route) (apisix_http_status)`
+# returns mitxonline_mitxonline-apisix-route-{direct,prefixed}-production_{passauth,
+# reqauth,checkout-anonymous}. (The direct group's auth gate was renamed from "cart"
+# to "checkout-anonymous"; the ".*" matcher already covered it either way.)
 webapp_trigger_auth, webapp_trigger_auth_name = create_webapp_prometheus_trigger_auth(
     application_name="mitxonline",
     env_name=env_name,
@@ -852,14 +854,25 @@ mitxonline_apisix_route_direct = OLApisixRoute(
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
             backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
         ),
+        # Login gate for the reordered ("anonymous first") checkout flow, and the
+        # successor to the former "cart" route. A learner who built a basket
+        # while logged out now browses /cart anonymously -- with the cart auth
+        # gate gone, /cart falls through to the passauth route above, which
+        # serves the anonymous basket. When they proceed to checkout they land
+        # here, where unauth_action="auth" forces the OIDC login that
+        # establishes the MITx Online session, after which the anonymous basket
+        # is claimed and checkout proceeds. Mirrors mitxonline's own gateway,
+        # which renamed its app-cart route to app-checkout-anonymous and swapped
+        # /cart for /checkout/anonymous for exactly this reason. Same direct
+        # (MITx Online) session and default per-host /.apisix/redirect callback
+        # as the old cart route.
         OLApisixRouteConfig(
-            route_name="cart",
+            route_name="checkout-anonymous",
             priority=20,
             hosts=[api_domain, frontend_domain],
             paths=[
-                "/cart/",
-                "/cart",
-                "/cart/*",
+                "/checkout/anonymous",
+                "/checkout/anonymous/",
             ],
             plugins=[
                 mitxonline_direct_oidc.get_full_oidc_plugin_config(
