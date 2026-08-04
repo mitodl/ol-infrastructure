@@ -132,7 +132,11 @@ config:
         memory_request: "2Gi"
         memory_limit: "3Gi"
       cms:
-        cpu_request: "250m"
+        # Studio operations (course publish/import, outline rebuilds) burst to
+        # ~0.65 cores per pod at only 1-9 req/s. The KEDA CPU trigger scales on
+        # utilization relative to this request, so an undersized request pins
+        # the webapp at max replicas during routine authoring activity.
+        cpu_request: "500m"
         memory_request: "2Gi"
         memory_limit: "4Gi"
     celery:
