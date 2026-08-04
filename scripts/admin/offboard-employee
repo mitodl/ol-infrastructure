@@ -31,6 +31,7 @@ from typing import Annotated, Any, Literal, Protocol
 import boto3
 import cyclopts
 import httpx
+import yaml
 from botocore.exceptions import (
     BotoCoreError,
     ClientError,
@@ -45,6 +46,11 @@ DEFAULT_KEYCLOAK_REALM = "ol-platform-engineering"
 DEFAULT_KEYCLOAK_AUTH_REALM = "master"
 DEFAULT_KEYCLOAK_USERNAME = "admin"
 ROOTLY_API_URL = "https://api.rootly.com"
+
+KEYCLOAK_STACK_DIR = "src/ol_infrastructure/substructure/keycloak"
+GRAFANA_WEB_ORIGINS_KEY = "keycloak_realm:ol-platform-engineering-grafana-web-origins"
+MONGODB_ATLAS_STACK_DIR = "src/ol_infrastructure/infrastructure/mongodb_atlas"
+MONGODB_ATLAS_ORG_KEY = "mongodb_atlas:organization_id"
 
 SERVICE_ORDER = {
     "keycloak": 10,
@@ -118,9 +124,9 @@ class CodeChange:
 class HumanAction:
     """A manual UI action that cannot be safely automated here."""
 
-    console_url: str
     owning_team: str
     instruction: str
+    console_url: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -969,47 +975,12 @@ class ManualTailProvider:
 
     name = "human"
 
+    def __init__(self, *, repo_root: Path):
+        """Initialize with the repository root used to derive console URLs."""
+        self.repo_root = repo_root
+
     def discover(self, identity: Identity) -> list[Finding]:
         """Return the residual manual access-review checklist."""
-        manual_actions = [
-            (
-                "github",
-                "https://github.com/orgs/mitodl/people",
-                "Platform Engineering",
-                (
-                    "Remove GitHub org/team and outside-collaborator memberships; this "
-                    "also removes the independent GitHub-auth path to Concourse's main "
-                    "team. Transfer sole-admin repositories and verify automation does "
-                    "not depend on a personal token before revoking authorizations."
-                ),
-            ),
-            (
-                "sentry",
-                "https://mit-office-of-digital-learning.sentry.io/settings/members/",
-                "Platform Engineering",
-                (
-                    "Remove Sentry organization membership if present and review audit "
-                    "logs for personal tokens or integrations that org admins cannot "
-                    "enumerate or revoke through the API."
-                ),
-            ),
-            (
-                "grafana-cloud",
-                "https://mitodl.grafana.net/",
-                "Platform Engineering",
-                (
-                    "Keycloak disable handles group-synced Grafana access. Remove any "
-                    "direct Grafana Cloud or portal membership and review attributable "
-                    "service accounts/API keys without deleting shared automation."
-                ),
-            ),
-            (
-                "password-manager-and-saas",
-                "https://github.mit.edu/ol-engineering/runbooks",
-                "Platform Engineering",
-                "Remove password manager vault access and any remaining privileged SaaS seats.",
-            ),
-        ]
         return [
             Finding(
                 service=self.name,
@@ -1020,12 +991,125 @@ class ManualTailProvider:
                 outcome=FindingOutcome.NEEDS_HUMAN,
                 human_action=HumanAction(
                     console_url=console_url,
-                    owning_team=owning_team,
+                    owning_team="Platform Engineering",
                     instruction=instruction,
                 ),
             )
-            for target, console_url, owning_team, instruction in manual_actions
+            for target, console_url, instruction in self._manual_actions()
         ]
+
+    def _manual_actions(self) -> list[tuple[str, str | None, str]]:
+        """Build the checklist, deriving console URLs from repository configuration."""
+        actions: list[tuple[str, str | None, str]] = [
+            (
+                "github",
+                "https://github.com/orgs/mitodl/people",
+                (
+                    "Remove GitHub org/team and outside-collaborator memberships; this "
+                    "also removes the independent GitHub-auth path to Concourse's main "
+                    "team. Transfer sole-admin repositories and verify automation does "
+                    "not depend on a personal token before revoking authorizations."
+                ),
+            ),
+            (
+                "sentry",
+                "https://mit-office-of-digital-learning.sentry.io/settings/members/",
+                (
+                    "Remove Sentry organization membership if present and review audit "
+                    "logs for personal tokens or integrations that org admins cannot "
+                    "enumerate or revoke through the API."
+                ),
+            ),
+        ]
+        actions.extend(
+            (
+                f"grafana:{host.removeprefix('https://').removesuffix('.grafana.net')}",
+                f"{host}/admin/users",
+                (
+                    f"Keycloak disable handles group-synced access to {host}. Remove any "
+                    "remaining local Grafana user, then review attributable service "
+                    "accounts and API keys without deleting shared automation. Grafana "
+                    "Cloud portal membership is managed separately from the stack and "
+                    "must be checked there too."
+                ),
+            )
+            for host in self._grafana_stack_urls()
+        )
+        actions.extend(
+            [
+                (
+                    "fastly",
+                    "https://manage.fastly.com/account/users",
+                    (
+                        "Remove the Fastly account user and review personal API tokens; "
+                        "tokens owned by a departing user break purges and TLS changes "
+                        "when the account is deleted."
+                    ),
+                ),
+                (
+                    "heroku",
+                    "https://dashboard.heroku.com/teams",
+                    (
+                        "Remove team membership and collaborator access on any remaining "
+                        "Heroku app, and confirm no pipeline depends on a personal API key."
+                    ),
+                ),
+                (
+                    "mongodb-atlas",
+                    self._mongodb_atlas_console_url(),
+                    (
+                        "Remove the Atlas organization user, then check project-level "
+                        "database users and API keys, which are not removed with the seat."
+                    ),
+                ),
+                (
+                    "qdrant-cloud",
+                    "https://cloud.qdrant.io/",
+                    "Remove Qdrant Cloud account access and review cluster API keys.",
+                ),
+                (
+                    "mailgun",
+                    "https://app.mailgun.com/",
+                    "Remove the Mailgun account user and review sending/API keys.",
+                ),
+                (
+                    "password-manager",
+                    None,
+                    (
+                        "Revoke the departing employee's credential store access and "
+                        "rotate any shared secret they could read. The vendor and console "
+                        "are not declared in this repository, so no URL can be derived; "
+                        "confirm the current tool with Platform Engineering."
+                    ),
+                ),
+            ]
+        )
+        return actions
+
+    def _grafana_stack_urls(self) -> tuple[str, ...]:
+        """Derive Grafana stack hosts from the Keycloak client's allowed web origins."""
+        origins: set[str] = set()
+        for config in (self.repo_root / KEYCLOAK_STACK_DIR).glob("Pulumi.*.yaml"):
+            values = pulumi_stack_config(config)
+            web_origins = values.get(GRAFANA_WEB_ORIGINS_KEY) or []
+            if isinstance(web_origins, str):
+                web_origins = [web_origins]
+            origins.update(
+                str(origin).rstrip("/")
+                for origin in web_origins
+                if str(origin).startswith("http")
+            )
+        return tuple(sorted(origins))
+
+    def _mongodb_atlas_console_url(self) -> str | None:
+        """Derive the Atlas organization user page from Pulumi stack configuration."""
+        for config in sorted(
+            (self.repo_root / MONGODB_ATLAS_STACK_DIR).glob("Pulumi.*.yaml")
+        ):
+            org_id = pulumi_stack_config(config).get(MONGODB_ATLAS_ORG_KEY)
+            if org_id:
+                return f"https://cloud.mongodb.com/v2#/org/{org_id}/access/users"
+        return "https://cloud.mongodb.com/"
 
     def revoke(self, finding: Finding, *, execute: bool) -> ActionRecord:
         """Report residual manual actions without mutating any service."""
@@ -1122,6 +1206,18 @@ def error_record(finding: Finding, reason: str, *, execute: bool) -> ActionRecor
         message=reason,
         preserve_followup=True,
     )
+
+
+def pulumi_stack_config(path: Path) -> dict[str, Any]:
+    """Return the ``config`` mapping of a Pulumi stack file, or empty on failure."""
+    try:
+        document = yaml.safe_load(path.read_text())
+    except (OSError, yaml.YAMLError):
+        return {}
+    if not isinstance(document, dict):
+        return {}
+    config = document.get("config")
+    return config if isinstance(config, dict) else {}
 
 
 def pulumi_stack_targets(repo_root: Path, stack_dirs: Sequence[str]) -> tuple[str, ...]:
@@ -1451,7 +1547,7 @@ def build_providers(
         ),
         RootlyProvider(repo_root=repo_root, token=rootly_token),
         RepoCodeProvider(repo_root=repo_root),
-        ManualTailProvider(),
+        ManualTailProvider(repo_root=repo_root),
     ]
 
 
@@ -1633,7 +1729,8 @@ def records_to_text(records: Sequence[ActionRecord], *, execute: bool) -> str:
                 lines.append(f"  - stacks: {', '.join(record.code_change.stacks)}")
                 lines.append(f"  - instruction: {record.code_change.instruction}")
             if record.human_action is not None:
-                lines.append(f"  - console: {record.human_action.console_url}")
+                if record.human_action.console_url:
+                    lines.append(f"  - console: {record.human_action.console_url}")
                 lines.append(f"  - owner: {record.human_action.owning_team}")
                 lines.append(f"  - instruction: {record.human_action.instruction}")
         lines.append("")

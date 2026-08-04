@@ -99,7 +99,11 @@ tooling.
   a convention the tool must verify rather than trust.
 - Rootly numeric user IDs cannot be derived from an email offline; they require an API lookup.
 - Sentry, Grafana Cloud org membership, and password-manager/SaaS consoles have no
-  Pulumi-managed or in-repo human-access surface, so they are irreducibly manual.
+  Pulumi-managed or in-repo human-access surface, so they are irreducibly manual. Their console
+  URLs are still derived from stack configuration wherever the repository declares them — the
+  Grafana stack hosts from the Keycloak client's allowed web origins and the MongoDB Atlas
+  organization from `mongodb_atlas:organization_id` — so a manual step is still a clickable link
+  that cannot drift from the deployed stacks.
 
 ### Options Considered
 
@@ -176,7 +180,8 @@ which is the only way it stays true as `iam_helper.py` and the Rootly user IDs c
 | AWS IAM | ephemeral credentials only: access keys, console login profile, MFA devices | remove from the relevant `iam_helper.py` list + `pulumi up` on `aws/iam`, `aws/eks`, `aws/opensearch`, `concourse` | — |
 | Rootly | user deactivation, **if** the API supports it (open question below) | remove `user_id` from `saas/rootly/__main__.py` team membership and escalation positions + `pulumi up` | reassign open incidents |
 | GitHub org | — | — | org/team membership removal |
-| Sentry, Grafana Cloud org, password manager, other SaaS | — | — | console removal |
+| Sentry, Grafana stacks, Fastly, Heroku, MongoDB Atlas, Qdrant Cloud, Mailgun | — | — | console removal, each with a deep-linked console URL |
+| Password manager | — | — | console removal; vendor is not declared in this repo, so no URL is emitted |
 
 Note the AWS split is deliberate: the script revokes credentials (immediate, reversible,
 not Pulumi-managed) and reports group membership (Pulumi-managed). Note also that

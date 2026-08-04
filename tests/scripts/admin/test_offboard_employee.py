@@ -126,7 +126,10 @@ def test_missing_provider_credentials_are_skipped_without_aborting(
 ) -> None:
     """A missing service credential yields a skipped record and keeps going."""
     identity = offboard_module.Identity("user@example.com")
-    providers = [MissingProvider(offboard_module), offboard_module.ManualTailProvider()]
+    providers = [
+        MissingProvider(offboard_module),
+        offboard_module.ManualTailProvider(repo_root=offboard_module.REPO_ROOT),
+    ]
 
     records = offboard_module.collect_action_records(
         [identity], providers, execute=False
@@ -847,3 +850,72 @@ def test_confirmation_must_match_exactly(
 
     with pytest.raises(RuntimeError, match="aborting without mutations"):
         offboard_module.require_confirmation([])
+
+
+@pytest.mark.unit
+def test_manual_tail_derives_console_urls_from_stack_config(
+    offboard_module: Any, tmp_path: Path
+) -> None:
+    """Grafana and Atlas consoles come from stack config, not hardcoded hostnames."""
+    keycloak_dir = tmp_path / "src/ol_infrastructure/substructure/keycloak"
+    keycloak_dir.mkdir(parents=True)
+    (keycloak_dir / "Pulumi.Production.yaml").write_text(
+        "config:\n"
+        "  keycloak_realm:ol-platform-engineering-grafana-web-origins:"
+        ' ["https://example-prod.grafana.net"]\n'
+    )
+    atlas_dir = tmp_path / "src/ol_infrastructure/infrastructure/mongodb_atlas"
+    atlas_dir.mkdir(parents=True)
+    (atlas_dir / "Pulumi.mitx.Production.yaml").write_text(
+        "config:\n  mongodb_atlas:organization_id: abc123\n"
+    )
+
+    findings = offboard_module.ManualTailProvider(repo_root=tmp_path).discover(
+        offboard_module.Identity("user@example.com")
+    )
+    consoles = {
+        finding.target_id.split(":", 1)[0]: finding.human_action.console_url
+        for finding in findings
+    }
+
+    assert consoles["grafana"] == "https://example-prod.grafana.net/admin/users"
+    assert (
+        consoles["mongodb-atlas"]
+        == "https://cloud.mongodb.com/v2#/org/abc123/access/users"
+    )
+
+
+@pytest.mark.unit
+def test_manual_tail_console_urls_are_real_consoles(offboard_module: Any) -> None:
+    """No manual action may point the operator at a docs or runbook repository."""
+    findings = offboard_module.ManualTailProvider(
+        repo_root=offboard_module.REPO_ROOT
+    ).discover(offboard_module.Identity("user@example.com"))
+    consoles = [
+        finding.human_action.console_url
+        for finding in findings
+        if finding.human_action.console_url
+    ]
+
+    assert consoles
+    assert all(console.startswith("https://") for console in consoles)
+    assert not any(
+        "runbook" in console or "github.mit.edu" in console for console in consoles
+    )
+
+
+@pytest.mark.unit
+def test_manual_tail_omits_console_url_it_cannot_derive(offboard_module: Any) -> None:
+    """An undiscoverable vendor yields no link rather than a misleading one."""
+    findings = offboard_module.ManualTailProvider(
+        repo_root=offboard_module.REPO_ROOT
+    ).discover(offboard_module.Identity("user@example.com"))
+    password_manager = next(
+        finding
+        for finding in findings
+        if finding.target_id.startswith("password-manager:")
+    )
+    record = offboard_module.report_record(password_manager, execute=False)
+
+    assert password_manager.human_action.console_url is None
+    assert "console:" not in offboard_module.records_to_text([record], execute=False)
