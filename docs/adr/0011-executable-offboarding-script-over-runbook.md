@@ -76,7 +76,7 @@ tooling.
 - The ten-service Keycloak fan-out means the highest-value action is also the easiest to script,
   and is currently undocumented anywhere.
 - Vault's OIDC `readonly` and `developer` roles carry **no** `bound_claims` (only `admin` is
-  claim-gated at `substructure/vault/auth/__main__.py:165`), so any authenticated realm user can
+  claim-gated at `src/ol_infrastructure/substructure/vault/auth/__main__.py:165`), so any authenticated realm user can
   mint a Vault token. Combined with an 8-hour `token_ttl`, a Keycloak disable alone leaves a live
   Vault session valid for up to 8 more hours. Nothing in the repo records that gap today.
 

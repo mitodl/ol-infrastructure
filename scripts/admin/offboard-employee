@@ -1,0 +1,1630 @@
+#!/usr/bin/env python3
+"""Employee offboarding planner and API revocation tool.
+
+The command accepts one or more email addresses and produces an ordered
+containment plan. Dry-run is the default. Mutating API calls require
+``--execute`` and an explicit confirmation unless ``--yes`` is supplied.
+
+The implementation intentionally splits findings into three outcomes:
+
+* ``REVOKED_VIA_API``: safe immediate containment, such as disabling Keycloak
+  login or revoking ephemeral AWS IAM credentials.
+* ``NEEDS_CODE_CHANGE``: Pulumi-managed identity that must be removed from this
+  repository and applied with ``pulumi up``. These are never API-deleted here.
+* ``NEEDS_HUMAN``: residual consoles and ownership handoffs that still need an
+  operator in a UI.
+"""
+
+from __future__ import annotations
+
+import ast
+import json
+import os
+import subprocess
+import sys
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass, field
+from enum import StrEnum
+from pathlib import Path
+from typing import Annotated, Any, Literal, Protocol
+
+import boto3
+import cyclopts
+import httpx
+from botocore.exceptions import (
+    BotoCoreError,
+    ClientError,
+    NoCredentialsError,
+    ProfileNotFound,
+)
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+DEFAULT_KEYCLOAK_URL = "https://sso-qa.ol.mit.edu"
+DEFAULT_KEYCLOAK_REALM = "ol-platform-engineering"
+DEFAULT_KEYCLOAK_AUTH_REALM = "master"
+DEFAULT_KEYCLOAK_USERNAME = "admin"
+ROOTLY_API_URL = "https://api.rootly.com"
+
+SERVICE_ORDER = {
+    "keycloak": 10,
+    "vault": 20,
+    "aws": 30,
+    "rootly": 40,
+    "repo-code": 50,
+    "human": 60,
+}
+
+app = cyclopts.App(
+    help="Plan and optionally execute safe employee offboarding actions."
+)
+
+
+class FindingOutcome(StrEnum):
+    """The mutually-exclusive disposition for an offboarding finding."""
+
+    REVOKED_VIA_API = "REVOKED_VIA_API"
+    NEEDS_CODE_CHANGE = "NEEDS_CODE_CHANGE"
+    NEEDS_HUMAN = "NEEDS_HUMAN"
+
+
+class ActionStatus(StrEnum):
+    """Execution status recorded for a finding."""
+
+    WOULD_REVOKE = "would_revoke"
+    REVOKED = "revoked"
+    REPORTED = "reported"
+    SKIPPED = "skipped"
+    ERROR = "error"
+
+
+@dataclass(frozen=True, slots=True)
+class Identity:
+    """The input employee identity and derived service-specific keys."""
+
+    email: str
+
+    def __post_init__(self) -> None:
+        """Reject ambiguous inputs before any provider can act on them."""
+        localpart, separator, domain = self.email.partition("@")
+        if not separator or not localpart or not domain or "@" in domain:
+            msg = f"Invalid email address: {self.email!r}"
+            raise ValueError(msg)
+
+    @property
+    def aws_username(self) -> str:
+        """Return the conventional MIT Kerberos/AWS username for the email."""
+        return self.email.split("@", 1)[0]
+
+    @property
+    def is_mit_email(self) -> bool:
+        """Return whether the IAM username convention is valid for this identity."""
+        return self.email.rsplit("@", 1)[1].lower() == "mit.edu"
+
+
+@dataclass(frozen=True, slots=True)
+class CodeChange:
+    """A Pulumi-managed change that must be made in code."""
+
+    path: str
+    symbol: str
+    stacks: tuple[str, ...]
+    instruction: str
+    line: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class HumanAction:
+    """A manual UI action that cannot be safely automated here."""
+
+    console_url: str
+    owning_team: str
+    instruction: str
+
+
+@dataclass(frozen=True, slots=True)
+class Finding:
+    """A read-only service discovery result."""
+
+    service: str
+    identity: Identity
+    target_id: str
+    target_label: str
+    verb: str
+    outcome: FindingOutcome
+    scope: str = ""
+    request: dict[str, Any] = field(default_factory=dict)
+    code_change: CodeChange | None = None
+    human_action: HumanAction | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class ActionRecord:
+    """Structured audit record emitted for every provider action."""
+
+    service: str
+    identity: str
+    target_id: str
+    target_label: str
+    verb: str
+    scope: str
+    outcome: FindingOutcome | None
+    status: ActionStatus
+    execute: bool
+    request: dict[str, Any]
+    message: str
+    code_change: CodeChange | None = None
+    human_action: HumanAction | None = None
+
+
+class Provider(Protocol):
+    """A service-specific offboarding provider."""
+
+    name: str
+
+    def discover(self, identity: Identity) -> list[Finding]:
+        """Return read-only findings for an employee identity."""
+
+    def revoke(self, finding: Finding, *, execute: bool) -> ActionRecord:
+        """Revoke or report a finding, preserving dry-run/action shape."""
+
+
+class OffboardingError(RuntimeError):
+    """Raised when a provider fails in a way that should be reported and skipped."""
+
+
+class KeycloakProvider:
+    """Disable the Keycloak user that fans out to OIDC-backed services."""
+
+    name = "keycloak"
+
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        realm: str,
+        auth_realm: str,
+        username: str,
+        password: str | None,
+        client: httpx.Client | None = None,
+    ):
+        """Initialize the Keycloak Admin REST API client."""
+        self.base_url = base_url.rstrip("/")
+        self.realm = realm
+        self.auth_realm = auth_realm
+        self.username = username
+        self.password = password
+        self.client = client or httpx.Client(timeout=30)
+        self._token: str | None = None
+
+    def _token_headers(self) -> dict[str, str]:
+        if not self.password:
+            msg = "set OFFBOARD_KEYCLOAK_PASSWORD or pass --keycloak-password"
+            raise OffboardingError(msg)
+        if self._token is None:
+            response = self.client.post(
+                f"{self.base_url}/realms/{self.auth_realm}"
+                "/protocol/openid-connect/token",
+                data={
+                    "client_id": "admin-cli",
+                    "username": self.username,
+                    "password": self.password,
+                    "grant_type": "password",
+                },
+            )
+            response.raise_for_status()
+            self._token = str(response.json()["access_token"])
+        return {"Authorization": f"Bearer {self._token}"}
+
+    def discover(self, identity: Identity) -> list[Finding]:
+        """Find the Keycloak user whose email or username matches the identity."""
+        users_url = f"{self.base_url}/admin/realms/{self.realm}/users"
+        response = self.client.get(
+            users_url,
+            params={"email": identity.email, "exact": "true"},
+            headers=self._token_headers(),
+        )
+        response.raise_for_status()
+        users = [
+            user
+            for user in response.json()
+            if str(user.get("email", "")).lower() == identity.email.lower()
+            or str(user.get("username", "")).lower() == identity.email.lower()
+        ]
+        return [
+            Finding(
+                service=self.name,
+                identity=identity,
+                target_id=str(user["id"]),
+                target_label=str(user.get("username") or user.get("email")),
+                verb=(
+                    "disable user, terminate sessions, remove role mappings and "
+                    "federated identities"
+                ),
+                outcome=FindingOutcome.REVOKED_VIA_API,
+                scope=f"{self.base_url} realm={self.realm}",
+                request={
+                    "method": "PUT/POST/DELETE",
+                    "paths": [
+                        f"/admin/realms/{self.realm}/users/{user['id']}",
+                        f"/admin/realms/{self.realm}/users/{user['id']}/logout",
+                        f"/admin/realms/{self.realm}/users/{user['id']}/role-mappings",
+                        f"/admin/realms/{self.realm}/users/{user['id']}/federated-identity",
+                    ],
+                },
+                metadata={"enabled": user.get("enabled", True), "user": user},
+            )
+            for user in users
+        ]
+
+    def revoke(self, finding: Finding, *, execute: bool) -> ActionRecord:
+        """Disable the user and remove session/role/federation state."""
+        if not execute:
+            return api_record(finding, execute=False, status=ActionStatus.WOULD_REVOKE)
+        headers = self._token_headers()
+        user_url = (
+            f"{self.base_url}/admin/realms/{self.realm}/users/{finding.target_id}"
+        )
+        user_representation = dict(finding.metadata.get("user", {}))
+        if not user_representation:
+            msg = "Keycloak discovery did not preserve the user representation"
+            raise OffboardingError(msg)
+        user_representation["enabled"] = False
+        disable_response = self.client.put(
+            user_url, headers=headers, json=user_representation
+        )
+        disable_response.raise_for_status()
+        logout_url = f"{user_url}/logout"
+        logout_response = self.client.post(logout_url, headers=headers)
+        logout_response.raise_for_status()
+        self._drop_groups(user_url, headers)
+        self._drop_role_mappings(user_url, headers)
+        self._drop_consents(user_url, headers)
+        self._drop_federated_identities(user_url, headers)
+        return api_record(
+            finding,
+            execute=True,
+            status=ActionStatus.REVOKED,
+            message=(
+                "Disabled Keycloak user, terminated sessions, and removed groups, "
+                "role mappings, consents, offline grants, and federated identities."
+            ),
+        )
+
+    def _drop_groups(self, user_url: str, headers: dict[str, str]) -> None:
+        """Remove every direct group membership for the user."""
+        response = self.client.get(f"{user_url}/groups", headers=headers)
+        response.raise_for_status()
+        for group in response.json():
+            group_id = group.get("id")
+            if not group_id:
+                continue
+            delete_response = self.client.delete(
+                f"{user_url}/groups/{group_id}", headers=headers
+            )
+            delete_response.raise_for_status()
+
+    def _drop_role_mappings(self, user_url: str, headers: dict[str, str]) -> None:
+        response = self.client.get(f"{user_url}/role-mappings", headers=headers)
+        if response.status_code == 404:
+            return
+        response.raise_for_status()
+        payload = response.json()
+        realm_mappings = payload.get("realmMappings") or []
+        if realm_mappings:
+            delete_response = self.client.request(
+                "DELETE",
+                f"{user_url}/role-mappings/realm",
+                headers=headers,
+                json=realm_mappings,
+            )
+            delete_response.raise_for_status()
+        for mapping in (payload.get("clientMappings") or {}).values():
+            client_id = mapping.get("id")
+            client_role_mappings = mapping.get("mappings") or []
+            if not client_id or not client_role_mappings:
+                continue
+            delete_response = self.client.request(
+                "DELETE",
+                f"{user_url}/role-mappings/clients/{client_id}",
+                headers=headers,
+                json=client_role_mappings,
+            )
+            delete_response.raise_for_status()
+
+    def _drop_consents(self, user_url: str, headers: dict[str, str]) -> None:
+        """Revoke client consents, including offline-token grants."""
+        response = self.client.get(f"{user_url}/consents", headers=headers)
+        response.raise_for_status()
+        for consent in response.json():
+            client_id = consent.get("clientId")
+            if not client_id:
+                continue
+            delete_response = self.client.delete(
+                f"{user_url}/consents/{client_id}", headers=headers
+            )
+            delete_response.raise_for_status()
+
+    def _drop_federated_identities(
+        self, user_url: str, headers: dict[str, str]
+    ) -> None:
+        response = self.client.get(f"{user_url}/federated-identity", headers=headers)
+        if response.status_code == 404:
+            return
+        response.raise_for_status()
+        for identity in response.json():
+            provider = identity.get("identityProvider")
+            if not provider:
+                continue
+            delete_response = self.client.delete(
+                f"{user_url}/federated-identity/{provider}", headers=headers
+            )
+            delete_response.raise_for_status()
+
+
+class VaultProvider:
+    """Revoke live Vault tokens associated with the Keycloak OIDC entity."""
+
+    name = "vault"
+
+    def __init__(
+        self,
+        *,
+        address: str | None,
+        token: str | None,
+        client: httpx.Client | None = None,
+    ):
+        """Initialize the Vault API client used for OIDC token lookup."""
+        self.address = address.rstrip("/") if address else None
+        self.token = token
+        self.client = client or httpx.Client(timeout=30)
+
+    def _headers(self) -> dict[str, str]:
+        """Return Vault token authentication headers."""
+        if not self.token:
+            msg = "set VAULT_ADDR and VAULT_TOKEN to check live OIDC entity tokens"
+            raise OffboardingError(msg)
+        return {"X-Vault-Token": self.token}
+
+    def _address(self) -> str:
+        """Return the configured Vault address or raise a provider skip."""
+        if not self.address:
+            msg = "set VAULT_ADDR and VAULT_TOKEN to check live OIDC entity tokens"
+            raise OffboardingError(msg)
+        return self.address
+
+    def discover(self, identity: Identity) -> list[Finding]:
+        """Find live Vault token accessors tied to the Keycloak OIDC entity."""
+        address = self._address()
+        headers = self._headers()
+        entity_id = self._lookup_oidc_entity_id(identity, headers)
+        if entity_id is None:
+            return [vault_unresolved_identity_finding(identity, address)]
+        accessors = self._token_accessors(headers)
+        findings: list[Finding] = []
+        for accessor in accessors:
+            response = self.client.post(
+                f"{self.address}/v1/auth/token/lookup-accessor",
+                headers=headers,
+                json={"accessor": accessor},
+            )
+            if response.status_code in {400, 404}:
+                continue
+            if response.status_code == 403:
+                msg = (
+                    "Vault token cannot inspect all accessors; refusing to report "
+                    "discovery as complete"
+                )
+                raise OffboardingError(msg)
+            response.raise_for_status()
+            token_data = response.json().get("data", {})
+            if token_data.get("entity_id") != entity_id:
+                continue
+            findings.append(
+                Finding(
+                    service=self.name,
+                    identity=identity,
+                    target_id=accessor,
+                    target_label=f"Vault token accessor {accessor} for {identity.email}",
+                    verb="revoke live OIDC token accessor",
+                    outcome=FindingOutcome.REVOKED_VIA_API,
+                    scope=address,
+                    request={
+                        "method": "POST",
+                        "path": "/v1/auth/token/revoke-accessor",
+                        "accessor": accessor,
+                        "order": 10,
+                    },
+                    metadata={"entity_id": entity_id},
+                )
+            )
+        findings.append(
+            Finding(
+                service=self.name,
+                identity=identity,
+                target_id=entity_id,
+                target_label=f"Vault OIDC identity entity for {identity.email}",
+                verb="delete OIDC entity, aliases, and group memberships",
+                outcome=FindingOutcome.REVOKED_VIA_API,
+                scope=address,
+                request={
+                    "method": "DELETE",
+                    "path": f"/v1/identity/entity/id/{entity_id}",
+                    "order": 20,
+                },
+            )
+        )
+        return findings
+
+    def _lookup_oidc_entity_id(
+        self, identity: Identity, headers: dict[str, str]
+    ) -> str | None:
+        """Return the Vault entity id for the email-backed OIDC alias."""
+        address = self._address()
+        auth_response = self.client.get(f"{address}/v1/sys/auth", headers=headers)
+        auth_response.raise_for_status()
+        auth_mount = auth_response.json().get("data", {}).get("oidc/")
+        if not auth_mount:
+            return None
+        accessor = auth_mount.get("accessor")
+        lookup_response = self.client.post(
+            f"{address}/v1/identity/lookup/entity",
+            headers=headers,
+            json={"alias_name": identity.email, "alias_mount_accessor": accessor},
+        )
+        if lookup_response.status_code in {400, 404}:
+            return None
+        lookup_response.raise_for_status()
+        entity_id = lookup_response.json().get("data", {}).get("id")
+        return str(entity_id) if entity_id else None
+
+    def _token_accessors(self, headers: dict[str, str]) -> list[str]:
+        """List Vault token accessors visible to the operator token."""
+        address = self._address()
+        response = self.client.request(
+            "LIST", f"{address}/v1/auth/token/accessors", headers=headers
+        )
+        response.raise_for_status()
+        keys = response.json().get("data", {}).get("keys", [])
+        return [str(accessor) for accessor in keys]
+
+    def revoke(self, finding: Finding, *, execute: bool) -> ActionRecord:
+        """Revoke a Vault token accessor, or report the dry-run action."""
+        if finding.outcome is not FindingOutcome.REVOKED_VIA_API:
+            return report_record(finding, execute=execute)
+        if not execute:
+            return api_record(finding, execute=False, status=ActionStatus.WOULD_REVOKE)
+        address = self._address()
+        headers = self._headers()
+        if finding.request.get("path") == "/v1/auth/token/revoke-accessor":
+            response = self.client.post(
+                f"{address}/v1/auth/token/revoke-accessor",
+                headers=headers,
+                json={"accessor": finding.target_id},
+            )
+            message = "Revoked Vault token accessor and its associated child tokens and leases."
+        else:
+            response = self.client.delete(
+                f"{address}/v1/identity/entity/id/{finding.target_id}",
+                headers=headers,
+            )
+            message = "Deleted Vault OIDC entity, aliases, and group memberships."
+        response.raise_for_status()
+        return api_record(
+            finding,
+            execute=True,
+            status=ActionStatus.REVOKED,
+            message=message,
+        )
+
+
+AWS_CODE_CHANGE_STACKS = {
+    "ADMIN_USERNAMES": ("src/ol_infrastructure/infrastructure/aws/iam",),
+    "DEVOPS_ADMIN_USERNAMES": ("src/ol_infrastructure/infrastructure/aws/opensearch",),
+    "EKS_ADMIN_USERNAMES": (
+        "src/ol_infrastructure/infrastructure/aws/iam",
+        "src/ol_infrastructure/infrastructure/aws/eks",
+    ),
+    "EKS_DEVELOPER_USERNAMES": (
+        "src/ol_infrastructure/infrastructure/aws/iam",
+        "src/ol_infrastructure/applications/concourse",
+    ),
+}
+
+
+class AWSProvider:
+    """Revoke ephemeral AWS IAM credentials and report Pulumi list cleanup."""
+
+    name = "aws"
+
+    def __init__(self, *, repo_root: Path, profile: str | None = None):
+        """Initialize AWS access with the repository root and optional profile."""
+        self.repo_root = repo_root
+        self.profile = profile
+
+    def _iam_client(self) -> Any:
+        if self.profile:
+            return boto3.Session(profile_name=self.profile).client("iam")
+        return boto3.Session().client("iam")
+
+    def discover(self, identity: Identity) -> list[Finding]:
+        """Report hardcoded Pulumi-managed IAM access for this identity."""
+        if not identity.is_mit_email:
+            return []
+        return self._code_change_findings(identity)
+
+    def _code_change_findings(self, identity: Identity) -> list[Finding]:
+        helper_path = self.repo_root / "src/ol_infrastructure/lib/aws/iam_helper.py"
+        username_locations = username_list_locations(helper_path)
+        findings: list[Finding] = []
+        for symbol, names in username_locations.items():
+            location = names.get(identity.aws_username)
+            if location is None:
+                continue
+            stack_dirs = AWS_CODE_CHANGE_STACKS[symbol]
+            stacks = pulumi_stack_targets(self.repo_root, stack_dirs)
+            instruction = (
+                f"Remove {identity.aws_username!r} from {symbol}, review the diff, "
+                f"and run pulumi up for every listed stack."
+            )
+            if symbol == "EKS_DEVELOPER_USERNAMES":
+                instruction += (
+                    " This list also declares iam.User resources; removal destroys "
+                    "that Pulumi-managed user."
+                )
+            elif symbol == "EKS_ADMIN_USERNAMES":
+                instruction += (
+                    " This removal also destroys the per-user EKS AccessEntry on "
+                    "every listed cluster stack."
+                )
+            findings.append(
+                Finding(
+                    service=self.name,
+                    identity=identity,
+                    target_id=f"{symbol}:{identity.aws_username}",
+                    target_label=f"{identity.aws_username} in {symbol}",
+                    verb="report Pulumi-managed AWS access cleanup",
+                    outcome=FindingOutcome.NEEDS_CODE_CHANGE,
+                    scope=str(helper_path.relative_to(self.repo_root)),
+                    code_change=CodeChange(
+                        path=str(helper_path.relative_to(self.repo_root)),
+                        symbol=symbol,
+                        line=location,
+                        stacks=stacks,
+                        instruction=instruction,
+                    ),
+                )
+            )
+        return findings
+
+    def _ephemeral_credential_findings(
+        self, identity: Identity, iam: Any, *, scope: str
+    ) -> list[Finding]:
+        username = identity.aws_username
+        findings = [
+            Finding(
+                service=self.name,
+                identity=identity,
+                target_id=str(key["AccessKeyId"]),
+                target_label=f"AWS access key {key['AccessKeyId']} for {username}",
+                verb="delete access key",
+                outcome=FindingOutcome.REVOKED_VIA_API,
+                scope=scope,
+                request={
+                    "operation": "DeleteAccessKey",
+                    "UserName": username,
+                    "AccessKeyId": key["AccessKeyId"],
+                },
+            )
+            for key in iam.list_access_keys(UserName=username).get(
+                "AccessKeyMetadata", []
+            )
+        ]
+        if has_login_profile(iam, username):
+            findings.append(
+                Finding(
+                    service=self.name,
+                    identity=identity,
+                    target_id=username,
+                    target_label=f"AWS console login profile for {username}",
+                    verb="delete login profile",
+                    outcome=FindingOutcome.REVOKED_VIA_API,
+                    scope=scope,
+                    request={"operation": "DeleteLoginProfile", "UserName": username},
+                )
+            )
+        for device in iam.list_mfa_devices(UserName=username).get("MFADevices", []):
+            serial = str(device["SerialNumber"])
+            findings.append(
+                Finding(
+                    service=self.name,
+                    identity=identity,
+                    target_id=serial,
+                    target_label=f"AWS MFA device {serial} for {username}",
+                    verb=(
+                        "deactivate and delete virtual MFA device"
+                        if ":mfa/" in serial
+                        else "deactivate hardware MFA device"
+                    ),
+                    outcome=FindingOutcome.REVOKED_VIA_API,
+                    scope=scope,
+                    request={
+                        "operation": (
+                            "DeactivateAndDeleteVirtualMFADevice"
+                            if ":mfa/" in serial
+                            else "DeactivateMFADevice"
+                        ),
+                        "UserName": username,
+                        "SerialNumber": serial,
+                    },
+                )
+            )
+        if findings:
+            findings.append(
+                Finding(
+                    service=self.name,
+                    identity=identity,
+                    target_id=f"sts-sessions:{username}",
+                    target_label=f"existing AWS STS sessions for {username}",
+                    verb="verify already-issued AWS STS sessions expire",
+                    outcome=FindingOutcome.NEEDS_HUMAN,
+                    scope=scope,
+                    human_action=HumanAction(
+                        console_url="https://console.aws.amazon.com/cloudtrail/home",
+                        owning_team="Platform Engineering",
+                        instruction=(
+                            "Deleting long-term credentials cannot revoke temporary STS "
+                            "credentials already issued from them. Review CloudTrail and "
+                            "treat the maximum session lifetime as residual access."
+                        ),
+                    ),
+                )
+            )
+        return findings
+
+    def revoke(self, finding: Finding, *, execute: bool) -> ActionRecord:
+        """Report Pulumi-managed AWS findings without API mutation."""
+        return report_record(finding, execute=execute)
+
+
+class AWSEphemeralCredentialProvider(AWSProvider):
+    """Revoke non-Pulumi AWS IAM credentials with the AWS API."""
+
+    def discover(self, identity: Identity) -> list[Finding]:
+        """Find ephemeral IAM credentials for the derived IAM username."""
+        if not identity.is_mit_email:
+            return [aws_unresolved_identity_finding(identity)]
+        try:
+            iam = self._iam_client()
+            user_response = iam.get_user(UserName=identity.aws_username)
+        except ClientError as exc:
+            error_code = exc.response.get("Error", {}).get("Code")
+            if error_code == "NoSuchEntity":
+                return [aws_unresolved_identity_finding(identity)]
+            msg = f"AWS API credential discovery skipped: {exc}"
+            raise OffboardingError(msg) from exc
+        except (BotoCoreError, NoCredentialsError, ProfileNotFound) as exc:
+            msg = f"AWS API credential discovery skipped: {exc}"
+            raise OffboardingError(msg) from exc
+        arn = str(user_response.get("User", {}).get("Arn", ""))
+        account_id = arn.split(":")[4] if arn.count(":") >= 4 else "unknown"
+        scope = f"AWS account={account_id} profile={self.profile or 'default'}"
+        return self._ephemeral_credential_findings(identity, iam, scope=scope)
+
+    def revoke(self, finding: Finding, *, execute: bool) -> ActionRecord:
+        """Delete AWS access keys, login profiles, or MFA devices when executing."""
+        if finding.outcome is not FindingOutcome.REVOKED_VIA_API:
+            return report_record(finding, execute=execute)
+        if not execute:
+            return api_record(finding, execute=False, status=ActionStatus.WOULD_REVOKE)
+        iam = self._iam_client()
+        operation = finding.request.get("operation")
+        if operation == "DeleteAccessKey":
+            iam.delete_access_key(
+                UserName=finding.request["UserName"],
+                AccessKeyId=finding.request["AccessKeyId"],
+            )
+        elif operation == "DeleteLoginProfile":
+            iam.delete_login_profile(UserName=finding.request["UserName"])
+        elif operation in {
+            "DeactivateMFADevice",
+            "DeactivateAndDeleteVirtualMFADevice",
+        }:
+            iam.deactivate_mfa_device(
+                UserName=finding.request["UserName"],
+                SerialNumber=finding.request["SerialNumber"],
+            )
+            if operation == "DeactivateAndDeleteVirtualMFADevice":
+                iam.delete_virtual_mfa_device(
+                    SerialNumber=finding.request["SerialNumber"]
+                )
+        else:
+            msg = f"Unsupported AWS operation: {operation}"
+            raise OffboardingError(msg)
+        return api_record(finding, execute=True, status=ActionStatus.REVOKED)
+
+
+class RootlyProvider:
+    """Discover Rootly users, report Pulumi-managed membership, and manual handoffs."""
+
+    name = "rootly"
+
+    def __init__(
+        self,
+        *,
+        repo_root: Path,
+        token: str | None,
+        base_url: str = ROOTLY_API_URL,
+        client: httpx.Client | None = None,
+    ):
+        """Initialize the Rootly REST API client."""
+        self.repo_root = repo_root
+        self.token = token
+        self.base_url = base_url.rstrip("/")
+        self.client = client or httpx.Client(timeout=30)
+
+    def discover(self, identity: Identity) -> list[Finding]:
+        """Resolve the email to Rootly user ids and code-change references."""
+        if not self.token:
+            msg = "set ROOTLY_API_TOKEN or OFFBOARD_ROOTLY_API_TOKEN"
+            raise OffboardingError(msg)
+        response = self.client.get(
+            f"{self.base_url}/v1/users",
+            params={"filter[email]": identity.email},
+            headers={"Authorization": f"Bearer {self.token}"},
+        )
+        response.raise_for_status()
+        users = response.json().get("data", [])
+        findings: list[Finding] = []
+        for user in users:
+            user_id = str(user.get("id"))
+            label = rootly_user_label(user)
+            findings.append(
+                Finding(
+                    service=self.name,
+                    identity=identity,
+                    target_id=user_id,
+                    target_label=label,
+                    verb="deactivate Rootly user and verify inactive state",
+                    outcome=FindingOutcome.REVOKED_VIA_API,
+                    scope=self.base_url,
+                    request={
+                        "method": "PATCH",
+                        "path": f"/v1/users/{user_id}",
+                        "json": {
+                            "data": {
+                                "id": user_id,
+                                "type": "users",
+                                "attributes": {"active": False},
+                            }
+                        },
+                    },
+                )
+            )
+            findings.extend(self._code_change_findings(identity, user_id))
+            findings.append(self._incident_handoff_finding(identity, user_id, label))
+        return findings
+
+    def _code_change_findings(self, identity: Identity, user_id: str) -> list[Finding]:
+        rootly_path = self.repo_root / "src/ol_infrastructure/saas/rootly/__main__.py"
+        source_lines = rootly_path.read_text().splitlines()
+        lines = matching_numeric_literal_lines(rootly_path, user_id)
+        stacks = pulumi_stack_targets(
+            self.repo_root, ("src/ol_infrastructure/saas/rootly",)
+        )
+        return [
+            Finding(
+                service=self.name,
+                identity=identity,
+                target_id=f"rootly:{user_id}:{line}",
+                target_label=f"Rootly user_id {user_id} at line {line}",
+                verb="report Pulumi-managed Rootly cleanup",
+                outcome=FindingOutcome.NEEDS_CODE_CHANGE,
+                scope=str(rootly_path.relative_to(self.repo_root)),
+                code_change=CodeChange(
+                    path=str(rootly_path.relative_to(self.repo_root)),
+                    symbol=rootly_reference_symbol(source_lines[line - 1]),
+                    line=line,
+                    stacks=stacks,
+                    instruction=rootly_reference_instruction(
+                        source_lines[line - 1], user_id
+                    ),
+                ),
+            )
+            for line in lines
+        ]
+
+    def _incident_handoff_finding(
+        self, identity: Identity, user_id: str, label: str
+    ) -> Finding:
+        """Build the manual Rootly incident reassignment finding."""
+        return Finding(
+            service=self.name,
+            identity=identity,
+            target_id=f"rootly-handoff:{user_id}",
+            target_label=f"Rootly incident ownership for {label}",
+            verb="reassign open incidents and on-call handoffs",
+            outcome=FindingOutcome.NEEDS_HUMAN,
+            scope=self.base_url,
+            human_action=HumanAction(
+                console_url=f"https://app.rootly.com/users/{user_id}",
+                owning_team="Platform Engineering",
+                instruction=(
+                    "Review open incidents, escalation coverage, and active on-call "
+                    "shifts before considering Rootly offboarding complete."
+                ),
+            ),
+        )
+
+    def revoke(self, finding: Finding, *, execute: bool) -> ActionRecord:
+        """Deactivate a Rootly user through the REST API when executing."""
+        if finding.outcome is not FindingOutcome.REVOKED_VIA_API:
+            return report_record(finding, execute=execute)
+        if not execute:
+            return api_record(finding, execute=False, status=ActionStatus.WOULD_REVOKE)
+        headers = {"Authorization": f"Bearer {self.token}"}
+        response = self.client.patch(
+            f"{self.base_url}/v1/users/{finding.target_id}",
+            headers=headers,
+            json={
+                "data": {
+                    "id": finding.target_id,
+                    "type": "users",
+                    "attributes": {"active": False},
+                }
+            },
+        )
+        response.raise_for_status()
+        verify_response = self.client.get(
+            f"{self.base_url}/v1/users/{finding.target_id}", headers=headers
+        )
+        verify_response.raise_for_status()
+        user = verify_response.json().get("data", {})
+        attributes = user.get("attributes", {})
+        if attributes.get("active") is not False:
+            msg = "Rootly API did not confirm the user is inactive"
+            raise OffboardingError(msg)
+        return api_record(
+            finding,
+            execute=True,
+            status=ActionStatus.REVOKED,
+            message="Deactivated Rootly user and verified active=false.",
+        )
+
+
+class RepoCodeProvider:
+    """Find hardcoded individual email references in tracked source files."""
+
+    name = "repo-code"
+
+    def __init__(self, *, repo_root: Path):
+        """Initialize the repository scanner with its root path."""
+        self.repo_root = repo_root
+
+    def discover(self, identity: Identity) -> list[Finding]:
+        """Scan tracked repository text for hardcoded email references."""
+        findings: list[Finding] = []
+        for path, line_number, line in scan_repo_for_text(
+            self.repo_root, identity.email
+        ):
+            rel_path = str(path.relative_to(self.repo_root))
+            if rel_path.startswith(("tests/scripts/admin/", "docs/adr/")):
+                continue
+            if line.lstrip().startswith("#"):
+                continue
+            findings.append(
+                Finding(
+                    service=self.name,
+                    identity=identity,
+                    target_id=f"{rel_path}:{line_number}",
+                    target_label=f"{rel_path}:{line_number}",
+                    verb="report hardcoded email cleanup",
+                    outcome=FindingOutcome.NEEDS_CODE_CHANGE,
+                    code_change=CodeChange(
+                        path=rel_path,
+                        symbol="hardcoded email reference",
+                        line=line_number,
+                        stacks=("repo follow-up",),
+                        instruction=(
+                            f"Review and remove or replace hardcoded email "
+                            f"{identity.email!r} at {rel_path}:{line_number}."
+                        ),
+                    ),
+                )
+            )
+        return findings
+
+    def revoke(self, finding: Finding, *, execute: bool) -> ActionRecord:
+        """Report repository code findings without editing files."""
+        return report_record(finding, execute=execute)
+
+
+class ManualTailProvider:
+    """Emit residual UI-only actions that cannot be proven from this repository."""
+
+    name = "human"
+
+    def discover(self, identity: Identity) -> list[Finding]:
+        """Return the residual manual access-review checklist."""
+        manual_actions = [
+            (
+                "github",
+                "https://github.com/orgs/mitodl/people",
+                "Platform Engineering",
+                (
+                    "Remove GitHub org/team and outside-collaborator memberships; this "
+                    "also removes the independent GitHub-auth path to Concourse's main "
+                    "team. Transfer sole-admin repositories and verify automation does "
+                    "not depend on a personal token before revoking authorizations."
+                ),
+            ),
+            (
+                "sentry",
+                "https://mit-office-of-digital-learning.sentry.io/settings/members/",
+                "Platform Engineering",
+                (
+                    "Remove Sentry organization membership if present and review audit "
+                    "logs for personal tokens or integrations that org admins cannot "
+                    "enumerate or revoke through the API."
+                ),
+            ),
+            (
+                "grafana-cloud",
+                "https://mitodl.grafana.net/",
+                "Platform Engineering",
+                (
+                    "Keycloak disable handles group-synced Grafana access. Remove any "
+                    "direct Grafana Cloud or portal membership and review attributable "
+                    "service accounts/API keys without deleting shared automation."
+                ),
+            ),
+            (
+                "password-manager-and-saas",
+                "https://github.mit.edu/ol-engineering/runbooks",
+                "Platform Engineering",
+                "Remove password manager vault access and any remaining privileged SaaS seats.",
+            ),
+        ]
+        return [
+            Finding(
+                service=self.name,
+                identity=identity,
+                target_id=f"{target}:{identity.email}",
+                target_label=f"{target} access for {identity.email}",
+                verb="manual access review",
+                outcome=FindingOutcome.NEEDS_HUMAN,
+                human_action=HumanAction(
+                    console_url=console_url,
+                    owning_team=owning_team,
+                    instruction=instruction,
+                ),
+            )
+            for target, console_url, owning_team, instruction in manual_actions
+        ]
+
+    def revoke(self, finding: Finding, *, execute: bool) -> ActionRecord:
+        """Report residual manual actions without mutating any service."""
+        return report_record(finding, execute=execute)
+
+
+def api_record(
+    finding: Finding,
+    *,
+    execute: bool,
+    status: ActionStatus,
+    message: str | None = None,
+) -> ActionRecord:
+    """Build an API action record from a finding."""
+    if message is None:
+        message = (
+            f"Would {finding.verb}."
+            if status is ActionStatus.WOULD_REVOKE
+            else f"{finding.verb}."
+        )
+    return ActionRecord(
+        service=finding.service,
+        identity=finding.identity.email,
+        target_id=finding.target_id,
+        target_label=finding.target_label,
+        verb=finding.verb,
+        scope=finding.scope,
+        outcome=finding.outcome,
+        status=status,
+        execute=execute,
+        request=finding.request,
+        message=message,
+    )
+
+
+def report_record(finding: Finding, *, execute: bool) -> ActionRecord:
+    """Build a non-mutating report record from a finding."""
+    return ActionRecord(
+        service=finding.service,
+        identity=finding.identity.email,
+        target_id=finding.target_id,
+        target_label=finding.target_label,
+        verb=finding.verb,
+        scope=finding.scope,
+        outcome=finding.outcome,
+        status=ActionStatus.REPORTED,
+        execute=execute,
+        request=finding.request,
+        message=finding.verb,
+        code_change=finding.code_change,
+        human_action=finding.human_action,
+    )
+
+
+def skipped_record(service: str, identity: Identity, reason: str) -> ActionRecord:
+    """Build a provider-skip record for missing credentials or discovery failures."""
+    return ActionRecord(
+        service=service,
+        identity=identity.email,
+        target_id=identity.email,
+        target_label=identity.email,
+        verb="discover",
+        scope="",
+        outcome=None,
+        status=ActionStatus.SKIPPED,
+        execute=False,
+        request={},
+        message=reason,
+    )
+
+
+def error_record(finding: Finding, reason: str, *, execute: bool) -> ActionRecord:
+    """Build a provider action error record without aborting the whole run."""
+    return ActionRecord(
+        service=finding.service,
+        identity=finding.identity.email,
+        target_id=finding.target_id,
+        target_label=finding.target_label,
+        verb=finding.verb,
+        scope=finding.scope,
+        outcome=finding.outcome,
+        status=ActionStatus.ERROR,
+        execute=execute,
+        request=finding.request,
+        message=reason,
+        code_change=finding.code_change,
+        human_action=finding.human_action,
+    )
+
+
+def pulumi_stack_targets(repo_root: Path, stack_dirs: Sequence[str]) -> tuple[str, ...]:
+    """Enumerate every concrete Pulumi stack affected by a code-list edit."""
+    targets: list[str] = []
+    for stack_dir in stack_dirs:
+        configs = sorted((repo_root / stack_dir).glob("Pulumi.*.yaml"))
+        if not configs:
+            targets.append(stack_dir)
+            continue
+        targets.extend(
+            f"{stack_dir}::{config.stem.removeprefix('Pulumi.')}" for config in configs
+        )
+    return tuple(targets)
+
+
+def username_list_locations(path: Path) -> dict[str, dict[str, int]]:
+    """Return line numbers for IAM username constants in ``iam_helper.py``."""
+    tree = ast.parse(path.read_text())
+    results: dict[str, dict[str, int]] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        targets = [target.id for target in node.targets if isinstance(target, ast.Name)]
+        if len(targets) != 1 or targets[0] not in AWS_CODE_CHANGE_STACKS:
+            continue
+        symbol = targets[0]
+        values: dict[str, int] = {}
+        if isinstance(node.value, ast.List):
+            for item in node.value.elts:
+                if isinstance(item, ast.Constant) and isinstance(item.value, str):
+                    values[item.value] = item.lineno
+        results[symbol] = values
+    return results
+
+
+def has_login_profile(iam: Any, username: str) -> bool:
+    """Return whether an IAM user has a console login profile."""
+    try:
+        iam.get_login_profile(UserName=username)
+    except ClientError as exc:
+        error_code = exc.response.get("Error", {}).get("Code")
+        if error_code == "NoSuchEntity":
+            return False
+        raise
+    return True
+
+
+def vault_unresolved_identity_finding(identity: Identity, address: str) -> Finding:
+    """Build the read-only unresolved Vault OIDC entity finding."""
+    return Finding(
+        service="vault",
+        identity=identity,
+        target_id=identity.email,
+        target_label=f"Vault OIDC entity for {identity.email}",
+        verb="verify Vault OIDC entity and live token accessors",
+        outcome=FindingOutcome.NEEDS_HUMAN,
+        human_action=HumanAction(
+            console_url=f"{address}/ui/vault/access/leases/list/auth/oidc",
+            owning_team="Platform Engineering",
+            instruction=(
+                "Vault did not return an OIDC entity for this email. Confirm whether "
+                "the user has ever logged in and manually inspect live tokens if needed."
+            ),
+        ),
+    )
+
+
+def aws_unresolved_identity_finding(identity: Identity) -> Finding:
+    """Build the read-only unresolved AWS username finding."""
+    return Finding(
+        service="aws",
+        identity=identity,
+        target_id=identity.aws_username,
+        target_label=f"AWS IAM user {identity.aws_username}",
+        verb="verify IAM user and ephemeral credentials",
+        outcome=FindingOutcome.NEEDS_HUMAN,
+        human_action=HumanAction(
+            console_url="https://console.aws.amazon.com/iam/home#/users",
+            owning_team="Platform Engineering",
+            instruction=(
+                "AWS API discovery succeeded, but the derived IAM username "
+                f"{identity.aws_username!r} does not exist. Confirm the user's "
+                "actual IAM username before considering AWS credential revocation "
+                "complete."
+            ),
+        ),
+    )
+
+
+def matching_numeric_literal_lines(path: Path, value: str) -> list[int]:
+    """Return exact AST literal locations for a numeric Rootly user id."""
+    tree = ast.parse(path.read_text())
+    numeric_value = int(value)
+    return sorted(
+        {
+            node.lineno
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant)
+            and not isinstance(node.value, bool)
+            and (node.value == numeric_value or node.value == value)
+        }
+    )
+
+
+def rootly_reference_symbol(line: str) -> str:
+    """Classify a Rootly user-id reference for an actionable report."""
+    if "user_ids" in line:
+        return "team_platform_engineering.user_ids"
+    if "memberId" in line:
+        return "schedule_rotation_members"
+    if "userId" in line or ('"id"' in line and '"type": "user"' in line):
+        return "notification_target_params"
+    for scalar in ("owner_user_id", "created_by_user_id", "last_updated_by_user_id"):
+        if scalar in line:
+            return scalar
+    return "Rootly user_id reference"
+
+
+def rootly_reference_instruction(line: str, user_id: str) -> str:
+    """Explain safe removals and refuse edits that need a successor decision."""
+    symbol = rootly_reference_symbol(line)
+    if symbol == "team_platform_engineering.user_ids":
+        return (
+            f"Remove Rootly user_id {user_id} from the team user_ids list, review "
+            "the diff, and run pulumi up for every listed Rootly stack."
+        )
+    if symbol == "schedule_rotation_members":
+        return (
+            f"URGENT: remove memberId {user_id} from the on-call rotation, resequence "
+            "surviving positions contiguously from 1, review the diff, and run pulumi up."
+        )
+    if symbol == "notification_target_params":
+        return (
+            f"REFUSE automatic removal of Rootly user_id {user_id}: an escalation "
+            "level must not be left without a notification target. Choose a replacement, "
+            "review the diff, and run pulumi up."
+        )
+    if symbol in {"owner_user_id", "created_by_user_id", "last_updated_by_user_id"}:
+        return (
+            f"REFUSE automatic removal of required scalar {symbol}={user_id}. "
+            "Choose the successor, review the diff, and run pulumi up."
+        )
+    return (
+        f"Review Rootly user_id {user_id}, make the required ownership or membership "
+        "change, and run pulumi up for every listed Rootly stack."
+    )
+
+
+def scan_repo_for_text(repo_root: Path, needle: str) -> Iterable[tuple[Path, int, str]]:
+    """Scan tracked repository text for a literal string."""
+    try:
+        result = subprocess.run(  # noqa: S603
+            ["git", "-C", str(repo_root), "ls-files", "-z"],  # noqa: S607
+            check=True,
+            capture_output=True,
+        )
+        paths = [
+            repo_root / entry.decode() for entry in result.stdout.split(b"\0") if entry
+        ]
+    except (OSError, subprocess.CalledProcessError, UnicodeDecodeError):
+        paths = list(repo_root.rglob("*"))
+    for path in paths:
+        if not path.is_file() or path.stat().st_size > 1_000_000:
+            continue
+        try:
+            lines = path.read_text().splitlines()
+        except (UnicodeDecodeError, OSError):
+            continue
+        for index, line in enumerate(lines, start=1):
+            if needle in line:
+                yield path, index, line
+
+
+def rootly_user_label(user: dict[str, Any]) -> str:
+    """Return a readable Rootly user label from JSON:API-ish responses."""
+    attrs = (
+        user.get("attributes", {}) if isinstance(user.get("attributes"), dict) else {}
+    )
+    email = attrs.get("email") or user.get("email") or user.get("id")
+    name = attrs.get("name") or attrs.get("full_name") or user.get("name")
+    return f"{name} <{email}>" if name else str(email)
+
+
+def parse_service_filter(value: Sequence[str] | None) -> set[str]:
+    """Parse comma-separated and repeated service filter values."""
+    if not value:
+        return set()
+    services: set[str] = set()
+    for item in value:
+        services.update(part.strip() for part in item.split(",") if part.strip())
+    unknown = services.difference(SERVICE_ORDER)
+    if unknown:
+        msg = f"Unknown service(s): {', '.join(sorted(unknown))}"
+        raise ValueError(msg)
+    return services
+
+
+def selected_providers(
+    providers: Sequence[Provider], only: set[str], skip: set[str]
+) -> list[Provider]:
+    """Return providers selected by --only/--skip."""
+    if only and skip:
+        msg = "Use either --only or --skip, not both."
+        raise ValueError(msg)
+    return [
+        provider
+        for provider in providers
+        if (not only or provider.name in only) and provider.name not in skip
+    ]
+
+
+def build_providers(
+    *,
+    repo_root: Path,
+    keycloak_url: str,
+    keycloak_realm: str,
+    keycloak_auth_realm: str,
+    keycloak_username: str,
+    keycloak_password: str | None,
+    vault_addr: str | None,
+    vault_token: str | None,
+    aws_profile: str | None,
+    rootly_token: str | None,
+) -> list[Provider]:
+    """Construct providers in containment-first output order."""
+    keycloak_providers = [
+        KeycloakProvider(
+            base_url=keycloak_url,
+            realm=realm.strip(),
+            auth_realm=keycloak_auth_realm,
+            username=keycloak_username,
+            password=keycloak_password,
+        )
+        for realm in keycloak_realm.split(",")
+        if realm.strip()
+    ]
+    return [
+        *keycloak_providers,
+        VaultProvider(address=vault_addr, token=vault_token),
+        AWSProvider(repo_root=repo_root, profile=aws_profile),
+        AWSEphemeralCredentialProvider(repo_root=repo_root, profile=aws_profile),
+        RootlyProvider(repo_root=repo_root, token=rootly_token),
+        RepoCodeProvider(repo_root=repo_root),
+        ManualTailProvider(),
+    ]
+
+
+def discover_provider_findings(
+    identities: Sequence[Identity], providers: Sequence[Provider]
+) -> tuple[list[tuple[Provider, Finding]], list[ActionRecord]]:
+    """Discover once so execution cannot drift from the confirmed plan."""
+    discovered: list[tuple[Provider, Finding]] = []
+    records: list[ActionRecord] = []
+    for identity in identities:
+        for provider in providers:
+            try:
+                findings = provider.discover(identity)
+            except OffboardingError as exc:
+                records.append(skipped_record(provider.name, identity, str(exc)))
+                continue
+            except httpx.HTTPError as exc:
+                records.append(
+                    skipped_record(provider.name, identity, f"HTTP error: {exc}")
+                )
+                continue
+            except Exception as exc:
+                records.append(
+                    skipped_record(provider.name, identity, f"Discovery failed: {exc}")
+                )
+                continue
+            discovered.extend((provider, finding) for finding in findings)
+    return discovered, records
+
+
+def records_for_discovery(
+    discovered: Sequence[tuple[Provider, Finding]],
+    discovery_records: Sequence[ActionRecord],
+    *,
+    execute: bool,
+) -> list[ActionRecord]:
+    """Revoke or report the exact findings returned by one discovery pass."""
+    records = list(discovery_records)
+    for provider, finding in discovered:
+        try:
+            records.append(provider.revoke(finding, execute=execute))
+        except Exception as exc:
+            records.append(error_record(finding, str(exc), execute=execute))
+    return sorted(records, key=record_sort_key)
+
+
+def collect_action_records(
+    identities: Sequence[Identity], providers: Sequence[Provider], *, execute: bool
+) -> list[ActionRecord]:
+    """Discover and record actions for callers that do not need confirmation."""
+    discovered, discovery_records = discover_provider_findings(identities, providers)
+    return records_for_discovery(discovered, discovery_records, execute=execute)
+
+
+def record_sort_key(record: ActionRecord) -> tuple[int, int, int, str, str]:
+    """Sort output by urgent API containment, then code changes, then humans."""
+    outcome_order = {
+        FindingOutcome.REVOKED_VIA_API: 0,
+        FindingOutcome.NEEDS_CODE_CHANGE: 1,
+        FindingOutcome.NEEDS_HUMAN: 2,
+        None: 3,
+    }
+    return (
+        outcome_order[record.outcome],
+        SERVICE_ORDER.get(record.service, 999),
+        int(record.request.get("order", 50)),
+        record.identity,
+        record.target_label,
+    )
+
+
+def confirmation_summary(records: Sequence[ActionRecord]) -> str:
+    """Return the identity summary an operator must confirm before execution."""
+    api_records = [
+        record for record in records if record.outcome is FindingOutcome.REVOKED_VIA_API
+    ]
+    lines = ["The following API revocations will execute:"]
+    lines.extend(
+        f"- {record.identity}: {record.service} [{record.scope or 'scope unavailable'}] "
+        f"-> {record.target_label} ({record.verb})"
+        for record in api_records
+    )
+    if not api_records:
+        lines.append("- none")
+    lines.append("Type EXECUTE to continue: ")
+    return "\n".join(lines)
+
+
+def require_confirmation(records: Sequence[ActionRecord]) -> None:
+    """Prompt for destructive execution confirmation."""
+    sys.stderr.write(confirmation_summary(records))
+    answer = input()
+    if answer != "EXECUTE":
+        msg = "Confirmation did not match; aborting without mutations."
+        raise RuntimeError(msg)
+
+
+def records_to_json(records: Sequence[ActionRecord]) -> str:
+    """Serialize action records as stable JSON."""
+    return json.dumps(
+        [record_to_dict(record) for record in records], indent=2, sort_keys=True
+    )
+
+
+def record_to_dict(record: ActionRecord) -> dict[str, Any]:
+    """Convert an action record to JSON-serializable data."""
+    return {
+        "service": record.service,
+        "identity": record.identity,
+        "target_id": record.target_id,
+        "target_label": record.target_label,
+        "verb": record.verb,
+        "scope": record.scope,
+        "outcome": record.outcome,
+        "status": record.status,
+        "execute": record.execute,
+        "request": record.request,
+        "message": record.message,
+        "code_change": None
+        if record.code_change is None
+        else {
+            "path": record.code_change.path,
+            "symbol": record.code_change.symbol,
+            "line": record.code_change.line,
+            "stacks": record.code_change.stacks,
+            "instruction": record.code_change.instruction,
+        },
+        "human_action": None
+        if record.human_action is None
+        else {
+            "console_url": record.human_action.console_url,
+            "owning_team": record.human_action.owning_team,
+            "instruction": record.human_action.instruction,
+        },
+    }
+
+
+def records_to_text(records: Sequence[ActionRecord], *, execute: bool) -> str:
+    """Render action records in the required three-section order."""
+    mode = "EXECUTE" if execute else "DRY RUN"
+    lines = [f"# Employee offboarding plan ({mode})", ""]
+    sections = [
+        (FindingOutcome.REVOKED_VIA_API, "Revoked via API"),
+        (FindingOutcome.NEEDS_CODE_CHANGE, "Requires code change + pulumi up"),
+        (FindingOutcome.NEEDS_HUMAN, "Requires human in a UI"),
+        (None, "Skipped providers / warnings"),
+    ]
+    for outcome, title in sections:
+        section_records = [record for record in records if record.outcome == outcome]
+        lines.append(f"## {title}")
+        if not section_records:
+            lines.append("- none")
+            lines.append("")
+            continue
+        for record in section_records:
+            scope = f" :: {record.scope}" if record.scope else ""
+            lines.append(
+                f"- [{record.status}] {record.identity} :: {record.service}{scope} :: "
+                f"{record.target_label} — {record.message}"
+            )
+            if record.code_change is not None:
+                line = f":{record.code_change.line}" if record.code_change.line else ""
+                lines.append(
+                    f"  - edit: {record.code_change.path}{line} ({record.code_change.symbol})"
+                )
+                lines.append(f"  - stacks: {', '.join(record.code_change.stacks)}")
+                lines.append(f"  - instruction: {record.code_change.instruction}")
+            if record.human_action is not None:
+                lines.append(f"  - console: {record.human_action.console_url}")
+                lines.append(f"  - owner: {record.human_action.owning_team}")
+                lines.append(f"  - instruction: {record.human_action.instruction}")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def validate_execution_targets(providers: Sequence[Provider]) -> None:
+    """Refuse destructive execution against discovery-only non-production targets."""
+    for provider in providers:
+        target = ""
+        if isinstance(provider, KeycloakProvider):
+            target = provider.base_url
+        elif isinstance(provider, VaultProvider):
+            target = provider.address or ""
+        elif isinstance(provider, RootlyProvider):
+            target = provider.base_url
+        elif isinstance(provider, AWSEphemeralCredentialProvider):
+            target = provider.profile or ""
+        normalized = target.lower()
+        nonproduction_markers = ("-qa.", "-ci.", ".qa.", ".ci.", "qa-", "ci-")
+        if normalized and any(marker in normalized for marker in nonproduction_markers):
+            msg = (
+                f"Refusing --execute against non-production {provider.name} target "
+                f"{target}; QA/CI are read-only discovery targets."
+            )
+            raise RuntimeError(msg)
+
+
+def records_exit_code(records: Sequence[ActionRecord], *, execute: bool) -> int:
+    """Return a machine-readable failure code for incomplete offboarding runs."""
+    if any(record.status is ActionStatus.ERROR for record in records):
+        return 1
+    if any(record.status is ActionStatus.SKIPPED for record in records):
+        return 2
+    if execute and any(
+        record.outcome is FindingOutcome.REVOKED_VIA_API
+        and record.status is not ActionStatus.REVOKED
+        for record in records
+    ):
+        return 1
+    return 0
+
+
+@app.default
+def main(
+    emails: Annotated[list[str], cyclopts.Parameter(name="EMAIL")],
+    *,
+    execute: bool = False,
+    yes: bool = False,
+    only: Annotated[
+        list[str] | None,
+        cyclopts.Parameter(help="Run only these comma-separated service names."),
+    ] = None,
+    skip: Annotated[
+        list[str] | None,
+        cyclopts.Parameter(help="Skip these comma-separated service names."),
+    ] = None,
+    output: Literal["text", "json"] = "text",
+    keycloak_url: str = DEFAULT_KEYCLOAK_URL,
+    keycloak_realm: str = DEFAULT_KEYCLOAK_REALM,
+    keycloak_auth_realm: str = DEFAULT_KEYCLOAK_AUTH_REALM,
+    keycloak_username: str = DEFAULT_KEYCLOAK_USERNAME,
+    keycloak_password: str | None = None,
+    vault_addr: str | None = None,
+    vault_token: str | None = None,
+    aws_profile: str | None = None,
+    rootly_token: str | None = None,
+) -> None:
+    """Plan or execute employee offboarding for one or more email addresses."""
+    keycloak_password = (
+        keycloak_password
+        or os.getenv("OFFBOARD_KEYCLOAK_PASSWORD")
+        or os.getenv("KEYCLOAK_ADMIN_PASSWORD")
+    )
+    vault_addr = vault_addr or os.getenv("VAULT_ADDR")
+    vault_token = vault_token or os.getenv("VAULT_TOKEN")
+    rootly_token = (
+        rootly_token
+        or os.getenv("OFFBOARD_ROOTLY_API_TOKEN")
+        or os.getenv("ROOTLY_API_TOKEN")
+    )
+    providers = selected_providers(
+        build_providers(
+            repo_root=REPO_ROOT,
+            keycloak_url=keycloak_url,
+            keycloak_realm=keycloak_realm,
+            keycloak_auth_realm=keycloak_auth_realm,
+            keycloak_username=keycloak_username,
+            keycloak_password=keycloak_password,
+            vault_addr=vault_addr,
+            vault_token=vault_token,
+            aws_profile=aws_profile,
+            rootly_token=rootly_token,
+        ),
+        parse_service_filter(only),
+        parse_service_filter(skip),
+    )
+    identities = [Identity(email=email.strip().lower()) for email in emails]
+    if execute:
+        validate_execution_targets(providers)
+    discovered, discovery_records = discover_provider_findings(identities, providers)
+    dry_run_records = records_for_discovery(
+        discovered, discovery_records, execute=False
+    )
+    if execute and not yes:
+        require_confirmation(dry_run_records)
+    records = (
+        records_for_discovery(discovered, discovery_records, execute=True)
+        if execute
+        else dry_run_records
+    )
+    rendered = (
+        records_to_json(records)
+        if output == "json"
+        else records_to_text(records, execute=execute)
+    )
+    sys.stdout.write(rendered)
+    exit_code = records_exit_code(records, execute=execute)
+    if exit_code:
+        raise SystemExit(exit_code)
+
+
+if __name__ == "__main__":
+    app()
