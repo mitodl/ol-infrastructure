@@ -948,7 +948,10 @@ learn_ai_oidc_resources = OLApisixOIDCResources(
         application_name="learn-ai",
         k8s_labels=k8s_global_labels,
         k8s_namespace=learn_ai_namespace,
-        oidc_scope="openid profile email",  # Default scope from component
+        # Narrower than the component default, which adds organization:*.  Safe
+        # on this host: its session is not shared with mit-learn, and learn-ai's
+        # own APISIX_USERDATA_MAP reads no organization claim.
+        oidc_scope="openid profile email",
         oidc_introspection_endpoint_auth_method="client_secret_basic",  # Default
         oidc_logout_path="/logout",
         oidc_post_logout_redirect_uri="/",
@@ -1004,7 +1007,11 @@ learn_ai_mit_learn_oidc_resources = OLApisixOIDCResources(
         application_name="learn-ai-mit-learn",
         k8s_labels=k8s_global_labels,
         k8s_namespace=learn_ai_namespace,
-        oidc_scope="openid profile email",  # Default scope from component
+        # No oidc_scope override, unlike the legacy-host resource above: the
+        # "reqauth" route below writes the shared session, so it has to request
+        # the same claims mit-learn's own login does.  The component default
+        # adds organization:*, which mit-learn maps to users.User.organizations
+        # via APISIX_USERDATA_MAP and reads to decide whether to skip onboarding.
         oidc_introspection_endpoint_auth_method="client_secret_basic",  # Default
         oidc_logout_path="/logout",
         oidc_post_logout_redirect_uri="/",
