@@ -1,2 +1,3 @@
 ---
-encryptionsalt: v1:v2Ek/E5/5SU=:v1:JqVAy0zRS6psyinr:4hBjOOVWdRCP8P0UvjRfQNg2e7cLgw==
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagEqrkzp6cnQ0aYHWqyg3esKAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMt5cCKS9BMIatKbEhAgEQgDtpLDNKXo6qc1mauPc2tVetS0ynqdfN3HtDVmQgSnVt+dA+maMvKPNqnDBFhA75ugTmy8oHn2y9SPYM9A==
