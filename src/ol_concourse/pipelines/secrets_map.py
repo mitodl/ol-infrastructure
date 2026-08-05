@@ -15,8 +15,9 @@ The mapping is derived from static analysis of ``read_yaml_secrets`` /
 ``read_json_secrets`` / ``set_env_secrets`` calls, following imports so that
 secrets read through shared modules (``lib/fastly.py``, ``lib/heroku.py``,
 ``lib/consul.py``, ``substructure/aws/eks/grafana.py``, ...) are attributed to
-every project that imports them.  ``tests/test_secrets_map.py`` re-runs that
-analysis and fails if the two ever disagree, so this file cannot silently rot.
+every project that imports them.  ``tests/ol_concourse/test_secrets_map.py``
+re-runs that analysis and fails if the two ever disagree, so this file cannot
+silently rot.
 """
 
 SECRETS_ROOT = "src/bridge/secrets"  # pragma: allowlist secret

@@ -8,6 +8,7 @@ re-derive the truth from the source tree and compare.
 """
 
 import ast
+from collections import defaultdict
 from pathlib import Path
 
 import pytest
@@ -56,9 +57,20 @@ def _as_path_string(node: ast.AST) -> str | None:
     return None
 
 
-def _path_valued_assignments(tree: ast.Module) -> dict[str, str]:
-    """Map module-level names to the path expression they were assigned."""
-    assigned: dict[str, str] = {}
+def _path_valued_names(tree: ast.Module) -> dict[str, set[str]]:
+    """Map each assigned name to every path expression bound to it anywhere.
+
+    Deliberately walks the whole tree rather than just the module body: a
+    project is free to build a secrets path inside a function, and missing that
+    read would be a false negative -- the direction that actually hurts, since
+    it would let a pipeline stop watching a secret it decrypts.
+
+    For the same reason a name that is assigned more than once (in different
+    scopes, or reassigned) keeps *all* of its renderings rather than whichever
+    the walk happened to reach last. Over-approximating asks the registry to
+    watch a bit too much; guessing wrong could ask it to watch too little.
+    """
+    assigned: dict[str, set[str]] = defaultdict(set)
     for node in ast.walk(tree):
         if (
             isinstance(node, ast.Assign)
@@ -67,7 +79,7 @@ def _path_valued_assignments(tree: ast.Module) -> dict[str, str]:
         ):
             rendered = _as_path_string(node.value)
             if rendered:
-                assigned[node.targets[0].id] = rendered
+                assigned[node.targets[0].id].add(rendered)
     return assigned
 
 
@@ -92,7 +104,7 @@ def _imported_module_files(node: ast.AST) -> set[Path]:
 def _analyze(path: Path) -> tuple[set[str], set[Path]]:
     """Return (secret paths read directly by ``path``, local modules it imports)."""
     tree = ast.parse(path.read_text())
-    local_paths = _path_valued_assignments(tree)
+    name_paths = _path_valued_names(tree)
 
     secrets: set[str] = set()
     imports: set[Path] = set()
@@ -105,10 +117,10 @@ def _analyze(path: Path) -> tuple[set[str], set[Path]]:
         ):
             arg = node.args[0]
             rendered = _as_path_string(arg)
-            if rendered is None and isinstance(arg, ast.Name):
-                rendered = local_paths.get(arg.id)
             if rendered:
                 secrets.add(rendered)
+            elif isinstance(arg, ast.Name):
+                secrets |= name_paths.get(arg.id, set())
         else:
             imports |= _imported_module_files(node)
     return secrets, imports
