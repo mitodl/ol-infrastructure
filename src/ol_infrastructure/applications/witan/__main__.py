@@ -59,15 +59,15 @@ silently assumed:
       the pulumi-provisioner's ``env_vars_from_files``), so a new push always
       changes the pod spec and triggers a rollout instead of silently
       leaving the running pod on a stale image.
-    - **Keycloak witan-users token provisioning.** agent-kit ADR-0004 D3
-      assigns the job of "walking the Keycloak witan-users group/role
-      membership and writing a generated token per user" into the shared
-      actor-tokens source. This stack only provisions the destination (the
-      Vault-backed ``actor-tokens`` Secret) — the omnigraph stack
-      (``applications/omnigraph``) writes the Vault source itself from a
-      SOPS file, seeded today with at minimum the ``svc-witan-ci`` entry —
-      the sync job that keeps per-user entries current as Keycloak group
-      membership changes is not yet built.
+    - **Per-user token provisioning.** agent-kit ADR-0004 D3's "writing a
+      generated token per user" into the shared actor-tokens source now
+      exists, but it lives in the omnigraph stack next to the Vault path it
+      writes — ``applications/omnigraph/token_sync.py``, a CronJob that
+      enumerates the Keycloak realm's users. This stack only provisions the
+      *destination*: the Vault-backed ``actor-tokens`` Secret its own
+      containers mount. It is off until an environment sets
+      ``omnigraph:keycloak_url``, and until then the omnigraph stack writes
+      that Vault path from a SOPS file carrying only ``svc-witan-ci``.
     - **GitHub App registration.** The CI indexer can clone private repos as a
       GitHub App installation (``ci_indexer.py``). Registering that App on the
       org, granting it ``contents: read``, and installing it on the repos it

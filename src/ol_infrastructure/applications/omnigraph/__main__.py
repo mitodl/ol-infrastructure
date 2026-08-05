@@ -21,6 +21,11 @@ the same artifact witan resolves per-user tokens from — synced here from Vault
 into the ``actor-tokens`` Secret (agent-kit ADR-0004 D3). See
 ``docs/adr/0009-deploy-witan-as-shared-multi-tenant-mcp-service.md``.
 
+Keycloak realm membership is turned into per-user entries in that map by the
+CronJob in ``token_sync.py``, in environments that set
+``omnigraph:keycloak_url``. Enabling it moves ownership of the actor-tokens
+Vault path from this program to that job — see the writer split below.
+
 Follow-up work this stack does NOT cover (tracked separately):
     - **Container image.** The ``omnigraph``/``pulumi-omnigraph`` Concourse
       pipeline builds the image once, owns the ECR repository itself
@@ -29,18 +34,6 @@ Follow-up work this stack does NOT cover (tracked separately):
       docstring. ``schema.pg`` (agent-kit repo,
       ``mcp/servers/witan/schema/schema.pg``) must be baked into the image at
       build time — this Pulumi program has no access to agent-kit's tree.
-    - **Keycloak witan-users token sync.** This stack writes the Vault
-      ``secret-operations/witan/actor-tokens`` source (below) from a
-      hand-authored SOPS file, and provisions the ``actor-tokens`` Secret
-      destination, but not the job that keeps per-user entries current as
-      Keycloak group membership changes — today the SOPS file only ever
-      carries the one ``svc-witan-ci`` entry. What this stack DOES now cover
-      is the other half of "add a user": the ``actor-tokens`` secret carries
-      ``restart_targets`` so the Vault Secrets Operator bounces
-      omnigraph-server whenever the token map changes (it only reads the map
-      at boot). Whatever eventually writes that Vault path — the sync job, a
-      break-glass ``vault kv put``, or this stack — gets the restart for free
-      and does not need to orchestrate one itself.
 """
 
 import json
@@ -57,6 +50,12 @@ from ol_infrastructure.applications.omnigraph.data_tier import (
     OMNIGRAPH_SERVER_SERVICE_NAME,
     create_data_tier,
     omnigraph_server_addr,
+)
+from ol_infrastructure.applications.omnigraph.token_sync import (
+    ACTOR_TOKENS_VAULT_PATH,
+    DEFAULT_SYNC_SCHEDULE,
+    SERVICE_TOKENS_VAULT_PATH,
+    create_token_sync,
 )
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
@@ -100,6 +99,19 @@ omnigraph_config = Config("omnigraph")
 # build_cluster_graphs). A repo that is not listed fails to resolve rather than
 # silently minting a graph nobody provisioned or backs up.
 MANAGED_REPOS: list[str] = omnigraph_config.get_object("managed_repos") or []
+
+# Keycloak realm -> actor-token sync. Set `omnigraph:keycloak_url` for an
+# environment to turn it on; leaving it unset keeps that environment on the
+# SOPS-only behaviour, which is the right default until its `witan-token-sync`
+# OIDC client exists (substructure/keycloak/ol_platform_engineering.py). The URL
+# is the switch rather than a separate boolean because there is nothing this can
+# do without it, and one setting cannot disagree with itself.
+KEYCLOAK_URL = omnigraph_config.get("keycloak_url")
+KEYCLOAK_REALM = omnigraph_config.get("keycloak_realm") or "ol-platform-engineering"
+TOKEN_SYNC_SCHEDULE = (
+    omnigraph_config.get("token_sync_schedule") or DEFAULT_SYNC_SCHEDULE
+)
+_TOKEN_SYNC_ENABLED = bool(KEYCLOAK_URL)
 
 cluster_stack = make_stack_reference(projects.EKS, f"operations.{stack_info.name}")
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
@@ -200,14 +212,61 @@ else:
     _actor_tokens_map = {}
     _witan_ci_token = None
 
-actor_tokens_vault_secret = None
+# The non-human actors, on their own Vault path. This is always written, in
+# every environment, and is the *input* the token-sync job merges Keycloak's
+# per-user entries into — see WHO WRITES actor-tokens below.
+service_tokens_vault_secret = None
 if _actor_tokens_map:
-    actor_tokens_vault_secret = vault.generic.Secret(
-        f"omnigraph-actor-tokens-vault-secret-{stack_info.env_suffix}",
-        path="secret-operations/witan/actor-tokens",
+    service_tokens_vault_secret = vault.generic.Secret(
+        f"omnigraph-service-tokens-vault-secret-{stack_info.env_suffix}",
+        path=SERVICE_TOKENS_VAULT_PATH,
         data_json=Output.secret(
             json.dumps({ACTOR_TOKENS_VAULT_KEY: json.dumps(_actor_tokens_map)})
         ),
+    )
+
+##############################################
+#   WHO WRITES actor-tokens                   #
+##############################################
+# Exactly one writer, but which one depends on whether this environment has a
+# Keycloak client provisioned for the sync job:
+#
+#   token sync OFF -> this program writes secret-operations/witan/actor-tokens
+#                     straight from the SOPS map. There are no per-user entries
+#                     to preserve, so the merged map and the service map are the
+#                     same thing.
+#   token sync ON  -> the CronJob in token_sync.py writes it, as
+#                     service-tokens plus one act-<sub> entry per enabled
+#                     human realm user, and this program stops writing it.
+#
+# The two must never overlap. A Pulumi write alongside the job's would revert
+# every per-user entry on each `pulumi up` — every user 401ing until the next
+# hourly run, plus an omnigraph-server restart at each end of that window.
+#
+# retain_on_delete is what makes the OFF -> ON transition safe. Removing this
+# resource from the program would otherwise DELETE the Vault path, and the
+# bootstrap Job that rewrites it is not ordered against that deletion; the
+# window between them is one where omnigraph-server has no valid token for
+# anybody. Retained, Pulumi drops it from state and leaves the content alone,
+# and the job's first run takes over an already-populated path.
+#
+# WHICH MAKES THE ROLLOUT TWO STEPS, NOT ONE. Pulumi reads retainOnDelete from
+# the STATE at deletion time, and a resource absent from the program is never
+# re-registered — so the flag has to already be recorded before the environment
+# is switched on. Deploy this change with the switch still off (one `pulumi up`
+# that records the flag against an otherwise unchanged resource), and only then
+# set `omnigraph:keycloak_url` and deploy again. Doing both in one `pulumi up`
+# deletes the Vault path and leaves every user 401ing until the bootstrap Job
+# lands. See docs/witan-token-sync-runbook.md.
+actor_tokens_vault_secret = None
+if _actor_tokens_map and not _TOKEN_SYNC_ENABLED:
+    actor_tokens_vault_secret = vault.generic.Secret(
+        f"omnigraph-actor-tokens-vault-secret-{stack_info.env_suffix}",
+        path=ACTOR_TOKENS_VAULT_PATH,
+        data_json=Output.secret(
+            json.dumps({ACTOR_TOKENS_VAULT_KEY: json.dumps(_actor_tokens_map)})
+        ),
+        opts=ResourceOptions(retain_on_delete=True),
     )
 
 if _witan_ci_token:
@@ -244,6 +303,31 @@ omnigraph_auth_binding = OLEKSAuthBinding(
         k8s_labels=k8s_labels,
     )
 )
+
+##############################################
+#   Keycloak realm -> actor tokens             #
+##############################################
+token_sync = None
+if _TOKEN_SYNC_ENABLED:
+    token_sync = create_token_sync(
+        stack_info=stack_info,
+        namespace=NAMESPACE,
+        k8s_global_labels=k8s_global_labels,
+        # Non-None by _TOKEN_SYNC_ENABLED, which is exactly `bool(KEYCLOAK_URL)`.
+        keycloak_url=KEYCLOAK_URL or "",
+        keycloak_realm=KEYCLOAK_REALM,
+        vault_address=Config("vault").get("address")
+        or f"https://vault-{stack_info.env_suffix}.odl.mit.edu",
+        vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+        vault_auth_name=omnigraph_auth_binding.vault_k8s_resources.auth_name,
+        schedule=TOKEN_SYNC_SCHEDULE,
+        # The job reads the service map on every run and refuses to write an
+        # actor map without it, so the Vault write has to land first.
+        depends_on=[
+            omnigraph_auth_binding.vault_k8s_resources,
+            *([service_tokens_vault_secret] if service_tokens_vault_secret else []),
+        ],
+    )
 
 actor_tokens_secret = OLVaultK8SSecret(
     f"omnigraph-actor-tokens-secret-{stack_info.env_suffix}",
@@ -306,9 +390,14 @@ actor_tokens_secret = OLVaultK8SSecret(
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
+        # Whichever of the two writers this environment uses has to have
+        # written the Vault path before the VSO is asked to render it —
+        # otherwise the Secret comes up empty and the Deployment that mounts it
+        # sits in ContainerCreating. Exactly one of these is ever non-None.
         depends_on=[
             omnigraph_auth_binding.vault_k8s_resources,
             *([actor_tokens_vault_secret] if actor_tokens_vault_secret else []),
+            *([token_sync.bootstrap_job] if token_sync else []),
         ],
     ),
 )
