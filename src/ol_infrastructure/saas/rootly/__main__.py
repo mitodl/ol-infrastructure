@@ -80,9 +80,10 @@ CLOUDWATCH_NON_PROD_URGENCY_RULES = [
     },
 ]
 
-# Deliberately no deduplication or resolution config on the two CloudWatch
-# sources below: the native cloud_watch integration already does both, keyed on
-# something better than we can express here.
+# Deliberately no CUSTOM deduplication-key or resolution-rule config on the two
+# CloudWatch sources below -- deduplicate_alerts_by_key is switched off so that
+# Rootly's native cloud_watch behaviour handles both, keyed on something better
+# than we can express here.
 #
 # Per https://docs.rootly.com/integrations/aws-cloudwatch -- "Rootly uses the
 # alarm ARN as the external identifier for the alert, ensuring that repeated
