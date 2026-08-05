@@ -4,7 +4,7 @@ _actions_secret_names:
 _excluded_environments: 1
 allow_auto_merge: false
 allow_rebase_merge: true
-archetype: application
+archetype: library
 dependabot_security_updates: false
 name: ol-django
 teams:

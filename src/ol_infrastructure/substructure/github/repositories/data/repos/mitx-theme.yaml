@@ -3,7 +3,7 @@ _excluded_environments: 1
 allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true
-archetype: application
+archetype: library
 default_branch: master
 delete_branch_on_merge: false
 dependabot_security_updates: false

@@ -87,6 +87,20 @@ FORK_NAME_EXACT = {
 INFRASTRUCTURE_NAME_HINTS = ("infrastructure", "concourse", "dagster", "salt", "packer")
 INFRASTRUCTURE_TOPIC_HINTS = ("infrastructure", "devops", "pulumi", "terraform")
 
+# GitHub Environments that do NOT mean "this repo is a deployed service".
+#
+# `copilot` is created automatically for the Copilot coding agent and appears on 15 of the
+# repos an earlier version of this heuristic called applications -- including `ol-django`,
+# which is a collection of Django libraries. `github-pages` is docs publishing and `pypi`
+# / `npm` are trusted-publishing targets: all three are things a LIBRARY does.
+#
+# Treating any environment as a deploy signal misclassified roughly half the application
+# bucket, which is the failure mode that matters most here -- see §4.5. An archetype is
+# only useful if the audit can trust it.
+NON_DEPLOY_ENVIRONMENTS = frozenset(
+    {"copilot", "github-pages", "pypi", "testpypi", "npm", "release"}
+)
+
 # Rules whose population is the archived fleet, not the active one. Reporting these as a
 # share of active repos overstates them badly (92 of 138 archived reads as "52% of active").
 ARCHIVED_SCOPED_RULES = frozenset({"CON-07 archived repo still grants team write"})
@@ -168,6 +182,12 @@ def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
         # IDs, not just counts: `imports` needs them to build the Pulumi import payload.
         hooks = _maybe(client, f"/repos/{ORG}/{name}/hooks?per_page=100") or []
         deploy_keys = _maybe(client, f"/repos/{ORG}/{name}/keys?per_page=100") or []
+        # A SAMPLE of environment names, not the full set -- mitxonline has 412 and the
+        # rest are ephemeral review apps. The count below stays authoritative; these
+        # names exist to tell a real deploy target from publishing plumbing.
+        environments = (
+            _maybe(client, f"/repos/{ORG}/{name}/environments?per_page=30") or {}
+        )
 
         required_checks: list[str] = []
         if protection:
@@ -225,8 +245,10 @@ def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
                 {"name": s["name"], "updated_at": s["updated_at"]}
                 for s in (secrets or {}).get("secrets", [])
             ],
-            "environment_count": _count(client, f"/repos/{ORG}/{name}/environments")
-            or 0,
+            "environment_count": int(environments.get("total_count", 0)),
+            "environment_names": [
+                e["name"] for e in environments.get("environments", [])
+            ],
             "webhook_count": len(hooks),
             # config.url and secret-presence feed SEC-07; the id is what `imports` needs.
             "webhooks": [
@@ -363,12 +385,21 @@ def propose_archetype(repo: dict[str, Any]) -> str:
         topics & set(INFRASTRUCTURE_TOPIC_HINTS)
     ):
         return "infrastructure"
-    # A deployed service has somewhere to deploy to; a library does not. Webhook presence
-    # was tried as a second signal and dropped: 91 active repos have a webhook and no
-    # environment, and they are overwhelmingly libraries, forks and tooling that merely
-    # have an org-wide integration (Renovate, Codecov) attached. It classified `.github`,
-    # `eslint-config` and `course-search-utils` as applications.
-    if repo["environment_count"] > 0:
+    # A deployed service has somewhere to deploy TO. Two signals were tried and dropped:
+    #
+    #   - webhook presence: 91 active repos have a webhook and no environment, nearly all
+    #     libraries and forks carrying an org-wide integration (Renovate, Codecov).
+    #   - any environment at all: half the resulting application bucket was repos whose
+    #     only environment is `copilot`, `github-pages` or `pypi`. See
+    #     NON_DEPLOY_ENVIRONMENTS.
+    #
+    # What survives is "has an environment that is not publishing plumbing". Note this
+    # reads the environment-name SAMPLE, so a repo with many ephemeral review-app
+    # environments is still an application by virtue of those names.
+    if any(
+        name.lower() not in NON_DEPLOY_ENVIRONMENTS
+        for name in repo.get("environment_names", [])
+    ):
         return "application"
     return "library"
 

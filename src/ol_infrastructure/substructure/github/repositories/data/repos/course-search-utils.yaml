@@ -1,7 +1,7 @@
 ---
 _excluded_environments: 1
 allow_auto_merge: false
-archetype: application
+archetype: library
 delete_branch_on_merge: false
 dependabot_security_updates: false
 description: JS library providing tools to work with MIT Open search

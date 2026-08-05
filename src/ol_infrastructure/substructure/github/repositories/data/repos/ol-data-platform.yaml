@@ -5,7 +5,7 @@ _excluded_environments: 2
 allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true
-archetype: application
+archetype: library
 dependabot_security_updates: false
 description: Pipeline definitions for managing data flows to power analytics at MIT
   Open Learning

@@ -1,6 +1,6 @@
 ---
 _excluded_environments: 1
-archetype: application
+archetype: library
 dependabot_security_updates: false
 name: mit-learn-api-clients
 teams:
