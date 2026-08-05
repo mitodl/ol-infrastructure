@@ -25,6 +25,7 @@ from ol_concourse.pipelines.constants import (
     dockerhub_ecr_image_uri,
 )
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.secrets_map import project_secrets_paths
 
 
 def build_dagster_docker_pipeline() -> Pipeline:
@@ -107,6 +108,7 @@ def build_dagster_docker_pipeline() -> Pipeline:
             *PULUMI_WATCHED_PATHS,
             "src/ol_infrastructure/applications/dagster/",
             "src/bridge/lib/versions.py",
+            *project_secrets_paths("applications/dagster/"),
         ],
         branch=pulumi_code_branch,
     )

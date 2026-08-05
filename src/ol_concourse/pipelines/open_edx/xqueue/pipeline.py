@@ -16,6 +16,7 @@ from bridge.settings.openedx.accessors import filter_deployments_by_application
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.secrets_map import project_secrets_paths
 
 
 def build_xqueue_pipeline(release_name: str):
@@ -53,6 +54,7 @@ def build_xqueue_pipeline(release_name: str):
             *PULUMI_WATCHED_PATHS,
             PULUMI_CODE_PATH.joinpath("applications/xqueue/"),
             "src/bridge/settings/openedx/",
+            *project_secrets_paths("applications/xqueue/"),
         ],
     )
 

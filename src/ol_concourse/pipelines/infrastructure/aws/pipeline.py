@@ -4,6 +4,7 @@ from ol_concourse.lib.resources import git_repo
 
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.secrets_map import project_secrets_paths
 
 # Project names differ from the service names for kms/network, so use explicit mapping.
 _SIMPLE_SERVICE_PROJECT_NAMES = {
@@ -22,6 +23,7 @@ for service in ["kms", "network"]:
         paths=[
             *PULUMI_WATCHED_PATHS,
             f"src/ol_infrastructure/infrastructure/aws/{service}",
+            *project_secrets_paths(f"infrastructure/aws/{service}/"),
         ],
     )
 
@@ -60,7 +62,8 @@ for service in ["dns", "policies", "iam"]:
         uri="https://github.com/mitodl/ol-infrastructure",
         paths=[
             *PULUMI_WATCHED_PATHS,
-            f"src/ol_infrastructure/infrastructurre/aws/{service}",
+            f"src/ol_infrastructure/infrastructure/aws/{service}",
+            *project_secrets_paths(f"infrastructure/aws/{service}/"),
         ],
     )
 
