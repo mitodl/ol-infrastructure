@@ -54,8 +54,10 @@ from pulumi import Config, Output, ResourceOptions, export
 
 from bridge.secrets import sops as _bridge_sops
 from bridge.secrets.sops import read_yaml_secrets
-from ol_infrastructure.applications.omnigraph.data_tier import (
+from ol_infrastructure.applications.omnigraph.cluster_config import (
     COUNCIL_GRAPH_ID,
+)
+from ol_infrastructure.applications.omnigraph.data_tier import (
     OMNIGRAPH_SERVER_SERVICE_NAME,
     create_data_tier,
     omnigraph_server_addr,
@@ -146,6 +148,29 @@ TOKEN_SYNC_SCHEDULE = (
     omnigraph_config.get("token_sync_schedule") or DEFAULT_SYNC_SCHEDULE
 )
 _TOKEN_SYNC_ENABLED = bool(KEYCLOAK_URL)
+
+# Cedar authorization is unconditional: cluster.yaml always carries the
+# `policies:` block. There is no per-environment gate because there is nothing
+# to stage — every environment finished its actor-token rollout on 2026-08-05,
+# and until a bundle is applied the graph is default-deny (only `read`
+# permitted), so an ungated environment is not a safer one, just an unusable
+# one.
+#
+# It does depend on token sync, and not advisorily: with a `policies:` block
+# and no bearer tokens omnigraph-server refuses to boot outright. Asserted here
+# rather than left to the data tier, because the failure it prevents is a
+# crash-looping server whose message ("policy file is configured but no bearer
+# tokens") points at the symptom, not at the environment that never enabled
+# sync. The SOPS-only service tokens would technically satisfy the server, but
+# they grant no human anything — the graph would be authenticated and unusable.
+if not _TOKEN_SYNC_ENABLED:
+    msg = (
+        "omnigraph:keycloak_url is unset, but the Cedar policy bundle is "
+        "always applied. Without per-user actor tokens every human user is "
+        "authenticated and then denied, and the server refuses to boot if the "
+        "token map is empty. Enable token sync for this environment first."
+    )
+    raise ValueError(msg)
 
 # Scheduled store maintenance (maintenance.py). Overridable per environment
 # because the two things that set the right cadence — write volume and how much
