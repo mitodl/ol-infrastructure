@@ -12,7 +12,7 @@ See agent-kit ``mcp/servers/witan/policy/README.md`` for the bundle contract.
 
 import pytest
 
-from ol_infrastructure.applications.omnigraph.data_tier import (
+from ol_infrastructure.applications.omnigraph.cluster_config import (
     BRIDGE_GRAPH_ID,
     COUNCIL_GRAPH_ID,
     build_cluster_graphs,

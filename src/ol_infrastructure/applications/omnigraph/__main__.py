@@ -54,8 +54,10 @@ from pulumi import Config, Output, ResourceOptions, export
 
 from bridge.secrets import sops as _bridge_sops
 from bridge.secrets.sops import read_yaml_secrets
-from ol_infrastructure.applications.omnigraph.data_tier import (
+from ol_infrastructure.applications.omnigraph.cluster_config import (
     COUNCIL_GRAPH_ID,
+)
+from ol_infrastructure.applications.omnigraph.data_tier import (
     OMNIGRAPH_SERVER_SERVICE_NAME,
     create_data_tier,
     omnigraph_server_addr,
