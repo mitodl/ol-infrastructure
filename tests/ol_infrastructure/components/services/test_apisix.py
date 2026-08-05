@@ -15,6 +15,8 @@ This module verifies:
 from __future__ import annotations
 
 import asyncio
+from contextlib import contextmanager
+from dataclasses import replace
 
 import pulumi
 
@@ -42,6 +44,7 @@ from bridge.lib.constants import (  # noqa: E402
     apisix_oidc_session_cookie_name,
     mit_learn_session_cookie_name,
 )
+from ol_infrastructure.components.services import apisix as apisix_module  # noqa: E402
 from ol_infrastructure.components.services.apisix import (  # noqa: E402
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
@@ -366,14 +369,31 @@ def plugin_named(plugins, name):
     return matches[0] if matches else None
 
 
+@contextmanager
+def stack_env(env_suffix: str):
+    """Pretend the component is being rendered against a given environment.
+
+    ``parse_stack`` is imported into the apisix module's namespace, and the
+    mocks fix the stack name process-wide, so patching the reference there is
+    the only way to exercise the per-environment gate.
+    """
+    original = apisix_module.parse_stack
+    apisix_module.parse_stack = lambda: replace(original(), env_suffix=env_suffix)
+    try:
+        yield
+    finally:
+        apisix_module.parse_stack = original
+
+
 @pulumi.runtime.test
-def test_gzip_is_attached_by_default():
+def test_gzip_is_attached_outside_production():
     """APISIX loads the gzip plugin cluster-wide, but a plugin does nothing
     until a route or plugin config references it -- for a long time this one
     referenced it nowhere and every shared-gateway response went out
-    uncompressed.
+    uncompressed. Non-production environments soak the fix first.
     """
-    plugins = shared_plugins("test-shared-plugins-gzip-default")
+    with stack_env("qa"):
+        plugins = shared_plugins("test-shared-plugins-gzip-qa")
 
     def check(spec):
         gzip = plugin_named(spec["plugins"], "gzip")
@@ -384,17 +404,70 @@ def test_gzip_is_attached_by_default():
 
 
 @pulumi.runtime.test
-def test_gzip_is_absent_when_defaults_disabled():
-    """enable_defaults=False has to drop gzip along with every other default;
-    a caller opting out of the defaults is opting out of this one too.
+def test_gzip_is_absent_in_production_by_default():
+    """Production stays off until the non-production soak says otherwise. The
+    risk is not correctness -- APISIX loads gzip everywhere -- it is CPU on a
+    gateway whose HPA scales on CPU, which only shows up at production volume.
     """
-    plugins = shared_plugins(
-        "test-shared-plugins-gzip-opt-out",
-        enable_defaults=False,
-    )
+    with stack_env("production"):
+        plugins = shared_plugins("test-shared-plugins-gzip-production")
 
     def check(spec):
         assert plugin_named(spec["plugins"], "gzip") is None
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_gzip_can_be_forced_on_in_production():
+    """An application that has done its own measurement can go early without
+    waiting for the fleet-wide default to flip.
+    """
+    with stack_env("production"):
+        plugins = shared_plugins(
+            "test-shared-plugins-gzip-production-override",
+            enable_gzip=True,
+        )
+
+    def check(spec):
+        assert plugin_named(spec["plugins"], "gzip") is not None
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_gzip_can_be_forced_off_outside_production():
+    """The override has to work in both directions -- an app that streams, or
+    is otherwise a bad fit for compression, opts out of the soak too.
+    """
+    with stack_env("qa"):
+        plugins = shared_plugins(
+            "test-shared-plugins-gzip-qa-opt-out",
+            enable_gzip=False,
+        )
+
+    def check(spec):
+        assert plugin_named(spec["plugins"], "gzip") is None
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_gzip_is_independent_of_enable_defaults():
+    """Gzip carries its own flag rather than riding in __default_plugins, so
+    enable_defaults=False does not turn it off -- same contract as
+    opentelemetry. enable_gzip=False is the way to drop it.
+    """
+    with stack_env("qa"):
+        plugins = shared_plugins(
+            "test-shared-plugins-gzip-without-defaults",
+            enable_defaults=False,
+        )
+
+    def check(spec):
+        assert plugin_named(spec["plugins"], "gzip") is not None
+        # The actual defaults are gone, confirming the flag is doing the work.
+        assert plugin_named(spec["plugins"], "cors") is None
 
     return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
 
