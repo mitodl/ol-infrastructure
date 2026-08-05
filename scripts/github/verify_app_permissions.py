@@ -16,21 +16,22 @@ Read-only throughout. Never prints credential material.
 import os
 import subprocess
 import sys
-import time
 from pathlib import Path
 from typing import Any
 
 import cyclopts
 import httpx
-import jwt
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
-from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.lib.github_helper import (
+    API_HEADERS,
+    GITHUB_API,
+    get_installation_token,
+)
 
 app = cyclopts.App(help="Verify the ol-infrastructure-as-code GitHub App installation.")
 
-API = "https://api.github.com"
 ORG = "mitodl"
 PROBE_REPO = "ol-infrastructure"
 
@@ -114,11 +115,6 @@ READ_CHECKS: list[tuple[str, str]] = [
     ("Installations (audit SEC-11/12)", f"/orgs/{ORG}/installations"),
 ]
 
-HEADERS = {
-    "Accept": "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
-}
-
 
 def _user_token() -> str:
     """Return a user token with admin:org, for listing installations.
@@ -137,30 +133,12 @@ def _user_token() -> str:
     return result.stdout.strip()
 
 
-def _installation_token() -> str:
-    """Mint a short-lived installation access token from the sops-held App key."""
-    secrets = read_yaml_secrets(Path("pulumi/github_app.yaml"))
-    now = int(time.time())
-    assertion = jwt.encode(
-        {"iat": now - 60, "exp": now + 540, "iss": str(secrets["app_id"])},
-        secrets["private_key"],
-        algorithm="RS256",
-    )
-    response = httpx.post(
-        f"{API}/app/installations/{secrets['installation_id']}/access_tokens",
-        headers={**HEADERS, "Authorization": f"Bearer {assertion}"},
-        timeout=30,
-    )
-    response.raise_for_status()
-    return str(response.json()["token"])
-
-
 @app.command
 def permissions() -> int:
     """Diff the live installation's permissions against the documented manifest (SEC-12)."""
     response = httpx.get(
-        f"{API}/orgs/{ORG}/installations",
-        headers={**HEADERS, "Authorization": f"Bearer {_user_token()}"},
+        f"{GITHUB_API}/orgs/{ORG}/installations",
+        headers={**API_HEADERS, "Authorization": f"Bearer {_user_token()}"},
         timeout=30,
     )
     if response.status_code != httpx.codes.OK:
@@ -209,11 +187,11 @@ def permissions() -> int:
 @app.command
 def reads() -> int:
     """Prove the installation can read every resource type the import touches."""
-    token = _installation_token()
-    auth = {**HEADERS, "Authorization": f"Bearer {token}"}
+    token = get_installation_token()
+    auth = {**API_HEADERS, "Authorization": f"Bearer {token}"}
     failures = 0
 
-    with httpx.Client(base_url=API, headers=auth, timeout=30) as client:
+    with httpx.Client(base_url=GITHUB_API, headers=auth, timeout=30) as client:
         for label, path in READ_CHECKS:
             status = client.get(path).status_code
             ok = status in (httpx.codes.OK, httpx.codes.NO_CONTENT)
