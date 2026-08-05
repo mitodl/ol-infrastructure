@@ -130,12 +130,23 @@ ARCHIVED_SCOPED_RULES = frozenset({"CON-07 archived repo still grants team write
 FLEET_SCOPED_RULES = frozenset(
     {
         "SEC-06 direct collaborator on repo (policy: repo access via teams only)",
-        "SEC-15 admin held by a team other than odl-engineering-owners",
+        "SEC-15 admin held by a team outside the sanctioned set",
     }
 )
 
-# The team(s) sanctioned to hold `admin` on a repository (policy 2026-08-05:
-# odl-engineering-owners is THE admin team; odl-engineering gets push or maintain).
+# The teams sanctioned to hold `admin` on a repository (policy 2026-08-05).
+#
+#   odl-engineering-owners  the org's admin team
+#   devops                  admin on infrastructure it operates
+#
+# NOT sanctioned, and each excluded on purpose:
+#   odl-engineering         the broad engineering team -- push or maintain (116 repos)
+#   devops-contractors      contractor counterpart to devops (4 repos)
+#   arbisoft-contractors    contractor team currently at admin on 57 repos
+#
+# The contractor teams are the point of the rule. Staff/contractor is exactly the boundary
+# where a permission ceiling earns its keep, and `devops` being sanctioned while
+# `devops-contractors` is not is a deliberate distinction rather than an oversight.
 #
 # Deliberately an ALLOWLIST rather than a list of teams barred from admin. `admin` carries
 # repo deletion, settings changes and ruleset bypass, and with direct collaborator grants
@@ -143,7 +154,7 @@ FLEET_SCOPED_RULES = frozenset(
 # Under a denylist a newly created team acquires admin silently and SEC-15 stays quiet;
 # under an allowlist it has to be named here first. Default-deny is the only version of
 # this rule that stays true as the org changes.
-ADMIN_TEAMS = frozenset({"odl-engineering-owners"})
+ADMIN_TEAMS = frozenset({"odl-engineering-owners", "devops"})
 ADMIN_PERMISSIONS = frozenset({"admin"})
 
 # The value GitHub reports for an active security-and-analysis feature. Hoisted to a
@@ -540,7 +551,7 @@ def _findings(
                 if (r.get("teams") or {})
                 != (archetype_teams.get(propose_archetype(r)) or {})
             ],
-            "SEC-15 admin held by a team other than odl-engineering-owners": [
+            "SEC-15 admin held by a team outside the sanctioned set": [
                 r["name"]
                 for r in repos
                 if any(

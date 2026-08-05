@@ -844,7 +844,7 @@ fixtures and cheap to add — the rule set is meant to grow every time someone n
 | SEC-12 | Our own app's live permissions diverge from `docs/github-app-permissions.md` | — |
 | SEC-13 | Private repo with weaker controls than the public baseline | `hq` |
 | SEC-14 | No CODEOWNERS on a tier-1 repo | unknown |
-| SEC-15 | `admin` held by any team other than `odl-engineering-owners`, the sanctioned admin team (policy 2026-08-05) | **fires on 144 repos** (74 active, 70 archived) |
+| SEC-15 | `admin` held by a team outside the sanctioned set — currently `odl-engineering-owners` and `devops` (policy 2026-08-05) | **fires on 125 repos** (66 active, 59 archived) |
 
 ### Axis: Consistency
 
