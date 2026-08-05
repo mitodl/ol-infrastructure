@@ -963,11 +963,18 @@ ovs_k8s_app = OLApplicationK8s(
 # when the sidecar goes away. nginx matched them by longest-prefix, so the three
 # individual videos have to outrank the collection-wide redirect, which in turn
 # has to outrank the `/*` passthrough -- hence the explicit priorities.
+#
+# Every entry carries both the bare path and a `*` variant because an nginx
+# `location /foo` is a prefix match: `/foo/`, and anything below it, hit the same
+# redirect. Without the wildcard a trailing slash on one of the video URLs would
+# fall through to the priority-10 collection route and land on the channel page
+# instead of the specific video.
 _YOUTUBE_COLLECTION_REDIRECTS: list[tuple[str, list[str], str, int]] = [
     (
         "letterlocking-iron-gall-ink",
         [
-            "/collections/letterlocking/videos/30213-iron-gall-ink-a-quick-and-easy-method"
+            "/collections/letterlocking/videos/30213-iron-gall-ink-a-quick-and-easy-method",
+            "/collections/letterlocking/videos/30213-iron-gall-ink-a-quick-and-easy-method*",
         ],
         "https://www.youtube.com/playlist?list=PL2uZTM-xaHP4tFQT7eTTK3sWRoJMcDWwB",
         20,
@@ -976,7 +983,9 @@ _YOUTUBE_COLLECTION_REDIRECTS: list[tuple[str, list[str], str, int]] = [
         "letterlocking-elizabeth-stuart",
         [
             "/collections/letterlocking/videos/30215-elizabeth-stuart-s-deciphering-"
-            "sir-thomas-roe-s-letter-cryptography-1626"
+            "sir-thomas-roe-s-letter-cryptography-1626",
+            "/collections/letterlocking/videos/30215-elizabeth-stuart-s-deciphering-"
+            "sir-thomas-roe-s-letter-cryptography-1626*",
         ],
         "https://www.youtube.com/watch?v=6X_ZXrLs8I8&list=PL2uZTM-xaHP4tFQT7eTTK3sWRoJMcDWwB&index=3&t=0s",
         20,
@@ -985,7 +994,9 @@ _YOUTUBE_COLLECTION_REDIRECTS: list[tuple[str, list[str], str, int]] = [
         "letterlocking-tiny-spy-letter",
         [
             "/collections/letterlocking/videos/30209-a-tiny-spy-letter-constantijn-"
-            "huygens-to-amalia-von-solms-1635"
+            "huygens-to-amalia-von-solms-1635",
+            "/collections/letterlocking/videos/30209-a-tiny-spy-letter-constantijn-"
+            "huygens-to-amalia-von-solms-1635*",
         ],
         "https://www.youtube.com/watch?v=PePWd-h679c&list=PL2uZTM-xaHP4tFQT7eTTK3sWRoJMcDWwB&index=7&t=0s",
         20,
