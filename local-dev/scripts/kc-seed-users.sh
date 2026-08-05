@@ -77,16 +77,31 @@ ensure_admin_role
 
 # ---------------------------------------------------------------------------
 # User definitions: (username, email, firstName, lastName, assign_admin_role)
+#
+# Plain case statements instead of associative arrays: declare -A requires
+# bash 4+, but macOS ships bash 3.2 (GPLv3 licensing) as the only /bin/bash on
+# PATH, where declare -A silently misparses and fails with a confusing
+# "unbound variable" error under set -u.
 # ---------------------------------------------------------------------------
-declare -A USER_EMAILS=( [admin]="admin@odl.local" [student]="student@odl.local" [prof]="prof@odl.local" )
-declare -A USER_FIRST=( [admin]="Admin" [student]="Student" [prof]="Professor" )
-declare -A USER_LAST=( [admin]="User" [student]="User" [prof]="User" )
-ADMIN_USERS=("admin")
+user_email() {
+    case "$1" in
+        admin) echo "admin@odl.local" ;;
+        student) echo "student@odl.local" ;;
+        prof) echo "prof@odl.local" ;;
+    esac
+}
+user_first() {
+    case "$1" in
+        admin) echo "Admin" ;;
+        student) echo "Student" ;;
+        prof) echo "Professor" ;;
+    esac
+}
 
 for USERNAME in admin student prof; do
-    EMAIL="${USER_EMAILS[$USERNAME]}"
-    FIRST="${USER_FIRST[$USERNAME]}"
-    LAST="${USER_LAST[$USERNAME]}"
+    EMAIL="$(user_email "$USERNAME")"
+    FIRST="$(user_first "$USERNAME")"
+    LAST="User"
 
     # Check if user already exists. Look up by email, not username: the realm
     # has registrationEmailAsUsername=true, so Keycloak stores the username as
@@ -131,21 +146,19 @@ for USERNAME in admin student prof; do
         | jq -r '.[0].id // empty' 2>/dev/null || true)
 
     # Assign the admin realm role if applicable.
-    for admin_user in "${ADMIN_USERS[@]}"; do
-        if [ "$admin_user" = "$USERNAME" ] && [ -n "$NEW_ID" ]; then
-            echo "[kc-seed-users] Assigning 'admin' realm role to ${USERNAME} ..."
-            ROLE_JSON=$(curl -sf --max-time 10 \
-                -H "Authorization: Bearer ${TOKEN}" \
-                "${KC_URL}/admin/realms/${REALM}/roles/admin" 2>/dev/null || true)
-            curl -sf --max-time 10 \
-                -X POST \
-                -H "Authorization: Bearer ${TOKEN}" \
-                -H "Content-Type: application/json" \
-                "${KC_URL}/admin/realms/${REALM}/users/${NEW_ID}/role-mappings/realm" \
-                -d "[${ROLE_JSON}]" \
-                -o /dev/null
-        fi
-    done
+    if [ "$USERNAME" = "admin" ] && [ -n "$NEW_ID" ]; then
+        echo "[kc-seed-users] Assigning 'admin' realm role to ${USERNAME} ..."
+        ROLE_JSON=$(curl -sf --max-time 10 \
+            -H "Authorization: Bearer ${TOKEN}" \
+            "${KC_URL}/admin/realms/${REALM}/roles/admin" 2>/dev/null || true)
+        curl -sf --max-time 10 \
+            -X POST \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            "${KC_URL}/admin/realms/${REALM}/users/${NEW_ID}/role-mappings/realm" \
+            -d "[${ROLE_JSON}]" \
+            -o /dev/null
+    fi
 done
 
 echo "[kc-seed-users] Done."
