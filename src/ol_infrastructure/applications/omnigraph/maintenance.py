@@ -53,6 +53,7 @@ manifest/head drift and its ``--force`` mode publishes drift a human has not
 verified; it is a reactive, operator-driven command. See the runbook.
 """
 
+import shlex
 from typing import NamedTuple
 
 import pulumi_kubernetes as kubernetes
@@ -120,9 +121,20 @@ def _sweep_script(command: str, extra_args: list[str], graph_ids: list[str]) -> 
     command echoes ("omnigraph cleanup -> s3://.../graphs/council.omni") is the
     log line that proves a run addressed the store it was meant to, which is
     the first thing to check when a sweep reports success against nothing.
+
+    Every interpolated value is ``shlex.quote``d. ``extra_args`` carries
+    ``cleanup_older_than``, which is Pulumi config an operator can set to
+    anything: unquoted, a plausible typo like ``30 days`` silently becomes two
+    shell words and the CLI gets a stray positional argument, which is a
+    confusing 4am failure rather than an obvious one. Quoted, the same typo
+    reaches the CLI as one argument and comes back as a duration parse error
+    naming the value. ``graph_ids`` are already normalized to ``[a-z0-9-]`` by
+    ``code_graph_id``, so quoting them is a no-op today and stays correct if
+    that normalization ever loosens — quoting each id individually preserves
+    the word list the ``for`` loop needs.
     """
-    graph_list = " ".join(graph_ids)
-    args = " ".join(["--as", '"${OMNIGRAPH_MAINTENANCE_ACTOR}"', *extra_args])
+    graph_list = " ".join(shlex.quote(graph) for graph in graph_ids)
+    args = " ".join(shlex.quote(arg) for arg in extra_args)
     return f"""set -u
 failed=""
 for graph in {graph_list}; do
@@ -130,7 +142,7 @@ for graph in {graph_list}; do
     if omnigraph {command} \\
         --cluster "${{OMNIGRAPH_STORAGE_ROOT}}" \\
         --graph "${{graph}}" \\
-        {args}; then
+        --as "${{OMNIGRAPH_MAINTENANCE_ACTOR}}" {args}; then
         :
     else
         echo "!!! omnigraph {command} failed for ${{graph}}" >&2

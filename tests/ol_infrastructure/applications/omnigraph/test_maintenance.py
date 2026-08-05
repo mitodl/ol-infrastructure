@@ -150,6 +150,59 @@ def test_cleanup_retention_is_an_age_not_a_version_count(run_sweep):
     assert "--keep" not in call
 
 
+def test_a_misconfigured_retention_stays_one_argument(run_sweep):
+    """``cleanup_older_than`` is operator-set Pulumi config, so it can be junk.
+
+    Unquoted, the plausible typo ``30 days`` splits into two shell words and the
+    CLI gets a stray positional argument — a confusing failure at 4am on a
+    Sunday. Quoted, it arrives as one argument and comes back as a duration
+    parse error naming the value.
+    """
+    result = run_sweep(
+        _sweep_script(
+            "cleanup", ["--older-than", "30 days", "--confirm", "--yes"], ["council"]
+        )
+    )
+
+    (call,) = result.calls
+    assert call[call.index("--older-than") + 1] == "30 days"
+
+
+def test_shell_metacharacters_in_config_do_not_escape_the_argument(run_sweep):
+    """Nothing an operator can put in config should change what runs.
+
+    Config is only settable by someone who could edit this program anyway, so
+    this is not a privilege boundary — but a value that silently rewrites the
+    command line is a failure mode worth foreclosing rather than reasoning
+    about.
+    """
+    hostile = '30d"; echo owned; #'
+    result = run_sweep(
+        _sweep_script(
+            "cleanup", ["--older-than", hostile, "--confirm", "--yes"], ["council"]
+        )
+    )
+
+    # The whole argv, not just the one field: had the metacharacters escaped,
+    # the `#` would have commented out everything after it and the flags below
+    # would be missing from the recorded call.
+    (call,) = result.calls
+    assert call == [
+        "cleanup",
+        "--cluster",
+        "s3://ol-data-witan-ci",
+        "--graph",
+        "council",
+        "--as",
+        "svc-witan-admin",
+        "--older-than",
+        hostile,
+        "--confirm",
+        "--yes",
+    ]
+    assert "owned" not in result.stdout
+
+
 def test_one_bad_graph_does_not_skip_the_rest(run_sweep):
     """A quarantined code graph must not cost every graph after it in the list.
 
