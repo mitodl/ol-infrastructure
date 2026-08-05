@@ -59,6 +59,10 @@ TEAMS: dict[str, dict[str, Any]] = {
         "description": "ODL Enginineering",
         "privacy": "closed",
     },
+    # NOTE: `None`, not `""`. The API returns JSON null here, whereas devops,
+    # devops-contractors and odlengweb genuinely hold empty strings. Both forms
+    # preview clean (verified), so this is a fidelity choice: `""` would assert an
+    # empty description where GitHub reports absence.
     "odl-engineering-owners": {
         "name": "ODL Engineering Owners",
         "description": None,

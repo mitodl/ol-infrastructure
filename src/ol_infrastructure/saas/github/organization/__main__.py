@@ -29,7 +29,6 @@ first apply this stack should preview clean. That empty diff is the gate (§6).
 from ol_infrastructure.lib.github_helper import setup_github_provider
 
 # Must run before any github.* resource is constructed: the stack transformation
-# attaches
 # attaches the App-authenticated provider to every one of them.
 setup_github_provider()
 

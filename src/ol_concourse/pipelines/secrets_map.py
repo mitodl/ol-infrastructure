@@ -163,6 +163,7 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     "infrastructure/vault/": ["vector/"],
     "infrastructure/vector_log_proxy/": ["fastly.yaml", "vector/"],
     # ---- saas/ ------------------------------------------------------------
+    "saas/github/organization/": [],
     "saas/rootly/": ["rootly/"],
     # ---- substructure/ ----------------------------------------------------
     "substructure/aws/eks/": ["alloy/"],
