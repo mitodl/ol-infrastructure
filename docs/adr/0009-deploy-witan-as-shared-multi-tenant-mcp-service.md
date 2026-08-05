@@ -285,6 +285,49 @@ the project/namespace renames needed no Pulumi state migration or aliases.
 from the foreign `mitodl/agent-kit` repo and gates its `pulumi_jobs_chain` on
 that build. See `src/ol_concourse/pipelines/infrastructure/{omnigraph,witan}/`.
 
+## Addendum (2026-08-05) — a storage-format bump is not a deploy; see the runbook
+
+The data tier's `strategy=Recreate` (2026-07-17 addendum, `data_tier.py`) covers
+*same*-format restarts: it tears the old pod down before the new one starts, so
+two binaries never write one S3 store. It does **not** cover an image bump that
+changes the storage format.
+
+omnigraph storage is strict-single-version — a binary reads exactly one
+internal-schema version, there is no in-place migration, and the gate is
+enforced on read-only opens too. Against a format-bumping image, Recreate
+starts the new pod on a store it refuses to open: the rollout fails on the
+version gate and the environment stays down until it is rolled back or the
+graphs are rebuilt offline. Nothing is corrupted — the graph is simply
+unreadable by the image that was just shipped.
+
+That rebuild is **export → `cluster apply` → `load` under a new storage root**,
+one pass over every declared graph (`council`, `code-bridge`, and one
+`code-<repo>` per `omnigraph:managed_repos` — 16 on CI today), with the old root
+left intact as the rollback. Ids stay identical, so clients — which address
+graphs by id, never by path — are unaffected.
+
+The procedure, the detection test that tells a format bump apart from an
+ordinary one, and the rollback are in
+[docs/omnigraph-storage-format-upgrade-runbook.md](../omnigraph-storage-format-upgrade-runbook.md).
+Two findings from validating it against the live CI deployment are worth
+recording here, since both contradict a reasonable reading of the CLI's help:
+
+- **`--cluster` does not address data commands.** `export`/`load`/`init`/
+  `snapshot` reach a cluster-managed graph by its store URI
+  (`--store <root>/graphs/<graph-id>.omni`); `--cluster <root> --graph <id>` is
+  for `optimize`/`repair`/`cleanup`/`cluster *` only and errors on the rest.
+- **`manifest_version` is not the format version.** `snapshot` reports both;
+  only `internal_schema_version` is what the gate compares, and
+  `manifest_version` legitimately differs between graphs in one cluster.
+
+This addendum records a consequence of the existing decision rather than
+changing it. One follow-on is worth doing before the procedure is ever needed
+in anger: the storage root is derived (`ol-data-witan-<env>`) with no config
+override, so repointing it is an edit to `data_tier.py` — done under outage
+pressure, on the step where a mistake silently leaves the cluster on the old
+root. A prefix within the existing bucket is a valid root (`cluster validate`
+accepts it), so the override is a config key, not a new bucket or IRSA change.
+
 ## Implementation Notes
 
 - **Effort Estimate:** Multi-week — spans a concurrency-behavior spike, witan
@@ -339,5 +382,6 @@ spanning both repos.
 | 2026-07-07 | _Pending_ | _Pending_ | Created during agentic scoping session |
 | 2026-07-07 | Tobias Macey | Approved | Accepted after Copilot automated review feedback addressed (RFC citation, ADR index, self-containment) |
 | 2026-07-17 | Tobias Macey | Amended | Added 2026-07-17 addendum: split `toolhive_witan` into separate `omnigraph` + `witan` projects/namespaces; dropped `toolhive` from element naming |
+| 2026-08-05 | Tobias Macey | Amended | Added 2026-08-05 addendum: storage-format bumps need the offline export/rebuild runbook, not a Recreate restart |
 
-**Last Updated:** 2026-07-17
+**Last Updated:** 2026-08-05
