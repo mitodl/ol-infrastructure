@@ -10,9 +10,8 @@ JUPYTERHUB_VERSION = "5.5.0"
 KEYCLOAK_VERSION = "26.7.0"
 # renovate: datasource=docker depName=leek packageName=kodhive/leek
 LEEK_VERSION = "0.7.7"
-MEILISEARCH_VERSION = (
-    "v1.33.0"  # (MD 2026-03-30) pin to v1.33.0 because of upgrade compatibility issues
-)
+# renovate: datasource=docker depName=meilisearch packageName=getmeili/meilisearch
+MEILISEARCH_VERSION = "v1.51.0"
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
 OPEN_METADATA_VERSION = "1.13.3"
 OVS_VERSION = "v0.65.1-3-g2630021"
