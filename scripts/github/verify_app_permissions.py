@@ -168,11 +168,21 @@ def permissions() -> int:
             f"cannot list installations ({response.status_code}); needs `gh auth` admin:org"
         )
         return 1
-    live: dict[str, Any] = next(
-        i["permissions"]
-        for i in response.json()["installations"]
-        if i["app_slug"] == "ol-infrastructure-as-code"
+    installation = next(
+        (
+            i
+            for i in response.json()["installations"]
+            if i["app_slug"] == "ol-infrastructure-as-code"
+        ),
+        None,
     )
+    if installation is None:
+        print(
+            "ol-infrastructure-as-code is not installed on this org. "
+            "That is itself the finding -- nothing in the import plan works without it."
+        )
+        return 1
+    live: dict[str, Any] = installation["permissions"]
 
     missing = {k: v for k, v in EXPECTED.items() if k not in live}
     unexpected = {k: v for k, v in live.items() if k not in EXPECTED}
