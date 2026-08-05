@@ -4,10 +4,13 @@ How to roll out an `omnigraph-server` image whose binary bumps the **storage
 format**, why the ordinary deploy cannot do it, and how to tell the two cases
 apart before you start.
 
-Commands here were checked against the live CI deployment on 2026-08-05
-(`operations-ci`, omnigraph 0.8.1, `internal-schema 4`). The read-only and
-addressing steps are verified; the two write steps that rebuild a graph are
-marked where they are not.
+Every command here was run against the live CI deployment on 2026-08-05
+(`operations-ci`, omnigraph 0.8.1, `internal-schema 4`), including a full
+rehearsal of the rebuild — `cluster import` → `cluster apply` → `load` →
+verification — on a scratch prefix with synthetic rows, which round-tripped
+exactly. The one thing not exercised is the version gate itself: no
+format-bumping image exists yet, so the drill ran the same binary on both
+sides.
 
 ## When this applies
 
@@ -201,7 +204,7 @@ Each pod shell you open below needs the same three set again — a `kubectl exec
 shell inherits nothing from your workstation, and the steps that open one say so
 where it matters.
 
-All `omnigraph` and `aws` work runs **in-cluster**, in a one-off pod on the
+All `omnigraph` work runs **in-cluster**, in a one-off pod on the
 `omnigraph-server` ServiceAccount, which carries the bucket's IRSA grant — no
 human AWS credentials, and it is the `svc-witan-admin` break-glass identity
 (agent-kit ADR-0005 path (b)) rather than a side channel. There is no
@@ -209,6 +212,12 @@ human AWS credentials, and it is the `svc-witan-admin` break-glass identity
 server pod to `exec` into either, so each step below says which of the two
 workspace pods it runs in. Commands starting with `kubectl` are the ones you
 run locally.
+
+> **The image ships only `omnigraph`, `omnigraph-server`, and its entrypoint.**
+> No `aws`, no `curl`, no `python3`. Anything moving data in or out of a
+> workspace pod goes through `kubectl exec`, not an S3 round trip — which is why
+> steps 3 and 4 hand the exports across rather than staging them in the bucket.
+> `aws` commands in this runbook run on your **workstation**.
 
 Two pods, because the migration spans two binaries: `omnigraph-migrate-old`
 (step 2, baseline + export) and `omnigraph-migrate-new` (step 4, rebuild).
@@ -238,7 +247,7 @@ image, which is the old binary that can still read the old root:
 ```shell
 kubectl -n omnigraph run omnigraph-migrate-old --restart=Never \
   --image=<OLD-image-ref> \
-  --overrides='{"spec":{"serviceAccountName":"omnigraph-server"}}' \
+  --overrides='{"apiVersion":"v1","spec":{"serviceAccountName":"omnigraph-server"}}' \
   --env=AWS_REGION=us-east-1 --command -- sleep 86400
 kubectl -n omnigraph wait --for=condition=Ready pod/omnigraph-migrate-old --timeout=120s
 kubectl -n omnigraph exec -i omnigraph-migrate-old -- sh -c 'cat > /tmp/graph-ids.txt' \
@@ -285,33 +294,55 @@ Still inside `omnigraph-migrate-old`:
 mkdir -p /tmp/export
 for g in $(cat /tmp/graph-ids.txt); do
   omnigraph export --store "$OLD_ROOT/graphs/$g.omni" > "/tmp/export/$g.jsonl"
+  echo "$g: $(wc -l < /tmp/export/$g.jsonl) lines"
 done
-aws s3 cp --recursive /tmp/export "$OLD_ROOT/_migration/<date>/"
 ```
 
-Copy the exports off the pod (a scratch prefix in the bucket is simplest — the
-SA can already write it). A failure here is a clean stop: nothing has changed,
-so scale back to 1 and investigate.
+Then pull them onto your workstation, which is where step 4 pushes them from.
+**The image has no `aws`, `curl`, or `python3` — only the `omnigraph` binaries** —
+so the transfer goes through `kubectl`, not an S3 round trip:
+
+```shell
+mkdir -p /tmp/export
+for g in $(cat /tmp/graph-ids.txt); do
+  kubectl -n omnigraph exec omnigraph-migrate-old -- \
+    cat "/tmp/export/$g.jsonl" > "/tmp/export/$g.jsonl"
+done
+wc -l /tmp/export/*.jsonl
+```
+
+Keep that workstation copy until step 7 — it is the only artifact that survives
+both pods being deleted. A failure anywhere in this step is a clean stop:
+nothing has been written, so scale the Deployment back to 1 and investigate.
 
 ### 4. Rebuild at the new root with the NEW binary
 
-> Steps 4 and 5 are the write path and have **not** been rehearsed end to end —
-> the addressing, `cluster validate`, and the schema layout below are verified
-> against CI, but `cluster apply` at a new root and `load --mode merge` are not.
-> Do a full drill against a scratch prefix in CI before running this on
-> Production.
+> Rehearsed against CI on 2026-08-05 with synthetic rows: `cluster import` →
+> `cluster apply` → `load --mode merge` → step 6's verification, on a scratch
+> prefix. Row counts round-tripped exactly. What that drill could **not**
+> cover is the version gate itself — both pods ran the same binary, because no
+> format-bumping image exists yet. Expect the gate's behaviour, and only the
+> gate's behaviour, to be new on the day.
 
 This step needs the **new** binary, so it runs in a second pod. On your
-workstation:
+workstation — push the graph list and the exports in, since the image has no
+`aws`:
 
 ```shell
 kubectl -n omnigraph run omnigraph-migrate-new --restart=Never \
   --image=<NEW-image-ref> \
-  --overrides='{"spec":{"serviceAccountName":"omnigraph-server"}}' \
+  --overrides='{"apiVersion":"v1","spec":{"serviceAccountName":"omnigraph-server"}}' \
   --env=AWS_REGION=us-east-1 --command -- sleep 86400
-kubectl -n omnigraph wait --for=condition=Ready pod/omnigraph-migrate-new --timeout=120s
+kubectl -n omnigraph wait --for=condition=Ready pod/omnigraph-migrate-new --timeout=180s
+
 kubectl -n omnigraph exec -i omnigraph-migrate-new -- sh -c 'cat > /tmp/graph-ids.txt' \
   < /tmp/graph-ids.txt
+kubectl -n omnigraph exec omnigraph-migrate-new -- mkdir -p /tmp/export
+for g in $(cat /tmp/graph-ids.txt); do
+  kubectl -n omnigraph exec -i omnigraph-migrate-new -- \
+    sh -c "cat > /tmp/export/$g.jsonl" < "/tmp/export/$g.jsonl"
+done
+
 kubectl -n omnigraph exec -it omnigraph-migrate-new -- sh
 ```
 
@@ -325,13 +356,12 @@ NEW_ROOT="$OLD_ROOT/fmt<N>"
 omnigraph version        # must show the NEW internal-schema number
 ```
 
-Everything below runs inside this pod. Pull the exports back down and build a
-config directory holding the image's baked-in schemas plus a cluster.yaml that
-is the live one with `storage:` repointed:
+Everything below runs inside this pod. Build a config directory holding the
+image's baked-in schemas plus a cluster.yaml that is the live one with
+`storage:` repointed:
 
 ```shell
-mkdir -p /tmp/rebuild /tmp/export
-aws s3 cp --recursive "$OLD_ROOT/_migration/<date>/" /tmp/export/
+mkdir -p /tmp/rebuild
 cp /etc/omnigraph/cluster/*.pg /tmp/rebuild/     # schema.pg, code-schema.pg, bridge-schema.pg
 cp /etc/omnigraph/cluster/cluster.yaml /tmp/rebuild/cluster.yaml
 vi /tmp/rebuild/cluster.yaml                     # edit only: storage: s3://ol-data-witan-$ENV/fmt<N>
@@ -352,14 +382,33 @@ kubectl -n omnigraph get configmap omnigraph-cluster-config \
 ```
 
 `cluster validate` is read-only and catches a mis-edited storage URI or an
-unresolvable `schema:` reference before anything is written. Then create every
-declared graph, empty, with the new binary's schemas:
+unresolvable `schema:` reference before anything is written.
+
+Now bootstrap the new root's state ledger, **then** converge it. Both commands,
+in this order:
 
 ```shell
-omnigraph cluster apply --config /tmp/rebuild --as svc-witan-admin
+omnigraph cluster import --config /tmp/rebuild --as svc-witan-admin
+omnigraph cluster apply  --config /tmp/rebuild --as svc-witan-admin
 ```
 
-And load each export:
+> **`cluster apply` alone fails on a root that has never been applied to.** A
+> new storage root has no `__cluster/state.json`, and apply refuses rather than
+> creating one:
+>
+> ```
+> ERROR state_missing __cluster/state.json: apply requires an existing
+> state.json; run `cluster import` to bootstrap state
+> ```
+>
+> `cluster import` writes that ledger — at a fresh root it observes nothing and
+> records revision 1 with 0 resources, which is exactly right. `apply` then
+> creates the graphs and moves to revision 2. This bites only on the *first*
+> apply against a new root, which is precisely what this procedure does, at the
+> point of no return, during an outage.
+
+Expect apply to report `Create graph.<id>` and `Create schema.<id>` for every
+declared graph, ending `converged: true, written: true`. Then load each export:
 
 ```shell
 for g in $(cat /tmp/graph-ids.txt); do
@@ -482,8 +531,8 @@ kubectl -n omnigraph delete pod omnigraph-migrate-old omnigraph-migrate-new --ig
 
 The old root itself waits. **Not the same day** — leave `$OLD_ROOT/graphs/`
 untouched through at least one full soak (a week for Production), because it is
-the only fast rollback. Delete it, and the `_migration/<date>/` exports, only
-after the next environment has migrated successfully too.
+the only fast rollback. Delete it, and the workstation copy of the exports in
+`/tmp/export/`, only after the next environment has migrated successfully too.
 
 ## Rollback
 
@@ -525,7 +574,7 @@ will drop any repo whose normalization you got wrong. Re-check against the
 ConfigMap listing in *What gets rebuilt*.
 
 **Row counts do not match.** Do not release the outage. The exports are in
-`$OLD_ROOT/_migration/<date>/` and the old root is intact — roll back and
+`/tmp/export/` on your workstation and the old root is intact — roll back and
 reconcile offline. A partial load is the one outcome worse than a failed one,
 because it looks like success.
 
