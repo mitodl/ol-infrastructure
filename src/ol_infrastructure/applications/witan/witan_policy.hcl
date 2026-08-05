@@ -18,10 +18,11 @@ path "secret-operations/witan/ci-token" {
 
 # {actor_id: token} JSON map — the same artifact omnigraph-server boots its
 # bearer-token auth from (OMNIGRAPH_SERVER_BEARER_TOKENS_FILE) and witan
-# resolves per-user tokens from (WITAN_ACTOR_TOKENS_FILE). Seeded here with at
-# least the svc-witan-ci entry; per-user entries are written by the
-# Keycloak witan-users sync (tk-... follow-up, not yet built — see
-# applications/witan/__main__.py).
+# resolves per-user tokens from (WITAN_ACTOR_TOKENS_FILE). Always carries the
+# svc-witan-ci entry; per-user entries are written by the realm token-sync
+# CronJob in the omnigraph stack (applications/omnigraph/token_sync.py), in
+# environments that have it enabled. Read-only here either way — this stack is
+# a consumer of that path, never a writer of it.
 path "secret-operations/witan/actor-tokens" {
   capabilities = ["read"]
 }
