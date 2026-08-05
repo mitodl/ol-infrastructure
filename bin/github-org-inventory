@@ -220,6 +220,20 @@ def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
         )
         rulesets = _maybe(client, f"/repos/{ORG}/{name}/rulesets") or []
         secrets = _maybe(client, f"/repos/{ORG}/{name}/actions/secrets?per_page=100")
+        # One page. The endpoint reports total_count, so trip loudly rather than
+        # truncating in silence -- these names feed SEC-09 (secrets never rotated), and a
+        # security audit quietly missing entries is worse than one that fails.
+        #
+        # Deliberately NOT switched to _paginate(): that helper extracts `items` from a
+        # dict response, while this endpoint returns `secrets`, so it would yield zero
+        # secrets for every repo. It also raises on the 403/404s that _maybe absorbs.
+        # Highest observed is 22 (access-forge) against a page size of 100.
+        if secrets and len(secrets["secrets"]) < secrets["total_count"]:
+            message = (
+                f"{name}: {secrets['total_count']} Actions secrets exceeds one page. "
+                "Pagination is now required -- see the note above."
+            )
+            raise RuntimeError(message)
         properties = _maybe(client, f"/repos/{ORG}/{name}/properties/values") or []
         teams = _maybe(client, f"/repos/{ORG}/{name}/teams?per_page=100") or []
         # IDs, not just counts: `imports` needs them to build the Pulumi import payload.
