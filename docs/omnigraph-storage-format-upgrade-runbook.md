@@ -197,7 +197,20 @@ Set these first, **on your workstation** — steps 5, 6 and 7 use them there:
 ```shell
 ENV=ci                                    # ci | qa | production
 OLD_ROOT="s3://ol-data-witan-$ENV"
-NEW_ROOT="$OLD_ROOT/fmt<N>"               # <N> = the new internal-schema number
+NEW_ROOT="$OLD_ROOT/fmt5"                 # digits = the NEW internal-schema number
+```
+
+`fmt5` is an example. **Substitute the real number** — `<` and `>` are legal in
+S3 object keys, so a literal `fmt<N>` becomes a real prefix and the migration
+silently rebuilds into the wrong place. The pod-shell blocks below re-set these
+and guard against exactly that; the same guard is worth running here:
+
+```shell
+case "$NEW_ROOT" in
+  *'<'*|*'>'*) echo "NEW_ROOT still has a placeholder — stop"; exit 1 ;;
+esac
+printf '%s\n' "$NEW_ROOT" | grep -qE '^s3://[a-z0-9.-]+/fmt[0-9]+$' \
+  || { echo "NEW_ROOT malformed: $NEW_ROOT — stop"; exit 1; }
 ```
 
 Each pod shell you open below needs the same three set again — a `kubectl exec`
@@ -271,7 +284,7 @@ sanity-check the binary and its addressing before relying on either:
 ```shell
 ENV=ci                                    # ci | qa | production
 OLD_ROOT="s3://ol-data-witan-$ENV"
-NEW_ROOT="$OLD_ROOT/fmt<N>"
+NEW_ROOT="$OLD_ROOT/fmt5"                 # real digits — see the guard in step 4
 omnigraph version
 omnigraph snapshot --store "$OLD_ROOT/graphs/council.omni" | head -3
 ```
@@ -380,10 +393,22 @@ kubectl -n omnigraph exec -it omnigraph-migrate-new -- sh
 ```shell
 ENV=ci                                    # ci | qa | production
 OLD_ROOT="s3://ol-data-witan-$ENV"
-NEW_ROOT="$OLD_ROOT/fmt<N>"
-test -n "$NEW_ROOT" || { echo "NEW_ROOT unset — stop"; exit 1; }
+NEW_ROOT="$OLD_ROOT/fmt5"                 # <-- real digits, not fmt<N>
+
+# Reject an unsubstituted placeholder and a malformed root. `<`/`>` are legal
+# in S3 keys, so `fmt<N>` would happily become a real prefix.
+case "$NEW_ROOT" in
+  *'<'*|*'>'*) echo "NEW_ROOT still has a placeholder — stop"; exit 1 ;;
+esac
+printf '%s\n' "$NEW_ROOT" | grep -qE '^s3://[a-z0-9.-]+/fmt[0-9]+$' \
+  || { echo "NEW_ROOT malformed: $NEW_ROOT — stop"; exit 1; }
+
 omnigraph version        # must show the NEW internal-schema number
 ```
+
+> The pod's `/bin/sh` is **dash**, not bash — `[[ ... =~ ... ]]` fails with
+> `[[: not found`. Every guard in this runbook is POSIX `case`/`grep` for that
+> reason; keep it that way if you add more.
 
 Repoint `storage:` with `sed` — there is no `vi`, `vim`, `nano`, or `ed` in the
 image, and no `busybox` to fall back on:
