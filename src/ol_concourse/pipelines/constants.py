@@ -29,7 +29,7 @@ def dockerhub_ecr_image_uri(image_repo: str) -> str:
       ``"aws_region": ECR_REGION``.
 
     :param image_repo: Docker Hub image name, e.g. ``"alpine"`` or
-        ``"grafana/grizzly"``.  Official library images (no namespace) are
+        ``"mitodl/ol-infrastructure"``.  Official library images (no namespace) are
         automatically prefixed with ``library/``.
     :returns: ECR pull-through repository path, e.g. ``"dockerhub/library/alpine"``.
     """

@@ -229,12 +229,16 @@ pingdom_integration_ids: [<integration-id>, ...]  # Pingdom integration IDs for 
 
 ---
 
-## Pending phases (as of 2026-07-02)
+## Pending phases (as of 2026-08-05)
 
-- **Phase 5** — Remove cortextool sync jobs (both cortex and loki) from the
-  Grafana Cloud Concourse pipeline
-  (`src/ol_concourse/pipelines/infrastructure/grafana_cloud/pipeline.py`)
-  once Pulumi rules (Phases 3 and 4) are verified in production.
+- **Phase 5** — Done. The legacy Grafana Concourse pipelines have been deleted:
+  `src/ol_concourse/pipelines/infrastructure/grafana_cloud/` (grizzly dashboard
+  sync + cortextool cortex/loki rule sync) and the older hand-written YAML
+  pipelines `pipelines/infrastructure/{grizzly,cortextool}/`. Alert rules and
+  Alertmanager config are now managed solely by this Pulumi program, deployed
+  via the `grafana-alerting` simple_pulumi pipeline. Note that the hourly
+  CI → QA → Production sync of the `mitodl/grafana-dashboards` repo went away
+  with it and has no Pulumi replacement.
 - **Phase 6** — Rename SNS topics `OpsGenie_Critical_Notifications` /
   `OpsGenie_Warning_Notifications` to reflect Rootly (cosmetic, low priority).
   Note: renaming an SNS topic changes its ARN and requires updating all
