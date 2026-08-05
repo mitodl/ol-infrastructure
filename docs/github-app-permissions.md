@@ -18,22 +18,29 @@ gh api /orgs/mitodl/installations \
 
 ## Current state vs. target
 
-**2026-08-03 — the grant landed.** The installation went from `metadata:read,
-repository_hooks:write` (scoped for its single original job, the OCW Studio webhook in
-`src/ol_infrastructure/applications/ocw_studio/__main__.py`) to **29 of the 31 permissions
-below**, `repository_selection: all`.
+**2026-08-05 — the live installation matches this file exactly.**
 
-Three deltas remain between the live installation and this file. Until they are closed, SEC-12
-fires on our own app:
+The installation went from `metadata:read, repository_hooks:write` (scoped for its single
+original job, the OCW Studio webhook in
+`src/ol_infrastructure/applications/ocw_studio/__main__.py`) to the **30 permissions below**,
+`repository_selection: all`.
 
-| Permission | This file says | Live | Action |
-|---|---|---|---|
-| `dependabot_secrets` | write | **absent** | Grant. `DependabotSecret` cannot be managed without it. |
-| `vulnerability_alerts` | read | **write** | Reduce to read. Over-grant, and it confounds the `RepositoryDependabotSecurityUpdates` test — see "Unresolved". |
-| `organization_custom_roles` | ~~write~~ | absent | **Do not grant — withdrawn.** Custom *repository* roles are Enterprise-only; see below. |
+```
+$ uv run python scripts/github/verify_app_permissions.py permissions
+30 live / 30 expected -- no discrepancies
+```
 
-Neither delta blocks phases 1–3: the import does not touch Dependabot secrets, and
-`dependabot_secrets` is tier B, needed only before that resource type is managed.
+SEC-12 is green against our own app, which is the standard we hold the 21 third-party
+installations to.
+
+Getting here took two rounds. The 2026-08-03 grant landed 29 of 30 and left three deltas;
+all are now closed:
+
+| Permission | Resolution |
+|---|---|
+| `dependabot_secrets` | Granted 2026-08-05. `/repos/{}/dependabot/secrets` went 403 → 200, and the read gate is now **32/32**. |
+| `vulnerability_alerts` | Reduced write → read 2026-08-05. The UI calls this **"Dependabot alerts"**, not "vulnerability alerts" — see the UI-label warning below, which is exactly the trap it caused. |
+| `organization_custom_roles` | **Withdrawn, not granted.** Custom *repository* roles are Enterprise-only; see below. |
 
 ### `organization_custom_roles` is withdrawn — Enterprise-only
 
@@ -54,16 +61,17 @@ which *is* granted and *does* work — `GET /orgs/mitodl/organization-roles` ret
 UI labels differ by one word and gate entirely different features. Easy to conflate; this file
 did, until the gate distinguished them.
 
-### Gate result — 2026-08-03
+### Gate result — 32/32 (2026-08-05)
 
 A read-only crawl exercised every resource type in plan §3.3 using a minted installation token
-(`scripts/github/` conventions; see the task record for the script). **31 of 33 read paths
-returned 200/204.** The two that did not:
+(`scripts/github/verify_app_permissions.py reads`). **All 32 read paths return 200/204.**
 
-| Path | Result | Meaning |
+Two failed on the first pass and both are now closed:
+
+| Path | First pass | Now |
 |---|---|---|
-| `/repos/mitodl/ol-infrastructure/dependabot/secrets` | 403 *Resource not accessible by integration* | the missing `dependabot_secrets` grant, exactly as predicted |
-| `/orgs/mitodl/custom-repository-roles` | 404 *Feature not available* | Enterprise-gated, see above |
+| `/repos/mitodl/ol-infrastructure/dependabot/secrets` | 403 *Resource not accessible by integration* | **200** — `dependabot_secrets` granted 2026-08-05 |
+| `/orgs/mitodl/custom-repository-roles` | 404 *Feature not available* | **removed from the gate** — Enterprise-only, see above |
 
 Everything the import actually depends on — repositories, topics, branches, protection,
 rulesets, collaborators, webhooks, deploy keys, environments, labels, secret *names*, variables,
@@ -203,14 +211,32 @@ The general shape of the error: a negative result from an incomplete reference w
 a positive finding. Only reading back a live grant can settle whether a slug exists, which is
 why step 3 of phase 0 is a read-back and not a doc review.
 
-## Unresolved
+## Resolved: `RepositoryDependabotSecurityUpdates` runs on `administration:write`
 
-**`RepositoryDependabotSecurityUpdates`.** The `automated-security-fixes` endpoint is grouped
-with the `vulnerability-alerts` toggle, so `administration:write` is expected to cover it, but
-this was inferred from adjacency rather than read off a doc heading. Confirm on first use; the
-symptom of being wrong is a 403 on that resource alone.
+Nothing is unresolved in this file as of 2026-08-05.
 
-Note that this test is currently **confounded**: the live installation holds
-`vulnerability_alerts: write` (an over-grant relative to the `read` this file specifies), so if
-the resource works we cannot tell which permission carried it. Reduce that entry to `read`
-before running the test, or the result proves nothing.
+The open question was whether `administration:write` covers the `automated-security-fixes`
+endpoint. This file asserted it did, but only by **adjacency** — the endpoint sits beside the
+`vulnerability-alerts` toggle in GitHub's docs — rather than from a doc heading or a live
+result. Adjacency is a guess wearing the clothes of a citation.
+
+It could not be tested while the installation held `vulnerability_alerts: write`, because two
+permissions could each independently explain a success. Once that entry was reduced to `read`,
+exactly one candidate remained:
+
+```
+$ uv run python scripts/github/verify_app_permissions.py reads
+  OK   204  RepositoryVulnerabilityAlerts
+  OK   200  RepositoryDependabotSecurityUpdates
+32/32 readable
+```
+
+`administration:write` genuinely carries it. The inference was right — but it is worth being
+precise that it was *unverified* until this point, not *verified because it sounded reasonable*.
+
+**The generalisable bit:** the over-grant was not merely a least-privilege problem, it was an
+*epistemic* one. A permission set broader than the manifest makes some questions unanswerable,
+because any success has more than one possible cause. Tightening to least privilege is what
+made the experiment able to produce a result at all. Worth remembering the next time an
+over-grant looks harmless because "it works either way" — that is precisely the condition
+under which you learn nothing.
