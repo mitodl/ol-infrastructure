@@ -1,4 +1,10 @@
 # ruff: noqa: ERA001
+#
+# This file is injected into the Superset Helm chart via `configOverrides`, and
+# the chart pipes that value through Helm's `tpl` function. Anything that looks
+# like a Go template action -- `{`+`{ ... }`+`}`, even inside a comment or a
+# string -- is evaluated at render time and fails the whole release. Never write
+# doubled curly braces here.
 import logging
 import os
 import re
@@ -700,7 +706,7 @@ def _interpolate_env_vars(value: str | None) -> str | None:
 
 # The bind address and port are not configurable from here: `superset mcp run`
 # takes them as CLI flags, and the chart's supersetMcp.command already passes
-# --host 0.0.0.0 --port {{ supersetMcp.service.port }}.
+# --host 0.0.0.0 with the port from supersetMcp.service.port.
 #
 # Public-facing base URL for MCP-generated links (e.g. chart preview URLs).
 # Injected at runtime via SUPERSET_MCP_PUBLIC_URL env var set in Pulumi.
