@@ -425,18 +425,40 @@ changes with cluster.yaml, so the restart happens on its own.
 
 ### 6. Verify before releasing the outage
 
+A graph that opens cleanly while missing half its rows looks perfectly healthy
+to `/healthz`, so the row-count diff — every graph, not a spot check — is the
+check that matters. From your workstation, with the server back up:
+
 ```shell
 kubectl -n omnigraph exec deploy/omnigraph-server -- omnigraph version
-kubectl -n omnigraph exec deploy/omnigraph-server -- \
-  omnigraph snapshot --store "$NEW_ROOT/graphs/council.omni" | head -3
+
+for g in $(cat /tmp/graph-ids.txt); do
+  echo "== $g"
+  kubectl -n omnigraph exec deploy/omnigraph-server -- \
+    omnigraph snapshot --store "$NEW_ROOT/graphs/$g.omni" \
+    | grep -E 'rows=|internal_schema'
+done | tee /tmp/after.txt
 ```
 
-`internal_schema_version` must now match the new binary's `internal-schema`.
-Then diff per-table row counts for every graph against `/tmp/baseline.txt`.
+Two comparisons against the step 2 baseline, and they expect **opposite**
+answers — which is why this is not one plain `diff`:
 
-A graph that opens cleanly while missing half its rows looks perfectly healthy
-to `/healthz`, so the count diff is the check that matters. Finish by exercising
-a real client path (a `recall`, a `task_ready`) rather than trusting probes.
+```shell
+# 1. Row counts must be identical. Empty output = pass.
+diff <(grep -E '^==|rows=' /tmp/baseline.txt) \
+     <(grep -E '^==|rows=' /tmp/after.txt) && echo "row counts match"
+
+# 2. The format version must have MOVED, uniformly, on every graph.
+grep internal_schema /tmp/after.txt | sort -u
+```
+
+The second must print exactly one line, carrying the new binary's
+`internal-schema` number. More than one line means some graph did not get
+rebuilt; the old number means you are still serving the old root — go back to
+step 5 and check the `pulumi preview --diff`.
+
+Finish by exercising a real client path (a `recall`, a `task_ready`) rather
+than trusting probes.
 
 ### 7. Clean up, then retire the old root
 
