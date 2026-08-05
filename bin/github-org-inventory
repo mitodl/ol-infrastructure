@@ -101,6 +101,24 @@ NON_DEPLOY_ENVIRONMENTS = frozenset(
     {"copilot", "github-pages", "pypi", "testpypi", "npm", "release"}
 )
 
+# Fields Pulumi will manage that an archetype may decline to pin. Where the archetype has
+# no opinion, the repo records its own current value, so the field is still managed and
+# still satisfies the empty-diff gate -- it is simply not being asked to change.
+#
+# Merge strategy: no archetype pins it (2026-08-05 decision -- squash-merge is preferred
+# but unenforced, since 158 of 178 active repos allow all three).
+# default_branch: pinned to `main` by `base`; `fork` opts out.
+UNPINNED_BUT_MANAGED_FIELDS = (
+    "allow_squash_merge",
+    "allow_merge_commit",
+    "allow_rebase_merge",
+    "default_branch",
+)
+
+# Archetypes exempt from CON-03 (default branch must be `main`). Forks follow upstream's
+# branch naming; enforcing ours would fire on ~102 repos with no action anyone would take.
+DEFAULT_BRANCH_EXEMPT_ARCHETYPES = frozenset({"fork", "archived"})
+
 # Rules whose population is the archived fleet, not the active one. Reporting these as a
 # share of active repos overstates them badly (92 of 138 archived reads as "52% of active").
 ARCHIVED_SCOPED_RULES = frozenset({"CON-07 archived repo still grants team write"})
@@ -435,8 +453,11 @@ def _findings(repos: list[dict[str, Any]]) -> dict[str, list[str]]:
         "CON-02 delete_branch_on_merge off": [
             r["name"] for r in live if not r["delete_branch_on_merge"]
         ],
-        "CON-03 default branch is not main": [
-            r["name"] for r in live if r["default_branch"] != "main"
+        "CON-03 default branch is not main (forks exempt)": [
+            r["name"]
+            for r in live
+            if r["default_branch"] != "main"
+            and propose_archetype(r) not in DEFAULT_BRANCH_EXEMPT_ARCHETYPES
         ],
         "CON-05 no topics": [r["name"] for r in live if not r["topics"]],
         "CON-09 no custom properties set": [
@@ -554,16 +575,26 @@ def report(
 
 
 def _resolve_archetype(archetypes: dict[str, Any], name: str) -> dict[str, Any]:
-    """Flatten an archetype's `extends` chain into the effective settings."""
+    """Flatten an archetype's `extends` chain into the effective settings.
+
+    A key set to `null` in a child archetype means **explicitly not enforced**, and is
+    dropped rather than inherited. `fork` uses this to opt out of `default_branch`: 102
+    active repos still default to `master` and nearly all are upstream forks, where the
+    branch name is upstream's choice and not ours to assign.
+
+    Without the opt-out there would be no way to say "this archetype deliberately has no
+    opinion here" -- a child can only ever override a parent's value with another value,
+    which is exactly how a rule ends up firing on ~100 repos nobody intends to change.
+    """
     spec = dict(archetypes[name])
     parent = spec.pop("extends", None)
     if not parent:
-        return spec
+        return {k: v for k, v in spec.items() if v is not None}
     merged = _resolve_archetype(archetypes, parent)
     # `teams` is replaced wholesale rather than merged: `infrastructure` grants devops
     # instead of odl-engineering, and a deep merge would silently grant both.
     merged.update(spec)
-    return merged
+    return {k: v for k, v in merged.items() if v is not None}
 
 
 def _deviations(repo: dict[str, Any], effective: dict[str, Any]) -> dict[str, Any]:
@@ -631,6 +662,16 @@ def crawl(
             doc["required_status_checks"] = repo["required_status_checks"]
         if repo["teams"]:
             doc["teams"] = repo["teams"]
+        # "Not enforced" must not become "not recorded". Where the archetype has no
+        # opinion on a field Pulumi will manage, the repo carries its own current value
+        # verbatim -- otherwise the field is unmanaged and the provider applies its own
+        # default on the first `up`, which breaks the empty-diff gate (§6).
+        #
+        # In practice: no archetype pins the merge flags, so every repo records them; only
+        # `fork` opts out of `default_branch`, so only forks record that.
+        for field in UNPINNED_BUT_MANAGED_FIELDS:
+            if field not in effective[archetype] and repo.get(field) is not None:
+                doc[field] = repo[field]
         doc.update(_deviations(repo, effective[archetype]))
         # Environments are NEVER imported wholesale (§4.3). Record what was skipped so
         # the exclusion stays visible rather than becoming silent.

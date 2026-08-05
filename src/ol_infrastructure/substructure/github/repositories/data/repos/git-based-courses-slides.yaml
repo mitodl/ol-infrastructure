@@ -1,5 +1,9 @@
 ---
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
 archetype: archived
+default_branch: master
 description: Slides for the "Git-based Courses" talk by Carson Gee and Peter Pinch
   at the 2014 Open edX conference
 name: git-based-courses-slides

@@ -1,4 +1,8 @@
 ---
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
 archetype: archived
+default_branch: main
 description: SaltStack formula for deploying and configuring Dremio data lake engine
 name: dremio-formula

@@ -16,7 +16,11 @@ _actions_secret_names:
 - POSTHOG_PERSONAL_API_KEY_RC
 - POSTHOG_PROJECT_API_KEY_PROD
 - POSTHOG_PROJECT_API_KEY_RC
+allow_merge_commit: false
+allow_rebase_merge: false
+allow_squash_merge: true
 archetype: archived
+default_branch: main
 description: AI Learn Test Repo
 name: learn-ai-compromised
 teams:

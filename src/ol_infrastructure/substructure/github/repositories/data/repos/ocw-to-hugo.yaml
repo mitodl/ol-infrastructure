@@ -1,5 +1,9 @@
 ---
+allow_merge_commit: false
+allow_rebase_merge: false
+allow_squash_merge: true
 archetype: archived
+default_branch: master
 description: A command line utility for taking master.json output from ocw-data-parser
   and producing markdown for use with hugo-course-publisher
 name: ocw-to-hugo

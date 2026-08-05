@@ -3,7 +3,9 @@ _actions_secret_names:
 - SEMANTIC_RELEASE_GITHUB_TOKEN
 - SEMANTIC_RELEASE_NPM_TOKEN
 allow_auto_merge: false
+allow_merge_commit: true
 allow_rebase_merge: true
+allow_squash_merge: true
 archetype: fork
 default_branch: master
 delete_branch_on_merge: false

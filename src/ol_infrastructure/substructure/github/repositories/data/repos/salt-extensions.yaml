@@ -1,5 +1,9 @@
 ---
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
 archetype: archived
+default_branch: main
 description: Plugins and extension modules for use with SaltStack that are generally
   useful outside of a given environment.
 name: salt-extensions

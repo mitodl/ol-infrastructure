@@ -1,7 +1,8 @@
 # Importing the `mitodl` GitHub Organization into Pulumi
 
 **Witan project:** `wp-import-the-mitodl-github-organization-into-pulum-47211a`
-**Status:** spec complete — all §9 decisions resolved; blocked on phase 0 (the App grant)
+**Status:** phase 0 complete (App widened and verified); phase 1 tooling landed —
+`bin/github-org-inventory`. Phase 2 gated on nothing but authoring.
 **Provider:** `pulumi-github>=6.0.0,<7` — resource names and import IDs verified against the
 shipped **6.14.1** schema on 2026-08-03 (§5.2)
 **Auth:** GitHub App installation `ol-infrastructure-as-code` (id `150389158`), wired via
@@ -69,9 +70,9 @@ Three corrections worth carrying forward:
   approach — and it roughly doubles the number of false findings that misclassification
   would have produced.
 - **102 of 178 active repos still default to `master`.** Not previously measured.
-  Concentrated in the fork fleet, where it is upstream's choice and should stay; CON-03
-  therefore needs to exempt the `fork` archetype or it will fire ~100 times with no
-  actionable remediation.
+  Concentrated in the fork fleet, where it is upstream's choice and should stay.
+  **Resolved 2026-08-05:** forks and archived repos are exempt from CON-03 and the `fork`
+  archetype no longer inherits `default_branch` (§3.4). The actionable set is **25**.
 
 Merge-strategy spread across active repos, which is CON-01's real shape:
 
@@ -83,9 +84,13 @@ Merge-strategy spread across active repos, which is CON-01's real shape:
 
 The sample's impression that "merge strategy is per-repo improvisation" was directionally
 right but structurally wrong: it is not 178 bespoke configurations, it is **one dominant
-default (all three, 89%) plus a 20-repo tail** that someone deliberately tightened. The
-archetype baseline in §3.2 (squash-only) therefore matches 19 repos and diverges from 158,
-which is a much larger phase-5 rollout than "fix the outliers" implies.
+default (all three, 89%) plus a 20-repo tail** that someone deliberately tightened.
+
+**Resolved 2026-08-05: merge strategy is not enforced.** Squash-merge remains the general
+preference, but pinning it in the archetype would have made CON-01 a fleet-wide behaviour
+change rather than a cleanup of outliers. Each repo records its own values verbatim and
+CON-01 is informational. See §3.4 for the mechanism and for how to turn enforcement on
+later with the rollout diff visible up front.
 
 ### Drift already visible without any tooling
 
@@ -280,10 +285,8 @@ archetypes:
   base:                                  # every non-archived repo inherits this
     tier: standard                       # -> custom property; org rulesets target this
     delete_branch_on_merge: true
-    allow_squash_merge: true
-    allow_merge_commit: false
-    allow_rebase_merge: false
     allow_auto_merge: true
+    # Merge strategy deliberately NOT pinned -- see §3.4.
     has_issues: true
     has_wiki: false
     web_commit_signoff_required: true
@@ -318,7 +321,7 @@ archetypes:
     extends: base
     tier: unmanaged                      # no org ruleset targets this tier
     has_issues: false
-    allow_merge_commit: true             # rebasing upstream needs it
+    default_branch: null                 # explicitly unenforced -- see §3.4
 
   archived:                              # the 138 archived repos
     archived: true
@@ -363,6 +366,36 @@ dictionary comparison rather than an API crawl.
 | `repositories/automation.py` | `RepositoryWebhook`, `ActionsSecret`, `ActionsVariable`, `RepositoryEnvironment` (allowlist) | ~250 |
 
 ---
+
+### 3.4 Unenforced-but-managed fields
+
+Two settings were deliberately left unpinned on 2026-08-05, once the full crawl showed what
+enforcing them would actually cost. Both use the same mechanism, and the distinction it
+encodes is worth stating plainly: **an archetype declining to pin a field is not the same as
+the field going unmanaged.**
+
+| Field | Decision |
+|---|---|
+| `allow_squash_merge` / `allow_merge_commit` / `allow_rebase_merge` | **Unenforced.** Squash-merge is the general preference, but 158 of 178 active repos allow all three. Pinning squash-only would make CON-01 a fleet-wide behaviour change affecting ~89% of active repos rather than a cleanup of outliers. |
+| `default_branch` on the `fork` archetype | **Exempt.** 102 active repos default to `master` and nearly all are upstream forks, where the branch name is upstream's choice. CON-03 skips forks and archived repos for the same reason; the actionable set drops from 106 to **25**. |
+
+The mechanism: a key set to `null` in a child archetype means *explicitly not enforced* and
+is dropped rather than inherited (`fork` uses this for `default_branch`). Where the resolved
+archetype has no opinion on a field Pulumi will manage, the per-repo YAML records that
+repo's **current value verbatim**. The field stays managed and the empty-diff gate still
+holds — the repo is simply not being asked to change.
+
+Getting this wrong in either direction is a real failure. Pin the field and you have
+silently authored a fleet-wide change. Drop it entirely and the provider applies its own
+default on the first `up`, which is a change nobody reviewed at all.
+
+Concretely, 265 of 316 repos now carry `default_branch`: 102 forks and 138 archived repos
+(neither archetype pins it) plus the 25 non-fork active repos genuinely on `master`, which
+is exactly the CON-03 backlog.
+
+**To start enforcing merge strategy later**, add the three `allow_*_merge` keys back to
+`base`. The per-repo files immediately show the 158 repos that would change, and that diff
+*is* the rollout plan — review it before applying rather than discovering it in a preview.
 
 ## 4. Scoping rules — what stays out
 

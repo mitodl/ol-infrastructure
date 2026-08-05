@@ -8,6 +8,9 @@ _actions_secret_names:
 - MITX_ONLINE_BASE_URL_RC
 _excluded_environments: 44
 allow_auto_merge: false
+allow_merge_commit: false
+allow_rebase_merge: false
+allow_squash_merge: true
 archetype: application
 dependabot_security_updates: false
 name: mit-learn

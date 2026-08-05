@@ -20,10 +20,18 @@ archetypes:
   base:
     tier: standard
     delete_branch_on_merge: true
-    allow_squash_merge: true
-    allow_merge_commit: false
-    allow_rebase_merge: false
     allow_auto_merge: true
+    # MERGE STRATEGY IS DELIBERATELY NOT ENFORCED (decision 2026-08-05).
+    #
+    # Squash-merge is the general preference, but 158 of 178 active repos currently allow
+    # all three strategies, so pinning squash-only in the archetype would turn CON-01 into
+    # a fleet-wide behaviour change affecting ~89% of active repos rather than a cleanup of
+    # outliers. Each repo therefore records its own `allow_*_merge` values verbatim (see
+    # data/repos/), nothing is being asked to change, and CON-01 stays informational.
+    #
+    # To start enforcing: add `allow_squash_merge: true`, `allow_merge_commit: false`,
+    # `allow_rebase_merge: false` here, and the per-repo files immediately show the 158
+    # repos that would change. That diff IS the rollout plan -- review it before applying.
     has_issues: true
     has_wiki: false
     web_commit_signoff_required: true
@@ -60,13 +68,16 @@ archetypes:
   # `tier: unmanaged` is deliberate and load-bearing: no org ruleset targets that value,
   # so forks are explicitly untargeted rather than accidentally unprotected. That
   # distinction is what stops CON-09 from reporting ~115 repos it cannot act on (§9.2).
-  # default_branch is NOT pinned here -- 102 active repos still use `master`, almost all
-  # of them forks, where it is upstream's choice and not ours to change.
   fork:
     extends: base
     tier: unmanaged
     has_issues: false
-    allow_merge_commit: true    # rebasing against upstream needs it
+    # EXEMPT FROM DEFAULT-BRANCH ASSIGNMENT (decision 2026-08-05). `null` means
+    # explicitly not enforced, so this is dropped rather than inheriting `main` from
+    # base. 102 active repos still default to `master` and nearly all are forks, where
+    # the branch name is upstream's choice. CON-03 skips this archetype for the same
+    # reason: a rule that fires 102 times with no action anyone would take is noise.
+    default_branch:
 
   # The 138 archived repos. Deliberately almost empty: GitHub rejects most writes to an
   # archived repo, so anything more here produces failed applies rather than policy.

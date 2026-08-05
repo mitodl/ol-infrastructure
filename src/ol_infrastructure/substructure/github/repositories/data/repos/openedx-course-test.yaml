@@ -1,5 +1,9 @@
 ---
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
 archetype: archived
+default_branch: master
 description: Script for validating/testing Open Learning XML courses for the edx-platform
   using a docker container
 name: openedx-course-test

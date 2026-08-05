@@ -2,6 +2,9 @@
 _actions_secret_names:
 - SLACK_WEBHOOK
 allow_auto_merge: false
+allow_merge_commit: false
+allow_rebase_merge: false
+allow_squash_merge: true
 archetype: library
 delete_branch_on_merge: false
 dependabot_security_updates: false

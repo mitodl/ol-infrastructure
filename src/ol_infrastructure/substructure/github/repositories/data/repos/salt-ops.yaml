@@ -1,5 +1,9 @@
 ---
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
 archetype: archived
+default_branch: main
 description: Repository for building, managing and deploying salt-based infrastructure
 name: salt-ops
 teams:

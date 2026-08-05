@@ -1,5 +1,9 @@
 ---
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
 archetype: archived
+default_branch: main
 description: This repo is a place to display example markdown for a course used in
   the OCW Next project
 name: ocw-course-example-markdown

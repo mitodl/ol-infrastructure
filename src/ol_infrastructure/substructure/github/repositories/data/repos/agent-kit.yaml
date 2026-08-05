@@ -1,6 +1,9 @@
 ---
 _excluded_environments: 2
 allow_auto_merge: false
+allow_merge_commit: false
+allow_rebase_merge: false
+allow_squash_merge: true
 archetype: library
 dependabot_security_updates: false
 description: 'Team toolkit for AI agent utilities: skills, custom agents, MCP helpers,

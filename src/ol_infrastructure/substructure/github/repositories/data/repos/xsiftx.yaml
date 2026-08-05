@@ -1,5 +1,9 @@
 ---
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
 archetype: archived
+default_branch: master
 description: Repo for running data collection scripts against courses and putting
   the results in the instructor dashboard
 name: xsiftx
