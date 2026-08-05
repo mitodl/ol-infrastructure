@@ -538,18 +538,29 @@ ovs_database_security_group = ec2.SecurityGroup(
         ec2.SecurityGroupIngressArgs(
             security_groups=[
                 vault_stack.require_output("vault_server")["security_group"],
-                data_vpc["security_groups"]["integrator"],
             ],
-            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"].apply(
-                lambda pod_cidrs: [*pod_cidrs, target_vpc["cidr"]]
-            ),
+            cidr_blocks=[target_vpc["cidr"]],
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
             description=(
-                "Access to Postgres from odl-video-service nodes on"
-                f" {DEFAULT_POSTGRES_PORT}"
+                f"Access to Postgres on {DEFAULT_POSTGRES_PORT} from the Vault server"
+                f" security group and the whole {target_vpc_name} CIDR"
+                " (odl-video-service nodes)"
             ),
+        ),
+        ec2.SecurityGroupIngressArgs(
+            security_groups=[
+                data_vpc["security_groups"]["integrator"],
+            ],
+            # Airbyte isn't using pod security groups in Kubernetes. This is a
+            # workaround to allow for data integration from the data Kubernetes
+            # cluster. (TMM 2025-05-16)
+            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"],
+            protocol="tcp",
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
+            description="Allow access from data VPC pod subnets.",
         ),
     ],
     vpc_id=target_vpc_id,
