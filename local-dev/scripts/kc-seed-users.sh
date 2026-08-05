@@ -78,10 +78,10 @@ ensure_admin_role
 # ---------------------------------------------------------------------------
 # User definitions: (username, email, firstName, lastName, assign_admin_role)
 #
-# Plain case statements instead of associative arrays: declare -A requires
-# bash 4+, but macOS ships bash 3.2 (GPLv3 licensing) as the only /bin/bash on
-# PATH, where declare -A silently misparses and fails with a confusing
-# "unbound variable" error under set -u.
+# Plain case statements instead of associative arrays: `declare -A` requires
+# bash 4+, but macOS ships bash 3.2 as /bin/bash (Apple hasn't updated it
+# since bash moved to GPLv3 licensing). Under bash 3.2, `declare -A` silently
+# misparses and fails with a confusing "unbound variable" error under set -u.
 # ---------------------------------------------------------------------------
 user_email() {
     case "$1" in
