@@ -707,20 +707,26 @@ def create_data_tier(  # noqa: PLR0913
                                     path="/healthz",
                                     port=OMNIGRAPH_SERVER_PORT,
                                 ),
-                                # Sized to the measured bind, not below it.
-                                # At 10s this fired three guaranteed failures
-                                # per boot (probes at 10/15/20s against a
-                                # 20.5s bind, observed on CI 2026-08-05) —
-                                # harmless, but indistinguishable in
-                                # `kubectl get events` from a sick server,
-                                # which is the noise this whole change exists
-                                # to remove. 20s puts the first probe at the
-                                # point the server actually answers: one
-                                # failure at worst, none when boot runs fast,
-                                # and no delay to Ready either way since the
-                                # 25s probe was already the one that
-                                # succeeded. A later delay would only postpone
-                                # Ready on a fast boot.
+                                # Sized to the top of the observed bind
+                                # range. Binds measured 2026-08-05 were 17.2s
+                                # (CI), 19.8s (QA), 17.2s (Production), then
+                                # 19.3s and 20.5s on later CI boots.
+                                #
+                                # At 10s the first three probes could only
+                                # ever fail — three per boot, harmless but
+                                # indistinguishable in `kubectl get events`
+                                # from a sick server, which is the noise this
+                                # change exists to remove.
+                                #
+                                # 20s sits just above four of those five
+                                # binds, so the usual outcome is zero
+                                # failures; a boot at the slow end of the
+                                # range (the 20.5s one) fires exactly one
+                                # before the 25s probe succeeds. Either way
+                                # Ready is unchanged, because 25s was already
+                                # the probe that passed. Going later would
+                                # trade that away, delaying Ready on every
+                                # fast boot to buy the one failure back.
                                 initial_delay_seconds=20,
                                 period_seconds=5,
                                 failure_threshold=24,
