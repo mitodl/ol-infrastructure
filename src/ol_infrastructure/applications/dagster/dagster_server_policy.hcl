@@ -56,6 +56,13 @@ path "postgres-micromasters/creds/readonly/*" {
 path "postgres-micromasters/creds/readonly" {
   capabilities = ["read"]
 }
+# Keycloak identity tables, ingested by the data_loading dlt pipeline.
+path "postgres-keycloak/creds/readonly/*" {
+  capabilities = ["read"]
+}
+path "postgres-keycloak/creds/readonly" {
+  capabilities = ["read"]
+}
 path "secret-data/" {
   capabilities = ["list"]
 }
