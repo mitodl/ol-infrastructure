@@ -26,6 +26,10 @@ CronJob in ``token_sync.py``, in environments that set
 ``omnigraph:keycloak_url``. Enabling it moves ownership of the actor-tokens
 Vault path from this program to that job — see the writer split below.
 
+Store upkeep — nightly fragment compaction and weekly version GC — runs as two
+further CronJobs (``maintenance.py``), against the S3 store directly rather
+than through the server. See ``docs/omnigraph-store-maintenance-runbook.md``.
+
 Follow-up work this stack does NOT cover (tracked separately):
     - **Container image.** The ``omnigraph``/``pulumi-omnigraph`` Concourse
       pipeline builds the image once, owns the ECR repository itself
@@ -50,6 +54,11 @@ from ol_infrastructure.applications.omnigraph.data_tier import (
     OMNIGRAPH_SERVER_SERVICE_NAME,
     create_data_tier,
     omnigraph_server_addr,
+)
+from ol_infrastructure.applications.omnigraph.maintenance import (
+    DEFAULT_CLEANUP_OLDER_THAN,
+    DEFAULT_CLEANUP_SCHEDULE,
+    DEFAULT_OPTIMIZE_SCHEDULE,
 )
 from ol_infrastructure.applications.omnigraph.token_sync import (
     ACTOR_TOKENS_VAULT_PATH,
@@ -112,6 +121,20 @@ TOKEN_SYNC_SCHEDULE = (
     omnigraph_config.get("token_sync_schedule") or DEFAULT_SYNC_SCHEDULE
 )
 _TOKEN_SYNC_ENABLED = bool(KEYCLOAK_URL)
+
+# Scheduled store maintenance (maintenance.py). Overridable per environment
+# because the two things that set the right cadence — write volume and how much
+# version history is worth keeping — differ between a CI store that is mostly
+# reindex churn and a Production one backing real team memory. The defaults are
+# sized for Production and are deliberately conservative; see maintenance.py
+# for why retention is an age rather than a version count.
+OPTIMIZE_SCHEDULE = (
+    omnigraph_config.get("optimize_schedule") or DEFAULT_OPTIMIZE_SCHEDULE
+)
+CLEANUP_SCHEDULE = omnigraph_config.get("cleanup_schedule") or DEFAULT_CLEANUP_SCHEDULE
+CLEANUP_OLDER_THAN = (
+    omnigraph_config.get("cleanup_older_than") or DEFAULT_CLEANUP_OLDER_THAN
+)
 
 cluster_stack = make_stack_reference(projects.EKS, f"operations.{stack_info.name}")
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
@@ -414,6 +437,9 @@ data_tier = create_data_tier(
     actor_tokens_secret_name=ACTOR_TOKENS_SECRET_NAME,
     actor_tokens_secret=actor_tokens_secret,
     managed_repos=MANAGED_REPOS,
+    optimize_schedule=OPTIMIZE_SCHEDULE,
+    cleanup_schedule=CLEANUP_SCHEDULE,
+    cleanup_older_than=CLEANUP_OLDER_THAN,
 )
 
 export("namespace", NAMESPACE)
