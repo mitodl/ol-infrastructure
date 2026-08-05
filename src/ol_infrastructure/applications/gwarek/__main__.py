@@ -343,6 +343,25 @@ gwarek_iam_policy_document = {
                 f"arn:aws:bedrock:*:{aws_account.account_id}:inference-profile/*anthropic*",
             ],
         },
+        {
+            # Invoking a Bedrock model backed by an AWS Marketplace product
+            # for the first time in an account makes Bedrock auto-initiate
+            # a subscription on the caller's behalf -- that auto-subscribe
+            # call fails with AccessDeniedException without these. No
+            # per-model resource scoping: aws-marketplace:ViewSubscriptions/
+            # Unsubscribe aren't ARN-scopable, and scoping Subscribe to a
+            # specific model's ProductId would mean an infra change every
+            # time Anthropic ships a new model -- exactly what the
+            # foundation-model/inference-profile wildcards above already
+            # avoid.
+            "Effect": "Allow",
+            "Action": [
+                "aws-marketplace:Subscribe",
+                "aws-marketplace:Unsubscribe",
+                "aws-marketplace:ViewSubscriptions",
+            ],
+            "Resource": "*",
+        },
     ],
 }
 
