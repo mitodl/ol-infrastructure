@@ -21,8 +21,8 @@ the same artifact witan resolves per-user tokens from — synced here from Vault
 into the ``actor-tokens`` Secret (agent-kit ADR-0004 D3). See
 ``docs/adr/0009-deploy-witan-as-shared-multi-tenant-mcp-service.md``.
 
-Keycloak ``witan-users`` membership is turned into per-user entries in that map
-by the CronJob in ``token_sync.py``, in environments that set
+Keycloak realm membership is turned into per-user entries in that map by the
+CronJob in ``token_sync.py``, in environments that set
 ``omnigraph:keycloak_url``. Enabling it moves ownership of the actor-tokens
 Vault path from this program to that job — see the writer split below.
 
@@ -100,7 +100,7 @@ omnigraph_config = Config("omnigraph")
 # silently minting a graph nobody provisioned or backs up.
 MANAGED_REPOS: list[str] = omnigraph_config.get_object("managed_repos") or []
 
-# Keycloak witan-users -> actor-token sync. Set `omnigraph:keycloak_url` for an
+# Keycloak realm -> actor-token sync. Set `omnigraph:keycloak_url` for an
 # environment to turn it on; leaving it unset keeps that environment on the
 # SOPS-only behaviour, which is the right default until its `witan-token-sync`
 # OIDC client exists (substructure/keycloak/ol_platform_engineering.py). The URL
@@ -236,8 +236,8 @@ if _actor_tokens_map:
 #                     to preserve, so the merged map and the service map are the
 #                     same thing.
 #   token sync ON  -> the CronJob in token_sync.py writes it, as
-#                     service-tokens plus one act-<sub> entry per witan-users
-#                     member, and this program stops writing it entirely.
+#                     service-tokens plus one act-<sub> entry per enabled
+#                     human realm user, and this program stops writing it.
 #
 # The two must never overlap. A Pulumi write alongside the job's would revert
 # every per-user entry on each `pulumi up` — every user 401ing until the next
@@ -305,7 +305,7 @@ omnigraph_auth_binding = OLEKSAuthBinding(
 )
 
 ##############################################
-#   Keycloak witan-users -> actor tokens      #
+#   Keycloak realm -> actor tokens             #
 ##############################################
 token_sync = None
 if _TOKEN_SYNC_ENABLED:

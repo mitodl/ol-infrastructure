@@ -1,4 +1,4 @@
-"""Reconcile the omnigraph actor-token map against Keycloak group membership.
+"""Reconcile the omnigraph actor-token map against Keycloak realm membership.
 
 agent-kit ADR-0004 D3 gives every witan user their own omnigraph bearer token,
 keyed by the actor id derived from their Keycloak ``sub``. This script is the
@@ -9,7 +9,7 @@ tier (``WITAN_ACTOR_TOKENS_FILE``) resolve tokens from.
 
 WHAT IT COMPUTES
 
-    actor-tokens  =  service-tokens  +  one act-<sub> entry per witan-users member
+    actor-tokens  =  service-tokens  +  one act-<sub> entry per human realm user
 
 ``service-tokens`` is the Pulumi/SOPS-owned map of non-human actors
 (``svc-witan-ci``, and later ``svc-witan-admin``). Splitting it out of
@@ -19,8 +19,17 @@ per-user entry, and every user 401s until the next run of this job. So Pulumi
 owns the *input*, this job owns the *derived output*, and each path has exactly
 one writer. See ``token_sync.py`` for the deployment side of that split.
 
+WHO COUNTS AS A USER
+
+Every enabled, non-service-account user of the realm. The realm IS the
+audience: ``ol-platform-engineering`` has ``registration_allowed=False``, no
+identity-provider brokering and no federation, so its membership is already
+exactly the people who should have witan. See :func:`realm_users` for why a
+dedicated ``witan-users`` Keycloak group was removed rather than added, and
+:func:`is_service_account` for the one class of realm user that is skipped.
+
 The output is a pure function of its two inputs, which is the property worth
-protecting: a token already provisioned for a still-present member is carried
+protecting: a token already provisioned for a still-present user is carried
 over verbatim rather than re-minted, so a steady-state run is a no-op and
 writes nothing. That matters more than it looks — the actor-tokens Vault secret
 carries a VSO ``rolloutRestartTarget``, so *every* write to it bounces
@@ -79,13 +88,13 @@ TOKEN_ENTROPY_BYTES = 32
 # the VSO template that renders it into the mounted file.
 TOKENS_VAULT_KEY = "tokens_json"  # pragma: allowlist secret
 
-# Keycloak caps a members page well below this in some versions; it returns
-# fewer than asked rather than erroring, and the loop below keys off that.
+# Keycloak caps a user page well below this in some versions; it returns fewer
+# than asked rather than erroring, and the paging loop keys off that.
 MEMBERS_PAGE_SIZE = 100
 
 # Guard against a paging bug turning into an unbounded loop against Keycloak.
-# 200 pages at the size above is 20k members — orders of magnitude above any
-# plausible witan-users group.
+# 200 pages at the size above is 20k users — orders of magnitude above any
+# plausible size for a hand-managed staff realm.
 MAX_MEMBER_PAGES = 200
 
 HTTP_TIMEOUT_SECONDS = 30
@@ -242,58 +251,61 @@ def keycloak_token(
     return token
 
 
-def find_group_id(base_url: str, realm: str, token: str, group_name: str) -> str:
-    """Resolve a top-level group name to its uuid.
+def realm_users(base_url: str, realm: str, token: str) -> list[dict[str, Any]]:
+    """Page through every user in the realm.
 
-    A missing group is fatal rather than "zero members". The two are
-    indistinguishable in the member list but not in consequence: an empty group
-    legitimately retires every per-user token, whereas a typo'd or not-yet-created
-    group would do the same thing and call it success.
+    The realm IS the audience. ``ol-platform-engineering`` has
+    ``registration_allowed=False``, no identity-provider brokering and no
+    federation — membership is hand-managed and already limited to the people
+    who should have witan. A dedicated ``witan-users`` group inside it would be
+    a second gate on an already-gated population, and its failure mode is the
+    bad one: somebody is added to the realm, nobody adds them to the group, and
+    they get a 401 that reads like a provisioning lag.
+
+    (``witan-users`` still exists as a *Cedar* group in agent-kit's policy
+    bundles, populated with the ``act-<sub>`` ids this job writes. Only its
+    source changed — from a Keycloak group of the same name to the realm's
+    human users. The name collision is what made the group look mandatory.)
     """
-    query = urllib.parse.urlencode({"search": group_name, "exact": "true"})
-    groups = (
-        _request(
-            f"{base_url}/admin/realms/{realm}/groups?{query}",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-        or []
-    )
-    for group in groups:
-        if group.get("name") == group_name:
-            return group["id"]
-    msg = (
-        f"Keycloak group {group_name!r} does not exist in realm {realm}. "
-        "It is provisioned by the keycloak substructure stack "
-        "(substructure/keycloak/ol_platform_engineering.py); this job will not "
-        "retire every per-user token on the strength of a lookup that failed."
-    )
-    raise SyncError(msg)
-
-
-def group_members(
-    base_url: str, realm: str, token: str, group_id: str
-) -> list[dict[str, Any]]:
-    """Page through the group's direct members."""
-    members: list[dict[str, Any]] = []
+    users: list[dict[str, Any]] = []
     for page in range(MAX_MEMBER_PAGES):
         query = urllib.parse.urlencode(
             {"first": page * MEMBERS_PAGE_SIZE, "max": MEMBERS_PAGE_SIZE}
         )
         batch = (
             _request(
-                f"{base_url}/admin/realms/{realm}/groups/{group_id}/members?{query}",
+                f"{base_url}/admin/realms/{realm}/users?{query}",
                 headers={"Authorization": f"Bearer {token}"},
             )
             or []
         )
-        members.extend(batch)
+        users.extend(batch)
         if len(batch) < MEMBERS_PAGE_SIZE:
-            return members
+            return users
     msg = (
-        f"Group {group_id} still paging after {MAX_MEMBER_PAGES} pages; "
+        f"Realm {realm} still paging after {MAX_MEMBER_PAGES} pages; "
         "refusing to continue"
     )
     raise SyncError(msg)
+
+
+def is_service_account(user: dict[str, Any]) -> bool:
+    """Whether this realm user is a client's service account rather than a human.
+
+    Keycloak stores a confidential client's service account as an ordinary
+    realm user, so enumerating the realm returns them alongside people — this
+    realm already has one for ``ol-opik-client`` and gains another for this
+    job's own ``witan-token-sync`` client. Minting a human's interactive
+    read/write token for them would hand every such client the Cedar rights of
+    a person.
+
+    ``serviceAccountClientId`` is where Keycloak records the owning client and
+    is the authoritative signal; the username prefix is Keycloak's own naming
+    convention for the same users and costs nothing to also check.
+    """
+    return bool(user.get("serviceAccountClientId")) or str(
+        user.get("username", "")
+    ).startswith("service-account-")
 
 
 ###############################################################################
@@ -304,23 +316,33 @@ def group_members(
 def reconcile(
     service_tokens: dict[str, str],
     current: dict[str, str],
-    members: list[dict[str, Any]],
+    users: list[dict[str, Any]],
 ) -> dict[str, str]:
     """Compute the desired actor-token map.
 
-    Disabled Keycloak users are treated as non-members: leaving a token live
-    for a disabled account would make "disable in Keycloak" a no-op for graph
-    access, which is the one thing an operator disabling an account expects it
-    not to be.
+    Disabled Keycloak users are skipped: leaving a token live for a disabled
+    account would make "disable in Keycloak" a no-op for graph access, which is
+    the one thing an operator disabling an account expects it not to be.
+
+    Service-account users are skipped too — see :func:`is_service_account`. The
+    non-human actors that DO get tokens come from the service map, which is
+    declared in SOPS rather than discovered in Keycloak.
     """
     desired = dict(service_tokens)
-    for member in members:
-        sub = member.get("id")
+    for user in users:
+        sub = user.get("id")
         if not sub:
-            msg = f"Keycloak returned a group member with no id: {member!r}"
+            msg = f"Keycloak returned a realm user with no id: {user!r}"
             raise SyncError(msg)
-        if not member.get("enabled", True):
-            LOG.info("skipping disabled user %s", member.get("username", sub))
+        if is_service_account(user):
+            LOG.info(
+                "skipping service account %s (client %s)",
+                user.get("username", sub),
+                user.get("serviceAccountClientId", "?"),
+            )
+            continue
+        if not user.get("enabled", True):
+            LOG.info("skipping disabled user %s", user.get("username", sub))
             continue
         actor_id = derive_actor_id(sub)
         if actor_id in service_tokens:
@@ -328,7 +350,7 @@ def reconcile(
             # the collision would hand a human the service identity's token, so
             # it stops the run rather than resolving in either direction.
             msg = (
-                f"Keycloak user {member.get('username', sub)} derives actor id "
+                f"Keycloak user {user.get('username', sub)} derives actor id "
                 f"{actor_id}, which collides with a service actor. Refusing to "
                 "overwrite either."
             )
@@ -376,7 +398,6 @@ def main() -> int:
     keycloak_realm = _require_env("KEYCLOAK_REALM")
     keycloak_client_id = _require_env("KEYCLOAK_CLIENT_ID")
     keycloak_client_secret = _require_env("KEYCLOAK_CLIENT_SECRET")
-    group_name = _require_env("WITAN_USERS_GROUP")
 
     try:
         with open(sa_token_path, encoding="utf-8") as handle:  # noqa: PTH123
@@ -415,11 +436,23 @@ def main() -> int:
     access_token = keycloak_token(
         keycloak_url, keycloak_realm, keycloak_client_id, keycloak_client_secret
     )
-    group_id = find_group_id(keycloak_url, keycloak_realm, access_token, group_name)
-    members = group_members(keycloak_url, keycloak_realm, access_token, group_id)
-    LOG.info("group %s (%s) has %d member(s)", group_name, group_id, len(members))
+    users = realm_users(keycloak_url, keycloak_realm, access_token)
+    # A realm with no users at all is a failed lookup wearing the costume of a
+    # legitimate result — a revoked role, a renamed realm, a silently-empty
+    # page. Left unguarded it would retire every per-user token and report
+    # success, which is exactly what the old group-does-not-exist check was
+    # protecting against before the realm replaced the group as the audience.
+    if not users:
+        msg = (
+            f"Keycloak realm {keycloak_realm} returned no users at all. That is "
+            "a lookup failure, not an empty realm — this job will not retire "
+            "every per-user token on the strength of it. Check that the "
+            "witan-token-sync service account still holds the view-users role."
+        )
+        raise SyncError(msg)
+    LOG.info("realm %s has %d user(s) before filtering", keycloak_realm, len(users))
 
-    desired = reconcile(service_tokens, current, members)
+    desired = reconcile(service_tokens, current, users)
 
     added = sorted(set(desired) - set(current))
     removed = sorted(set(current) - set(desired))

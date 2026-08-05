@@ -12,17 +12,34 @@ CronJob in the `omnigraph` namespace is what mints and retires them:
 ```
 secret-operations/witan/actor-tokens
     = secret-operations/witan/service-tokens
-    + one act-<sub> entry per enabled member of the witan-users Keycloak group
+    + one act-<sub> entry per enabled, non-service-account user of the realm
 ```
 
-- **Onboarding a user is one action:** add them to the `witan-users` group in
-  the `ol-platform-engineering` realm. Within an hour they have a token.
-- **Offboarding is the same action in reverse** — remove them from the group, or
+- **Onboarding a user is one action:** add them to the `ol-platform-engineering`
+  realm. Within an hour they have a token.
+- **Offboarding is the same action in reverse** — remove them from the realm, or
   disable the account. Either retires the token on the next run.
 - **Nobody ever sees these tokens.** A user authenticates to the witan MCP tier
   with an OIDC JWT; witan maps their `sub` to `act-<sub>`, looks the token up,
   and presents it to omnigraph-server on their behalf. There is nothing to
   distribute and nothing for a user to configure.
+
+**There is no `witan-users` Keycloak group, deliberately.** ADR-0004 D3 names
+one, but `witan-users` is a *Cedar* group in agent-kit's policy bundles
+(`mcp/servers/witan/policy/server.policy.yaml`), populated with the `act-<sub>`
+ids this job writes — the name collision is what made a Keycloak group of the
+same name look mandatory. The realm has `registration_allowed=False`, no
+identity-provider brokering and no federation, so it is already limited to
+exactly the intended audience. A group inside it would be a second gate whose
+failure mode is somebody joining the realm, nobody adding them to the group, and
+a 401 that reads like a provisioning lag. The trade accepted: **no way to revoke
+witan while leaving this realm's other applications (jupyterhub, superset, opik)
+intact** — realm access is witan access.
+
+Clients' own service accounts (`service-account-*`, e.g. `ol-opik-client` and
+this job's own `witan-token-sync`) are realm users too, and are skipped. The
+non-human actors that *do* get tokens come from the service map, which is
+declared in SOPS rather than discovered in Keycloak.
 
 Source: `src/ol_infrastructure/applications/omnigraph/token_sync.py` (deployment)
 and `.../omnigraph/scripts/sync_actor_tokens.py` (the reconciliation itself).
@@ -48,10 +65,10 @@ the service map are the same thing).
 The switch is `omnigraph:keycloak_url`. Setting it moves ownership of
 `actor-tokens` from Pulumi to the CronJob.
 
-**Prerequisite:** the `witan-token-sync` Keycloak client and the `witan-users`
-group must exist in the target realm. Both come from the keycloak substructure
-stack, so deploy `ol-infrastructure-substructure-keycloak` for that environment
-first and confirm `secret-operations/witan/token-sync-oidc` is populated:
+**Prerequisite:** the `witan-token-sync` Keycloak client must exist in the target
+realm. It comes from the keycloak substructure stack, so deploy
+`ol-infrastructure-substructure-keycloak` for that environment first and confirm
+`secret-operations/witan/token-sync-oidc` is populated:
 
 ```shell
 vault kv get secret-operations/witan/token-sync-oidc
@@ -148,7 +165,7 @@ kubectl -n omnigraph create job --from=cronjob/witan-token-sync token-sync-rotat
 ## Troubleshooting
 
 **A new user still gets "No omnigraph bearer token provisioned for actor …".**
-Check, in order: are they in `witan-users` and enabled; has the CronJob run
+Check, in order: are they in the realm and enabled; has the CronJob run
 since; did it write; has the VSO propagated. The error text comes from
 agent-kit's `ActorTokenResolver` and means the map on disk has no such key.
 
@@ -169,11 +186,11 @@ replace, so an empty service map would silently retire `svc-witan-ci` and break
 the CI indexer and witan's fallback client. Fix `service-tokens` (it comes from
 the SOPS file via `pulumi up`), then re-run.
 
-**The job fails with "Keycloak group 'witan-users' does not exist".** Also
-deliberate: a missing group and an empty group are indistinguishable in the
-member list but not in consequence, and the job will not retire every per-user
-token on the strength of a lookup that failed. Deploy the keycloak substructure
-stack for that environment.
+**The job fails with "returned no users at all".** Also deliberate: a failed
+lookup and a genuinely empty realm are indistinguishable in the response but not
+in consequence, and the job will not retire every per-user token on the strength
+of one. The usual cause is the `witan-token-sync` service account having lost its
+`view-users` realm-management role — re-deploy the keycloak substructure stack.
 
 **403 from Vault.** The paths in `token_sync_policy.hcl` must match
 `ACTOR_TOKENS_VAULT_PATH` / `SERVICE_TOKENS_VAULT_PATH` in `token_sync.py`

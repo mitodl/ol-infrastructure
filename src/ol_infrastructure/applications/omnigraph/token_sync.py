@@ -1,4 +1,4 @@
-"""Deploy the Keycloak witan-users -> actor-token sync job.
+"""Deploy the Keycloak realm -> actor-token sync job.
 
 The job itself is ``scripts/sync_actor_tokens.py``; its module docstring covers
 what it computes and why. This module is the deployment half: the identity it
@@ -91,9 +91,6 @@ SERVICE_TOKENS_VAULT_PATH = (  # pragma: allowlist secret
 KEYCLOAK_CREDENTIALS_VAULT_PATH = "witan/token-sync-oidc"
 KEYCLOAK_CREDENTIALS_SECRET_NAME = "witan-token-sync-oidc"  # noqa: S105  # pragma: allowlist secret
 
-# The Keycloak group whose membership defines who gets a token.
-WITAN_USERS_GROUP = "witan-users"
-
 # Hourly. The floor on this is not Keycloak's cost — the job makes two API
 # calls — but the fact that a membership change writes Vault and therefore
 # bounces omnigraph-server (replicas=1/Recreate, a hard ~10-30s graph outage
@@ -175,9 +172,6 @@ def _pod_spec(  # noqa: PLR0913
                         ),
                         kubernetes.core.v1.EnvVarArgs(
                             name="KEYCLOAK_REALM", value=keycloak_realm
-                        ),
-                        kubernetes.core.v1.EnvVarArgs(
-                            name="WITAN_USERS_GROUP", value=WITAN_USERS_GROUP
                         ),
                         kubernetes.core.v1.EnvVarArgs(
                             name="KEYCLOAK_CLIENT_ID",

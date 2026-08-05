@@ -11,7 +11,7 @@
 # {actor_id: token} JSON map — the artifact omnigraph-server boots its
 # bearer-token auth from (OMNIGRAPH_SERVER_BEARER_TOKENS_FILE). The same
 # Vault source witan resolves per-user tokens from (WITAN_ACTOR_TOKENS_FILE)
-# in its own namespace. Read-only, and read-only it stays: the witan-users sync
+# in its own namespace. Read-only, and read-only it stays: the realm token-sync
 # job that writes this path authenticates as its own Vault role with its own
 # policy (token_sync_policy.hcl), precisely so the write capability does not
 # land on the identity every VSO sync in this namespace uses.

@@ -285,28 +285,27 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
     # TOOLHIVE [END] # noqa: ERA001
 
     # WITAN [START] # noqa: ERA001
-    # Membership of this group is the authoritative answer to "who may use
-    # witan". The omnigraph stack's token-sync CronJob walks it hourly and
-    # maintains one omnigraph bearer token per member, keyed by the actor id
-    # derived from the member's `sub` (agent-kit ADR-0004 D3). Adding someone
-    # here is the entire onboarding step; removing them retires their token on
-    # the next run.
+    # Membership of THIS REALM is the authoritative answer to "who may use
+    # witan". The omnigraph stack's token-sync CronJob enumerates it hourly and
+    # maintains one omnigraph bearer token per enabled human user, keyed by the
+    # actor id derived from their `sub` (agent-kit ADR-0004 D3). Adding someone
+    # to the realm is the entire onboarding step; removing or disabling them
+    # retires their token on the next run.
     #
-    # A group rather than a realm role — the first keycloak.Group in this repo,
-    # which is worth a word. Roles here (`admin`, `developer`) describe what
-    # somebody is and get mapped into tokens for applications to authorize on.
-    # This is neither: nothing reads a `witan-users` claim, because the tokens
-    # the sync job mints are what carry the authority, and the group is only
-    # ever enumerated out-of-band by that job. A role would work and would put
-    # a claim nobody consumes into every token in the realm.
-    keycloak.Group(
-        "ol-platform-engineering-witan-users-group",
-        realm_id=ol_platform_engineering_realm.id,
-        name="witan-users",
-        opts=resource_options,
-    )
-
-    # The identity the token-sync job enumerates that group as. CONFIDENTIAL
+    # DELIBERATELY NO `witan-users` GROUP, despite ADR-0004 D3 naming one. That
+    # name is a *Cedar* group in agent-kit's policy bundles
+    # (mcp/servers/witan/policy/server.policy.yaml), populated with the
+    # act-<sub> ids the sync job writes — the collision with a hypothetical
+    # Keycloak group of the same name is what made one look mandatory. This
+    # realm has registration_allowed=False, no identity-provider brokering and
+    # no federation, so it is already limited to exactly the intended audience;
+    # a group inside it would be a second gate on an already-gated population,
+    # whose failure mode is somebody being added to the realm, nobody adding
+    # them to the group, and a 401 that reads like a provisioning lag. The
+    # trade accepted: no way to revoke witan while leaving this realm's other
+    # applications (jupyterhub, superset, opik) intact.
+    #
+    # The identity the token-sync job enumerates the realm as. CONFIDENTIAL
     # with only the service-account (client-credentials) flow enabled: no human
     # ever logs in as this, there is no redirect URI to get wrong, and the
     # standard/implicit/direct-access flows are all off so a leaked secret buys
@@ -333,31 +332,27 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 
-    # Exactly the two realm-management roles the job's two calls need, and both
-    # are read-only. `view-users` covers listing a group's members;
-    # `query-groups` covers resolving the group name to its id. Deliberately not
-    # `realm-admin` or `manage-users`: this credential lives in a Kubernetes
+    # Exactly one realm-management role, and it is read-only: `view-users` is
+    # all that listing the realm's users requires. Deliberately not
+    # `realm-admin` or `manage-users` — this credential lives in a Kubernetes
     # Secret, and nothing about its job requires the ability to change a single
-    # thing in the realm.
+    # thing in the realm. (An earlier revision also granted `query-groups`, for
+    # resolving a `witan-users` group that no longer exists.)
     witan_realm_mgmt_client = keycloak.openid.get_client(
         realm_id="ol-platform-engineering",
         client_id="realm-management",
         opts=InvokeOptions(provider=keycloak_provider),
     )
-    for resource_name, role in [
-        ("ol-platform-engineering-witan-token-sync-view-users", "view-users"),
-        ("ol-platform-engineering-witan-token-sync-query-groups", "query-groups"),
-    ]:
-        keycloak.openid.ClientServiceAccountRole(
-            resource_name,
-            realm_id=ol_platform_engineering_realm.id,
-            service_account_user_id=(
-                ol_platform_engineering_witan_token_sync_client.service_account_user_id
-            ),
-            client_id=witan_realm_mgmt_client.id,
-            role=role,
-            opts=resource_options,
-        )
+    keycloak.openid.ClientServiceAccountRole(
+        "ol-platform-engineering-witan-token-sync-view-users",
+        realm_id=ol_platform_engineering_realm.id,
+        service_account_user_id=(
+            ol_platform_engineering_witan_token_sync_client.service_account_user_id
+        ),
+        client_id=witan_realm_mgmt_client.id,
+        role="view-users",
+        opts=resource_options,
+    )
 
     # Filed under `witan/` rather than `sso/` with this realm's application
     # clients: the consumer is witan's own provisioning plumbing, and the

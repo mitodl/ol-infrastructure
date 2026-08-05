@@ -17,8 +17,9 @@ import pytest
 from ol_infrastructure.applications.omnigraph.scripts.sync_actor_tokens import (
     SyncError,
     derive_actor_id,
-    group_members,
+    is_service_account,
     read_token_map,
+    realm_users,
     reconcile,
 )
 
@@ -27,6 +28,16 @@ SERVICE_TOKENS = {"svc-witan-ci": "ci-token"}  # pragma: allowlist secret
 
 def member(user_id: str, *, enabled: bool = True) -> dict[str, Any]:
     return {"id": user_id, "username": f"user-{user_id}", "enabled": enabled}
+
+
+def service_account(client_id: str) -> dict[str, Any]:
+    """Build a realm user as Keycloak represents a client's own service account."""
+    return {
+        "id": f"sa-{client_id}",
+        "username": f"service-account-{client_id}",
+        "enabled": True,
+        "serviceAccountClientId": client_id,
+    }
 
 
 def test_derive_actor_id_matches_witan_core():
@@ -96,6 +107,31 @@ def test_reconcile_rejects_a_member_with_no_id():
         reconcile(SERVICE_TOKENS, {}, [{"username": "nameless"}])
 
 
+def test_reconcile_skips_service_account_users():
+    # Enumerating the realm returns clients' own service accounts alongside
+    # people — this realm has one for ol-opik-client and one for the token-sync
+    # client itself. Minting a human's interactive token for them would hand
+    # every such client the Cedar rights of a person.
+    desired = reconcile(
+        SERVICE_TOKENS,
+        {},
+        [
+            member("alice"),
+            service_account("ol-opik-client"),
+            service_account("witan-token-sync"),
+        ],
+    )
+
+    assert set(desired) == {"svc-witan-ci", "act-alice"}
+
+
+def test_is_service_account_detects_both_signals():
+    assert is_service_account(service_account("ol-opik-client"))
+    # Username convention alone, in case the representation omits the field.
+    assert is_service_account({"username": "service-account-something"})
+    assert not is_service_account(member("alice"))
+
+
 class _StubHandler(BaseHTTPRequestHandler):
     """Serves whatever ``routes`` maps the path to: (status, body)."""
 
@@ -158,18 +194,18 @@ def test_read_token_map_rejects_a_non_string_map(stub_server):
         read_token_map(base, "token", "secret-operations/witan/actor-tokens")
 
 
-def test_group_members_pages_to_the_end(stub_server):
+def test_realm_users_pages_to_the_end(stub_server):
     _, base = stub_server
     full_page = [member(f"u{i}") for i in range(100)]
     tail = [member("u100")]
     _StubHandler.routes = {
-        "/admin/realms/r/groups/g/members?first=0&max=100": (200, full_page),
-        "/admin/realms/r/groups/g/members?first=100&max=100": (200, tail),
+        "/admin/realms/r/users?first=0&max=100": (200, full_page),
+        "/admin/realms/r/users?first=100&max=100": (200, tail),
     }
 
-    # A short page is the only end-of-list signal Keycloak gives, so a group
+    # A short page is the only end-of-list signal Keycloak gives, so a realm
     # that lands exactly on the page size must still fetch the next one.
-    members = group_members(base, "r", "token", "g")
+    users = realm_users(base, "r", "token")
 
-    assert len(members) == 101
-    assert members[-1]["id"] == "u100"
+    assert len(users) == 101
+    assert users[-1]["id"] == "u100"
