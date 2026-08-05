@@ -4,7 +4,7 @@ import json
 
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
-from pulumi import Alias, Config, Output, ResourceOptions
+from pulumi import Alias, Config, InvokeOptions, Output, ResourceOptions
 
 
 def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
@@ -283,6 +283,99 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         ).apply(json.dumps),
     )
     # TOOLHIVE [END] # noqa: ERA001
+
+    # WITAN [START] # noqa: ERA001
+    # Membership of this group is the authoritative answer to "who may use
+    # witan". The omnigraph stack's token-sync CronJob walks it hourly and
+    # maintains one omnigraph bearer token per member, keyed by the actor id
+    # derived from the member's `sub` (agent-kit ADR-0004 D3). Adding someone
+    # here is the entire onboarding step; removing them retires their token on
+    # the next run.
+    #
+    # A group rather than a realm role — the first keycloak.Group in this repo,
+    # which is worth a word. Roles here (`admin`, `developer`) describe what
+    # somebody is and get mapped into tokens for applications to authorize on.
+    # This is neither: nothing reads a `witan-users` claim, because the tokens
+    # the sync job mints are what carry the authority, and the group is only
+    # ever enumerated out-of-band by that job. A role would work and would put
+    # a claim nobody consumes into every token in the realm.
+    keycloak.Group(
+        "ol-platform-engineering-witan-users-group",
+        realm_id=ol_platform_engineering_realm.id,
+        name="witan-users",
+        opts=resource_options,
+    )
+
+    # The identity the token-sync job enumerates that group as. CONFIDENTIAL
+    # with only the service-account (client-credentials) flow enabled: no human
+    # ever logs in as this, there is no redirect URI to get wrong, and the
+    # standard/implicit/direct-access flows are all off so a leaked secret buys
+    # exactly the two read-only Admin API calls below and nothing else.
+    #
+    # This is NOT the `witan-cli` public client that ADR-0005 path (a)'s
+    # `witan login` device-code flow authenticates against — that one is a
+    # separate, public client tracked on its own task. Interactive user login
+    # and this machine credential have no reason to share a client.
+    ol_platform_engineering_witan_token_sync_client = keycloak.openid.Client(
+        "ol-platform-engineering-witan-token-sync-client",
+        name="ol-platform-engineering-witan-token-sync-client",
+        realm_id="ol-platform-engineering",
+        client_id="witan-token-sync",
+        client_secret=keycloak_realm_config.get(
+            "ol-platform-engineering-witan-token-sync-client-secret"
+        ),
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        service_accounts_enabled=True,
+        standard_flow_enabled=False,
+        implicit_flow_enabled=False,
+        direct_access_grants_enabled=False,
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+
+    # Exactly the two realm-management roles the job's two calls need, and both
+    # are read-only. `view-users` covers listing a group's members;
+    # `query-groups` covers resolving the group name to its id. Deliberately not
+    # `realm-admin` or `manage-users`: this credential lives in a Kubernetes
+    # Secret, and nothing about its job requires the ability to change a single
+    # thing in the realm.
+    witan_realm_mgmt_client = keycloak.openid.get_client(
+        realm_id="ol-platform-engineering",
+        client_id="realm-management",
+        opts=InvokeOptions(provider=keycloak_provider),
+    )
+    for resource_name, role in [
+        ("ol-platform-engineering-witan-token-sync-view-users", "view-users"),
+        ("ol-platform-engineering-witan-token-sync-query-groups", "query-groups"),
+    ]:
+        keycloak.openid.ClientServiceAccountRole(
+            resource_name,
+            realm_id=ol_platform_engineering_realm.id,
+            service_account_user_id=(
+                ol_platform_engineering_witan_token_sync_client.service_account_user_id
+            ),
+            client_id=witan_realm_mgmt_client.id,
+            role=role,
+            opts=resource_options,
+        )
+
+    # Filed under `witan/` rather than `sso/` with this realm's application
+    # clients: the consumer is witan's own provisioning plumbing, and the
+    # omnigraph stack's VSO reads it alongside witan/actor-tokens and
+    # witan/ci-token. Only the two fields the job actually uses — it talks to
+    # the Admin API, not to a login endpoint, so there is no realm public key
+    # or session secret to publish.
+    vault.generic.Secret(
+        "ol-platform-engineering-witan-token-sync-vault-oidc-credentials",
+        path="secret-operations/witan/token-sync-oidc",
+        data_json=Output.all(
+            client_id=ol_platform_engineering_witan_token_sync_client.client_id,
+            client_secret=(
+                ol_platform_engineering_witan_token_sync_client.client_secret
+            ),
+        ).apply(json.dumps),
+    )
+    # WITAN [END] # noqa: ERA001
 
     # JUPYTERHUB [START] # noqa: ERA001
     ol_platform_engineering_jupyterhub_client = keycloak.openid.Client(
