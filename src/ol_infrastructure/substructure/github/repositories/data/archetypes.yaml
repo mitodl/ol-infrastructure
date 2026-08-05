@@ -79,9 +79,19 @@ archetypes:
     # reason: a rule that fires 102 times with no action anyone would take is noise.
     default_branch:
 
-  # The 138 archived repos. Deliberately almost empty: GitHub rejects most writes to an
+  # The archived repos. Deliberately almost empty: GitHub rejects most writes to an
   # archived repo, so anything more here produces failed applies rather than policy.
   # They are imported rather than ignored so that nothing stops someone re-adding one
   # later with a full config -- see §4.4.
+  #
+  # Note this archetype does NOT extend base -- inheriting base's settings would emit a
+  # config full of values that cannot be applied.
+  #
+  # `tier: unmanaged` is the same "deliberately untargeted" statement the forks make. An
+  # `archived-freeze` ruleset targeting a distinct `tier: archived` was specified in §5.4
+  # and dropped on 2026-08-05: GitHub already rejects writes to an archived repo, so it
+  # would have enforced read-only on things that are read-only. Without a tier value at
+  # all, CON-09 would fire on every archived repo for a label nobody intends to apply.
   archived:
     archived: true
+    tier: unmanaged

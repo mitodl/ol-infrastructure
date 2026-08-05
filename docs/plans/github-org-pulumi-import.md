@@ -359,7 +359,7 @@ dictionary comparison rather than an API crawl.
 | `organization/custom_properties.py` | `OrganizationCustomProperties` | **1 per property** (~3), not 1 total — see §5.2 |
 | `organization/teams.py` | `Team`, `TeamSettings`, `TeamMembership` | ~14 + ~60 |
 | `organization/members.py` | `Membership` | 39 |
-| `organization/org_rulesets.py` | `OrganizationRuleset` (property-targeted, §5.4) | ~4 |
+| `organization/org_rulesets.py` | `OrganizationRuleset` (property-targeted, §5.4) | 2 |
 | `organization/org_automation.py` | `OrganizationWebhook`, `ActionsRunnerGroup`, org secrets/variables | ~10 |
 | `repositories/repository.py` | `Repository`, `RepositoryTopics`, `BranchDefault`, `RepositoryVulnerabilityAlerts`, `RepositoryDependabotSecurityUpdates`, `RepositoryCustomProperty`, `TeamRepository` | 317 × ~6 |
 | `repositories/rulesets.py` | `RepositoryRuleset` — only repos declaring `required_status_checks` (§5.4) | ~20, not 179 |
@@ -655,19 +655,49 @@ Settled empirically by C6c (§9.1). A `repository_property` condition on an orga
 ruleset genuinely matches: the labeled repo saw the ruleset, the unlabeled control did not,
 and both read endpoints agreed.
 
-So the baseline is **~4 `OrganizationRuleset` resources targeting a `tier` custom property**,
-not ~179 `RepositoryRuleset` resources:
+So the baseline is **two `OrganizationRuleset` resources targeting a `tier` custom
+property**, not ~179 `RepositoryRuleset` resources:
 
 | Ruleset | Targets | Enforces |
 |---|---|---|
 | `baseline-default-branch` | `tier in (tier-1, standard)` | no force-push, no deletion, 1 approving review, dismiss stale reviews |
 | `tier-1-hardening` | `tier = tier-1` | require last-push approval, require conversation resolution |
-| `archived-freeze` | `tier = archived` | block all writes |
-| *(none)* | `tier = unmanaged` | forks are deliberately untargeted |
+| *(none)* | `tier = unmanaged` | forks **and archived repos** are deliberately untargeted |
+
+`tier` therefore has three allowed values: `tier-1`, `standard`, `unmanaged`. Across the
+current fleet that resolves to:
+
+| Tier | Repos | Which |
+|---|---:|---|
+| `tier-1` | 74 | application (10) + library (61) + infrastructure (3) |
+| `unmanaged` | 242 | fork (102) + archived (140) |
+| `standard` | **0** | — |
+
+**`standard` being empty is correct, not a gap.** Every classified archetype either promotes
+to `tier-1` or opts out to `unmanaged`, so the only thing that ever carries `standard` is a
+repo nobody has classified yet — which is exactly what a *newly created* repo is (§3.5). It
+is the property's `default_value`, and `baseline-default-branch` targets it so that a new
+repo is protected from creation, before anyone opens a PR to assign it an archetype.
+
+So `standard` is not a tier repos sit in; it is the landing pad they arrive on and leave.
+If it ever holds a non-trivial number of repos, that is the signal that classification has
+fallen behind repo creation — worth an audit rule in phase 4.
+
+**An `archived-freeze` ruleset was specified here and has been dropped (2026-08-05.)** It
+would have targeted `tier = archived` to block all writes to the 138 archived repos. GitHub
+already rejects writes to an archived repo, so the ruleset would have enforced read-only on
+things that are read-only — a resource to maintain, review and reason about in exchange for
+nothing. Archived repos take `tier: unmanaged` instead, which is the same "deliberately
+untargeted" statement the forks make and costs no additional ruleset.
+
+That also closes a latent inconsistency: the `archived` archetype does not extend `base` and
+so carried no `tier` at all, meaning the ruleset it was written for could never have matched
+anything, and CON-09 would have fired on all 138 archived repos for a label nobody intended
+to apply.
 
 What this buys:
 
-- The repositories stack drops ~179 resources, and the baseline becomes reviewable as four
+- The repositories stack drops ~179 resources, and the baseline becomes reviewable as two
   objects rather than a diff across 179 near-identical ones.
 - Tightening the baseline is a one-line change to one ruleset, not a 179-repo rollout.
 - A new repo is protected the moment its `tier` property is set — no separate ruleset
@@ -806,7 +836,7 @@ and route findings to the project's witan task list.
 | **1** | Build `bin/github-org-inventory`. Crawl. Human-confirm archetype per repo. Commit `data/`. | 317 repos classified; estate report reviewed |
 | **2** | Author `organization/`. Import org, teams, members. Define the `tier` custom-property schema (§5.4) — now a prerequisite, not a fast-follow. | **Empty diff** on `ol-substructure-github-organization` |
 | **3** | Author `repositories/`. Import in ~25-repo batches, including each repo's `tier` value. | **Empty diff** after every batch, and on the whole stack |
-| **3.5** | Add the ~4 property-targeted org rulesets at `enforcement: evaluate`. Watch, then promote to `active`. | Rule-suite logs show the expected repos matching and no surprises |
+| **3.5** | Add the two property-targeted org rulesets at `enforcement: evaluate`. Watch, then promote to `active`. | Rule-suite logs show the expected repos matching and no surprises |
 | **4** | Build `bin/github-estate-audit`. Run all three axes. Emit witan tasks. | Backlog exists and is triaged |
 | **5** | Remediate by tightening archetypes, not per-repo edits. Land in reviewed waves. | Each wave previews clean and is approved |
 | **6** | Nightly `drift` job in Concourse; org custom-properties schema populated; consider Vault-sourced Actions secrets. | Drift job green |
