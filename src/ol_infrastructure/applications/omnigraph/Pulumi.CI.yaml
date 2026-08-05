@@ -38,12 +38,10 @@ config:
   # #5253) — without that, dropping it from the program deletes the Vault path
   # and leaves a window where no token is valid for anybody.
   #
-  # QA and Production deliberately do NOT set this yet. Their
-  # substructure/keycloak stacks carry no witan resources, so
-  # secret-operations/witan/token-sync-oidc does not exist there and the
-  # bootstrap Job would block the deploy. Deploy that stack per environment
-  # first, then set this (note: Production is https://sso.ol.mit.edu, not
-  # sso-production — the runbook's `sso-<env>` template does not hold there).
+  # REQUIRES ol-substructure-keycloak to have been deployed to this
+  # environment first: it creates the witan-token-sync client and populates
+  # secret-operations/witan/token-sync-oidc, without which the bootstrap Job
+  # has no credential to authenticate to Keycloak with.
   omnigraph:keycloak_url: https://sso-ci.ol.mit.edu
   aws:region: us-east-1
   vault:address: https://vault-ci.odl.mit.edu

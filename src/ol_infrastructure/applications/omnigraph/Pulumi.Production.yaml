@@ -26,6 +26,21 @@ config:
   - https://github.com/mitodl/learn-ai
   - https://github.com/mitodl/ocw-hugo-themes
   - https://github.com/mitodl/ol-django
+  # Turns actor-token sync on: the bootstrap Job and the hourly CronJob take
+  # ownership of secret-operations/witan/actor-tokens, which Pulumi otherwise
+  # writes directly. Safe only because the existing actor-tokens resource
+  # already carries retainOnDelete=true (from #5253) — without that, dropping
+  # it from the program deletes the Vault path and leaves a window where no
+  # token is valid for anybody.
+  #
+  # REQUIRES ol-substructure-keycloak to have been deployed to this
+  # environment first: it creates the witan-token-sync client and populates
+  # secret-operations/witan/token-sync-oidc, without which the bootstrap Job
+  # has no credential to authenticate to Keycloak with.
+  #
+  # Production's realm is sso.ol.mit.edu — NOT sso-production. The runbook's
+  # `https://sso-<env>.ol.mit.edu` template holds for CI and QA but not here.
+  omnigraph:keycloak_url: https://sso.ol.mit.edu
   aws:region: us-east-1
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
