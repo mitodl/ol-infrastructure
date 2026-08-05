@@ -397,6 +397,64 @@ is exactly the CON-03 backlog.
 `base`. The per-repo files immediately show the 158 repos that would change, and that diff
 *is* the rollout plan — review it before applying rather than discovering it in a preview.
 
+### 3.5 Provisioning a new repository
+
+The question this design has to answer well: **when someone creates a repo tomorrow, what
+protects it, and does anyone have to write Pulumi code first?**
+
+The answer is deliberately split so that the two are independent. **Protection is
+automatic and requires no PR. Pulumi management is bookkeeping that follows.** If those
+were coupled, every new repo would sit unprotected until someone got around to a PR —
+which is precisely how `ol-django` ended up with no branch protection at all.
+
+#### Tier 1 — automatic at creation, no PR
+
+| Mechanism | What it covers |
+|---|---|
+| `tier` custom property with `required: true, defaultValue: standard` | The new repo carries `tier=standard` from birth, so the `baseline-default-branch` org ruleset (§5.4) matches it **immediately**. |
+| `OrganizationSettings` new-repo toggles | `advanced_security`, `dependabot_alerts`, `dependabot_security_updates`, `dependency_graph`, `secret_scanning`, `secret_scanning_push_protection` — six `*_enabled_for_new_repositories` flags, **all currently off** (SEC-05). Set once; every future repo inherits them. |
+| The `.github` repo | Org-wide default issue/PR templates and community health files. Already works; no Pulumi involvement. |
+| `default_repository_permission: none` | Already correct. |
+
+Nobody edits this repository to get any of it. That is the whole point.
+
+**One empirical question before relying on the first row.** The provider exposes
+`default_value` on `OrganizationCustomProperties`, but whether GitHub applies that default
+to *newly created* repos — as opposed to only back-filling repos that existed when the
+property was defined — has **not** been verified. It is load-bearing for tier 1 and it is
+exactly the shape of assumption that the C6 probe caught being wrong about ruleset
+visibility. Settle it with `bin/github-ruleset-capability-probe`: define a property with a
+default, create a throwaway repo, check whether the org ruleset matches it.
+
+If defaults turn out not to apply to new repos, the fallback is an org ruleset targeting
+`~ALL` instead of a property. Probe controls C6a/C6b already proved `~ALL` targeting works,
+so the failure mode has a known answer rather than being an open risk.
+
+#### Tier 2 — brought under Pulumi, which does need a PR
+
+Adding `data/repos/<name>.yaml` plus an entry in the archetype assignment file. This is
+recording a repo that is *already protected*, not protecting it.
+
+It also cannot be forgotten silently: `github-org-inventory crawl` refuses to run when a
+crawled repo has no archetype assignment, naming the repos —
+
+```
+N repo(s) have no archetype in .../archetypes-proposed.yaml: ['new-service', ...]
+Re-run `infer-archetypes` to regenerate, then confirm the additions.
+```
+
+— and refuses again if a repo's assignment disagrees with GitHub's `archived` flag. So the
+gap between "repo exists" and "repo is in Pulumi" is *visible and bounded* rather than
+open-ended. A nightly `drift` run (§7) is what surfaces it without anyone remembering to look.
+
+#### What this deliberately does not do
+
+No `Repository` resources are created from Pulumi in phases 0–5. The provider supports
+`template` and `is_template`, so a template-repo workflow is available later if wanted, but
+creating repos through IaC is a separate decision from governing them and is not in scope
+here. Repos keep being created however they are created today; the difference is that from
+tier 1 onward they are born protected.
+
 ## 4. Scoping rules — what stays out
 
 The single most common way a brownfield IaC import fails is importing things that are actually
@@ -459,6 +517,42 @@ findings. Classifying every repo into an archetype is the manual step of phase 1
 the step that determines whether §7 produces signal or noise.
 
 ---
+
+### 4.6 Copilot: PR review is in scope, seats and agent settings are not
+
+Verified 2026-08-05 against both the published registry docs and the shipped 6.14.1 schema,
+because the first check got it wrong in an instructive way — it grepped the schema's
+**resources** for `copilot`, found nothing, and concluded there was no support at all. The
+support is real; it just lives in **types**, as a rule inside rulesets rather than as a
+resource of its own.
+
+| Surface | Pulumi support | Decision |
+|---|---|---|
+| **Copilot code review on PRs** | **Yes** — `copilot_code_review` rule on both `RepositoryRuleset` and `OrganizationRuleset`, with `review_draft_pull_requests` and `review_on_push` | **In scope.** Already in the import payload. |
+| Seat management | None | Out of scope, like the third-party installations (§4.2). |
+| Copilot agent settings / org policy | None | Out of scope. |
+
+This matters more than it first appears, because **Copilot review is the most widely
+deployed policy in the org**. Of the 10 repository rulesets that exist across all 316 repos,
+**six are "Copilot review for default branch"** — `agent-kit`, `lehrer`, `mit-learn`,
+`ol-data-platform`, `ol-infrastructure`, `open-edx-plugins`, all `active`. The remaining four
+are ordinary branch protection. There are **zero** org rulesets.
+
+So Copilot code review currently has a wider ruleset footprint than branch protection does,
+and all ten rulesets are already in `import-repositories.json` — meaning phase 3 imports
+Copilot review whether or not anyone framed it as a decision. Three things follow:
+
+1. **Decide whether it is meant to be fleet-wide.** Since `OrganizationRuleset` supports both
+   `copilot_code_review` and `repository_property` targeting (proven by probe C6c), it can be
+   one org ruleset targeting `tier` rather than six hand-made per-repo ones — the same shape
+   as §5.4's branch-protection design. If it is *not* meant to be fleet-wide, the six should
+   be recorded as deliberate per-repo deviations rather than left looking accidental.
+2. **Capture the rule parameters before phase 3.** The inventory records ruleset ids and
+   names but not each rule's settings, so `review_on_push` / `review_draft_pull_requests` are
+   currently unknown per repo. The empty-diff gate needs them.
+3. Seats and agent settings stay out, and the App manifest's exclusion of
+   `organization_copilot_seat_management` / `organization_copilot_agent_settings` remains
+   correct. An audit-only read is the option worth revisiting in phase 4.
 
 ## 5. Discovery and import mechanics
 
