@@ -5,8 +5,8 @@ allow_rebase_merge: true
 archetype: library
 delete_branch_on_merge: false
 dependabot_security_updates: false
-description: "Natural language LLM interface for Apache Superset — chart, dashboard,\
-  \ and data exploration via chat. Deployed as a Superset extension plugin."
+description: Natural language LLM interface for Apache Superset — chart, dashboard,
+  and data exploration via chat. Deployed as a Superset extension plugin.
 has_wiki: true
 name: superset-nl-explorer
 teams: {}

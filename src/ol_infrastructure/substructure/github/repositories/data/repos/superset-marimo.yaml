@@ -2,8 +2,8 @@
 allow_auto_merge: false
 archetype: library
 dependabot_security_updates: false
-description: "Marimo notebook integration for Apache Superset — connects reactive\
-  \ Python notebooks to Superset-configured data sources"
+description: Marimo notebook integration for Apache Superset — connects reactive Python
+  notebooks to Superset-configured data sources
 name: superset-marimo
 required_status_checks:
 - Backend lint & type-check

@@ -11,7 +11,7 @@ archetype: application
 default_branch: master
 delete_branch_on_merge: false
 dependabot_security_updates: false
-description: "Portal for learners and course teams to access MITx Micromasters® programs "
+description: 'Portal for learners and course teams to access MITx Micromasters® programs '
 homepage: https://mm.mit.edu
 name: micromasters
 teams:
