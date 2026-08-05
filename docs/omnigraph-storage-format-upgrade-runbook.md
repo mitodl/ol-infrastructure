@@ -108,11 +108,23 @@ declares:
 
 CI currently declares 16 graphs. Enumerate from the running config, not from
 `managed_repos` — the ids are derived, and re-deriving them by hand is how you
-drop one:
+drop one. Produce a plain one-id-per-line list, because every loop below reads
+it:
 
 ```shell
 kubectl -n omnigraph get configmap omnigraph-cluster-config \
-  -o jsonpath='{.data.cluster\.yaml}' | yq '.graphs | keys'
+  -o jsonpath='{.data.cluster\.yaml}' | yq -r '.graphs | keys | .[]' \
+  > /tmp/graph-ids.txt
+wc -l /tmp/graph-ids.txt
+```
+
+That file is on your workstation, but the loops in steps 2–4 run **inside** the
+workspace pods, which do not mount the cluster ConfigMap. Copy it in after
+starting each pod:
+
+```shell
+kubectl -n omnigraph exec -i <pod> -- sh -c 'cat > /tmp/graph-ids.txt' \
+  < /tmp/graph-ids.txt
 ```
 
 Then cross-check against what is actually in the bucket, which is not
@@ -152,10 +164,12 @@ recovery path anyone should be attempting under time pressure.
 > **Prerequisite, read before scheduling.** The storage root is derived, not
 > configurable: `data_tier.py` sets
 > `bucket_name = f"ol-data-witan-{stack_info.env_suffix}"` and builds `storage:`
-> from it, so step 5 is a code edit today. An `omnigraph:storage_root` override
-> — an optional config key that replaces the derived storage URI in cluster.yaml
-> while leaving bucket creation and IRSA alone — is what makes this runbook
-> executable as written. Tracked in the witan project backlog.
+> from it. **There is no `omnigraph:storage_root` config key yet**, so step 5
+> repoints by editing that derivation, and setting a config key of that name
+> today would no-op silently. Adding the override — an optional key that
+> replaces the derived storage URI in cluster.yaml while leaving bucket
+> creation and IRSA alone — is what makes step 5 a config change instead.
+> Tracked in the witan project backlog.
 
 ## Addressing: `--store`, not `--cluster`
 
@@ -283,13 +297,49 @@ and is the safe choice — `overwrite` is destructive and buys nothing here.
 
 ### 5. Repoint the cluster and deploy the new image
 
-```shell
-cd src/ol_infrastructure/applications/omnigraph
-pulumi config set omnigraph:storage_root "$NEW_ROOT" --stack <CI|QA|Production>
+> **Do this by code edit today.** `omnigraph:storage_root` does not exist yet
+> (see *Prerequisite* above). Setting that config key on a stack that does not
+> read it **fails silently** — `pulumi up` reports success, cluster.yaml still
+> names the old root, and the new binary hits the same version gate that
+> started this outage. Do not run `pulumi config set omnigraph:storage_root`
+> until the override has actually landed.
+
+Edit the storage URI in `src/ol_infrastructure/applications/omnigraph/data_tier.py`:
+
+```python
+# storage_uri: Output[str] = omnigraph_bucket.bucket_v2.bucket.apply(
+#     lambda name: f"s3://{name}"
+# )
+storage_uri: Output[str] = omnigraph_bucket.bucket_v2.bucket.apply(
+    lambda name: f"s3://{name}/fmt<N>"      # storage-format migration <date>
+)
 ```
+
+Change only this value. Leave the `OLBucket`, the IAM policy, and the IRSA
+grant keyed to the derived bucket name — the new root is a prefix *inside* that
+same bucket, so they already cover it, and repointing them would drop the
+grant and the versioning config.
+
+Confirm the generated config before applying:
+
+```shell
+pulumi preview --stack <CI|QA|Production> --diff | grep -A5 'cluster.yaml'
+```
+
+The `storage:` line must show the new root. If it does not, stop — the deploy
+will silently no-op back onto the old root.
 
 Then let the paused pipeline's deploy job for this environment run (or
 `pulumi up` directly with `OMNIGRAPH_DOCKER_SHA` set to the new digest).
+
+**Once `omnigraph:storage_root` lands**, this whole step collapses to:
+
+```shell
+pulumi config set omnigraph:storage_root "$NEW_ROOT" --stack <CI|QA|Production>
+```
+
+with the same `pulumi preview` confirmation, and the rollback below becomes
+`pulumi config rm` instead of reverting the edit.
 
 The deploy regenerates cluster.yaml against the new root, runs its own
 `cluster apply` Job — a no-op, since step 4 already converged that root — and
@@ -322,12 +372,11 @@ it only after the next environment has migrated successfully too.
 Before step 5 there is nothing to roll back: scale to 1 and you are on the old
 image against the old root.
 
-After step 5:
-
-```shell
-pulumi config rm omnigraph:storage_root --stack <CI|QA|Production>
-# redeploy with OMNIGRAPH_DOCKER_SHA pinned to the OLD image digest
-```
+After step 5 — revert the `storage_uri` edit from that step (or, once the
+override lands, `pulumi config rm omnigraph:storage_root --stack <…>`), then
+redeploy with `OMNIGRAPH_DOCKER_SHA` pinned to the **old** image digest.
+Confirm with the same `pulumi preview --diff` check that `storage:` is back to
+the derived root before applying.
 
 The old root was never written to, so this is a revert, not a restore. Writes
 that landed on the new root after step 5 are lost — which is the real reason

@@ -321,11 +321,12 @@ recording here, since both contradict a reasonable reading of the CLI's help:
   `manifest_version` legitimately differs between graphs in one cluster.
 
 This addendum records a consequence of the existing decision rather than
-changing it. One follow-on is required to make the runbook executable as
-written: the storage root is derived (`ol-data-witan-<env>`) with no override,
-so repointing it is a code edit today. A prefix within the existing bucket is a
-valid root (`cluster validate` accepts it), so the override is a config key, not
-a new bucket or IRSA change.
+changing it. One follow-on is worth doing before the procedure is ever needed
+in anger: the storage root is derived (`ol-data-witan-<env>`) with no config
+override, so repointing it is an edit to `data_tier.py` — done under outage
+pressure, on the step where a mistake silently leaves the cluster on the old
+root. A prefix within the existing bucket is a valid root (`cluster validate`
+accepts it), so the override is a config key, not a new bucket or IRSA change.
 
 ## Implementation Notes
 
