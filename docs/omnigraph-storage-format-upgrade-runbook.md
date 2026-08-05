@@ -189,8 +189,17 @@ The cluster's own state ledger lives at `<root>/__cluster/state.json`.
 
 ## Procedure
 
-`$ENV` is the lowercased env suffix (`ci`, `qa`, `production`), `$OLD_ROOT` is
-`s3://ol-data-witan-$ENV`, `$NEW_ROOT` is `$OLD_ROOT/fmt<N>`.
+Set these first, **on your workstation** — steps 5, 6 and 7 use them there:
+
+```shell
+ENV=ci                                    # ci | qa | production
+OLD_ROOT="s3://ol-data-witan-$ENV"
+NEW_ROOT="$OLD_ROOT/fmt<N>"               # <N> = the new internal-schema number
+```
+
+Each pod shell you open below needs the same three set again — a `kubectl exec`
+shell inherits nothing from your workstation, and the steps that open one say so
+where it matters.
 
 All `omnigraph` and `aws` work runs **in-cluster**, in a one-off pod on the
 `omnigraph-server` ServiceAccount, which carries the bucket's IRSA grant — no
@@ -238,9 +247,8 @@ kubectl -n omnigraph exec -it omnigraph-migrate-old -- sh
 ```
 
 Everything in steps 2 and 3 runs **inside this pod** unless it starts with
-`kubectl`. Set the roots in the pod shell — they are not inherited from your
-workstation — and sanity-check the binary and its addressing before relying on
-either:
+`kubectl`. Re-set the roots here — the pod shell inherits nothing — and
+sanity-check the binary and its addressing before relying on either:
 
 ```shell
 ENV=ci                                    # ci | qa | production
@@ -249,8 +257,6 @@ NEW_ROOT="$OLD_ROOT/fmt<N>"
 omnigraph version
 omnigraph snapshot --store "$OLD_ROOT/graphs/council.omni" | head -3
 ```
-
-Re-set the same three in the step 4 pod; each `kubectl exec` shell starts clean.
 
 Then record the baseline — per-table row counts for every graph. This is what
 step 6 checks against, and it is the only thing that catches a load which
@@ -309,10 +315,13 @@ kubectl -n omnigraph exec -i omnigraph-migrate-new -- sh -c 'cat > /tmp/graph-id
 kubectl -n omnigraph exec -it omnigraph-migrate-new -- sh
 ```
 
-Confirm you are on the binary you think you are — this is the whole point of
-the exercise:
+Re-set the roots (this shell inherits nothing either) and confirm you are on the
+binary you think you are — this is the whole point of the exercise:
 
 ```shell
+ENV=ci                                    # ci | qa | production
+OLD_ROOT="s3://ol-data-witan-$ENV"
+NEW_ROOT="$OLD_ROOT/fmt<N>"
 omnigraph version        # must show the NEW internal-schema number
 ```
 
