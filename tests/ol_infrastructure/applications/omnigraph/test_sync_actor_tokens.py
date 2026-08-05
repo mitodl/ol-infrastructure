@@ -181,6 +181,33 @@ def test_read_token_map_rejects_a_corrupt_payload(stub_server):
         read_token_map(base, "token", "secret-operations/witan/actor-tokens")
 
 
+def test_read_token_map_rejects_an_existing_secret_with_no_key(stub_server):
+    _, base = stub_server
+    _StubHandler.routes = {
+        "/v1/secret-operations/witan/actor-tokens": (200, {"data": {"other": "x"}})
+    }
+
+    # Distinct from the 404 bootstrap case above. Every writer of this path sets
+    # tokens_json, so a secret that exists without it is malformed — and
+    # treating it as empty would re-mint every user's token and bounce
+    # omnigraph-server to recover from what may be a transient read problem.
+    with pytest.raises(SyncError, match="no non-empty tokens_json"):
+        read_token_map(base, "token", "secret-operations/witan/actor-tokens")
+
+
+def test_read_token_map_rejects_a_non_json_success_body(stub_server):
+    _, base = stub_server
+    # An HTML error page from a proxy, served with a 200.
+    _StubHandler.routes = {
+        "/v1/secret-operations/witan/actor-tokens": (200, "<html>gateway</html>")
+    }
+
+    # Must surface as SyncError, not a bare JSONDecodeError traceback naming
+    # json/decoder.py instead of the request that was misrouted.
+    with pytest.raises(SyncError, match="non-JSON body"):
+        read_token_map(base, "token", "secret-operations/witan/actor-tokens")
+
+
 def test_read_token_map_rejects_a_non_string_map(stub_server):
     _, base = stub_server
     _StubHandler.routes = {

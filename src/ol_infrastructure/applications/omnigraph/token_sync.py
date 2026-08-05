@@ -309,10 +309,24 @@ def create_token_sync(  # noqa: PLR0913
         opts=ResourceOptions(delete_before_replace=True, depends_on=depends_on),
     )
 
-    # Auto-named so a script change rolls a new ConfigMap rather than mutating
-    # one in place: a mutated ConfigMap propagates to a running pod on the
-    # kubelet's own schedule, which for a CronJob means an indeterminate mix of
-    # old and new for the next interval.
+    # A script change must roll a NEW ConfigMap rather than mutate one in
+    # place: a mutated ConfigMap propagates to already-scheduled pods on the
+    # kubelet's own schedule, so a run that starts during propagation can mount
+    # a stale script.
+    #
+    # Auto-naming (no metadata.name) is only half of that, and on its own it
+    # does nothing here — Pulumi generates the name once, at creation, and a
+    # `data` change is an in-place update that keeps it. `replace_on_changes`
+    # is what makes the data the thing that forces a replacement; auto-naming
+    # is then what lets the replacement take a *different* name instead of
+    # colliding with the resource it replaces. Both are required, and because
+    # the new name flows into the pod spec through
+    # `script_config_map.metadata.name`, replacing the ConfigMap also updates
+    # the CronJob that mounts it.
+    #
+    # delete_before_replace stays False (the default, stated because it is
+    # load-bearing): the new ConfigMap is created before the old one goes, so
+    # there is no window in which a scheduled run finds no ConfigMap at all.
     script_config_map = kubernetes.core.v1.ConfigMap(
         f"witan-token-sync-script-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -320,6 +334,10 @@ def create_token_sync(  # noqa: PLR0913
             labels=k8s_global_labels,
         ),
         data={SCRIPT_FILENAME: script_body},
+        opts=ResourceOptions(
+            replace_on_changes=["data"],
+            delete_before_replace=False,
+        ),
     )
 
     pod_template = _pod_spec(

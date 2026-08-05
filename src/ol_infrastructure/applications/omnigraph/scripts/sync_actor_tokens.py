@@ -146,7 +146,19 @@ def _request(
         raise SyncError(msg) from exc
     if not body:
         return None
-    return json.loads(body)
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError as exc:
+        # A 2xx whose body is not JSON means we are talking to something other
+        # than the API we think we are — an HTML error page from a proxy, or a
+        # misrouted URL. Left uncaught this is the one failure in the script
+        # that escapes SyncError and reaches the operator as a bare traceback,
+        # which names json/decoder.py rather than the request that was wrong.
+        msg = (
+            f"{method} {url} returned HTTP 200 with a non-JSON body "
+            f"({body[:200]!r}): {exc}"
+        )
+        raise SyncError(msg) from exc
 
 
 ###############################################################################
@@ -172,9 +184,16 @@ def vault_login(vault_addr: str, auth_mount: str, role: str, jwt: str) -> str:
 def read_token_map(vault_addr: str, vault_token: str, path: str) -> dict[str, str]:
     """Read a ``{actor_id: token}`` map out of a kv-v1 Vault secret.
 
-    A missing secret is an empty map — the bootstrap case. A secret that exists
-    but whose payload is unparseable is not: that is corruption, and continuing
-    would rewrite the path with whatever we could still make sense of.
+    An ABSENT secret is an empty map — the bootstrap case, where this job's
+    first run is what creates the path. A secret that EXISTS but is not what we
+    write is not: that is corruption, and continuing would rewrite the path
+    with whatever we could still make sense of.
+
+    The distinction matters most for actor-tokens, whose only writer is this
+    job. Treating a present-but-malformed payload as empty would carry no
+    existing token over, re-mint one for every user, and — because that write
+    trips the VSO restart target — bounce omnigraph-server, invalidating every
+    live session to recover from what may be a transient read problem.
     """
     response = _request(
         f"{vault_addr}/v1/{path}",
@@ -186,10 +205,13 @@ def read_token_map(vault_addr: str, vault_token: str, path: str) -> dict[str, st
         return {}
     raw = (response.get("data") or {}).get(TOKENS_VAULT_KEY)
     if raw in (None, ""):
-        LOG.info(
-            "vault path %s has no %s key; treating as empty", path, TOKENS_VAULT_KEY
+        msg = (
+            f"Vault path {path} exists but has no non-empty {TOKENS_VAULT_KEY} "
+            "key. Every writer of this path sets it, so this is a malformed or "
+            "partially-written secret rather than an empty one — refusing to "
+            "treat it as no tokens and re-mint the whole map."
         )
-        return {}
+        raise SyncError(msg)
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError as exc:
