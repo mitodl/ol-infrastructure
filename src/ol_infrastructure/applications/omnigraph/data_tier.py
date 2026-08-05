@@ -554,13 +554,26 @@ def create_data_tier(  # noqa: PLR0913
                             # sick server. Only failureThreshold=3 kept it from
                             # being a crashloop.
                             #
+                            # The two probes are sized against that measurement
+                            # for DIFFERENT reasons, and only one of them
+                            # carries headroom:
+                            #
+                            # - readiness sits just past the slowest boot (20s
+                            #   vs 19.8s). Deliberate: a failed readiness probe
+                            #   costs nothing but a 5s retry, and every second
+                            #   spent out of the Service is restart outage. It
+                            #   is allowed to be tight.
+                            # - liveness carries the headroom (60s, 3x), because
+                            #   its failure mode is killing a healthy pod.
+                            #
                             # The converge cost scales with the declared graph
-                            # count (~1.2s/graph), so these are set well past
-                            # today's measurement to leave room as
-                            # `managed_repos` grows. A fixed delay still cannot
-                            # track that growth forever; a startupProbe is the
-                            # mechanism that does, and is the right follow-up if
-                            # the graph list keeps expanding.
+                            # count (~1.2s/graph), so as `managed_repos` grows
+                            # readiness will start probing early again — noisy
+                            # but harmless — and liveness eats into its 3x. A
+                            # fixed delay cannot track that growth; a
+                            # startupProbe is the mechanism that does, and is
+                            # the right follow-up if the graph list keeps
+                            # expanding.
                             readiness_probe=kubernetes.core.v1.ProbeArgs(
                                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
                                     path="/healthz",
