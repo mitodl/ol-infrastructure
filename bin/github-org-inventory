@@ -128,8 +128,19 @@ ARCHIVED_SCOPED_RULES = frozenset({"CON-07 archived repo still grants team write
 # grant on an archived repo is inert only until someone unarchives it, and the fork fleet
 # was explicitly included when the policy was set.
 FLEET_SCOPED_RULES = frozenset(
-    {"SEC-06 direct collaborator on repo (policy: repo access via teams only)"}
+    {
+        "SEC-06 direct collaborator on repo (policy: repo access via teams only)",
+        "SEC-15 broad team holds admin (policy: push or maintain)",
+    }
 )
+
+# Teams broad enough that `admin` on a repo is over-privilege rather than ownership
+# (SEC-15, policy set 2026-08-05: odl-engineering should hold push or maintain). `admin`
+# carries repo deletion, settings changes and the ability to bypass rulesets -- with
+# direct collaborator grants going away (§4.7), team grants ARE the access control, so
+# their level is the whole story rather than a detail. Add teams here as the policy grows.
+NO_ADMIN_TEAMS = frozenset({"odl-engineering"})
+ADMIN_PERMISSIONS = frozenset({"admin"})
 
 # The value GitHub reports for an active security-and-analysis feature. Hoisted to a
 # constant because comparing the scanning-status fields against a literal trips both
@@ -485,7 +496,26 @@ def propose_archetype(repo: dict[str, Any]) -> str:
     return "library"
 
 
-def _findings(repos: list[dict[str, Any]]) -> dict[str, list[str]]:
+def _archetype_teams(archetypes_file: Path) -> dict[str, dict[str, str]] | None:
+    """Resolve each archetype's target team grants, or None if the file is absent.
+
+    `report` is documented as usable before any Pulumi exists, so a missing archetypes
+    file is a legitimate state rather than an error -- it just means the two conformance
+    rules cannot be evaluated, which the caller reports rather than scoring as zero.
+    """
+    if not archetypes_file.exists():
+        return None
+    archetypes = yaml.safe_load(archetypes_file.read_text())["archetypes"]
+    return {
+        name: _resolve_archetype(archetypes, name).get("teams") or {}
+        for name in archetypes
+    }
+
+
+def _findings(
+    repos: list[dict[str, Any]],
+    archetype_teams: dict[str, dict[str, str]] | None = None,
+) -> dict[str, list[str]]:
     """Map §7 rule id -> repo names that fire it.
 
     Rules scope to active repos by default. Two exceptions, both declared as frozensets
@@ -494,7 +524,29 @@ def _findings(repos: list[dict[str, Any]]) -> dict[str, list[str]]:
     exemptions.
     """
     live = [r for r in repos if not r["archived"]]
+    # CON-04/SEC-15 need each archetype's target team grants. Absent (no archetypes.yaml),
+    # both are skipped rather than reported as zero -- an empty finding and an unmeasured
+    # one look identical in a report, and only one of them is good news.
+    conformance: dict[str, list[str]] = {}
+    if archetype_teams is not None:
+        conformance = {
+            "CON-04 team grants deviate from archetype": [
+                r["name"]
+                for r in live
+                if (r.get("teams") or {})
+                != (archetype_teams.get(propose_archetype(r)) or {})
+            ],
+            "SEC-15 broad team holds admin (policy: push or maintain)": [
+                r["name"]
+                for r in repos
+                if any(
+                    team in NO_ADMIN_TEAMS and perm in ADMIN_PERMISSIONS
+                    for team, perm in (r.get("teams") or {}).items()
+                )
+            ],
+        }
     return {
+        **conformance,
         "SEC-01 no branch protection and no ruleset": [
             r["name"]
             for r in live
@@ -560,12 +612,15 @@ def report(
     as_json: Annotated[
         bool, cyclopts.Parameter(name=["--json"], help="Emit JSON instead of text.")
     ] = False,
+    archetypes_file: Annotated[
+        Path, cyclopts.Parameter(help="Archetype definitions, for CON-04 / SEC-15.")
+    ] = DATA_DIR / "archetypes.yaml",
 ) -> None:
     """Estate report for the whole org, before any Pulumi is involved."""
     data = _crawl_org(cache, refresh=refresh)
     repos = data["repos"]
     live = [r for r in repos if not r["archived"]]
-    findings = _findings(repos)
+    findings = _findings(repos, _archetype_teams(archetypes_file))
 
     if as_json:
         print(
@@ -632,6 +687,24 @@ def report(
             denominator, label = len(live), "active"
         share = f"{len(hits) / denominator:.0%}" if denominator else "-"
         print(f"  {len(hits):4}  ({share:>4} of {label})  {rule}")
+
+    grants: Counter[str] = Counter()
+    by_team: Counter[str] = Counter()
+    for repo in repos:
+        for team, perm in (repo.get("teams") or {}).items():
+            grants[perm] += 1
+            if perm in ADMIN_PERMISSIONS:
+                by_team[team] += 1
+    if grants:
+        total = sum(grants.values())
+        admin = sum(c for p, c in grants.items() if p in ADMIN_PERMISSIONS)
+        print(f"\n## Team permission spread — {admin}/{total} grants are admin")
+        for perm, count in grants.most_common():
+            print(f"     {count:5}  {perm}")
+        print("  teams holding admin, by repo count:")
+        for team, count in by_team.most_common(8):
+            flag = "  <-- SEC-15" if team in NO_ADMIN_TEAMS else ""
+            print(f"     {count:5}  {team}{flag}")
 
     holders: Counter[str] = Counter()
     levels: Counter[str] = Counter()

@@ -844,6 +844,7 @@ fixtures and cheap to add — the rule set is meant to grow every time someone n
 | SEC-12 | Our own app's live permissions diverge from `docs/github-app-permissions.md` | — |
 | SEC-13 | Private repo with weaker controls than the public baseline | `hq` |
 | SEC-14 | No CODEOWNERS on a tier-1 repo | unknown |
+| SEC-15 | A broad team holds `admin` — `odl-engineering` must be `push` or `maintain` (policy 2026-08-05) | **fires on 116 repos** (61 active, 55 archived) |
 
 ### Axis: Consistency
 
@@ -852,7 +853,7 @@ fixtures and cheap to add — the rule set is meant to grow every time someone n
 | CON-01 | Merge strategy deviates from archetype | 4 of 5 sampled repos disagree |
 | CON-02 | `delete_branch_on_merge` disabled | `hq` |
 | CON-03 | Default branch is not `main` | unknown |
-| CON-04 | Team grants deviate from archetype | unknown |
+| CON-04 | Team grants deviate from archetype | **fires on 174 of 176 active repos** — only 2 conform |
 | CON-05 | No topics, or topics outside the controlled vocabulary | `mit-learn`, `ol-django`, `mitxonline` have none |
 | CON-06 | Missing LICENSE / README / SECURITY.md | unknown |
 | CON-07 | Archived repo still grants write to a team | unknown |
