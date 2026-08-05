@@ -400,11 +400,21 @@ grant and the versioning config.
 Confirm the generated config before applying:
 
 ```shell
-pulumi preview --stack <CI|QA|Production> --diff | grep -A5 'cluster.yaml'
+pulumi preview --stack <CI|QA|Production> --diff | grep -E '^\s*[-+]?\s*storage:'
 ```
 
-The `storage:` line must show the new root. If it does not, stop — the deploy
-will silently no-op back onto the old root.
+Expect a `-`/`+` pair showing the old root replaced by the new one. **Empty
+output means the edit did not take** — the ConfigMap is unchanged and the deploy
+will no-op back onto the old root. Stop and fix the edit rather than applying.
+
+If the diff is hard to read (the ConfigMap `data` renders as one blob), fall
+back to the generated value itself:
+
+```shell
+pulumi preview --stack <CI|QA|Production> --json \
+  | jq -r '.steps[]?.newState?.inputs?.data?["cluster.yaml"] // empty' \
+  | grep '^storage:'
+```
 
 Then let the paused pipeline's deploy job for this environment run (or
 `pulumi up` directly with `OMNIGRAPH_DOCKER_SHA` set to the new digest).
