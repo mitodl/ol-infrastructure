@@ -93,9 +93,7 @@ from pulumi import Config, Output, ResourceOptions, export
 from bridge.secrets import sops as _bridge_sops
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.witan.break_glass import (
-    CRONJOB_NAME as BREAK_GLASS_CRONJOB_NAME,
-)
-from ol_infrastructure.applications.witan.break_glass import (
+    BREAK_GLASS_CRONJOB_NAME,
     create_break_glass_cronjob,
 )
 from ol_infrastructure.applications.witan.ci_indexer import (

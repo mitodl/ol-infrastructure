@@ -67,7 +67,7 @@ from pulumi import Output, Resource, ResourceOptions
 
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
-CRONJOB_NAME = "witan-break-glass"
+BREAK_GLASS_CRONJOB_NAME = "witan-break-glass"
 
 # 31 February. The API validates the *format*, not that the date can occur, so
 # this parses fine and matches nothing. Belt and braces on top of
@@ -115,15 +115,16 @@ def create_break_glass_cronjob(  # noqa: PLR0913
         # from a runbook, which needs a name that does not change on every
         # deploy.
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=CRONJOB_NAME,
+            name=BREAK_GLASS_CRONJOB_NAME,
             namespace=namespace,
             labels=k8s_global_labels,
             annotations={
                 "ol.mit.edu/purpose": (
                     "Break-glass maintenance template (ADR-0005 path b). Never "
                     "scheduled; instantiate with `kubectl create job "
-                    f"--from=cronjob/{CRONJOB_NAME}`, then `kubectl exec` into "
-                    "it. See docs/witan-admin-break-glass-runbook.md."
+                    f"--from=cronjob/{BREAK_GLASS_CRONJOB_NAME}`, then "
+                    "`kubectl exec` into it. See "
+                    "docs/witan-admin-break-glass-runbook.md."
                 ),
             },
         ),
@@ -146,7 +147,7 @@ def create_break_glass_cronjob(  # noqa: PLR0913
                         metadata=kubernetes.meta.v1.ObjectMetaArgs(
                             labels={
                                 **k8s_global_labels,
-                                "app.kubernetes.io/name": CRONJOB_NAME,
+                                "app.kubernetes.io/name": BREAK_GLASS_CRONJOB_NAME,
                             },
                         ),
                         spec=kubernetes.core.v1.PodSpecArgs(

@@ -373,8 +373,8 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
 
     # The client a human's `witan` CLI authenticates as (agent-kit ADR-0005 path
     # a: `witan login`/`whoami`/`logout`, witan_core.remote.oidc). PUBLIC with
-    # ONLY the device authorization grant enabled — every property here is load
-    # bearing:
+    # ONLY the device authorization grant enabled — every property here is
+    # load-bearing:
     #
     #   - PUBLIC because a CLI on a laptop cannot keep a secret. `witan-cli` is
     #     also the client_id agent-kit defaults to
