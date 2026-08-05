@@ -21,22 +21,34 @@ digest alone makes it wrong on the next deploy.
 A CronJob with ``suspend: true`` is the shape that stores a pod template without
 running it. Kubernetes has a first-class verb for instantiating one on demand::
 
-    kubectl -n witan create job witan-break-glass-$(date +%s) \\
-        --from=cronjob/witan-break-glass -- witan migrate schema
+    kubectl -n witan create job witan-bg-$(date +%s) \\
+        --from=cronjob/witan-break-glass
+    kubectl -n witan exec -it job/witan-bg-<...> -- witan migrate schema
 
-...and the ``--`` override replaces the command while keeping every piece of
-wiring above. The schedule is required by the API and never fires; it is set to a
-date that cannot occur (see ``NEVER_SCHEDULE``) so that a bug or a manual
-``kubectl patch`` un-suspending it still does not silently start running
-migrations on a timer.
+The schedule is required by the API and never fires; it is set to a date that
+cannot occur (see ``NEVER_SCHEDULE``) so that a bug or a manual ``kubectl patch``
+un-suspending it still does not silently start running migrations on a timer.
 
-WHY IT SLEEPS BY DEFAULT
+WHY IT SLEEPS BY DEFAULT, AND WHY THAT IS THE ONLY WAY IN
 
-The container's default command is a ``sleep``, not a migration. An operator who
-instantiates the CronJob without an explicit ``--`` override gets a pod they can
-``kubectl exec`` into — which is the bastion-pod half of ADR-0005 path (b) —
-rather than a surprise schema apply. Getting a shell is the safe default;
-mutating the store is the thing you have to ask for by name.
+The container's default command is a ``sleep``, so the pod comes up idle and the
+operator runs the real command through ``kubectl exec`` — the bastion-pod half of
+ADR-0005 path (b). That is not merely the safe default, it is the only shape
+``--from`` supports: ``kubectl create job --from=cronjob/x -- <command>`` is
+rejected outright (``error: cannot specify --from and command``, verified against
+kubectl rather than inferred), and a Job's pod template is immutable once
+created, so there is no patching it afterwards either.
+
+An unattended one-shot is still possible, by rendering the Job and overriding the
+command before it is submitted::
+
+    kubectl -n witan create job witan-bg-$(date +%s) --from=cronjob/witan-break-glass \\
+        --dry-run=client -o json \\
+      | jq '.spec.template.spec.containers[0].command = ["witan","migrate","schema"]' \\
+      | kubectl -n witan create -f -
+
+Worth knowing about, but the interactive path is the one to reach for first: these
+are operations somebody is watching.
 
 WHAT IT CANNOT DO
 
@@ -63,11 +75,12 @@ CRONJOB_NAME = "witan-break-glass"
 # refactor that flips the field) still starts nothing.
 NEVER_SCHEDULE = "0 0 31 2 *"
 
-# A shell that outlives the longest plausible investigation but not the day, so a
-# forgotten pod cleans itself up. `kubectl create job --from=` copies the pod
-# template verbatim, including this — an operator overriding the command with
-# `-- witan migrate schema` replaces it entirely and the Job ends when the
-# migration does.
+# Four hours: longer than any plausible investigation, shorter than a day, so a
+# pod somebody walked away from cleans itself up. This is also the pod's whole
+# lifetime in the normal (exec) flow — `kubectl create job --from=` copies the
+# template verbatim, and the migration runs *inside* this sleep rather than
+# replacing it, so the window has to cover the work as well as the thinking.
+# `kubectl delete job` is how you end one early.
 DEFAULT_IDLE_SECONDS = 14400
 
 # One attempt. Every operation reached through this pod is either idempotent (a
@@ -109,8 +122,8 @@ def create_break_glass_cronjob(  # noqa: PLR0913
                 "ol.mit.edu/purpose": (
                     "Break-glass maintenance template (ADR-0005 path b). Never "
                     "scheduled; instantiate with `kubectl create job "
-                    f"--from=cronjob/{CRONJOB_NAME}`. See "
-                    "docs/witan-admin-break-glass-runbook.md."
+                    f"--from=cronjob/{CRONJOB_NAME}`, then `kubectl exec` into "
+                    "it. See docs/witan-admin-break-glass-runbook.md."
                 ),
             },
         ),

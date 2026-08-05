@@ -151,26 +151,45 @@ image digest, ClusterIP address, graph id, token, service account — that a
 runbook should not be restating by hand. Instantiate it:
 
 ```bash
-# Run one command and exit
-kubectl -n witan create job witan-bg-$(date +%s) \
-    --from=cronjob/witan-break-glass -- witan migrate schema
-kubectl -n witan logs -f job/witan-bg-<...>
-
-# Or get a shell (the pod's default command is a 4-hour sleep)
+# 1. Start the pod. Its default command is a 4-hour sleep, so it comes up idle.
 kubectl -n witan create job witan-bg-$(date +%s) --from=cronjob/witan-break-glass
+kubectl -n witan get pods -l app.kubernetes.io/name=witan-break-glass
+
+# 2. Run the operation inside it.
+kubectl -n witan exec -it job/witan-bg-<...> -- witan migrate schema
+
+# ...or get a shell and poke around.
 kubectl -n witan exec -it job/witan-bg-<...> -- /bin/sh
+
+# 3. Done? End it rather than waiting out the sleep.
+kubectl -n witan delete job witan-bg-<...>
 ```
 
-The default being a shell rather than a migration is deliberate: an operator who
-forgets the `--` override gets a pod to poke at, not a surprise schema apply.
+**`kubectl create job --from=… -- <command>` does not work** — kubectl rejects it
+outright (`error: cannot specify --from and command`), and a Job's pod template is
+immutable once created, so there is no patching it afterwards. Exec into the idle
+pod; that is the flow this template is shaped for, and it is the bastion-pod half
+of path (b).
+
+If you genuinely need an unattended one-shot, override the command before the Job
+is submitted rather than after:
+
+```bash
+kubectl -n witan create job witan-bg-$(date +%s) --from=cronjob/witan-break-glass \
+    --dry-run=client -o json \
+  | jq '.spec.template.spec.containers[0].command = ["witan","migrate","schema"]' \
+  | kubectl -n witan create -f -
+```
+
 Finished pods are kept for a week — they are the record of a manual intervention,
 and `kubectl logs` on them is how the next person finds out what was done.
 
 Things worth knowing before you run one:
 
 - **`witan migrate storage` rebuilds the store and drops commit history and
-  branches**, keeping a `.pre-migrate` backup. It is not a routine operation.
-  Pass `--yes`: the pod has no TTY, and without it the command aborts on `EOF`.
+  branches**, keeping a `.pre-migrate` backup. It is not a routine operation. It
+  prompts for confirmation, which `kubectl exec -it` can answer; run it any other
+  way (no TTY) and it aborts on `EOF` unless you pass `--yes`.
 - **`witan migrate merge` needs its source store reachable from the pod.** A
   local `.omni` directory on your laptop is not; copy it in or export/load it
   through S3 first (Lance embeds absolute paths — export and load, never `mv`).
