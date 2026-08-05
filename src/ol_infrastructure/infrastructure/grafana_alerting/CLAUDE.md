@@ -229,7 +229,7 @@ pingdom_integration_ids: [<integration-id>, ...]  # Pingdom integration IDs for 
 
 ---
 
-## Pending phases (as of 2026-08-05)
+## Phase status (as of 2026-08-05)
 
 - **Phase 5** — Done. The legacy Grafana Concourse pipelines have been deleted:
   `src/ol_concourse/pipelines/infrastructure/grafana_cloud/` (grizzly dashboard
