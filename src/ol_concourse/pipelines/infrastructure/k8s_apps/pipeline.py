@@ -50,6 +50,7 @@ from ol_concourse.pipelines.constants import (
     dockerhub_ecr_image_uri,
 )
 from ol_concourse.pipelines.jobs import pulumi_job, pulumi_jobs_chain
+from ol_concourse.pipelines.secrets_map import project_secrets_paths
 
 
 class SentrySourcemapsConfig(BaseModel):
@@ -381,6 +382,7 @@ def _define_git_resources_legacy(
         paths=[
             f"src/ol_infrastructure/applications/{app_name.replace('-', '_')}",
             *PULUMI_WATCHED_PATHS,
+            *project_secrets_paths(f"applications/{app_name.replace('-', '_')}/"),
         ],
     )
     return (
@@ -842,6 +844,7 @@ def _define_git_resources(
         paths=[
             f"src/ol_infrastructure/applications/{app_name.replace('-', '_')}",
             *PULUMI_WATCHED_PATHS,
+            *project_secrets_paths(f"applications/{app_name.replace('-', '_')}/"),
         ],
     )
     return main_repo, ol_infra_repo

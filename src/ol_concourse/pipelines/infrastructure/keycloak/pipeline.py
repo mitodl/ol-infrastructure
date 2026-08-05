@@ -33,6 +33,7 @@ from ol_concourse.pipelines.constants import (
     dockerhub_ecr_image_uri,
 )
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.secrets_map import project_secrets_paths
 
 
 def build_keycloak_substructure_pipeline() -> PipelineFragment:
@@ -43,6 +44,7 @@ def build_keycloak_substructure_pipeline() -> PipelineFragment:
         paths=[
             *PULUMI_WATCHED_PATHS,
             str(PULUMI_CODE_PATH.joinpath("substructure/keycloak/")),
+            *project_secrets_paths("substructure/keycloak/"),
         ],
     )
     substructure_fragment = pulumi_jobs_chain(
@@ -83,6 +85,7 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
             *PULUMI_WATCHED_PATHS,
             str(PULUMI_CODE_PATH.joinpath("applications/keycloak/")),
             "src/bridge/lib/versions.py",
+            *project_secrets_paths("applications/keycloak/"),
         ],
     )
 

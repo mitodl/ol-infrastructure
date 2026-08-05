@@ -31,6 +31,7 @@ from bridge.settings.openedx.types import (
 )
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.secrets_map import project_secrets_paths
 
 
 def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
@@ -107,8 +108,8 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                 paths=[
                     *PULUMI_WATCHED_PATHS,
                     "src/ol_infrastructure/applications/edxapp/",
-                    "src/bridge/secrets/edxapp/",
                     "src/bridge/settings/openedx/",
+                    *project_secrets_paths("applications/edxapp/"),
                 ],
             )
 

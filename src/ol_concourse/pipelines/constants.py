@@ -45,9 +45,20 @@ PACKER_WATCHED_PATHS = [
     "src/bilder/components/",
 ]
 PULUMI_CODE_PATH = Path("src/ol_infrastructure")
+# Paths every Pulumi pipeline watches, regardless of which project it deploys.
+#
+# NOTE: this deliberately does NOT include "src/bridge/secrets/".  Watching the
+# whole secrets tree meant a change to any one application's secret file
+# re-triggered every Pulumi pipeline in both Concourse instances.  Each pipeline
+# now watches only the secrets its own project decrypts, via
+# `ol_concourse.pipelines.secrets_map.project_secrets_paths`.  What remains
+# below is the SOPS decryption machinery itself -- the helper module, and the
+# vendored sops binaries it shells out to -- which every project does run.
 PULUMI_WATCHED_PATHS = [
     "src/ol_infrastructure/lib/",
     "src/ol_infrastructure/components/",
     "pipelines/infrastructure/scripts/",
-    "src/bridge/secrets/",
+    "src/bridge/secrets/sops.py",
+    "src/bridge/secrets/__init__.py",
+    "src/bridge/secrets/bin/",
 ]

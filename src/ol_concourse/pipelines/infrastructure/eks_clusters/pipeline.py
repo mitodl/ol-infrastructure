@@ -4,6 +4,7 @@ from ol_concourse.lib.resources import git_repo
 
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.secrets_map import project_secrets_paths
 
 eks_infrastructure_code = git_repo(
     Identifier("ol-infrastructure"),
@@ -12,6 +13,7 @@ eks_infrastructure_code = git_repo(
         "src/ol_infrastructure/infrastructure/aws/eks",
         *PULUMI_WATCHED_PATHS,
         "src/bridge/lib/versions.py",
+        *project_secrets_paths("infrastructure/aws/eks/"),
     ],
 )
 
@@ -22,6 +24,7 @@ eks_substructure_code = git_repo(
         "src/ol_infrastructure/substructure/aws/eks",
         *PULUMI_WATCHED_PATHS,
         "src/bridge/lib/versions.py",
+        *project_secrets_paths("substructure/aws/eks/"),
     ],
 )
 

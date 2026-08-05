@@ -38,6 +38,7 @@ from ol_concourse.pipelines.constants import (
     dockerhub_ecr_image_uri,
 )
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.secrets_map import project_secrets_paths
 
 
 class DockerImageConfig(BaseModel):
@@ -103,7 +104,12 @@ class SimplePulumiParams(BaseModel):
                           If specified, auto_discover_stacks will be used.
         auto_discover_stacks: If True, automatically discover stacks from repo
                              (default: False unless deployment_groups is set).
-        additional_watched_paths: Additional paths to watch beyond PULUMI_WATCHED_PATHS.
+        additional_watched_paths: Additional paths to watch beyond
+                          PULUMI_WATCHED_PATHS and the project's own directory.
+                          Do NOT list src/bridge/secrets paths here -- those come
+                          from `secrets_map.PROJECT_SECRETS`, which is what keeps
+                          one app's secret change from re-triggering every
+                          Pulumi pipeline.
         branch: Git branch to watch (default: "main").
         docker_image: Optional Docker image configuration for apps that depend on
                      external Docker images, or (with ``build`` set) their own image.
@@ -302,10 +308,6 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="airbyte",
         pulumi_project_path="applications/airbyte/",
         pulumi_project_name="ol-application-airbyte",
-        additional_watched_paths=[
-            "src/bridge/secrets/airbyte/",
-            "src/bridge/lib/versions.py",
-        ],
     ),
     "celery-monitoring": SimplePulumiParams(
         app_name="celery-monitoring",
@@ -333,7 +335,6 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="digital-credentials",
         pulumi_project_path="applications/digital_credentials/",
         pulumi_project_name="ol-application-digital-credentials",
-        additional_watched_paths=["src/bridge/secrets/digital_credentials/"],
     ),
     "fastly-redirector": SimplePulumiParams(
         app_name="fastly-redirector",
@@ -350,7 +351,6 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="jupyterhub-data",
         pulumi_project_path="applications/jupyterhub_data/",
         pulumi_project_name="ol-application-jupyterhub-data",
-        additional_watched_paths=["src/bridge/secrets/jupyterhub_data/"],
     ),
     "marimo-data": SimplePulumiParams(
         app_name="marimo-data",
@@ -380,19 +380,11 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="open-metadata",
         pulumi_project_path="applications/open_metadata/",
         pulumi_project_name="ol-application-open-metadata",
-        additional_watched_paths=[
-            "src/bridge/secrets/open_metadata/",
-            "src/bridge/lib/versions.py",
-        ],
     ),
     "open-metadata-substructure": SimplePulumiParams(
         app_name="open-metadata-substructure",
         pulumi_project_path="substructure/open_metadata/",
         pulumi_project_name="ol-substructure-open-metadata",
-        additional_watched_paths=[
-            "src/bridge/secrets/open_metadata/",
-            "src/bridge/lib/versions.py",
-        ],
         stages=["QA", "Production"],
     ),
     "opensearch": SimplePulumiParams(
@@ -422,10 +414,6 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_path="infrastructure/qdrant_cloud/",
         pulumi_project_name="ol-infrastructure-qdrant-cloud",
         stack_prefix="mitlearn",
-        additional_watched_paths=[
-            "src/bridge/secrets/qdrant_cloud/",
-            "src/bridge/lib/versions.py",
-        ],
     ),
     "rootly": SimplePulumiParams(
         app_name="rootly",
@@ -438,10 +426,6 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="sentry",
         pulumi_project_path="infrastructure/sentry/",
         pulumi_project_name="ol-infrastructure-sentry",
-        additional_watched_paths=[
-            "src/bridge/secrets/sentry/",
-            "src/bridge/lib/versions.py",
-        ],
         stages=["Production"],
     ),
     "starrocks": SimplePulumiParams(
@@ -564,7 +548,6 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_path="applications/release_bot/",
         pulumi_project_name="ol-infrastructure-release-bot",
         stages=["default"],
-        additional_watched_paths=["src/bridge/secrets/release_bot/"],
         # __main__.py is a singleton (stack "default") and always creates the
         # ECR repository named "release-bot-production" regardless of stage.
         docker_image=DockerImageConfig(
@@ -607,6 +590,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             *PULUMI_WATCHED_PATHS,
             str(PULUMI_CODE_PATH.joinpath(params.pulumi_project_path)),
             "src/bridge/lib/versions.py",
+            *project_secrets_paths(params.pulumi_project_path),
             *params.additional_watched_paths,
         ],
     )
