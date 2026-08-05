@@ -516,7 +516,10 @@ edxapp_db_security_group = ec2.SecurityGroup(
             protocol="tcp",
             from_port=DEFAULT_MYSQL_PORT,
             to_port=DEFAULT_MYSQL_PORT,
-            description="Access to MariaDB from Edxapp web nodes and Vault",
+            description=(
+                "Access to MariaDB from the Vault server security group and the"
+                " whole edxapp VPC CIDR (web and worker nodes)"
+            ),
         ),
         # This is needed because the security group pinning near the bottom does not work
         ec2.SecurityGroupIngressArgs(

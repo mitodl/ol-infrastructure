@@ -544,8 +544,9 @@ ovs_database_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
             description=(
-                "Access to Postgres from odl-video-service nodes on"
-                f" {DEFAULT_POSTGRES_PORT}"
+                f"Access to Postgres on {DEFAULT_POSTGRES_PORT} from the Vault server"
+                f" security group and the whole {target_vpc_name} CIDR"
+                " (odl-video-service nodes)"
             ),
         ),
         ec2.SecurityGroupIngressArgs(

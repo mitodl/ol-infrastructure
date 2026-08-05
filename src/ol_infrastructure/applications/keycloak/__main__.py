@@ -267,7 +267,9 @@ keycloak_database_security_group = ec2.SecurityGroup(
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
             description=(
-                f"Access to Postgres from keycloak nodes on {DEFAULT_POSTGRES_PORT}"
+                f"Access to Postgres on {DEFAULT_POSTGRES_PORT} from the keycloak"
+                f" server and Vault server security groups, and the whole"
+                f" {target_vpc_name} CIDR"
             ),
         ),
         ec2.SecurityGroupIngressArgs(
