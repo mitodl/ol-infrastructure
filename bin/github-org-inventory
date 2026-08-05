@@ -154,17 +154,31 @@ def _paginate(client: httpx.Client, path: str) -> list[dict[str, Any]]:
 def _maybe(client: httpx.Client, path: str) -> Any:
     """GET a path where 403/404 is a legitimate answer rather than an error.
 
-    Archived repos reject several endpoints, and a 404 on branch protection means "none
-    configured" -- itself the SEC-01 finding. Returning None keeps the crawl going and
-    keeps the distinction visible in the data.
+    Returns the decoded JSON, or None for 403/404. Archived repos reject several
+    endpoints, and a 404 on branch protection means "none configured" -- itself the
+    SEC-01 finding. Returning None keeps the crawl going and keeps the distinction
+    visible in the data.
+
+    Use `_flag()` for endpoints that answer 204-means-yes / 404-means-no. This function
+    deliberately does NOT return a bool: a `JSON | None | bool` union makes the common
+    `_maybe(...) or {}` idiom silently wrong (`True or {}` is `True`, not `{}`), and
+    every caller would have to defend against a case only one endpoint can produce.
     """
     response = client.get(path)
     if response.status_code in (httpx.codes.NOT_FOUND, httpx.codes.FORBIDDEN):
         return None
-    if response.status_code == httpx.codes.NO_CONTENT:
-        return True
     response.raise_for_status()
     return response.json()
+
+
+def _flag(client: httpx.Client, path: str) -> bool:
+    """Read a boolean endpoint that signals with status alone: 204 yes, 404 no.
+
+    Only `/repos/{}/vulnerability-alerts` behaves this way. Note that
+    `/repos/{}/automated-security-fixes` does NOT -- it answers 200 with a JSON body in
+    both states, verified against live repos with the feature on and off.
+    """
+    return client.get(path).status_code == httpx.codes.NO_CONTENT
 
 
 def _count(client: httpx.Client, path: str) -> int | None:
@@ -247,10 +261,9 @@ def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
                 }
                 for r in rulesets
             ],
-            "vulnerability_alerts": _maybe(
+            "vulnerability_alerts": _flag(
                 client, f"/repos/{ORG}/{name}/vulnerability-alerts"
-            )
-            is True,
+            ),
             "dependabot_security_updates": bool(
                 (
                     _maybe(client, f"/repos/{ORG}/{name}/automated-security-fixes")
@@ -637,17 +650,41 @@ def crawl(
     """
     data = _crawl_org(cache, refresh=refresh)
     archetypes = yaml.safe_load(archetypes_file.read_text())["archetypes"]
+    # The assignment file is edited by hand -- that human confirmation step IS phase 1's
+    # gate -- so it gets validated rather than trusted. An emptied-out archetype parses
+    # as None, and a typo'd name would otherwise surface as a bare KeyError several
+    # hundred lines from its cause.
+    assignment_doc = yaml.safe_load(assignments.read_text()) or {}
+    if unknown := sorted(set(assignment_doc) - set(archetypes)):
+        message = (
+            f"{assignments}: unknown archetype(s) {unknown}. "
+            f"Valid archetypes are {sorted(archetypes)}."
+        )
+        raise SystemExit(message)
     assigned = {
         name: archetype
-        for archetype, names in yaml.safe_load(assignments.read_text()).items()
-        for name in names
+        for archetype, names in assignment_doc.items()
+        for name in (names or [])
     }
     effective = {a: _resolve_archetype(archetypes, a) for a in archetypes}
+
+    # A repo absent from the assignment file is a gap in the human review, not a library.
+    # Silently defaulting would hand it the `library` tier and, with it, whichever org
+    # rulesets target that tier -- a protection decision nobody actually made.
+    if unassigned := sorted(
+        r["name"] for r in data["repos"] if r["name"] not in assigned
+    ):
+        message = (
+            f"{len(unassigned)} repo(s) have no archetype in {assignments}: "
+            f"{unassigned[:10]}{' ...' if len(unassigned) > 10 else ''}\n"
+            "Re-run `infer-archetypes` to regenerate, then confirm the additions."
+        )
+        raise SystemExit(message)
 
     out.mkdir(parents=True, exist_ok=True)
     written = 0
     for repo in data["repos"]:
-        archetype = assigned.get(repo["name"], "library")
+        archetype = assigned[repo["name"]]
         doc: dict[str, Any] = {"name": repo["name"], "archetype": archetype}
         if repo["description"]:
             doc["description"] = repo["description"]
