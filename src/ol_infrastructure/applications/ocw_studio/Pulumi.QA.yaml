@@ -22,7 +22,7 @@ config:
     GITHUB_RATE_LIMIT_CHECK: "False"
     GITHUB_WEBHOOK_BRANCH: 'release-candidate'
     GTM_ACCOUNT_ID: GTM-57BZ8PN
-    HUGO_CSRF_COOKIE_NAME: learn_csrftoken
+    HUGO_CSRF_COOKIE_NAME: learn_rc_csrftoken
     MAILGUN_FROM_EMAIL: 'MIT OCW <no-reply@ocw-rc.mail.odl.mit.edu'
     MAILGUN_SENDER_DOMAIN: 'ocw-rc.mail.odl.mit.edu'
     MAILGUN_URL: https://api.mailgun.net/v3/ocw-rc.mail.odl.mit.edu
