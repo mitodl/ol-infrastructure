@@ -52,6 +52,10 @@ import pulumi_kubernetes as kubernetes
 import yaml
 from pulumi import Output, ResourceOptions
 
+from ol_infrastructure.applications.omnigraph.maintenance import (
+    OmnigraphMaintenance,
+    create_maintenance,
+)
 from ol_infrastructure.components.applications.eks import OLEKSAuthBinding
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.vault import OLVaultK8SSecret
@@ -79,6 +83,81 @@ ACTOR_TOKENS_FILENAME = "tokens.json"  # pragma: allowlist secret
 # than silently writing as nobody. Matches the break-glass identity in
 # agent-kit ADR-0005 path (b).
 CLUSTER_APPLY_ACTOR = "svc-witan-admin"
+
+# ── Server resource envelope ─────────────────────────────────────────────────
+#
+# Named rather than inlined because the per-actor admission caps below are
+# derived from the memory limit, and a limit raised without revisiting the caps
+# would silently leave them mis-sized.
+SERVER_MEMORY_LIMIT = "2Gi"
+
+# ── Per-actor admission caps ─────────────────────────────────────────────────
+#
+# omnigraph-server admits writes per actor and 429s (with Retry-After) over the
+# limit; Cedar authz runs first, so this is a resource guard, not an authz one.
+# Both env vars are confirmed present in the 0.8.1 server binary.
+#
+# WHY THE DEFAULTS ARE WRONG FOR THIS DEPLOYMENT, specifically the byte cap.
+# The upstream default is 4 GiB of in-flight bytes per actor — TWICE this pod's
+# entire memory limit. A cap above the limit can never bind: the pod OOMKills
+# before admission control ever declines a write, which turns a designed
+# backpressure signal (429 + client retry, already implemented in agent-kit's
+# OmnigraphClient) into a hard restart of a single-replica Recreate Deployment.
+# The cap is only useful below the memory limit, so it has to be set here.
+#
+# SIZING. The cap is PER ACTOR and there is no global limiter, so total
+# in-flight bytes are (concurrent actors x cap) and no single setting can bound
+# them. Sized against realistic peak concurrency rather than the worst case:
+# a handful of agent sessions plus svc-witan-ci, call it 4 concurrent writers;
+# reserving ~768 MiB of the 2 GiB for the server's own working set and Lance
+# buffers leaves ~1.25 GiB to share, so ~320 MiB each, rounded down to 256 MiB.
+# The pod's memory limit remains the real backstop for a concurrency spike
+# beyond that — this bounds the single-runaway-actor case, which is the one
+# that actually shows up (a CI reindex streaming a large NDJSON load).
+#
+# The in-flight COUNT comes down from 16 to 8 for the same reason: against a
+# 1-CPU pod, 16 concurrent writes from one actor only queue. An interactive
+# witan session issues one write at a time, so 8 is still far above any
+# legitimate single-user pattern while halving what one bursty indexer can pin.
+#
+# These are a deliberate starting point, not a measurement. Revisit from
+# observed 429 rates and in-flight-byte peaks once the shared service has
+# metrics (tk-observability-for-shared-witan-service-ad3dba) — and note that
+# witan's client-side retry cannot read the server's Retry-After header (the
+# omnigraph CLI's error path discards response headers), so the sizing signal
+# has to come from server-side metrics, not from the client.
+PER_ACTOR_INFLIGHT_MAX = 8
+PER_ACTOR_BYTES_MAX = 256 * 1024 * 1024
+
+# ── Startup behaviour on an unopenable graph ─────────────────────────────────
+#
+# DECISION: leave OMNIGRAPH_REQUIRE_ALL_GRAPHS unset (i.e. keep the default
+# quarantine behaviour). Setting it was proposed when this cluster served one
+# graph, where quarantine's failure mode is a silent brownout — pod Ready,
+# /healthz 200, /graphs empty, every real request 404ing — and all-or-nothing
+# startup would have made that loud.
+#
+# That premise no longer holds. build_cluster_graphs now declares `council`,
+# `code-bridge`, and one `code-<repo>` graph per managed repo, which is exactly
+# the multi-graph condition the original note named as the reversal trigger.
+# All-or-nothing would mean one unopenable per-repo code graph — the least
+# critical and most numerous kind, rebuildable by a reindex — takes down the
+# memory/task/workflow graph the entire team's agents depend on. Quarantine
+# gets the blast radius right: a broken code graph costs that repo's code
+# lookups and nothing else.
+#
+# The brownout risk quarantine leaves behind is real but narrower than it was:
+# it now only matters for `council` specifically, and the fix is a probe or
+# alert that distinguishes "serving" from "serving the graph that matters",
+# which /healthz structurally cannot (and /graphs cannot substitute for — it is
+# auth-gated behind a graph_list grant on Server::"root", so it is not usable
+# as a kubelet probe). That belongs with the service's monitoring, not with a
+# startup flag that trades a narrow failure for a broad one — see
+# tk-observability-for-shared-witan-service-ad3dba.
+#
+# REVISIT IF: the cluster ever collapses back to serving `council` alone, or
+# the server grows a per-graph health signal a readiness probe can reach
+# unauthenticated.
 
 # Fixed ConfigMap name, referenced both by the ConfigMap's own metadata and by
 # the Deployment's volume. The Deployment uses this constant rather than
@@ -198,6 +277,7 @@ class OmnigraphDataTier(NamedTuple):
     service: kubernetes.core.v1.Service
     deployment: kubernetes.apps.v1.Deployment
     cluster_apply_job: kubernetes.batch.v1.Job
+    maintenance: OmnigraphMaintenance
 
 
 def create_data_tier(  # noqa: PLR0913
@@ -209,6 +289,9 @@ def create_data_tier(  # noqa: PLR0913
     actor_tokens_secret_name: str,
     actor_tokens_secret: OLVaultK8SSecret,
     managed_repos: list[str],
+    optimize_schedule: str,
+    cleanup_schedule: str,
+    cleanup_older_than: str,
 ) -> OmnigraphDataTier:
     """Provision the S3 bucket, IRSA policy, ECR repo, ConfigMap, and Deployment."""
     # The bucket is named for its tenant (witan's graphs), not the omnigraph
@@ -515,15 +598,24 @@ def create_data_tier(  # noqa: PLR0913
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="AWS_REGION", value=aws_config.region
                                 ),
-                                # Per-actor admission cap (tk-...-d241d2 sets
-                                # real values for this deployment; the
-                                # server's own defaults apply until then).
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="OMNIGRAPH_SERVER_BEARER_TOKENS_FILE",
                                     value=(
                                         f"{ACTOR_TOKENS_MOUNT_PATH}/"
                                         f"{ACTOR_TOKENS_FILENAME}"
                                     ),
+                                ),
+                                # Per-actor admission caps, set deliberately
+                                # rather than inherited — the upstream byte
+                                # default is twice this pod's memory limit and
+                                # therefore unreachable. See the constants.
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="OMNIGRAPH_PER_ACTOR_INFLIGHT_MAX",
+                                    value=str(PER_ACTOR_INFLIGHT_MAX),
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="OMNIGRAPH_PER_ACTOR_BYTES_MAX",
+                                    value=str(PER_ACTOR_BYTES_MAX),
                                 ),
                             ],
                             ports=[
@@ -552,9 +644,11 @@ def create_data_tier(  # noqa: PLR0913
                                 initial_delay_seconds=15,
                                 period_seconds=20,
                             ),
+                            # The memory limit is what PER_ACTOR_BYTES_MAX is
+                            # sized against — change one and revisit the other.
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={"cpu": "250m", "memory": "512Mi"},
-                                limits={"cpu": "1", "memory": "2Gi"},
+                                limits={"cpu": "1", "memory": SERVER_MEMORY_LIMIT},
                             ),
                             volume_mounts=[
                                 # sub_path overlays only cluster.yaml, leaving
@@ -631,10 +725,35 @@ def create_data_tier(  # noqa: PLR0913
         opts=ResourceOptions(depends_on=[omnigraph_deployment]),
     )
 
+    # Scheduled compaction and version GC against the S3 store directly. Swept
+    # per graph over exactly the ids cluster.yaml declares — the same
+    # `cluster_graphs` dict rendered into the ConfigMap above, so a newly
+    # managed repo joins the sweep in the deploy that creates its graph.
+    #
+    # Ordered behind the converge Job because a graph that has not been applied
+    # yet is a hard error for `optimize --graph <id>` ("graph `X` is not applied
+    # in cluster ..."), which would fail the first sweep of every new graph.
+    omnigraph_maintenance = create_maintenance(
+        stack_info=stack_info,
+        namespace=namespace,
+        k8s_global_labels=k8s_global_labels,
+        image=omnigraph_server_image,
+        service_account_name=OMNIGRAPH_SERVICE_ACCOUNT_NAME,
+        aws_region=aws_config.region,
+        storage_uri=storage_uri,
+        maintenance_actor=CLUSTER_APPLY_ACTOR,
+        graph_ids=list(cluster_graphs),
+        optimize_schedule=optimize_schedule,
+        cleanup_schedule=cleanup_schedule,
+        cleanup_older_than=cleanup_older_than,
+        depends_on=[cluster_apply_job, *auth_binding.irsa_service_accounts],
+    )
+
     return OmnigraphDataTier(
         bucket=omnigraph_bucket,
         image_repository=image_repository,
         service=omnigraph_service,
         deployment=omnigraph_deployment,
         cluster_apply_job=cluster_apply_job,
+        maintenance=omnigraph_maintenance,
     )
