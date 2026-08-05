@@ -11,7 +11,11 @@ Usage (called by meta.py, analogous to pipeline.py):
 
     e.g. python site_pipeline.py mitxonline
 
-Supported deployments: mitxonline, mitx, xpro.
+Supported deployments: mitxonline, mitx, mitx-staging, xpro.  mitx-staging has
+no Site Project directory of its own in lehrer — it builds from frontend/mitx
+(see ``SiteProjectEnv.config_source``) and publishes to its own bucket/public
+path, since per-site values come from the runtime frontend_site_config API
+rather than the build.
 
 Build: mitodl/dcind:latest (Docker-in-Docker) + ``dagger call mfe build-site``.
 Promote: rclone cross-bucket copy — no rebuild at QA or Production.
@@ -56,6 +60,12 @@ class SiteProjectEnv:
     deployment_name: str
     environment: str  # e.g. "mitxonline-ci"
     environment_stage: str  # "CI", "QA", "Production"
+    # lehrer frontend/ subdirectory to build from, when it differs from
+    # deployment_name — e.g. mitx-staging builds from frontend/mitx, since its
+    # site.config.build.tsx is explicitly written to cover both deployments
+    # (real per-site values come from the runtime frontend_site_config API,
+    # not the build).  Defaults to deployment_name when unset.
+    config_source: str | None = None
 
 
 @dataclass
@@ -85,6 +95,26 @@ SITE_PROJECTS: list[SiteProjectConfig] = [
             SiteProjectEnv("mitx", "mitx-production", "Production"),
         ],
     ),
+    # mitx-staging has no frontend/mitx-staging/ Site Project of its own — it
+    # builds from frontend/mitx (see SiteProjectEnv.config_source) and
+    # publishes under its own deployment identity/bucket.
+    SiteProjectConfig(
+        deployment_name="mitx-staging",
+        envs=[
+            SiteProjectEnv(
+                "mitx-staging", "mitx-staging-ci", "CI", config_source="mitx"
+            ),
+            SiteProjectEnv(
+                "mitx-staging", "mitx-staging-qa", "QA", config_source="mitx"
+            ),
+            SiteProjectEnv(
+                "mitx-staging",
+                "mitx-staging-production",
+                "Production",
+                config_source="mitx",
+            ),
+        ],
+    ),
     SiteProjectConfig(
         deployment_name="xpro",
         envs=[
@@ -96,13 +126,13 @@ SITE_PROJECTS: list[SiteProjectConfig] = [
 ]
 
 
-def _lehrer_resource(deployment_name: str) -> Resource:
+def _lehrer_resource(deployment_name: str, config_source: str) -> Resource:
     return git_repo(
         name=Identifier(f"lehrer-{deployment_name}"),
         uri=LEHRER_URI,
         branch="main",
         paths=[
-            f"deployments/mit-ol/mfe_slot_config/frontend/{deployment_name}/",
+            f"deployments/mit-ol/mfe_slot_config/frontend/{config_source}/",
             "deployments/mit-ol/mfe_slot_config/frontend/shared/",
         ],
     )
@@ -160,7 +190,8 @@ def site_build_job(
     DinD), exports dist/, then syncs it to the deployment's CI S3 bucket.
     QA and Production artifacts are promoted via :func:`site_promote_job`.
     """
-    lehrer = _lehrer_resource(env.deployment_name)
+    config_source = env.config_source or env.deployment_name
+    lehrer = _lehrer_resource(env.deployment_name, config_source)
     post_resource = _gh_issues_post(env.deployment_name, env.environment_stage)
 
     get_lehrer = GetStep(get=lehrer.name, trigger=True)
@@ -173,7 +204,7 @@ def site_build_job(
 
     deployment = env.deployment_name
     lehrer_input = str(lehrer.name)
-    site_project_path = f"./deployments/mit-ol/mfe_slot_config/frontend/{deployment}"
+    site_project_path = f"./deployments/mit-ol/mfe_slot_config/frontend/{config_source}"
     shared_src_path = "./deployments/mit-ol/mfe_slot_config/frontend/shared"
     public_path = f"/apps/{deployment}-site/"
 
