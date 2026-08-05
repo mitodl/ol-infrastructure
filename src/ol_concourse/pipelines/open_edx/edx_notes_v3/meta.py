@@ -25,6 +25,8 @@ pipeline_code = git_repo(
     paths=[
         "pyproject.toml",
         "src/ol_concourse/pipelines/jobs.py",
+        "src/ol_concourse/pipelines/constants.py",
+        "src/ol_concourse/pipelines/secrets_map.py",
         "src/ol_concourse/pipelines/open_edx/edx_notes_v3/",
         "src/bridge/settings/openedx/",
     ],
