@@ -333,9 +333,15 @@ nothing has been written, so scale the Deployment back to 1 and investigate.
 > format-bumping image exists yet. Expect the gate's behaviour, and only the
 > gate's behaviour, to be new on the day.
 
-This step needs the **new** binary, so it runs in a second pod. On your
-workstation — push the graph list and the exports in, since the image has no
-`aws`:
+This step needs the **new** binary, so it runs in a second pod. Do **all** of
+the workstation-side setup first, in one go, and only then open the pod shell —
+the rest of the step never leaves it. Interleaving the two is how `$NEW_ROOT`
+ends up unset at the moment `sed` uses it.
+
+The image carries the three schema files but **not** `cluster.yaml` — that
+exists only inside the *server* pod, where the ConfigMap is mounted over the
+same directory. A `kubectl run` pod has no such mount, so the config, the graph
+list and the exports all get pushed in from here:
 
 ```shell
 kubectl -n omnigraph run omnigraph-migrate-new --restart=Never \
@@ -344,58 +350,70 @@ kubectl -n omnigraph run omnigraph-migrate-new --restart=Never \
   --env=AWS_REGION=us-east-1 --command -- sleep 86400
 kubectl -n omnigraph wait --for=condition=Ready pod/omnigraph-migrate-new --timeout=180s
 
+# graph list
 kubectl -n omnigraph exec -i omnigraph-migrate-new -- sh -c 'cat > /tmp/graph-ids.txt' \
   < /tmp/graph-ids.txt
+
+# exports
 kubectl -n omnigraph exec omnigraph-migrate-new -- mkdir -p /tmp/export
 for g in $(cat /tmp/graph-ids.txt); do
   kubectl -n omnigraph exec -i omnigraph-migrate-new -- \
     sh -c "cat > /tmp/export/$g.jsonl" < "/tmp/export/$g.jsonl"
 done
 
-kubectl -n omnigraph exec -it omnigraph-migrate-new -- sh
-```
-
-Re-set the roots (this shell inherits nothing either) and confirm you are on the
-binary you think you are — this is the whole point of the exercise:
-
-```shell
-ENV=ci                                    # ci | qa | production
-OLD_ROOT="s3://ol-data-witan-$ENV"
-NEW_ROOT="$OLD_ROOT/fmt<N>"
-omnigraph version        # must show the NEW internal-schema number
-```
-
-Now build the config directory. The image carries the three schema files but
-**not** `cluster.yaml` — that only exists inside the *server* pod, where the
-ConfigMap is mounted over the same directory. A `kubectl run` pod has no such
-mount, so the config comes from the ConfigMap. From your **workstation**:
-
-```shell
+# schemas from the image + cluster.yaml from the ConfigMap
 kubectl -n omnigraph exec omnigraph-migrate-new -- \
   sh -c 'mkdir -p /tmp/rebuild && cp /etc/omnigraph/cluster/*.pg /tmp/rebuild/'
-
 kubectl -n omnigraph get configmap omnigraph-cluster-config \
   -o jsonpath='{.data.cluster\.yaml}' \
   | kubectl -n omnigraph exec -i omnigraph-migrate-new -- \
       sh -c 'cat > /tmp/rebuild/cluster.yaml'
 ```
 
-Back **inside the pod**, repoint `storage:` with `sed` — there is no `vi`,
-`vim`, `nano`, or `ed` in the image, and no `busybox` to fall back on:
+Now open the shell. **Everything from here to the end of step 4 runs inside
+it** — if you do leave, re-set the three roots before doing anything else:
+
+```shell
+kubectl -n omnigraph exec -it omnigraph-migrate-new -- sh
+```
+
+```shell
+ENV=ci                                    # ci | qa | production
+OLD_ROOT="s3://ol-data-witan-$ENV"
+NEW_ROOT="$OLD_ROOT/fmt<N>"
+test -n "$NEW_ROOT" || { echo "NEW_ROOT unset — stop"; exit 1; }
+omnigraph version        # must show the NEW internal-schema number
+```
+
+Repoint `storage:` with `sed` — there is no `vi`, `vim`, `nano`, or `ed` in the
+image, and no `busybox` to fall back on:
 
 ```shell
 sed -i "s|^storage: .*|storage: $NEW_ROOT|" /tmp/rebuild/cluster.yaml
-grep '^storage:' /tmp/rebuild/cluster.yaml     # confirm it took
+
+# storage: must name the new root. An EMPTY value here is the dangerous case.
+grep '^storage:' /tmp/rebuild/cluster.yaml
+grep -q "^storage: $NEW_ROOT\$" /tmp/rebuild/cluster.yaml \
+  && echo "storage repointed OK" || echo "WRONG — do not continue"
+
 grep -c 'schema:' /tmp/rebuild/cluster.yaml    # graph count must be unchanged
 omnigraph cluster validate --config /tmp/rebuild
 ```
 
-`cluster validate` reports `N resource(s), M dependency edge(s)` — two
+> **`cluster validate` does not catch an empty `storage:`.** A cluster.yaml
+> with a blank storage value validates clean —
+> `cluster config valid: 2 resource(s), 1 dependency edge(s)` — verified
+> 2026-08-05. So if `$NEW_ROOT` were unset when `sed` ran, the blanked config
+> would sail through validation and `cluster import`/`apply` would build the
+> graphs somewhere other than the intended S3 root, with `load` then reporting
+> success. That is why the `grep -q` above exists: validation is not the guard
+> here.
+
+What validation *does* catch is an unresolvable `schema:` reference and
+structural damage. It reports `N resource(s), M dependency edge(s)` — two
 resources and one edge per declared graph, so 16 graphs give
 `32 resource(s), 16 dependency edge(s)`. A count that does not match the graph
-list means the `sed` ate more than the storage line. Validation is read-only,
-and catches a mis-edited storage URI or an unresolvable `schema:` reference
-before anything is written.
+list means the `sed` ate more than the storage line.
 
 Now bootstrap the new root's state ledger, **then** converge it. Both commands,
 in this order:
