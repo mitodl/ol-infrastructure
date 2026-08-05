@@ -10,6 +10,8 @@ Both Pulumi builders are additionally wrapped to strip the upstream
 ``_drop_pulumi_retry`` for why.
 """
 
+from collections.abc import Iterator
+
 from ol_concourse.lib.jobs.infrastructure import (
     packer_jobs,
 )
@@ -21,6 +23,7 @@ from ol_concourse.lib.jobs.infrastructure import (
 )
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import PutStep
+from pydantic import BaseModel
 
 from ol_concourse.pipelines.constants import GH_ISSUES_DEFAULT_REPOSITORY
 
@@ -65,14 +68,37 @@ def _drop_pulumi_retry(fragment: PipelineFragment) -> PipelineFragment:
     chokepoint that protects every ol-infrastructure pipeline until that lands.
     """
     for job in fragment.jobs:
-        for step in job.plan:
-            if (
-                isinstance(step, PutStep)
-                and step.put
-                and step.put.startswith(PULUMI_RESOURCE_PREFIX)
-            ):
-                step.attempts = None
+        for step in _pulumi_puts(job):
+            step.attempts = None
     return fragment
+
+
+def _pulumi_puts(node: object) -> Iterator[PutStep]:
+    """Every pulumi-provisioner ``put`` anywhere in a job, at any nesting depth.
+
+    ``pulumi_job`` puts its Pulumi step directly in ``job.plan`` today — all 89
+    of them across the rendered pipelines sit at the top level, none inside a
+    composite step. So this walks deeper than it strictly has to.
+
+    That is deliberate. A ``PutStep`` nested in an ``InParallelStep`` / ``DoStep``
+    / ``TryStep``, or hung off an ``on_success``/``ensure`` hook, would be missed
+    by a one-level scan and would silently keep ``attempts=2`` — which brings
+    back exactly the failure this function exists to prevent, and brings it back
+    invisibly. Recursing over the model tree costs nothing and does not depend on
+    upstream keeping the plan flat.
+    """
+    if (
+        isinstance(node, PutStep)
+        and node.put
+        and node.put.startswith(PULUMI_RESOURCE_PREFIX)
+    ):
+        yield node
+    if isinstance(node, BaseModel):
+        for field in type(node).model_fields:
+            yield from _pulumi_puts(getattr(node, field, None))
+    elif isinstance(node, (list, tuple)):
+        for item in node:
+            yield from _pulumi_puts(item)
 
 
 def pulumi_job(*args, **kwargs) -> PipelineFragment:
