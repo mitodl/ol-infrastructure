@@ -621,69 +621,80 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
     # LEEK [END] # noqa: ERA001
 
     # GWAREK [START] # noqa: ERA001
-    ol_platform_engineering_gwarek_client = keycloak.openid.Client(
-        "ol-platform-engineering-gwarek-client",
-        name="ol-platform-engineering-gwarek-client",
-        realm_id="ol-platform-engineering",
-        client_id="ol-gwarek-client",
-        client_secret=keycloak_realm_config.get(
-            "ol-platform-engineering-gwarek-client-secret"
-        ),
-        enabled=True,
-        access_type="CONFIDENTIAL",
-        standard_flow_enabled=True,
-        implicit_flow_enabled=False,
-        service_accounts_enabled=False,
-        valid_redirect_uris=keycloak_realm_config.get_object(
-            "ol-platform-engineering-gwarek-redirect-uris"
-        ),
-        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
-    )
-
-    # Realm-wide roles for gwarek's admin/viewer split. Kept distinct from
-    # the generic admin/developer roles above since those are shared across
-    # unrelated tools (Airbyte, Vault, Concourse) and granting them
-    # shouldn't imply gwarek access or vice versa. Realm roles land in
-    # every token's realm_access.roles claim automatically, so — unlike the
-    # Grafana client-role + UserClientRoleProtocolMapper pattern below — no
-    # protocol mapper is needed here; gwarek's FastAPI backend reads
-    # realm_access.roles directly (mirroring ol-analytics-api's
-    # require_mit_admin).
-    keycloak.Role(
-        "ol-platform-engineering-gwarek-admin-role",
-        realm_id=ol_platform_engineering_realm.id,
-        name="gwarek-admin",
-        description="Gwarek admin — manage integrations and trigger analysis",
-        opts=resource_options,
-    )
-    keycloak.Role(
-        "ol-platform-engineering-gwarek-viewer-role",
-        realm_id=ol_platform_engineering_realm.id,
-        name="gwarek-viewer",
-        description="Gwarek viewer — read-only access to findings/reports",
-        opts=resource_options,
-    )
-
-    vault.generic.Secret(
-        "ol-platform-engineering-gwarek-client-vault-oidc-credentials",
-        path="secret-operations/sso/gwarek",
-        data_json=Output.all(
-            url=ol_platform_engineering_gwarek_client.realm_id.apply(
-                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+    # Guarded like OL ANALYTICS API and MIT LEARN in olapps.py: gwarek is a
+    # Production-only application (applications/gwarek has only a
+    # Pulumi.Production.yaml), so Pulumi.CI.yaml and Pulumi.QA.yaml define
+    # neither ol-platform-engineering-gwarek-client-secret nor
+    # -redirect-uris. Without this guard the CI and QA keycloak stacks try to
+    # create a CONFIDENTIAL client with a null secret and null
+    # valid_redirect_uris, which the provider rejects outright ("standard
+    # (authorization code) and implicit flows require at least one valid
+    # redirect uri") -- failing the whole substructure update, not just this
+    # resource.
+    if keycloak_realm_config.get("ol-platform-engineering-gwarek-client-secret"):
+        ol_platform_engineering_gwarek_client = keycloak.openid.Client(
+            "ol-platform-engineering-gwarek-client",
+            name="ol-platform-engineering-gwarek-client",
+            realm_id="ol-platform-engineering",
+            client_id="ol-gwarek-client",
+            client_secret=keycloak_realm_config.get(
+                "ol-platform-engineering-gwarek-client-secret"
             ),
-            client_id=ol_platform_engineering_gwarek_client.client_id,
-            client_secret=ol_platform_engineering_gwarek_client.client_secret,
-            # This is included for the case where we are using traefik-forward-auth.
-            # It requires a random secret value to be present which is independent
-            # of the OAuth credentials.
-            secret=session_secret,
-            realm_id=ol_platform_engineering_gwarek_client.realm_id,
-            realm_name="ol-platform-engineering",
-            realm_public_key=ol_platform_engineering_gwarek_client.realm_id.apply(
-                fetch_realm_public_key_partial
+            enabled=True,
+            access_type="CONFIDENTIAL",
+            standard_flow_enabled=True,
+            implicit_flow_enabled=False,
+            service_accounts_enabled=False,
+            valid_redirect_uris=keycloak_realm_config.get_object(
+                "ol-platform-engineering-gwarek-redirect-uris"
             ),
-        ).apply(json.dumps),
-    )
+            opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+        )
+
+        # Realm-wide roles for gwarek's admin/viewer split. Kept distinct from
+        # the generic admin/developer roles above since those are shared across
+        # unrelated tools (Airbyte, Vault, Concourse) and granting them
+        # shouldn't imply gwarek access or vice versa. Realm roles land in
+        # every token's realm_access.roles claim automatically, so — unlike the
+        # Grafana client-role + UserClientRoleProtocolMapper pattern below — no
+        # protocol mapper is needed here; gwarek's FastAPI backend reads
+        # realm_access.roles directly (mirroring ol-analytics-api's
+        # require_mit_admin).
+        keycloak.Role(
+            "ol-platform-engineering-gwarek-admin-role",
+            realm_id=ol_platform_engineering_realm.id,
+            name="gwarek-admin",
+            description="Gwarek admin — manage integrations and trigger analysis",
+            opts=resource_options,
+        )
+        keycloak.Role(
+            "ol-platform-engineering-gwarek-viewer-role",
+            realm_id=ol_platform_engineering_realm.id,
+            name="gwarek-viewer",
+            description="Gwarek viewer — read-only access to findings/reports",
+            opts=resource_options,
+        )
+
+        vault.generic.Secret(
+            "ol-platform-engineering-gwarek-client-vault-oidc-credentials",
+            path="secret-operations/sso/gwarek",
+            data_json=Output.all(
+                url=ol_platform_engineering_gwarek_client.realm_id.apply(
+                    lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+                ),
+                client_id=ol_platform_engineering_gwarek_client.client_id,
+                client_secret=ol_platform_engineering_gwarek_client.client_secret,
+                # This is included for the case where we are using
+                # traefik-forward-auth. It requires a random secret value to be
+                # present which is independent of the OAuth credentials.
+                secret=session_secret,
+                realm_id=ol_platform_engineering_gwarek_client.realm_id,
+                realm_name="ol-platform-engineering",
+                realm_public_key=ol_platform_engineering_gwarek_client.realm_id.apply(
+                    fetch_realm_public_key_partial
+                ),
+            ).apply(json.dumps),
+        )
     # GWAREK [END] # noqa: ERA001
 
     # VAULT [START] # noqa: ERA001
