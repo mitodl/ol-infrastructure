@@ -227,14 +227,23 @@ Both are cleaned up in step 7.
 
 ```shell
 kubectl -n omnigraph scale deploy/omnigraph-server --replicas=0
-kubectl -n omnigraph rollout status deploy/omnigraph-server --timeout=120s
+kubectl -n omnigraph wait --for=delete pod \
+  -l app.kubernetes.io/name=omnigraph-server --timeout=120s
 ```
 
+Wait on the **pod being gone**, not on `rollout status`. The deployment
+reconciles to zero long before the old server finishes terminating —
+`omnigraph-server` uses the full SIGTERM grace period — and until that process
+exits it is still a writer against the old root. `rollout status` reports the
+Deployment converged and would let you proceed with the server still up.
+
 Nothing may write to the old root from here until the migration completes or
-rolls back. Confirm no maintenance job is mid-run — `optimize`/`cleanup` write:
+rolls back. Confirm no maintenance job is mid-run — `optimize`/`cleanup` write
+directly to the store, bypassing the server entirely:
 
 ```shell
 kubectl -n omnigraph get jobs
+kubectl -n omnigraph get pods            # expect no omnigraph-server pod at all
 ```
 
 ### 2. Start the OLD-image workspace pod
@@ -356,33 +365,37 @@ NEW_ROOT="$OLD_ROOT/fmt<N>"
 omnigraph version        # must show the NEW internal-schema number
 ```
 
-Everything below runs inside this pod. Build a config directory holding the
-image's baked-in schemas plus a cluster.yaml that is the live one with
-`storage:` repointed:
+Now build the config directory. The image carries the three schema files but
+**not** `cluster.yaml` — that only exists inside the *server* pod, where the
+ConfigMap is mounted over the same directory. A `kubectl run` pod has no such
+mount, so the config comes from the ConfigMap. From your **workstation**:
 
 ```shell
-mkdir -p /tmp/rebuild
-cp /etc/omnigraph/cluster/*.pg /tmp/rebuild/     # schema.pg, code-schema.pg, bridge-schema.pg
-cp /etc/omnigraph/cluster/cluster.yaml /tmp/rebuild/cluster.yaml
-vi /tmp/rebuild/cluster.yaml                     # edit only: storage: s3://ol-data-witan-$ENV/fmt<N>
-omnigraph cluster validate --config /tmp/rebuild
-```
+kubectl -n omnigraph exec omnigraph-migrate-new -- \
+  sh -c 'mkdir -p /tmp/rebuild && cp /etc/omnigraph/cluster/*.pg /tmp/rebuild/'
 
-The new image bakes in the same cluster.yaml the live ConfigMap overlays, so
-copying it from `/etc/omnigraph/cluster/` inside the pod avoids a round trip
-through the workstation. If that file is stale relative to the running config
-(it is baked at image build, the ConfigMap is generated per deploy), take the
-ConfigMap version instead and pipe it in:
-
-```shell
 kubectl -n omnigraph get configmap omnigraph-cluster-config \
   -o jsonpath='{.data.cluster\.yaml}' \
   | kubectl -n omnigraph exec -i omnigraph-migrate-new -- \
       sh -c 'cat > /tmp/rebuild/cluster.yaml'
 ```
 
-`cluster validate` is read-only and catches a mis-edited storage URI or an
-unresolvable `schema:` reference before anything is written.
+Back **inside the pod**, repoint `storage:` with `sed` — there is no `vi`,
+`vim`, `nano`, or `ed` in the image, and no `busybox` to fall back on:
+
+```shell
+sed -i "s|^storage: .*|storage: $NEW_ROOT|" /tmp/rebuild/cluster.yaml
+grep '^storage:' /tmp/rebuild/cluster.yaml     # confirm it took
+grep -c 'schema:' /tmp/rebuild/cluster.yaml    # graph count must be unchanged
+omnigraph cluster validate --config /tmp/rebuild
+```
+
+`cluster validate` reports `N resource(s), M dependency edge(s)` — two
+resources and one edge per declared graph, so 16 graphs give
+`32 resource(s), 16 dependency edge(s)`. A count that does not match the graph
+list means the `sed` ate more than the storage line. Validation is read-only,
+and catches a mis-edited storage URI or an unresolvable `schema:` reference
+before anything is written.
 
 Now bootstrap the new root's state ledger, **then** converge it. Both commands,
 in this order:
