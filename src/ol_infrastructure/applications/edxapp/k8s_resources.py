@@ -791,11 +791,11 @@ def create_k8s_resources(  # noqa: C901
                     "lms-migrate",
                     ["python", "manage.py", "lms", "migrate", "--noinput"],
                 ),
-                # `migrate` only ever touches the `default` connection, so the
-                # `student_module_history` schema (edxapp_csmh) is not migrated by
-                # the command above -- StudentModuleHistoryExtendedRouter sends the
-                # StudentModuleHistoryExtended model to its own database, and blocks
-                # every other model's migrations there.
+                # The migrate above passes no `--database`, so it targets only the
+                # `default` connection. StudentModuleHistoryExtendedRouter sends the
+                # StudentModuleHistoryExtended model to the `student_module_history`
+                # connection instead (the edxapp_csmh schema), and blocks every other
+                # model's migrations there -- so csmh needs its own explicit migrate.
                 #
                 # Without this, csmh silently stops receiving migrations: every
                 # deployment sat at 0002 while `default` had advanced to 0003, so
