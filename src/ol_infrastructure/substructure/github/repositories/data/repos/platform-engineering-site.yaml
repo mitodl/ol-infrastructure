@@ -1,0 +1,15 @@
+---
+_excluded_environments: 2
+allow_auto_merge: false
+allow_merge_commit: false
+allow_rebase_merge: false
+allow_squash_merge: true
+archetype: library
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: The MIT Online Learning Platform Engineering Site Repository
+has_wiki: true
+name: platform-engineering-site
+teams:
+  odl-engineering: admin
+web_commit_signoff_required: false

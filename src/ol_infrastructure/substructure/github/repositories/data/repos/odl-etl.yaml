@@ -1,0 +1,10 @@
+---
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: master
+description: Repository to use for extract, transform, and load tasks
+name: odl-etl
+teams:
+  devops: admin

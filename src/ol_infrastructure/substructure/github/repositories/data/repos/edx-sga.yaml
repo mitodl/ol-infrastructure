@@ -1,0 +1,22 @@
+---
+_excluded_environments: 1
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: fork
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: Staff Graded Assignment XBlock for the edX platform
+has_issues: true
+has_wiki: true
+name: edx-sga
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin
+  odl-engineering-owners: admin
+topics:
+- edx
+- xblock
+web_commit_signoff_required: false

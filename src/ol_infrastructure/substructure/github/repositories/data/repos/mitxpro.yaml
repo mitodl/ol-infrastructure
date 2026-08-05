@@ -1,0 +1,18 @@
+---
+_actions_secret_names:
+- HEROKU_API_KEY
+- HEROKU_EMAIL
+- OL_HQ_PROJECT_SECRET
+_excluded_environments: 2042
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: application
+default_branch: master
+dependabot_security_updates: false
+name: mitxpro
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin
+web_commit_signoff_required: false

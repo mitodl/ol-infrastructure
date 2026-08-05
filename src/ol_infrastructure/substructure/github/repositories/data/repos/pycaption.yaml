@@ -1,0 +1,8 @@
+---
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: master
+description: Python module to read/write popular video caption formats
+name: pycaption

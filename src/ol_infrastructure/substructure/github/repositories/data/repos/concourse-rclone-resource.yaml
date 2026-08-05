@@ -1,0 +1,15 @@
+---
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: fork
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: A Rclone resource for Concourse CI
+has_wiki: true
+name: concourse-rclone-resource
+teams: {}
+vulnerability_alerts: false
+web_commit_signoff_required: false

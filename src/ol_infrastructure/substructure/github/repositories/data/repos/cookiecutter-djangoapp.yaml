@@ -1,0 +1,13 @@
+---
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: master
+description: Cookie cutter template for starting a new django application
+name: cookiecutter-djangoapp
+teams:
+  odl-engineering: admin
+  odl-engineering-owners: admin
+topics:
+- django

@@ -1,0 +1,8 @@
+---
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: master
+description: slides for periodic ODL Engineering Updates
+name: odleng-update-slides

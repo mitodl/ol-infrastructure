@@ -1,0 +1,11 @@
+---
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: master
+description: a django app that demonstrates how to use the open-widget-framework
+name: open-widget-sample-app
+teams:
+  odl-engineering: admin
+  odl-engineering-owners: admin

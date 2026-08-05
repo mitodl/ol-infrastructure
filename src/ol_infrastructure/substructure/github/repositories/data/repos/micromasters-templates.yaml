@@ -1,0 +1,10 @@
+---
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: gh-pages
+description: templates for the micromasters application, https://github.com/mitodl/micromasters
+name: micromasters-templates
+teams:
+  odl-engineering: admin

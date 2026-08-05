@@ -1,0 +1,12 @@
+---
+_excluded_environments: 1
+allow_merge_commit: false
+allow_rebase_merge: false
+allow_squash_merge: true
+archetype: library
+dependabot_security_updates: false
+name: mit-learn-api-clients
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin
+web_commit_signoff_required: false

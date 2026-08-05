@@ -1,0 +1,15 @@
+---
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: library
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: Lists of resources to be excluded from search results
+has_wiki: true
+name: open-resource-blocklists
+teams:
+  odl-engineering: push
+web_commit_signoff_required: false

@@ -1,0 +1,17 @@
+---
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: fork
+default_branch: develop
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: React UI components / widgets. The easiest way to build a great search
+  experience with Elasticsearch.
+has_wiki: true
+homepage: http://www.searchkit.co
+name: searchkit
+teams: {}
+vulnerability_alerts: false
+web_commit_signoff_required: false

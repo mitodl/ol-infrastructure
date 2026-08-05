@@ -1,0 +1,19 @@
+---
+_excluded_environments: 1
+allow_auto_merge: false
+allow_merge_commit: false
+allow_rebase_merge: false
+allow_squash_merge: true
+archetype: library
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: Information on how we do what we do.
+homepage: http://mitodl.github.io/handbook/
+name: handbook
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin
+topics:
+- handbook
+web_commit_signoff_required: false

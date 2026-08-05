@@ -1,0 +1,10 @@
+---
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: master
+description: Tool to convert & load data from edX platform into BigQuery
+name: edx2bigquery
+teams:
+  odl-engineering-owners: admin

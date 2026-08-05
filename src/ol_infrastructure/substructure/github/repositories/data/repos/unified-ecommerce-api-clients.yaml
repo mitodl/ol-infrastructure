@@ -1,0 +1,10 @@
+---
+allow_merge_commit: false
+allow_rebase_merge: false
+allow_squash_merge: true
+archetype: archived
+default_branch: main
+description: JavaScript API client for the Unified Ecommerce application
+name: unified-ecommerce-api-clients
+teams:
+  odl-engineering: admin

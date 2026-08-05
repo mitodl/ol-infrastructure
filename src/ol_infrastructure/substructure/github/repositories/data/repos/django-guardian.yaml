@@ -1,0 +1,16 @@
+---
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: fork
+default_branch: devel
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: Implementation of per object permissions for Django 1.2+
+name: django-guardian
+teams:
+  odl-engineering: admin
+  odl-engineering-owners: admin
+vulnerability_alerts: false
+web_commit_signoff_required: false

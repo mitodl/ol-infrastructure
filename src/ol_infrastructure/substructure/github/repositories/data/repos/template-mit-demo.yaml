@@ -1,0 +1,16 @@
+---
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: library
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: A copy of https://github.com/mitocw/content-mit-latex2edx-demo turned
+  into a cookiecutter template.
+has_wiki: true
+name: template-mit-demo
+teams:
+  odl-engineering-owners: admin
+web_commit_signoff_required: false

@@ -1,0 +1,97 @@
+---
+# Shared repository shapes for the mitodl fleet.
+#
+# A repo's YAML in data/repos/ declares ONLY what it deviates from its archetype on, so a
+# `git diff` over that directory shows exactly the drift and nothing else. See
+# docs/plans/github-org-pulumi-import.md §3.2.
+#
+# IMPORTANT: these are the TARGET values, not current reality. During phases 1-3 the
+# per-repo files record what each repo actually is today, deviations and all -- including
+# where today's value is wrong. Making a wrong value explicit is what turns it into an
+# auditable finding in phase 4 rather than an invisible one (§6). Nothing here is applied
+# to GitHub until phase 5.
+#
+# No branch-protection block appears in any archetype. Since the C6c probe, protection is
+# enforced by org rulesets targeting the `tier` custom property (§5.4), not by per-repo
+# resources. Only `required_status_checks` stays per-repo, because check names differ.
+
+archetypes:
+  # Every non-archived repo inherits this.
+  base:
+    tier: standard
+    delete_branch_on_merge: true
+    allow_auto_merge: true
+    # MERGE STRATEGY IS DELIBERATELY NOT ENFORCED (decision 2026-08-05).
+    #
+    # Squash-merge is the general preference, but 158 of 178 active repos currently allow
+    # all three strategies, so pinning squash-only in the archetype would turn CON-01 into
+    # a fleet-wide behaviour change affecting ~89% of active repos rather than a cleanup of
+    # outliers. Each repo therefore records its own `allow_*_merge` values verbatim (see
+    # data/repos/), nothing is being asked to change, and CON-01 stays informational.
+    #
+    # To start enforcing: add `allow_squash_merge: true`, `allow_merge_commit: false`,
+    # `allow_rebase_merge: false` here, and the per-repo files immediately show the 158
+    # repos that would change. That diff IS the rollout plan -- review it before applying.
+    has_issues: true
+    has_wiki: false
+    web_commit_signoff_required: true
+    vulnerability_alerts: true
+    dependabot_security_updates: true
+    secret_scanning: enabled  # pragma: allowlist secret
+    secret_scanning_push_protection: enabled  # pragma: allowlist secret
+    default_branch: main
+    teams:
+      odl-engineering: push
+      odl-engineering-owners: admin
+
+  # Deployed services: mit-learn, mitxonline, ocw-studio, ...
+  application:
+    extends: base
+    tier: tier-1
+    visibility: public
+
+  # Published packages and shared libraries: ol-django, smoot-design, ...
+  library:
+    extends: base
+    tier: tier-1
+
+  # ol-infrastructure, ol-concourse, dagster.
+  infrastructure:
+    extends: base
+    tier: tier-1
+    teams:
+      devops: push
+      odl-engineering-owners: admin
+
+  # Upstream forks: edx-platform, XBlock, tutor, frontend-app-*, ...
+  #
+  # `tier: unmanaged` is deliberate and load-bearing: no org ruleset targets that value,
+  # so forks are explicitly untargeted rather than accidentally unprotected. That
+  # distinction is what stops CON-09 from reporting ~115 repos it cannot act on (§9.2).
+  fork:
+    extends: base
+    tier: unmanaged
+    has_issues: false
+    # EXEMPT FROM DEFAULT-BRANCH ASSIGNMENT (decision 2026-08-05). `null` means
+    # explicitly not enforced, so this is dropped rather than inheriting `main` from
+    # base. 102 active repos still default to `master` and nearly all are forks, where
+    # the branch name is upstream's choice. CON-03 skips this archetype for the same
+    # reason: a rule that fires 102 times with no action anyone would take is noise.
+    default_branch:
+
+  # The archived repos. Deliberately almost empty: GitHub rejects most writes to an
+  # archived repo, so anything more here produces failed applies rather than policy.
+  # They are imported rather than ignored so that nothing stops someone re-adding one
+  # later with a full config -- see §4.4.
+  #
+  # Note this archetype does NOT extend base -- inheriting base's settings would emit a
+  # config full of values that cannot be applied.
+  #
+  # `tier: unmanaged` is the same "deliberately untargeted" statement the forks make. An
+  # `archived-freeze` ruleset targeting a distinct `tier: archived` was specified in §5.4
+  # and dropped on 2026-08-05: GitHub already rejects writes to an archived repo, so it
+  # would have enforced read-only on things that are read-only. Without a tier value at
+  # all, CON-09 would fire on every archived repo for a label nobody intends to apply.
+  archived:
+    archived: true
+    tier: unmanaged

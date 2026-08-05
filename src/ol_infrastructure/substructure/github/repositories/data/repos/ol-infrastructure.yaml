@@ -1,0 +1,23 @@
+---
+_actions_secret_names:
+- GH_PROJECT_AUTOMATION_TOKEN
+_excluded_environments: 2
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: infrastructure
+dependabot_security_updates: false
+description: Infrastructure automation code for use by MIT Open Learning
+has_wiki: true
+name: ol-infrastructure
+teams:
+  arbisoft-contractors: admin
+  devops: admin
+  devops-contractors: admin
+  odl-engineering: maintain
+topics:
+- aws
+- devops
+- infrastructure
+web_commit_signoff_required: false

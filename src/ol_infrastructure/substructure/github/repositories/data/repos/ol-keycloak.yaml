@@ -1,0 +1,13 @@
+---
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: library
+dependabot_security_updates: false
+description: Custom theme and extensions for Keycloak SSO
+has_wiki: true
+name: ol-keycloak
+teams:
+  odl-engineering: maintain
+web_commit_signoff_required: false

@@ -1,0 +1,9 @@
+---
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: master
+description: A silly little CLI to quickly see the output of a failed Travis build
+  and understand what parts of the build are failing.
+name: travisfail

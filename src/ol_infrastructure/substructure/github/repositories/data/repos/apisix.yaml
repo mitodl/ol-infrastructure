@@ -1,0 +1,15 @@
+---
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: fork
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: The Cloud-Native API Gateway and AI Gateway
+has_wiki: true
+homepage: https://apisix.apache.org/blog/
+name: apisix
+teams: {}
+web_commit_signoff_required: false

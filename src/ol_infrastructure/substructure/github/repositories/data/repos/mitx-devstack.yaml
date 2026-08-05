@@ -1,0 +1,9 @@
+---
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: master
+description: Automation for building a distributable environment for use in course
+  authoring
+name: mitx-devstack

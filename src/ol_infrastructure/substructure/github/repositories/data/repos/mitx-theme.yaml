@@ -1,0 +1,20 @@
+---
+_excluded_environments: 1
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: library
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: Open edX theme for the Residential MITx instance
+has_wiki: true
+name: mitx-theme
+teams:
+  arbisoft-contractors: push
+  odl-engineering: admin
+topics:
+- openedx
+- theme
+web_commit_signoff_required: false

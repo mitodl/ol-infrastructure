@@ -1,0 +1,11 @@
+---
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: master
+description: Export Django settings to templates
+homepage: https://pypi.python.org/pypi/django-settings-export
+name: django-settings-export
+teams:
+  odl-engineering-owners: admin

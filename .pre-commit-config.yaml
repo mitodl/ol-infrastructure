@@ -76,6 +76,12 @@ repos:
     - sdks/
     - --exclude-files
     - skills-lock.json
+    # Generated GitHub fleet inventory. Trips the keyword detector on GitHub's own
+    # field names (`secret_scanning: disabled`) and on Actions secret NAMES, which are
+    # recorded deliberately -- values are write-only and never captured, so this tree
+    # cannot contain a credential by construction. See the data/README.md there.
+    - --exclude-files
+    - src/ol_infrastructure/substructure/github/repositories/data/
     - --exclude-files
     - src/ol_infrastructure/infrastructure/sentry/sentry_imports.json
 - repo: https://github.com/astral-sh/ruff-pre-commit

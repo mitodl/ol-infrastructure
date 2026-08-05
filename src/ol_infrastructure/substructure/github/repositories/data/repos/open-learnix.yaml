@@ -1,0 +1,10 @@
+---
+allow_merge_commit: false
+allow_rebase_merge: false
+allow_squash_merge: true
+archetype: library
+dependabot_security_updates: false
+description: Nix tooling to work with our repositories under Nixos
+name: open-learnix
+teams: {}
+web_commit_signoff_required: false

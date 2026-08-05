@@ -1,0 +1,10 @@
+---
+_excluded_environments: 1
+allow_merge_commit: false
+allow_rebase_merge: false
+allow_squash_merge: true
+archetype: archived
+default_branch: main
+name: unified-ecommerce-frontend
+teams:
+  odl-engineering: admin

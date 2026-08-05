@@ -1,0 +1,11 @@
+---
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: main
+description: Automatically managed grafana dashboards used by mitodl
+name: grafana-dashboards
+teams:
+  devops: admin
+  odl-engineering: admin

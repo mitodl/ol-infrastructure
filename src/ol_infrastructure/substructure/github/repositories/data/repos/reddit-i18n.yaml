@@ -1,0 +1,20 @@
+---
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: fork
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: reddit's translation files - USE CROWDIN TO SUBMIT TRANSLATIONS. Direct
+  pull requests to this repository will, generally, be rejected.
+has_wiki: true
+homepage: https://crowdin.net/project/reddit
+name: reddit-i18n
+teams:
+  devops: admin
+  odl-engineering: push
+  odl-engineering-owners: admin
+vulnerability_alerts: false
+web_commit_signoff_required: false

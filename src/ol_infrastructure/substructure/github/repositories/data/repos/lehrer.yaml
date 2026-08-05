@@ -1,0 +1,16 @@
+---
+_excluded_environments: 1
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: library
+dependabot_security_updates: false
+description: Dagger-based build pipeline for Open edX platform images
+has_wiki: true
+name: lehrer
+teams:
+  arbisoft-contractors: maintain
+  odl-engineering: maintain
+  odl-engineering-owners: admin
+web_commit_signoff_required: false

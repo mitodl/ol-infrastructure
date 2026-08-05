@@ -1,0 +1,15 @@
+---
+_actions_secret_names:
+- PYPI_TOKEN
+_excluded_environments: 1
+allow_auto_merge: false
+allow_merge_commit: false
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: library
+dependabot_security_updates: false
+name: ol-django
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin
+web_commit_signoff_required: false

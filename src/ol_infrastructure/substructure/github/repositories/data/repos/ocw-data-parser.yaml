@@ -1,0 +1,11 @@
+---
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: master
+description: A parsing script for MIT OpenCourseWare course data
+name: ocw-data-parser
+teams:
+  odl-engineering: admin
+  odl-engineering-owners: admin

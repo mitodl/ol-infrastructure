@@ -1,0 +1,38 @@
+---
+_actions_secret_names:
+- CI_KEYCLOAK_CLIENT_ID
+- CI_KEYCLOAK_OL_ENG_CLIENT_ID
+- CI_KEYCLOAK_OL_ENG_CLIENT_SECRET
+- CI_KEYCLOAK_OL_ENG_REALM
+- CI_KEYCLOAK_REALM
+- CI_KEYCLOAK_SERVER_URL
+- MIT_API_CLIENT_ID
+- MIT_API_CLIENT_SECRET
+- PRODUCTION_KEYCLOAK_CLIENT_ID
+- PRODUCTION_KEYCLOAK_CLIENT_SECRET
+- PRODUCTION_KEYCLOAK_OL_ENG_CLIENT_ID
+- PRODUCTION_KEYCLOAK_OL_ENG_CLIENT_SECRET
+- PRODUCTION_KEYCLOAK_OL_ENG_REALM
+- PRODUCTION_KEYCLOAK_REALM
+- PRODUCTION_KEYCLOAK_SERVER_URL
+- QA_KEYCLOAK_CLIENT_ID
+- QA_KEYCLOAK_CLIENT_SECRET
+- QA_KEYCLOAK_OL_ENG_CLIENT_ID
+- QA_KEYCLOAK_OL_ENG_CLIENT_SECRET
+- QA_KEYCLOAK_OL_ENG_REALM
+- QA_KEYCLOAK_REALM
+- QA_KEYCLOAK_SERVER_URL
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: library
+description: Automated user management system for Keycloak using GitHub Actions
+has_wiki: true
+name: access-forge
+secret_scanning: disabled
+secret_scanning_push_protection: disabled
+teams:
+  devops: admin
+  ol-data: maintain
+web_commit_signoff_required: false

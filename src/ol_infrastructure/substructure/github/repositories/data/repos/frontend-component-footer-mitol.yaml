@@ -1,0 +1,21 @@
+---
+_actions_secret_names:
+- SEMANTIC_RELEASE_GITHUB_TOKEN
+- SEMANTIC_RELEASE_NPM_TOKEN
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: fork
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: Site footer component for edX frontend apps.
+has_issues: true
+has_wiki: true
+name: frontend-component-footer-mitol
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin
+vulnerability_alerts: false
+web_commit_signoff_required: false

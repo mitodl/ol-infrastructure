@@ -1,0 +1,11 @@
+---
+allow_merge_commit: false
+allow_rebase_merge: false
+allow_squash_merge: true
+archetype: archived
+default_branch: main
+description: Monorepo for Open Learning Engineering's node libraries
+name: ol-npm-libraries
+topics:
+- typescript
+- typescript-library

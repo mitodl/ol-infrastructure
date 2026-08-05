@@ -1,0 +1,11 @@
+---
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: master
+description: Webhook server for automatic loading of course content from github to
+  edX Studio instances.
+name: git2edx
+teams:
+  odl-engineering-owners: admin

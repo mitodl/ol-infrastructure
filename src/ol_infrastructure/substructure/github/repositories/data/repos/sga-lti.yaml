@@ -1,0 +1,12 @@
+---
+_excluded_environments: 29
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: master
+description: an LTI implementation of Staff Graded Assignments, for use with edX
+name: sga-lti
+teams:
+  odl-engineering: pull
+  odl-engineering-owners: admin
