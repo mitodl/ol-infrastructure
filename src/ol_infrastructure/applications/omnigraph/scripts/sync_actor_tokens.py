@@ -12,7 +12,7 @@ WHAT IT COMPUTES
     actor-tokens  =  service-tokens  +  one act-<sub> entry per human realm user
 
 ``service-tokens`` is the Pulumi/SOPS-owned map of non-human actors
-(``svc-witan-ci``, and later ``svc-witan-admin``). Splitting it out of
+(``svc-witan-ci``, and ``svc-witan-admin`` where provisioned). Splitting it out of
 ``actor-tokens`` is what lets this script own the merged output outright: two
 writers on one Vault path means every ``pulumi up`` silently reverts every
 per-user entry, and every user 401s until the next run of this job. So Pulumi

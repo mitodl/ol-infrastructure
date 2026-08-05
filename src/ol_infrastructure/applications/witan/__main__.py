@@ -16,7 +16,10 @@ to the omnigraph stack, which runs ``omnigraph cluster apply`` before its
 server restarts — it declares the graphs and bakes their schema files into the
 omnigraph-server image. This stack runs only witan's own **data** backfills
 (``migrations.py``), gated ahead of the MCPServer so a new image never serves
-against a graph its migrations haven't run over.
+against a graph its migrations haven't run over. Both those backfills and the
+ad-hoc maintenance operations the MCP path refuses (``break_glass.py``)
+authenticate as ``svc-witan-admin`` where the omnigraph stack has provisioned it —
+see ``docs/witan-admin-break-glass-runbook.md``.
 ToolHive is only the operator that runs this MCP tier; it is an implementation
 detail of this stack, not part of witan's or omnigraph's identity — hence the
 plain ``witan`` / ``omnigraph`` project and namespace names.
@@ -89,6 +92,10 @@ from pulumi import Config, Output, ResourceOptions, export
 
 from bridge.secrets import sops as _bridge_sops
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.applications.witan.break_glass import (
+    BREAK_GLASS_CRONJOB_NAME,
+    create_break_glass_cronjob,
+)
 from ol_infrastructure.applications.witan.ci_indexer import (
     DEFAULT_INDEX_SCHEDULE,
     create_ci_indexer,
@@ -168,6 +175,24 @@ council_graph_id = require_stack_output_value(omnigraph_stack, "council_graph_id
 # the same thing an empty list means — no code graphs to index yet, so no
 # indexer — and the next omnigraph deploy supplies it.
 managed_repos = optional_stack_output_value(omnigraph_stack, "managed_repos") or []
+# Whether the omnigraph stack provisioned the break-glass principal for this
+# environment — i.e. whether secret-operations/witan/admin-token exists (see that
+# stack's WITAN_ADMIN_TOKEN_VAULT_PATH). A boolean, not the token: this stack
+# reads the token itself through VSO, from Vault, like every other credential it
+# holds.
+#
+# Optional and eagerly resolved for the same two reasons `managed_repos` is: it
+# gates whether resources are declared at all (a program-time branch, not
+# something `.apply` can express), and the two stacks deploy from independent
+# pipelines, so requiring it would wedge every witan deploy until omnigraph
+# happens to run. False means "not provisioned yet", which is the state every
+# environment starts in — maintenance keeps running as svc-witan-ci until the
+# SOPS keys are added and the omnigraph stack redeployed.
+admin_token_provisioned = bool(
+    optional_stack_output_value(
+        omnigraph_stack, "admin_token_provisioned", default=False
+    )
+)
 
 NAMESPACE = "witan"
 
@@ -331,6 +356,24 @@ ACTOR_TOKENS_SECRET_KEY = "tokens.json"  # noqa: S105  # pragma: allowlist secre
 WITAN_CI_TOKEN_VAULT_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 ACTOR_TOKENS_VAULT_KEY = "tokens_json"  # pragma: allowlist secret
 
+# The break-glass maintenance principal (agent-kit ADR-0005 path b / ADR-0002 D4
+# as amended). Written to Vault by the omnigraph stack alongside the CI token;
+# read here because the two things that use it — the pre-deploy migration Job and
+# the break-glass pod template — both live in this namespace.
+#
+# Its own Secret rather than a key in the actor-tokens map, even though the map
+# contains the same value: a Job mounts one env var, and mounting the whole map
+# into a maintenance pod would hand it every user's token as well.
+WITAN_ADMIN_TOKEN_SECRET_NAME = (  # pragma: allowlist secret
+    "witan-admin-token"  # noqa: S105
+)
+WITAN_ADMIN_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
+WITAN_ADMIN_TOKEN_VAULT_KEY = "token"  # noqa: S105  # pragma: allowlist secret
+WITAN_ADMIN_ACTOR_ID = "svc-witan-admin"
+# The identity the code-graph pipeline uses, and the identity maintenance falls
+# back to in environments where the admin principal is not provisioned yet.
+WITAN_CI_ACTOR_ID = "svc-witan-ci"
+
 ##############################################
 #   Vault auth binding (VSO sync only)        #
 ##############################################
@@ -414,6 +457,65 @@ witan_code_token_secret = OLVaultK8SSecret(
         depends_on=witan_auth_binding.vault_k8s_resources,
     ),
 )
+
+# svc-witan-admin's token, in environments whose omnigraph stack provisioned it.
+# Consumed by the pre-deploy migration Job and the break-glass pod template
+# below, and by nothing that serves traffic — the MCP tier must not hold a
+# credential that can rewrite memory rows out from under a per-user actor.
+witan_admin_token_secret = None
+if admin_token_provisioned:
+    witan_admin_token_secret = OLVaultK8SSecret(
+        f"witan-admin-token-secret-{stack_info.env_suffix}",
+        resource_config=OLVaultK8SStaticSecretConfig(
+            name=WITAN_ADMIN_TOKEN_SECRET_NAME,
+            namespace=NAMESPACE,
+            labels=k8s_global_labels,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=WITAN_ADMIN_TOKEN_SECRET_NAME,
+            dest_secret_type="Opaque",  # pragma: allowlist secret  # noqa: S106
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="witan/admin-token",
+            exclude_raw=True,
+            excludes=[".*"],
+            templates={
+                WITAN_ADMIN_TOKEN_SECRET_KEY: (
+                    f'{{{{ get .Secrets "{WITAN_ADMIN_TOKEN_VAULT_KEY}" }}}}'
+                )
+            },
+            # Rotating this is a deliberate act (edit the SOPS file, redeploy the
+            # omnigraph stack), and nothing consumes it continuously — the two
+            # consumers are a per-deploy Job and a pod an operator starts by
+            # hand, both of which read it fresh at pod start. Polling it as often
+            # as the per-user map would be checking for a change that only ever
+            # arrives with a deploy.
+            refresh_after="1h",
+            vaultauth=witan_auth_binding.vault_k8s_resources.auth_name,
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=witan_auth_binding.vault_k8s_resources,
+        ),
+    )
+
+# Which principal in-cluster maintenance authenticates as. svc-witan-admin where
+# it exists; svc-witan-ci otherwise, which is what every environment does today
+# and is exactly what this replaces — the code-graph pipeline's identity, used on
+# the memory graph agent-kit's Cedar bundle grants it no access to. The fallback
+# is explicit and temporary rather than silent: it keeps a first deploy of this
+# change from breaking the migration gate in an environment whose SOPS file has
+# not been updated, and it disappears from every environment the moment those two
+# keys are added. See docs/witan-admin-break-glass-runbook.md.
+if witan_admin_token_secret is not None:
+    maintenance_actor_id = WITAN_ADMIN_ACTOR_ID
+    maintenance_token_secret_name = WITAN_ADMIN_TOKEN_SECRET_NAME
+    maintenance_token_secret_key = WITAN_ADMIN_TOKEN_SECRET_KEY
+    maintenance_token_secret: OLVaultK8SSecret = witan_admin_token_secret
+else:
+    maintenance_actor_id = WITAN_CI_ACTOR_ID
+    maintenance_token_secret_name = WITAN_CI_TOKEN_SECRET_NAME
+    maintenance_token_secret_key = WITAN_CI_TOKEN_SECRET_KEY
+    maintenance_token_secret = witan_ci_token_secret
 
 actor_tokens_secret = OLVaultK8SSecret(
     f"witan-actor-tokens-secret-{stack_info.env_suffix}",
@@ -521,10 +623,34 @@ witan_migration_job = create_migration_job(
     witan_image=witan_image,
     omnigraph_server_addr=omnigraph_server_addr,
     council_graph_id=council_graph_id,
-    witan_ci_token_secret_name=WITAN_CI_TOKEN_SECRET_NAME,
-    witan_ci_token_secret_key=WITAN_CI_TOKEN_SECRET_KEY,
-    witan_ci_token_secret=witan_ci_token_secret,
+    maintenance_actor_id=maintenance_actor_id,
+    maintenance_token_secret_name=maintenance_token_secret_name,
+    maintenance_token_secret_key=maintenance_token_secret_key,
+    maintenance_token_secret=maintenance_token_secret,
 )
+
+#########################################
+#   Break-glass maintenance template     #
+#########################################
+# A suspended CronJob carrying the pod spec an operator instantiates by hand for
+# the ADR-0005 path (b) operations the MCP path refuses (schema apply, storage
+# rebuild, store merge, cross-actor debugging). Declared only where the admin
+# principal exists: the alternative would be a break-glass pod that runs as the
+# code-graph pipeline, which is the thing this task exists to stop.
+witan_break_glass = None
+if witan_admin_token_secret is not None:
+    witan_break_glass = create_break_glass_cronjob(
+        stack_info=stack_info,
+        namespace=NAMESPACE,
+        k8s_global_labels=k8s_global_labels,
+        witan_image=witan_image,
+        omnigraph_server_addr=omnigraph_server_addr,
+        council_graph_id=council_graph_id,
+        admin_actor_id=WITAN_ADMIN_ACTOR_ID,
+        admin_token_secret_name=WITAN_ADMIN_TOKEN_SECRET_NAME,
+        admin_token_secret_key=WITAN_ADMIN_TOKEN_SECRET_KEY,
+        admin_token_secret=witan_admin_token_secret,
+    )
 
 #########################################
 #   MCPGroup + witan MCPServer           #
@@ -671,3 +797,13 @@ export("vmcp_domain", VMCP_DOMAIN)
 export("vmcp_oidc_issuer", KEYCLOAK_ISSUER)
 export("witan_image_repository", witan_image_repository)
 export("omnigraph_server_addr", omnigraph_server_addr)
+# Which principal ran this environment's migrations, and the name to pass to
+# `kubectl create job --from=cronjob/…` for a break-glass pod (null where the
+# admin principal is not provisioned yet, in which case there is no such
+# CronJob). Exported so the runbook's first step — "check which identity this
+# environment is on" — is a `pulumi stack output` rather than reading two files.
+export("maintenance_actor_id", maintenance_actor_id)
+export(
+    "break_glass_cronjob",
+    BREAK_GLASS_CRONJOB_NAME if witan_break_glass is not None else None,
+)

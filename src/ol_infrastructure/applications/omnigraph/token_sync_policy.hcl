@@ -20,7 +20,8 @@ path "secret-operations/witan/actor-tokens" {
 }
 
 # The job's input: the Pulumi/SOPS-owned map of non-human actors (svc-witan-ci,
-# and later svc-witan-admin) that gets merged into every write of the path
+# and svc-witan-admin where an environment has provisioned it) that gets merged
+# into every write of the path
 # above. Read-only here — this job is not the writer of that path, and the
 # separation of the two writers is the whole point of the split.
 path "secret-operations/witan/service-tokens" {

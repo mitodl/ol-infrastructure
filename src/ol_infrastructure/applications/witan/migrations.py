@@ -87,16 +87,26 @@ def create_migration_job(  # noqa: PLR0913
     witan_image: str | Output[str],
     omnigraph_server_addr: str | Output[str],
     council_graph_id: str | Output[str],
-    witan_ci_token_secret_name: str,
-    witan_ci_token_secret_key: str,
-    witan_ci_token_secret: Resource,
+    maintenance_actor_id: str,
+    maintenance_token_secret_name: str,
+    maintenance_token_secret_key: str,
+    maintenance_token_secret: Resource,
 ) -> kubernetes.batch.v1.Job:
     """Run witan's own data backfills before the MCPServer serves the new image.
 
     Talks to omnigraph-server over the cluster network with the same
-    ``WITAN_MEMORY_*`` wiring the MCPServer uses, authenticating as
-    ``svc-witan-ci`` — these are admin/module-level operations that never carry
-    a per-user JWT (agent-kit ADR-0005 path b).
+    ``WITAN_MEMORY_*`` wiring the MCPServer uses — these are admin/module-level
+    operations that never carry a per-user JWT (agent-kit ADR-0005 path b), so
+    the identity is a service principal, passed in by the caller.
+
+    That principal is ``svc-witan-admin`` where the environment provisions it and
+    ``svc-witan-ci`` where it does not (yet). The distinction matters: these
+    backfills rewrite rows on the **memory** graph, which the code-graph pipeline
+    identity has no business on at all — agent-kit's Cedar bundle grants
+    ``witan-ci`` nothing there. Running as CI works today only because the
+    deployed ``cluster.yaml`` declares no ``policies:`` block; the same Job would
+    be denied the moment one is applied. Which is the argument for switching the
+    identity *before* enforcement lands, not after.
     """
     migration_env = [
         kubernetes.core.v1.EnvVarArgs(
@@ -109,11 +119,17 @@ def create_migration_job(  # noqa: PLR0913
             name="WITAN_MEMORY_TOKEN",
             value_from=kubernetes.core.v1.EnvVarSourceArgs(
                 secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
-                    name=witan_ci_token_secret_name,
-                    key=witan_ci_token_secret_key,
+                    name=maintenance_token_secret_name,
+                    key=maintenance_token_secret_key,
                 )
             ),
         ),
+        # Attribution on any row these backfills touch. Without it witan falls
+        # back to `git config user.name`, then `$USER`, then the literal
+        # "unknown" — and "unknown" is what a rewritten row's author field would
+        # say, in a graph whose whole point is provenance. The actor id is the
+        # honest answer to "who changed this": nobody did, a migration did.
+        kubernetes.core.v1.EnvVarArgs(name="WITAN_AUTHOR", value=maintenance_actor_id),
         # WITAN_REMOTE_URL is deliberately unset: that selects the remote
         # MCP-client path, over which every `migrate_*` is refused as an
         # admin-only operation (witan/remote/proxy.py `_ADMIN_ONLY`). This Job
@@ -171,5 +187,5 @@ def create_migration_job(  # noqa: PLR0913
                 ),
             ),
         ),
-        opts=ResourceOptions(depends_on=[witan_ci_token_secret]),
+        opts=ResourceOptions(depends_on=[maintenance_token_secret]),
     )
