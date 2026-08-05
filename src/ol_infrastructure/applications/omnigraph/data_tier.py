@@ -655,12 +655,21 @@ def create_data_tier(  # noqa: PLR0913
                             # server goes unnoticed for that long.
                             #
                             # The startupProbe replaces the guess with a
-                            # budget: failureThreshold x periodSeconds = 24 x 5
-                            # = 120s to become healthy, ~4.6x the measured 26s.
-                            # At ~1.2s/graph that absorbs roughly 100 graphs
-                            # before needing a thought, and a boot that blows
-                            # the budget is killed — which is correct, that is
-                            # a stuck start, not a slow one.
+                            # budget. The first probe fires at
+                            # initialDelaySeconds and every periodSeconds
+                            # after, so the Nth failure lands at
+                            # initial_delay + (N-1) x period — the container is
+                            # killed on the 24th, at 10 + 23x5 = 125s. (Not
+                            # 24x5=120, which ignores the initial delay, and
+                            # not 10+24x5=130, which counts an interval that
+                            # never elapses.)
+                            #
+                            # 125s is ~4.8x the measured 26s. Boot is roughly
+                            # 6s of fixed cost plus ~1.18s per declared graph,
+                            # so the budget absorbs about 100 graphs before it
+                            # needs revisiting — and a boot that blows it is
+                            # killed, which is correct: that is a stuck start,
+                            # not a slow one.
                             #
                             # Liveness and readiness then carry NO initial
                             # delay, deliberately: they cannot run until
