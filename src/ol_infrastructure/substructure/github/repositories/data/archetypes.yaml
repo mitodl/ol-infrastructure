@@ -40,6 +40,14 @@ archetypes:
     secret_scanning: enabled  # pragma: allowlist secret
     secret_scanning_push_protection: enabled  # pragma: allowlist secret
     default_branch: main
+    # Repo access comes from these grants and nothing else -- no individual holds a
+    # direct permission on a repo (§4.7). That makes the LEVEL here the whole access
+    # story rather than a detail.
+    #
+    # `odl-engineering` is capped at push (maintain is also acceptable; admin is not --
+    # policy 2026-08-05, audited as SEC-15). It is the broad engineering team, and admin
+    # carries repo deletion, settings changes and ruleset bypass. It currently holds
+    # admin on 116 repos, so this target is aspirational and phase-5 work, not reality.
     teams:
       odl-engineering: push
       odl-engineering-owners: admin

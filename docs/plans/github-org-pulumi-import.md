@@ -206,9 +206,9 @@ each one is a new blast-radius surface for no current benefit.
 1. Every `github.Repository` carries `pulumi.ResourceOptions(retain_on_delete=True)`. Removing
    a repo from the YAML removes it from state and *never* from GitHub.
 2. Org-level resources (`OrganizationSettings`, `OrganizationRuleset`, `OrganizationWebhook`)
-   carry `protect=True`. **So does `Membership`** — deleting one removes a human from the org,
-   which is the same class of irreversible action as deleting a repo and was missing from the
-   first version of this list (see §9.3).
+   carry `protect=True`. `Membership` was going to join them for the same reason — deleting
+   one removes a human from the org — but as of 2026-08-05 it is **not modelled at all**
+   (§4.7). Not having the resource is a stronger guarantee than protecting it.
 3. The Concourse job for the `github-organization` project requires manual approval before
    `pulumi up`; `github-repositories` may auto-apply once the empty-diff gate (§6) is green.
 
@@ -238,7 +238,6 @@ src/ol_infrastructure/substructure/github/
 │   ├── org_settings.py
 │   ├── custom_properties.py
 │   ├── teams.py
-│   ├── members.py
 │   ├── org_rulesets.py
 │   └── org_automation.py         # org webhooks, runner groups, org secrets/vars
 └── repositories/                 # project: ol-substructure-github-repositories
@@ -357,8 +356,7 @@ dictionary comparison rather than an API crawl.
 |---|---|---:|
 | `organization/org_settings.py` | `OrganizationSettings` | 1 |
 | `organization/custom_properties.py` | `OrganizationCustomProperties` | **1 per property** (~3), not 1 total — see §5.2 |
-| `organization/teams.py` | `Team`, `TeamSettings`, `TeamMembership` | ~14 + ~60 |
-| `organization/members.py` | `Membership` | 39 |
+| `organization/teams.py` | `Team` (+`TeamSettings`) — **not** `TeamMembership` (§4.7) | 14 |
 | `organization/org_rulesets.py` | `OrganizationRuleset` (property-targeted, §5.4) | 2 |
 | `organization/org_automation.py` | `OrganizationWebhook`, `ActionsRunnerGroup`, org secrets/variables | ~10 |
 | `repositories/repository.py` | `Repository`, `RepositoryTopics`, `BranchDefault`, `RepositoryVulnerabilityAlerts`, `RepositoryDependabotSecurityUpdates`, `RepositoryCustomProperty`, `TeamRepository` | 317 × ~6 |
@@ -554,6 +552,67 @@ Copilot review whether or not anyone framed it as a decision. Three things follo
    `organization_copilot_seat_management` / `organization_copilot_agent_settings` remains
    correct. An audit-only read is the option worth revisiting in phase 4.
 
+### 4.7 People are not in the estate; teams are
+
+Decided 2026-08-05. Two rules that reinforce each other.
+
+**Rule 1 — Pulumi manages teams, not individuals.** Neither `Membership` (who belongs to
+the org) nor `TeamMembership` (who belongs to a team) is imported or declared. The
+organization payload drops from **199 resources to 15** — 14 `Team` plus
+`OrganizationSettings`.
+
+**Rule 2 — repo access comes from team membership only.** No individual is granted a direct
+permission on a repository. `TeamRepository` is the sole path from a person to a repo, via
+the team they are in.
+
+They fit together: rule 2 is what makes rule 1 safe. Modelling people would only be buying
+a security property if access flowed *through* the individual records — and it does not. It
+flows through `TeamRepository`, which stays fully managed, all **169** of them.
+
+What that buys:
+
+- **Onboarding, offboarding and team moves never touch this repository.** No PR, no
+  manual-approval apply, no waiting on the infra team. That is the single largest operational
+  cost the earlier design carried (§9.3).
+- **The 39/39 seat ceiling stops being a Pulumi problem.** A `pulumi up` can no longer fail
+  on the 40th hire because Pulumi never adds one.
+- **The highest-blast-radius resource in the estate disappears.** Deleting a `Membership`
+  evicts a human from the org. Not modelling it is a stronger guarantee than `protect=True`.
+
+What it gives up, stated plainly: org membership and team rosters are **not declared in
+code**, so drift there is visible but not enforced. The crawl still records both — that is
+inventory feeding the audit, not Pulumi state — so a roster change shows up in a `drift` run
+without anything blocking it.
+
+#### The direct-collaborator backlog
+
+Rule 2 is a policy the fleet does not currently satisfy. Measured 2026-08-05:
+
+| | |
+|---|---:|
+| Repos with ≥1 direct collaborator | **72** (43 active, 29 archived) |
+| Total direct grants | **83** |
+| — at `admin` | **73** |
+| — at `write` | 10 |
+| Distinct people holding them | 20 |
+
+**73 of 83 direct grants are `admin`**, which is the part worth pausing on: the informal
+path to access is not a lesser permission, it is the highest one. One person holds direct
+grants on 20 repos; a bot account (`odlbot`) holds admin on 7.
+
+The policy applies to **every repo, forks and archived included** — no exemptions. An
+`admin` grant on an archived repo is inert only until someone unarchives it, and the fork
+fleet was explicitly in scope when the rule was set. SEC-06 is therefore a fleet-wide rule
+(the only one besides CON-07 that is not scoped to active repos), and each finding names the
+person and permission so it converts into "which team should this be" rather than a count.
+
+Remediation is phase 5 work — it changes access, so it is downstream of a reviewed backlog,
+not something the import does on the way past.
+
+**One convenient consequence.** `RepositoryCollaborators` has no documented import in the
+provider schema (§5.2 flagged it as untrusted). Under rule 2 there is eventually nothing to
+import, so a gap in the provider stops mattering instead of needing a workaround.
+
 ## 5. Discovery and import mechanics
 
 ### 5.1 One inventory pass produces both sides
@@ -601,10 +660,10 @@ stable across majors, and three entries in the pre-verification draft of this ta
 | `BranchProtection` | `<repo>:<pattern>` | |
 | `Team` | `<team-id>` **or** `<team-slug>` | both accepted |
 | `TeamRepository` | `<team-id>:<repo>` **or** `<team-slug>:<repo>` | slug form is what §3.2 relies on |
-| `TeamMembership` | `<team-id>:<username>` **or** `<team-slug>:<username>` | |
+| ~~`TeamMembership`~~ | `<team-id>:<username>` **or** `<team-slug>:<username>` | **Out of scope (§4.7)** — form kept for reference only |
 | `TeamMembers` | `<team-id>` | **use the numeric id.** The provider warns that importing by slug makes it convert slug↔id and *destroy and recreate every membership*. |
 | `TeamSettings` | `<team-id>` or `<team-slug>` | |
-| `Membership` | `<org>:<username>` | |
+| ~~`Membership`~~ | `<org>:<username>` | **Out of scope (§4.7)** — form kept for reference only |
 | `RepositoryWebhook` | `<repo>/<hook-id>` | **slash**, not colon |
 | `OrganizationWebhook` | `<hook-id>` | |
 | `RepositoryVulnerabilityAlerts` | `<repo>` | |
@@ -776,7 +835,7 @@ fixtures and cheap to add — the rule set is meant to grow every time someone n
 | SEC-03 | No required status checks on default branch | every sampled repo |
 | SEC-04 | Secret scanning or push protection disabled | `hq` (private) |
 | SEC-05 | Dependabot alerts or security updates disabled | every sampled repo + org default |
-| SEC-06 | Outside collaborator holds `admin` or `maintain` | `mitxonline` has 1 direct collaborator |
+| SEC-06 | **Any** direct collaborator on **any** repo — repo access must come from team membership (§4.7) | **fires on 72 repos**: 83 grants, 73 of them `admin`, across 20 people |
 | SEC-07 | Webhook without a secret, or a non-HTTPS URL | unknown |
 | SEC-08 | Write-enabled deploy key on an active repo | unknown |
 | SEC-09 | Actions secret not rotated in > 12 months | unknown |
@@ -785,6 +844,7 @@ fixtures and cheap to add — the rule set is meant to grow every time someone n
 | SEC-12 | Our own app's live permissions diverge from `docs/github-app-permissions.md` | — |
 | SEC-13 | Private repo with weaker controls than the public baseline | `hq` |
 | SEC-14 | No CODEOWNERS on a tier-1 repo | unknown |
+| SEC-15 | `admin` held by a team outside the sanctioned set — currently `odl-engineering-owners` and `devops` (policy 2026-08-05) | **fires on 125 repos** (66 active, 59 archived) |
 
 ### Axis: Consistency
 
@@ -793,7 +853,7 @@ fixtures and cheap to add — the rule set is meant to grow every time someone n
 | CON-01 | Merge strategy deviates from archetype | 4 of 5 sampled repos disagree |
 | CON-02 | `delete_branch_on_merge` disabled | `hq` |
 | CON-03 | Default branch is not `main` | unknown |
-| CON-04 | Team grants deviate from archetype | unknown |
+| CON-04 | Team grants deviate from archetype | **fires on 174 of 176 active repos** — only 2 conform |
 | CON-05 | No topics, or topics outside the controlled vocabulary | `mit-learn`, `ol-django`, `mitxonline` have none |
 | CON-06 | Missing LICENSE / README / SECURITY.md | unknown |
 | CON-07 | Archived repo still grants write to a team | unknown |
@@ -834,7 +894,7 @@ and route findings to the project's witan task list.
 |---|---|---|
 | **0** | Widen the GitHub App (§2). Write `docs/github-app-permissions.md`. Verify with a read-only crawl. | App can read every resource type in §3.3 |
 | **1** | Build `bin/github-org-inventory`. Crawl. Human-confirm archetype per repo. Commit `data/`. | 317 repos classified; estate report reviewed |
-| **2** | Author `organization/`. Import org, teams, members. Define the `tier` custom-property schema (§5.4) — now a prerequisite, not a fast-follow. | **Empty diff** on `ol-substructure-github-organization` |
+| **2** | Author `organization/`. Import org settings and the 14 teams — **not** members or team rosters (§4.7). Define the `tier` custom-property schema (§5.4) — a prerequisite, not a fast-follow. | **Empty diff** on `ol-substructure-github-organization` |
 | **3** | Author `repositories/`. Import in ~25-repo batches, including each repo's `tier` value. | **Empty diff** after every batch, and on the whole stack |
 | **3.5** | Add the two property-targeted org rulesets at `enforcement: evaluate`. Watch, then promote to `active`. | Rule-suite logs show the expected repos matching and no surprises |
 | **4** | Build `bin/github-estate-audit`. Run all three axes. Emit witan tasks. | Backlog exists and is triaged |
@@ -931,38 +991,35 @@ because the evidence is what makes a decision re-examinable when the estate chan
    That is cheap enough that the stack-size argument for excluding them does not survive
    contact with the audit-noise argument for including them.
 
-3. ~~**Seat pressure.**~~ **RESOLVED 2026-08-03 — keep `Membership` in Pulumi; the seat
-   ceiling is an operational precondition for phase 2, not a design constraint.**
+3. ~~**Seat pressure.**~~ **SUPERSEDED 2026-08-05 — `Membership` is out of scope entirely
+   (§4.7), which dissolves the question rather than answering it.**
 
-   Confirmed against the live org (`gh api /orgs/mitodl --jq .plan`):
+   The 2026-08-03 conclusion was *keep `Membership` in Pulumi and accept that onboarding
+   moves onto the infra team's critical path*. That reasoning was sound on its own terms and
+   is kept below, because the thing that changed was not the argument but a decision it had
+   treated as fixed.
 
-   ```json
-   {"name": "team", "seats": 39, "filled_seats": 39}
-   ```
+   It had framed "39 members go unmanaged" as the cost of not modelling them. That is only a
+   cost if managing *people* is what buys the security property. It is not — repo access
+   comes from `TeamRepository`, which stays fully managed. Once that is separated out,
+   modelling members buys a declared roster and costs a PR per hire, per departure and per
+   team move, on a stack that requires manual approval. The trade stops being close.
 
-   `seats == filled_seats`, so there is genuinely zero headroom. But the framing in the
-   original question was wrong in a way worth correcting: a `pulumi up` that fails on the 40th
-   member is *loud, immediate, and harmless* — nothing is half-applied and nobody is locked
-   out. That is not the failure mode to design around.
+   Everything the original analysis established still holds and is worth keeping:
 
-   The real cost is that onboarding moves onto the infra team's critical path, because
-   `ol-substructure-github-organization` requires manual approval before apply (§2.2). That is
-   a process consequence to accept knowingly, not a reason to leave 39 members unmanaged.
+   - Confirmed live: `{"name": "team", "seats": 39, "filled_seats": 39}` — zero headroom.
+   - A `pulumi up` failing on the 40th member would be loud, immediate and harmless. That
+     was never the failure mode to design around; the critical-path cost was.
+   - The billing question — whether a 40th member auto-provisions a paid seat or hard-fails
+     — is **not readable from the API** and still wants an answer from whoever owns the
+     GitHub bill. It is no longer a phase-2 blocker, since Pulumi never adds a member, but it
+     is still the difference between a smooth hire and a surprised one.
+   - Audit rule **DX-10** (zero seat headroom) stands, and matters *more* now: with members
+     unmanaged, the audit is the only thing watching the ceiling.
 
-   Two things follow, neither of which blocks the design:
-
-   - **Verify the billing behaviour before phase 2, not during it.** Whether adding a 40th
-     member auto-provisions a paid seat or hard-fails depends on the billing arrangement, and
-     that is not readable from the API — `/orgs/mitodl` reports the seat counts above but not
-     the billing cadence. Ask whoever owns the GitHub bill. The answer changes the runbook,
-     not the plan.
-   - **`Membership` carries `protect=True`**, joining the org-level resources in §2.2.
-     Deleting a `Membership` removes a human from the org; a bad merge to `members.py` should
-     fail the apply rather than evict people. This is the counterweight that the original
-     §2.2 list omitted, because it only considered repository deletion.
-
-   New audit rule **DX-10**: zero seat headroom (`filled_seats == seats`) — the next hire
-   cannot be added without a billing change. Fires now.
+   The counterweight the original conclusion added — `protect=True` on `Membership` — is
+   withdrawn along with the resource. Not modelling something is a stronger guarantee than
+   protecting it.
 
 4. **Actions secrets into Vault** (§4.1) — real value, but a source-of-truth migration.
    Recommend deferring to its own project rather than smuggling it into this one. Note that
