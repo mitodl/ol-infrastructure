@@ -52,7 +52,7 @@ app = cyclopts.App(help="Inventory the mitodl GitHub org for the Pulumi import."
 ORG = "mitodl"
 DEFAULT_CACHE = Path(".github-org-inventory-cache.json")
 CRAWL_THREADS = 12
-DATA_DIR = Path("src/ol_infrastructure/substructure/github/repositories/data")
+DATA_DIR = Path("src/ol_infrastructure/saas/github/repositories/data")
 
 # A repo is an archive candidate (DX-07) after this long with no push.
 STALE_DAYS = 365
