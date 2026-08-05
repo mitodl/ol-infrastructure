@@ -191,6 +191,17 @@ COUNCIL_SCHEMA_FILE = "schema.pg"
 CODE_SCHEMA_FILE = "code-schema.pg"
 BRIDGE_SCHEMA_FILE = "bridge-schema.pg"
 
+# Cedar bundle filenames, baked into the image next to the schemas by the same
+# build and for the same reason. Their committed `groups:` are fixtures — the
+# image entrypoint rewrites membership from the mounted actor-token map before
+# `cluster apply`, because `witan-users` has to track the hourly token-sync
+# job's output and this program cannot see it. See agent-kit
+# mcp/servers/witan/policy/README.md § "Group membership is rendered at boot".
+MEMORY_POLICY_FILE = "memory.policy.yaml"
+CODE_POLICY_FILE = "code-graph.policy.yaml"
+BRIDGE_POLICY_FILE = "bridge.policy.yaml"
+SERVER_POLICY_FILE = "server.policy.yaml"
+
 _GRAPH_ID_MAX_LEN = 64
 
 
@@ -260,6 +271,64 @@ def build_cluster_graphs(managed_repos: list[str]) -> dict[str, dict[str, str]]:
             raise ValueError(msg)
         graphs[graph] = {"schema": CODE_SCHEMA_FILE}
     return graphs
+
+
+def build_cluster_policies(
+    cluster_graphs: dict[str, dict[str, str]],
+) -> dict[str, dict[str, object]]:
+    """Build the ``policies:`` block of cluster.yaml for ``cluster_graphs``.
+
+    Wires the four Cedar bundles baked into the image onto the graphs they
+    govern. Derived from the graph map rather than rebuilt from
+    ``managed_repos`` so a graph can never exist without a bundle: an
+    ungoverned graph is not "open", it is default-deny, and it would fail every
+    write with an error pointing at policy rather than at the missing wiring.
+
+    APPLYING ANY BUNDLE IS A HARD CUTOVER TO AUTHENTICATED-EVERYTHING. With a
+    ``policies:`` block the server refuses to boot without bearer tokens
+    ("policy file is configured but no bearer tokens — every request would 401
+    because no token can ever match"), and once booted an actor with no grant
+    gets ``policy denied action '…' for unknown actor '…'``. Unconditional
+    rather than gated per environment because every environment finished its
+    actor-token rollout on 2026-08-05 and nothing is using the graphs yet —
+    ``__main__.py`` asserts token sync is enabled, which is the precondition
+    that actually matters.
+
+    The server bundle is scoped to ``cluster`` rather than to a graph:
+    ``graph_list`` binds to ``Omnigraph::Server::"root"``. It is deploy-time
+    only — omnigraph 0.8.1's offline ``policy validate``/``policy test`` load
+    every bundle under the per-graph engine and reject a server-scoped action,
+    so agent-kit's CI fixture deliberately omits it and it is validated here by
+    omnigraph-server at boot instead.
+    """
+    code_graph_ids = sorted(
+        graph
+        for graph, spec in cluster_graphs.items()
+        if spec["schema"] == CODE_SCHEMA_FILE
+    )
+    policies: dict[str, dict[str, object]] = {
+        "memory_rules": {
+            "file": f"./{MEMORY_POLICY_FILE}",
+            "applies_to": [COUNCIL_GRAPH_ID],
+        },
+        "bridge_rules": {
+            "file": f"./{BRIDGE_POLICY_FILE}",
+            "applies_to": [BRIDGE_GRAPH_ID],
+        },
+        "server_rules": {
+            "file": f"./{SERVER_POLICY_FILE}",
+            "applies_to": ["cluster"],
+        },
+    }
+    # Omitted entirely when no repo is managed: a bundle with an empty
+    # `applies_to` governs nothing, and declaring one reads as though the code
+    # graphs were covered when there are none.
+    if code_graph_ids:
+        policies["code_rules"] = {
+            "file": f"./{CODE_POLICY_FILE}",
+            "applies_to": code_graph_ids,
+        }
+    return policies
 
 
 def omnigraph_server_addr(namespace: str) -> str:
@@ -402,6 +471,11 @@ def create_data_tier(  # noqa: PLR0913
         lambda name: storage_uri_for(name, storage_prefix)
     )
     cluster_name = f"mitodl-witan-{stack_info.env_suffix.lower()}"
+    # Appended after `graphs`, preserving the existing key order exactly: the
+    # ConfigMap's content feeds the config hash that restarts the server, so
+    # reordering keys would bounce the data tier on a deploy that changed
+    # nothing.
+    cluster_policies = build_cluster_policies(cluster_graphs)
     cluster_yaml_content: Output[str] = storage_uri.apply(
         lambda uri: yaml.dump(
             {
@@ -410,6 +484,7 @@ def create_data_tier(  # noqa: PLR0913
                 "state": {"backend": "cluster"},
                 "storage": uri,
                 "graphs": cluster_graphs,
+                "policies": cluster_policies,
             },
             sort_keys=False,
         )
