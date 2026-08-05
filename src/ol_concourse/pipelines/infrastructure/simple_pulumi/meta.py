@@ -197,6 +197,7 @@ if __name__ == "__main__":
         "data_warehouse",
         "digital-credentials",
         "fastly-redirector",
+        "grafana-alerting",
         "jupyterhub-data",
         "mailgun",
         "marimo-data",

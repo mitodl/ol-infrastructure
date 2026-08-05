@@ -1,2 +1,3 @@
 ---
-encryptionsalt: v1:ut0g7Wr8b8Y=:v1:4qr110SYUeOUowgh:/N4mL8kguQh8Q9JD1sQ7iXShVJ9rkg==
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwG4tBva161e0ucBCCXDrIE0AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMCwVqXQPcOnnWj2pXAgEQgDtsiON1HfCMzrDGGoOvkO+5PYHe12k24s6E6Sv0PqVuCTdZDIEbCVYOEVawgsdRYH/a0W0gjVZGDSRtnQ==

@@ -341,6 +341,11 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_name="ol-application-fastly-redirector",
         refresh_stack=False,
     ),
+    "grafana-alerting": SimplePulumiParams(
+        app_name="grafana-alerting",
+        pulumi_project_path="infrastructure/grafana_alerting/",
+        pulumi_project_name="ol-infrastructure-grafana-alerting",
+    ),
     "jupyterhub-data": SimplePulumiParams(
         app_name="jupyterhub-data",
         pulumi_project_path="applications/jupyterhub_data/",
