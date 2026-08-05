@@ -250,9 +250,9 @@ def create_token_sync(  # noqa: PLR0913
     script_body = (Path(__file__).parent / "scripts" / SCRIPT_FILENAME).read_text()
 
     # Its own ServiceAccount rather than the namespace's existing two. The IRSA
-    # one carries S3 write access to the graph bucket and the VSO one carries
-    # system:auth-delegator; this pod needs neither, and reusing either would
-    # hand it a credential far broader than the single Vault write it makes.
+    # one carries S3 write access to the graph bucket, which this pod has no use
+    # for; reusing it would hand this job a credential far broader than the
+    # single Vault write it makes.
     service_account = kubernetes.core.v1.ServiceAccount(
         f"witan-token-sync-service-account-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -260,6 +260,42 @@ def create_token_sync(  # noqa: PLR0913
             namespace=namespace,
             labels=k8s_global_labels,
         ),
+    )
+
+    # It does need the one thing the VSO account has, though. The cluster's
+    # Vault kubernetes auth backend is configured with no token_reviewer_jwt
+    # (vault_secrets_operator.py, infrastructure/aws/eks), so Vault
+    # authenticates each login by replaying the CALLER's own JWT against the
+    # Kubernetes TokenReview API -- which requires that caller's ServiceAccount
+    # to hold "system:auth-delegator" clusterwide. OLVaultK8SResources
+    # (components/services/vault.py) grants that binding only to the
+    # "{application_name}-vault" VSO sync account, since nearly every app in
+    # this repo reaches Vault only through the vault-secrets-operator. This job
+    # is the exception in the omnigraph namespace: sync_actor_tokens.py logs in
+    # directly as this ServiceAccount. Without the binding every login 403s with
+    # a bare {"errors":["permission denied"]} naming neither the role nor the
+    # missing permission -- see the CI bootstrap Job BackoffLimitExceeded this
+    # was written to fix. ol_analytics_api carries the same binding for the same
+    # reason.
+    auth_delegator_binding = kubernetes.rbac.v1.ClusterRoleBinding(
+        f"witan-token-sync-vault-cluster-role-binding-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{SERVICE_ACCOUNT_NAME}:cluster-auth",
+            labels=k8s_global_labels,
+        ),
+        role_ref=kubernetes.rbac.v1.RoleRefArgs(
+            api_group="rbac.authorization.k8s.io",
+            kind="ClusterRole",
+            name="system:auth-delegator",
+        ),
+        subjects=[
+            kubernetes.rbac.v1.SubjectArgs(
+                kind="ServiceAccount",
+                name=SERVICE_ACCOUNT_NAME,
+                namespace=namespace,
+            ),
+        ],
+        opts=ResourceOptions(parent=service_account),
     )
 
     vault_policy = Policy(
@@ -351,6 +387,10 @@ def create_token_sync(  # noqa: PLR0913
 
     job_depends_on: list[Resource] = [
         service_account,
+        # Ordered explicitly: without the delegator binding in place first, the
+        # pod's very first Vault login 403s, and the Job burns its backoffLimit
+        # before Kubernetes has finished creating the binding.
+        auth_delegator_binding,
         vault_auth_role,
         keycloak_credentials_secret,
         script_config_map,
