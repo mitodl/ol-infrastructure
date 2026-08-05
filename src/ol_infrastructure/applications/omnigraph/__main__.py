@@ -60,6 +60,7 @@ from ol_infrastructure.applications.omnigraph.maintenance import (
     DEFAULT_CLEANUP_SCHEDULE,
     DEFAULT_OPTIMIZE_SCHEDULE,
 )
+from ol_infrastructure.applications.omnigraph.storage import validate_storage_prefix
 from ol_infrastructure.applications.omnigraph.token_sync import (
     ACTOR_TOKENS_VAULT_PATH,
     DEFAULT_SYNC_SCHEDULE,
@@ -108,6 +109,25 @@ omnigraph_config = Config("omnigraph")
 # build_cluster_graphs). A repo that is not listed fails to resolve rather than
 # silently minting a graph nobody provisioned or backs up.
 MANAGED_REPOS: list[str] = omnigraph_config.get_object("managed_repos") or []
+
+# Storage-root override for a storage-format migration. Unset (the steady
+# state) puts the cluster's graphs at the bucket root. Set it and they live at
+# `s3://ol-data-witan-<env>/<prefix>` instead — which is how
+# docs/omnigraph-storage-format-upgrade-runbook.md repoints the cluster at
+# graphs rebuilt under a new root while the old root stays intact as the
+# rollback.
+#
+# A prefix inside the managed bucket, NOT a full URI: the bucket, its IAM
+# policy and the IRSA grant are all keyed to the derived name, so a free-form
+# URI could aim the cluster at storage nothing has granted access to. It is
+# also what keeps backups and versioning covering the new root for free.
+#
+# Validated here rather than at the point of use because the failure this
+# guards against is silent: `omnigraph cluster validate` accepts any storage
+# string, including an empty one, so a malformed root is not caught downstream
+# — it just builds the graphs somewhere nobody looks. See the runbook's
+# "cluster validate does not catch an empty storage:" note.
+STORAGE_PREFIX: str = validate_storage_prefix(omnigraph_config.get("storage_prefix"))
 
 # Keycloak realm -> actor-token sync. Set `omnigraph:keycloak_url` for an
 # environment to turn it on; leaving it unset keeps that environment on the
@@ -440,6 +460,7 @@ data_tier = create_data_tier(
     optimize_schedule=OPTIMIZE_SCHEDULE,
     cleanup_schedule=CLEANUP_SCHEDULE,
     cleanup_older_than=CLEANUP_OLDER_THAN,
+    storage_prefix=STORAGE_PREFIX,
 )
 
 export("namespace", NAMESPACE)
@@ -454,3 +475,9 @@ export("omnigraph_server_image_repository", data_tier.image_repository)
 # writer's repo list and the cluster's graph list are the same list, and a
 # second copy of it in another stack's config could only ever drift.
 export("managed_repos", MANAGED_REPOS)
+# Mid-migration, the question an operator has is "which root is being served",
+# so export the resolved URI — not just the config knob that shaped it, which
+# is empty in the steady state and says nothing about the bucket. The prefix
+# goes out alongside it because that is the value they would set or clear.
+export("storage_uri", data_tier.storage_uri)
+export("storage_prefix", STORAGE_PREFIX)

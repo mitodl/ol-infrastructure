@@ -56,6 +56,7 @@ from ol_infrastructure.applications.omnigraph.maintenance import (
     OmnigraphMaintenance,
     create_maintenance,
 )
+from ol_infrastructure.applications.omnigraph.storage import storage_uri_for
 from ol_infrastructure.components.applications.eks import OLEKSAuthBinding
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.vault import OLVaultK8SSecret
@@ -278,6 +279,10 @@ class OmnigraphDataTier(NamedTuple):
     deployment: kubernetes.apps.v1.Deployment
     cluster_apply_job: kubernetes.batch.v1.Job
     maintenance: OmnigraphMaintenance
+    # The resolved cluster storage root (bucket + any storage_prefix), so the
+    # program can export what is actually being served rather than the config
+    # knob that shaped it.
+    storage_uri: Output[str]
 
 
 def create_data_tier(  # noqa: PLR0913
@@ -292,8 +297,18 @@ def create_data_tier(  # noqa: PLR0913
     optimize_schedule: str,
     cleanup_schedule: str,
     cleanup_older_than: str,
+    storage_prefix: str = "",
 ) -> OmnigraphDataTier:
-    """Provision the S3 bucket, IRSA policy, ECR repo, ConfigMap, and Deployment."""
+    """Provision the S3 bucket, IRSA policy, ECR repo, ConfigMap, and Deployment.
+
+    ``storage_prefix`` moves the cluster's storage root to a prefix inside the
+    managed bucket (``s3://<bucket>/<prefix>``) instead of the bucket root. It
+    exists for the storage-format migration in
+    ``docs/omnigraph-storage-format-upgrade-runbook.md``, where the graphs are
+    rebuilt under a new root and the cluster is then repointed at it, leaving
+    the old root intact as the rollback. Empty (the default) means the bucket
+    root, which is the steady state.
+    """
     # The bucket is named for its tenant (witan's graphs), not the omnigraph
     # service — omnigraph is generic and a future second instance would get its
     # own tenant-named bucket rather than colliding on an omnigraph-named one.
@@ -373,8 +388,18 @@ def create_data_tier(  # noqa: PLR0913
     # ``cluster.yaml`` file and leaves those baked-in schemas visible alongside
     # it, rather than replacing the whole directory.
     cluster_graphs = build_cluster_graphs(managed_repos)
+    # Storage root. Normally the bucket root; `omnigraph:storage_prefix` moves
+    # it to a prefix *inside* that same bucket, which is what a storage-format
+    # migration needs (docs/omnigraph-storage-format-upgrade-runbook.md).
+    #
+    # Deliberately a prefix rather than a full URI: the bucket, its IAM policy
+    # and the IRSA grant above stay keyed to the derived name no matter what
+    # this is set to. A free-form URI could point the cluster at a bucket
+    # nothing has granted access to, and the failure would land mid-migration.
+    # `cluster validate` would not catch it either — it accepts any storage
+    # string, including an empty one.
     storage_uri: Output[str] = omnigraph_bucket.bucket_v2.bucket.apply(
-        lambda name: f"s3://{name}"
+        lambda name: storage_uri_for(name, storage_prefix)
     )
     cluster_name = f"mitodl-witan-{stack_info.env_suffix.lower()}"
     cluster_yaml_content: Output[str] = storage_uri.apply(
@@ -802,4 +827,5 @@ def create_data_tier(  # noqa: PLR0913
         deployment=omnigraph_deployment,
         cluster_apply_job=cluster_apply_job,
         maintenance=omnigraph_maintenance,
+        storage_uri=storage_uri,
     )

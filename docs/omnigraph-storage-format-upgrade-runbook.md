@@ -159,15 +159,19 @@ each old store first, leaving S3 object versioning as the only rollback. Do not
 do that. Reassembling a Lance store from thousands of object versions is not a
 recovery path anyone should be attempting under time pressure.
 
-> **Prerequisite, read before scheduling.** The storage root is derived, not
-> configurable: `data_tier.py` sets
-> `bucket_name = f"ol-data-witan-{stack_info.env_suffix}"` and builds `storage:`
-> from it. **There is no `omnigraph:storage_root` config key yet**, so step 5
-> repoints by editing that derivation, and setting a config key of that name
-> today would no-op silently. Adding the override — an optional key that
-> replaces the derived storage URI in cluster.yaml while leaving bucket
-> creation and IRSA alone — is what makes step 5 a config change instead.
-> Tracked in the witan project backlog.
+Repointing is a config change: **`omnigraph:storage_prefix`**. Unset (the
+steady state) puts the graphs at the bucket root; set to `fmt5` they live at
+`s3://ol-data-witan-<env>/fmt5`. Step 5 sets it, rollback removes it, and no
+code is edited during the outage.
+
+It is a *prefix inside the managed bucket*, not a free-form URI, on purpose:
+the bucket, its IAM policy and the IRSA grant are all keyed to the derived
+name, so a full URI could aim the cluster at storage nothing has granted
+access to — and that failure would land mid-migration. Keeping it inside the
+bucket also means backups and versioning cover the new root for free. The
+value is validated at `pulumi preview` time (single `[A-Za-z0-9._-]` segment,
+no wrapping slashes), which is the only place it *can* be caught — see the
+`cluster validate` note in step 4.
 
 ## Addressing: `--store`, not `--cluster`
 
@@ -479,28 +483,18 @@ and is the safe choice — `overwrite` is destructive and buys nothing here.
 
 ### 5. Repoint the cluster and deploy the new image
 
-> **Do this by code edit today.** `omnigraph:storage_root` does not exist yet
-> (see *Prerequisite* above). Setting that config key on a stack that does not
-> read it **fails silently** — `pulumi up` reports success, cluster.yaml still
-> names the old root, and the new binary hits the same version gate that
-> started this outage. Do not run `pulumi config set omnigraph:storage_root`
-> until the override has actually landed.
+Set the prefix — the same one `$NEW_ROOT` names, without the `s3://<bucket>/`:
 
-Edit the storage URI in `src/ol_infrastructure/applications/omnigraph/data_tier.py`:
-
-```python
-# storage_uri: Output[str] = omnigraph_bucket.bucket_v2.bucket.apply(
-#     lambda name: f"s3://{name}"
-# )
-storage_uri: Output[str] = omnigraph_bucket.bucket_v2.bucket.apply(
-    lambda name: f"s3://{name}/fmt<N>"      # storage-format migration <date>
-)
+```shell
+cd src/ol_infrastructure/applications/omnigraph
+pulumi config set omnigraph:storage_prefix fmt5 --stack <CI|QA|Production>
 ```
 
-Change only this value. Leave the `OLBucket`, the IAM policy, and the IRSA
-grant keyed to the derived bucket name — the new root is a prefix *inside* that
-same bucket, so they already cover it, and repointing them would drop the
-grant and the versioning config.
+A malformed value fails the preview rather than deploying: wrapping slashes and
+anything outside a single `[A-Za-z0-9._-]` segment are rejected, which includes
+an unsubstituted `fmt<N>`. That check lives here because it cannot live
+downstream — `cluster validate` accepts any storage string, empty ones
+included.
 
 Confirm the generated config before applying:
 
@@ -523,15 +517,6 @@ pulumi preview --stack <CI|QA|Production> --json \
 
 Then let the paused pipeline's deploy job for this environment run (or
 `pulumi up` directly with `OMNIGRAPH_DOCKER_SHA` set to the new digest).
-
-**Once `omnigraph:storage_root` lands**, this whole step collapses to:
-
-```shell
-pulumi config set omnigraph:storage_root "$NEW_ROOT" --stack <CI|QA|Production>
-```
-
-with the same `pulumi preview` confirmation, and the rollback below becomes
-`pulumi config rm` instead of reverting the edit.
 
 The deploy regenerates cluster.yaml against the new root, runs its own
 `cluster apply` Job — a no-op, since step 4 already converged that root — and
@@ -595,9 +580,13 @@ the only fast rollback. Delete it, and the workstation copy of the exports in
 Before step 5 there is nothing to roll back: scale to 1 and you are on the old
 image against the old root.
 
-After step 5 — revert the `storage_uri` edit from that step (or, once the
-override lands, `pulumi config rm omnigraph:storage_root --stack <…>`), then
-redeploy with `OMNIGRAPH_DOCKER_SHA` pinned to the **old** image digest.
+After step 5:
+
+```shell
+pulumi config rm omnigraph:storage_prefix --stack <CI|QA|Production>
+```
+
+then redeploy with `OMNIGRAPH_DOCKER_SHA` pinned to the **old** image digest.
 Confirm with the same `pulumi preview --diff` check that `storage:` is back to
 the derived root before applying.
 
