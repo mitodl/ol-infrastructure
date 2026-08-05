@@ -12,7 +12,7 @@ See ``docs/omnigraph-storage-format-upgrade-runbook.md``.
 
 import pytest
 
-from ol_infrastructure.applications.omnigraph.data_tier import (
+from ol_infrastructure.applications.omnigraph.storage import (
     storage_uri_for,
     validate_storage_prefix,
 )

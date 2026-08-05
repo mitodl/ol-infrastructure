@@ -54,13 +54,13 @@ from ol_infrastructure.applications.omnigraph.data_tier import (
     OMNIGRAPH_SERVER_SERVICE_NAME,
     create_data_tier,
     omnigraph_server_addr,
-    validate_storage_prefix,
 )
 from ol_infrastructure.applications.omnigraph.maintenance import (
     DEFAULT_CLEANUP_OLDER_THAN,
     DEFAULT_CLEANUP_SCHEDULE,
     DEFAULT_OPTIMIZE_SCHEDULE,
 )
+from ol_infrastructure.applications.omnigraph.storage import validate_storage_prefix
 from ol_infrastructure.applications.omnigraph.token_sync import (
     ACTOR_TOKENS_VAULT_PATH,
     DEFAULT_SYNC_SCHEDULE,
@@ -475,6 +475,9 @@ export("omnigraph_server_image_repository", data_tier.image_repository)
 # writer's repo list and the cluster's graph list are the same list, and a
 # second copy of it in another stack's config could only ever drift.
 export("managed_repos", MANAGED_REPOS)
-# The active storage root, so an operator mid-migration can confirm which
-# root the cluster is actually serving without reading the ConfigMap.
+# Mid-migration, the question an operator has is "which root is being served",
+# so export the resolved URI — not just the config knob that shaped it, which
+# is empty in the steady state and says nothing about the bucket. The prefix
+# goes out alongside it because that is the value they would set or clear.
+export("storage_uri", data_tier.storage_uri)
 export("storage_prefix", STORAGE_PREFIX)

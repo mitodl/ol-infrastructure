@@ -56,6 +56,7 @@ from ol_infrastructure.applications.omnigraph.maintenance import (
     OmnigraphMaintenance,
     create_maintenance,
 )
+from ol_infrastructure.applications.omnigraph.storage import storage_uri_for
 from ol_infrastructure.components.applications.eks import OLEKSAuthBinding
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.vault import OLVaultK8SSecret
@@ -223,53 +224,6 @@ def code_graph_id(repo: str) -> str:
     return f"{CODE_GRAPH_PREFIX}{body[:keep].strip('-')}-{digest}"
 
 
-def validate_storage_prefix(prefix: str | None) -> str:
-    """Normalize and check ``omnigraph:storage_prefix``; return "" when unset.
-
-    The storage root is normally the bucket root; a prefix moves it to
-    ``s3://<bucket>/<prefix>`` for a storage-format migration (see
-    ``docs/omnigraph-storage-format-upgrade-runbook.md``).
-
-    Validated up front because every failure downstream of here is silent:
-    ``omnigraph cluster validate`` accepts *any* storage string, including an
-    empty one, so a malformed root is never caught by the tooling — the
-    migration just rebuilds the graphs somewhere nobody is looking, and
-    ``load`` reports success on top of it.
-
-    Raises ``ValueError`` on a leading/trailing ``/`` (it is joined as
-    ``s3://<bucket>/<prefix>``) or on anything that is not a single
-    ``[A-Za-z0-9._-]`` path segment. That last rule is what catches an
-    unsubstituted ``fmt<N>`` copied out of the runbook: ``<`` and ``>`` are
-    legal in S3 object keys, so it would otherwise become a real prefix.
-    """
-    cleaned = (prefix or "").strip()
-    if not cleaned:
-        return ""
-    if cleaned.startswith("/") or cleaned.endswith("/"):
-        msg = (
-            f"omnigraph:storage_prefix must not start or end with '/': "
-            f"{cleaned!r}. It is joined as s3://<bucket>/<prefix>."
-        )
-        raise ValueError(msg)
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", cleaned):
-        msg = (
-            f"omnigraph:storage_prefix must be a single path segment of "
-            f"[A-Za-z0-9._-] starting alphanumeric: {cleaned!r}. An "
-            "unsubstituted placeholder such as 'fmt<N>' lands here."
-        )
-        raise ValueError(msg)
-    return cleaned
-
-
-def storage_uri_for(bucket: str, prefix: str) -> str:
-    """Cluster storage root for ``bucket``, optionally under ``prefix``.
-
-    Kept separate from the ``Output.apply`` that calls it so the join is
-    testable — an off-by-one slash here silently relocates every graph.
-    """
-    return f"s3://{bucket}/{prefix}" if prefix else f"s3://{bucket}"
-
-
 def build_cluster_graphs(managed_repos: list[str]) -> dict[str, dict[str, str]]:
     """Build the ``graphs:`` block of cluster.yaml for ``managed_repos``.
 
@@ -325,6 +279,10 @@ class OmnigraphDataTier(NamedTuple):
     deployment: kubernetes.apps.v1.Deployment
     cluster_apply_job: kubernetes.batch.v1.Job
     maintenance: OmnigraphMaintenance
+    # The resolved cluster storage root (bucket + any storage_prefix), so the
+    # program can export what is actually being served rather than the config
+    # knob that shaped it.
+    storage_uri: Output[str]
 
 
 def create_data_tier(  # noqa: PLR0913
@@ -869,4 +827,5 @@ def create_data_tier(  # noqa: PLR0913
         deployment=omnigraph_deployment,
         cluster_apply_job=cluster_apply_job,
         maintenance=omnigraph_maintenance,
+        storage_uri=storage_uri,
     )
