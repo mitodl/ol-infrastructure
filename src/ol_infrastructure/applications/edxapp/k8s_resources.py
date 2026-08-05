@@ -791,6 +791,38 @@ def create_k8s_resources(  # noqa: C901
                     "lms-migrate",
                     ["python", "manage.py", "lms", "migrate", "--noinput"],
                 ),
+                # The migrate above passes no `--database`, so it targets only the
+                # `default` connection. StudentModuleHistoryExtendedRouter sends the
+                # StudentModuleHistoryExtended model to the `student_module_history`
+                # connection instead (the edxapp_csmh schema), and blocks every other
+                # model's migrations there -- so csmh needs its own explicit migrate.
+                #
+                # Without this, csmh silently stops receiving migrations: every
+                # deployment sat at 0002 while `default` had advanced to 0003, so
+                # csmh kept both of 0003's superseded indexes on student_module_id
+                # and never gained the `student_module_idx` that replaces them. Two
+                # of those stale duplicates went corrupt (errno 1712), which broke
+                # the staff Submission History view and made StudentModule deletion
+                # throw, until they were rebuilt by hand on 2026-08-05.
+                #
+                # Deliberately LMS-only even though Studio also installs the app,
+                # loads the router, and has the connection (cms/envs/common.py lists
+                # `lms.djangoapps.coursewarehistoryextended` among apps "imported by
+                # other apps"). The LMS and CMS pre-deploy Jobs run concurrently, so
+                # migrating csmh from both would race two processes against the same
+                # schema. The LMS is the single owner.
+                (
+                    "lms-migrate-csmh",
+                    [
+                        "python",
+                        "manage.py",
+                        "lms",
+                        "migrate",
+                        "coursewarehistoryextended",
+                        "--noinput",
+                        "--database=student_module_history",
+                    ],
+                ),
                 (
                     "lms-waffleflag",
                     [
