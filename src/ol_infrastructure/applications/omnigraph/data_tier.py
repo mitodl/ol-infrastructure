@@ -684,17 +684,17 @@ def create_data_tier(  # noqa: PLR0913
                             # initialDelaySeconds and every periodSeconds
                             # after, so the Nth failure lands at
                             # initial_delay + (N-1) x period — the container is
-                            # killed on the 24th, at 10 + 23x5 = 125s. (Not
+                            # killed on the 24th, at 20 + 23x5 = 135s. (Not
                             # 24x5=120, which ignores the initial delay, and
-                            # not 10+24x5=130, which counts an interval that
+                            # not 20+24x5=140, which counts an interval that
                             # never elapses.)
                             #
-                            # 125s is ~4.8x the measured 26s. Boot is roughly
-                            # 6s of fixed cost plus ~1.18s per declared graph,
-                            # so the budget absorbs about 100 graphs before it
-                            # needs revisiting — and a boot that blows it is
-                            # killed, which is correct: that is a stuck start,
-                            # not a slow one.
+                            # 135s is ~5.2x the measured 25-26s. Boot is
+                            # roughly 6s of fixed cost plus ~1.18s per declared
+                            # graph, so the budget absorbs about 110 graphs
+                            # before it needs revisiting — and a boot that
+                            # blows it is killed, which is correct: that is a
+                            # stuck start, not a slow one.
                             #
                             # Liveness and readiness then carry NO initial
                             # delay, deliberately: they cannot run until
@@ -707,11 +707,27 @@ def create_data_tier(  # noqa: PLR0913
                                     path="/healthz",
                                     port=OMNIGRAPH_SERVER_PORT,
                                 ),
-                                # Nothing can answer before the converge
-                                # finishes, so the first few probes are pure
-                                # cost; 10s skips them without cutting into the
-                                # budget meaningfully.
-                                initial_delay_seconds=10,
+                                # Sized to the top of the observed bind
+                                # range. Binds measured 2026-08-05 were 17.2s
+                                # (CI), 19.8s (QA), 17.2s (Production), then
+                                # 19.3s and 20.5s on later CI boots.
+                                #
+                                # At 10s the first three probes could only
+                                # ever fail — three per boot, harmless but
+                                # indistinguishable in `kubectl get events`
+                                # from a sick server, which is the noise this
+                                # change exists to remove.
+                                #
+                                # 20s sits just above four of those five
+                                # binds, so the usual outcome is zero
+                                # failures; a boot at the slow end of the
+                                # range (the 20.5s one) fires exactly one
+                                # before the 25s probe succeeds. Either way
+                                # Ready is unchanged, because 25s was already
+                                # the probe that passed. Going later would
+                                # trade that away, delaying Ready on every
+                                # fast boot to buy the one failure back.
+                                initial_delay_seconds=20,
                                 period_seconds=5,
                                 failure_threshold=24,
                             ),
