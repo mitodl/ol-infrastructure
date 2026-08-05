@@ -45,6 +45,8 @@ from bridge.lib.constants import (  # noqa: E402
 from ol_infrastructure.components.services.apisix import (  # noqa: E402
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
     OLApisixUpstream,
     OLApisixUpstreamConfig,
     stale_session_cookie_cleanup_plugin,
@@ -340,3 +342,114 @@ def test_cleanup_plugin_honours_a_custom_stale_name():
     ).config["functions"]
 
     assert 'name == "mitlearn_apisix_session"' in lua
+
+
+# ─── Shared plugin defaults ────────────────────────────────────────────────────
+
+
+def shared_plugins(name: str, **overrides) -> OLApisixSharedPlugins:
+    """Build a shared plugin config with the fields every caller has to supply."""
+    return OLApisixSharedPlugins(
+        name,
+        plugin_config=OLApisixSharedPluginsConfig(
+            application_name="myapp",
+            k8s_namespace="myapp-ns",
+            **overrides,
+        ),
+    )
+
+
+def plugin_named(plugins, name):
+    """Return the single plugin entry called ``name``, or None if absent."""
+    matches = [plugin for plugin in plugins if plugin["name"] == name]
+    assert len(matches) <= 1, f"{name} rendered more than once"
+    return matches[0] if matches else None
+
+
+@pulumi.runtime.test
+def test_gzip_is_attached_by_default():
+    """APISIX loads the gzip plugin cluster-wide, but a plugin does nothing
+    until a route or plugin config references it -- for a long time this one
+    referenced it nowhere and every shared-gateway response went out
+    uncompressed.
+    """
+    plugins = shared_plugins("test-shared-plugins-gzip-default")
+
+    def check(spec):
+        gzip = plugin_named(spec["plugins"], "gzip")
+        assert gzip is not None
+        assert gzip["enable"] is True
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_gzip_is_absent_when_defaults_disabled():
+    """enable_defaults=False has to drop gzip along with every other default;
+    a caller opting out of the defaults is opting out of this one too.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-gzip-opt-out",
+        enable_defaults=False,
+    )
+
+    def check(spec):
+        assert plugin_named(spec["plugins"], "gzip") is None
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_gzip_reaches_the_gateway_api_plugin_config():
+    """The v1alpha1 PluginConfig is rendered by a separate comprehension that
+    rewrites each entry, so Gateway API HTTPRoutes need their own assertion
+    rather than inheriting the v2 one.
+    """
+    plugins = shared_plugins("test-shared-plugins-gzip-gateway-api")
+
+    def check(spec):
+        gzip = plugin_named(spec["plugins"], "gzip")
+        assert gzip is not None
+        # v1alpha1 accepts only name and config -- ``enable`` is v2-only.
+        assert set(gzip) == {"name", "config"}
+
+    return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_gzip_does_not_compress_streaming_or_precompressed_types():
+    """text/event-stream is excluded so SSE responses are not held back by the
+    compression buffers, and already-compressed formats are excluded so they
+    do not burn gateway CPU for no gain. Both are easy to undo by accident
+    when someone widens the list.
+    """
+    plugins = shared_plugins("test-shared-plugins-gzip-types")
+
+    def check(spec):
+        types = plugin_named(spec["plugins"], "gzip")["config"]["types"]
+        assert "text/event-stream" not in types
+        for precompressed in (
+            "image/png",
+            "video/mp4",
+            "font/woff2",
+            "application/zip",
+        ):
+            assert precompressed not in types
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_gzip_compression_level_stays_cheap():
+    """comp_level is pinned to NGINX's own default of 1 on purpose: this
+    attaches to every route on a gateway whose HPA scales on CPU. Raising it
+    is a deliberate decision to make with measurement in hand, not a drive-by.
+    """
+    plugins = shared_plugins("test-shared-plugins-gzip-comp-level")
+
+    def check(spec):
+        config = plugin_named(spec["plugins"], "gzip")["config"]
+        assert config["comp_level"] == 1
+        assert config["vary"] is True
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
