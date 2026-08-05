@@ -16,6 +16,16 @@ path "secret-operations/witan/ci-token" {
   capabilities = ["read"]
 }
 
+# svc-witan-admin: the break-glass maintenance principal (agent-kit ADR-0005 path
+# b). Read by the pre-deploy migration Job and by the suspended break-glass
+# CronJob in this namespace — never by anything that serves traffic, which is the
+# point of it being a separate path from the map next door. Written by the
+# omnigraph stack from the same SOPS source as ci-token; absent in environments
+# that have not provisioned it yet, where this grant simply reads nothing.
+path "secret-operations/witan/admin-token" {
+  capabilities = ["read"]
+}
+
 # {actor_id: token} JSON map — the same artifact omnigraph-server boots its
 # bearer-token auth from (OMNIGRAPH_SERVER_BEARER_TOKENS_FILE) and witan
 # resolves per-user tokens from (WITAN_ACTOR_TOKENS_FILE). Always carries the

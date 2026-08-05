@@ -30,6 +30,11 @@ Store upkeep — nightly fragment compaction and weekly version GC — runs as t
 further CronJobs (``maintenance.py``), against the S3 store directly rather
 than through the server. See ``docs/omnigraph-store-maintenance-runbook.md``.
 
+The *other* kind of upkeep — data and schema migrations, which do go through the
+server — runs in the witan stack as ``svc-witan-admin``, the break-glass
+principal whose token this stack provisions alongside ``svc-witan-ci``. See
+``docs/witan-admin-break-glass-runbook.md``.
+
 Follow-up work this stack does NOT cover (tracked separately):
     - **Container image.** The ``omnigraph``/``pulumi-omnigraph`` Concourse
       pipeline builds the image once, owns the ECR repository itself
@@ -200,6 +205,30 @@ ACTOR_TOKENS_VAULT_KEY = "tokens_json"  # pragma: allowlist secret
 # same SOPS source record below so they can't drift.
 WITAN_CI_TOKEN_VAULT_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 
+# The break-glass maintenance principal (agent-kit ADR-0005 path b, ADR-0002 D4
+# as amended). Same shape as the CI token above — a raw single-actor token
+# carried on its own Vault path so the witan stack's maintenance Jobs mount only
+# that one value, plus the matching entry in the actor-tokens map so
+# omnigraph-server will accept it. Both come from the one SOPS record, checked
+# against each other below.
+#
+# Separate from svc-witan-ci because the in-cluster migration Job would
+# otherwise keep authenticating as the code-graph pipeline — an identity with no
+# legitimate access to the memory graph at all — and separate from
+# svc-witan-service because the serving tier should not hold a credential that
+# can rewrite memory rows. Cedar grants it `change` only on the memory graph,
+# where every human user already has it; on the code and bridge graphs it is
+# read + schema only (agent-kit mcp/servers/witan/policy/).
+#
+# Optional, unlike the CI token: environments whose SOPS file predates this are
+# left exactly as they were, still running maintenance as svc-witan-ci, and no
+# resource here or in the witan stack materializes. Adding the two keys and
+# deploying is what switches an environment over. See
+# docs/witan-admin-break-glass-runbook.md.
+WITAN_ADMIN_TOKEN_VAULT_PATH = "secret-operations/witan/admin-token"  # noqa: S105  # pragma: allowlist secret
+WITAN_ADMIN_TOKEN_VAULT_KEY = "token"  # noqa: S105  # pragma: allowlist secret
+WITAN_ADMIN_ACTOR_ID = "svc-witan-admin"
+
 ##############################################
 #   Vault secret source (SOPS -> Vault)       #
 ##############################################
@@ -251,9 +280,43 @@ if (_BRIDGE_SECRETS_DIR / _witan_secrets_path).exists():
             "— they are the same token exposed to two different consumers."
         )
         raise ValueError(msg)
+
+    # Optional, but all-or-nothing. Half-configuring this is worse than not
+    # configuring it: a token in the actor map with no `admin_token` record
+    # leaves a credential omnigraph-server accepts that nothing can use, and an
+    # `admin_token` with no map entry gives the witan stack's Jobs a token the
+    # server 401s — a failure that surfaces as a migration Job crash-looping on
+    # every deploy, at the point where it gates the MCPServer.
+    _witan_admin_token = _witan_secrets_source.get("admin_token")
+    _mapped_admin_token = _actor_tokens_map.get(WITAN_ADMIN_ACTOR_ID)
+    if bool(_witan_admin_token) != bool(_mapped_admin_token):
+        msg = (
+            f"omnigraph/secrets.{stack_info.env_suffix}.yaml: 'admin_token' and "
+            f"actor_tokens['{WITAN_ADMIN_ACTOR_ID}'] must be set together or "
+            "not at all — one without the other provisions a credential that "
+            "cannot authenticate (see docs/witan-admin-break-glass-runbook.md)."
+        )
+        raise ValueError(msg)
+    if _witan_admin_token and _mapped_admin_token != _witan_admin_token:
+        msg = (
+            f"omnigraph/secrets.{stack_info.env_suffix}.yaml: admin_token must "
+            f"match actor_tokens['{WITAN_ADMIN_ACTOR_ID}'] — they are the same "
+            "token exposed to two different consumers (agent-kit ADR-0005 path b)."
+        )
+        raise ValueError(msg)
+    if _witan_admin_token == _witan_ci_token:
+        msg = (
+            f"omnigraph/secrets.{stack_info.env_suffix}.yaml: admin_token must "
+            "not equal ci_token. The whole point of the break-glass principal "
+            "is that maintenance stops running as the code-graph pipeline; one "
+            "shared value would make the two identities indistinguishable to "
+            "the server while looking separate here."
+        )
+        raise ValueError(msg)
 else:
     _actor_tokens_map = {}
     _witan_ci_token = None
+    _witan_admin_token = None
 
 # The non-human actors, on their own Vault path. This is always written, in
 # every environment, and is the *input* the token-sync job merges Keycloak's
@@ -318,6 +381,19 @@ if _witan_ci_token:
         path="secret-operations/witan/ci-token",
         data_json=Output.secret(
             json.dumps({WITAN_CI_TOKEN_VAULT_KEY: _witan_ci_token})
+        ),
+    )
+
+# The break-glass principal's own path, written the same way and by the same
+# sole writer. Nothing in THIS stack consumes it — the maintenance Jobs that do
+# live in the witan stack, which reads it through its own VSO sync (one writer
+# per Vault path, as above).
+if _witan_admin_token:
+    vault.generic.Secret(
+        f"omnigraph-witan-admin-token-vault-secret-{stack_info.env_suffix}",
+        path=WITAN_ADMIN_TOKEN_VAULT_PATH,
+        data_json=Output.secret(
+            json.dumps({WITAN_ADMIN_TOKEN_VAULT_KEY: _witan_admin_token})
         ),
     )
 
@@ -481,3 +557,12 @@ export("managed_repos", MANAGED_REPOS)
 # goes out alongside it because that is the value they would set or clear.
 export("storage_uri", data_tier.storage_uri)
 export("storage_prefix", STORAGE_PREFIX)
+# Whether this environment's SOPS file carries the break-glass principal, and
+# therefore whether secret-operations/witan/admin-token exists. A boolean, not
+# the token: the witan stack needs to decide *whether* to declare its
+# admin-token Secret and maintenance Jobs, which is a program-time branch, and
+# it reads this eagerly (optional_stack_output_value) for exactly that reason.
+# Publishing the value itself would put a live credential in this stack's
+# outputs, where `pulumi stack output` and every consumer's state would carry
+# it — the token travels through Vault, which is what Vault is for.
+export("admin_token_provisioned", bool(_witan_admin_token))

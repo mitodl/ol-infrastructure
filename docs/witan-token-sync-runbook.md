@@ -48,7 +48,7 @@ and `.../omnigraph/scripts/sync_actor_tokens.py` (the reconciliation itself).
 
 | Path | Writer | Contents |
 | --- | --- | --- |
-| `secret-operations/witan/service-tokens` | the omnigraph Pulumi stack, from `src/bridge/secrets/omnigraph/secrets.<env>.yaml` | non-human actors (`svc-witan-ci`, later `svc-witan-admin`) |
+| `secret-operations/witan/service-tokens` | the omnigraph Pulumi stack, from `src/bridge/secrets/omnigraph/secrets.<env>.yaml` | non-human actors (`svc-witan-ci`, and `svc-witan-admin` where provisioned — see `witan-admin-break-glass-runbook.md`) |
 | `secret-operations/witan/actor-tokens` | the `witan-token-sync` CronJob | the merged map both omnigraph-server and the witan tier read |
 
 One writer per path, and they must stay that way. A second writer on

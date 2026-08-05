@@ -312,9 +312,9 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
     # exactly the two read-only Admin API calls below and nothing else.
     #
     # This is NOT the `witan-cli` public client that ADR-0005 path (a)'s
-    # `witan login` device-code flow authenticates against — that one is a
-    # separate, public client tracked on its own task. Interactive user login
-    # and this machine credential have no reason to share a client.
+    # `witan login` device-code flow authenticates against — that one is
+    # declared separately below. Interactive user login and this machine
+    # credential have no reason to share a client.
     ol_platform_engineering_witan_token_sync_client = keycloak.openid.Client(
         "ol-platform-engineering-witan-token-sync-client",
         name="ol-platform-engineering-witan-token-sync-client",
@@ -369,6 +369,76 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
                 ol_platform_engineering_witan_token_sync_client.client_secret
             ),
         ).apply(json.dumps),
+    )
+
+    # The client a human's `witan` CLI authenticates as (agent-kit ADR-0005 path
+    # a: `witan login`/`whoami`/`logout`, witan_core.remote.oidc). PUBLIC with
+    # ONLY the device authorization grant enabled — every property here is load
+    # bearing:
+    #
+    #   - PUBLIC because a CLI on a laptop cannot keep a secret. `witan-cli` is
+    #     also the client_id agent-kit defaults to
+    #     (witan_core.remote.config.DEFAULT_CLIENT_ID), so a user needs no
+    #     client configuration at all — only WITAN_REMOTE_URL and
+    #     WITAN_OIDC_ISSUER.
+    #   - Device grant (RFC 8628) because the CLI has no loopback listener and
+    #     no browser of its own: it prints a code and a URL, the human completes
+    #     the login in whatever browser they already have, and the CLI polls the
+    #     token endpoint. That is the one flow that works over SSH into a
+    #     jumphost, which is where operators actually run this.
+    #   - standard/implicit/direct-access all OFF. Standard flow would need a
+    #     redirect URI (there is no web app here); direct access grants would let
+    #     the CLI collect a password, which is exactly what the device flow
+    #     exists to avoid.
+    #   - No `client_secret` argument: passing one to a PUBLIC client is silently
+    #     ignored by Keycloak and would only mislead a future reader into
+    #     thinking one is required.
+    #
+    # No Vault write accompanies this client, unlike every other client in this
+    # file: a public client has no secret to distribute, and issuer/client_id/
+    # audience are plain configuration a user sets from the runbook.
+    ol_platform_engineering_witan_cli_client = keycloak.openid.Client(
+        "ol-platform-engineering-witan-cli-client",
+        name="ol-platform-engineering-witan-cli-client",
+        realm_id="ol-platform-engineering",
+        client_id="witan-cli",
+        enabled=True,
+        access_type="PUBLIC",
+        oauth2_device_authorization_grant_enabled=True,
+        standard_flow_enabled=False,
+        implicit_flow_enabled=False,
+        direct_access_grants_enabled=False,
+        service_accounts_enabled=False,
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+
+    # Stamps `aud: witan` onto the access token this client mints, which is what
+    # makes the token usable: both the witan vMCP's incomingAuth
+    # (applications/witan/__main__.py, `audience: WITAN_OIDC_AUDIENCE`) and
+    # witan's own JWTVerifier (WITAN_OIDC_AUDIENCE, agent-kit ADR-0004 D1)
+    # reject a token whose audience does not match, and Keycloak puts no such
+    # audience in by default.
+    #
+    # `included_custom_audience` rather than `included_client_audience`: the
+    # audience is the *witan service*, which is not a Keycloak client at all
+    # (the deployment validates a literal string, it does not resolve a client),
+    # so there is no client id to point at. The value is deliberately the
+    # hard-coded default rather than realm config — `witan:oidc_audience` in the
+    # witan stack defaults to the same literal, and a mismatch between the two
+    # is an unauthenticated-CLI bug that only shows up at login time. If that
+    # stack's audience is ever overridden per environment, this must move to
+    # realm config in the same change.
+    keycloak.openid.AudienceProtocolMapper(
+        "ol-platform-engineering-witan-cli-audience-mapper",
+        realm_id=ol_platform_engineering_realm.id,
+        client_id=ol_platform_engineering_witan_cli_client.id,
+        name="witan-audience",
+        included_custom_audience="witan",
+        add_to_access_token=True,
+        # The witan service reads the ACCESS token; nothing consumes the id
+        # token, so it stays out of it.
+        add_to_id_token=False,
+        opts=resource_options,
     )
     # WITAN [END] # noqa: ERA001
 
