@@ -21,7 +21,7 @@ TRAEFIK_VERSION = "3.7.10"
 TUTOR_PERMISSIONS_VERSION = "15.3.4"
 TYPESENSE_VERSION = "30.1"
 # renovate: datasource=github-releases depName=vault packageName=hashicorp/vault
-VAULT_VERSION = "2.0.3"
+VAULT_VERSION = "2.0.4"
 # renovate: datasource=docker depName=vector packageName=timberio/vector
 VECTOR_VERSION = "0.40.1"
 
