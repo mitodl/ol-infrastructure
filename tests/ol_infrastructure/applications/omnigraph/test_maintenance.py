@@ -28,6 +28,15 @@ GRAPHS = ["council", "code-bridge", "code-github-com-mitodl-ol-django"]
 
 CLEANUP_ARGS = ["--older-than", DEFAULT_CLEANUP_OLDER_THAN, "--confirm", "--yes"]
 
+# Deliberately NOT the real bucket or actor. Both reach the script through the
+# environment, and what is under test is that it passes them through unaltered —
+# nothing here pins a naming convention. The real values are built in
+# data_tier.py (`ol-data-witan-<env>` from the OLBucket, and CLUSTER_APPLY_ACTOR),
+# so a realistic-looking literal here would only send someone renaming the bucket
+# to a test that never needed to change.
+STORAGE_ROOT = "s3://test-storage-root"
+MAINTENANCE_ACTOR = "test-actor"
+
 
 class SweepResult:
     """A sweep run: its exit status and the argv of each ``omnigraph`` call."""
@@ -82,8 +91,8 @@ def run_sweep(tmp_path: Path):
             text=True,
             env={
                 "PATH": str(bin_dir),
-                "OMNIGRAPH_STORAGE_ROOT": "s3://ol-data-witan-ci",
-                "OMNIGRAPH_MAINTENANCE_ACTOR": "svc-witan-admin",
+                "OMNIGRAPH_STORAGE_ROOT": STORAGE_ROOT,
+                "OMNIGRAPH_MAINTENANCE_ACTOR": MAINTENANCE_ACTOR,
             },
             check=False,
         )
@@ -119,11 +128,11 @@ def test_sweep_addresses_the_cluster_root_not_a_bare_uri(run_sweep):
     assert call == [
         "optimize",
         "--cluster",
-        "s3://ol-data-witan-ci",
+        STORAGE_ROOT,
         "--graph",
         "council",
         "--as",
-        "svc-witan-admin",
+        MAINTENANCE_ACTOR,
     ]
 
 
@@ -190,11 +199,11 @@ def test_shell_metacharacters_in_config_do_not_escape_the_argument(run_sweep):
     assert call == [
         "cleanup",
         "--cluster",
-        "s3://ol-data-witan-ci",
+        STORAGE_ROOT,
         "--graph",
         "council",
         "--as",
-        "svc-witan-admin",
+        MAINTENANCE_ACTOR,
         "--older-than",
         hostile,
         "--confirm",
