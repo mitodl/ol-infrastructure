@@ -289,7 +289,32 @@ if (_BRIDGE_SECRETS_DIR / _witan_secrets_path).exists():
     # every deploy, at the point where it gates the MCPServer.
     _witan_admin_token = _witan_secrets_source.get("admin_token")
     _mapped_admin_token = _actor_tokens_map.get(WITAN_ADMIN_ACTOR_ID)
-    if bool(_witan_admin_token) != bool(_mapped_admin_token):
+
+    # ABSENT AND BLANK ARE DIFFERENT THINGS, and every check below turns on
+    # `is None` rather than truthiness because of it. A key that is simply not
+    # in the file is an environment that has not opted in; a key present but
+    # empty — or holding a stray space, which is *truthy* — is a mistake in a
+    # hand-edited SOPS file, and the two must not resolve to the same behaviour.
+    # Treated as absent, an empty `admin_token` silently leaves maintenance
+    # running as svc-witan-ci while the operator believes they switched it over,
+    # which is the exact failure the all-or-nothing rule below exists to catch;
+    # treated as present, a whitespace token gets written to Vault and 401s
+    # everything that reads it.
+    for _label, _value in (
+        ("admin_token", _witan_admin_token),
+        (f"actor_tokens['{WITAN_ADMIN_ACTOR_ID}']", _mapped_admin_token),
+    ):
+        if _value is not None and not str(_value).strip():
+            msg = (
+                f"omnigraph/secrets.{stack_info.env_suffix}.yaml: {_label} is "
+                "present but empty. Remove the key to leave this environment on "
+                "svc-witan-ci, or give it a real token — an empty value is not "
+                "the same as an absent one "
+                "(see docs/witan-admin-break-glass-runbook.md)."
+            )
+            raise ValueError(msg)
+
+    if (_witan_admin_token is None) != (_mapped_admin_token is None):
         msg = (
             f"omnigraph/secrets.{stack_info.env_suffix}.yaml: 'admin_token' and "
             f"actor_tokens['{WITAN_ADMIN_ACTOR_ID}'] must be set together or "
@@ -297,14 +322,14 @@ if (_BRIDGE_SECRETS_DIR / _witan_secrets_path).exists():
             "cannot authenticate (see docs/witan-admin-break-glass-runbook.md)."
         )
         raise ValueError(msg)
-    if _witan_admin_token and _mapped_admin_token != _witan_admin_token:
+    if _witan_admin_token is not None and _mapped_admin_token != _witan_admin_token:
         msg = (
             f"omnigraph/secrets.{stack_info.env_suffix}.yaml: admin_token must "
             f"match actor_tokens['{WITAN_ADMIN_ACTOR_ID}'] — they are the same "
             "token exposed to two different consumers (agent-kit ADR-0005 path b)."
         )
         raise ValueError(msg)
-    if _witan_admin_token == _witan_ci_token:
+    if _witan_admin_token is not None and _witan_admin_token == _witan_ci_token:
         msg = (
             f"omnigraph/secrets.{stack_info.env_suffix}.yaml: admin_token must "
             "not equal ci_token. The whole point of the break-glass principal "
@@ -388,7 +413,7 @@ if _witan_ci_token:
 # sole writer. Nothing in THIS stack consumes it — the maintenance Jobs that do
 # live in the witan stack, which reads it through its own VSO sync (one writer
 # per Vault path, as above).
-if _witan_admin_token:
+if _witan_admin_token is not None:
     vault.generic.Secret(
         f"omnigraph-witan-admin-token-vault-secret-{stack_info.env_suffix}",
         path=WITAN_ADMIN_TOKEN_VAULT_PATH,
@@ -565,4 +590,4 @@ export("storage_prefix", STORAGE_PREFIX)
 # Publishing the value itself would put a live credential in this stack's
 # outputs, where `pulumi stack output` and every consumer's state would carry
 # it — the token travels through Vault, which is what Vault is for.
-export("admin_token_provisioned", bool(_witan_admin_token))
+export("admin_token_provisioned", _witan_admin_token is not None)
