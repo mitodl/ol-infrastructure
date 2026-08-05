@@ -123,6 +123,14 @@ DEFAULT_BRANCH_EXEMPT_ARCHETYPES = frozenset({"fork", "archived"})
 # share of active repos overstates them badly (92 of 138 archived reads as "52% of active").
 ARCHIVED_SCOPED_RULES = frozenset({"CON-07 archived repo still grants team write"})
 
+# Rules whose population is the WHOLE fleet, active and archived alike. SEC-06 is here
+# because the no-direct-collaborators policy (2026-08-05) admits no exceptions: an admin
+# grant on an archived repo is inert only until someone unarchives it, and the fork fleet
+# was explicitly included when the policy was set.
+FLEET_SCOPED_RULES = frozenset(
+    {"SEC-06 direct collaborator on repo (policy: repo access via teams only)"}
+)
+
 # The value GitHub reports for an active security-and-analysis feature. Hoisted to a
 # constant because comparing the scanning-status fields against a literal trips both
 # ruff S105 and detect-secrets as a hardcoded-credential false positive.
@@ -239,6 +247,13 @@ def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
         # IDs, not just counts: `imports` needs them to build the Pulumi import payload.
         hooks = _maybe(client, f"/repos/{ORG}/{name}/hooks?per_page=100") or []
         deploy_keys = _maybe(client, f"/repos/{ORG}/{name}/keys?per_page=100") or []
+        direct_collaborators = (
+            _maybe(
+                client,
+                f"/repos/{ORG}/{name}/collaborators?affiliation=direct&per_page=100",
+            )
+            or []
+        )
         # A SAMPLE of environment names, not the full set -- mitxonline has 412 and the
         # rest are ephemeral review apps. The count below stays authoritative; these
         # names exist to tell a real deploy target from publishing plumbing.
@@ -319,10 +334,14 @@ def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
             "deploy_keys": [
                 {"id": k["id"], "read_only": k.get("read_only")} for k in deploy_keys
             ],
-            "collaborator_count": _count(
-                client, f"/repos/{ORG}/{name}/collaborators?affiliation=direct"
-            )
-            or 0,
+            "collaborator_count": len(direct_collaborators),
+            # WHO holds a direct grant and at what level, not just how many. Repo access
+            # is meant to come from team membership only (§4.7), so every entry here is a
+            # SEC-06 finding with a name attached and a specific team to migrate it to.
+            # A count alone cannot produce that remediation list.
+            "direct_collaborators": {
+                u["login"]: u.get("role_name") for u in direct_collaborators
+            },
             "custom_properties": {
                 p["property_name"]: p["value"] for p in properties if p.get("value")
             },
@@ -469,8 +488,10 @@ def propose_archetype(repo: dict[str, Any]) -> str:
 def _findings(repos: list[dict[str, Any]]) -> dict[str, list[str]]:
     """Map §7 rule id -> repo names that fire it.
 
-    Every rule scopes to active repos except CON-07, which is about archived ones by
-    definition -- see the ARCHIVED_SCOPED_RULES set used when rendering percentages.
+    Rules scope to active repos by default. Two exceptions, both declared as frozensets
+    above so the percentage rendering agrees with the population: CON-07 is about archived
+    repos by definition, and SEC-06 is fleet-wide because the policy behind it has no
+    exemptions.
     """
     live = [r for r in repos if not r["archived"]]
     return {
@@ -491,8 +512,9 @@ def _findings(repos: list[dict[str, Any]]) -> dict[str, list[str]]:
         "SEC-05 dependabot security updates off": [
             r["name"] for r in live if not r["dependabot_security_updates"]
         ],
-        "SEC-06 direct collaborators on repo": [
-            r["name"] for r in live if r["collaborator_count"] > 0
+        # Fleet-wide, deliberately: see FLEET_SCOPED_RULES.
+        "SEC-06 direct collaborator on repo (policy: repo access via teams only)": [
+            r["name"] for r in repos if r["collaborator_count"] > 0
         ],
         "CON-02 delete_branch_on_merge off": [
             r["name"] for r in live if not r["delete_branch_on_merge"]
@@ -602,11 +624,29 @@ def report(
     archived_count = len(repos) - len(live)
     print("\n## Findings")
     for rule, hits in sorted(findings.items(), key=lambda kv: -len(kv[1])):
-        over_archived = rule in ARCHIVED_SCOPED_RULES
-        denominator = archived_count if over_archived else len(live)
-        label = "archived" if over_archived else "active"
+        if rule in FLEET_SCOPED_RULES:
+            denominator, label = len(repos), "all repos"
+        elif rule in ARCHIVED_SCOPED_RULES:
+            denominator, label = archived_count, "archived"
+        else:
+            denominator, label = len(live), "active"
         share = f"{len(hits) / denominator:.0%}" if denominator else "-"
         print(f"  {len(hits):4}  ({share:>4} of {label})  {rule}")
+
+    holders: Counter[str] = Counter()
+    levels: Counter[str] = Counter()
+    for repo in repos:
+        for login, role in repo.get("direct_collaborators", {}).items():
+            holders[login] += 1
+            levels[role or "unknown"] += 1
+    if holders:
+        print("\n## Direct collaborators (SEC-06) — every one of these moves to a team")
+        print(f"  {sum(levels.values())} grants across {len(holders)} people:")
+        for role, count in levels.most_common():
+            print(f"     {count:5}  {role}")
+        print("  most-granted:")
+        for login, count in holders.most_common(8):
+            print(f"     {count:5}  {login}")
 
     print("\n## Environment sprawl detail (DX-08)")
     for repo in sorted(live, key=lambda r: -r["environment_count"])[:10]:
@@ -818,17 +858,26 @@ def imports(
             "mitodl",
             str(data["org"]["id"]),
         )
+    # NO INDIVIDUAL PEOPLE IN THE ESTATE (decision 2026-08-05). Pulumi manages teams and
+    # what teams can do; it does not manage who is an org member or who is in a team.
+    #
+    # `Membership` (39) and `TeamMembership` (145) are deliberately not emitted, taking
+    # the organization payload from 199 resources to 15. Reasons, in order of weight:
+    #
+    #   1. Onboarding stops depending on infrastructure. Both resource types put every
+    #      hire, departure and team move behind a PR and this stack's manual-approval
+    #      apply. The org is also at 39/39 seats, so a Pulumi-managed Membership would
+    #      fail on the next hire -- loudly and harmlessly, but at the worst moment.
+    #   2. `Membership` deletion evicts a human from the org. Not modelling it removes
+    #      the highest-blast-radius resource in the estate rather than guarding it.
+    #   3. Repo access does not flow through either one. It flows through TeamRepository,
+    #      which the repositories payload still emits (169 of them) -- so "team
+    #      permissions" stay fully managed while people stay out.
+    #
+    # The crawl still RECORDS org members and team rosters; that is inventory feeding the
+    # audit, not Pulumi state. Drift in a roster stays visible without being enforced.
     for team in data["teams"]:
         add(org_resources, "team:Team", team["slug"], str(team["id"]))
-        for member in team["members"]:
-            add(
-                org_resources,
-                "teamMembership:TeamMembership",
-                f"{team['slug']}-{member}",
-                f"{team['id']}:{member}",
-            )
-    for member in data["members"]:
-        add(org_resources, "membership:Membership", member, f"{ORG}:{member}")
     for hook in data.get("org_webhooks", []):
         add(
             org_resources,
