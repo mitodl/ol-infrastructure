@@ -130,16 +130,20 @@ ARCHIVED_SCOPED_RULES = frozenset({"CON-07 archived repo still grants team write
 FLEET_SCOPED_RULES = frozenset(
     {
         "SEC-06 direct collaborator on repo (policy: repo access via teams only)",
-        "SEC-15 broad team holds admin (policy: push or maintain)",
+        "SEC-15 admin held by a team other than odl-engineering-owners",
     }
 )
 
-# Teams broad enough that `admin` on a repo is over-privilege rather than ownership
-# (SEC-15, policy set 2026-08-05: odl-engineering should hold push or maintain). `admin`
-# carries repo deletion, settings changes and the ability to bypass rulesets -- with
-# direct collaborator grants going away (§4.7), team grants ARE the access control, so
-# their level is the whole story rather than a detail. Add teams here as the policy grows.
-NO_ADMIN_TEAMS = frozenset({"odl-engineering"})
+# The team(s) sanctioned to hold `admin` on a repository (policy 2026-08-05:
+# odl-engineering-owners is THE admin team; odl-engineering gets push or maintain).
+#
+# Deliberately an ALLOWLIST rather than a list of teams barred from admin. `admin` carries
+# repo deletion, settings changes and ruleset bypass, and with direct collaborator grants
+# going away (§4.7) team grants are the whole access control rather than one input to it.
+# Under a denylist a newly created team acquires admin silently and SEC-15 stays quiet;
+# under an allowlist it has to be named here first. Default-deny is the only version of
+# this rule that stays true as the org changes.
+ADMIN_TEAMS = frozenset({"odl-engineering-owners"})
 ADMIN_PERMISSIONS = frozenset({"admin"})
 
 # The value GitHub reports for an active security-and-analysis feature. Hoisted to a
@@ -536,11 +540,11 @@ def _findings(
                 if (r.get("teams") or {})
                 != (archetype_teams.get(propose_archetype(r)) or {})
             ],
-            "SEC-15 broad team holds admin (policy: push or maintain)": [
+            "SEC-15 admin held by a team other than odl-engineering-owners": [
                 r["name"]
                 for r in repos
                 if any(
-                    team in NO_ADMIN_TEAMS and perm in ADMIN_PERMISSIONS
+                    perm in ADMIN_PERMISSIONS and team not in ADMIN_TEAMS
                     for team, perm in (r.get("teams") or {}).items()
                 )
             ],
@@ -703,7 +707,7 @@ def report(
             print(f"     {count:5}  {perm}")
         print("  teams holding admin, by repo count:")
         for team, count in by_team.most_common(8):
-            flag = "  <-- SEC-15" if team in NO_ADMIN_TEAMS else ""
+            flag = "" if team in ADMIN_TEAMS else "  <-- SEC-15"
             print(f"     {count:5}  {team}{flag}")
 
     holders: Counter[str] = Counter()
