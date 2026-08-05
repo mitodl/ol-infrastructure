@@ -38,7 +38,8 @@ def test_upstream_still_sets_the_retry(pulumi_code):
     """Guard the premise: if upstream drops attempts=2, this wrapper is redundant.
 
     A failure here means ol-concourse fixed it and the local override in
-    ``pulumi_jobs.py`` can go away -- it does not mean this repo regressed.
+    ``src/ol_concourse/pipelines/jobs.py`` (``_drop_pulumi_retry``, and the two
+    wrappers that call it) can go away -- it does not mean this repo regressed.
     """
     fragment = upstream_pulumi_job(
         pulumi_code=pulumi_code,
@@ -73,6 +74,17 @@ def test_pulumi_jobs_chain_does_not_retry_any_stage(pulumi_code):
     assert all(step.attempts is None for step in steps)
 
 
+def _keys_anywhere(node):
+    """Every mapping key in a nested dict/list structure."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            yield key
+            yield from _keys_anywhere(value)
+    elif isinstance(node, list):
+        for item in node:
+            yield from _keys_anywhere(item)
+
+
 def test_no_retry_wrapper_is_serialized(pulumi_code):
     """``attempts=None`` must drop out of the rendered pipeline, not render as 1."""
     fragment = pulumi_job(
@@ -82,7 +94,7 @@ def test_no_retry_wrapper_is_serialized(pulumi_code):
         project_source_path=Path("src/ol_infrastructure/test"),
     )
     rendered = fragment.jobs[0].model_dump(exclude_none=True)
-    assert "attempts" not in str(rendered)
+    assert "attempts" not in set(_keys_anywhere(rendered))
 
 
 def test_promotion_gate_still_hangs_off_on_success(pulumi_code):
