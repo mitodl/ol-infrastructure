@@ -227,11 +227,32 @@ standard.
 
 ## 3. Code layout
 
+### 3.0 Why `saas/` and not `substructure/`
+
+GitHub is a **singleton third-party service**, the same shape as Rootly: one account, one
+set of resources, no per-environment instances. That is what `saas/` is for. `substructure/`
+holds things we operate that have QA and Production incarnations — Vault, Keycloak,
+StarRocks — and the tell is that those projects carry stack files like
+`Pulumi.operations.QA.yaml` alongside Production. A GitHub org has no QA.
+
+Naming follows `substructure/vault/{auth,pki,setup,…}` → `ol-substructure-vault-auth`, so
+the family name carries into the project name:
+
+| Path | Pulumi project |
+|---|---|
+| `saas/github/organization/` | `ol-saas-github-organization` |
+| `saas/github/repositories/` | `ol-saas-github-repositories` |
+
+Relocated 2026-08-05 from `substructure/github/`. Nothing about the design changed — the
+data files, archetypes and import payloads are identical — but a project family in the
+wrong directory is the kind of thing that never gets fixed once stacks exist in the state
+backend, so it was worth doing before phase 2 authors anything.
+
 ### 3.1 Two Pulumi projects, split by blast radius
 
 ```
-src/ol_infrastructure/substructure/github/
-├── organization/                 # project: ol-substructure-github-organization
+src/ol_infrastructure/saas/github/
+├── organization/                 # project: ol-saas-github-organization
 │   ├── Pulumi.yaml
 │   ├── Pulumi.Production.yaml
 │   ├── __main__.py
@@ -240,7 +261,7 @@ src/ol_infrastructure/substructure/github/
 │   ├── teams.py
 │   ├── org_rulesets.py
 │   └── org_automation.py         # org webhooks, runner groups, org secrets/vars
-└── repositories/                 # project: ol-substructure-github-repositories
+└── repositories/                 # project: ol-saas-github-repositories
     ├── Pulumi.yaml
     ├── Pulumi.Production.yaml
     ├── __main__.py
@@ -894,7 +915,7 @@ and route findings to the project's witan task list.
 |---|---|---|
 | **0** | Widen the GitHub App (§2). Write `docs/github-app-permissions.md`. Verify with a read-only crawl. | App can read every resource type in §3.3 |
 | **1** | Build `bin/github-org-inventory`. Crawl. Human-confirm archetype per repo. Commit `data/`. | 317 repos classified; estate report reviewed |
-| **2** | Author `organization/`. Import org settings and the 14 teams — **not** members or team rosters (§4.7). Define the `tier` custom-property schema (§5.4) — a prerequisite, not a fast-follow. | **Empty diff** on `ol-substructure-github-organization` |
+| **2** | Author `organization/`. Import org settings and the 14 teams — **not** members or team rosters (§4.7). Define the `tier` custom-property schema (§5.4) — a prerequisite, not a fast-follow. | **Empty diff** on `ol-saas-github-organization` |
 | **3** | Author `repositories/`. Import in ~25-repo batches, including each repo's `tier` value. | **Empty diff** after every batch, and on the whole stack |
 | **3.5** | Add the two property-targeted org rulesets at `enforcement: evaluate`. Watch, then promote to `active`. | Rule-suite logs show the expected repos matching and no surprises |
 | **4** | Build `bin/github-estate-audit`. Run all three axes. Emit witan tasks. | Backlog exists and is triaged |

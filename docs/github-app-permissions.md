@@ -148,8 +148,8 @@ convention:
    `OrganizationCustomProperties`) carry `protect=True`, **and so does `Membership`** —
    `members:write` permits removing people from the org, which is as irreversible as deleting
    a repo. Added 2026-08-03; the first version of this list only considered repositories.
-3. The Concourse job for `ol-substructure-github-organization` requires manual approval before
-   `pulumi up`. `ol-substructure-github-repositories` may auto-apply once its empty-diff gate
+3. The Concourse job for `ol-saas-github-organization` requires manual approval before
+   `pulumi up`. `ol-saas-github-repositories` may auto-apply once its empty-diff gate
    is green.
 
 A fourth, from the §5.4 ruleset design: because org rulesets target a `tier` custom property,
