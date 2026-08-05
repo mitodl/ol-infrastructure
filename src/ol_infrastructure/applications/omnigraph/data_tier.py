@@ -628,20 +628,66 @@ def create_data_tier(  # noqa: PLR0913
                             # over a bare TCP check so the probe reflects the
                             # server actually being up, not just the port being
                             # bound.
+                            #
+                            # DELAYS ARE SIZED FROM A MEASURED BOOT, not picked.
+                            # The entrypoint converges the cluster catalog
+                            # *before* the server binds :8080, and that converge
+                            # re-observes every declared graph over S3. Measured
+                            # 2026-08-05 with 17 graphs, from the container's
+                            # first log line to `serving omnigraph bind=`:
+                            #
+                            #     CI 17.2s | QA 19.8s | Production 17.2s
+                            #
+                            # ~95% of which is the converge. At the previous
+                            # values (readiness 5, liveness 15) both probes were
+                            # guaranteed to fire against a closed port on every
+                            # start in every environment — the connection-refused
+                            # Unhealthy events on a healthy boot were this, not a
+                            # sick server. Only failureThreshold=3 kept it from
+                            # being a crashloop.
+                            #
+                            # The two probes are sized against that measurement
+                            # for DIFFERENT reasons, and only one of them
+                            # carries headroom:
+                            #
+                            # - readiness sits just past the slowest boot (20s
+                            #   vs 19.8s). Deliberate: a failed readiness probe
+                            #   costs nothing but a 5s retry, and every second
+                            #   spent out of the Service is restart outage. It
+                            #   is allowed to be tight.
+                            # - liveness carries the headroom (60s, 3x), because
+                            #   its failure mode is killing a healthy pod.
+                            #
+                            # The converge cost scales with the declared graph
+                            # count (~1.2s/graph), so as `managed_repos` grows
+                            # readiness will start probing early again — noisy
+                            # but harmless — and liveness eats into its 3x. A
+                            # fixed delay cannot track that growth; a
+                            # startupProbe is the mechanism that does, and is
+                            # the right follow-up if the graph list keeps
+                            # expanding.
                             readiness_probe=kubernetes.core.v1.ProbeArgs(
                                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
                                     path="/healthz",
                                     port=OMNIGRAPH_SERVER_PORT,
                                 ),
-                                initial_delay_seconds=5,
-                                period_seconds=10,
+                                # First probe just past the measured boot, then
+                                # poll fast: this is what ends the restart
+                                # outage, so the gap between "bound" and "in the
+                                # Service" should be small.
+                                initial_delay_seconds=20,
+                                period_seconds=5,
                             ),
                             liveness_probe=kubernetes.core.v1.ProbeArgs(
                                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
                                     path="/healthz",
                                     port=OMNIGRAPH_SERVER_PORT,
                                 ),
-                                initial_delay_seconds=15,
+                                # 3x the slowest measured boot. With
+                                # period_seconds=20 and the default
+                                # failureThreshold=3, a genuinely wedged server
+                                # is still killed by ~100s.
+                                initial_delay_seconds=60,
                                 period_seconds=20,
                             ),
                             # The memory limit is what PER_ACTOR_BYTES_MAX is
