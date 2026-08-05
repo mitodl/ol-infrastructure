@@ -177,8 +177,19 @@ def _flag(client: httpx.Client, path: str) -> bool:
     Only `/repos/{}/vulnerability-alerts` behaves this way. Note that
     `/repos/{}/automated-security-fixes` does NOT -- it answers 200 with a JSON body in
     both states, verified against live repos with the feature on and off.
+
+    Anything other than 204/404 raises rather than reading as False. A 500 quietly
+    becoming "alerts are off" would manufacture a SEC-05 finding out of a transient
+    server error, which is worse than crashing: a false finding gets acted on.
     """
-    return client.get(path).status_code == httpx.codes.NO_CONTENT
+    response = client.get(path)
+    if response.status_code == httpx.codes.NO_CONTENT:
+        return True
+    if response.status_code == httpx.codes.NOT_FOUND:
+        return False
+    response.raise_for_status()
+    message = f"{path}: unexpected {response.status_code} from a 204/404 endpoint"
+    raise RuntimeError(message)
 
 
 def _count(client: httpx.Client, path: str) -> int | None:
@@ -314,7 +325,13 @@ def _crawl_org(cache: Path, *, refresh: bool) -> dict[str, Any]:
     with _client(token) as client:
         print(f"listing repos in {ORG} ...", file=sys.stderr)
         repos = _paginate(client, f"/orgs/{ORG}/repos?type=all")
-        org_settings = client.get(f"/orgs/{ORG}").json()
+        # Not via _maybe(): a 404 here is not "none configured", it means the crawl
+        # cannot see the org at all. Swallowing it would drop OrganizationSettings from
+        # the import payload silently, and a resource that is never imported never shows
+        # up as a diff -- the empty-diff gate cannot catch an absence.
+        org_response = client.get(f"/orgs/{ORG}")
+        org_response.raise_for_status()
+        org_settings = org_response.json()
         teams = _paginate(client, f"/orgs/{ORG}/teams")
         members = _paginate(client, f"/orgs/{ORG}/members")
         property_schema = _maybe(client, f"/orgs/{ORG}/properties/schema") or []
@@ -667,6 +684,26 @@ def crawl(
         for name in (names or [])
     }
     effective = {a: _resolve_archetype(archetypes, a) for a in archetypes}
+
+    # GitHub's archived flag is authoritative and moves without anyone editing this file.
+    # Two repos were archived mid-review on 2026-08-05 while still assigned `library`,
+    # which would have emitted a library-shaped config for a repo that rejects most
+    # writes. The assignment file is human-confirmed, not human-authoritative.
+    mismatched = [
+        f"{r['name']}: archived on GitHub, assigned `{assigned[r['name']]}`"
+        if r["archived"]
+        else f"{r['name']}: assigned `archived`, but live on GitHub"
+        for r in data["repos"]
+        if r["name"] in assigned
+        and r["archived"] != (assigned[r["name"]] == "archived")
+    ]
+    if mismatched:
+        message = (
+            f"{len(mismatched)} repo(s) disagree with GitHub's archived flag:\n  "
+            + "\n  ".join(mismatched)
+            + "\nRe-run `infer-archetypes` to pick up the change, then confirm."
+        )
+        raise SystemExit(message)
 
     # A repo absent from the assignment file is a gap in the human review, not a library.
     # Silently defaulting would hand it the `library` tier and, with it, whichever org

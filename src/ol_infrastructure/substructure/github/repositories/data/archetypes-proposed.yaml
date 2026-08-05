@@ -67,6 +67,8 @@ archived:
 - git-based-courses-slides
 - git2edx
 - gitreload
+- grafana-alerts
+- grafana-dashboards
 - herokuconfigurator
 - hugo-course-publisher
 - import-api-slides
@@ -272,8 +274,6 @@ library:
 - django-cas-mapper
 - edxcut
 - eslint-config
-- grafana-alerts
-- grafana-dashboards
 - gwarek
 - hacksnack
 - handbook

@@ -1,14 +1,10 @@
 ---
-allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true
-archetype: library
-delete_branch_on_merge: false
-dependabot_security_updates: false
+archetype: archived
+default_branch: main
 description: 'Alerting configuration for the MITODL engineering group '
-has_wiki: true
 name: grafana-alerts
 teams:
   odl-engineering: admin
-web_commit_signoff_required: false
