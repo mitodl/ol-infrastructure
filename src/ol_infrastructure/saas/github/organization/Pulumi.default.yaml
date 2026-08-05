@@ -1,0 +1,3 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwEcieF5M2yNoPj//Z5sH2JOAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMJyryG9YP9tjXcX0SAgEQgDtfmQuHwKVoF7z1d2jBwS5N0EkuXKmyn2m/audI6nJY16mW/ccCThBHNrn0MieOq57RC/6zMpzt0FIY6w==

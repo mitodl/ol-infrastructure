@@ -939,11 +939,17 @@ def imports(
     def add(bucket: list[dict[str, str]], type_: str, name: str, id_: str) -> None:
         bucket.append({"type": f"github:index/{type_}", "name": name, "id": id_})
 
+    # LOGICAL NAMES MUST MATCH THE AUTHORED CODE, not just be unique. `pulumi import`
+    # writes state at a URN derived from the name, so a mismatch imports the resource
+    # where nothing declares it: preview then shows a create for the declared resource
+    # AND a delete for the imported one, and the empty-diff gate (section 6) becomes
+    # unreachable. These strings are the same ones used in
+    # src/ol_infrastructure/saas/github/organization/.
     if data["org"].get("id"):
         add(
             org_resources,
             "organizationSettings:OrganizationSettings",
-            "mitodl",
+            "mitodl-organization-settings",
             str(data["org"]["id"]),
         )
     # NO INDIVIDUAL PEOPLE IN THE ESTATE (decision 2026-08-05). Pulumi manages teams and
@@ -965,7 +971,12 @@ def imports(
     # The crawl still RECORDS org members and team rosters; that is inventory feeding the
     # audit, not Pulumi state. Drift in a roster stays visible without being enforced.
     for team in data["teams"]:
-        add(org_resources, "team:Team", team["slug"], str(team["id"]))
+        add(
+            org_resources,
+            "team:Team",
+            f"mitodl-team-{team['slug']}",
+            str(team["id"]),
+        )
     for hook in data.get("org_webhooks", []):
         add(
             org_resources,
