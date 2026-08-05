@@ -118,14 +118,9 @@ kubectl -n omnigraph get configmap omnigraph-cluster-config \
 wc -l /tmp/graph-ids.txt
 ```
 
-That file is on your workstation, but the loops in steps 2–4 run **inside** the
-workspace pods, which do not mount the cluster ConfigMap. Copy it in after
-starting each pod:
-
-```shell
-kubectl -n omnigraph exec -i <pod> -- sh -c 'cat > /tmp/graph-ids.txt' \
-  < /tmp/graph-ids.txt
-```
+Keep that file — every loop in the procedure reads it. It lives on your
+workstation, and steps 2 and 4 each copy it into their workspace pod, which has
+no ConfigMap mount of its own.
 
 Then cross-check against what is actually in the bucket, which is not
 necessarily the same set:
@@ -197,10 +192,18 @@ The cluster's own state ledger lives at `<root>/__cluster/state.json`.
 `$ENV` is the lowercased env suffix (`ci`, `qa`, `production`), `$OLD_ROOT` is
 `s3://ol-data-witan-$ENV`, `$NEW_ROOT` is `$OLD_ROOT/fmt<N>`.
 
-All CLI work runs in-cluster as a one-off pod on the `omnigraph-server`
-ServiceAccount, which carries the bucket's IRSA grant — no human AWS credentials,
-and it is the `svc-witan-admin` break-glass identity (agent-kit ADR-0005 path
-(b)) rather than a side channel.
+All `omnigraph` and `aws` work runs **in-cluster**, in a one-off pod on the
+`omnigraph-server` ServiceAccount, which carries the bucket's IRSA grant — no
+human AWS credentials, and it is the `svc-witan-admin` break-glass identity
+(agent-kit ADR-0005 path (b)) rather than a side channel. There is no
+`omnigraph` binary on your workstation, and after step 1 there is no running
+server pod to `exec` into either, so each step below says which of the two
+workspace pods it runs in. Commands starting with `kubectl` are the ones you
+run locally.
+
+Two pods, because the migration spans two binaries: `omnigraph-migrate-old`
+(step 2, baseline + export) and `omnigraph-migrate-new` (step 4, rebuild).
+Both are cleaned up in step 7.
 
 ### 1. Take the graph out of the serving set
 
@@ -216,11 +219,42 @@ rolls back. Confirm no maintenance job is mid-run — `optimize`/`cleanup` write
 kubectl -n omnigraph get jobs
 ```
 
-### 2. Record the baseline
+### 2. Start the OLD-image workspace pod
 
-Per-table row counts, from `snapshot`, for every graph. This is what step 6
-checks against, and it is the only thing that catches a load that silently
-dropped a table:
+Step 1 scaled the Deployment to zero, so `kubectl exec deploy/omnigraph-server`
+is gone with it and there is no `omnigraph` binary on your workstation. Steps 2
+and 3 both need one, so start it here — a pod on the **currently-deployed**
+image, which is the old binary that can still read the old root:
+
+```shell
+kubectl -n omnigraph run omnigraph-migrate-old --restart=Never \
+  --image=<OLD-image-ref> \
+  --overrides='{"spec":{"serviceAccountName":"omnigraph-server"}}' \
+  --env=AWS_REGION=us-east-1 --command -- sleep 86400
+kubectl -n omnigraph wait --for=condition=Ready pod/omnigraph-migrate-old --timeout=120s
+kubectl -n omnigraph exec -i omnigraph-migrate-old -- sh -c 'cat > /tmp/graph-ids.txt' \
+  < /tmp/graph-ids.txt
+kubectl -n omnigraph exec -it omnigraph-migrate-old -- sh
+```
+
+Everything in steps 2 and 3 runs **inside this pod** unless it starts with
+`kubectl`. Set the roots in the pod shell — they are not inherited from your
+workstation — and sanity-check the binary and its addressing before relying on
+either:
+
+```shell
+ENV=ci                                    # ci | qa | production
+OLD_ROOT="s3://ol-data-witan-$ENV"
+NEW_ROOT="$OLD_ROOT/fmt<N>"
+omnigraph version
+omnigraph snapshot --store "$OLD_ROOT/graphs/council.omni" | head -3
+```
+
+Re-set the same three in the step 4 pod; each `kubectl exec` shell starts clean.
+
+Then record the baseline — per-table row counts for every graph. This is what
+step 6 checks against, and it is the only thing that catches a load which
+silently dropped a table:
 
 ```shell
 for g in $(cat /tmp/graph-ids.txt); do
@@ -229,17 +263,17 @@ for g in $(cat /tmp/graph-ids.txt); do
 done | tee /tmp/baseline.txt
 ```
 
-### 3. Export every graph with the OLD binary
-
-Start a workspace pod on the currently-deployed image:
+Copy it out so it survives the pod — from your workstation, in a second
+terminal or after exiting the pod shell:
 
 ```shell
-kubectl -n omnigraph run omnigraph-migrate-old --restart=Never \
-  --image=<OLD-image-ref> \
-  --overrides='{"spec":{"serviceAccountName":"omnigraph-server"}}' \
-  --env=AWS_REGION=us-east-1 --command -- sleep 86400
-kubectl -n omnigraph exec -it omnigraph-migrate-old -- sh
+kubectl -n omnigraph exec omnigraph-migrate-old -- cat /tmp/baseline.txt \
+  > /tmp/baseline.txt
 ```
+
+### 3. Export every graph with the OLD binary
+
+Still inside `omnigraph-migrate-old`:
 
 ```shell
 mkdir -p /tmp/export
@@ -261,17 +295,51 @@ so scale back to 1 and investigate.
 > Do a full drill against a scratch prefix in CI before running this on
 > Production.
 
-Start a second pod on the **new** image, same ServiceAccount, and pull the
-exports back down. Build a config directory holding the baked-in schemas plus a
-cluster.yaml that is the live one with `storage:` repointed:
+This step needs the **new** binary, so it runs in a second pod. On your
+workstation:
 
 ```shell
-mkdir -p /tmp/rebuild
+kubectl -n omnigraph run omnigraph-migrate-new --restart=Never \
+  --image=<NEW-image-ref> \
+  --overrides='{"spec":{"serviceAccountName":"omnigraph-server"}}' \
+  --env=AWS_REGION=us-east-1 --command -- sleep 86400
+kubectl -n omnigraph wait --for=condition=Ready pod/omnigraph-migrate-new --timeout=120s
+kubectl -n omnigraph exec -i omnigraph-migrate-new -- sh -c 'cat > /tmp/graph-ids.txt' \
+  < /tmp/graph-ids.txt
+kubectl -n omnigraph exec -it omnigraph-migrate-new -- sh
+```
+
+Confirm you are on the binary you think you are — this is the whole point of
+the exercise:
+
+```shell
+omnigraph version        # must show the NEW internal-schema number
+```
+
+Everything below runs inside this pod. Pull the exports back down and build a
+config directory holding the image's baked-in schemas plus a cluster.yaml that
+is the live one with `storage:` repointed:
+
+```shell
+mkdir -p /tmp/rebuild /tmp/export
+aws s3 cp --recursive "$OLD_ROOT/_migration/<date>/" /tmp/export/
 cp /etc/omnigraph/cluster/*.pg /tmp/rebuild/     # schema.pg, code-schema.pg, bridge-schema.pg
-kubectl -n omnigraph get configmap omnigraph-cluster-config \
-  -o jsonpath='{.data.cluster\.yaml}' > /tmp/rebuild/cluster.yaml
-# edit only: storage: s3://ol-data-witan-$ENV/fmt<N>
+cp /etc/omnigraph/cluster/cluster.yaml /tmp/rebuild/cluster.yaml
+vi /tmp/rebuild/cluster.yaml                     # edit only: storage: s3://ol-data-witan-$ENV/fmt<N>
 omnigraph cluster validate --config /tmp/rebuild
+```
+
+The new image bakes in the same cluster.yaml the live ConfigMap overlays, so
+copying it from `/etc/omnigraph/cluster/` inside the pod avoids a round trip
+through the workstation. If that file is stale relative to the running config
+(it is baked at image build, the ConfigMap is generated per deploy), take the
+ConfigMap version instead and pipe it in:
+
+```shell
+kubectl -n omnigraph get configmap omnigraph-cluster-config \
+  -o jsonpath='{.data.cluster\.yaml}' \
+  | kubectl -n omnigraph exec -i omnigraph-migrate-new -- \
+      sh -c 'cat > /tmp/rebuild/cluster.yaml'
 ```
 
 `cluster validate` is read-only and catches a mis-edited storage URI or an
@@ -361,11 +429,20 @@ A graph that opens cleanly while missing half its rows looks perfectly healthy
 to `/healthz`, so the count diff is the check that matters. Finish by exercising
 a real client path (a `recall`, a `task_ready`) rather than trusting probes.
 
-### 7. Retire the old root
+### 7. Clean up, then retire the old root
 
-**Not the same day.** Leave `$OLD_ROOT/graphs/` untouched through at least one
-full soak — a week for Production — because it is the only fast rollback. Delete
-it only after the next environment has migrated successfully too.
+Delete the workspace pods once verification passes — they hold an idle
+`sleep 86400` on the `omnigraph-server` ServiceAccount, and leaving them around
+is a stray identity with write access to the bucket:
+
+```shell
+kubectl -n omnigraph delete pod omnigraph-migrate-old omnigraph-migrate-new --ignore-not-found
+```
+
+The old root itself waits. **Not the same day** — leave `$OLD_ROOT/graphs/`
+untouched through at least one full soak (a week for Production), because it is
+the only fast rollback. Delete it, and the `_migration/<date>/` exports, only
+after the next environment has migrated successfully too.
 
 ## Rollback
 
