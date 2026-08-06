@@ -2,7 +2,13 @@
 _actions_secret_names:
 - HEROKU_API_KEY
 - HEROKU_EMAIL
+_direct_collaborators:
+  rhysyngsun: admin
 _excluded_environments: 5
+_has_branch_protection: true
+_pushed_at: '2026-08-06T12:23:54Z'
+_ruleset_count: 0
+_visibility: public
 allow_auto_merge: false
 allow_merge_commit: false
 allow_rebase_merge: false

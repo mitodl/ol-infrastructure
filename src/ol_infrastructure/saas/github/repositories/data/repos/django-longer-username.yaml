@@ -1,4 +1,8 @@
 ---
+_has_branch_protection: false
+_pushed_at: '2015-07-15T09:44:36Z'
+_ruleset_count: 0
+_visibility: public
 allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true

@@ -4,6 +4,10 @@ _actions_secret_names:
 - HEROKU_EMAIL
 - SENTRY_AUTH_TOKEN
 _excluded_environments: 2694
+_has_branch_protection: true
+_pushed_at: '2026-08-06T14:27:37Z'
+_ruleset_count: 0
+_visibility: public
 allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true

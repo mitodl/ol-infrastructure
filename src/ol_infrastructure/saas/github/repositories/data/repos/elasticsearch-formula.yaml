@@ -1,4 +1,8 @@
 ---
+_has_branch_protection: false
+_pushed_at: '2020-06-19T18:28:07Z'
+_ruleset_count: 0
+_visibility: public
 allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true

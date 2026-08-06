@@ -1,5 +1,11 @@
 ---
+_direct_collaborators:
+  mbertrand: admin
 _excluded_environments: 1
+_has_branch_protection: false
+_pushed_at: '2024-08-29T20:01:40Z'
+_ruleset_count: 0
+_visibility: public
 allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true

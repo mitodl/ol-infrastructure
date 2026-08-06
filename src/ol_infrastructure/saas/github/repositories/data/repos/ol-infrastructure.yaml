@@ -2,6 +2,10 @@
 _actions_secret_names:
 - GH_PROJECT_AUTOMATION_TOKEN
 _excluded_environments: 2
+_has_branch_protection: true
+_pushed_at: '2026-08-06T15:31:19Z'
+_ruleset_count: 1
+_visibility: public
 allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true

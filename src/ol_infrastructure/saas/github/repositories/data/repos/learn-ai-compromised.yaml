@@ -16,6 +16,14 @@ _actions_secret_names:
 - POSTHOG_PERSONAL_API_KEY_RC
 - POSTHOG_PROJECT_API_KEY_PROD
 - POSTHOG_PROJECT_API_KEY_RC
+_direct_collaborators:
+  ChristopherChudzicki: admin
+  mbertrand: write
+  odlbot: write
+_has_branch_protection: false
+_pushed_at: '2026-07-27T14:15:12Z'
+_ruleset_count: 0
+_visibility: private
 allow_merge_commit: false
 allow_rebase_merge: false
 allow_squash_merge: true

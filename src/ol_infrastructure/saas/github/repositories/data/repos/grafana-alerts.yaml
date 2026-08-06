@@ -1,4 +1,10 @@
 ---
+_direct_collaborators:
+  Ardiea: admin
+_has_branch_protection: false
+_pushed_at: '2026-06-25T15:06:09Z'
+_ruleset_count: 0
+_visibility: public
 allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true

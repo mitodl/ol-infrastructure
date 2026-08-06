@@ -1,4 +1,10 @@
 ---
+_direct_collaborators:
+  jkachel: admin
+_has_branch_protection: false
+_pushed_at: '2026-08-05T16:57:02Z'
+_ruleset_count: 0
+_visibility: private
 allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true

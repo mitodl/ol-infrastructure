@@ -1,7 +1,13 @@
 ---
 _actions_secret_names:
 - PYPI_TOKEN
+_direct_collaborators:
+  rhysyngsun: admin
 _excluded_environments: 1
+_has_branch_protection: false
+_pushed_at: '2026-08-05T20:30:04Z'
+_ruleset_count: 0
+_visibility: public
 allow_auto_merge: false
 allow_merge_commit: false
 allow_rebase_merge: true

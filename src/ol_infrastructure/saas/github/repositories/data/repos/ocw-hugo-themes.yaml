@@ -12,7 +12,13 @@ _actions_secret_names:
 - SEARCH_API_URL
 - SSH_KEY
 - STATIC_API_BASE_URL
+_direct_collaborators:
+  gumaerc: admin
 _excluded_environments: 3
+_has_branch_protection: true
+_pushed_at: '2026-08-06T13:47:48Z'
+_ruleset_count: 0
+_visibility: public
 allow_auto_merge: false
 allow_merge_commit: false
 allow_rebase_merge: false

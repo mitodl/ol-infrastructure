@@ -919,12 +919,22 @@ def crawl(
             if field not in effective[archetype] and repo.get(field) is not None:
                 doc[field] = repo[field]
         doc.update(_deviations(repo, effective[archetype]))
-        # Environments are NEVER imported wholesale (§4.3). Record what was skipped so
-        # the exclusion stays visible rather than becoming silent.
+        # `_`-prefixed keys are INVENTORY, not configuration: nothing generates a
+        # Pulumi resource from them. They exist so `bin/github-estate-audit` is a query
+        # over committed data rather than an API crawl -- which makes it fast, testable
+        # with fixtures, and diffable in git over time. See data/README.md.
         if repo["environment_count"]:
+            # Environments are NEVER imported wholesale (§4.3). Recording the count
+            # keeps the exclusion visible rather than silent.
             doc["_excluded_environments"] = repo["environment_count"]
         if repo["actions_secrets"]:
             doc["_actions_secret_names"] = [s["name"] for s in repo["actions_secrets"]]
+        doc["_visibility"] = repo["visibility"]
+        doc["_pushed_at"] = repo["pushed_at"]
+        doc["_has_branch_protection"] = repo["has_branch_protection"]
+        doc["_ruleset_count"] = repo["ruleset_count"]
+        if repo.get("direct_collaborators"):
+            doc["_direct_collaborators"] = repo["direct_collaborators"]
 
         (out / f"{repo['name']}.yaml").write_text(
             # The leading `---` matches what the repo's YAML formatter enforces. Without
