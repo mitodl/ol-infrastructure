@@ -36,11 +36,9 @@ Incoming auth — ToolHive's "External OIDC provider" scenario, NOT
     Swapping that JWT for a vMCP-minted one before it reaches witan would
     break D1 outright. So this stack configures ``incomingAuth`` to validate
     directly against Keycloak's **real** issuer (no ``authServerConfig``,
-    hence no embedded broker, no persistent signing keys, no Redis) — ToolHive
-    then has nothing of its own to substitute and simply forwards the client's
-    original bearer token to the ``witan`` MCPServer. See ADR-0009's
-    Resolution addendum and agent-kit ADR-0004's matching Resolution addendum
-    (2026-07-10) for the full decision record.
+    hence no embedded broker, no persistent signing keys, no Redis). See
+    ADR-0009's Resolution addendum and agent-kit ADR-0004's matching
+    Resolution addendum (2026-07-10) for the full decision record.
 
     This also means clients need an already-valid Keycloak JWT with the right
     audience before calling — there is no vMCP-brokered interactive login
@@ -49,6 +47,44 @@ Incoming auth — ToolHive's "External OIDC provider" scenario, NOT
     it does mean whatever normally gets a human or CI agent a Keycloak JWT for
     other internal tools (existing SSO session, device-code flow, etc.) is a
     prerequisite this stack does not itself provide.
+
+Outgoing auth — why two settings are needed to forward one token:
+
+    Having no embedded broker to substitute a token does NOT mean ToolHive
+    forwards the client's. It forwards **nothing** unless told to. This stack
+    originally assumed otherwise, and the result was a total, silent outage:
+    the vMCP called the backend with no credential at all, witan's JWTVerifier
+    returned 401, and — because a backend whose resolved strategy is
+    ``unauthenticated`` has its 401 read as genuine misconfiguration rather
+    than as proof of life — the vMCP marked its only backend
+    ``unauthenticated`` and excluded it from capability aggregation. Clients
+    got a successful ``initialize`` and then ``tools/list`` failed, so every
+    external signal (pod ready, route resolving, TLS, 200 + session id) looked
+    healthy while the endpoint served zero tools. Two settings fix it, and
+    both are required:
+
+    - ``passthroughHeaders: ["Authorization"]`` is what actually forwards the
+      user's Keycloak JWT to witan. It applies to real session traffic only.
+    - ``outgoingAuth.backends.witan`` points at a ``headerInjection``
+      ``MCPExternalAuthConfig``. This is NOT how the backend authenticates —
+      witan ignores the injected header entirely. It exists because the
+      periodic backend health probe runs on a background context that carries
+      no client request and therefore no passthrough header, so the probe will
+      always 401. ToolHive treats a probe 401 as healthy when the backend has
+      *some* non-``unauthenticated`` strategy configured, and as a
+      misconfiguration when it does not. Configuring any such strategy is
+      what keeps the backend in the aggregated view; header injection is the
+      only one that neither sets ``Authorization`` (which would clobber the
+      passthrough token) nor needs new Keycloak plumbing.
+
+    The alternative, ``tokenExchange``, would authenticate the probe properly
+    via client-credentials instead of relying on 401-as-healthy, and would
+    still preserve per-user identity on real traffic. It is not used here
+    because it requires a confidential Keycloak client, realm-level token
+    exchange, and a rotated secret — where passthrough needs none of that,
+    since ``witan-cli`` already mints tokens with the ``witan`` audience that
+    witan's own verifier checks. Revisit if the probe's 401 noise or the
+    forwarded-header trust model becomes a problem.
 
 Follow-up work this stack does NOT cover, tracked separately rather than
 silently assumed:
@@ -103,6 +139,7 @@ from ol_infrastructure.applications.witan.ci_indexer import (
 from ol_infrastructure.applications.witan.ingress import create_ingress_resources
 from ol_infrastructure.applications.witan.mcp_servers import (
     MCP_GROUP_NAME,
+    WITAN_MCPSERVER_NAME,
     create_mcp_servers,
 )
 from ol_infrastructure.applications.witan.migrations import create_migration_job
@@ -720,14 +757,64 @@ mcp_oidc_config = kubernetes.apiextensions.CustomResource(
 )
 
 #########################################
+#   vMCP -> backend probe credential     #
+#########################################
+# Exists only to give the witan backend a non-`unauthenticated` outgoing-auth
+# strategy. See the "Outgoing auth" section of this module's docstring for why
+# that is load-bearing. The value is NOT a credential: witan never reads this
+# header, and the vMCP -> backend hop is ClusterIP-only. It is a fixed marker
+# because ToolHive's `headerInjection` strategy requires a non-empty
+# `valueSecretRef`, so a Secret is the only shape the CRD accepts. Deliberately
+# a plain Secret rather than a Vault-backed one — routing a constant with no
+# secret value through Vault would imply a rotation story that does not exist.
+VMCP_PROBE_HEADER_NAME = "X-Witan-Vmcp"
+VMCP_PROBE_SECRET_NAME = "witan-vmcp-backend-probe"  # noqa: S105  # pragma: allowlist secret
+VMCP_PROBE_SECRET_KEY = "value"  # noqa: S105  # pragma: allowlist secret
+VMCP_BACKEND_AUTH_CONFIG_NAME = "witan-vmcp-backend-auth"
+
+vmcp_probe_secret = kubernetes.core.v1.Secret(
+    f"witan-vmcp-backend-probe-secret-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=VMCP_PROBE_SECRET_NAME,
+        namespace=NAMESPACE,
+        labels=k8s_global_labels,
+    ),
+    string_data={VMCP_PROBE_SECRET_KEY: "witan-vmcp"},  # pragma: allowlist secret
+    opts=ResourceOptions(depends_on=[cluster_stack]),
+)
+
+vmcp_backend_auth_config = kubernetes.apiextensions.CustomResource(
+    f"witan-vmcp-backend-auth-{stack_info.env_suffix}",
+    api_version="toolhive.stacklok.dev/v1beta1",
+    kind="MCPExternalAuthConfig",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=VMCP_BACKEND_AUTH_CONFIG_NAME,
+        namespace=NAMESPACE,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        "type": "headerInjection",
+        "headerInjection": {
+            "headerName": VMCP_PROBE_HEADER_NAME,
+            "valueSecretRef": {
+                "name": VMCP_PROBE_SECRET_NAME,
+                "key": VMCP_PROBE_SECRET_KEY,
+            },
+        },
+    },
+    opts=ResourceOptions(depends_on=[vmcp_probe_secret]),
+)
+
+#########################################
 #   VirtualMCPServer aggregator          #
 #########################################
 # No authServerConfig block: unlike toolhive_swe, this vMCP is NOT an OAuth
 # provider of its own. incomingAuth validates the client's genuine Keycloak
-# JWT directly and — because there is no embedded auth server to substitute
-# a token — that same JWT reaches the witan MCPServer unmodified, which is
-# exactly the "External OIDC provider" scenario ADR-0009's Resolution
-# addendum specifies.
+# JWT directly, and `passthroughHeaders` then forwards that same JWT to the
+# witan MCPServer unmodified — which is exactly the "External OIDC provider"
+# scenario ADR-0009's Resolution addendum specifies. The forwarding is
+# explicit: ToolHive does not do it by default. See the "Outgoing auth"
+# section of this module's docstring.
 witan_virtualmcpserver = kubernetes.apiextensions.CustomResource(
     f"witan-vmcp-{stack_info.env_suffix}",
     api_version="toolhive.stacklok.dev/v1beta1",
@@ -747,6 +834,25 @@ witan_virtualmcpserver = kubernetes.apiextensions.CustomResource(
                 "resourceUrl": VMCP_RESOURCE_ID,
             },
         },
+        # The client's Keycloak bearer token, forwarded verbatim to the backend
+        # so witan's own JWTVerifier sees the *user's* token and derives the
+        # per-request actor from its `sub` (ADR-0004 D1/D2). Header-forwarding
+        # runs outermost on the outbound chain and is skip-if-present, so the
+        # header-injection strategy below (a different header name) coexists
+        # with it rather than overwriting it.
+        "passthroughHeaders": ["Authorization"],
+        "outgoingAuth": {
+            # `discovered` inspects each backend's own externalAuthConfigRef;
+            # witan's MCPServer deliberately has none (see mcp_servers.py), so
+            # the per-backend override below is what actually applies.
+            "source": "discovered",
+            "backends": {
+                WITAN_MCPSERVER_NAME: {
+                    "type": "externalAuthConfigRef",
+                    "externalAuthConfigRef": {"name": VMCP_BACKEND_AUTH_CONFIG_NAME},
+                },
+            },
+        },
         "serviceType": "ClusterIP",
         "config": {
             "aggregation": {
@@ -760,6 +866,7 @@ witan_virtualmcpserver = kubernetes.apiextensions.CustomResource(
             mcp_servers.group,
             *mcp_servers.servers,
             mcp_oidc_config,
+            vmcp_backend_auth_config,
             # Every Secret the backend MCPServer consumes, restated here even
             # though `*mcp_servers.servers` already carries them: Pulumi orders
             # transitively, so this changes nothing the engine does. It is kept
