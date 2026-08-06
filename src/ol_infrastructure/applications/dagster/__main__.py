@@ -10,6 +10,7 @@ This deployment uses:
 - APISix ingress with OpenID Connect for authentication
 """
 
+import json
 import os
 from pathlib import Path
 
@@ -89,6 +90,10 @@ vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
 cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
+# Owns the Sentry project and client key whose DSN this stack writes to Vault.
+# Single-stack (Production) because there is one Sentry org, and one Dagster
+# project within it shared by every environment.
+sentry_stack = make_stack_reference(projects.SENTRY, "Production")
 # Keycloak is deployed to CI/QA/Production only; the Dev Dagster stack has no
 # counterpart to reference, so its data_loading deployment simply goes without
 # the Keycloak host and that source stays unavailable there.
@@ -510,6 +515,47 @@ dagster_dbt_secrets = OLVaultK8SSecret(
         vaultauth=dagster_auth_binding.vault_k8s_resources.auth_name,
     ),
     opts=ResourceOptions(depends_on=[dagster_auth_binding]),
+)
+
+# The DSN is created by the ol-infrastructure-sentry stack, which owns the
+# Sentry project and its client key, so Pulumi manages the value end to end and
+# nobody has to hand-write it into Vault. secret-data is a pre-existing kv-v1
+# mount shared by the other Dagster secrets, so only the secret itself is
+# declared here, not the mount.
+dagster_sentry_vault_secret = vault.generic.Secret(
+    f"dagster-sentry-dsn-{stack_info.env_suffix}",
+    path="secret-data/dagster/sentry",
+    data_json=sentry_stack.require_output("dagster_sentry_dsn").apply(
+        lambda dsn: json.dumps({"dsn": dsn})
+    ),
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
+# Sentry DSN for the code locations and run workers. Kept as its own secret
+# rather than folded into dagster-static-secrets because an OLVaultK8SSecret
+# reads a single Vault path, and the DSN is owned by the sentry stack.
+dagster_sentry_secrets = OLVaultK8SSecret(
+    f"dagster-k8s-sentry-secrets-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        dest_secret_labels=k8s_global_labels.model_dump(),
+        dest_secret_name="dagster-sentry-secrets",  # pragma: allowlist secret  # noqa: E501, S106
+        exclude_raw=True,
+        excludes=[".*"],
+        labels=k8s_global_labels.model_dump(),
+        mount="secret-data",
+        mount_type="kv-v1",
+        name="dagster-sentry-secrets",
+        namespace=dagster_namespace,
+        path="dagster/sentry",
+        refresh_after="1m",
+        templates={
+            "SENTRY_DSN": '{{ get .Secrets "dsn" }}',
+        },
+        vaultauth=dagster_auth_binding.vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        depends_on=[dagster_auth_binding, dagster_sentry_vault_secret]
+    ),
 )
 
 # Create Vault dynamic secret for database credentials
@@ -1000,11 +1046,15 @@ for location in code_locations:
             {"name": "DAGSTER_ENVIRONMENT", "value": stack_info.env_suffix},
             {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
             {"name": "DAGSTER_VAULT_ROLE", "value": "dagster"},
+            # Ties each Sentry issue to the image it came from. Same git
+            # short-ref the Concourse pipeline tagged the image with.
+            {"name": "SENTRY_RELEASE", "value": image_tag_or_digest},
         ],
         "envSecrets": [
             {"name": "dagster-static-secrets"},
             {"name": "dagster-dbt-secrets"},
             {"name": "dagster-postgresql-secret"},
+            {"name": "dagster-sentry-secrets"},
         ],
     }
 
