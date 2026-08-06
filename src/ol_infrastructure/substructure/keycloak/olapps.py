@@ -930,6 +930,37 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 resource_options=resource_options,
             ),
         )
+        onboard_saml_org(
+            SamlIdpConfig(
+                idp_alias="IBSU",
+                idp_display_name="International Black Sea University",
+                org_saml_metadata_url="https://emis.ibsu.edu.ge/saml/metadata",
+                principal_type="ATTRIBUTE",
+                principal_attribute="urn:oid:0.9.2342.19200300.100.1.3",
+                name_id_format=NameIdFormat.email,
+                single_sign_on_service_url="https://emis.ibsu.edu.ge/saml/sso/mit",
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                attribute_map={
+                    "email": "urn:oid:0.9.2342.19200300.100.1.3",
+                    "firstName": "firstName",
+                    "lastName": "lastName",
+                    "fullName": "displayName",
+                },
+                want_assertions_encrypted=False,
+                want_assertions_signed=True,
+            ),
+            org=OrgConfig(
+                org_domains=["ibsu.edu.ge"],
+                org_name="International Black Sea University",
+                org_alias="IBSU",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
         istanbul_aydin_org = create_org_for_learn(
             OrgConfig(
                 org_domains=[
