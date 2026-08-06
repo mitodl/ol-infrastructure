@@ -649,7 +649,8 @@ if (
 ) and (STARROCKS_CHART_VERSION not in ("1.11.6", "1.11.7")):
     msg = (
         f"_FE_CONFIG_BASE was sourced from chart 1.11.6/1.11.7; review defaults"
-        f" for {STARROCKS_CHART_VERSION} before deploying with SSL or CN enabled"
+        f" for {STARROCKS_CHART_VERSION} before deploying with SSL, CN, or BE"
+        f" enabled"
     )
     raise ValueError(msg)
 # Set JVM heap to 87.5 % of the container memory limit to leave headroom for
