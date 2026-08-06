@@ -229,6 +229,7 @@ ACTOR_TOKENS_VAULT_KEY = "tokens_json"  # pragma: allowlist secret
 # the "svc-witan-ci" entry of the actor-tokens map above; both come from the
 # same SOPS source record below so they can't drift.
 WITAN_CI_TOKEN_VAULT_KEY = "token"  # noqa: S105  # pragma: allowlist secret
+WITAN_CI_ACTOR_ID = "svc-witan-ci"
 
 # The break-glass maintenance principal (agent-kit ADR-0005 path b, ADR-0002 D4
 # as amended). Same shape as the CI token above — a raw single-actor token
@@ -323,11 +324,12 @@ if (_BRIDGE_SECRETS_DIR / _witan_secrets_path).exists():
             "map are required once the file exists."
         )
         raise ValueError(msg)
-    if _actor_tokens_map.get("svc-witan-ci") != _witan_ci_token:
+    if _actor_tokens_map.get(WITAN_CI_ACTOR_ID) != _witan_ci_token:
         msg = (
             f"omnigraph/secrets.{stack_info.env_suffix}.yaml: ci_token must "
-            "match actor_tokens['svc-witan-ci'] (ADR-0009 decision point 3) "
-            "— they are the same token exposed to two different consumers."
+            f"match actor_tokens['{WITAN_CI_ACTOR_ID}'] (ADR-0009 decision "
+            "point 3) — they are the same token exposed to two different "
+            "consumers."
         )
         raise ValueError(msg)
 
@@ -431,17 +433,24 @@ if (_BRIDGE_SECRETS_DIR / _witan_secrets_path).exists():
     # distinguishes them by actor id alone, so two principals sharing a token
     # are one principal with the union of their grants, however separate the
     # groups look in the bundle.
-    for _other_label, _other in (
-        ("ci_token", _witan_ci_token),
-        ("admin_token", _witan_admin_token),
+    # Each pair carries the ACTOR ID, not a word derived from the key name. An
+    # earlier version said "everything ci can do", which is ambiguous on its own
+    # and actively misleading in this message: the same sentence already names
+    # the environment, and that environment is literally called `ci`. The thing
+    # being collapsed is an actor, so the message names actors.
+    for _other_label, _other_actor, _other in (
+        ("ci_token", WITAN_CI_ACTOR_ID, _witan_ci_token),
+        ("admin_token", WITAN_ADMIN_ACTOR_ID, _witan_admin_token),
     ):
         if _other is not None and _witan_service_token == _other:
             msg = (
                 f"omnigraph/secrets.{stack_info.env_suffix}.yaml: service_token "
                 f"must not equal {_other_label}. Cedar tells these principals "
-                "apart by actor id only, so a shared value silently grants the "
-                f"serving tier everything {_other_label.removesuffix('_token')} "
-                "can do, while the bundle still shows them as separate groups."
+                f"apart by actor id alone, so a shared value makes "
+                f"{WITAN_SERVICE_ACTOR_ID} and {_other_actor} one principal "
+                f"holding both sets of grants — the serving tier would gain "
+                f"everything {_other_actor} can do, while the bundle still "
+                "shows them as separate groups."
             )
             raise ValueError(msg)
 else:
