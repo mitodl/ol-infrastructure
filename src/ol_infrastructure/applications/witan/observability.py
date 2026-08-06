@@ -67,6 +67,14 @@ def ships_telemetry(stack_info: StackInfo) -> bool:
     Mirrors ``setup_grafana``'s CI early-return. Kept as a named predicate so
     the reason a stack is dark is one grep away from the reason the collector
     is absent.
+
+    The ``.lower()`` is redundant and deliberate: ``parse_stack`` builds
+    ``env_suffix`` as ``stack_name.lower()`` (lib/pulumi_helper.py), so it is
+    lowercase by construction and the telemetry labels below can use it raw
+    without risk of a ``QA``/``qa`` split. It is kept here only so this
+    predicate is character-for-character the condition ``setup_grafana``
+    tests — the two drifting apart is the failure this function exists to
+    prevent.
     """
     return stack_info.env_suffix.lower() != "ci"
 
@@ -136,6 +144,30 @@ def downward_api_env_dicts() -> list[dict[str, object]]:
     a full ``EnvVar`` and merges it onto the operator-managed ``mcp`` container
     — which is already how ``spec.secrets`` reaches the pod as
     ``secretKeyRef`` entries.
+
+    THIS DOES NOT CLOBBER THE OPERATOR'S OWN ENV, and it is worth stating
+    because the obvious worry — that a PodTemplateSpec patch replaces list
+    fields wholesale, RFC 7386 style — is a real failure mode for other CRDs
+    and simply is not how this path works. Traced through toolhive v0.40.1,
+    every step is an explicit append:
+
+    1. ``PodTemplateSpecBuilder.WithSecrets`` starts from *this* template,
+       finds the container named ``mcp``, and does
+       ``Env = append(Env, secretEnvVars...)`` — the vars below are the
+       existing ``Env``, the secrets land after them. The result is what the
+       operator serializes into ``--k8s-pod-patch``.
+    2. The runner applies that patch to an **empty** base PodTemplateSpec, so
+       its ``WithSpec`` whole-spec assignment has nothing to overwrite.
+    3. ``configureContainer`` then calls client-go's
+       ``ContainerApplyConfiguration.WithEnv``, itself an append, to add the
+       ``spec.env`` entries.
+
+    Final order is podTemplateSpec env, then ``spec.secrets``, then
+    ``spec.env`` — all three coexist, which the live workload confirms
+    (2 ``secretKeyRef`` vars from the patch alongside 8 ``spec.env`` vars).
+    The one real constraint is that concatenation does not de-duplicate, so a
+    name used here must not collide with a ``spec.env`` or ``spec.secrets``
+    name; the three below do not.
     """
     return [
         {
