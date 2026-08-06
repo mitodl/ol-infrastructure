@@ -193,6 +193,16 @@ admin_token_provisioned = bool(
         omnigraph_stack, "admin_token_provisioned", default=False
     )
 )
+# Same shape, for svc-witan: whether the MCP tier has an account of its own to
+# enumerate graphs as, or is still borrowing svc-witan-ci for it. False only in
+# an environment whose omnigraph stack has no SOPS secrets file at all — where
+# there is no service-token path to read, so falling back is the only option
+# that yields a working Secret.
+service_token_provisioned = bool(
+    optional_stack_output_value(
+        omnigraph_stack, "service_token_provisioned", default=False
+    )
+)
 
 NAMESPACE = "witan"
 
@@ -427,9 +437,16 @@ witan_ci_token_secret = OLVaultK8SSecret(
     ),
 )
 
-# Same Vault path as witan_ci_token_secret above — see
-# WITAN_CODE_TOKEN_SECRET_NAME for why this is its own Secret and not a second
-# reference to that one.
+# The MCP tier's credential for its own server-scoped questions (graph_list).
+# Its own Secret rather than a second reference to witan-ci-token — see
+# WITAN_CODE_TOKEN_SECRET_NAME — which is what lets the Vault path move here
+# without touching the MCPServer spec.
+#
+# svc-witan where it is provisioned, svc-witan-ci where it is not. The fallback
+# is not a supported operating mode so much as the only thing that yields a
+# working Secret in an environment with no omnigraph SOPS file: reading an
+# absent Vault path would sync an empty Secret, and the tier would send an empty
+# bearer token and be denied every enumeration.
 witan_code_token_secret = OLVaultK8SSecret(
     f"witan-code-token-secret-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(
@@ -441,11 +458,13 @@ witan_code_token_secret = OLVaultK8SSecret(
         dest_secret_type="Opaque",  # pragma: allowlist secret  # noqa: S106
         mount="secret-operations",
         mount_type="kv-v1",
-        path="witan/ci-token",
+        path=("witan/service-token" if service_token_provisioned else "witan/ci-token"),
         exclude_raw=True,
         excludes=[".*"],
         templates={
             WITAN_CODE_TOKEN_SECRET_KEY: (
+                # Both paths store the raw token under the same "token" key, so
+                # the template is the same either way.
                 f'{{{{ get .Secrets "{WITAN_CI_TOKEN_VAULT_KEY}" }}}}'
             )
         },
