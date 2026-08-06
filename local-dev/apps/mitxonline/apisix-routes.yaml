@@ -48,7 +48,8 @@ spec:
 #   passauth        : /*              (pass — injects X-Userinfo if session present)
 #   logout-redirect : /logout/oidc/* (redirect to /logout/oidc)
 #   reqauth         : /login/*, /admin/login/*, /login*, /login/oidc*
-#   cart            : /cart, /cart/, /cart/* (require authentication, priority 20)
+#   checkout-anonymous : /checkout/anonymous, /checkout/anonymous/,
+#                     /checkout/anonymous/* (require authentication, priority 20)
 #
 # No explicit redirect_uri — lua-resty-openidc auto-derives it.
 # session.cookie.domain set to .mitxonline.mit.dev so the cookie is shared
@@ -158,16 +159,24 @@ spec:
           user: true
         unauth_action: auth
 
-  - name: cart
+  # Login gate for the "anonymous first" checkout flow, and the successor to the
+  # former "cart" route. /cart is now served anonymously (it falls through to
+  # passauth above, which returns the anonymous basket); the login that
+  # establishes the session — so the anonymous basket can be claimed — happens
+  # when the learner proceeds to checkout and lands here. The /* path catches
+  # this route's own OIDC callback, which lua-resty-openidc derives relative to
+  # the request path (/checkout/anonymous/.apisix/redirect); without it the
+  # callback falls through to passauth and only works by accident.
+  - name: checkout-anonymous
     priority: 20
     match:
       hosts:
       - "mitxonline.mit.dev"
       - "api.mitxonline.mit.dev"
       paths:
-      - "/cart"
-      - "/cart/"
-      - "/cart/*"
+      - "/checkout/anonymous"
+      - "/checkout/anonymous/"
+      - "/checkout/anonymous/*"
     backends:
     - serviceName: mitxonline-webapp
       servicePort: 8010
