@@ -865,9 +865,28 @@ witan_virtualmcpserver = kubernetes.apiextensions.CustomResource(
         },
         "serviceType": "ClusterIP",
         "config": {
+            # `priority`, NOT the CRD's `prefix` default, because prefix mode
+            # renames unconditionally: it does no conflict detection at all, so
+            # with witan as the group's only member it still rewrote all 65
+            # tools to `witan_*` and no client asking for `memory_search` could
+            # find them. `priority` leaves a tool whose name is unique across
+            # the group exactly as the backend published it, which — since
+            # nothing else is in the group — is every tool.
+            #
+            # There is no "don't rename anything" setting: the enum is
+            # prefix/priority/manual and an empty prefixFormat is rejected, so
+            # bare names have to come from one of the other two strategies.
+            # `manual` would also work; `priority` is chosen because its one
+            # downside (on a name collision the loser is dropped with only a
+            # log line, where manual fails the whole tools/list loudly) needs
+            # two backends to be reachable, and witan-code is mounted
+            # in-process rather than deployed separately.
             "aggregation": {
-                "conflictResolution": "prefix",
-                "conflictResolutionConfig": {"prefixFormat": "{workload}_"},
+                "conflictResolution": "priority",
+                # Required and must be non-empty — the vMCP refuses to start
+                # otherwise, and the CRD does not catch it, so a missing entry
+                # here is a CrashLoop rather than a rejected apply.
+                "conflictResolutionConfig": {"priorityOrder": [WITAN_MCPSERVER_NAME]},
             },
         },
     },

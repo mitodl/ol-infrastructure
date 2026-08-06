@@ -1,10 +1,19 @@
 """Backend MCP server definition for witan.
 
 The ``witan-tools`` ``MCPGroup`` exists so the ``VirtualMCPServer`` in
-``__main__.py`` can front the group behind a single endpoint, following the
-``toolhive_swe`` pattern even though — today — witan is the group's only
-member. This leaves room to add a second backend (e.g. a dedicated
-``witan-code`` workload) later without restructuring the ingress/auth layer.
+``__main__.py`` can front it behind a single endpoint, following the
+``toolhive_swe`` pattern. witan is the group's only member, and is expected to
+stay that way: the code-graph tools are mounted **in-process** by ``witan
+serve`` (``witan_mcp.mount(code_mcp)``, agent-kit
+``mcp/servers/witan/witan/cli/__init__.py``), not run as a separate workload,
+and there is no intent to split them out. The group and the vMCP earn their
+keep as the OIDC and ingress boundary, not as an aggregation point.
+
+An earlier version of this docstring justified the group as leaving room for a
+second backend. That framing is what led ``__main__.py`` to accept the CRD's
+default ``conflictResolution: prefix``, which renamed every tool to
+``witan_*`` and broke every client. Aggregation config there is now set for
+the single-backend reality; see the comment on ``config.aggregation``.
 
 Unlike every backend in ``toolhive_swe`` (fetch/grafana/context7/sentry, which
 carry no identity of their own and trust the vMCP's auth wholesale), witan
