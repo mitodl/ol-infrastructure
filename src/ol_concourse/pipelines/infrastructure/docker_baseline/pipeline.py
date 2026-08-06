@@ -7,7 +7,9 @@ from ol_concourse.pipelines.constants import PACKER_WATCHED_PATHS
 from ol_concourse.pipelines.jobs import packer_jobs
 
 hashicorp_release_resource = hashicorp_resource()
-vector_release = github_release(Identifier("vector-release"), "vectordotdev", "vector")
+vector_release = github_release(
+    Identifier("vector-release"), "vectordotdev", "vector", github_token=""
+)
 vault_agent_release = hashicorp_release(
     name=Identifier("vault-release"), project="vault"
 )

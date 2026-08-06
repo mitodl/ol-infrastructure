@@ -101,6 +101,7 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
         repository="keycloak-protocol-cas",
         tag_filter=KEYCLOAK_VERSION,
         order_by="time",
+        github_token="",
     )
 
     # Repo: https://github.com/mitodl/ol-keycloak
@@ -110,12 +111,14 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
         owner="mitodl",
         repository="ol-keycloak",
         check_frequency="1h",
+        github_token="",
     )
 
     ol_keycloakify = github_release(
         name=Identifier("ol-keycloakify"),
         owner="mitodl",
         repository="ol-keycloakify",
+        github_token="",
     )
 
     scim_plugin = s3_object(

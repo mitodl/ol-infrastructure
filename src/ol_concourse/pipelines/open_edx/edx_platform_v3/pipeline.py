@@ -96,6 +96,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                 repository="node",
                 tag_filter=rf"^v({node_version}\.\d+\.\d+)",
                 order_by="version",
+                github_token="",
             )
 
             # Pulumi code related resource setup

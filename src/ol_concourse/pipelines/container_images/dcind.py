@@ -34,6 +34,7 @@ dagger_release = github_release(
     owner="dagger",
     repository="dagger",
     order_by="time",
+    github_token="",
 )
 
 dcind_release_image = Resource(

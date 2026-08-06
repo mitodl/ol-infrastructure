@@ -37,6 +37,7 @@ def build_superset_docker_pipeline() -> Pipeline:
         repository="superset",
         tag_filter="^6",
         order_by="time",
+        github_token="",
     )
 
     docker_code_repo = git_repo(
