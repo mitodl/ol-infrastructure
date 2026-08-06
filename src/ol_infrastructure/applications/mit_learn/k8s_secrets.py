@@ -212,11 +212,6 @@ def create_mitlearn_k8s_secrets(
             "templates": {"EMBEDLY_KEY": '{{ get .Secrets "key" }}'},
         },
         {
-            "base_name": "secret-ops-odlbot-github",  # GitHub token for odl-bot
-            "path": "global/odlbot-github-access-token",
-            "templates": {"GITHUB_ACCESS_TOKEN": '{{ get .Secrets "value" }}'},
-        },
-        {
             "base_name": "secret-ops-mit-smtp",  # MIT SMTP relay credentials
             "path": "global/mit-smtp",
             "templates": {
