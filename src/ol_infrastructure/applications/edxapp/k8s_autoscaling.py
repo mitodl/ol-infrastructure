@@ -53,16 +53,17 @@ def build_lms_webapp_keda_config(
 ) -> OLApplicationK8sKedaWebappScalingConfig:
     """Build the KEDA ScaledObject config for the LMS webapp deployment.
 
-    NOTE: the per-pod divisor namespace is now derived from the stack's
-    env_prefix. It was previously hardcoded to "mitxonline-openedx" for every
-    edxapp deployment, so the mitx, xpro and mitx-staging stacks were dividing
-    their own request rate by mitxonline's pod count.
+    The request-rate trigger's per-pod divisor is gone entirely -- the HPA
+    already divides by replica count for an AverageValue metric, so the explicit
+    divisor double-divided and left the trigger inert. See the metric-type notes
+    in ol_infrastructure.lib.k8s_keda. This also retires the earlier bug where
+    that divisor's namespace was hardcoded to "mitxonline-openedx" for every
+    edxapp deployment, making the mitx, xpro and mitx-staging stacks divide their
+    own request rate by mitxonline's pod count.
     """
     return build_webapp_keda_config(
         trigger_auth_name=trigger_auth_name,
         route_matcher=f"{stack_info.env_prefix}-openedx_ol-{stack_info.env_prefix}-edxapp-lms-apisix-route-{stack_info.env_suffix}_lms-default",
-        namespace=f"{stack_info.env_prefix}-openedx",
-        pod_matcher=".*lms-edxapp-app.*",
         container_name="lms-edxapp-app",
         requests_threshold=edxapp_config.get("autoscaling_lms_requests_threshold")
         or "20",
@@ -89,13 +90,11 @@ def build_cms_webapp_keda_config(
     minutes after a burst costs capacity without buying much. Making this
     explicit keeps the refactor behaviour-preserving for CMS.
 
-    See build_lms_webapp_keda_config for the divisor-namespace correction.
+    See build_lms_webapp_keda_config for the request-rate divisor removal.
     """
     return build_webapp_keda_config(
         trigger_auth_name=trigger_auth_name,
         route_matcher=f"{stack_info.env_prefix}-openedx_ol-{stack_info.env_prefix}-edxapp-cms-apisix-route-{stack_info.env_suffix}_cms-default",
-        namespace=f"{stack_info.env_prefix}-openedx",
-        pod_matcher=".*cms-edxapp-app.*",
         container_name="cms-edxapp-app",
         requests_threshold=edxapp_config.get("autoscaling_cms_requests_threshold")
         or "20",
