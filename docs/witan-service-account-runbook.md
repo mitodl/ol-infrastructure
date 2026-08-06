@@ -145,7 +145,7 @@ group being **absent** from it — a dropped group is not logged as
 ... memory.policy.yaml [witan-users=33, witan-admin=1]
 ```
 
-The renderer also says so outright, on stderr, which is the more direct check:
+The renderer also says so outright, on stderr:
 
 ```bash
 kubectl -n omnigraph logs deploy/omnigraph-server | grep "unprovisioned group"
@@ -154,7 +154,41 @@ kubectl -n omnigraph logs deploy/omnigraph-server | grep "unprovisioned group"
 #   actions are granted to nobody
 ```
 
-Silence from that grep is the passing result.
+### Silence from those greps is NOT a pass
+
+Both lines are printed **once, at boot**, and `omnigraph-server` logs every
+Lance operation at INFO. On a server doing real work the boot output rotates
+out of the retained log within about ten minutes, after which *both* greps
+return nothing whether or not the account exists — the failing state and the
+passing state become indistinguishable.
+
+This is a live trap, not a theoretical one: it produced a confident false pass
+during this account's own rollout, on a server that had in fact never been given
+the token.
+
+**Confirm the boot output is still there before trusting either grep:**
+
+```bash
+kubectl -n omnigraph logs deploy/omnigraph-server | grep -c "render-policy-groups"
+```
+
+`0` means the log rotated and you have learned nothing. `4` (one line per
+bundle) means the window is still open and the greps above are meaningful.
+
+**When it has rotated, read the token map instead.** It is the input the
+renderer works from, so it answers the question directly and does not expire:
+
+```bash
+kubectl -n omnigraph get secret actor-tokens -o go-template='{{index .data "tokens.json"}}' \
+  | base64 -d | jq 'keys | map(select(startswith("act-") | not))'
+#   [ "svc-witan", "svc-witan-admin", "svc-witan-ci" ]
+```
+
+Piping through `jq 'keys'` keeps the tokens themselves off your terminal and out
+of your shell history; do not `cat` that Secret.
+
+Restarting the pod to regenerate the boot lines also works, but costs a
+data-tier outage to answer a question the Secret already answers.
 
 End to end, the thing that actually proves it works is an enumeration through
 the tier — `code_indexed_repos` returning repos rather than nothing.
