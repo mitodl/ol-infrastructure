@@ -163,7 +163,8 @@ def build_webapp_keda_config(  # noqa: PLR0913
             omit the latency trigger -- appropriate where request duration is
             dominated by payload size rather than contention (edxapp CMS), or
             where latency is dominated by a shared backend that adding replicas
-            cannot relieve (mit-learn).
+            cannot relieve, and can make worse (mit-learn, edxapp LMS). Only
+            mitxonline and learn_ai still pass a value.
         cpu_threshold: CPU utilization percent for the backstop trigger.
         scale_down_stabilization_seconds: How long the scaler must observe lower
             demand before shedding replicas. Defaults to 25 minutes, which suits

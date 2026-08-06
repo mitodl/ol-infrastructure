@@ -60,6 +60,22 @@ def build_lms_webapp_keda_config(
     that divisor's namespace was hardcoded to "mitxonline-openedx" for every
     edxapp deployment, making the mitx, xpro and mitx-staging stacks divide their
     own request rate by mitxonline's pod count.
+
+    No latency trigger either, for a different reason than CMS below: LMS p95 is
+    dominated by MySQL, MongoDB and Redis, so a latency excursion is usually a
+    signal about a shared backend rather than about LMS capacity. Adding LMS
+    replicas then makes it worse -- more pods means more connections against the
+    component that is already the constraint -- while the trigger keeps reading
+    high latency and keeps asking for more, up to max_replicas. Request rate plus
+    the CPU backstop covers the cases where replicas actually help.
+
+    This matters more now that the trigger is emitted as ``Value`` rather than
+    ``AverageValue``: as ``AverageValue`` it was inert (it needed a 60s p95 to
+    reach a 30-replica ceiling), whereas ``Value`` turns a routine 4-6s incident
+    excursion into a demand for 2-3x the current replica count. Set
+    ``autoscaling_lms_latency_threshold`` on a stack to opt back in; a value
+    around 4000 keeps the signal with more headroom than the old 2000 default,
+    against observed p95 of 100-953ms across the production LMS stacks.
     """
     return build_webapp_keda_config(
         trigger_auth_name=trigger_auth_name,
@@ -67,8 +83,7 @@ def build_lms_webapp_keda_config(
         container_name="lms-edxapp-app",
         requests_threshold=edxapp_config.get("autoscaling_lms_requests_threshold")
         or "20",
-        latency_threshold=edxapp_config.get("autoscaling_lms_latency_threshold")
-        or "2000",
+        latency_threshold=edxapp_config.get("autoscaling_lms_latency_threshold"),
         cpu_threshold=edxapp_config.get("autoscaling_lms_cpu_threshold") or "70",
     )
 
