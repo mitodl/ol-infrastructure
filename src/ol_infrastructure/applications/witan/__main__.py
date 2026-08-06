@@ -77,6 +77,16 @@ Outgoing auth — why two settings are needed to forward one token:
       only one that neither sets ``Authorization`` (which would clobber the
       passthrough token) nor needs new Keycloak plumbing.
 
+      That 401-is-healthy rule is upstream's deliberate, tested design, not an
+      inference from observed behavior. At ToolHive v0.40.1 it is
+      ``authErrorStatus`` (``pkg/vmcp/health/checker.go:192``), reached from
+      ``categorizeError`` (same file, :154 and :168), and pinned by
+      ``TestHealthChecker_CheckHealth_AuthErrorWithOutgoingAuthIsHealthy``
+      (``pkg/vmcp/health/checker_test.go:691``) — whose table includes a
+      ``header_injection`` row asserting ``BackendHealthy`` and a nil error.
+      Cited because the claim is not verifiable from this repository, and the
+      whole outage came from an unverified assumption about this same hop.
+
     The alternative, ``tokenExchange``, would authenticate the probe properly
     via client-credentials instead of relying on 401-as-healthy, and would
     still preserve per-user identity on real traffic. It is not used here
