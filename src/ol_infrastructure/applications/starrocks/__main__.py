@@ -635,6 +635,9 @@ if starrocks_config.get_bool("use_cn"):
 # Ref: starrocks/values.yaml starrocksFESpec.config in the operator Helm chart.
 # Reviewed for 1.11.6: the only diff from 1.11.5 is an unrelated
 # externalTrafficPolicy service field; the fe.conf config block is unchanged.
+# Reviewed for 1.11.7: the only diff from 1.11.6 is unrelated csiVolumes
+# support (CSI ephemeral inline volumes); the fe.conf config block is
+# byte-identical.
 #
 # NOTE: The SSL keystore password appears in fe.conf (→ K8s ConfigMap). This is
 # an inherent limitation of StarRocks' SSL design; the password protects the
@@ -643,10 +646,10 @@ if (
     ssl_enabled
     or starrocks_config.get_bool("use_cn")
     or starrocks_config.get_bool("use_be")
-) and (STARROCKS_CHART_VERSION != "1.11.6"):
+) and (STARROCKS_CHART_VERSION not in ("1.11.6", "1.11.7")):
     msg = (
-        f"_FE_CONFIG_BASE was sourced from chart 1.11.6; review defaults for"
-        f" {STARROCKS_CHART_VERSION} before deploying with SSL or CN enabled"
+        f"_FE_CONFIG_BASE was sourced from chart 1.11.6/1.11.7; review defaults"
+        f" for {STARROCKS_CHART_VERSION} before deploying with SSL or CN enabled"
     )
     raise ValueError(msg)
 # Set JVM heap to 87.5 % of the container memory limit to leave headroom for
