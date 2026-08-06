@@ -26,6 +26,8 @@ pipeline_code = git_repo(
         "src/bridge/settings/openedx/",
         "pyproject.toml",
         "src/ol_concourse/pipelines/jobs.py",
+        "src/ol_concourse/pipelines/constants.py",
+        "src/ol_concourse/pipelines/secrets_map.py",
         "src/ol_concourse/pipelines/open_edx/xqueue/",
     ],
 )

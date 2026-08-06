@@ -34,7 +34,7 @@ from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 
 
-def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
+def build_edx_pipeline(release_names: list[str]) -> Pipeline:
     # This resource will be shared by all releases/deployment combinations
     lehrer_git_resource = git_repo(
         name=Identifier("lehrer"),
@@ -47,7 +47,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
     pulumi_fragments = []
     group_configs = []
 
-    for release_name in releases:
+    for release_name in release_names:
         job_names = []
         for deployment in filter_deployments_by_release(release_name):
             deployment_name = deployment.deployment_name

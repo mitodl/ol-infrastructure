@@ -110,6 +110,7 @@ def meta_pipeline(
             "pyproject.toml",
             "src/ol_concourse/pipelines/constants.py",
             "src/ol_concourse/pipelines/jobs.py",
+            "src/ol_concourse/pipelines/secrets_map.py",
         ],
     )
 
