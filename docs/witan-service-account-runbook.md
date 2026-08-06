@@ -31,7 +31,8 @@ meant rotating the CI token took the tier's code-graph reads down with it.
 as `svc-witan-ci`, which is a working arrangement. **`svc-witan` is not.**
 
 The bundles are applied unconditionally in every environment (see
-`applications/omnigraph/cluster_config.py`), and the image entrypoint renders
+`src/ol_infrastructure/applications/omnigraph/cluster_config.py`), and the
+image entrypoint renders
 group membership from the live actor-token map at boot
 (agent-kit `mcp/servers/witan/policy/render_groups.py`). An environment whose
 token map has no `svc-witan` entry gets a `witan-service` group with no members,
@@ -127,10 +128,18 @@ happen before it ships rather than after.
 kubectl -n omnigraph logs deploy/omnigraph-server | grep render-policy-groups
 #   ... memory.policy.yaml [witan-users=33, witan-service=1, witan-admin=1]
 
-# The tier is using its own identity
-kubectl -n witan get secret witan-code-token -o jsonpath='{.metadata.name}'
+# The tier is using its own identity — ask the VaultStaticSecret which Vault
+# path it syncs from. The Secret's own name never changes, so `get secret` tells
+# you nothing; the spec is where ci-token and service-token differ.
+kubectl -n witan get vaultstaticsecret witan-code-token -o jsonpath='{.spec.path}{"\n"}'
+#   witan/service-token      <- provisioned
+#   witan/ci-token           <- still borrowing the pipeline's credential
+
 pulumi stack output service_token_provisioned --stack <CI|QA|Production>
 ```
+
+Nothing above prints secret data: `.spec.path` is configuration, and the
+VaultStaticSecret spec holds no token.
 
 **`READY 1/1` is not evidence.** Since agent-kit #188 the server starts fine
 whether or not this account exists, so deployment health tells you nothing here.

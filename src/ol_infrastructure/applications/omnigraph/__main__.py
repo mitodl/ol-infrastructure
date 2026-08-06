@@ -419,12 +419,12 @@ if (_BRIDGE_SECRETS_DIR / _witan_secrets_path).exists():
         if _value is None or not str(_value).strip():
             msg = (
                 f"omnigraph/secrets.{stack_info.env_suffix}.yaml: {_label} is "
-                f"missing or empty, and it is required — without it the "
-                f"'witan-service' Cedar group has no members, the boot-time "
-                f"renderer drops it, and the MCP tier is denied `graph_list`: "
-                f"no code-graph writes and an empty code_indexed_repos, with a "
-                f"data tier that otherwise looks healthy. Mint one with "
-                "`openssl rand -hex 32` and set both keys to it "
+                "missing or empty, and it is required — without it the "
+                "'witan-service' Cedar group has no members, the boot-time "
+                "renderer drops it, and the MCP tier is denied `graph_list`. "
+                "Every code-graph write then fails and `code_indexed_repos` "
+                "returns nothing, on a data tier that looks healthy throughout. "
+                "Mint one with `openssl rand -hex 32` and set both keys to it "
                 "(see docs/witan-service-account-runbook.md)."
             )
             raise ValueError(msg)
