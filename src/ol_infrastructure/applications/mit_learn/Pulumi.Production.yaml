@@ -56,6 +56,15 @@ config:
   # declared limit, so the VPA can still size these pods down, just not into the
   # range that kills them.
   mitlearn:webapp_vpa_min_allowed_memory: 3Gi
+  # Raised from the 500m default (memory stays 3200Mi via the merge in
+  # __main__.py). granian runs 2 workers x 2 threads with no CPU limit, so 500m
+  # read as 95-116% utilization under normal load and pegged the HPA at
+  # max_replicas. Calibrated, not padded: at 0.035 cores/rps a pod doing the
+  # intended 20 rps draws ~700m, and 700m/0.60 is ~1170m. Don't raise it further
+  # without fixing the inert Prometheus triggers in lib/k8s_keda.py first -- the
+  # cpu trigger is currently the only working scale-up signal.
+  mitlearn:webapp_resource_requests:
+    cpu: 1200m
   mitlearn:vars:
     AI_MIT_SYLLABUS_URL: "https://api.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.learn.mit.edu/api/v0/vector_content_files_search/"

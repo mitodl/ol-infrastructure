@@ -1445,6 +1445,11 @@ def _resource_config(config_key: str, default: dict[str, str]) -> dict[str, str]
     return {**default, **(mitlearn_config.get_object(config_key) or {})}
 
 
+# The 500m CPU default suits CI/QA, which idle. Production overrides it to 1200m:
+# granian can consume several cores, and a request this far below real usage makes
+# the KEDA cpu trigger read 95-116% utilization under normal load and peg the HPA at
+# max_replicas. See the calibration note on webapp_resource_requests in
+# Pulumi.Production.yaml before changing either value.
 webapp_resource_requests = _resource_config(
     "webapp_resource_requests", {"cpu": "500m", "memory": "3200Mi"}
 )
