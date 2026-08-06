@@ -971,7 +971,7 @@ and route findings to the project's witan task list.
 | **1** | Build `bin/github-org-inventory`. Crawl. Human-confirm archetype per repo. Commit `data/`. | 317 repos classified; estate report reviewed |
 | **2** | Author `organization/`. Import org settings and the 14 teams — **not** members or team rosters (§4.7). Define the `tier` custom-property schema (§5.4) — a prerequisite, not a fast-follow. | **Empty diff** on `ol-saas-github-organization` |
 | **3** | Author `repositories/`. Import in ~25-repo batches, including each repo's `tier` value. | **Empty diff** after every batch, and on the whole stack |
-| **3.5** | Add the two property-targeted org rulesets at `enforcement: evaluate`. Watch, then promote to `active`. | Rule-suite logs show the expected repos matching and no surprises |
+| **3.5** | Add the two property-targeted org rulesets at `enforcement: evaluate`. Watch, then promote to `active` by flipping `_ENFORCEMENT` in `organization/org_rulesets.py`. | Rule-suite logs show the expected repos matching and no surprises |
 | **4** | Build `bin/github-estate-audit`. Run all three axes. Emit witan tasks. | Backlog exists and is triaged |
 | **5** | Remediate by tightening archetypes, not per-repo edits. Land in reviewed waves. | Each wave previews clean and is approved |
 | **6** | Nightly `drift` job in Concourse; org custom-properties schema populated; consider Vault-sourced Actions secrets. | Drift job green |

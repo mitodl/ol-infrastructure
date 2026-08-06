@@ -1,7 +1,7 @@
 """Management of the mitodl GitHub organization, its teams, and the `tier` schema.
 
-Phase 2 of docs/plans/github-org-pulumi-import.md. Fifteen resources: org settings, the
-14 teams, and the custom property that org rulesets will target.
+Phases 2 and 3.5 of docs/plans/github-org-pulumi-import.md: org settings, the 14
+teams, the `tier` custom property, and the two org rulesets that target it.
 
 Deliberately absent, each for a reason worth knowing:
 
@@ -11,10 +11,6 @@ Deliberately absent, each for a reason worth knowing:
       at the cost of a PR per hire, departure and team move -- on a stack gated behind
       manual approval. It also removes the highest-blast-radius resource in the estate,
       since deleting a Membership evicts a human from the org.
-
-  OrganizationRuleset
-      Phase 3.5, and NOT before the repositories project has set per-repo tiers. See the
-      sequencing hazard documented in custom_properties.py.
 
   OrganizationWebhook
       None exist (crawl 2026-08-05).
@@ -34,6 +30,7 @@ setup_github_provider()
 
 from ol_infrastructure.saas.github.organization import (  # noqa: E402, F401
     custom_properties,
+    org_rulesets,
     org_settings,
     teams,
 )
