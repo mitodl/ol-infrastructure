@@ -17,6 +17,19 @@ does not exist reports an error rather than scaling. Confirm the application's
 routes actually appear in ``count by (route) (apisix_http_status)`` before
 adopting this; several apps declare an ``OLApisixRoute`` in Pulumi yet emit no
 APISIX metrics in production.
+
+**Metric types matter here.** KEDA hands each Prometheus trigger to the HPA as an
+External metric, and the HPA's arithmetic differs by ``metricType``:
+
+* ``AverageValue`` (KEDA's default): ``desired = ceil(query / threshold)``. The
+  division by replica count is implicit, so the query must return a *total* and
+  the threshold is per-pod. Correct for request rate, which scales with replicas.
+* ``Value``: ``desired = ceil(N * query / threshold)``. Correct for a gauge that
+  does *not* scale with replicas, such as a latency percentile.
+
+Both triggers were originally emitted as ``AverageValue`` with a query shaped for
+the other convention, which left each of them inert in production. Keep the
+query shape and the metric type in agreement when adding a trigger.
 """
 
 from typing import Any
@@ -126,8 +139,6 @@ def create_webapp_prometheus_trigger_auth(  # noqa: PLR0913
 def build_webapp_keda_config(  # noqa: PLR0913
     trigger_auth_name: str,
     route_matcher: str,
-    namespace: str,
-    pod_matcher: str,
     container_name: str,
     requests_threshold: str = DEFAULT_REQUESTS_THRESHOLD,
     latency_threshold: str | None = DEFAULT_LATENCY_THRESHOLD,
@@ -145,14 +156,15 @@ def build_webapp_keda_config(  # noqa: PLR0913
             value against live metrics -- the label is
             ``<namespace>_<OLApisixRoute pulumi resource name>_<route_name>``,
             which is not derivable from the application name alone.
-        namespace: Kubernetes namespace, for the per-pod request-rate divisor.
-        pod_matcher: PromQL matcher for the ``pod`` label, applied with ``=~``,
-            selecting the webapp pods that serve the routes above.
         container_name: Container the CPU backstop trigger measures.
         requests_threshold: Requests/sec per pod before scaling up.
-        latency_threshold: p95 latency in ms before scaling up. Pass None to omit
-            the latency trigger (appropriate where request duration is dominated
-            by payload size rather than contention, e.g. edxapp CMS).
+        latency_threshold: p95 latency in ms at which the trigger asks for the
+            current replica count (see the ``Value`` note below). Pass None to
+            omit the latency trigger -- appropriate where request duration is
+            dominated by payload size rather than contention (edxapp CMS), or
+            where latency is dominated by a shared backend that adding replicas
+            cannot relieve, and can make worse (mit-learn, edxapp LMS). Only
+            mitxonline and learn_ai still pass a value.
         cpu_threshold: CPU utilization percent for the backstop trigger.
         scale_down_stabilization_seconds: How long the scaler must observe lower
             demand before shedding replicas. Defaults to 25 minutes, which suits
@@ -163,20 +175,17 @@ def build_webapp_keda_config(  # noqa: PLR0913
     Returns:
         A populated OLApplicationK8sKedaWebappScalingConfig.
     """
-    # Divide by pod count so the threshold is per-pod and stays meaningful as the
-    # deployment scales. Without this, total request rate rises with replicas and
-    # the scaler ratchets upward indefinitely.
-    #
-    # `or vector(1)` guards the divisor: when the pod matcher selects nothing --
-    # mid-rollout, or because the matcher is wrong -- `count()` returns no series
-    # rather than 0, which makes the whole division return an empty result and
-    # leaves KEDA with no value to scale on. Falling back to 1 degrades to
-    # "total request rate" instead of silently going blind.
-    requests_query = (
-        f'sum(rate(apisix_http_status{{route=~"{route_matcher}"}}[5m]))'
-        f'/(count(kube_pod_info{{job="integrations/kubernetes/kube-state-metrics",'
-        f'namespace="{namespace}",pod=~"{pod_matcher}"}}) or vector(1))'
-    )
+    # Total request rate, NOT per-pod. KEDA exposes a Prometheus trigger to the
+    # HPA as an External metric with target.type AverageValue, and the HPA's
+    # AverageValue path already divides by the live replica count -- it computes
+    # ``ceil(query / threshold)`` -- so the threshold is per-pod by construction.
+    # An explicit ``/count(pods)`` divisor here double-divides, making the
+    # effective condition ``total_rps / N^2 > threshold``, which at real traffic
+    # volumes never fires. Measured on applications-production 2026-08-06, every
+    # webapp using this helper read single-digit-milli against a threshold of 20;
+    # mit-learn would have needed ~11,500 rps to add one replica. Do not
+    # reintroduce the divisor.
+    requests_query = f'sum(rate(apisix_http_status{{route=~"{route_matcher}"}}[5m]))'
     latency_query = (
         f"histogram_quantile(0.95,sum(rate("
         f'apisix_http_latency_bucket{{route=~"{route_matcher}"}}[5m])) by (le))'
@@ -197,6 +206,15 @@ def build_webapp_keda_config(  # noqa: PLR0913
         triggers.append(
             {
                 "type": "prometheus",
+                # `Value`, not the KEDA default of `AverageValue`. p95 latency is
+                # a gauge that does not scale with replica count, so dividing it
+                # by that count (what AverageValue does) is dimensionally
+                # meaningless: it reduces to "one replica per 2s of latency" and
+                # needs a 60s p95 to reach a 30-replica ceiling. `Value` gives
+                # the proportional controller this is meant to be --
+                # desiredReplicas = ceil(N * p95 / threshold) -- so a p95 at
+                # twice the threshold asks for twice the replicas.
+                "metricType": "Value",
                 "metadata": {
                     "serverAddress": PROMETHEUS_SERVER,
                     "query": latency_query,
