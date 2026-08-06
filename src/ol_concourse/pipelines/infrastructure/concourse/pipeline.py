@@ -16,7 +16,7 @@ from ol_concourse.pipelines.secrets_map import project_secrets_paths
 # RESOURCES #
 #############
 concourse_release = github_release(
-    Identifier("concourse-release"), "concourse", "concourse"
+    Identifier("concourse-release"), "concourse", "concourse", github_token=""
 )
 concourse_image_code = git_repo(
     Identifier("ol-infrastructure-packer"),
