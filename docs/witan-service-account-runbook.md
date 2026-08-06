@@ -28,31 +28,35 @@ meant rotating the CI token took the tier's code-graph reads down with it.
 ## Why it is required, not optional
 
 `svc-witan-admin` is opt-in: an environment without it keeps running maintenance
-as `svc-witan-ci`. **`svc-witan` is not.**
-
-witan's Cedar bundles all declare a `witan-service` group, and
-`omnigraph-policy` refuses to start the server on a group with no members:
-
-```
-Error:
-   0: policy group 'witan-service' must not be empty
-   crates/omnigraph-policy/src/lib.rs:302
-```
+as `svc-witan-ci`, which is a working arrangement. **`svc-witan` is not.**
 
 The bundles are applied unconditionally in every environment (see
 `applications/omnigraph/cluster_config.py`), and the image entrypoint renders
 group membership from the live actor-token map at boot
-(agent-kit `mcp/servers/witan/policy/render_groups.py`). So an environment whose
-token map has no `svc-witan` entry produces an empty `witan-service` group and a
-**crash-looping data tier** — the server logs `serving omnigraph` and then exits,
-which reads like a healthy start right up until the pod restarts.
+(agent-kit `mcp/servers/witan/policy/render_groups.py`). An environment whose
+token map has no `svc-witan` entry gets a `witan-service` group with no members,
+which the renderer **drops** — along with every rule naming it.
 
-This is not hypothetical: it took CI down on 2026-08-06 between the Cedar bundles
-landing and this account being provisioned.
+So the MCP tier is granted nothing it needs: `graph_list` is denied, which fails
+`witan_code.store.ensure_store` ahead of every code-graph write and makes
+`code_indexed_repos` return nothing. The data tier itself is healthy.
 
-The omnigraph stack therefore hard-fails the deploy when the keys are missing,
-so the message names the missing SOPS keys instead of leaving an operator to
-work backwards from a CrashLoopBackOff.
+**The symptom is a working server with a broken tier, not a crash-loop.** Worth
+stating precisely, because it changed:
+
+- Before agent-kit **#188**, the renderer emitted the empty group and
+  `omnigraph-policy` rejected it outright — `policy group 'witan-service' must
+  not be empty` (`omnigraph-policy/src/lib.rs:302`) — raised *after* the
+  `serving omnigraph` log line, so it read like a healthy start right up until
+  the pod restarted. That took CI down on 2026-08-06, between the bundles
+  landing and this account being provisioned.
+- #188 taught the renderer to drop unprovisioned groups instead. The outage is
+  gone; the misconfiguration is now silent.
+
+Which is exactly why the omnigraph stack hard-fails the deploy when the keys are
+missing. A crash-loop announces itself. A dropped group looks like a successful
+deploy until someone notices code-graph writes failing, so the check has to
+happen before it ships rather than after.
 
 ## Provisioning it (per environment)
 
@@ -119,18 +123,41 @@ work backwards from a CrashLoopBackOff.
 ## Verifying
 
 ```bash
-# The group is populated and the server stayed up
+# The group is populated
 kubectl -n omnigraph logs deploy/omnigraph-server | grep render-policy-groups
 #   ... memory.policy.yaml [witan-users=33, witan-service=1, witan-admin=1]
-kubectl -n omnigraph get deploy omnigraph-server   # READY 1/1, no restarts
 
 # The tier is using its own identity
 kubectl -n witan get secret witan-code-token -o jsonpath='{.metadata.name}'
 pulumi stack output service_token_provisioned --stack <CI|QA|Production>
 ```
 
-A `witan-service=0` in that log line is the failure this account exists to
-prevent — the server will exit immediately after.
+**`READY 1/1` is not evidence.** Since agent-kit #188 the server starts fine
+whether or not this account exists, so deployment health tells you nothing here.
+The render line is the check that matters, and the failure signature is the
+group being **absent** from it — a dropped group is not logged as
+`witan-service=0`, it simply does not appear:
+
+```
+# provisioned
+... memory.policy.yaml [witan-users=33, witan-service=1, witan-admin=1]
+# NOT provisioned — note what is missing, not what is zero
+... memory.policy.yaml [witan-users=33, witan-admin=1]
+```
+
+The renderer also says so outright, on stderr, which is the more direct check:
+
+```bash
+kubectl -n omnigraph logs deploy/omnigraph-server | grep "unprovisioned group"
+#   render-policy-groups: WARNING unprovisioned group(s): ['witan-service'] —
+#   dropped from every bundle along with the rules referencing them, so those
+#   actions are granted to nobody
+```
+
+Silence from that grep is the passing result.
+
+End to end, the thing that actually proves it works is an enumeration through
+the tier — `code_indexed_repos` returning repos rather than nothing.
 
 ## Rotating
 

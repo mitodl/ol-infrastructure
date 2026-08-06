@@ -269,13 +269,26 @@ WITAN_ADMIN_ACTOR_ID = "svc-witan-admin"
 # credentials' rotation.
 #
 # NOT OPTIONAL, unlike the admin principal — and this is the one real difference
-# between them. witan's Cedar bundles all declare a `witan-service` group, and
-# omnigraph-policy REFUSES TO BOOT on a group with no members ("policy group
-# 'witan-service' must not be empty", crates/omnigraph-policy/src/lib.rs:302).
-# Since the bundles are now applied unconditionally in every environment, an
-# environment without this token is a crash-looping data tier, not a degraded
-# one. The all-or-nothing checks below are therefore hard requirements wherever
-# a SOPS file exists at all, rather than the opt-in pair `admin_token` gets.
+# between them. An environment that skips `admin_token` keeps running maintenance
+# as svc-witan-ci, which is a working arrangement. An environment that skips this
+# one has an MCP tier that cannot enumerate graphs, and therefore cannot write a
+# code graph at all: `graph_list` is denied, `ensure_store` fails ahead of every
+# write, and `code_indexed_repos` returns nothing. The all-or-nothing checks
+# below are hard requirements wherever a SOPS file exists, rather than the opt-in
+# pair `admin_token` gets.
+#
+# WHAT THAT FAILURE LOOKS LIKE CHANGED, and the distinction matters for anyone
+# debugging it. omnigraph-policy refuses to boot on a group with no members
+# ("policy group '<name>' must not be empty", omnigraph-policy/src/lib.rs:302),
+# so this was briefly a crash-looping data tier — it took CI down on 2026-08-06
+# between the bundles landing and this account existing. agent-kit #188 then
+# taught the boot-time renderer to DROP an unprovisioned group and every rule
+# naming it, rather than emit one the server rejects. So today the server starts
+# cleanly and the tier is simply granted nothing.
+#
+# That makes checking here MORE valuable, not less: the failure it prevents is
+# now silent. A crash-loop announces itself; a dropped group looks like a healthy
+# deploy until someone notices code-graph writes failing.
 WITAN_SERVICE_TOKEN_VAULT_PATH = "secret-operations/witan/service-token"  # noqa: S105  # pragma: allowlist secret
 WITAN_SERVICE_TOKEN_VAULT_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 WITAN_SERVICE_ACTOR_ID = "svc-witan"
@@ -392,12 +405,10 @@ if (_BRIDGE_SECRETS_DIR / _witan_secrets_path).exists():
         raise ValueError(msg)
 
     # svc-witan, the serving tier's own account. REQUIRED, not opt-in — see
-    # WITAN_SERVICE_TOKEN_VAULT_PATH: the Cedar bundles declare a
-    # `witan-service` group in every environment, and omnigraph-policy refuses
-    # to start on an empty group. A SOPS file without these keys is a
-    # crash-looping data tier, so this fails the deploy instead, where the
-    # message names the missing keys rather than leaving an operator reading
-    # "policy group 'witan-service' must not be empty" out of a CrashLoopBackOff.
+    # WITAN_SERVICE_TOKEN_VAULT_PATH. Caught here because the runtime failure is
+    # silent: the boot-time renderer drops the unprovisioned `witan-service`
+    # group and its rules, so the server starts cleanly and the MCP tier is
+    # simply denied `graph_list` from then on.
     _witan_service_token = _witan_secrets_source.get("service_token")
     _mapped_service_token = _actor_tokens_map.get(WITAN_SERVICE_ACTOR_ID)
 
@@ -408,10 +419,12 @@ if (_BRIDGE_SECRETS_DIR / _witan_secrets_path).exists():
         if _value is None or not str(_value).strip():
             msg = (
                 f"omnigraph/secrets.{stack_info.env_suffix}.yaml: {_label} is "
-                "missing or empty, and it is required — witan's Cedar bundles "
-                "declare a 'witan-service' group in every environment, and "
-                "omnigraph-server refuses to boot on a group with no members. "
-                "Mint one with `openssl rand -hex 32` and set both keys to it "
+                f"missing or empty, and it is required — without it the "
+                f"'witan-service' Cedar group has no members, the boot-time "
+                f"renderer drops it, and the MCP tier is denied `graph_list`: "
+                f"no code-graph writes and an empty code_indexed_repos, with a "
+                f"data tier that otherwise looks healthy. Mint one with "
+                "`openssl rand -hex 32` and set both keys to it "
                 "(see docs/witan-service-account-runbook.md)."
             )
             raise ValueError(msg)
