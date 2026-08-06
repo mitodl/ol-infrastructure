@@ -26,6 +26,18 @@ path "secret-operations/witan/admin-token" {
   capabilities = ["read"]
 }
 
+# svc-witan: the MCP serving tier's own account, used for the server-scoped
+# questions it asks before any per-actor token is in scope — `omnigraph graphs
+# list`, which gates code-graph writes and backs code_indexed_repos (Cedar
+# `graph_list`). Read by the witan-code-token Secret, which pointed at ci-token
+# until this account existed. Written by the omnigraph stack from the same SOPS
+# source as the other two. Unlike admin-token this is present in every
+# environment that has a SOPS file at all, because the Cedar bundles'
+# `witan-service` group cannot be empty.
+path "secret-operations/witan/service-token" {
+  capabilities = ["read"]
+}
+
 # {actor_id: token} JSON map — the same artifact omnigraph-server boots its
 # bearer-token auth from (OMNIGRAPH_SERVER_BEARER_TOKENS_FILE) and witan
 # resolves per-user tokens from (WITAN_ACTOR_TOKENS_FILE). Always carries the

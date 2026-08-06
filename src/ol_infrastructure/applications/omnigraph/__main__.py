@@ -254,6 +254,31 @@ WITAN_ADMIN_TOKEN_VAULT_PATH = "secret-operations/witan/admin-token"  # noqa: S1
 WITAN_ADMIN_TOKEN_VAULT_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 WITAN_ADMIN_ACTOR_ID = "svc-witan-admin"
 
+# The MCP serving tier's own account — the third and last of the non-human
+# principals, same shape as the two above.
+#
+# It exists for the questions the tier asks *about* the server rather than of a
+# graph: `omnigraph graphs list`, which witan_code.store.ensure_store runs before
+# a write to confirm the cluster declares the target graph, and which backs
+# code_indexed_repos. That listing is server-scoped (Cedar `graph_list`), belongs
+# to no actor, and happens before witan_code.ingest._client swaps in the
+# requesting actor's token — so it authenticates as the service or not at all.
+# Until now the tier borrowed svc-witan-ci for it, which worked but attributed
+# the serving tier's enumerations to the code-graph pipeline and coupled the two
+# credentials' rotation.
+#
+# NOT OPTIONAL, unlike the admin principal — and this is the one real difference
+# between them. witan's Cedar bundles all declare a `witan-service` group, and
+# omnigraph-policy REFUSES TO BOOT on a group with no members ("policy group
+# 'witan-service' must not be empty", crates/omnigraph-policy/src/lib.rs:302).
+# Since the bundles are now applied unconditionally in every environment, an
+# environment without this token is a crash-looping data tier, not a degraded
+# one. The all-or-nothing checks below are therefore hard requirements wherever
+# a SOPS file exists at all, rather than the opt-in pair `admin_token` gets.
+WITAN_SERVICE_TOKEN_VAULT_PATH = "secret-operations/witan/service-token"  # noqa: S105  # pragma: allowlist secret
+WITAN_SERVICE_TOKEN_VAULT_KEY = "token"  # noqa: S105  # pragma: allowlist secret
+WITAN_SERVICE_ACTOR_ID = "svc-witan"
+
 ##############################################
 #   Vault secret source (SOPS -> Vault)       #
 ##############################################
@@ -363,10 +388,67 @@ if (_BRIDGE_SECRETS_DIR / _witan_secrets_path).exists():
             "the server while looking separate here."
         )
         raise ValueError(msg)
+
+    # svc-witan, the serving tier's own account. REQUIRED, not opt-in — see
+    # WITAN_SERVICE_TOKEN_VAULT_PATH: the Cedar bundles declare a
+    # `witan-service` group in every environment, and omnigraph-policy refuses
+    # to start on an empty group. A SOPS file without these keys is a
+    # crash-looping data tier, so this fails the deploy instead, where the
+    # message names the missing keys rather than leaving an operator reading
+    # "policy group 'witan-service' must not be empty" out of a CrashLoopBackOff.
+    _witan_service_token = _witan_secrets_source.get("service_token")
+    _mapped_service_token = _actor_tokens_map.get(WITAN_SERVICE_ACTOR_ID)
+
+    for _label, _value in (
+        ("service_token", _witan_service_token),
+        (f"actor_tokens['{WITAN_SERVICE_ACTOR_ID}']", _mapped_service_token),
+    ):
+        if _value is None or not str(_value).strip():
+            msg = (
+                f"omnigraph/secrets.{stack_info.env_suffix}.yaml: {_label} is "
+                "missing or empty, and it is required — witan's Cedar bundles "
+                "declare a 'witan-service' group in every environment, and "
+                "omnigraph-server refuses to boot on a group with no members. "
+                "Mint one with `openssl rand -hex 32` and set both keys to it "
+                "(see docs/witan-service-account-runbook.md)."
+            )
+            raise ValueError(msg)
+
+    if _mapped_service_token != _witan_service_token:
+        msg = (
+            f"omnigraph/secrets.{stack_info.env_suffix}.yaml: service_token must "
+            f"match actor_tokens['{WITAN_SERVICE_ACTOR_ID}'] — they are the same "
+            "token exposed to two different consumers, exactly as ci_token and "
+            "admin_token are."
+        )
+        raise ValueError(msg)
+
+    # Distinct from BOTH of the others. The serving tier is the one principal
+    # that holds a credential while serving user traffic, so collapsing it into
+    # either of the others is what would let a request-time identity reach
+    # privileges it should not have: svc-witan-ci can write a graph's shared
+    # default-branch view, and svc-witan-admin can rewrite memory rows. Cedar
+    # distinguishes them by actor id alone, so two principals sharing a token
+    # are one principal with the union of their grants, however separate the
+    # groups look in the bundle.
+    for _other_label, _other in (
+        ("ci_token", _witan_ci_token),
+        ("admin_token", _witan_admin_token),
+    ):
+        if _other is not None and _witan_service_token == _other:
+            msg = (
+                f"omnigraph/secrets.{stack_info.env_suffix}.yaml: service_token "
+                f"must not equal {_other_label}. Cedar tells these principals "
+                "apart by actor id only, so a shared value silently grants the "
+                f"serving tier everything {_other_label.removesuffix('_token')} "
+                "can do, while the bundle still shows them as separate groups."
+            )
+            raise ValueError(msg)
 else:
     _actor_tokens_map = {}
     _witan_ci_token = None
     _witan_admin_token = None
+    _witan_service_token = None
 
 # The non-human actors, on their own Vault path. This is always written, in
 # every environment, and is the *input* the token-sync job merges Keycloak's
@@ -444,6 +526,17 @@ if _witan_admin_token is not None:
         path=WITAN_ADMIN_TOKEN_VAULT_PATH,
         data_json=Output.secret(
             json.dumps({WITAN_ADMIN_TOKEN_VAULT_KEY: _witan_admin_token})
+        ),
+    )
+
+# The serving tier's account, same sole-writer arrangement. Consumed only by the
+# witan stack's `witan-code-token` Secret, which used to point at ci-token.
+if _witan_service_token is not None:
+    vault.generic.Secret(
+        f"omnigraph-witan-service-token-vault-secret-{stack_info.env_suffix}",
+        path=WITAN_SERVICE_TOKEN_VAULT_PATH,
+        data_json=Output.secret(
+            json.dumps({WITAN_SERVICE_TOKEN_VAULT_KEY: _witan_service_token})
         ),
     )
 
@@ -616,3 +709,8 @@ export("storage_prefix", STORAGE_PREFIX)
 # outputs, where `pulumi stack output` and every consumer's state would carry
 # it — the token travels through Vault, which is what Vault is for.
 export("admin_token_provisioned", _witan_admin_token is not None)
+# Read by the witan stack to decide whether `witan-code-token` syncs from
+# service-token or falls back to ci-token. Always true once a SOPS file exists
+# (the checks above are hard requirements), so the flag exists for exactly one
+# case: an environment with no SOPS file at all, which provisions neither.
+export("service_token_provisioned", _witan_service_token is not None)
