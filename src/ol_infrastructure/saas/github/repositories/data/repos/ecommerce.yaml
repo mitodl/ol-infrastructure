@@ -9,7 +9,13 @@ delete_branch_on_merge: false
 dependabot_security_updates: false
 description: (Deprecated) Service for managing edX's product catalog and handling
   orders for those products
+has_discussions: false
+has_projects: true
 homepage: https://edx-ecommerce.readthedocs.io/en/latest/
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: ecommerce
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams: {}
 web_commit_signoff_required: false

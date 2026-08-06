@@ -5,7 +5,16 @@ allow_squash_merge: true
 archetype: archived
 default_branch: master
 description: Norm!
+has_discussions: false
+has_issues: true
+has_projects: true
+has_wiki: false
 homepage: http://test.do
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: jenkins-atlassian-theme
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   odl-engineering-owners: admin
+web_commit_signoff_required: false

@@ -8,8 +8,17 @@ description: gitreload is a Flask/WSGI application for responding to github trig
   asynchronously.  Out of the box it is primarily intended for use with the edx-platform
   but could be used for general updating of local git repositories based on a trigger
   call from github using it's `/update` url
+has_discussions: false
+has_issues: true
+has_projects: true
+has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: gitreload
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   arbisoft-contractors: admin
   odl-engineering: admin
   odl-engineering-owners: admin
+web_commit_signoff_required: false

@@ -9,6 +9,12 @@ delete_branch_on_merge: false
 dependabot_security_updates: false
 description: Front-end for the Open edX course experience, implemented using React
   and Paragon.
+has_discussions: false
+has_projects: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: frontend-app-learning
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams: {}
 web_commit_signoff_required: false

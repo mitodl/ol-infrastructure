@@ -8,9 +8,15 @@ default_branch: master
 delete_branch_on_merge: false
 dependabot_security_updates: false
 description: Django app which listens for pings and sends alerts when pings are late
+has_discussions: false
+has_projects: true
 has_wiki: true
 homepage: https://healthchecks.io
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: healthchecks
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams: {}
 vulnerability_alerts: false
 web_commit_signoff_required: false

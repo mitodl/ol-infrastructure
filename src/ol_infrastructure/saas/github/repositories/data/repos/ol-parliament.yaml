@@ -8,7 +8,13 @@ archetype: fork
 default_branch: main
 dependabot_security_updates: false
 description: AWS IAM linting library
+has_discussions: false
+has_projects: true
 has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: ol-parliament
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams: {}
 web_commit_signoff_required: false

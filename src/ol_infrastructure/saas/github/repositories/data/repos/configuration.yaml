@@ -9,9 +9,15 @@ delete_branch_on_merge: false
 dependabot_security_updates: false
 description: a simple, but flexible, way for anyone to stand up an instance of the
   edX platform that is fully configured and ready-to-go
+has_discussions: false
 has_issues: true
+has_projects: true
 has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: configuration
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   odl-engineering-owners: admin
 vulnerability_alerts: false

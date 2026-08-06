@@ -9,8 +9,14 @@ delete_branch_on_merge: false
 dependabot_security_updates: false
 description: Multi-tenant read-only FastAPI analytics gateway over StarRocks (B2B
   site-license analytics for MIT Learn)
+has_discussions: false
+has_projects: true
 has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: ol-analytics-api
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   odl-engineering: maintain
 web_commit_signoff_required: false

@@ -6,7 +6,16 @@ archetype: archived
 default_branch: master
 description: 'Discern allows anyone to use machine learning based automated textual
   classification as an API service. '
+has_discussions: false
+has_issues: false
+has_projects: true
+has_wiki: true
 homepage: http://code.edx.org/discern/
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: discern
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   odl-engineering-owners: admin
+web_commit_signoff_required: false

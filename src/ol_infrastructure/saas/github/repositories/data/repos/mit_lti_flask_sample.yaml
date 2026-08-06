@@ -5,7 +5,15 @@ allow_squash_merge: true
 archetype: archived
 default_branch: master
 description: a sample LTI provider using the PyLTI library and the Flask framework
+has_discussions: false
+has_issues: true
+has_projects: true
+has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: mit_lti_flask_sample
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   arbisoft-contractors: admin
   odl-engineering: admin
@@ -14,3 +22,4 @@ topics:
 - flask
 - lti-provider
 - python
+web_commit_signoff_required: false

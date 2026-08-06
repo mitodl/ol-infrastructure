@@ -9,7 +9,13 @@ delete_branch_on_merge: false
 dependabot_security_updates: false
 description: Work-in-progress micro-frontend experience for Open edX Blockstore-based
   content libraries.
+has_discussions: false
+has_projects: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: frontend-app-library-authoring
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams: {}
 vulnerability_alerts: false
 web_commit_signoff_required: false

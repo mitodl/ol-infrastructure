@@ -11,7 +11,13 @@ allow_squash_merge: true
 archetype: application
 default_branch: master
 dependabot_security_updates: false
+has_discussions: false
+has_projects: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: mitxpro
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   arbisoft-contractors: admin
   odl-engineering: admin

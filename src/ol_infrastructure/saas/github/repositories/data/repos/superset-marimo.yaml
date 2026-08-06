@@ -7,10 +7,16 @@ archetype: library
 dependabot_security_updates: false
 description: Marimo notebook integration for Apache Superset — connects reactive Python
   notebooks to Superset-configured data sources
+has_discussions: false
+has_projects: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: superset-marimo
 required_status_checks:
 - Backend lint & type-check
 - Backend tests
 - Frontend type-check & build
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams: {}
 web_commit_signoff_required: false

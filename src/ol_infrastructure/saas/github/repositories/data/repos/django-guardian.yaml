@@ -8,7 +8,13 @@ default_branch: devel
 delete_branch_on_merge: false
 dependabot_security_updates: false
 description: Implementation of per object permissions for Django 1.2+
+has_discussions: false
+has_projects: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: django-guardian
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   odl-engineering: admin
   odl-engineering-owners: admin

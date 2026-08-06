@@ -6,6 +6,15 @@ archetype: archived
 default_branch: master
 description: Repo for running data collection scripts against courses and putting
   the results in the instructor dashboard
+has_discussions: false
+has_issues: true
+has_projects: true
+has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: xsiftx
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   odl-engineering: admin
+web_commit_signoff_required: false
