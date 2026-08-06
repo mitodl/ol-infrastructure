@@ -41,3 +41,11 @@ path "sys/leases/revoke" {
 path "secret-global/learn_ai" {
   capabilities = ["read"]
 }
+# Grafana Cloud metrics credentials, read by the webapp's KEDA Prometheus
+# TriggerAuthentication. Without this the VaultStaticSecret sync 403s, KEDA
+# cannot resolve the trigger's basic auth, and it refuses to create the HPA at
+# all -- leaving the webapp entirely unautoscaled rather than falling back to
+# the CPU trigger.
+path "secret-global/data/grafana" {
+  capabilities = ["read"]
+}
