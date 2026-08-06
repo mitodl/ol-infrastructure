@@ -1,0 +1,161 @@
+"""OpenTelemetry + structured-logging environment for the witan workloads.
+
+agent-kit ``witan_core.observability`` (PR #193) installs structlog plus OTel
+tracer and meter providers, but it deliberately installs **no provider at all**
+when no OTLP endpoint is in the environment — that is what keeps every local
+CLI run and stdio session free of exporters. So the instrumentation is inert
+until something sets these variables, and this module is that something.
+
+Nothing here is witan-specific translation: the code passes no endpoint to the
+exporters and no service name to the ``Resource``, precisely so the OTel SDK
+reads the standard variables itself. Adding a witan-shaped indirection layer
+would be a second thing to keep in sync with the SDK for no gain.
+
+── Why CI gets logs but no traces or metrics ──
+``setup_grafana`` (``substructure/aws/eks/grafana.py``) returns early for CI, so
+operations-ci runs no Grafana Alloy: its ``grafana`` namespace exists and is
+empty, and ``grafana-k8s-monitoring-alloy-receiver`` — the Service every
+precedent exports to — resolves in QA and Production only. Setting the endpoint
+uniformly across all three stacks would therefore not be free in CI; it would
+point the exporters at a name that does not resolve and buy a connection
+failure per batch and per 60s metric interval, forever, in the one environment
+where nobody is watching. ``ships_telemetry`` mirrors ``setup_grafana``'s own
+condition instead, so CI lands back on the SDK's no-provider path by
+construction.
+
+CI still gets the structured JSON logs, which are the half that does not depend
+on Alloy at all: they go to stderr and the k8s-monitoring chart ships pod logs
+to Loki. That is why ``witan_log_env`` is unconditional while the OTel block is
+not.
+"""
+
+import pulumi_kubernetes as kubernetes
+
+from ol_infrastructure.lib.pulumi_helper import StackInfo
+
+# The in-cluster OTLP/HTTP receiver, shared with mit_learn, learn_ai and edxapp
+# (see their Pulumi.{QA,Production}.yaml and edxapp/k8s_configmaps.py). Port
+# 4318 is http/protobuf; 4317 on the same Service is gRPC, which we do not use.
+OTLP_ENDPOINT = (
+    "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318"
+)
+
+# Sampling and propagation, matched to the mit_learn/learn_ai precedent rather
+# than chosen fresh, so a trace that crosses from one of those services into
+# witan is sampled consistently instead of being decided twice.
+TRACES_SAMPLER = "parentbased_traceidratio"
+TRACES_SAMPLER_ARG = "0.25"
+PROPAGATORS = "tracecontext,baggage"
+METRIC_EXPORT_INTERVAL_MS = "60000"
+
+# The three variables `witan_core.observability` reads for pod identity. It adds
+# them BOTH as OTel resource attributes (`k8s.pod.name`, `k8s.namespace.name`,
+# `k8s.node.name`) and as log fields (`pod_name`, `namespace`, `node_name`), and
+# it reads them ONCE at import — so they have to be in the pod environment at
+# startup, which is what makes the downward API the only workable source.
+# Without them a span cannot be attributed to a replica.
+_DOWNWARD_API_FIELDS = {
+    "KUBERNETES_POD_NAME": "metadata.name",
+    "KUBERNETES_NAMESPACE": "metadata.namespace",
+    "KUBERNETES_NODE_NAME": "spec.nodeName",
+}
+
+
+def ships_telemetry(stack_info: StackInfo) -> bool:
+    """Whether this environment has an OTLP receiver to export to.
+
+    Mirrors ``setup_grafana``'s CI early-return. Kept as a named predicate so
+    the reason a stack is dark is one grep away from the reason the collector
+    is absent.
+    """
+    return stack_info.env_suffix.lower() != "ci"
+
+
+def witan_log_env() -> dict[str, str]:
+    """Structured-logging variables, safe in every environment.
+
+    Both are what the code already defaults to in a container (``json``
+    whenever stderr is not a tty, ``INFO`` when neither ``WITAN_LOG_LEVEL`` nor
+    ``LOG_LEVEL`` is set). Stated anyway: a log format that depends on tty
+    detection is one ``kubectl exec`` away from looking different from what the
+    Loki pipeline was built against.
+    """
+    return {
+        "WITAN_LOG_FORMAT": "json",
+        "WITAN_LOG_LEVEL": "INFO",
+    }
+
+
+def otel_env(
+    stack_info: StackInfo,
+    service_name: str,
+    service_version: str,
+) -> dict[str, str]:
+    """Build the standard ``OTEL_*`` variables for a witan workload.
+
+    Returns an empty mapping where there is no collector, which puts
+    ``configure_tracing()``/``configure_metrics()`` back on their intended
+    no-provider path rather than on a failing exporter.
+
+    :param service_name: e.g. ``"witan"`` — prefixed with the environment to
+        match the ``<env>-<service>`` convention edxapp and mit_learn use.
+    :param service_version: the image tag or digest this workload runs, from
+        ``get_docker_image_tag("WITAN")``. The precedents carry a literal
+        ``${GIT_SHA:-unknown}`` because their Helm values are expanded by an
+        entrypoint shell; nothing expands variables here, so a copied literal
+        would ship the string ``${GIT_SHA:-unknown}`` as the version. Pulumi
+        already knows the exact identifier the pod will run, so use it.
+    """
+    if not ships_telemetry(stack_info):
+        return {}
+
+    resource_attributes = ",".join(
+        [
+            f"deployment.environment={stack_info.env_suffix}",
+            "service.namespace=witan",
+            f"service.version={service_version}",
+        ]
+    )
+    return {
+        "OTEL_EXPORTER_OTLP_ENDPOINT": OTLP_ENDPOINT,
+        "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+        "OTEL_SERVICE_NAME": f"{stack_info.env_suffix}-{service_name}",
+        "OTEL_RESOURCE_ATTRIBUTES": resource_attributes,
+        "OTEL_TRACES_SAMPLER": TRACES_SAMPLER,
+        "OTEL_TRACES_SAMPLER_ARG": TRACES_SAMPLER_ARG,
+        "OTEL_PROPAGATORS": PROPAGATORS,
+        "OTEL_METRIC_EXPORT_INTERVAL": METRIC_EXPORT_INTERVAL_MS,
+    }
+
+
+def downward_api_env_dicts() -> list[dict[str, object]]:
+    """Pod-identity env in plain-dict form, for a ``podTemplateSpec`` patch.
+
+    The ``MCPServer`` CRD's own ``spec.env`` is name/value only, so a
+    ``fieldRef`` cannot go there; ToolHive's PodTemplateSpec escape hatch takes
+    a full ``EnvVar`` and merges it onto the operator-managed ``mcp`` container
+    — which is already how ``spec.secrets`` reaches the pod as
+    ``secretKeyRef`` entries.
+    """
+    return [
+        {
+            "name": name,
+            "valueFrom": {"fieldRef": {"fieldPath": field_path}},
+        }
+        for name, field_path in _DOWNWARD_API_FIELDS.items()
+    ]
+
+
+def downward_api_env_args() -> list[kubernetes.core.v1.EnvVarArgs]:
+    """Pod-identity env as ``EnvVarArgs``, for ordinary Job/CronJob specs."""
+    return [
+        kubernetes.core.v1.EnvVarArgs(
+            name=name,
+            value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                field_ref=kubernetes.core.v1.ObjectFieldSelectorArgs(
+                    field_path=field_path,
+                )
+            ),
+        )
+        for name, field_path in _DOWNWARD_API_FIELDS.items()
+    ]

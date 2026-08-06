@@ -42,6 +42,11 @@ release apart in what they put in them.
 import pulumi_kubernetes as kubernetes
 from pulumi import Output, Resource, ResourceOptions
 
+from ol_infrastructure.applications.witan.observability import (
+    downward_api_env_args,
+    otel_env,
+    witan_log_env,
+)
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 # Scratch space for the checkouts. An emptyDir rather than the container
@@ -92,6 +97,7 @@ def create_ci_indexer(  # noqa: PLR0913
     witan_ci_token_secret_name: str,
     witan_ci_token_secret_key: str,
     witan_ci_token_secret: Resource,
+    service_version: str,
     github_app_id: str | None = None,
     github_app_installation_id: str | None = None,
     github_app_secret_name: str | None = None,
@@ -193,6 +199,27 @@ def create_ci_indexer(  # noqa: PLR0913
                 value=f"{GITHUB_APP_MOUNT_PATH}/{GITHUB_APP_KEY_FILENAME}",
             ),
         ]
+
+    # Structured logging + OTel, from the same helper the MCP tier uses. Traced
+    # deliberately rather than as a freebie: this job is the one witan workload
+    # with a history of failing silently for hours between four-hourly ticks,
+    # and every diagnosis so far has come from `kubectl logs` on a pod that had
+    # already been garbage-collected. A per-repo span and an `outcome`-labelled
+    # counter are what let the next failure be noticed without that.
+    # `otel_env` is empty in CI, which has no collector.
+    #
+    # Appended last, after the optional block above, so adding it is a purely
+    # additive diff: k8s treats `env` as a list, and inserting ahead of the
+    # GitHub App vars would renumber them and show as three modifications on
+    # top of the additions in every environment that sets them.
+    indexer_env += [
+        kubernetes.core.v1.EnvVarArgs(name=name, value=value)
+        for name, value in (
+            witan_log_env()
+            | otel_env(stack_info, "witan-code-indexer", service_version)
+        ).items()
+    ]
+    indexer_env += downward_api_env_args()
 
     volume_mounts = [
         kubernetes.core.v1.VolumeMountArgs(

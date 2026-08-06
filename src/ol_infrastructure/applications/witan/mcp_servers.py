@@ -43,6 +43,11 @@ from typing import NamedTuple
 import pulumi_kubernetes as kubernetes
 from pulumi import Output, Resource, ResourceOptions, StackReference
 
+from ol_infrastructure.applications.witan.observability import (
+    downward_api_env_dicts,
+    otel_env,
+    witan_log_env,
+)
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 # Name shared by the MCPGroup and the VirtualMCPServer that references it.
@@ -90,6 +95,7 @@ def create_mcp_servers(  # noqa: PLR0913
     witan_code_token_secret_key: str,
     witan_code_token_secret: Resource,
     migration_job: Resource,
+    service_version: str,
 ) -> WitanMCPServers:
     """Provision the witan-tools MCPGroup and the witan MCPServer backend."""
     witan_mcpgroup = kubernetes.apiextensions.CustomResource(
@@ -180,6 +186,17 @@ def create_mcp_servers(  # noqa: PLR0913
                 # boundary from claiming a graph's shared default-branch view;
                 # only the in-cluster CI indexer Job declares itself `ci`.
                 {"name": "WITAN_CODE_SERVER", "value": omnigraph_server_addr},
+                # Structured logging + OTel. Appended from a shared helper
+                # rather than spelled out here so this workload, the CI
+                # indexer, and anything added later cannot drift into
+                # describing themselves as three different services. `otel_env`
+                # is empty in CI, which has no collector — see observability.py.
+                *(
+                    {"name": name, "value": value}
+                    for name, value in (
+                        witan_log_env() | otel_env(stack_info, "witan", service_version)
+                    ).items()
+                ),
             ],
             "secrets": [
                 {
@@ -242,6 +259,14 @@ def create_mcp_servers(  # noqa: PLR0913
                     "containers": [
                         {
                             "name": "mcp",
+                            # Pod identity for spans and log lines. It rides
+                            # the same patch as the volume mount because
+                            # `spec.env` above is name/value only and cannot
+                            # express a `fieldRef` — the operator merges full
+                            # EnvVars from here onto the `mcp` container, which
+                            # is already how `spec.secrets` arrives as
+                            # `secretKeyRef`.
+                            "env": downward_api_env_dicts(),
                             "volumeMounts": [
                                 {
                                     "name": "actor-tokens",

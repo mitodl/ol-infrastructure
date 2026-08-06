@@ -174,6 +174,7 @@ from ol_infrastructure.lib.ol_types import (
 )
 from ol_infrastructure.lib.pulumi_helper import (
     format_docker_image_ref,
+    get_docker_image_tag,
     make_stack_reference,
     optional_stack_output_value,
     parse_stack,
@@ -674,6 +675,10 @@ witan_image_repository = (
     f"{witan_aws_account.account_id}.dkr.ecr.{aws_config.region}.amazonaws.com/witan"
 )
 witan_image = format_docker_image_ref(witan_image_repository, "WITAN")
+# `service.version` on every span and metric this stack's workloads emit. The
+# same tag-or-digest `witan_image` is built from, so a trace in Tempo names the
+# exact artifact it came from and not a build-time guess at one.
+witan_service_version = get_docker_image_tag("WITAN")
 
 #########################################
 #   Pre-deploy witan data migrations     #
@@ -740,6 +745,7 @@ mcp_servers = create_mcp_servers(
     witan_code_token_secret_key=WITAN_CODE_TOKEN_SECRET_KEY,
     witan_code_token_secret=witan_code_token_secret,
     migration_job=witan_migration_job,
+    service_version=witan_service_version,
 )
 
 #########################################
@@ -937,6 +943,7 @@ witan_ci_indexer = create_ci_indexer(
     witan_ci_token_secret_name=WITAN_CI_TOKEN_SECRET_NAME,
     witan_ci_token_secret_key=WITAN_CI_TOKEN_SECRET_KEY,
     witan_ci_token_secret=witan_ci_token_secret,
+    service_version=witan_service_version,
     github_app_id=WITAN_GITHUB_APP_ID if github_app_secret else None,
     github_app_installation_id=(
         WITAN_GITHUB_APP_INSTALLATION_ID if github_app_secret else None
