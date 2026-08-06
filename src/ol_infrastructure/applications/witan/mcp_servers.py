@@ -39,6 +39,14 @@ from ol_infrastructure.lib.pulumi_helper import StackInfo
 # Name shared by the MCPGroup and the VirtualMCPServer that references it.
 MCP_GROUP_NAME = "witan-tools"
 
+# The MCPServer resource name. ToolHive derives a workload's backend id from the
+# resource name, so this is also the key the vMCP's `outgoingAuth.backends`
+# map must use. A key that doesn't match resolves to no per-backend strategy at
+# all, which lands on the unauthenticated one — the exact failure the "Outgoing
+# auth" section of `__main__.py`'s docstring describes. Shared as a constant so
+# the two cannot drift.
+WITAN_MCPSERVER_NAME = "witan"
+
 # Mount path (inside the witan container) for the actor-tokens Secret volume.
 # The MCPServer CRD's own `volumes` field only supports hostPath mounts, so
 # this is wired via `spec.podTemplateSpec` (RawExtension) instead — see
@@ -101,7 +109,7 @@ def create_mcp_servers(  # noqa: PLR0913
         api_version="toolhive.stacklok.dev/v1beta1",
         kind="MCPServer",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="witan",
+            name=WITAN_MCPSERVER_NAME,
             namespace=namespace,
             labels=k8s_global_labels,
         ),
