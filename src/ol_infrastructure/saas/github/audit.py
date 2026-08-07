@@ -23,6 +23,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal
 
+from ol_infrastructure.saas.github.tiers import TIER_PROPERTY_NAME
+
 Axis = Literal["security", "consistency", "developer-experience"]
 Scope = Literal["active", "archived", "fleet"]
 Severity = Literal["high", "medium", "low"]
@@ -78,6 +80,17 @@ def _is_stale(repo: dict[str, Any]) -> bool:
         return False
     age = datetime.now(UTC) - datetime.fromisoformat(pushed.replace("Z", "+00:00"))
     return age.days > STALE_DAYS
+
+
+def _live_tier(repo: dict[str, Any]) -> str | None:
+    """Return the `tier` GitHub actually reports for this repo, per the last crawl.
+
+    `None` means the crawl recorded no value -- either the repo YAML predates
+    `_custom_properties` or the property genuinely came back empty. Both are findings,
+    and CON-11 reports them as such rather than passing. `tier` is `required` with a
+    default, so there is no live state in which the correct answer is "no value".
+    """
+    return (repo.get("_custom_properties") or {}).get(TIER_PROPERTY_NAME)
 
 
 def _unsanctioned_admin(repo: dict[str, Any]) -> list[str]:
@@ -167,6 +180,32 @@ RULES: tuple[Rule, ...] = (
                 "downgrade to push or maintain",
             )
             if _unsanctioned_admin(r)
+            else None
+        ),
+    ),
+    Rule(
+        "CON-11",
+        "consistency",
+        "high",
+        "fleet",
+        "live `tier` does not match the declared tier",
+        # The one field where declared-vs-live divergence changes which org rulesets
+        # apply, so it is graded `high` despite being a consistency rule -- a repo at
+        # the wrong tier is protected by a different baseline than the code claims.
+        #
+        # WRITTEN AS A THREE-WAY COMPARISON ON PURPOSE. The tempting form,
+        # `if declared and declared != live`, passes silently whenever either side is
+        # missing, and a missing live value is precisely how the 140-repo archived-repo
+        # divergence stayed invisible: those repos were not untiered, they had fallen
+        # into the property's `standard` default. Absence on either side is reported.
+        lambda r: (
+            (
+                f"live {_live_tier(r) or 'unrecorded'}",
+                f"declared {r.get('tier') or 'nothing'}",
+                "re-run `github-org-inventory crawl --refresh`; if the live value is "
+                "real, `pulumi up` the repositories stack to rewrite it",
+            )
+            if _live_tier(r) != r.get("tier")
             else None
         ),
     ),

@@ -1,7 +1,9 @@
 ---
+_custom_properties:
+  tier: tier-1
 _excluded_environments: 1
 _has_branch_protection: false
-_pushed_at: '2026-08-06T12:39:06Z'
+_pushed_at: '2026-08-07T13:36:43Z'
 _ruleset_count: 2
 _visibility: public
 allow_auto_merge: false

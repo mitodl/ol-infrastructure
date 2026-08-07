@@ -46,6 +46,7 @@ from ol_infrastructure.lib.github_helper import (
     GITHUB_API,
     get_installation_token,
 )
+from ol_infrastructure.saas.github.tiers import TIER_PROPERTY_NAME
 
 app = cyclopts.App(help="Inventory the mitodl GitHub org for the Pulumi import.")
 
@@ -284,7 +285,6 @@ def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
                 "Pagination is now required -- see the note above."
             )
             raise RuntimeError(message)
-        properties = _maybe(client, f"/repos/{ORG}/{name}/properties/values") or []
         teams = _maybe(client, f"/repos/{ORG}/{name}/teams?per_page=100") or []
         # IDs, not just counts: `imports` needs them to build the Pulumi import payload.
         hooks = _maybe(client, f"/repos/{ORG}/{name}/hooks?per_page=100") or []
@@ -394,9 +394,9 @@ def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
             "direct_collaborators": {
                 u["login"]: u.get("role_name") for u in direct_collaborators
             },
-            "custom_properties": {
-                p["property_name"]: p["value"] for p in properties if p.get("value")
-            },
+            # `custom_properties` is NOT built here -- see _crawl_org. One org-wide call
+            # covers all 316 repos, so asking per repo bought 315 extra requests and a
+            # second code path for the same fact.
             "teams": {t["slug"]: t["permission"] for t in teams},
         }
 
@@ -420,6 +420,26 @@ def _crawl_org(cache: Path, *, refresh: bool) -> dict[str, Any]:
         teams = _paginate(client, f"/orgs/{ORG}/teams")
         members = _paginate(client, f"/orgs/{ORG}/members")
         property_schema = _maybe(client, f"/orgs/{ORG}/properties/schema") or []
+        # Every repo's custom-property values in ~4 pages. `tier` is what the phase-3.5
+        # org rulesets target, so this is the single most consequential field in the
+        # crawl: a repo whose live tier is not its declared tier is matched by a
+        # different set of rulesets than the code says it is.
+        #
+        # AN UNSET PROPERTY IS A VALUE, NOT AN ABSENCE. `tier` is `required` with
+        # `default_value: standard`, so a repo nobody has written to reads back as
+        # `standard` -- and `standard` is targeted by `baseline-default-branch`. That
+        # is not a hypothetical: after the phase-3 apply all 140 archived repos were
+        # live at `standard` while the fleet declared `unmanaged`, and the ruleset
+        # matched 214 repos where 74 was intended (PR #5317). Values are therefore
+        # recorded VERBATIM, including falsy ones -- an earlier `if p.get("value")`
+        # filter here made "set to empty" and "never measured" identical, which is the
+        # exact shape of the bug that hid the divergence.
+        property_values = {
+            entry["repository_name"]: {
+                p["property_name"]: p["value"] for p in entry["properties"]
+            }
+            for entry in _paginate(client, f"/orgs/{ORG}/properties/values")
+        }
         org_rulesets = _maybe(client, f"/orgs/{ORG}/rulesets") or []
         org_hooks = _maybe(client, f"/orgs/{ORG}/hooks?per_page=100") or []
         # TeamMembership imports as <team-id>:<username>, so the roster has to be per team.
@@ -436,6 +456,21 @@ def _crawl_org(cache: Path, *, refresh: bool) -> dict[str, Any]:
     )
     with ThreadPoolExecutor(max_workers=CRAWL_THREADS) as pool:
         crawled = list(pool.map(lambda r: _crawl_repo(token, r), repos))
+
+    # A repo missing from the org-wide property response gets `{}`, and `{}` must not be
+    # read as "no properties set" -- with a required, defaulted `tier` that cannot happen,
+    # so it means the response did not cover the fleet. Trip rather than emit repo files
+    # whose tier the audit will then report as drifted for a reason that is not drift.
+    if uncovered := sorted({r["name"] for r in crawled} - set(property_values)):
+        message = (
+            f"{len(uncovered)} repo(s) absent from /orgs/{ORG}/properties/values: "
+            f"{uncovered[:10]}{' ...' if len(uncovered) > 10 else ''}\n"
+            "`tier` is required with a default, so every repo must appear. Suspect "
+            "pagination or a permissions change before believing the data."
+        )
+        raise SystemExit(message)
+    for repo in crawled:
+        repo["custom_properties"] = property_values[repo["name"]]
 
     data = {
         "crawled_at": datetime.now(UTC).isoformat(),
@@ -901,8 +936,6 @@ def crawl(
             doc["homepage"] = repo["homepage"]
         if repo["topics"]:
             doc["topics"] = repo["topics"]
-        if repo["custom_properties"]:
-            doc["custom_properties"] = repo["custom_properties"]
         # The one genuinely per-repo rule (§5.4) -- check names differ per repo.
         if repo["required_status_checks"]:
             doc["required_status_checks"] = repo["required_status_checks"]
@@ -929,6 +962,13 @@ def crawl(
             doc["_excluded_environments"] = repo["environment_count"]
         if repo["actions_secrets"]:
             doc["_actions_secret_names"] = [s["name"] for s in repo["actions_secrets"]]
+        # OBSERVED property values, under `_` because they are inventory: the DECLARED
+        # tier is `tier`, resolved from the archetype, and it is what Pulumi writes.
+        # Recording the live value beside it is what lets CON-11 compare the two without
+        # an API call. Emitted unconditionally -- an empty dict here is a real finding
+        # (the property exists org-wide with a default, so nothing should read back
+        # empty), and omitting the key on empty would hide it.
+        doc["_custom_properties"] = repo["custom_properties"]
         doc["_visibility"] = repo["visibility"]
         doc["_pushed_at"] = repo["pushed_at"]
         doc["_has_branch_protection"] = repo["has_branch_protection"]
@@ -1082,13 +1122,19 @@ def imports(
             f"mitodl-repo-vulnerability-alerts-{name}",
             name,
         )
-        for property_name in repo["custom_properties"]:
+        # `tier` only, not every property in the crawl. The resource name has to match
+        # what repository.py declares (`mitodl-repo-tier-<repo>`), and that function
+        # emits exactly one RepositoryCustomProperty per repo. Importing a second
+        # property under the tier's name would bind live state to the wrong resource.
+        # A new org property therefore needs a code change here AND in repository.py --
+        # which is the right amount of friction for something rulesets target.
+        if repo["custom_properties"].get(TIER_PROPERTY_NAME) is not None:
             # Three parts, and the ORG name is part of the id.
             add(
                 repo_resources,
                 "repositoryCustomProperty:RepositoryCustomProperty",
                 f"mitodl-repo-tier-{name}",
-                f"{ORG}:{name}:{property_name}",
+                f"{ORG}:{name}:{TIER_PROPERTY_NAME}",
             )
         for team_slug in repo["teams"]:
             add(

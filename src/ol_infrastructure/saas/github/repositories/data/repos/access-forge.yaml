@@ -22,8 +22,10 @@ _actions_secret_names:
 - QA_KEYCLOAK_OL_ENG_REALM
 - QA_KEYCLOAK_REALM
 - QA_KEYCLOAK_SERVER_URL
+_custom_properties:
+  tier: tier-1
 _has_branch_protection: false
-_pushed_at: '2026-08-06T12:40:38Z'
+_pushed_at: '2026-08-07T05:00:32Z'
 _ruleset_count: 0
 _visibility: private
 allow_auto_merge: false

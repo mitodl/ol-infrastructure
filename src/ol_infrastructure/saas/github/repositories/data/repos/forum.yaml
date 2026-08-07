@@ -1,4 +1,6 @@
 ---
+_custom_properties:
+  tier: unmanaged
 _has_branch_protection: false
 _pushed_at: '2026-03-30T10:22:19Z'
 _ruleset_count: 0

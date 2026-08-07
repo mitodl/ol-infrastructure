@@ -2,6 +2,8 @@
 _actions_secret_names:
 - HEROKU_API_KEY
 - HEROKU_EMAIL
+_custom_properties:
+  tier: tier-1
 _excluded_environments: 1723
 _has_branch_protection: true
 _pushed_at: '2026-07-23T18:59:37Z'

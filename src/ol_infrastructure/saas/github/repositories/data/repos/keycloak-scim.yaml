@@ -1,4 +1,6 @@
 ---
+_custom_properties:
+  tier: tier-1
 _has_branch_protection: false
 _pushed_at: '2026-07-21T00:07:13Z'
 _ruleset_count: 0

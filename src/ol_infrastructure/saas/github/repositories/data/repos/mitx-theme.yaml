@@ -1,4 +1,6 @@
 ---
+_custom_properties:
+  tier: tier-1
 _excluded_environments: 1
 _has_branch_protection: false
 _pushed_at: '2026-07-13T13:04:55Z'

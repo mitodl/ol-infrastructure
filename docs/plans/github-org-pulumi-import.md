@@ -961,6 +961,26 @@ Re-crawls live GitHub and diffs against declared YAML. This is what keeps the es
 after the import: any out-of-band console change surfaces as a diff. Run it nightly in Concourse
 and route findings to the project's witan task list.
 
+**`tier` is compared separately from the rest, on purpose.** The generic loop skips a field
+the fleet declares nothing for — legitimate for every other tracked field, since archetypes
+may stay silent — but `tier` decides which org rulesets match a repo (§5.4), so it is the one
+field where "declared nothing" is itself the finding. It also does not live at the top level
+of the crawl: GitHub reports it among the repo's custom-property values, from one org-wide
+`GET /orgs/{org}/properties/values`.
+
+The failure this guards against is not hypothetical. After the phase-3 apply, all 140 archived
+repos were live at `tier=standard` while the fleet declared `unmanaged` — because `tier` is
+`required` with `default_value: standard`, so the repos nobody had written to had not fallen
+*outside* the scheme, they had fallen *into* the targeted tier. `baseline-default-branch`
+matched 214 repos where 74 was intended (PR #5317). Nothing surfaced it; it was found by
+hand-querying the API. An unset custom property is a **value, not an absence**, and any
+comparison written as `if want and want != got` passes it silently.
+
+The same divergence is now also visible without credentials: `crawl` records the observed
+values as `_custom_properties` in each repo's YAML, and audit rule **CON-11** compares them
+against the declared tier in `run`. `run` lists every rule including those at zero, so CON-11
+reading clean is distinguishable from CON-11 not running.
+
 ---
 
 ## 8. Phasing

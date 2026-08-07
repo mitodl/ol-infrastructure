@@ -62,7 +62,6 @@ def run(
         findings = [f for f in findings if f.axis == axis]
 
     by_rule = Counter(f.rule_id for f in findings)
-    rules = {r.rule_id: r for r in audit.RULES}
 
     if as_json:
         print(
@@ -80,16 +79,24 @@ def run(
         print(
             f"# mitodl estate audit -- {len(fleet)} repos, {len(findings)} findings\n"
         )
+        # EVERY rule is listed, including the ones at zero, and `--axis` filters which
+        # rules are listed rather than only which findings are counted. A rule that
+        # fires nowhere would otherwise be indistinguishable from a rule that is not
+        # registered, or one whose input the crawl never recorded -- the same
+        # "empty and unmeasured look identical" failure audit.py exists to avoid, just
+        # moved to the reporter. CON-11 read as clean from the day it was written; the
+        # only thing separating that from a broken rule is seeing it on the report.
+        listed = [r for r in audit.RULES if axis is None or r.axis == axis]
         ordered = sorted(
-            by_rule,
-            key=lambda rid: (SEVERITY_ORDER[rules[rid].severity], -by_rule[rid]),
+            listed,
+            key=lambda r: (SEVERITY_ORDER[r.severity], -by_rule[r.rule_id]),
         )
-        for rule_id in ordered:
-            rule = rules[rule_id]
+        for rule in ordered:
+            count = by_rule[rule.rule_id]
             total = audit.population(fleet, rule.scope)
-            share = f"{by_rule[rule_id] / total:.0%}" if total else "-"
+            share = f"{count / total:.0%}" if total else "-"
             print(
-                f"  {rule.severity:6} {rule_id:8} {by_rule[rule_id]:4} "
+                f"  {rule.severity:6} {rule.rule_id:8} {count:4} "
                 f"({share:>4} of {total} {rule.scope})  {rule.summary}"
             )
         print("\nWorst offenders, by number of findings:")
@@ -161,8 +168,29 @@ def drift(
         for field in tracked:
             want = declared[name].get(field)
             got = live[name].get(field)
+            # `want is None` means the fleet declares nothing for this field, so there
+            # is nothing to have drifted from -- that is a real exemption for the
+            # tracked fields above, all of which archetypes may legitimately stay
+            # silent on. It is NOT true of `tier`, which is compared separately below
+            # precisely so it cannot inherit this skip.
             if want is not None and want != got:
                 changed.append(f"{name}.{field}: declared {want!r}, live {got!r}")
+        # `tier` is not in `tracked` because it does not live at the top level of the
+        # crawl: GitHub reports it among the repo's custom-property values. It gets its
+        # own comparison rather than a flattening step so that BOTH sides are asserted
+        # present -- an unset custom property reads back as the schema's default value,
+        # never as an absence, so `got is None` means the crawl failed to measure it
+        # rather than that the repo has no tier. Reporting that as "no drift" is how a
+        # 140-repo divergence went unseen (PR #5317); reporting it as drift is noisy
+        # exactly once, when the cache predates this field.
+        want_tier = declared[name].get("tier")
+        got_tier = (live[name].get("custom_properties") or {}).get("tier")
+        if want_tier != got_tier:
+            changed.append(
+                f"{name}.tier: declared {want_tier!r}, "
+                f"live {got_tier!r}"
+                f"{' (not in the crawl)' if got_tier is None else ''}"
+            )
 
     for name in only_live:
         print(f"  UNMANAGED   {name} exists on GitHub but has no fleet entry")

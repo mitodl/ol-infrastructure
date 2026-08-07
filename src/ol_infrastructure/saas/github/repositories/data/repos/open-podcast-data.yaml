@@ -1,4 +1,6 @@
 ---
+_custom_properties:
+  tier: tier-1
 _direct_collaborators:
   odlbot: admin
 _has_branch_protection: false

@@ -6,9 +6,11 @@ _actions_secret_names:
 - MITOL_LEARN_DOCKERHUB_USER
 - MITX_ONLINE_BASE_URL_PROD
 - MITX_ONLINE_BASE_URL_RC
+_custom_properties:
+  tier: tier-1
 _excluded_environments: 44
 _has_branch_protection: true
-_pushed_at: '2026-08-06T14:21:55Z'
+_pushed_at: '2026-08-07T20:41:25Z'
 _ruleset_count: 1
 _visibility: public
 allow_auto_merge: false

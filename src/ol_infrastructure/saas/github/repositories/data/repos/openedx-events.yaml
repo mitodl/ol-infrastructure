@@ -1,4 +1,6 @@
 ---
+_custom_properties:
+  tier: unmanaged
 _direct_collaborators:
   Anas12091101: admin
 _has_branch_protection: false

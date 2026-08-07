@@ -12,6 +12,8 @@ _actions_secret_names:
 - SEARCH_API_URL
 - SSH_KEY
 - STATIC_API_BASE_URL
+_custom_properties:
+  tier: tier-1
 _direct_collaborators:
   gumaerc: admin
 _excluded_environments: 3

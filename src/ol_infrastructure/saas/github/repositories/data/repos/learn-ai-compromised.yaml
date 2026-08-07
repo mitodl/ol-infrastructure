@@ -16,6 +16,8 @@ _actions_secret_names:
 - POSTHOG_PERSONAL_API_KEY_RC
 - POSTHOG_PROJECT_API_KEY_PROD
 - POSTHOG_PROJECT_API_KEY_RC
+_custom_properties:
+  tier: unmanaged
 _direct_collaborators:
   ChristopherChudzicki: admin
   mbertrand: write

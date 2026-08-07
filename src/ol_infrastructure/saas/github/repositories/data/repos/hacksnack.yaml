@@ -1,8 +1,10 @@
 ---
+_custom_properties:
+  tier: tier-1
 _direct_collaborators:
   abeglova: admin
 _has_branch_protection: false
-_pushed_at: '2026-07-01T15:24:21Z'
+_pushed_at: '2026-08-07T13:33:02Z'
 _ruleset_count: 0
 _visibility: public
 allow_auto_merge: false
@@ -20,5 +22,8 @@ merge_commit_title: MERGE_MESSAGE
 name: hacksnack
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
-teams: {}
+teams:
+  arbisoft-contractors: triage
+  odl-engineering: admin
+  odl-engineering-owners: admin
 web_commit_signoff_required: false
