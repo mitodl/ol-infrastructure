@@ -411,7 +411,7 @@ mitlearn_vault_static_secrets = vault.generic.Secret(
     path=mitlearn_vault_mount.path.apply("{}/secrets".format),
     data_json=Output.all(
         qdrant_api_key=qdrant_api_key.key,
-        sentry_dsn=sentry_stack.require_output("open_next_sentry_dsn"),
+        sentry_dsn=sentry_stack.require_output("mit_learn_sentry_dsn"),
     ).apply(
         lambda args: json.dumps(
             {
