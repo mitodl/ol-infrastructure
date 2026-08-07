@@ -362,10 +362,6 @@ vault.generic.Secret(
     ),
     opts=ResourceOptions(parent=mit_open_vault_iam_role),
 )
-secret_operations_global_mit_open_sentry_dsn = vault.generic.get_secret_output(
-    path="secret-operations/global/mit-open/sentry-dsn",
-    opts=InvokeOptions(parent=mit_open_vault_iam_role),
-)
 secret_operations_sso_open_discussions = vault.generic.get_secret_output(
     path="secret-operations/sso/open-discussions",
     opts=InvokeOptions(parent=mit_open_vault_iam_role),
@@ -530,9 +526,7 @@ sensitive_heroku_vars = {
     "SECRET_KEY": secret_mit_open_env_django_secret_key.data.apply(
         lambda data: "{}".format(data["value"])
     ),
-    "SENTRY_DSN": secret_operations_global_mit_open_sentry_dsn.data.apply(
-        lambda data: "{}".format(data["value"])
-    ),
+    "SENTRY_DSN": sentry_stack.require_output("open_sentry_dsn"),
     "SOCIAL_AUTH_OL_OIDC_SECRET": secret_operations_sso_open_discussions.data.apply(
         lambda data: "{}".format(data["client_secret"])
     ),
