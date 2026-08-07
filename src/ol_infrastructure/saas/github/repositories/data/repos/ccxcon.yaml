@@ -1,4 +1,6 @@
 ---
+_custom_properties:
+  tier: unmanaged
 _excluded_environments: 46
 _has_branch_protection: true
 _pushed_at: '2016-03-16T15:42:13Z'

@@ -9,6 +9,8 @@ _actions_secret_names:
 - SEARCH_API_URL
 - ZAP_PROD_TARGET
 - ZAP_RC_TARGET
+_custom_properties:
+  tier: unmanaged
 _excluded_environments: 2
 _has_branch_protection: false
 _pushed_at: '2022-02-21T19:44:11Z'

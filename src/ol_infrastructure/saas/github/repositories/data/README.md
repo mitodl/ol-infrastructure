@@ -20,6 +20,17 @@ uv run bin/github-org-inventory crawl --refresh
     imported (§4.3). 7,803 exist org-wide; importing them guarantees a churning diff.
   - `_actions_secret_names` — secret **names** only. Values are write-only and are never
     imported (§4.1).
+  - `_custom_properties` — the property values GitHub **actually reports** for the repo,
+    as of the last crawl. Read this beside the top-level `tier`, which is the value the
+    archetype **declares** and Pulumi writes; `CON-11` compares the two, which is how the
+    audit detects a tier divergence without an API call.
+
+    An unset custom property is a **value, not an absence**. `tier` is `required` with
+    `default_value: standard`, so a repo nobody has written to reads back as `standard` —
+    and `standard` is a tier the `baseline-default-branch` org ruleset targets. After the
+    phase-3 apply all 140 archived repos sat at live `standard` while declaring
+    `unmanaged`, and the ruleset matched 214 repos where 74 was intended (PR #5317).
+    Nothing reported it, because nothing recorded it. Hence this key.
 - These files record what each repo **is today**, deviations and all, including where
   today's value is wrong. That is deliberate: §6's empty-diff gate requires the model to
   match reality before phase 5 changes anything. A wrong-but-explicit value is an

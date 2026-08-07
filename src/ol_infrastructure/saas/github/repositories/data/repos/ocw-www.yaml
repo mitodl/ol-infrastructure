@@ -4,6 +4,8 @@ _actions_secret_names:
 - NETLIFY_SITE_ID
 - OCW_STUDIO_BASE_URL
 - SEARCH_API_URL
+_custom_properties:
+  tier: unmanaged
 _excluded_environments: 3
 _has_branch_protection: false
 _pushed_at: '2021-11-08T14:22:21Z'

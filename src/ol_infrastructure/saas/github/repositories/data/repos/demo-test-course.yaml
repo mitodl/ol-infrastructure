@@ -1,4 +1,6 @@
 ---
+_custom_properties:
+  tier: unmanaged
 _direct_collaborators:
   pdpinch: admin
 _has_branch_protection: false

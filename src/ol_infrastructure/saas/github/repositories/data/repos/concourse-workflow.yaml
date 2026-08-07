@@ -1,6 +1,8 @@
 ---
 _actions_secret_names:
 - PRIVATE_KEY
+_custom_properties:
+  tier: tier-1
 _direct_collaborators:
   Ardiea: admin
   odlbot: admin

@@ -1,4 +1,6 @@
 ---
+_custom_properties:
+  tier: unmanaged
 _direct_collaborators:
   mbertrand: admin
 _excluded_environments: 1
