@@ -252,8 +252,8 @@ project_open = sentry.SentryProject(
 project_open_next = sentry.SentryProject(
     "project_open_next",
     organization=ORGANIZATION,
-    name="open-next",
-    slug="open-next",
+    name="mit-learn",
+    slug="mit-learn",
     platform="python-django",
     teams=["mit-learn", "mit-office-of-digital-learning", "devops"],
     digests_min_delay=300,
@@ -301,19 +301,6 @@ project_openedx_residential = sentry.SentryProject(
     opts=sentry_opts,
 )
 
-project_python = sentry.SentryProject(
-    "project_python",
-    organization=ORGANIZATION,
-    name="python",
-    slug="python",
-    platform="python",
-    teams=["mit-office-of-digital-learning"],
-    digests_min_delay=300,
-    digests_max_delay=1800,
-    resolve_age=0,
-    opts=sentry_opts,
-)
-
 project_release_script = sentry.SentryProject(
     "project_release_script",
     organization=ORGANIZATION,
@@ -324,19 +311,6 @@ project_release_script = sentry.SentryProject(
     digests_min_delay=300,
     digests_max_delay=1800,
     resolve_age=0,
-    opts=sentry_opts,
-)
-
-project_sandbox = sentry.SentryProject(
-    "project_sandbox",
-    organization=ORGANIZATION,
-    name="Python",
-    slug="sandbox",
-    platform="python",
-    teams=["mit-office-of-digital-learning"],
-    digests_min_delay=300,
-    digests_max_delay=1800,
-    resolve_age=120,
     opts=sentry_opts,
 )
 
@@ -3382,7 +3356,7 @@ key_open_default_005a98ba45c3472dbb4c12405d814557 = sentry.SentryKey(
 key_open_next_default_8131564a9b9e31ac3cbcf7952f0fea80 = sentry.SentryKey(
     "key_open_next_default_8131564a9b9e31ac3cbcf7952f0fea80",  # pragma: allowlist secret
     organization=ORGANIZATION,
-    project="open-next",
+    project="mit-learn",
     name="Default",
     opts=sentry_opts,
 )
@@ -3411,26 +3385,10 @@ key_openedx_residential_default_3741f5e8334b429eaa048bec1e3daa30 = sentry.Sentry
     opts=sentry_opts,
 )
 
-key_python_default_7cc91e53ac70f26e91a2e788288be63d = sentry.SentryKey(
-    "key_python_default_7cc91e53ac70f26e91a2e788288be63d",  # pragma: allowlist secret
-    organization=ORGANIZATION,
-    project="python",
-    name="Default",
-    opts=sentry_opts,
-)
-
 key_release_script_default_67d74d4e5121a4ca332f1523ff8affdd = sentry.SentryKey(
     "key_release_script_default_67d74d4e5121a4ca332f1523ff8affdd",  # pragma: allowlist secret
     organization=ORGANIZATION,
     project="release-script",
-    name="Default",
-    opts=sentry_opts,
-)
-
-key_sandbox_default_8c6395a9422040c999373e204b15bd8b = sentry.SentryKey(
-    "key_sandbox_default_8c6395a9422040c999373e204b15bd8b",  # pragma: allowlist secret
-    organization=ORGANIZATION,
-    project="sandbox",
     name="Default",
     opts=sentry_opts,
 )
@@ -3712,7 +3670,7 @@ pulumi.export(
     key_open_default_005a98ba45c3472dbb4c12405d814557.dsn_public,
 )
 pulumi.export(
-    "open_next_sentry_dsn",
+    "mit_learn_sentry_dsn",
     key_open_next_default_8131564a9b9e31ac3cbcf7952f0fea80.dsn_public,
 )
 pulumi.export(
@@ -3728,16 +3686,8 @@ pulumi.export(
     key_openedx_residential_default_3741f5e8334b429eaa048bec1e3daa30.dsn_public,
 )
 pulumi.export(
-    "python_sentry_dsn",
-    key_python_default_7cc91e53ac70f26e91a2e788288be63d.dsn_public,
-)
-pulumi.export(
     "release_script_sentry_dsn",
     key_release_script_default_67d74d4e5121a4ca332f1523ff8affdd.dsn_public,
-)
-pulumi.export(
-    "sandbox_sentry_dsn",
-    key_sandbox_default_8c6395a9422040c999373e204b15bd8b.dsn_public,
 )
 pulumi.export(
     "xpro_sentry_dsn",

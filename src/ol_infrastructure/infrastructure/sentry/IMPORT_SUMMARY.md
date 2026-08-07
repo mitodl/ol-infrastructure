@@ -85,12 +85,18 @@ configuration, then `pulumi import --file sentry_imports.json` followed by
   are not part of the generator's output template -- if `bin/import-sentry-config`
   is re-run and a key's generated variable name changes (e.g. its numeric
   suffix), update the matching export line by hand.
-- `project_airbyte` / `key_airbyte_default_*` and `project_unified_ecommerce` /
-  `key_unified_ecommerce_default_*`: removed by hand post-import (unused,
-  zero Sentry events/issues). If `bin/import-sentry-config` is re-run against
-  a `sentry_imports.json` that still lists these live projects, drop them
-  from the import file first or the regenerated code will recreate the
-  resource blocks.
+- `project_airbyte` / `key_airbyte_default_*`, `project_unified_ecommerce` /
+  `key_unified_ecommerce_default_*`, `project_python` / `key_python_default_*`,
+  and `project_sandbox` / `key_sandbox_default_*`: removed by hand post-import
+  (unused, zero Sentry events/issues in any of them). If `bin/import-sentry-config`
+  is re-run against a `sentry_imports.json` that still lists these live
+  projects, drop them from the import file first or the regenerated code will
+  recreate the resource blocks. **All eight resources (4 projects + 4 keys)
+  carry `protect=True` via the file-wide `sentry_opts`, so `pulumi up` will
+  fail on these deletes with "cannot be deleted because it is protected"
+  until each is unprotected first**, e.g.:
+  `pulumi state unprotect 'urn:pulumi:default::ol-infrastructure-sentry::sentry:index/sentryProject:SentryProject::project_airbyte'`
+  (repeat for the other 3 projects and 4 keys) -- confirmed via `pulumi preview`.
 - `project_ocw_next` / `key_ocw_next_default_*`: the live Sentry project's
   `name`/`slug` were hand-changed from `ocw-next` to `ocw-site` (matching the
   `ocw_site` application) without renaming the Pulumi resource identifiers,
@@ -99,3 +105,17 @@ configuration, then `pulumi import --file sentry_imports.json` followed by
   run will regenerate `name`/`slug` back to whatever the live project is
   named at that point -- expect it to match `ocw-site` unless it's renamed
   again live.
+- `project_open_next` / `key_open_next_default_*`: the live Sentry project's
+  `name`/`slug` were hand-changed from `open-next` to `mit-learn` (without
+  renaming the Pulumi resource identifiers, same in-place-update rationale as
+  `project_ocw_next` above). `open` is the legacy `open-discussions`/`mit_open`
+  Heroku deployment (culprits are old `/api/v0/...` routes and old task
+  modules like `search.tasks.*`, `course_catalog.tasks.*`); `open-next` is the
+  current MIT Learn stack as a whole -- both the k8s `mit_learn` Django
+  backend (`/api/v1/learning_resources/...`, `vector_search.tasks.*`, SCIM)
+  and the `mit_learn_nextjs` frontend share this one project, the same way
+  `project_dagster` covers all of Dagster's code locations rather than
+  splitting by app. The hand-added export is `mit_learn_sentry_dsn`. A future
+  `bin/import-sentry-config` run will regenerate `name`/`slug` back to
+  whatever the live project is named at that point -- expect it to match
+  `mit-learn` unless it's renamed again live.
