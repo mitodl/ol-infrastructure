@@ -1535,10 +1535,10 @@ mitlearn_k8s_app = OLApplicationK8s(
             #
             # Raised again 2026-08-07, 1350 -> 1500. The previous 1350 (pair 2700Mi,
             # ~370Mi margin under a 3Gi floor) was sized against a 2774Mi peak that
-            # was itself measured while the fleet was over-scaled (HPA pegged near
-            # max_replicas by an inert KEDA trigger, spreading traffic thin). PR #5303
-            # fixed that trigger, the HPA settled into a much smaller replica range,
-            # and the same total traffic concentrating onto fewer pods pushed
+            # was itself measured while the fleet was over-scaled (the two inert Prometheus
+            # triggers left the undersized-request CPU trigger pegging the HPA near
+            # max_replicas and spreading traffic thin). PR #5303 raised the CPU request, so
+            # the HPA settled into a much smaller replica range,
             # container RSS to 3045-3069Mi within a day -- eating the margin and
             # reviving the OOMKills. 2*1500 = 3000Mi leaves ~580Mi under the new 3.5Gi
             # floor for the master and transient overshoot, sized with more headroom

@@ -50,8 +50,8 @@ config:
   mitlearn:use_granian: true
   # Raised again 2026-08-07, 3Gi -> 3.5Gi. The 3Gi floor (peak RSS 2774Mi + ~11%,
   # see git history for that calibration) got eaten within ~10 days: PR #5303
-  # (2026-08-06) raised the webapp CPU request 500m->1200m to fix an inert KEDA
-  # trigger that was pegging the HPA at max_replicas=30. That fix was correct on
+  # (2026-08-06) raised the webapp CPU request 500m->1200m because the two
+  # Prometheus triggers were inert, leaving CPU to peg the HPA at max_replicas=30.
   # its own terms, but it also means the same real CPU usage reads as lower
   # utilization, so the HPA now legitimately runs fewer replicas (observed
   # kube_horizontalpodautoscaler_status_current_replicas dropped from oscillating
