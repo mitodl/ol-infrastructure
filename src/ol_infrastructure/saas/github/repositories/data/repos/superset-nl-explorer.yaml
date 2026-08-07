@@ -8,7 +8,13 @@ delete_branch_on_merge: false
 dependabot_security_updates: false
 description: Natural language LLM interface for Apache Superset — chart, dashboard,
   and data exploration via chat. Deployed as a Superset extension plugin.
+has_discussions: false
+has_projects: true
 has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: superset-nl-explorer
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams: {}
 web_commit_signoff_required: false

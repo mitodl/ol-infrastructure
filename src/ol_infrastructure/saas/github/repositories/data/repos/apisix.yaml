@@ -8,8 +8,14 @@ default_branch: master
 delete_branch_on_merge: false
 dependabot_security_updates: false
 description: The Cloud-Native API Gateway and AI Gateway
+has_discussions: false
+has_projects: true
 has_wiki: true
 homepage: https://apisix.apache.org/blog/
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: apisix
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams: {}
 web_commit_signoff_required: false

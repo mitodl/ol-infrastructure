@@ -7,9 +7,15 @@ archetype: fork
 default_branch: master
 delete_branch_on_merge: false
 description: The classic editor build of CKEditor 5.
+has_discussions: false
 has_issues: true
+has_projects: true
 homepage: https://ckeditor.com
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: ckeditor-custom-build
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   odl-engineering: admin
 web_commit_signoff_required: false

@@ -1,0 +1,7 @@
+---
+name: ol-saas-github-repositories
+runtime: python
+description: Management of the mitodl repository fleet, its topics, team grants, and
+  governance tier
+backend:
+  url: s3://mitol-pulumi-state/

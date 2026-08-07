@@ -10,8 +10,14 @@ archetype: library
 dependabot_security_updates: false
 description: Pipeline definitions for managing data flows to power analytics at MIT
   Open Learning
+has_discussions: true
+has_projects: true
 has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: ol-data-platform
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   arbisoft-contractors: push
   odl-engineering: push

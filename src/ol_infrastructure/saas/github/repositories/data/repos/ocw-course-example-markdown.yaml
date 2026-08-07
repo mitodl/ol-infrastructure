@@ -6,4 +6,13 @@ archetype: archived
 default_branch: main
 description: This repo is a place to display example markdown for a course used in
   the OCW Next project
+has_discussions: false
+has_issues: true
+has_projects: true
+has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: ocw-course-example-markdown
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+web_commit_signoff_required: false

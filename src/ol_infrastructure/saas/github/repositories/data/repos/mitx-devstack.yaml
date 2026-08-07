@@ -6,4 +6,13 @@ archetype: archived
 default_branch: master
 description: Automation for building a distributable environment for use in course
   authoring
+has_discussions: false
+has_issues: true
+has_projects: true
+has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: mitx-devstack
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+web_commit_signoff_required: false

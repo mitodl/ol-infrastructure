@@ -5,8 +5,17 @@ allow_squash_merge: true
 archetype: archived
 default_branch: master
 description: Helpful tools for running edX's docker-based devstack
+has_discussions: false
+has_issues: true
+has_projects: true
+has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: odl_devstack_tools
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 topics:
 - devstack
 - docker
 - edx
+web_commit_signoff_required: false

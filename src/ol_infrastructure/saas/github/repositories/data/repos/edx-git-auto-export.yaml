@@ -6,7 +6,16 @@ archetype: archived
 default_branch: master
 description: If the Git auto-export feature is enabled then push the OLX changes to
   Git from edX platform
+has_discussions: false
+has_issues: true
+has_projects: true
+has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: edx-git-auto-export
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   arbisoft-contractors: admin
   odl-engineering: admin
+web_commit_signoff_required: false

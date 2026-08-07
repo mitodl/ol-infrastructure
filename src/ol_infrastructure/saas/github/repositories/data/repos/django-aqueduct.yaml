@@ -8,8 +8,14 @@ archetype: library
 delete_branch_on_merge: false
 dependabot_security_updates: false
 description: Structured, typed, auditable Django settings management powered by Pydantic
+has_discussions: false
+has_projects: true
 has_wiki: true
 homepage: https://github.com/mitodl/django-aqueduct
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: django-aqueduct
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams: {}
 web_commit_signoff_required: false

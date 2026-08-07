@@ -9,9 +9,15 @@ delete_branch_on_merge: false
 dependabot_security_updates: false
 description: reddit's translation files - USE CROWDIN TO SUBMIT TRANSLATIONS. Direct
   pull requests to this repository will, generally, be rejected.
+has_discussions: false
+has_projects: true
 has_wiki: true
 homepage: https://crowdin.net/project/reddit
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: reddit-i18n
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   devops: admin
   odl-engineering: push

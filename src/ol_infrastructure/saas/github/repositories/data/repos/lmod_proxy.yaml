@@ -6,9 +6,18 @@ archetype: archived
 default_branch: master
 description: Flask application for proxying requests to the MIT Learning Modules API
   from edx-platform
+has_discussions: false
+has_issues: true
+has_projects: true
+has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: lmod_proxy
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   odl-engineering: admin
   odl-engineering-owners: admin
 topics:
 - edx-platform
+web_commit_signoff_required: false

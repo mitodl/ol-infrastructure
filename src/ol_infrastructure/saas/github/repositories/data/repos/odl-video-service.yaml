@@ -8,7 +8,13 @@ archetype: application
 default_branch: master
 dependabot_security_updates: false
 description: building blocks for a basic video service for ODL
+has_discussions: false
+has_projects: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: odl-video-service
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   arbisoft-contractors: push
   devops: admin

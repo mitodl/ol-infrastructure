@@ -6,7 +6,16 @@ archetype: archived
 default_branch: main
 description: A plugin to enable update usernames through admin panel in Open edX (and
   other apps that log into Open edX via OAuth)
+has_discussions: false
+has_issues: true
+has_projects: true
+has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: edx-username-changer
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   arbisoft-contractors: admin
   odl-engineering: admin
+web_commit_signoff_required: false

@@ -5,5 +5,14 @@ allow_squash_merge: true
 archetype: archived
 default_branch: main
 description: Nginx Salt Formula
+has_discussions: false
+has_issues: false
+has_projects: true
+has_wiki: true
 homepage: http://docs.saltstack.com/en/latest/topics/development/conventions/formulas.html
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: nginx-formula
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+web_commit_signoff_required: false

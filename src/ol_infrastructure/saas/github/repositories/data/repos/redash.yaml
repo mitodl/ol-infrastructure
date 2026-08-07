@@ -9,9 +9,15 @@ delete_branch_on_merge: false
 dependabot_security_updates: false
 description: Make Your Company Data Driven. Connect to any data source, easily visualize
   and share your data.
+has_discussions: false
 has_issues: true
+has_projects: true
 homepage: http://redash.io/
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
 name: redash
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   odl-engineering: admin
 vulnerability_alerts: false
