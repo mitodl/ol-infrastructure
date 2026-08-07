@@ -37,7 +37,3 @@ path "sys/leases/revoke" {
     lease_id = ["postgres-learn-ai/creds/app/*"]
   }
 }
-
-path "secret-global/learn_ai" {
-  capabilities = ["read"]
-}
