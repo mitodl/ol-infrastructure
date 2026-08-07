@@ -655,11 +655,18 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         # the generic admin/developer roles above since those are shared across
         # unrelated tools (Airbyte, Vault, Concourse) and granting them
         # shouldn't imply gwarek access or vice versa. Realm roles land in
-        # every token's realm_access.roles claim automatically, so — unlike the
-        # Grafana client-role + UserClientRoleProtocolMapper pattern below — no
-        # protocol mapper is needed here; gwarek's FastAPI backend reads
-        # realm_access.roles directly (mirroring ol-analytics-api's
-        # require_mit_admin).
+        # every access/ID token's realm_access.roles claim automatically via
+        # Keycloak's default "roles" client scope -- but that default mapper's
+        # "Add to userinfo" is off, and APISIX's openid-connect plugin builds
+        # the X-Userinfo header gwarek's backend trusts from the /userinfo
+        # response, not the raw token. Confirmed in production: gwarek-admin
+        # assigned to a user still 403'd on every request ("No gwarek role
+        # assigned") because realm_access was simply absent from userinfo.
+        # The explicit UserRealmRoleProtocolMapper below (userinfo-only, so it
+        # doesn't duplicate what the default scope already puts in the
+        # access/ID token) closes that gap -- same shape as the Concourse
+        # groups-mapper above, just writing to realm_access.roles instead of
+        # a custom "groups" claim.
         keycloak.Role(
             "ol-platform-engineering-gwarek-admin-role",
             realm_id=ol_platform_engineering_realm.id,
@@ -672,6 +679,18 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
             realm_id=ol_platform_engineering_realm.id,
             name="gwarek-viewer",
             description="Gwarek viewer — read-only access to findings/reports",
+            opts=resource_options,
+        )
+        keycloak.openid.UserRealmRoleProtocolMapper(
+            "ol-platform-engineering-gwarek-realm-role-userinfo-mapper",
+            realm_id=ol_platform_engineering_realm.id,
+            client_id=ol_platform_engineering_gwarek_client.id,
+            name="Realm Roles Userinfo Mapper",
+            claim_name="realm_access.roles",
+            multivalued=True,
+            add_to_id_token=False,
+            add_to_access_token=False,
+            add_to_userinfo=True,
             opts=resource_options,
         )
 

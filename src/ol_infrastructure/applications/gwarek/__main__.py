@@ -654,6 +654,90 @@ gwarek_common_env_from = [
 gwarek_replicas = gwarek_config.get_int("replicas") or 1
 
 # ---------------------------------------------------------------------------
+# One-off migration Job — runs `alembic upgrade head` against the admin
+# Vault DB role, then grants the *stable* "gwarek" role (every dynamic app
+# credential is a member of it) privileges on whatever tables now exist.
+#
+# The grant step is the actual fix for a real production incident: the
+# app-role Vault credential (gwarek_db_app_secret below) is a
+# VaultDynamicSecret reissued on Vault's own lease/TTL schedule, entirely
+# decoupled from any given `pulumi up` -- its one-time GRANT ALL creation
+# statement only covers tables that existed at *that* issuance time.
+# Ordering this Job before the api/worker Deployments (their depends_on
+# below) only changes when those pods start; it does nothing to make Vault
+# reissue a credential, so a long-lived, already-granted credential started
+# right back up with zero privileges on finding_tracking/issue_trackers
+# after they were added, regardless of deploy timing. Granting the stable
+# role directly here makes correctness independent of Vault's reissuance
+# schedule -- every migration run leaves it correct for the schema as it
+# stands, deterministically.
+#
+# Still defined before the Deployments and referenced in their depends_on:
+# Pulumi's Kubernetes provider awaits a Job's Complete condition by default,
+# so app pods won't start serving against a schema mid-migration -- a real
+# but separate concern from the privilege grant above.
+# ---------------------------------------------------------------------------
+_GWAREK_MIGRATE_AND_GRANT_SCRIPT = """
+import asyncio, os, subprocess, sys
+import asyncpg
+
+subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], check=True)
+
+async def _grant():
+    conn = await asyncpg.connect(
+        user=os.environ["DB_USERNAME"],
+        password=os.environ["DB_PASSWORD"],
+        host=os.environ["DB_HOST"],
+        database="gwarek",
+    )
+    try:
+        await conn.execute(
+            "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO gwarek"
+        )
+        await conn.execute(
+            "GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO gwarek"
+        )
+    finally:
+        await conn.close()
+
+asyncio.run(_grant())
+"""
+
+gwarek_migration_job = batch.v1.Job(
+    f"gwarek-migration-job-{stack_info.env_suffix}",
+    metadata=meta.v1.ObjectMetaArgs(
+        name="gwarek-migrate",
+        namespace=gwarek_namespace,
+        labels=application_labels,
+    ),
+    spec=batch.v1.JobSpecArgs(
+        backoff_limit=2,
+        template=core.v1.PodTemplateSpecArgs(
+            metadata=meta.v1.ObjectMetaArgs(labels=application_labels),
+            spec=core.v1.PodSpecArgs(
+                restart_policy="Never",
+                containers=[
+                    core.v1.ContainerArgs(
+                        name="migrate",
+                        image=gwarek_api_image,
+                        # subprocess, not a shell wrapper -- the DHI runtime
+                        # image this runs on ships no shell to chain `&&`
+                        # through.
+                        command=[
+                            "/app/.venv/bin/python",
+                            "-c",
+                            _GWAREK_MIGRATE_AND_GRANT_SCRIPT,
+                        ],
+                        env=_db_env(gwarek_db_admin_secret_k8s_name),
+                    ),
+                ],
+            ),
+        ),
+    ),
+    opts=ResourceOptions(depends_on=[gwarek_db_admin_secret]),
+)
+
+# ---------------------------------------------------------------------------
 # api Deployment + Service
 # ---------------------------------------------------------------------------
 gwarek_api_deployment = apps_v1.Deployment(
@@ -714,7 +798,12 @@ gwarek_api_deployment = apps_v1.Deployment(
         ),
     ),
     opts=ResourceOptions(
-        depends_on=[gwarek_db_app_secret, gwarek_app_secrets, gwarek_redis_creds]
+        depends_on=[
+            gwarek_db_app_secret,
+            gwarek_app_secrets,
+            gwarek_redis_creds,
+            gwarek_migration_job,
+        ]
     ),
 )
 
@@ -786,7 +875,12 @@ gwarek_worker_deployment = apps_v1.Deployment(
         ),
     ),
     opts=ResourceOptions(
-        depends_on=[gwarek_db_app_secret, gwarek_app_secrets, gwarek_redis_creds]
+        depends_on=[
+            gwarek_db_app_secret,
+            gwarek_app_secrets,
+            gwarek_redis_creds,
+            gwarek_migration_job,
+        ]
     ),
 )
 
@@ -866,47 +960,6 @@ gwarek_web_service = core.v1.Service(
         selector={"app": "gwarek", "component": "web"},
         ports=[core.v1.ServicePortArgs(port=3000, target_port=3000, name="http")],
     ),
-)
-
-# ---------------------------------------------------------------------------
-# One-off migration Job — runs `alembic upgrade head` against the admin
-# Vault DB role before the api/worker Deployments are expected to serve
-# traffic. Pulumi does not block on Job completion, so this ordering is
-# advisory only (via depends_on on the Job's own secret) — confirm the
-# migration actually completed before considering a deploy done (see the
-# plan's Phase 6/7 manual verification step).
-# ---------------------------------------------------------------------------
-gwarek_migration_job = batch.v1.Job(
-    f"gwarek-migration-job-{stack_info.env_suffix}",
-    metadata=meta.v1.ObjectMetaArgs(
-        name="gwarek-migrate",
-        namespace=gwarek_namespace,
-        labels=application_labels,
-    ),
-    spec=batch.v1.JobSpecArgs(
-        backoff_limit=2,
-        template=core.v1.PodTemplateSpecArgs(
-            metadata=meta.v1.ObjectMetaArgs(labels=application_labels),
-            spec=core.v1.PodSpecArgs(
-                restart_policy="Never",
-                containers=[
-                    core.v1.ContainerArgs(
-                        name="migrate",
-                        image=gwarek_api_image,
-                        command=[
-                            "/app/.venv/bin/python",
-                            "-m",
-                            "alembic",
-                            "upgrade",
-                            "head",
-                        ],
-                        env=_db_env(gwarek_db_admin_secret_k8s_name),
-                    ),
-                ],
-            ),
-        ),
-    ),
-    opts=ResourceOptions(depends_on=[gwarek_db_admin_secret]),
 )
 
 # ---------------------------------------------------------------------------
