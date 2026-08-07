@@ -110,6 +110,7 @@ monitoring_stack = make_stack_reference(projects.MONITORING, "default")
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 opik_stack = make_stack_reference(projects.OPIK, stack_info.name)
 policy_stack = make_stack_reference(projects.POLICIES, "default")
+sentry_stack = make_stack_reference(projects.SENTRY, "Production")
 vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
@@ -456,7 +457,9 @@ learn_ai_vault_mount = vault.Mount(
 learn_ai_static_vault_secrets = vault.generic.Secret(
     f"learn-ai-secrets-{stack_info.env_suffix}",
     path=learn_ai_vault_mount.path.apply("{}/secrets".format),
-    data_json=json.dumps(learn_ai_vault_secrets),
+    data_json=sentry_stack.require_output("learn_ai_sentry_dsn").apply(
+        lambda dsn: json.dumps({**learn_ai_vault_secrets, "SENTRY_DSN": dsn})
+    ),
 )
 
 ################################################
