@@ -6,11 +6,15 @@ Two independent checks against the `ol-infrastructure-as-code` App installation:
    SEC-12). Reports missing, over-granted, and unexpected entries.
 2. `reads` — mint an installation token and exercise one read endpoint per resource type in
    plan section 3.3, proving the App can actually see what the import needs to import.
+3. `writes` — ask GitHub which permission each write endpoint requires, and check the
+   manifest agrees. `permissions` proves we HOLD what the manifest asks for; only this
+   proves the manifest asks for the RIGHT thing.
 
-Read-only throughout. Never prints credential material.
+Non-mutating throughout. Never prints credential material.
 
     uv run python scripts/github/verify_app_permissions.py permissions
     uv run python scripts/github/verify_app_permissions.py reads
+    uv run python scripts/github/verify_app_permissions.py writes
 """
 
 import os
@@ -51,7 +55,10 @@ EXPECTED: dict[str, str] = {
     "pages": "write",
     "repository_hooks": "write",
     "metadata": "read",
-    "repository_custom_properties": "read",
+    # write, not read. Setting a repo's property values is PATCH /repos/{repo}/
+    # properties/values, which takes the REPOSITORY permission -- the org-level grant
+    # covers only the schema and the org-level bulk endpoint. See `writes`.
+    "repository_custom_properties": "write",
     "vulnerability_alerts": "read",
     "secret_scanning_alerts": "read",  # pragma: allowlist secret
     "security_events": "read",
@@ -182,6 +189,105 @@ def permissions() -> int:
         f"\n{len(live)} live / {len(EXPECTED)} expected -- {total or 'no'} discrepancies"
     )
     return 1 if total else 0
+
+
+#: Write endpoints the import actually exercises, and the permission the manifest claims
+#: each one needs. `writes` compares that claim against GitHub's own answer.
+#:
+#: EVERY BODY HERE MUST BE PROVABLY NON-MUTATING. These use an unknown property NAME,
+#: which GitHub rejects outright ("Unexpected property") after it has already decided the
+#: authorization question -- so the request returns the header without writing anything.
+#:
+#: Do NOT probe by sending a valid field with an invalid VALUE. On PATCH /repos/{repo}
+#: GitHub coerces `{"has_issues": "not-a-boolean"}` to true and returns 200: the probe
+#: succeeds and the write lands. That is why `administration` is absent from this table
+#: despite being the most load-bearing permission we hold -- there is no known body for
+#: that endpoint that is guaranteed inert, and a gate that can corrupt the estate it
+#: audits is worse than no gate.
+_BOGUS_PROPERTY = "__ol_permission_probe_does_not_exist__"
+
+#: GitHub's permission levels are a ladder, not a set. A grant of `admin` satisfies an
+#: endpoint that enforces `write`. The manifest may therefore legitimately ask for MORE
+#: than a given endpoint needs -- `organization_custom_properties` is `admin` because
+#: defining the property schema requires it, while setting values needs only `write`.
+#: Comparing for equality would report that correct entry as a failure.
+_LEVELS = {"read": 0, "write": 1, "admin": 2}
+
+WRITE_CHECKS: tuple[tuple[str, str, str, dict[str, Any]], ...] = (
+    (
+        "set a repo's custom property values",
+        "repository_custom_properties=write",
+        f"/repos/{ORG}/{PROBE_REPO}/properties/values",
+        {"properties": [{"property_name": _BOGUS_PROPERTY, "value": None}]},
+    ),
+    (
+        "set custom property values org-wide",
+        "organization_custom_properties=write",
+        f"/orgs/{ORG}/properties/values",
+        {
+            "repository_names": [PROBE_REPO],
+            "properties": [{"property_name": _BOGUS_PROPERTY, "value": None}],
+        },
+    ),
+)
+
+
+@app.command
+def writes() -> int:
+    """Check the manifest against GitHub's own statement of what each write needs.
+
+    THE FAILURE THIS EXISTS FOR. `EXPECTED` recorded `repository_custom_properties: read`
+    because we reasoned that the org-level `admin` grant covered setting values on repos.
+    It does not -- they are different endpoints taking different permissions. `permissions`
+    saw no discrepancy, because the App had been granted exactly what the manifest asked
+    for; the manifest was simply wrong. The fleet apply then died on 403 partway through
+    176 writes, with the estate half-updated.
+
+    A gate over read endpoints cannot catch that, no matter how many endpoints it covers.
+    So this asks the API instead of trusting our reading of the docs: GitHub returns
+    `x-accepted-github-permissions` on success, on 403, and on a validation failure alike,
+    naming the permission it actually enforced.
+    """
+    token = get_installation_token()
+    auth = {**API_HEADERS, "Authorization": f"Bearer {token}"}
+    failures = 0
+
+    with httpx.Client(base_url=GITHUB_API, headers=auth, timeout=30) as client:
+        for label, claimed, path, body in WRITE_CHECKS:
+            response = client.patch(path, json=body)
+            enforced = response.headers.get("x-accepted-github-permissions", "")
+            slug = claimed.partition("=")[0]
+
+            # GitHub may list several acceptable permission sets, comma-separated.
+            entries = dict(
+                entry.strip().split("=", 1)
+                for entry in enforced.split(",")
+                if "=" in entry
+            )
+            if slug not in entries:
+                failures += 1
+                print(f"  FAIL {claimed:45} {label}  <- GitHub enforced {enforced!r}")
+                continue
+
+            # The manifest must ask for AT LEAST what the endpoint enforces. More is fine.
+            required = _LEVELS[entries[slug]]
+            granted = _LEVELS.get(EXPECTED.get(slug, ""), -1)
+            ok = granted >= required
+            note = ""
+            if not ok:
+                note = (
+                    f"  <- endpoint needs {slug}={entries[slug]}, "
+                    f"manifest says {EXPECTED.get(slug)!r}"
+                )
+                failures += 1
+            elif granted > required:
+                note = f"  (manifest asks {EXPECTED[slug]}; endpoint needs {entries[slug]})"
+            print(f"  {'OK  ' if ok else 'FAIL'} {claimed:45} {label}{note}")
+
+    print(
+        f"\n{len(WRITE_CHECKS) - failures}/{len(WRITE_CHECKS)} write permissions agree"
+    )
+    return 1 if failures else 0
 
 
 @app.command

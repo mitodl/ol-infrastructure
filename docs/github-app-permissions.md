@@ -97,7 +97,7 @@ resource · **C** = read-only, exists so the §7 estate audit works without a se
 | Issues | `issues` | write | B | `IssueLabel`, `IssueLabels`, `RepositoryMilestone`. Label standardization (CON-08). |
 | Pages | `pages` | write | B | `RepositoryPages`. Optional — drop if we never manage Pages. |
 | Webhooks | `repository_hooks` | write | B | `RepositoryWebhook`. **Already held.** |
-| Custom properties | `repository_custom_properties` | read | C | Reads a repo's own property values. Note: *setting* values is an org-level permission — see below. |
+| Custom properties | `repository_custom_properties` | write | B | `RepositoryCustomProperty`. **Write, and it is a repository permission — not covered by the org-level grant.** Corrected 2026-08-07 after the fleet apply died on 403; see "Setting a repo's property values" below. |
 | Dependabot alerts | `vulnerability_alerts` | read | C | Audit SEC-05: which repos have open Dependabot alerts. Distinct from the on/off toggle, which is `administration`. |
 | Secret scanning alerts | `secret_scanning_alerts` | read | C | Audit SEC-04. |
 | Code scanning alerts | `security_events` | read | C | Audit: code-scanning alert state. |
@@ -110,7 +110,7 @@ resource · **C** = read-only, exists so the §7 estate audit works without a se
 |---|---|---|:--:|---|
 | Administration | `organization_administration` | write | B | `OrganizationSettings` **and `OrganizationRuleset`** — org rulesets live under org Administration, not a rulesets-specific permission. |
 | Members | `members` | write | B | `Membership`, `Team`, `TeamSettings`, `TeamMembership`, `TeamMembers`, and the org half of `TeamRepository`. |
-| Custom properties | `organization_custom_properties` | admin | B | `OrganizationCustomProperties` (the schema) **and `RepositoryCustomProperty`** (setting values on repos). `admin` is required to define the schema; `write` only sets values. This is the backbone of the §5.4 ruleset design. |
+| Custom properties | `organization_custom_properties` | admin | B | `OrganizationCustomProperties` — the property **schema**, which is what `admin` is required for. It does **not** cover setting values on a repo through the provider; that is `repository_custom_properties`. Also authorises the org-level bulk endpoint (`write` suffices there). Backbone of the §5.4 ruleset design. |
 | Webhooks | `organization_hooks` | write | B | `OrganizationWebhook`. |
 | Secrets | `organization_secrets` | write | B | Org-level Actions and Dependabot secrets. |
 | Variables | `organization_actions_variables` | write | B | Org-level Actions variables. Slug **confirmed 2026-08-03**. |
@@ -135,6 +135,57 @@ concrete resource needs it:
 `repository_projects`, `organization_announcement_banners`, `interaction_limits`,
 `enterprise_custom_properties_for_organizations`, and every user-scoped permission
 (`email_addresses`, `followers`, `gpg_keys`, `git_ssh_keys`, `profile`, `starring`).
+
+## Setting a repo's property values: two endpoints, two permissions
+
+Recorded because getting it wrong cost a half-completed fleet apply, and because the shape of
+the mistake is more instructive than the fact.
+
+This file used to claim `organization_custom_properties: admin` covered `RepositoryCustomProperty`
+— "setting values on repos". It does not. Custom property values are reachable by two different
+endpoints that take two different permissions:
+
+| Call | Permission | Used by |
+|---|---|---|
+| `PATCH /repos/{owner}/{repo}/properties/values` | `repository_custom_properties=write` | **the Pulumi provider** |
+| `PATCH /orgs/{org}/properties/values` (bulk) | `organization_custom_properties=write` | nothing yet; viable for a `bin/` script |
+
+Holding the org-level permission at `admin` therefore does nothing for the provider, which only
+ever calls the repository endpoint. Phase 3's apply reached the 176 `RepositoryCustomProperty`
+writes and failed on every one with `403 Resource not accessible by integration`, having already
+committed 140 unrelated metadata updates. Granted 2026-08-07 and re-verified.
+
+GitHub will simply tell you which permission an endpoint enforces. Every response carries an
+`x-accepted-github-permissions` header — on success, on 403, and on a validation failure alike:
+
+```
+$ PATCH /repos/mitodl/agent-kit/properties/values
+403  x-accepted-github-permissions: repository_custom_properties=write
+```
+
+**Why the existing gates could not catch this.** `permissions` diffs the live installation
+against `EXPECTED` in `scripts/github/verify_app_permissions.py` and reported no discrepancy —
+correctly, because the App had been granted exactly what the manifest asked for. The manifest
+was wrong. `reads` exercises 32 endpoints and is read-only by construction, so a missing *write*
+permission is invisible to it. Both gates were working; neither was asking whether the spec
+itself was right.
+
+`writes` closes that. It sends a deliberately-invalid body to each write endpoint the import
+uses and compares the header GitHub returns against the manifest, so the requirement is taken
+from the API rather than from our reading of the docs:
+
+    uv run python scripts/github/verify_app_permissions.py writes
+
+Two constraints on extending it, both learned the hard way:
+
+- **The probe body must be inert by NAME, not by type.** An unknown property name is rejected
+  outright. An invalid *value* is not safe: `PATCH /repos/{repo}` with `{"has_issues": "not-a-boolean"}`
+  returns **200**, coercing the string to `true` — the probe "fails" and the write lands. That is
+  why `administration` is absent from the table despite being the most load-bearing permission
+  here; no body for that endpoint is known to be inert.
+- **Levels are a ladder, not a set.** `admin` satisfies an endpoint enforcing `write`, so the
+  check asserts the manifest asks for at least what is enforced. Comparing for equality flags
+  the correct `organization_custom_properties: admin` entry as a failure.
 
 ## Safety counterweights
 
