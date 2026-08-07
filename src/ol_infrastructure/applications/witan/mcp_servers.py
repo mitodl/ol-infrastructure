@@ -82,12 +82,18 @@ ACTOR_TOKENS_FILENAME = "tokens.json"  # pragma: allowlist secret
 # Disk-backed on purpose — `medium: Memory` would charge this to the pod's
 # 512Mi memory limit and OOM the server on a large export.
 #
-# Writability depends on the pod's `fsGroup: 1000` (the ToolHive operator sets
-# it, and the container runs as uid/gid 1000): kubelet group-owns an emptyDir
-# by fsGroup, so a non-root process can write it. Remove fsGroup and this mount
-# silently becomes root-owned and useless — the same trap ci_indexer.py
-# documents on its scratch volume.
+# Writability depends on `fsGroup`: kubelet group-owns an emptyDir by it, and
+# the container runs as uid/gid 1000, so without it the mount is root-owned and
+# useless — the same trap ci_indexer.py documents on its scratch volume.
+#
+# The ToolHive operator already sets `fsGroup: 1000` (verified on the running
+# pod in CI, QA and Production), so TMP_FS_GROUP below is a no-op today. It is
+# declared anyway: that value is the operator's default, not something this
+# stack asked for, and an upgrade that changed it would turn this mount
+# read-only with no signal beyond witan tools failing again. Declaring it makes
+# the invariant ours instead of inherited.
 TMP_MOUNT_PATH = "/tmp"  # noqa: S108
+TMP_FS_GROUP = 1000
 # Sized for the server-side work, which is dominated by the graph export
 # `store_merge` takes of its OWN target to reconcile against — that grows with
 # the shared graph, not with the caller's upload (the client's batches are
@@ -317,6 +323,9 @@ def create_mcp_servers(  # noqa: PLR0913
                             "emptyDir": {"sizeLimit": TMP_SIZE_LIMIT},
                         },
                     ],
+                    # What makes the emptyDir above writable by a non-root
+                    # container — see TMP_FS_GROUP.
+                    "securityContext": {"fsGroup": TMP_FS_GROUP},
                 }
             },
         },
