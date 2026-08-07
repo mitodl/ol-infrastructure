@@ -50,13 +50,13 @@ path "secret-digital-credentials/data/signing-service" {
 path "sys/leases/renew" {
   capabilities = ["update"]
   allowed_parameters = {
-    lease_id = ["postgres-mitopen/creds/app/*"]
+    lease_id = ["postgres-mitxonline/creds/app/*"]
   }
 }
 path "sys/leases/revoke" {
   capabilities = ["update"]
   allowed_parameters = {
-    lease_id = ["postgres-mitopen/creds/app/*"]
+    lease_id = ["postgres-mitxonline/creds/app/*"]
   }
 }
 
