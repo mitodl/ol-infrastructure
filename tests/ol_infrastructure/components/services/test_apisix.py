@@ -15,6 +15,8 @@ This module verifies:
 from __future__ import annotations
 
 import asyncio
+from contextlib import contextmanager
+from dataclasses import replace
 
 import pulumi
 
@@ -42,9 +44,12 @@ from bridge.lib.constants import (  # noqa: E402
     apisix_oidc_session_cookie_name,
     mit_learn_session_cookie_name,
 )
+from ol_infrastructure.components.services import apisix as apisix_module  # noqa: E402
 from ol_infrastructure.components.services.apisix import (  # noqa: E402
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
     OLApisixUpstream,
     OLApisixUpstreamConfig,
     stale_session_cookie_cleanup_plugin,
@@ -340,3 +345,184 @@ def test_cleanup_plugin_honours_a_custom_stale_name():
     ).config["functions"]
 
     assert 'name == "mitlearn_apisix_session"' in lua
+
+
+# ─── Shared plugin defaults ────────────────────────────────────────────────────
+
+
+def shared_plugins(name: str, **overrides) -> OLApisixSharedPlugins:
+    """Build a shared plugin config with the fields every caller has to supply."""
+    return OLApisixSharedPlugins(
+        name,
+        plugin_config=OLApisixSharedPluginsConfig(
+            application_name="myapp",
+            k8s_namespace="myapp-ns",
+            **overrides,
+        ),
+    )
+
+
+def plugin_named(plugins, name):
+    """Return the single plugin entry called ``name``, or None if absent."""
+    matches = [plugin for plugin in plugins if plugin["name"] == name]
+    assert len(matches) <= 1, f"{name} rendered more than once"
+    return matches[0] if matches else None
+
+
+@contextmanager
+def stack_env(env_suffix: str):
+    """Pretend the component is being rendered against a given environment.
+
+    ``parse_stack`` is imported into the apisix module's namespace, and the
+    mocks fix the stack name process-wide, so patching the reference there is
+    the only way to exercise the per-environment gate.
+    """
+    original = apisix_module.parse_stack
+    apisix_module.parse_stack = lambda: replace(original(), env_suffix=env_suffix)
+    try:
+        yield
+    finally:
+        apisix_module.parse_stack = original
+
+
+@pulumi.runtime.test
+def test_gzip_is_attached_outside_production():
+    """APISIX loads the gzip plugin cluster-wide, but a plugin does nothing
+    until a route or plugin config references it -- for a long time this one
+    referenced it nowhere and every shared-gateway response went out
+    uncompressed. Non-production environments soak the fix first.
+    """
+    with stack_env("qa"):
+        plugins = shared_plugins("test-shared-plugins-gzip-qa")
+
+    def check(spec):
+        gzip = plugin_named(spec["plugins"], "gzip")
+        assert gzip is not None
+        assert gzip["enable"] is True
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_gzip_is_absent_in_production_by_default():
+    """Production stays off until the non-production soak says otherwise. The
+    risk is not correctness -- APISIX loads gzip everywhere -- it is CPU on a
+    gateway whose HPA scales on CPU, which only shows up at production volume.
+    """
+    with stack_env("production"):
+        plugins = shared_plugins("test-shared-plugins-gzip-production")
+
+    def check(spec):
+        assert plugin_named(spec["plugins"], "gzip") is None
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_gzip_can_be_forced_on_in_production():
+    """An application that has done its own measurement can go early without
+    waiting for the fleet-wide default to flip.
+    """
+    with stack_env("production"):
+        plugins = shared_plugins(
+            "test-shared-plugins-gzip-production-override",
+            enable_gzip=True,
+        )
+
+    def check(spec):
+        assert plugin_named(spec["plugins"], "gzip") is not None
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_gzip_can_be_forced_off_outside_production():
+    """The override has to work in both directions -- an app that streams, or
+    is otherwise a bad fit for compression, opts out of the soak too.
+    """
+    with stack_env("qa"):
+        plugins = shared_plugins(
+            "test-shared-plugins-gzip-qa-opt-out",
+            enable_gzip=False,
+        )
+
+    def check(spec):
+        assert plugin_named(spec["plugins"], "gzip") is None
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_gzip_is_independent_of_enable_defaults():
+    """Gzip carries its own flag rather than riding in __default_plugins, so
+    enable_defaults=False does not turn it off -- same contract as
+    opentelemetry. enable_gzip=False is the way to drop it.
+    """
+    with stack_env("qa"):
+        plugins = shared_plugins(
+            "test-shared-plugins-gzip-without-defaults",
+            enable_defaults=False,
+        )
+
+    def check(spec):
+        assert plugin_named(spec["plugins"], "gzip") is not None
+        # The actual defaults are gone, confirming the flag is doing the work.
+        assert plugin_named(spec["plugins"], "cors") is None
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_gzip_reaches_the_gateway_api_plugin_config():
+    """The v1alpha1 PluginConfig is rendered by a separate comprehension that
+    rewrites each entry, so Gateway API HTTPRoutes need their own assertion
+    rather than inheriting the v2 one.
+    """
+    plugins = shared_plugins("test-shared-plugins-gzip-gateway-api")
+
+    def check(spec):
+        gzip = plugin_named(spec["plugins"], "gzip")
+        assert gzip is not None
+        # v1alpha1 accepts only name and config -- ``enable`` is v2-only.
+        assert set(gzip) == {"name", "config"}
+
+    return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_gzip_does_not_compress_streaming_or_precompressed_types():
+    """text/event-stream is excluded so SSE responses are not held back by the
+    compression buffers, and already-compressed formats are excluded so they
+    do not burn gateway CPU for no gain. Both are easy to undo by accident
+    when someone widens the list.
+    """
+    plugins = shared_plugins("test-shared-plugins-gzip-types")
+
+    def check(spec):
+        types = plugin_named(spec["plugins"], "gzip")["config"]["types"]
+        assert "text/event-stream" not in types
+        for precompressed in (
+            "image/png",
+            "video/mp4",
+            "font/woff2",
+            "application/zip",
+        ):
+            assert precompressed not in types
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_gzip_compression_level_stays_cheap():
+    """comp_level is pinned to NGINX's own default of 1 on purpose: this
+    attaches to every route on a gateway whose HPA scales on CPU. Raising it
+    is a deliberate decision to make with measurement in hand, not a drive-by.
+    """
+    plugins = shared_plugins("test-shared-plugins-gzip-comp-level")
+
+    def check(spec):
+        config = plugin_named(spec["plugins"], "gzip")["config"]
+        assert config["comp_level"] == 1
+        assert config["vary"] is True
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)

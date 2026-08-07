@@ -441,6 +441,14 @@ class OLApisixSharedPluginsConfig(BaseModel):
     # references a plugin APISIX has not loaded is rejected, so the route-level
     # attachment must be gated to match the cluster-level plugin enablement.
     enable_opentelemetry: bool = True
+    # Attach the gzip response-compression plugin.  ``None`` (the default)
+    # resolves from the stack: on everywhere except Production.  Compression is
+    # cheap to validate for correctness, but its real cost is CPU on a gateway
+    # whose HPA scales on CPU, and that only shows up under production traffic
+    # volume -- so Production stays off until the non-production soak says
+    # otherwise, at which point this default becomes the single line to flip.
+    # Pass True or False to override for one application ahead of that.
+    enable_gzip: bool | None = None
     k8s_labels: dict[str, str] = {}
     k8s_namespace: str
     # Either raw CRD dicts or OLApisixPluginConfig objects; the component
@@ -513,6 +521,65 @@ class OLApisixSharedPlugins(ComponentResource):
             },
         ]
 
+        # Response compression.  APISIX loads the gzip plugin cluster-wide (see
+        # the enabled-plugins list in infrastructure/aws/eks/apisix_official.py)
+        # but until now it was attached to no route anywhere, so every response
+        # through every shared gateway went out uncompressed.  Measured on
+        # applications-production 2026-08-05: each JupyterHub
+        # notebook_core.<hash>.js fetch was exactly 7,167,719 bytes, byte for
+        # byte, on every single request -- ~4.85 GB/day of /static/ on
+        # nb.learn.mit.edu alone.  Compressing shrinks both the egress and the
+        # body NGINX has to buffer for a slow client, which is the mechanism
+        # behind the 2026-07-21 gateway OOM (see the proxy_buffering block in
+        # apisix_official.py).
+        #
+        # Kept out of __default_plugins because it is rolled out
+        # non-production-first -- see ``enable_gzip`` on the config class.
+        #
+        # ``types`` deliberately lists only text-shaped payloads.  Formats that
+        # are already compressed (images, video, woff/woff2, archives) would
+        # burn CPU for no gain, and ``text/event-stream`` is excluded so SSE
+        # responses are not held back by the compression buffers.
+        #
+        # ``comp_level`` stays at NGINX's own default of 1 rather than something
+        # higher: this attaches to every route on a gateway whose HPA scales on
+        # CPU, and level 1 already captures most of the reduction on JS/JSON.
+        # Raise it only with gateway CPU headroom in hand.  ``vary`` is on so
+        # downstream shared caches key on Accept-Encoding instead of serving a
+        # gzipped body to a client that did not ask for one.
+        __gzip_plugin: dict[str, Any] = {
+            "name": "gzip",
+            "enable": True,
+            "config": {
+                "types": [
+                    "application/javascript",
+                    "application/json",
+                    "application/manifest+json",
+                    "application/rss+xml",
+                    "application/wasm",
+                    "application/x-javascript",
+                    "application/xml",
+                    "image/svg+xml",
+                    "text/css",
+                    "text/html",
+                    "text/javascript",
+                    "text/plain",
+                    "text/xml",
+                ],
+                # Below roughly one MTU the framing overhead outweighs the
+                # saving, and APISIX's own default of 20 bytes would compress
+                # essentially every response.
+                "min_length": 1024,
+                "comp_level": 1,
+                # 16 x 4 KiB = 64 KiB of compression buffers per in-flight
+                # response, deliberately in the same range as the ~72 KiB
+                # proxy-buffer budget set in apisix_official.py so the
+                # per-request memory footprint stays predictable.
+                "buffers": {"number": 16, "size": 4096},
+                "vary": True,
+            },
+        }
+
         # opentelemetry emits an OTLP trace span per request.  ``always_on`` head
         # sampling exports every span to the Grafana Alloy receiver, which then
         # applies tail sampling (keep errors, keep slow traces, probabilistic
@@ -550,6 +617,16 @@ class OLApisixSharedPlugins(ComponentResource):
             and parse_stack().env_suffix.lower() != "ci"
         ):
             plugins.append(__opentelemetry_plugin)
+
+        # Unset means "resolve from the stack": every non-Production environment
+        # soaks compression first.  Unlike the opentelemetry gate above this is
+        # not a correctness constraint -- APISIX loads gzip everywhere -- it is
+        # a deliberate rollout order, so a caller may override it either way.
+        enable_gzip = plugin_config.enable_gzip
+        if enable_gzip is None:
+            enable_gzip = parse_stack().env_suffix.lower() != "production"
+        if enable_gzip:
+            plugins.append(__gzip_plugin)
 
         self.resource_name = (
             f"{plugin_config.application_name}-{plugin_config.resource_suffix}"
