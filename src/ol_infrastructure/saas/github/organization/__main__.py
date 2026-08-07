@@ -18,8 +18,11 @@ Deliberately absent, each for a reason worth knowing:
   OrganizationCustomRole / OrganizationRepositoryRole
       Enterprise-only; 404 on the Team plan. Withdrawn from scope entirely.
 
-Everything except `tier` is an import of something that already exists, so after the
-first apply this stack should preview clean. That empty diff is the gate (§6).
+Three resources here are new creates -- the `tier` property schema and the two org
+rulesets, none of which exist on GitHub today. Everything else, the org settings and
+the 14 teams, is an import of something that already exists. So the empty-diff gate
+(§6) applies from the SECOND preview: the first apply creates those three, and every
+preview after it should be clean.
 """
 
 from ol_infrastructure.lib.github_helper import setup_github_provider

@@ -12,8 +12,11 @@ available on the Team plan; without it this would have to roll out blind.
 
   Promotion to `active` is a deliberate, separate change: flip `_ENFORCEMENT` to
   "active" after reading the rule-suite logs at
-  https://github.com/organizations/mitodl/settings/rules -- and expect it to be the
-  moment CI stops being advisory (SEC-03 fires on 175 of 176 active repos today).
+  https://github.com/organizations/mitodl/settings/rules. What starts blocking then is
+  exactly what is declared below: force-push and deletion of the default branch, and
+  merging without an approving review. CI stays advisory either way -- neither ruleset
+  carries `required_status_checks` (see the omissions at the foot of this file), so
+  SEC-03 is untouched by the flip and remains a per-repo audit finding.
 
 ORDERING. These must not be applied before `ol-saas-github-repositories` has set
 per-repo tiers. Until then every repo carries the property default `standard`, which
