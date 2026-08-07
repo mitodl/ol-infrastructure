@@ -27,8 +27,8 @@ name: edx-sga
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
-  arbisoft-contractors: admin
-  odl-engineering: admin
+  arbisoft-contractors: push
+  odl-engineering: push
   odl-engineering-owners: admin
 topics:
 - edx
