@@ -152,19 +152,6 @@ team_xpro = sentry.SentryTeam(
     opts=sentry_opts,
 )
 
-project_airbyte = sentry.SentryProject(
-    "project_airbyte",
-    organization=ORGANIZATION,
-    name="airbyte",
-    slug="airbyte",
-    platform="java",
-    teams=["devops"],
-    digests_min_delay=300,
-    digests_max_delay=1800,
-    resolve_age=0,
-    opts=sentry_opts,
-)
-
 project_learn_ai = sentry.SentryProject(
     "project_learn_ai",
     organization=ORGANIZATION,
@@ -213,8 +200,8 @@ project_mitxonline = sentry.SentryProject(
 project_ocw_next = sentry.SentryProject(
     "project_ocw_next",
     organization=ORGANIZATION,
-    name="ocw-next",
-    slug="ocw-next",
+    name="ocw-site",
+    slug="ocw-site",
     platform="python-django",
     teams=["mit-office-of-digital-learning", "applications", "ocw"],
     digests_min_delay=300,
@@ -265,8 +252,8 @@ project_open = sentry.SentryProject(
 project_open_next = sentry.SentryProject(
     "project_open_next",
     organization=ORGANIZATION,
-    name="open-next",
-    slug="open-next",
+    name="mit-learn",
+    slug="mit-learn",
     platform="python-django",
     teams=["mit-learn", "mit-office-of-digital-learning", "devops"],
     digests_min_delay=300,
@@ -314,19 +301,6 @@ project_openedx_residential = sentry.SentryProject(
     opts=sentry_opts,
 )
 
-project_python = sentry.SentryProject(
-    "project_python",
-    organization=ORGANIZATION,
-    name="python",
-    slug="python",
-    platform="python",
-    teams=["mit-office-of-digital-learning"],
-    digests_min_delay=300,
-    digests_max_delay=1800,
-    resolve_age=0,
-    opts=sentry_opts,
-)
-
 project_release_script = sentry.SentryProject(
     "project_release_script",
     organization=ORGANIZATION,
@@ -334,32 +308,6 @@ project_release_script = sentry.SentryProject(
     slug="release-script",
     platform="python",
     teams=["mit-office-of-digital-learning"],
-    digests_min_delay=300,
-    digests_max_delay=1800,
-    resolve_age=0,
-    opts=sentry_opts,
-)
-
-project_sandbox = sentry.SentryProject(
-    "project_sandbox",
-    organization=ORGANIZATION,
-    name="Python",
-    slug="sandbox",
-    platform="python",
-    teams=["mit-office-of-digital-learning"],
-    digests_min_delay=300,
-    digests_max_delay=1800,
-    resolve_age=120,
-    opts=sentry_opts,
-)
-
-project_unified_ecommerce = sentry.SentryProject(
-    "project_unified_ecommerce",
-    organization=ORGANIZATION,
-    name="unified-ecommerce",
-    slug="unified-ecommerce",
-    platform="python-django",
-    teams=["team-jkachel"],
     digests_min_delay=300,
     digests_max_delay=1800,
     resolve_age=0,
@@ -3341,14 +3289,6 @@ dashboard_caches_1072565 = sentry.SentryDashboard(
     opts=sentry_opts,
 )
 
-key_airbyte_default_0e552f29a3594a6a972cf2d73dfa140b = sentry.SentryKey(
-    "key_airbyte_default_0e552f29a3594a6a972cf2d73dfa140b",  # pragma: allowlist secret
-    organization=ORGANIZATION,
-    project="airbyte",
-    name="Default",
-    opts=sentry_opts,
-)
-
 key_learn_ai_default_5e497d1f33127fc35dfc811b290747c7 = sentry.SentryKey(
     "key_learn_ai_default_5e497d1f33127fc35dfc811b290747c7",  # pragma: allowlist secret
     organization=ORGANIZATION,
@@ -3376,7 +3316,7 @@ key_mitxonline_default_8ba006dc817541a0865033722f8289ad = sentry.SentryKey(
 key_ocw_next_default_eee58f41dda54d2b814296e12dced4b7 = sentry.SentryKey(
     "key_ocw_next_default_eee58f41dda54d2b814296e12dced4b7",  # pragma: allowlist secret
     organization=ORGANIZATION,
-    project="ocw-next",
+    project="ocw-site",
     name="Default",
     opts=sentry_opts,
 )
@@ -3416,7 +3356,7 @@ key_open_default_005a98ba45c3472dbb4c12405d814557 = sentry.SentryKey(
 key_open_next_default_8131564a9b9e31ac3cbcf7952f0fea80 = sentry.SentryKey(
     "key_open_next_default_8131564a9b9e31ac3cbcf7952f0fea80",  # pragma: allowlist secret
     organization=ORGANIZATION,
-    project="open-next",
+    project="mit-learn",
     name="Default",
     opts=sentry_opts,
 )
@@ -3445,34 +3385,10 @@ key_openedx_residential_default_3741f5e8334b429eaa048bec1e3daa30 = sentry.Sentry
     opts=sentry_opts,
 )
 
-key_python_default_7cc91e53ac70f26e91a2e788288be63d = sentry.SentryKey(
-    "key_python_default_7cc91e53ac70f26e91a2e788288be63d",  # pragma: allowlist secret
-    organization=ORGANIZATION,
-    project="python",
-    name="Default",
-    opts=sentry_opts,
-)
-
 key_release_script_default_67d74d4e5121a4ca332f1523ff8affdd = sentry.SentryKey(
     "key_release_script_default_67d74d4e5121a4ca332f1523ff8affdd",  # pragma: allowlist secret
     organization=ORGANIZATION,
     project="release-script",
-    name="Default",
-    opts=sentry_opts,
-)
-
-key_sandbox_default_8c6395a9422040c999373e204b15bd8b = sentry.SentryKey(
-    "key_sandbox_default_8c6395a9422040c999373e204b15bd8b",  # pragma: allowlist secret
-    organization=ORGANIZATION,
-    project="sandbox",
-    name="Default",
-    opts=sentry_opts,
-)
-
-key_unified_ecommerce_default_734c791eb3c83eb35db04c1b753ff67e = sentry.SentryKey(
-    "key_unified_ecommerce_default_734c791eb3c83eb35db04c1b753ff67e",  # pragma: allowlist secret
-    organization=ORGANIZATION,
-    project="unified-ecommerce",
     name="Default",
     opts=sentry_opts,
 )
@@ -3715,3 +3631,65 @@ key_dagster = sentry.SentryKey(
 )
 
 pulumi.export("dagster_sentry_dsn", key_dagster.dsn_public)
+
+# Hand-added stack outputs (not produced by bin/import-sentry-config) exposing
+# each project's DSN so consuming stacks can read it via
+# sentry_stack.require_output(...) instead of a hard-coded/SOPS/Vault secret.
+# See ol-infrastructure#5004. Naming convention: `<project_slug>_sentry_dsn`,
+# with a name-suffixed variant for projects that have more than one key.
+pulumi.export(
+    "learn_ai_sentry_dsn",
+    key_learn_ai_default_5e497d1f33127fc35dfc811b290747c7.dsn_public,
+)
+pulumi.export(
+    "micromasters_sentry_dsn",
+    key_micromasters_default_6134fa8f62f74ba49d3892f9eb8c2fb7.dsn_public,
+)
+pulumi.export(
+    "mitxonline_sentry_dsn",
+    key_mitxonline_default_8ba006dc817541a0865033722f8289ad.dsn_public,
+)
+pulumi.export(
+    "ocw_site_sentry_dsn",
+    key_ocw_next_default_eee58f41dda54d2b814296e12dced4b7.dsn_public,
+)
+pulumi.export(
+    "ocw_studio_sentry_dsn",
+    key_ocw_studio_default_ba06ef0080e342db9b9ae1db53944f1a.dsn_public,
+)
+pulumi.export(
+    "odl_video_service_sentry_dsn",
+    key_odl_video_service_default_f75d3b6abb8f4a30b95769f8f9644ee3.dsn_public,
+)
+pulumi.export(
+    "odl_video_service_eternal_mink_sentry_dsn",
+    key_odl_video_service_eternal_mink_7e70a5f1227743959ba1cb1e8db1240f.dsn_public,
+)
+pulumi.export(
+    "open_sentry_dsn",
+    key_open_default_005a98ba45c3472dbb4c12405d814557.dsn_public,
+)
+pulumi.export(
+    "mit_learn_sentry_dsn",
+    key_open_next_default_8131564a9b9e31ac3cbcf7952f0fea80.dsn_public,
+)
+pulumi.export(
+    "openedx_mitxonline_sentry_dsn",
+    key_openedx_mitxonline_default_8807f1e77ff44d91beeb2580507ad84a.dsn_public,
+)
+pulumi.export(
+    "openedx_mitxpro_sentry_dsn",
+    key_openedx_mitxpro_default_3b523a8e89c040f0a46ddc90a64f9d14.dsn_public,
+)
+pulumi.export(
+    "openedx_residential_sentry_dsn",
+    key_openedx_residential_default_3741f5e8334b429eaa048bec1e3daa30.dsn_public,
+)
+pulumi.export(
+    "release_script_sentry_dsn",
+    key_release_script_default_67d74d4e5121a4ca332f1523ff8affdd.dsn_public,
+)
+pulumi.export(
+    "xpro_sentry_dsn",
+    key_xpro_default_c9f9886a461647708cd0c0c551166866.dsn_public,
+)
