@@ -426,7 +426,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="sentry",
         pulumi_project_path="infrastructure/sentry/",
         pulumi_project_name="ol-infrastructure-sentry",
-        stages=["Production"],
+        stages=["default"],
     ),
     "starrocks": SimplePulumiParams(
         app_name="starrocks",

@@ -734,7 +734,7 @@ def render_summary(
             "From `src/ol_infrastructure/infrastructure/sentry`:",
             "",
             "```bash",
-            "pulumi stack select Production",
+            "pulumi stack select default",
             "pulumi import --file sentry_imports.json --preview-only",
             "pulumi import --file sentry_imports.json",
             "pulumi preview --refresh --diff",

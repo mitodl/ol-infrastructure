@@ -82,8 +82,6 @@ repos:
     # cannot contain a credential by construction. See the data/README.md there.
     - --exclude-files
     - src/ol_infrastructure/saas/github/repositories/data/
-    - --exclude-files
-    - src/ol_infrastructure/infrastructure/sentry/sentry_imports.json
 - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
   rev: "v0.16.1"

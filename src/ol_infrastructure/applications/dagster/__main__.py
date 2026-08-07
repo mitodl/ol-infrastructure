@@ -91,9 +91,9 @@ vault_stack = make_stack_reference(
 )
 cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
 # Owns the Sentry project and client key whose DSN this stack writes to Vault.
-# Single-stack (Production) because there is one Sentry org, and one Dagster
+# Single-stack (default) because there is one Sentry org, and one Dagster
 # project within it shared by every environment.
-sentry_stack = make_stack_reference(projects.SENTRY, "Production")
+sentry_stack = make_stack_reference(projects.SENTRY, "default")
 # Keycloak is deployed to CI/QA/Production only; the Dev Dagster stack has no
 # counterpart to reference, so its data_loading deployment simply goes without
 # the Keycloak host and that source stays unavailable there.
