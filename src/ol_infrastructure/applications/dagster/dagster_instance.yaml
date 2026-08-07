@@ -50,6 +50,9 @@ run_launcher:
     - dagster-static-secrets
     - dagster-dbt-secrets
     - dagster-postgresql-secret
+    # Ops execute in run worker pods, not in the code location pods, so the
+    # Sentry DSN has to reach them here as well.
+    - dagster-sentry-secrets
 
 
 run_storage:

@@ -3680,3 +3680,38 @@ key_ol_analytics_api = sentry.SentryKey(
 )
 
 pulumi.export("ol_analytics_api_sentry_dsn", key_ol_analytics_api.dsn_public)
+
+# Hand-authored addition, same rationale as project_ol_analytics_api above --
+# see IMPORT_SUMMARY.md.
+#
+# One project covers the whole Dagster deployment. CI/QA/Production are
+# separated by the SDK's `environment` tag and the ten code locations by a
+# `dagster_code_location` tag, rather than by multiplying projects.
+project_dagster = sentry.SentryProject(
+    "project_dagster",
+    organization=ORGANIZATION,
+    name="dagster",
+    slug="dagster",
+    platform="python",
+    # The data/BI team owns the pipelines; devops and MIT ODL get the same
+    # blanket access they hold on the other infrastructure projects.
+    teams=[
+        "bi",
+        "devops",
+        "mit-office-of-digital-learning",
+    ],
+    digests_min_delay=300,
+    digests_max_delay=1800,
+    resolve_age=0,
+    opts=sentry_opts,
+)
+
+key_dagster = sentry.SentryKey(
+    "key_dagster",  # pragma: allowlist secret
+    organization=ORGANIZATION,
+    project=project_dagster.slug,
+    name="Default",
+    opts=sentry_opts,
+)
+
+pulumi.export("dagster_sentry_dsn", key_dagster.dsn_public)

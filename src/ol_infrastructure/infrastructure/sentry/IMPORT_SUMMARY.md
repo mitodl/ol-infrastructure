@@ -74,3 +74,12 @@ The import file contains resource IDs only, not Sentry token values or DSNs.
   matching `pulumi state rename` at that point). The `ol_analytics_api_sentry_dsn`
   stack output is also hand-added and not part of the generator's output
   template.
+
+- `project_dagster` / `key_dagster`: added by hand for the same reason -- the
+  Dagster Sentry project does not exist live yet, so there is nothing to
+  import and `pulumi up` creates both. One project serves all environments and
+  all ten code locations; they are separated by the SDK's `environment` tag and
+  a `dagster_code_location` tag rather than by separate projects. The
+  `dagster_sentry_dsn` stack output is consumed by the Dagster application
+  stack, which writes it to Vault at `secret-data/dagster/sentry`. The same
+  naming-convergence caveat as above applies to `key_dagster`.
