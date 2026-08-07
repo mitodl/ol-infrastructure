@@ -166,6 +166,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
 )
+from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
     BusinessUnit,
@@ -870,6 +871,58 @@ witan_virtualmcpserver = kubernetes.apiextensions.CustomResource(
             },
         },
         "serviceType": "ClusterIP",
+        # VirtualMCPServerSpec has no `resources` field of its own (unlike
+        # MCPServer), so the aggregator's limits can only be set through the
+        # documented PodTemplateSpec escape hatch, targeting the operator-managed
+        # `vmcp` container by name — the same mechanism mcp_servers.py uses for
+        # the backend.
+        #
+        # ── WHY THIS EXISTS ──
+        # The operator's default is 500m CPU / 512Mi memory, and 512Mi is not
+        # enough. Measured against CI on 2026-08-07: the vMCP holds per-session
+        # aggregated capability state — its log emits `session capabilities
+        # injected from core … tool_count:67` once PER SESSION — and grows from
+        # 17Mi idle to past 512Mi at ~32 concurrent sessions, i.e. roughly 15Mi
+        # resident per session. It was OOMKilled (`exitCode: 137`), APISIX lost
+        # its only upstream, and every client got a 502 HTML page until it came
+        # back. Two identical 32-client bursts four seconds apart read
+        # `{200: 32}` then `{200: 3, 502: 29}` — the first burst killed it.
+        #
+        # Nothing else in the path was under any strain: the proxy runner stayed
+        # Ready at 11m against its 500m CPU limit (~2%) and the backend never
+        # restarted. This is a memory ceiling and nothing else, which is also why
+        # replicas are not the answer to it — see the VPA note below and the same
+        # lesson already learned in `infrastructure/aws/eks/traefik.py`.
+        #
+        # ── SIZING ──
+        # 2Gi supports roughly 130 concurrent sessions at the measured
+        # ~15Mi/session, against 36 provisioned realm users.
+        #
+        # ★ The 4:1 limit:request ratio is load-bearing, not incidental. The VPA
+        # below controls this container with `controlledValues:
+        # RequestsAndLimits`, which scales the limit to PRESERVE this ratio while
+        # bounding only the request. So the ratio chosen here, multiplied by the
+        # VPA's `maxAllowed`, is what actually caps memory: 4 x 1Gi = 4Gi. Widen
+        # the ratio (say a 256Mi request against the same 2Gi limit) and the
+        # effective ceiling silently becomes 8Gi, which would let a leak grow
+        # until it evicts its node-mates rather than failing loudly.
+        #
+        # The per-session figure is inferred from a single OOM boundary, not a
+        # sweep — treat it as a floor to revise once the VPA has real numbers.
+        # Reproduce with agent-kit's `python -m witan.scripts.concurrency_probe`.
+        "podTemplateSpec": {
+            "spec": {
+                "containers": [
+                    {
+                        "name": "vmcp",
+                        "resources": {
+                            "requests": {"cpu": "100m", "memory": "512Mi"},
+                            "limits": {"cpu": "500m", "memory": "2Gi"},
+                        },
+                    }
+                ],
+            }
+        },
         "config": {
             # `priority`, NOT the CRD's `prefix` default, because prefix mode
             # renames unconditionally: it does no conflict detection at all, so
@@ -913,6 +966,66 @@ witan_virtualmcpserver = kubernetes.apiextensions.CustomResource(
             actor_tokens_secret,
         ]
     ),
+)
+
+#########################################
+#   Vertical rightsizing (VPA)           #
+#########################################
+# Memory only, deliberately. Both workloads are far from any CPU limit — the
+# aggregator peaked at 11m against 500m (~2%) during the burst that OOMKilled it
+# — so CPU is not the resource that needs managing, and leaving it uncontrolled
+# keeps the door open for a CPU-based HPA later without re-creating the known
+# HPA/VPA conflict that `infrastructure/aws/eks/traefik.py` and
+# `apisix_official.py` both document.
+#
+# This is the same remedy, for the same failure, as the one traefik.py describes:
+# a per-pod memory ceiling with no headroom, where "adding replicas doesn't help
+# ... it just means more pods hitting the same wall". Worth stating plainly here
+# because the instinct on seeing 502s under load is to reach for replicas, and
+# for this failure that would have changed nothing.
+#
+# `minAllowed` is what stops the fix from undoing itself: VPA sizes from observed
+# usage, and witan sits idle at ~17Mi for long stretches, so an unbounded
+# recommender would shrink the aggregator back toward its idle footprint and
+# re-introduce the OOM on the next burst. The floors below are the measured safe
+# sizes, not recommendations to be optimised away.
+#
+# Only the two workloads whose containers this stack actually declares. The
+# ToolHive proxy runner Deployment is left alone: it showed ~20Mi against a
+# 512Mi limit, its resources are not settable through the MCPServer CRD (
+# `resourceOverrides` covers annotations and labels only), and adding a VPA to a
+# workload under no pressure is churn for its own sake.
+make_vpa(
+    f"witan-vmcp-vpa-{stack_info.env_suffix}",
+    namespace=NAMESPACE,
+    target_kind="Deployment",
+    target_name="witan-vmcp",
+    container_name="vmcp",
+    controlled_resources=["memory"],
+    # Floor = the request declared on the vMCP above; ceiling x the 4:1 ratio
+    # there = a 4Gi hard cap on the limit. See that comment.
+    min_allowed={"memory": "512Mi"},
+    max_allowed={"memory": "1Gi"},
+    disable_other_containers=True,
+    opts=ResourceOptions(depends_on=[witan_virtualmcpserver]),
+)
+
+make_vpa(
+    f"witan-backend-vpa-{stack_info.env_suffix}",
+    namespace=NAMESPACE,
+    # The backend is a StatefulSet named `witan`; the proxy runner is a
+    # Deployment ALSO named `witan` in this same namespace. Only `target_kind`
+    # separates them, so this is not a place to guess.
+    target_kind="StatefulSet",
+    target_name=WITAN_MCPSERVER_NAME,
+    container_name="mcp",
+    controlled_resources=["memory"],
+    # Floor = WITAN_BACKEND_RESOURCES' request. 2:1 ratio there, so the 1Gi
+    # ceiling caps the limit at 2Gi.
+    min_allowed={"memory": "256Mi"},
+    max_allowed={"memory": "1Gi"},
+    disable_other_containers=True,
+    opts=ResourceOptions(depends_on=[*mcp_servers.servers]),
 )
 
 #########################################
