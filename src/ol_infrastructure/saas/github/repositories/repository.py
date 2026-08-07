@@ -2,7 +2,12 @@
 
 One function, called once per repo in the fleet. Which resources it emits depends
 on whether the repo is archived: GitHub rejects most writes to an archived repo, so
-those get a `Repository` and nothing else (plan section 4.4).
+those get a `Repository` and their `tier` property, and nothing else (plan section
+4.4). The tier is not an exception to that rule so much as a case where the rule
+does not apply -- a property value is org metadata about a repo, not repo
+configuration, and GitHub accepts the write. Omitting it would not leave an archived
+repo untiered; it would leave it in the `standard` default, which org rulesets
+target. See `_tier_property`.
 
 WHAT IS DELIBERATELY NOT EMITTED HERE, and why it is not an oversight:
 
