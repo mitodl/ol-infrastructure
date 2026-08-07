@@ -283,14 +283,37 @@ aws_mcp_deny_policy_document = {
                 "ssm:GetParametersByPath",
                 "ssm:GetParameterHistory",
                 "kms:Decrypt",
-                # Configuration that conventionally carries credentials in
-                # plaintext: Lambda and ECS environment variables, EC2 user-data
-                # bootstrap scripts (where this repo's Consul/Vault bootstrap
-                # config lives). All three measured as permitted.
+                # Service configuration that conventionally carries credentials
+                # in plaintext environment variables. Every action in this group
+                # was measured as permitted by ReadOnlyAccess. The list is long
+                # because the surface is: any service that runs a container or a
+                # build hands its environment back through a Describe/Get call.
                 "lambda:GetFunction",
                 "lambda:GetFunctionConfiguration",
                 "ecs:DescribeTaskDefinition",
+                "codebuild:BatchGetProjects",
+                "apprunner:DescribeService",
+                "batch:DescribeJobDefinitions",
+                "amplify:GetApp",
+                "amplify:GetBranch",
+                "elasticbeanstalk:DescribeConfigurationSettings",
+                "sagemaker:DescribeTrainingJob",
+                "sagemaker:DescribeProcessingJob",
+                # Glue job DefaultArguments routinely hold connection strings.
+                "glue:GetJob",
+                # EC2 user-data, where this repo's Consul/Vault bootstrap config
+                # lives. DescribeInstanceAttribute covers a RUNNING instance;
+                # launch templates and launch configurations are a second door to
+                # the same script and are what an ASG actually renders from, so
+                # denying only the first would leave the data reachable.
                 "ec2:DescribeInstanceAttribute",
+                "ec2:DescribeLaunchTemplateVersions",
+                "autoscaling:DescribeLaunchConfigurations",
+                # Other surfaces that embed values inline.
+                "cloudformation:GetTemplate",
+                "ssm:GetDocument",
+                # EMR's IAM prefix is elasticmapreduce, not the boto3 name emr.
+                "elasticmapreduce:ListBootstrapActions",
                 # Credential-minting reads. Measured as blocked today, but only
                 # because ReadOnlyAccess does not happen to grant them; pinned so
                 # a future expansion of that managed policy cannot open them.
@@ -354,11 +377,22 @@ aws_mcp_deny_policy_document = {
     ],
 }
 
-# The IRSA role, its ServiceAccount and the grants below are created in EVERY
-# stack, not gated behind toolhive_swe:aws_mcp_enabled. A role that no pod can
-# assume is inert, and keeping the IAM identical across environments makes
-# promoting the backend to QA/Production a config-only change — the same way this
-# stack already treats environment promotion.
+# The ServiceAccount and the ReadOnlyAccess attachment are gated on the same
+# boolean as the backend itself, because a ServiceAccount is NOT bound to one
+# workload: Kubernetes lets any pod in the namespace select it by name and
+# receive its projected token. Leaving it in place in a stack where the backend
+# is disabled would mean anyone able to create an MCPServer CR in toolhive-swe
+# could set spec.serviceAccount to it and obtain shared-account AWS reads —
+# turning namespace-level workload creation into Production-wide access with the
+# feature switched off. Creating the SA only where the backend runs closes that:
+# Kubernetes refuses to schedule a pod naming a ServiceAccount that is absent.
+#
+# The trust role and the Deny policy are still created everywhere. Both are
+# genuinely inert on their own — a role with nothing but a Deny attached grants
+# nothing — and keeping them stack-invariant means promotion stays a one-line
+# config change.
+aws_mcp_enabled = toolhive_swe_config.get_bool("aws_mcp_enabled")
+
 toolhive_swe_auth_binding = OLEKSAuthBinding(
     OLEKSAuthBindingConfig(
         application_name="toolhive-swe",
@@ -373,7 +407,7 @@ toolhive_swe_auth_binding = OLEKSAuthBinding(
         cluster_identities=cluster_stack.require_output("cluster_identities"),
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
         irsa_service_account_name=AWS_MCP_SERVICE_ACCOUNT_NAME,
-        create_irsa_service_account=True,
+        create_irsa_service_account=aws_mcp_enabled,
         vault_sync_service_account_names="toolhive-swe-vault",
         k8s_labels=k8s_labels,
     )
@@ -383,11 +417,15 @@ toolhive_swe_auth_binding = OLEKSAuthBinding(
 # able to describe whatever an agent is debugging without a human relaying CLI
 # output. The Deny above is what keeps "describe everything" from also meaning
 # "read every secret".
-iam.RolePolicyAttachment(
-    f"toolhive-swe-aws-mcp-readonly-attach-{stack_info.env_suffix}",
-    policy_arn="arn:aws:iam::aws:policy/ReadOnlyAccess",
-    role=toolhive_swe_auth_binding.irsa_role.name,
-)
+#
+# Gated with the ServiceAccount so a stack with the backend disabled has no path
+# to these permissions at all, rather than a dormant one.
+if aws_mcp_enabled:
+    iam.RolePolicyAttachment(
+        f"toolhive-swe-aws-mcp-readonly-attach-{stack_info.env_suffix}",
+        policy_arn="arn:aws:iam::aws:policy/ReadOnlyAccess",
+        role=toolhive_swe_auth_binding.irsa_role.name,
+    )
 
 # Sync the Keycloak client secret from Vault into a namespace-local K8s Secret so
 # ToolHive's embedded auth server can reference it as the upstream clientSecretRef.
@@ -480,7 +518,9 @@ mcp_servers = create_mcp_servers(
     k8s_global_labels=k8s_global_labels,
     cluster_stack=cluster_stack,
     toolhive_swe_config=toolhive_swe_config,
-    aws_mcp_service_account=toolhive_swe_auth_binding.irsa_service_accounts[0],
+    # A list, not a single handle: it is empty in stacks where the backend is
+    # disabled, which is exactly the stacks that build no MCPServer to depend on.
+    aws_mcp_service_accounts=toolhive_swe_auth_binding.irsa_service_accounts,
 )
 
 #########################################

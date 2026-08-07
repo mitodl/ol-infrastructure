@@ -69,7 +69,7 @@ def create_mcp_servers(  # noqa: PLR0913
     k8s_global_labels: dict[str, str],
     cluster_stack: StackReference,
     toolhive_swe_config: Config,
-    aws_mcp_service_account: kubernetes.core.v1.ServiceAccount,
+    aws_mcp_service_accounts: list[kubernetes.core.v1.ServiceAccount],
 ) -> ToolhiveSWEMCPServers:
     """Provision the MCPGroup and every backend MCPServer that joins it."""
     swe_mcpgroup = kubernetes.apiextensions.CustomResource(
@@ -453,8 +453,11 @@ def create_mcp_servers(  # noqa: PLR0913
             },
             # The ServiceAccount stands in for the token Secret the other
             # backends wait on: without it the operator reconciles this into a
-            # pod that has no way to obtain credentials.
-            opts=ResourceOptions(depends_on=[swe_mcpgroup, aws_mcp_service_account]),
+            # pod with no way to obtain credentials — and, since Kubernetes will
+            # not schedule a pod naming an absent ServiceAccount, into one that
+            # never starts at all. __main__.py creates it under the same gate as
+            # this block, so the list below is populated exactly when we get here.
+            opts=ResourceOptions(depends_on=[swe_mcpgroup, *aws_mcp_service_accounts]),
         )
         servers.append(aws_mcpserver)
 
