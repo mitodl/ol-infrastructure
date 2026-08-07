@@ -1527,21 +1527,28 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
         granian_config=GranianConfig(
             workers=2,
-            # Sized against the VPA *floor* (3Gi in production), not the declared
+            # Sized against the VPA *floor* (3.5Gi in production), not the declared
             # 3200Mi limit, because the floor is the smallest limit a pod can be
             # running under and therefore the one the cap has to beat. The component's
             # own floor(limit/workers*0.9) would give 1440, leaving the worker pair at
-            # 2880Mi with almost nothing left for the master under a 3072Mi floor.
+            # 2880Mi with almost nothing left for the master under the floor.
             #
-            # 2*1350 = 2700Mi bounds the pair below the 2774Mi peak container RSS
-            # measured over 14 days, leaving ~370Mi for the master and transient
-            # overshoot. The previous value of 1080 sat *below* the ~1300Mi a worker
-            # legitimately reaches at peak, so it fired during normal operation --
-            # graceful respawns as steady-state behaviour rather than a runaway guard.
+            # Raised again 2026-08-07, 1350 -> 1500. The previous 1350 (pair 2700Mi,
+            # ~370Mi margin under a 3Gi floor) was sized against a 2774Mi peak that
+            # was itself measured while the fleet was over-scaled (HPA pegged near
+            # max_replicas by an inert KEDA trigger, spreading traffic thin). PR #5303
+            # fixed that trigger, the HPA settled into a much smaller replica range,
+            # and the same total traffic concentrating onto fewer pods pushed
+            # container RSS to 3045-3069Mi within a day -- eating the margin and
+            # reviving the OOMKills. 2*1500 = 3000Mi leaves ~580Mi under the new 3.5Gi
+            # floor for the master and transient overshoot, sized with more headroom
+            # than before since this margin has now been eaten twice. See
+            # les-root-cause-found-mit-learn-s-aug-6-cpu-request-b-cfebf0 (witan) for
+            # the full investigation.
             #
             # Coupled to `workers` and to the VPA floor: both must be revisited
             # together. Dropping to workers=1 without resizing this would cap the sole
-            # worker at 1350Mi of a 3Gi pod. See the stage 4 task in
+            # worker at 1500Mi of a 3.5Gi pod. See the stage 4 task in
             # docs/plans/granian-configuration-overhaul.md.
             #
             # This is one value across all stacks, while the VPA floor it is sized
@@ -1549,11 +1556,11 @@ mitlearn_k8s_app = OLApplicationK8s(
             # the protection gap it looks like: a cap only guards anything when
             # 2*cap + master fits under the running limit, and no cap derived from
             # the 3200Mi declared limit fits under a VPA floor of 256Mi. Below a
-            # ~2300Mi limit the cap is inert at 1080 and at 1350 alike, so CI/QA are
-            # no worse off than before. Making it genuinely track the limit the
+            # ~2300Mi limit the cap is inert at 1080, 1350 and 1500 alike, so CI/QA
+            # are no worse off than before. Making it genuinely track the limit the
             # kernel enforces needs a runtime cgroup read, not a synth-time constant
             # -- tracked as tk-evaluate-runtime-cgroup-derived-workers-max-rss.
-            workers_max_rss=1350,
+            workers_max_rss=1500,
             enable_metrics=True,
             interface="asginl",
             backlog=None,
