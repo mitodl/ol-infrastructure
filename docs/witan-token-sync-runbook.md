@@ -172,32 +172,58 @@ policy decision actor_id="act-36615884-fc52-465a-9f1d-9db040495163"
   action=change allowed=true matched_rule_id="users-write-memory"
 ```
 
-**Start with witan's log, not this one.** witan holds the JWT and logs both
-halves on the same line, so one query answers it:
+**Start with witan's log, not this one.** witan holds the JWT and is the only
+tier that can name a person, so one query answers it:
 
 ```logql
 {namespace="witan"} | json | actor_id="act-36615884-fc52-465a-9f1d-9db040495163"
 ```
 
-Every `mcp.tool_call` line carries `actor` — the part of `preferred_username`
-before the `@`. The domain is deliberately not logged (it is the same address
-Keycloak holds, and witan's own scanner classes a bare email as PII), so `actor`
+Every `mcp.tool_call` line carries `actor_id`. Most also carry `actor` — the
+part of `preferred_username` (or, if that claim is absent, `email`) before the
+`@`. The domain is deliberately not logged: it is the same address Keycloak
+holds, and witan's own scanner classes a bare email as PII, so `actor`
 identifies a colleague to a human reader without putting an address into log
-storage. Two sentinels are not people: `local` means the call carried no JWT at
-all — a local stdio server, never the deployed one, which rejects
-unauthenticated requests before a handler runs — and `unknown` means a token
-arrived whose `sub` would not derive an id, which is a bug worth chasing.
+storage.
+
+**A missing `actor` is not a logging regression.** It is omitted rather than
+blank or invented whenever the call names nobody — which is every call with no
+JWT, and any token carrying neither `preferred_username` nor `email`. Two
+`actor_id` sentinels are likewise not people:
+
+| `actor_id` | Means | Expected? |
+| --- | --- | --- |
+| `local` | The call carried no JWT at all. A local stdio server — never the deployed one, which rejects unauthenticated requests before a handler runs. | Yes, locally |
+| `unknown` | Identity extraction failed. Either the token's `sub` would not derive an id, or reading the token raised at all. | No — worth chasing |
 
 **If they have never called a witan tool**, there will be no such line. Go to
 Keycloak directly: the id is `act-` plus the `sub`, which is the user's Keycloak
 UUID verbatim (`derive_actor_id` only sanitizes, and a UUID survives it
 unchanged), so it is a primary-key lookup.
 
+The same service account this job uses can do the lookup — it already holds
+`view-users` on the realm, which is what lets it enumerate users here, and a
+single-user `GET` needs nothing more. Mint a token from its credentials
+(`sso-ci` / `sso-qa` / `sso` for CI / QA / Production):
+
 ```shell
+KEYCLOAK_URL=https://sso-ci.ol.mit.edu
+SECRET=secret-operations/witan/token-sync-oidc
+TOKEN=$(curl -s -X POST \
+  "$KEYCLOAK_URL/realms/ol-platform-engineering/protocol/openid-connect/token" \
+  -d grant_type=client_credentials \
+  -d "client_id=$(vault kv get -field=client_id "$SECRET")" \
+  -d "client_secret=$(vault kv get -field=client_secret "$SECRET")" \
+  | jq -r .access_token)
+
 curl -sH "Authorization: Bearer $TOKEN" \
   "$KEYCLOAK_URL/admin/realms/ol-platform-engineering/users/36615884-fc52-465a-9f1d-9db040495163" \
   | jq '{username, email, enabled}'
 ```
+
+A 403 on the second call rather than the first means the service account has
+lost `view-users` — the same cause as the "returned no users at all" failure
+below, and the same fix.
 
 There is deliberately no stored `{actor_id: username}` directory. Both halves
 are already derivable from sources that cannot drift — the log line and the
