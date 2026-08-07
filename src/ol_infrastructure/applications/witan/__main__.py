@@ -895,8 +895,11 @@ witan_virtualmcpserver = kubernetes.apiextensions.CustomResource(
         # lesson already learned in `infrastructure/aws/eks/traefik.py`.
         #
         # ── SIZING ──
-        # 2Gi supports roughly 130 concurrent sessions at the measured
-        # ~15Mi/session, against 36 provisioned realm users.
+        # 2Gi supports roughly 130 concurrent SESSIONS at the measured
+        # ~15Mi/session. Sessions, not people: the burst above opened all 32
+        # from a single token, so one user running a fleet of agents can hold
+        # many at once and the count of provisioned realm users says nothing
+        # about the ceiling. Size against expected concurrent sessions.
         #
         # ★ The 4:1 limit:request ratio is load-bearing, not incidental. The VPA
         # below controls this container with `controlledValues:
@@ -971,12 +974,16 @@ witan_virtualmcpserver = kubernetes.apiextensions.CustomResource(
 #########################################
 #   Vertical rightsizing (VPA)           #
 #########################################
-# Memory only, deliberately. Both workloads are far from any CPU limit — the
-# aggregator peaked at 11m against 500m (~2%) during the burst that OOMKilled it
-# — so CPU is not the resource that needs managing, and leaving it uncontrolled
-# keeps the door open for a CPU-based HPA later without re-creating the known
-# HPA/VPA conflict that `infrastructure/aws/eks/traefik.py` and
-# `apisix_official.py` both document.
+# Memory only, deliberately. Memory is the resource with a demonstrated failure:
+# the aggregator died of it, and the backend's limits were never applied at all.
+# No CPU pressure has been observed on either of these two workloads — but note
+# that is an absence of evidence, not a measurement: the only CPU figure taken
+# during the incident was the PROXY RUNNER's (11m against its 500m limit), and
+# that is a third workload, not one of the two targeted here. Leaving CPU
+# uncontrolled therefore rests on memory being the known problem, not on proven
+# CPU headroom; it also keeps the door open for a CPU-based HPA later without
+# re-creating the known HPA/VPA conflict that
+# `infrastructure/aws/eks/traefik.py` and `apisix_official.py` both document.
 #
 # This is the same remedy, for the same failure, as the one traefik.py describes:
 # a per-pod memory ceiling with no headroom, where "adding replicas doesn't help
@@ -989,6 +996,34 @@ witan_virtualmcpserver = kubernetes.apiextensions.CustomResource(
 # recommender would shrink the aggregator back toward its idle footprint and
 # re-introduce the OOM on the next burst. The floors below are the measured safe
 # sizes, not recommendations to be optimised away.
+#
+# ★ THESE TARGETS ARE SINGLETONS, AND THAT NORMALLY DEFEATS THE VPA UPDATER.
+# The updater refuses to touch a controller with fewer than `--min-replicas`
+# pods (upstream default 2, and not overridden on this cluster), which would
+# leave both VPAs below computing recommendations that never reach a pod. What
+# rescues it is `--in-place-skip-disruption-budget=true` on the
+# `vertical-pod-autoscaler-updater` Deployment in `kube-system`, combined with
+# `make_vpa`'s unconditional `InPlaceOrRecreate` mode — vpa-updater 1.7.1,
+# `pkg/updater/restriction/pods_restriction_factory.go`:
+#
+#     skipReplicaCheck := (usingInPlaceOrRecreate || usingInPlace) &&
+#                         f.inPlaceSkipDisruptionBudget
+#
+# and, for a controller whose live pod count is under `required`: when
+# `skipReplicaCheck` is false it is skipped outright (`continue`), and when true
+# it is admitted with `isBelowMinReplicas = true` instead.
+#
+# So a 1-replica controller IS admitted, flagged `belowMinReplicas`. That flag
+# then makes `CanEvict` return false while `CanInPlaceUpdate` still approves —
+# which is exactly the behaviour wanted here: resize the live pod, never evict
+# it. Evicting either of these singletons would drop APISIX's only upstream and
+# recreate the very 502 this stack is fixing.
+#
+# The dependency is invisible from here, so: if that updater flag is ever
+# removed, or `min-replicas` is set per-VPA, these two VPAs silently degrade to
+# recommendation-only and the OOM protection above goes with them. Raised by
+# review on PR #5320 as a suspected defect; verified against the running
+# updater's args and the 1.7.1 source rather than assumed either way.
 #
 # Only the two workloads whose containers this stack actually declares. The
 # ToolHive proxy runner Deployment is left alone: it showed ~20Mi against a
