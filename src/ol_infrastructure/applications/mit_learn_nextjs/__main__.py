@@ -35,6 +35,7 @@ from ol_infrastructure.lib.pulumi_helper import (
 stack_info = parse_stack()
 
 cluster_stack = make_stack_reference(projects.EKS, f"applications.{stack_info.name}")
+sentry_stack = make_stack_reference(projects.SENTRY, "Production")
 MIT_LEARN_NEXTJS_DOCKER_TAG = get_docker_image_tag("MIT_LEARN_NEXTJS")
 
 app_image = ecr_image_uri(
@@ -150,7 +151,7 @@ raw_env_vars = {
     "NEXT_PUBLIC_POSTHOG_API_KEY": nextjs_config.require("posthog_api_key"),
     "NEXT_PUBLIC_POSTHOG_PROJECT_ID": nextjs_config.require("posthog_project_id"),
     "NEXT_PUBLIC_POSTHOG_UI_HOST": "https://us.posthog.com",
-    "NEXT_PUBLIC_SENTRY_DSN": nextjs_config.require("sentry_dsn"),
+    "NEXT_PUBLIC_SENTRY_DSN": sentry_stack.require_output("mit_learn_sentry_dsn"),
     "NEXT_PUBLIC_SENTRY_ENV": nextjs_config.require("sentry_env"),
     "NEXT_PUBLIC_SENTRY_PROFILES_SAMPLE_RATE": "0.25",
     "NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE": "0.001",
