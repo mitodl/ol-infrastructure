@@ -16,6 +16,7 @@ import pulumiverse_sentry as sentry
 from pulumi import ResourceOptions
 
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.lib.ol_types import Services
 
 sentry_secrets = read_yaml_secrets(Path("sentry/account.yaml"))
 ORGANIZATION = sentry_secrets["organization"]
@@ -155,7 +156,7 @@ team_xpro = sentry.SentryTeam(
 project_learn_ai = sentry.SentryProject(
     "project_learn_ai",
     organization=ORGANIZATION,
-    name="learn-ai",
+    name=Services.learn_ai,
     slug="learn-ai",
     platform="python-django",
     teams=[
@@ -174,7 +175,7 @@ project_learn_ai = sentry.SentryProject(
 project_micromasters = sentry.SentryProject(
     "project_micromasters",
     organization=ORGANIZATION,
-    name="MicroMasters",
+    name=Services.micromasters,
     slug="micromasters",
     platform="javascript",
     teams=["micromasters", "mit-office-of-digital-learning", "arbisoft", "devops"],
@@ -187,7 +188,7 @@ project_micromasters = sentry.SentryProject(
 project_mitxonline = sentry.SentryProject(
     "project_mitxonline",
     organization=ORGANIZATION,
-    name="mitxonline",
+    name=Services.mitxonline,
     slug="mitxonline",
     platform="python",
     teams=["devops", "mitxonline", "arbisoft", "mit-office-of-digital-learning"],
@@ -200,7 +201,7 @@ project_mitxonline = sentry.SentryProject(
 project_ocw_next = sentry.SentryProject(
     "project_ocw_next",
     organization=ORGANIZATION,
-    name="ocw-site",
+    name=Services.ocw_site,
     slug="ocw-site",
     platform="python-django",
     teams=["mit-office-of-digital-learning", "applications", "ocw"],
@@ -213,7 +214,7 @@ project_ocw_next = sentry.SentryProject(
 project_ocw_studio = sentry.SentryProject(
     "project_ocw_studio",
     organization=ORGANIZATION,
-    name="ocw-studio",
+    name=Services.ocw_studio,
     slug="ocw-studio",
     platform="python",
     teams=["ocw"],
@@ -226,7 +227,7 @@ project_ocw_studio = sentry.SentryProject(
 project_odl_video_service = sentry.SentryProject(
     "project_odl_video_service",
     organization=ORGANIZATION,
-    name="ODL Video Service",
+    name=Services.odl_video_service,
     slug="odl-video-service",
     platform="python",
     teams=["devops", "mit-office-of-digital-learning"],
@@ -239,7 +240,7 @@ project_odl_video_service = sentry.SentryProject(
 project_open = sentry.SentryProject(
     "project_open",
     organization=ORGANIZATION,
-    name="Discussions",
+    name=Services.mit_open,
     slug="open",
     platform="python",
     teams=["devops", "mit-learn", "mit-office-of-digital-learning"],
@@ -252,7 +253,7 @@ project_open = sentry.SentryProject(
 project_open_next = sentry.SentryProject(
     "project_open_next",
     organization=ORGANIZATION,
-    name="mit-learn",
+    name=Services.mit_learn,
     slug="mit-learn",
     platform="python-django",
     teams=["mit-learn", "mit-office-of-digital-learning", "devops"],
@@ -265,7 +266,7 @@ project_open_next = sentry.SentryProject(
 project_openedx_mitxonline = sentry.SentryProject(
     "project_openedx_mitxonline",
     organization=ORGANIZATION,
-    name="openedx-mitxonline",
+    name=Services.mitxonline_edx,
     slug="openedx-mitxonline",
     platform="python-django",
     teams=["mitxonline", "devops"],
@@ -278,7 +279,7 @@ project_openedx_mitxonline = sentry.SentryProject(
 project_openedx_mitxpro = sentry.SentryProject(
     "project_openedx_mitxpro",
     organization=ORGANIZATION,
-    name="openedx-xpro",
+    name=Services.mitxpro_edx,
     slug="openedx-mitxpro",
     platform="python-django",
     teams=["devops", "xpro", "mit-office-of-digital-learning"],
@@ -291,7 +292,7 @@ project_openedx_mitxpro = sentry.SentryProject(
 project_openedx_residential = sentry.SentryProject(
     "project_openedx_residential",
     organization=ORGANIZATION,
-    name="openedx-residential",
+    name=Services.mitx_edx,
     slug="openedx-residential",
     platform="python-django",
     teams=["applications", "residential-mitx", "devops"],
@@ -317,7 +318,7 @@ project_release_script = sentry.SentryProject(
 project_xpro = sentry.SentryProject(
     "project_xpro",
     organization=ORGANIZATION,
-    name="xpro",
+    name=Services.xpro,
     slug="xpro",
     platform="python",
     teams=["arbisoft", "devops", "mit-office-of-digital-learning", "xpro"],
@@ -3569,7 +3570,7 @@ issue_alert_xpro_xpro_slack_notifications_15045794 = sentry.SentryIssueAlert(
 project_ol_analytics_api = sentry.SentryProject(
     "project_ol_analytics_api",
     organization=ORGANIZATION,
-    name="ol-analytics-api",
+    name=Services.ol_analytics_api,
     slug="ol-analytics-api",
     platform="python-fastapi",
     # Same team set as project_learn_ai -- the closest analog: also a small
@@ -3606,7 +3607,7 @@ pulumi.export("ol_analytics_api_sentry_dsn", key_ol_analytics_api.dsn_public)
 project_dagster = sentry.SentryProject(
     "project_dagster",
     organization=ORGANIZATION,
-    name="dagster",
+    name=Services.dagster,
     slug="dagster",
     platform="python",
     # The data/BI team owns the pipelines; devops and MIT ODL get the same

@@ -77,7 +77,7 @@ class Services(StrEnum):
     ol_analytics_api = "ol-analytics-api"
     opik = "opik"
     open_edx = "open-edx"
-    learn_ai = ("learn-ai",)
+    learn_ai = "learn-ai"
     mit_learn = "mit-learn"
     mit_open = "open"
     mitx_edx = "mitx-edx"
@@ -85,6 +85,7 @@ class Services(StrEnum):
     mitxonline_edx = "mitxonline-edx"
     mitxpro_edx = "xpro-edx"
     ocw_build = "ocw-build"
+    ocw_site = "ocw-site"
     ocw_studio = "ocw-studio"
     odl_video_service = "ovs"
     open_metadata = "open-metadata"

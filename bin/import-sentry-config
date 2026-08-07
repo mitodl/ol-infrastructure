@@ -18,6 +18,7 @@ import cyclopts
 import httpx
 
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.lib.ol_types import Services
 
 app = cyclopts.App(help=__doc__)
 
@@ -44,6 +45,25 @@ RESOURCE_TOKENS = {
     ),
     "plugin": "sentry:index/sentryPlugin:SentryPlugin",
 }
+SENTRY_PROJECT_SERVICES: dict[str, Services] = {
+    "dagster": Services.dagster,
+    "learn-ai": Services.learn_ai,
+    "micromasters": Services.micromasters,
+    "mit-learn": Services.mit_learn,
+    "mitxonline": Services.mitxonline,
+    "ocw-site": Services.ocw_site,
+    "ocw-studio": Services.ocw_studio,
+    "odl-video-service": Services.odl_video_service,
+    "ol-analytics-api": Services.ol_analytics_api,
+    "open": Services.mit_open,
+    "openedx-mitxonline": Services.mitxonline_edx,
+    "openedx-mitxpro": Services.mitxpro_edx,
+    "openedx-residential": Services.mitx_edx,
+    "xpro": Services.xpro,
+}
+SENTRY_PROJECT_NAME_EXCEPTIONS = {
+    "release-script": "the release-script service is being phased out",
+}
 
 
 class PyExpr(str):
@@ -55,6 +75,23 @@ class PyExpr(str):
 
 
 ORGANIZATION_REF = PyExpr("ORGANIZATION")
+
+
+def sentry_project_name(slug: str, live_name: str | None) -> str:
+    """Return the ol_types expression for a Sentry project's display name."""
+    if service := SENTRY_PROJECT_SERVICES.get(slug):
+        return PyExpr(f"Services.{service.name}")
+    if slug in SENTRY_PROJECT_NAME_EXCEPTIONS:
+        if live_name is None:
+            msg = f"Sentry project {slug!r} is missing its live display name"
+            raise ValueError(msg)
+        return live_name
+    msg = (
+        f"Sentry project {slug!r} has no Services mapping or documented "
+        "name exception; update ol_types and SENTRY_PROJECT_SERVICES or discuss "
+        "an explicit exception"
+    )
+    raise ValueError(msg)
 
 
 class SentryApi:
@@ -354,6 +391,7 @@ import pulumiverse_sentry as sentry
 from pulumi import ResourceOptions
 
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.lib.ol_types import Services
 
 sentry_secrets = read_yaml_secrets(Path("sentry/account.yaml"))
 ORGANIZATION = sentry_secrets["organization"]
@@ -463,17 +501,24 @@ def build_program(inventory: dict[str, Any], organization: str) -> PulumiProgram
         )
 
     for project in sorted(inventory["projects"], key=lambda item: item["slug"]):
+        project_slug = str(project["slug"])
         teams = [team["slug"] for team in project.get("teams", [])]
+        project_name = sentry_project_name(project_slug, project.get("name"))
+        if exception_reason := SENTRY_PROJECT_NAME_EXCEPTIONS.get(project_slug):
+            program.warnings.append(
+                f"Sentry project {project_slug} keeps its literal display name because "
+                f"{exception_reason}."
+            )
         program.add_resource(
             "project",
             "SentryProject",
-            safe_name("project", project.get("slug")),
-            f"{organization}/{project['slug']}",
+            safe_name("project", project_slug),
+            f"{organization}/{project_slug}",
             compact(
                 {
                     "organization": ORGANIZATION_REF,
-                    "name": project.get("name"),
-                    "slug": project.get("slug"),
+                    "name": project_name,
+                    "slug": project_slug,
                     "platform": project.get("platform"),
                     "teams": teams or None,
                     "digests_min_delay": project.get("digestsMinDelay"),
@@ -726,6 +771,8 @@ def render_summary(
         lines.append("- None from generation.")
     lines.extend(
         [
+            "- Sentry project `name` values are generated as `Services.<member>` expressions from `ol_infrastructure.lib.ol_types`, which is the source of truth for service names (ol-infrastructure#4883). Live `slug` values are always preserved as-is, so a name that differs from its slug is expected.",
+            "- Generation fails when a live Sentry project has neither a `SENTRY_PROJECT_SERVICES` mapping nor a documented `SENTRY_PROJECT_NAME_EXCEPTIONS` entry, so a new project forces an explicit decision about its canonical service name instead of silently reintroducing a literal one.",
             "- Dashboard widget IDs and query IDs are computed-only in the provider and are omitted from generated code.",
             "- Issue alert action/filter/condition maps are ignored after import because Sentry's issue-alert API/provider refresh currently normalizes imported rule body lists in a way that would otherwise cause destructive drift. `actionMatch` is still managed and null live values are generated as `any`.",
             "",
@@ -741,6 +788,8 @@ def render_summary(
             "```",
             "",
             "The import file contains resource IDs only, not Sentry token values or DSNs.",
+            "",
+            "`--refresh` above is for the post-import drift check, where re-reading live state is the point. For an ordinary code-change review use plain `pulumi preview --diff`: `--refresh` re-reads every managed resource through pulumiverse-sentry and reliably trips Sentry's API rate limits (HTTP 429, 40 requests/second and 25 concurrent per endpoint), which fails the preview outright on repeat runs.",
         ]
     )
     return "\n".join(lines) + "\n"

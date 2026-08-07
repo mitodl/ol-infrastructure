@@ -42,6 +42,9 @@ Organization: `mit-office-of-digital-learning`
 - Skipped issue alert openedx-residential/10002327352 (Critical - Notify Rootly, Warning - Notify Rootly): rule is driven exclusively by a Sentry-app integration action (NotifyEventSentryAppAction) with actionMatch=null. Sentry's classic Rules API accepts GET but rejects PUT with 404 for these rules, so pulumiverse-sentry 0.0.9 cannot manage them.
 - Skipped issue alert xpro/10002210772 (Notify OpsGenie via Opsgenie): rule is driven exclusively by a Sentry-app integration action (NotifyEventSentryAppAction) with actionMatch=null. Sentry's classic Rules API accepts GET but rejects PUT with 404 for these rules, so pulumiverse-sentry 0.0.9 cannot manage them.
 - Skipped metric alerts: pulumiverse-sentry 0.0.9 cannot refresh live Sentry metric alerts whose actions contain numeric targetIdentifier values (provider JSON unmarshal error).
+- Sentry project `name` values are generated as `Services.<member>` expressions from `ol_infrastructure.lib.ol_types`, which is the source of truth for service names (ol-infrastructure#4883). Live `slug` values are always preserved as-is, so a name that differs from its slug is expected.
+- Generation fails when a live Sentry project has neither a `SENTRY_PROJECT_SERVICES` mapping nor a documented `SENTRY_PROJECT_NAME_EXCEPTIONS` entry, so a new project forces an explicit decision about its canonical service name instead of silently reintroducing a literal one.
+- Sentry project release-script keeps its literal display name because the release-script service is being phased out.
 - Dashboard widget IDs and query IDs are computed-only in the provider and are omitted from generated code.
 - Issue alert action/filter/condition maps are ignored after import because Sentry's issue-alert API/provider refresh currently normalizes imported rule body lists in a way that would otherwise cause destructive drift. `actionMatch` is still managed and null live values are generated as `any`.
 
@@ -49,6 +52,13 @@ Re-running `bin/import-sentry-config generate` regenerates `__main__.py`,
 `sentry_imports.json`, and this file together from live Sentry
 configuration, then `pulumi import --file sentry_imports.json` followed by
 `pulumi preview --refresh --diff` applies any newly discovered resources.
+
+`--refresh` belongs to that post-import drift check, where re-reading live
+state is the point. For an ordinary code-change review use plain
+`pulumi preview --diff`: `--refresh` re-reads every managed resource through
+pulumiverse-sentry and reliably trips Sentry's API rate limits (HTTP 429,
+40 requests/second and 25 concurrent per endpoint), which fails the preview
+outright on repeat runs.
 
 ## Hand-authored exceptions
 
@@ -103,10 +113,10 @@ configuration, then `pulumi import --file sentry_imports.json` followed by
   `name`/`slug` were hand-changed from `ocw-next` to `ocw-site` (matching the
   `ocw_site` application) without renaming the Pulumi resource identifiers,
   so the update applies in place rather than replacing the resource. The
-  hand-added export is `ocw_site_sentry_dsn`. A future `bin/import-sentry-config`
-  run will regenerate `name`/`slug` back to whatever the live project is
-  named at that point -- expect it to match `ocw-site` unless it's renamed
-  again live.
+  hand-added export is `ocw_site_sentry_dsn`. The `name` is now generated from
+  `Services.ocw_site`, so a future `bin/import-sentry-config` run keeps it;
+  `slug` is still regenerated from whatever the live project carries at that
+  point -- expect it to match `ocw-site` unless it's renamed again live.
 - `project_open_next` / `key_open_next_default_*`: the live Sentry project's
   `name`/`slug` were hand-changed from `open-next` to `mit-learn` (without
   renaming the Pulumi resource identifiers, same in-place-update rationale as
@@ -117,7 +127,14 @@ configuration, then `pulumi import --file sentry_imports.json` followed by
   backend (`/api/v1/learning_resources/...`, `vector_search.tasks.*`, SCIM)
   and the `mit_learn_nextjs` frontend share this one project, the same way
   `project_dagster` covers all of Dagster's code locations rather than
-  splitting by app. The hand-added export is `mit_learn_sentry_dsn`. A future
-  `bin/import-sentry-config` run will regenerate `name`/`slug` back to
-  whatever the live project is named at that point -- expect it to match
+  splitting by app. The hand-added export is `mit_learn_sentry_dsn`. The `name`
+  is now generated from `Services.mit_learn`, so a future
+  `bin/import-sentry-config` run keeps it; `slug` is still regenerated from
+  whatever the live project carries at that point -- expect it to match
   `mit-learn` unless it's renamed again live.
+- `project_release_script`: the only live project whose display name is not
+  sourced from `Services`. It is kept as a literal via
+  `SENTRY_PROJECT_NAME_EXCEPTIONS` in `bin/import-sentry-config` because the
+  release-script service is being phased out, so it deliberately does not get
+  an `ol_types` member. Drop the exception entry along with the project when
+  that phase-out completes.
