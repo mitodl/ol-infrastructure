@@ -37,3 +37,7 @@ path "sys/leases/revoke" {
     lease_id = ["postgres-learn-ai/creds/app/*"]
   }
 }
+
+path "secret-global/data/grafana" {
+  capabilities = ["read"]
+}

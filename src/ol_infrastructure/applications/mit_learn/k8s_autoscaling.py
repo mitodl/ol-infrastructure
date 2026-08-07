@@ -62,12 +62,16 @@ def build_webapp_keda_config(
     return _build_webapp_keda_config(
         trigger_auth_name=trigger_auth_name,
         route_matcher=f"mitlearn_ol-mitlearn-k8s-apisix-route.*-{stack_info.env_suffix}_.*",
-        namespace="mitlearn",
-        pod_matcher="mitlearn-app-.*",
         container_name="mitlearn-app",
         requests_threshold=mitlearn_config.get("autoscaling_requests_threshold")
         or "20",
-        latency_threshold=mitlearn_config.get("autoscaling_latency_threshold")
-        or "2000",
+        # No latency trigger by default (note the absent `or "2000"`): mit-learn's
+        # p95 is dominated by Postgres and OpenSearch, and adding webapp replicas
+        # against a slow shared backend does not lower it -- it just adds
+        # connections to the thing that is already struggling, while the HPA keeps
+        # asking for more. Request rate plus the CPU backstop covers the cases
+        # where replicas actually help. Set `mitlearn:autoscaling_latency_threshold`
+        # on a stack to opt back in.
+        latency_threshold=mitlearn_config.get("autoscaling_latency_threshold"),
         cpu_threshold=mitlearn_config.get("autoscaling_cpu_threshold") or "60",
     )
