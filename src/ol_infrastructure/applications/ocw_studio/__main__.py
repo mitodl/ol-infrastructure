@@ -94,7 +94,7 @@ network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
-sentry_stack = make_stack_reference(projects.SENTRY, "Production")
+sentry_stack = make_stack_reference(projects.SENTRY, "default")
 apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
