@@ -20,4 +20,5 @@ config:
   toolhive_swe:context7_enabled: "true"
   toolhive_swe:context7_api_key:
     secure: v1:+EHQSAypsSet/IkB:wNtFOo5pAO1dUtlJFZqWOo93F0r4EOgUA8kV1whv66c0Y54Sbeczbv2W97eek2JphIhJilcRLl4P78g=
-  toolhive_swe:aws_mcp_enabled: "false"
+  # The `aws` backend needs no secret config: it authenticates with IRSA.
+  toolhive_swe:aws_mcp_enabled: "true"
