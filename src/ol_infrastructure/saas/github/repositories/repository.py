@@ -96,6 +96,34 @@ _ARCHIVED_IGNORED_SETTINGS = [
 ]
 
 
+def _tier_property(
+    name: str, tier: str, repository: github.Repository
+) -> github.RepositoryCustomProperty:
+    """Set the repo's governance tier. Emitted for ARCHIVED repos too.
+
+    That exception is worth stating, because everywhere else in this file an archived
+    repo gets almost nothing: GitHub refuses most writes to one. Custom property values
+    are org metadata *about* a repo rather than repo configuration, and the write is
+    accepted -- `PATCH /repos/{repo}/properties/values` returns 204 on an archived repo
+    and leaves it archived (verified 2026-08-07 against PASSSL).
+
+    SKIPPING IT IS NOT NEUTRAL, which is why the archived path used to be wrong. `tier`
+    is `required` with a default of `standard`, so a repo with no value written does not
+    sit outside the scheme -- it sits in `standard`, and `baseline-default-branch`
+    targets `standard`. Leaving the 140 archived repos unwritten put every one of them
+    inside the ruleset that organization/org_rulesets.py says they are excluded from.
+    An unset property is a value, not an absence.
+    """
+    return github.RepositoryCustomProperty(
+        f"mitodl-repo-tier-{name}",
+        repository=name,
+        property_name=TIER_PROPERTY_NAME,
+        property_type="single_select",
+        property_values=[tier],
+        opts=ResourceOptions(depends_on=[repository]),
+    )
+
+
 def build(repo: dict[str, Any]) -> None:
     """Emit the resource family for one repo."""
     name = repo["name"]
@@ -104,9 +132,11 @@ def build(repo: dict[str, Any]) -> None:
     if archived:
         # Almost empty on purpose (section 4.4). Archived repos are imported so that
         # nothing stops someone re-adding one later with a full config and triggering
-        # a wave of failed writes -- but what is managed is the archived flag and the
-        # name, nothing more.
-        github.Repository(
+        # a wave of failed writes -- so what is managed is the archived flag, the name,
+        # and the tier. The tier is not an inconsistency: see _tier_property, and note
+        # that NOT writing it leaves the repo in the `standard` default, which is a
+        # targeted tier.
+        repository = github.Repository(
             f"mitodl-repo-{name}",
             name=name,
             archived=True,
@@ -116,6 +146,7 @@ def build(repo: dict[str, Any]) -> None:
                 ignore_changes=_ARCHIVED_IGNORED_SETTINGS,
             ),
         )
+        _tier_property(name, repo["tier"], repository)
         return
 
     # retain_on_delete is the counterweight for administration:write (section 2.2).
@@ -174,18 +205,7 @@ def build(repo: dict[str, Any]) -> None:
         opts=ResourceOptions(depends_on=[repository]),
     )
 
-    # The tier value. This is a CREATE, not an import -- no repo carries a custom
-    # property today. Until it lands, every repo inherits `standard` from the
-    # property default, which is why phase 3.5's rulesets must come after this
-    # (see organization/custom_properties.py).
-    github.RepositoryCustomProperty(
-        f"mitodl-repo-tier-{name}",
-        repository=name,
-        property_name=TIER_PROPERTY_NAME,
-        property_type="single_select",
-        property_values=[repo["tier"]],
-        opts=ResourceOptions(depends_on=[repository]),
-    )
+    _tier_property(name, repo["tier"], repository)
 
     for team_slug, permission in (repo.get("teams") or {}).items():
         github.TeamRepository(
