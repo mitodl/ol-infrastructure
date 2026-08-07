@@ -68,6 +68,33 @@ WITAN_MCPSERVER_NAME = "witan"
 ACTOR_TOKENS_MOUNT_PATH = "/etc/witan/actor-tokens"  # pragma: allowlist secret
 ACTOR_TOKENS_FILENAME = "tokens.json"  # pragma: allowlist secret
 
+# Writable scratch space. The container runs `readOnlyRootFilesystem: true`
+# with no writable volume, so Python's tempfile found nothing in
+# ['/tmp', '/var/tmp', '/usr/tmp', '/src'] and every server-side tool that
+# needs a temp file failed outright — verified against CI on 2026-08-07, where
+# `witan migrate merge` through the MCP tier (ADR-0007 D5) returned
+# "No usable temporary directory found" at every payload size, including
+# --dry-run. Those tools hand a file to the `omnigraph` binary, so there is no
+# in-memory path to fall back to.
+#
+# An emptyDir rather than relaxing readOnlyRootFilesystem: the read-only root
+# is worth keeping, and this grants exactly the one writable directory needed.
+# Disk-backed on purpose — `medium: Memory` would charge this to the pod's
+# 512Mi memory limit and OOM the server on a large export.
+#
+# Writability depends on the pod's `fsGroup: 1000` (the ToolHive operator sets
+# it, and the container runs as uid/gid 1000): kubelet group-owns an emptyDir
+# by fsGroup, so a non-root process can write it. Remove fsGroup and this mount
+# silently becomes root-owned and useless — the same trap ci_indexer.py
+# documents on its scratch volume.
+TMP_MOUNT_PATH = "/tmp"  # noqa: S108
+# Sized for the server-side work, which is dominated by the graph export
+# `store_merge` takes of its OWN target to reconcile against — that grows with
+# the shared graph, not with the caller's upload (the client's batches are
+# capped near 2 MiB by witan_core.chunking.MCP_LOAD_MAX_BYTES). 2Gi is well
+# clear of a council graph's export today and far below the indexer's 8Gi.
+TMP_SIZE_LIMIT = "2Gi"
+
 
 class WitanMCPServers(NamedTuple):
     """Handles to the group and backend server CRs for depends_on wiring."""
@@ -272,7 +299,11 @@ def create_mcp_servers(  # noqa: PLR0913
                                     "name": "actor-tokens",
                                     "mountPath": ACTOR_TOKENS_MOUNT_PATH,
                                     "readOnly": True,
-                                }
+                                },
+                                {
+                                    "name": "tmp",
+                                    "mountPath": TMP_MOUNT_PATH,
+                                },
                             ],
                         }
                     ],
@@ -280,7 +311,11 @@ def create_mcp_servers(  # noqa: PLR0913
                         {
                             "name": "actor-tokens",
                             "secret": {"secretName": actor_tokens_secret_name},
-                        }
+                        },
+                        {
+                            "name": "tmp",
+                            "emptyDir": {"sizeLimit": TMP_SIZE_LIMIT},
+                        },
                     ],
                 }
             },
