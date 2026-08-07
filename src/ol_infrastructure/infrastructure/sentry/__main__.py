@@ -152,19 +152,6 @@ team_xpro = sentry.SentryTeam(
     opts=sentry_opts,
 )
 
-project_airbyte = sentry.SentryProject(
-    "project_airbyte",
-    organization=ORGANIZATION,
-    name="airbyte",
-    slug="airbyte",
-    platform="java",
-    teams=["devops"],
-    digests_min_delay=300,
-    digests_max_delay=1800,
-    resolve_age=0,
-    opts=sentry_opts,
-)
-
 project_learn_ai = sentry.SentryProject(
     "project_learn_ai",
     organization=ORGANIZATION,
@@ -213,8 +200,8 @@ project_mitxonline = sentry.SentryProject(
 project_ocw_next = sentry.SentryProject(
     "project_ocw_next",
     organization=ORGANIZATION,
-    name="ocw-next",
-    slug="ocw-next",
+    name="ocw-site",
+    slug="ocw-site",
     platform="python-django",
     teams=["mit-office-of-digital-learning", "applications", "ocw"],
     digests_min_delay=300,
@@ -350,19 +337,6 @@ project_sandbox = sentry.SentryProject(
     digests_min_delay=300,
     digests_max_delay=1800,
     resolve_age=120,
-    opts=sentry_opts,
-)
-
-project_unified_ecommerce = sentry.SentryProject(
-    "project_unified_ecommerce",
-    organization=ORGANIZATION,
-    name="unified-ecommerce",
-    slug="unified-ecommerce",
-    platform="python-django",
-    teams=["team-jkachel"],
-    digests_min_delay=300,
-    digests_max_delay=1800,
-    resolve_age=0,
     opts=sentry_opts,
 )
 
@@ -3341,14 +3315,6 @@ dashboard_caches_1072565 = sentry.SentryDashboard(
     opts=sentry_opts,
 )
 
-key_airbyte_default_0e552f29a3594a6a972cf2d73dfa140b = sentry.SentryKey(
-    "key_airbyte_default_0e552f29a3594a6a972cf2d73dfa140b",  # pragma: allowlist secret
-    organization=ORGANIZATION,
-    project="airbyte",
-    name="Default",
-    opts=sentry_opts,
-)
-
 key_learn_ai_default_5e497d1f33127fc35dfc811b290747c7 = sentry.SentryKey(
     "key_learn_ai_default_5e497d1f33127fc35dfc811b290747c7",  # pragma: allowlist secret
     organization=ORGANIZATION,
@@ -3376,7 +3342,7 @@ key_mitxonline_default_8ba006dc817541a0865033722f8289ad = sentry.SentryKey(
 key_ocw_next_default_eee58f41dda54d2b814296e12dced4b7 = sentry.SentryKey(
     "key_ocw_next_default_eee58f41dda54d2b814296e12dced4b7",  # pragma: allowlist secret
     organization=ORGANIZATION,
-    project="ocw-next",
+    project="ocw-site",
     name="Default",
     opts=sentry_opts,
 )
@@ -3465,14 +3431,6 @@ key_sandbox_default_8c6395a9422040c999373e204b15bd8b = sentry.SentryKey(
     "key_sandbox_default_8c6395a9422040c999373e204b15bd8b",  # pragma: allowlist secret
     organization=ORGANIZATION,
     project="sandbox",
-    name="Default",
-    opts=sentry_opts,
-)
-
-key_unified_ecommerce_default_734c791eb3c83eb35db04c1b753ff67e = sentry.SentryKey(
-    "key_unified_ecommerce_default_734c791eb3c83eb35db04c1b753ff67e",  # pragma: allowlist secret
-    organization=ORGANIZATION,
-    project="unified-ecommerce",
     name="Default",
     opts=sentry_opts,
 )
@@ -3722,10 +3680,6 @@ pulumi.export("dagster_sentry_dsn", key_dagster.dsn_public)
 # See ol-infrastructure#5004. Naming convention: `<project_slug>_sentry_dsn`,
 # with a name-suffixed variant for projects that have more than one key.
 pulumi.export(
-    "airbyte_sentry_dsn",
-    key_airbyte_default_0e552f29a3594a6a972cf2d73dfa140b.dsn_public,
-)
-pulumi.export(
     "learn_ai_sentry_dsn",
     key_learn_ai_default_5e497d1f33127fc35dfc811b290747c7.dsn_public,
 )
@@ -3738,7 +3692,7 @@ pulumi.export(
     key_mitxonline_default_8ba006dc817541a0865033722f8289ad.dsn_public,
 )
 pulumi.export(
-    "ocw_next_sentry_dsn",
+    "ocw_site_sentry_dsn",
     key_ocw_next_default_eee58f41dda54d2b814296e12dced4b7.dsn_public,
 )
 pulumi.export(
@@ -3784,10 +3738,6 @@ pulumi.export(
 pulumi.export(
     "sandbox_sentry_dsn",
     key_sandbox_default_8c6395a9422040c999373e204b15bd8b.dsn_public,
-)
-pulumi.export(
-    "unified_ecommerce_sentry_dsn",
-    key_unified_ecommerce_default_734c791eb3c83eb35db04c1b753ff67e.dsn_public,
 )
 pulumi.export(
     "xpro_sentry_dsn",

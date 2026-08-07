@@ -85,3 +85,17 @@ configuration, then `pulumi import --file sentry_imports.json` followed by
   are not part of the generator's output template -- if `bin/import-sentry-config`
   is re-run and a key's generated variable name changes (e.g. its numeric
   suffix), update the matching export line by hand.
+- `project_airbyte` / `key_airbyte_default_*` and `project_unified_ecommerce` /
+  `key_unified_ecommerce_default_*`: removed by hand post-import (unused,
+  zero Sentry events/issues). If `bin/import-sentry-config` is re-run against
+  a `sentry_imports.json` that still lists these live projects, drop them
+  from the import file first or the regenerated code will recreate the
+  resource blocks.
+- `project_ocw_next` / `key_ocw_next_default_*`: the live Sentry project's
+  `name`/`slug` were hand-changed from `ocw-next` to `ocw-site` (matching the
+  `ocw_site` application) without renaming the Pulumi resource identifiers,
+  so the update applies in place rather than replacing the resource. The
+  hand-added export is `ocw_site_sentry_dsn`. A future `bin/import-sentry-config`
+  run will regenerate `name`/`slug` back to whatever the live project is
+  named at that point -- expect it to match `ocw-site` unless it's renamed
+  again live.
