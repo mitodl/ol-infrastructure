@@ -35,6 +35,39 @@ def _resolve(archetypes: dict[str, Any], name: str) -> dict[str, Any]:
     return {k: v for k, v in merged.items() if v is not None}
 
 
+def _check_team_references(fleet: list[dict[str, Any]]) -> None:
+    """Fail if any repo grants to a team slug absent from teams.yaml.
+
+    repository.py looks up `TEAM_IDS[team_slug]` unguarded, and must: the numeric id
+    is required for a non-destructive TeamRepository, so an unknown slug is data we
+    cannot act on. The defensive-looking `.get()` would be a REGRESSION -- it yields
+    `team_id="None"` and Pulumi then plans a grant against a nonexistent team.
+
+    What a bare KeyError lacks is provenance. It names the slug but not the repo that
+    referenced it, and surfaces mid-preview several hundred repos in. Checking here
+    reports every offender in one run, before any resource is constructed.
+
+    Grants come from the merged dict because archetypes carry `teams` too, so a bad
+    slug in archetypes.yaml would fan out across every repo that extends it.
+    """
+    unknown = sorted(
+        {
+            f"{repo['name']}: {slug!r}"
+            for repo in fleet
+            for slug in (repo.get("teams") or {})
+            if slug not in TEAM_IDS
+        }
+    )
+    if unknown:
+        message = (
+            "fleet data grants to teams that are not in teams.yaml:\n  "
+            + "\n  ".join(unknown)
+            + "\nIf a team was renamed or created, re-run "
+            "`bin/github-org-inventory crawl` to refresh teams.yaml."
+        )
+        raise ValueError(message)
+
+
 def load_fleet() -> list[dict[str, Any]]:
     """Return one merged dict per repo: archetype defaults under its own values.
 
@@ -51,8 +84,13 @@ def load_fleet() -> list[dict[str, Any]]:
     for path in sorted(REPOS_DIR.glob("*.yaml")):
         declared = yaml.safe_load(path.read_text())
         archetype = declared["archetype"]
+        if archetype not in effective:
+            message = f"{path.name} names archetype {archetype!r}, which is not defined"
+            raise ValueError(message)
         merged = {**effective[archetype], **declared}
         fleet.append(merged)
+
+    _check_team_references(fleet)
 
     # The dotfile trap is silent by construction, so assert rather than trust.
     assignments = yaml.safe_load((DATA_DIR / "archetypes-proposed.yaml").read_text())
