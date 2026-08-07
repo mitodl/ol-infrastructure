@@ -25,6 +25,6 @@ name: frontend-lib-special-exams-mitol
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
-  arbisoft-contractors: admin
+  arbisoft-contractors: push
 vulnerability_alerts: false
 web_commit_signoff_required: false

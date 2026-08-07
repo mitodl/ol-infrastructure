@@ -46,8 +46,13 @@ archetypes:
     #
     # `odl-engineering` is capped at push (maintain is also acceptable; admin is not --
     # policy 2026-08-05, audited as SEC-15). It is the broad engineering team, and admin
-    # carries repo deletion, settings changes and ruleset bypass. It currently holds
-    # admin on 116 repos, so this target is aspirational and phase-5 work, not reality.
+    # carries repo deletion, settings changes and ruleset bypass.
+    #
+    # NOT ASPIRATIONAL ANY MORE. The SEC-15 wave rewrote the 62 active repos that granted
+    # `odl-engineering: admin` down to `push`. What remains above this line is the 55
+    # ARCHIVED repos that still grant admin, which no resource in this project can reach
+    # -- archived repos emit no TeamRepository (repository.py) because GitHub rejects the
+    # write. They need a separate mechanism, tracked as its own task.
     teams:
       odl-engineering: push
       odl-engineering-owners: admin
@@ -67,8 +72,22 @@ archetypes:
   infrastructure:
     extends: base
     tier: tier-1
+    # `devops: admin` rather than base's `push`, and rather than the `devops: push` this
+    # archetype used to declare (decision 2026-08-07). `devops` is one of the two teams
+    # policy sanctions for admin -- it operates the infrastructure it administers, so
+    # settings changes and ruleset bypass are the job rather than an over-grant.
+    #
+    # The old `push` target was the reason CON-04 fired on every devops-admin repo: the
+    # archetype disagreed with both the policy and reality, so the rule was reporting a
+    # divergence nobody intended to close.
+    #
+    # `odl-engineering` is deliberately ABSENT, unlike in `base`. `teams` REPLACES the
+    # archetype's grants wholesale rather than merging into them, so listing it here
+    # would grant the broad engineering team push on every future infrastructure repo --
+    # a widening, not a preservation. All three current infrastructure repos declare
+    # their own `teams`, so this block only governs the next one.
     teams:
-      devops: push
+      devops: admin
       odl-engineering-owners: admin
 
   # Upstream forks: edx-platform, XBlock, tutor, frontend-app-*, ...

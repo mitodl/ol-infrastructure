@@ -30,5 +30,5 @@ squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   devops: admin
-  ol-data: admin
+  ol-data: push
 web_commit_signoff_required: false

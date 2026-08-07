@@ -24,7 +24,7 @@ squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   arbisoft-contractors: push
   devops: admin
-  odl-engineering: admin
+  odl-engineering: push
   odl-engineering-owners: admin
 topics:
 - techtv
