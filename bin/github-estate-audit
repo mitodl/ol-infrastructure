@@ -35,14 +35,21 @@ SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 @app.command
 def run(
     *,
+    # Literal, not str: cyclopts then rejects a typo and lists the valid choices.
+    # `--axis securty` under a bare `str` would filter to zero findings and print a
+    # clean report -- an unmeasured axis and a clean one look identical, and only one
+    # of them is good news. That is the same trap audit.py's scope handling exists to
+    # avoid, so the CLI should not reintroduce it at the edge.
     axis: Annotated[
-        str | None, cyclopts.Parameter(help="Restrict to one axis.")
+        audit.Axis | None, cyclopts.Parameter(help="Restrict to one axis.")
     ] = None,
     as_json: Annotated[
         bool, cyclopts.Parameter(name=["--json"], help="Emit JSON instead of text.")
     ] = False,
+    # Literal for the same reason, plus a concrete one: the body indexes
+    # SEVERITY_ORDER[fail_on] directly, so an unvalidated typo raised KeyError.
     fail_on: Annotated[
-        str | None,
+        audit.Severity | None,
         cyclopts.Parameter(
             help="Exit non-zero if any finding is at or above this severity."
         ),

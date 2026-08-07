@@ -25,6 +25,7 @@ from typing import Any, Literal
 
 Axis = Literal["security", "consistency", "developer-experience"]
 Scope = Literal["active", "archived", "fleet"]
+Severity = Literal["high", "medium", "low"]
 
 #: A repo is an archive candidate (DX-07) after this long with no push.
 STALE_DAYS = 365
@@ -44,7 +45,7 @@ class Finding:
 
     rule_id: str
     axis: Axis
-    severity: Literal["high", "medium", "low"]
+    severity: Severity
     repo: str
     current: str
     expected: str
@@ -57,7 +58,7 @@ class Rule:
 
     rule_id: str
     axis: Axis
-    severity: Literal["high", "medium", "low"]
+    severity: Severity
     scope: Scope
     summary: str
     check: Callable[[dict[str, Any]], tuple[str, str, str] | None]
