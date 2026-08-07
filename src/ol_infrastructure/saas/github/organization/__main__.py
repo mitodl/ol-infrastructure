@@ -1,7 +1,7 @@
 """Management of the mitodl GitHub organization, its teams, and the `tier` schema.
 
-Phase 2 of docs/plans/github-org-pulumi-import.md. Fifteen resources: org settings, the
-14 teams, and the custom property that org rulesets will target.
+Phases 2 and 3.5 of docs/plans/github-org-pulumi-import.md: org settings, the 14
+teams, the `tier` custom property, and the two org rulesets that target it.
 
 Deliberately absent, each for a reason worth knowing:
 
@@ -12,18 +12,17 @@ Deliberately absent, each for a reason worth knowing:
       manual approval. It also removes the highest-blast-radius resource in the estate,
       since deleting a Membership evicts a human from the org.
 
-  OrganizationRuleset
-      Phase 3.5, and NOT before the repositories project has set per-repo tiers. See the
-      sequencing hazard documented in custom_properties.py.
-
   OrganizationWebhook
       None exist (crawl 2026-08-05).
 
   OrganizationCustomRole / OrganizationRepositoryRole
       Enterprise-only; 404 on the Team plan. Withdrawn from scope entirely.
 
-Everything except `tier` is an import of something that already exists, so after the
-first apply this stack should preview clean. That empty diff is the gate (§6).
+Three resources here are new creates -- the `tier` property schema and the two org
+rulesets, none of which exist on GitHub today. Everything else, the org settings and
+the 14 teams, is an import of something that already exists. So the empty-diff gate
+(§6) applies from the SECOND preview: the first apply creates those three, and every
+preview after it should be clean.
 """
 
 from ol_infrastructure.lib.github_helper import setup_github_provider
@@ -34,6 +33,7 @@ setup_github_provider()
 
 from ol_infrastructure.saas.github.organization import (  # noqa: E402, F401
     custom_properties,
+    org_rulesets,
     org_settings,
     teams,
 )
