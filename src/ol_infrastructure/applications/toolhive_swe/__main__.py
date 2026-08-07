@@ -20,6 +20,8 @@ https://docs.stacklok.com/toolhive/guides-vmcp/authentication:
 - the ``grafana`` ``MCPServer`` (OSS mcp-grafana pointed at Grafana Cloud with a
   service-account token from stack config; see mcp_servers.py for why the hosted
   Grafana Cloud MCP endpoint is not proxied instead), also joined to the group,
+- the per-stack optional ``context7``, ``sentry`` and ``aws`` ``MCPServer``s, each
+  gated behind a ``toolhive_swe:<name>_enabled`` boolean (see mcp_servers.py),
 - an ``MCPOIDCConfig`` (``swe-vmcp-oidc``) used to validate the JWTs the vMCP's own
   embedded auth server issues (its issuer is the vMCP endpoint itself), and
 - a ``VirtualMCPServer`` (``swe-vmcp``) that aggregates every backend in the group
@@ -69,6 +71,21 @@ Incoming auth (browser login via Keycloak, brokered by ToolHive):
         clients get ``invalid_client`` and must re-register. Redis runs with
         requirepass; the CRD requires a password (aclUserConfig.passwordSecretRef).
 
+AWS access (for the ``aws`` backend):
+    The ``aws`` backend is AWS's official ``mcp-proxy-for-aws`` SigV4 proxy in front
+    of the managed AWS MCP Server endpoint. It authenticates with IRSA rather than a
+    token in stack config: the ``OLEKSAuthBinding`` below creates the
+    ``toolhive-swe-aws-mcp`` ServiceAccount annotated with the IRSA role ARN, the
+    MCPServer's ``spec.serviceAccount`` puts the workload pod on it, and the EKS
+    pod-identity webhook supplies the web-identity credentials boto3 picks up.
+
+    Read-only is enforced entirely by that role's IAM — AWS-managed
+    ``ReadOnlyAccess`` plus an explicit Deny on secret-material reads. The proxy's
+    ``--read-only`` flag is deliberately not used; see mcp_servers.py for why it
+    removes account access altogether rather than restricting it. IAM matters here
+    because CI, QA and Production share one AWS account, so this role reads
+    Production resources regardless of which stack created it.
+
 The ``VirtualMCPServer`` is exposed to the internet through the shared APISIX gateway
 on the operations cluster at ``toolhive-swe[.<env>].ol.mit.edu`` using the hybrid
 HTTPRoute + ApisixTls pattern (ADR-0003). The hostname is added to the operations EKS
@@ -79,11 +96,13 @@ from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, ResourceOptions, export
+from pulumi_aws import iam
 
 from ol_infrastructure.applications.toolhive_swe.ingress import (
     create_ingress_resources,
 )
 from ol_infrastructure.applications.toolhive_swe.mcp_servers import (
+    AWS_MCP_SERVICE_ACCOUNT_NAME,
     MCP_GROUP_NAME,
     create_mcp_servers,
 )
@@ -213,27 +232,161 @@ HMAC_SECRET_KEY = "hmac-key"  # noqa: S105  # pragma: allowlist secret
 REDIS_ADDR = redis_addr(TOOLHIVE_NAMESPACE)
 
 #############################################
-#   Vault auth binding (for VSO secret sync)#
+#   Vault auth binding + AWS read-only IRSA #
 #############################################
-# No AWS access is required, so no IAM policy is attached (iam_policy_document=None).
 # The binding provisions the Vault Secrets Operator wiring (VaultConnection /
 # VaultAuth / sync service account) plus a Vault policy granting read access to the
-# Keycloak client secret at secret-operations/sso/toolhive.
+# Keycloak client secret at secret-operations/sso/toolhive. It ALSO provisions the
+# IRSA role and ServiceAccount the `aws` MCP backend runs under (see
+# mcp_servers.py), which is the only thing in this namespace that touches AWS.
+#
+# AWS-managed ReadOnlyAccess is attached below rather than being spelled out as a
+# policy document: reproducing it by hand would be thousands of actions to keep in
+# sync with AWS. What is spelled out here is the Deny that carves back the
+# data-plane reads ReadOnlyAccess includes — the ones that turn "read-only" into
+# "can exfiltrate every credential we keep in AWS". An explicit Deny beats
+# ReadOnlyAccess's Allow in IAM policy evaluation, so these stay unreachable even
+# as AWS grows what the managed policy covers.
+#
+# The action list was derived empirically, not from the docs: on 2026-08-07 the
+# live CI role was probed against each candidate with a deliberately nonexistent
+# resource, so a 403 meant IAM blocks the action and any other error meant IAM
+# permits it. Nine actions came back permitted; every one of them is below. Where
+# a comment says "measured", that is what it refers to.
+#
+# Several denies are blunter than we would like because IAM offers no condition
+# key to scope them — ec2:DescribeInstanceAttribute is one action for every
+# attribute, apigateway:GET one action for every read, ssm:GetParameter* cannot
+# distinguish SecureString from String. In each case the whole action goes, and
+# the lost describe-level detail is an accepted cost.
+#
+# NOTE this is a denylist against a managed policy that AWS keeps growing, which
+# makes it unbounded by construction: it closes what was measured, not what AWS
+# ships next. Swapping the base grant to ViewOnlyAccess (List/Describe only, no
+# resource contents) would make this class of gap structurally impossible and
+# reduce this document to a short backstop. That is the durable fix if this ever
+# needs revisiting.
+aws_mcp_deny_policy_document = {
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "DenyCredentialMaterialReads",
+            "Effect": "Deny",
+            "Action": [
+                "secretsmanager:GetSecretValue",
+                "secretsmanager:BatchGetSecretValue",
+                # GetParameterHistory returns the same values GetParameter does,
+                # plus superseded ones. Measured: it was the one outright bypass
+                # of this statement's original form, permitted by ReadOnlyAccess.
+                "ssm:GetParameter",
+                "ssm:GetParameters",
+                "ssm:GetParametersByPath",
+                "ssm:GetParameterHistory",
+                "kms:Decrypt",
+                # Configuration that conventionally carries credentials in
+                # plaintext: Lambda and ECS environment variables, EC2 user-data
+                # bootstrap scripts (where this repo's Consul/Vault bootstrap
+                # config lives). All three measured as permitted.
+                "lambda:GetFunction",
+                "lambda:GetFunctionConfiguration",
+                "ecs:DescribeTaskDefinition",
+                "ec2:DescribeInstanceAttribute",
+                # Credential-minting reads. Measured as blocked today, but only
+                # because ReadOnlyAccess does not happen to grant them; pinned so
+                # a future expansion of that managed policy cannot open them.
+                # ecr:GetAuthorizationToken is the exception to "measured": it
+                # takes no arguments, so probing it would have minted a real
+                # 12-hour registry credential. It is denied on inference from the
+                # ecr:Get* family that ReadOnlyAccess grants.
+                "ecr:GetAuthorizationToken",
+                "redshift:GetClusterCredentials",
+                "redshift-serverless:GetCredentials",
+                "glue:GetConnection",
+                # sso:GetRoleCredentials deliberately NOT listed: the SSO portal
+                # API is authorized by an SSO access token rather than by IAM
+                # identity-based policy, so denying it here would be a no-op.
+                # Parliament rejects it as an unknown action for that reason.
+                # One action covers /apikeys?includeValues=true, which returns
+                # API key material.
+                "apigateway:GET",
+            ],
+            "Resource": "*",
+        },
+        {
+            "Sid": "DenyBulkDataPlaneReads",
+            "Effect": "Deny",
+            "Action": [
+                "s3:GetObject",
+                "s3:GetObjectVersion",
+                "s3:GetObjectTorrent",
+                # Athena and Redshift read the data lake through their OWN
+                # service roles and return rows over their APIs, so the s3
+                # denies above do not cover them — a second door to the same
+                # room the ol-data-lake-* buckets are in.
+                "athena:GetQueryResults",
+                "redshift-data:GetStatementResult",
+                "rds-data:ExecuteStatement",
+                "rds-data:BatchExecuteStatement",
+                "rds-data:ExecuteSql",
+                "dynamodb:GetItem",
+                "dynamodb:BatchGetItem",
+                "dynamodb:Query",
+                "dynamodb:Scan",
+                "dynamodb:PartiQLSelect",
+                "dynamodb:GetRecords",
+                # sqs:ReceiveMessage is not even read-only in effect: it starts a
+                # visibility timeout and can stall a real consumer.
+                "kinesis:GetRecords",
+                "kinesis:GetShardIterator",
+                "kinesis:SubscribeToShard",
+                "sqs:ReceiveMessage",
+                # Log bodies are the most common accidental secret store. Denied
+                # at a real cost to debugging, but CloudWatch log content stays
+                # reachable through the grafana backend, which reads it under its
+                # own service account rather than this role.
+                "logs:GetLogEvents",
+                "logs:FilterLogEvents",
+                "logs:GetLogRecord",
+                "logs:GetQueryResults",
+            ],
+            "Resource": "*",
+        },
+    ],
+}
+
+# The IRSA role, its ServiceAccount and the grants below are created in EVERY
+# stack, not gated behind toolhive_swe:aws_mcp_enabled. A role that no pod can
+# assume is inert, and keeping the IAM identical across environments makes
+# promoting the backend to QA/Production a config-only change — the same way this
+# stack already treats environment promotion.
 toolhive_swe_auth_binding = OLEKSAuthBinding(
     OLEKSAuthBindingConfig(
         application_name="toolhive-swe",
         namespace=TOOLHIVE_NAMESPACE,
         stack_info=stack_info,
         aws_config=aws_config,
-        iam_policy_document=None,
+        iam_policy_document=aws_mcp_deny_policy_document,
+        # A Deny on "*" is the point of this document, not an oversight.
+        parliament_config={"RESOURCE_EFFECTIVELY_STAR": {}},
         vault_policy_path=Path(__file__).parent.joinpath("toolhive_swe_policy.hcl"),
         cluster_name=cluster_stack.require_output("cluster_name"),
         cluster_identities=cluster_stack.require_output("cluster_identities"),
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
-        irsa_service_account_name="toolhive-swe",
+        irsa_service_account_name=AWS_MCP_SERVICE_ACCOUNT_NAME,
+        create_irsa_service_account=True,
         vault_sync_service_account_names="toolhive-swe-vault",
         k8s_labels=k8s_labels,
     )
+)
+
+# The read grant itself. Broad on purpose: the value of an AWS backend is being
+# able to describe whatever an agent is debugging without a human relaying CLI
+# output. The Deny above is what keeps "describe everything" from also meaning
+# "read every secret".
+iam.RolePolicyAttachment(
+    f"toolhive-swe-aws-mcp-readonly-attach-{stack_info.env_suffix}",
+    policy_arn="arn:aws:iam::aws:policy/ReadOnlyAccess",
+    role=toolhive_swe_auth_binding.irsa_role.name,
 )
 
 # Sync the Keycloak client secret from Vault into a namespace-local K8s Secret so
@@ -327,6 +480,7 @@ mcp_servers = create_mcp_servers(
     k8s_global_labels=k8s_global_labels,
     cluster_stack=cluster_stack,
     toolhive_swe_config=toolhive_swe_config,
+    aws_mcp_service_account=toolhive_swe_auth_binding.irsa_service_accounts[0],
 )
 
 #########################################

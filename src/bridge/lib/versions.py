@@ -127,3 +127,7 @@ MCP_SENTRY_VERSION = "0.37.0"
 # stdio mode). Tag tracks the dockyard build, not the upstream npm pkg.
 # renovate: datasource=docker depName=context7 packageName=ghcr.io/stacklok/dockyard/npx/context7
 MCP_CONTEXT7_VERSION = "3.2.5"
+# AWS's official SigV4 proxy image, the stdio bridge to the managed AWS MCP Server
+# endpoint. Image tags track the PyPI package (mcp-proxy-for-aws) one-for-one.
+# renovate: datasource=docker depName=mcp-proxy-for-aws packageName=public.ecr.aws/mcp-proxy-for-aws/mcp-proxy-for-aws
+MCP_PROXY_FOR_AWS_VERSION = "1.6.4"
