@@ -1,4 +1,10 @@
 ---
+_direct_collaborators:
+  rhysyngsun: admin
+_has_branch_protection: true
+_pushed_at: '2024-04-11T10:34:56Z'
+_ruleset_count: 0
+_visibility: public
 allow_merge_commit: false
 allow_rebase_merge: false
 allow_squash_merge: true

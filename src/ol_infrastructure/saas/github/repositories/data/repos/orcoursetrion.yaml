@@ -1,4 +1,12 @@
 ---
+_direct_collaborators:
+  NotoriousMKD: write
+  indagation: write
+  sfrucht: write
+_has_branch_protection: false
+_pushed_at: '2023-10-20T13:38:02Z'
+_ruleset_count: 0
+_visibility: public
 allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true

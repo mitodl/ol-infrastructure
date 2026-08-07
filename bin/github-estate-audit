@@ -1,0 +1,180 @@
+#!/usr/bin/env python3
+"""Audit the mitodl GitHub estate from the committed fleet data.
+
+Phase 4 of docs/plans/github-org-pulumi-import.md. The rules live in
+`ol_infrastructure.saas.github.audit` as pure functions; this is the CLI around them.
+
+    github-estate-audit run                    # all axes, text
+    github-estate-audit run --axis security    # one axis
+    github-estate-audit run --json             # machine-readable, for CI
+    github-estate-audit drift                  # live GitHub vs. the committed data
+
+`run` needs NO credentials and hits NO API -- it reads data/repos/, which is why it
+finishes in milliseconds and works anywhere. `drift` is the exception: comparing
+declared against live is the one job that requires both.
+"""
+
+import json
+import sys
+from collections import Counter
+from pathlib import Path
+from typing import Annotated
+
+import cyclopts
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from ol_infrastructure.saas.github import audit
+from ol_infrastructure.saas.github.repositories import archetypes
+
+app = cyclopts.App(help="Audit the mitodl GitHub estate.")
+
+SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
+
+
+@app.command
+def run(
+    *,
+    # Literal, not str: cyclopts then rejects a typo and lists the valid choices.
+    # `--axis securty` under a bare `str` would filter to zero findings and print a
+    # clean report -- an unmeasured axis and a clean one look identical, and only one
+    # of them is good news. That is the same trap audit.py's scope handling exists to
+    # avoid, so the CLI should not reintroduce it at the edge.
+    axis: Annotated[
+        audit.Axis | None, cyclopts.Parameter(help="Restrict to one axis.")
+    ] = None,
+    as_json: Annotated[
+        bool, cyclopts.Parameter(name=["--json"], help="Emit JSON instead of text.")
+    ] = False,
+    # Literal for the same reason, plus a concrete one: the body indexes
+    # SEVERITY_ORDER[fail_on] directly, so an unvalidated typo raised KeyError.
+    fail_on: Annotated[
+        audit.Severity | None,
+        cyclopts.Parameter(
+            help="Exit non-zero if any finding is at or above this severity."
+        ),
+    ] = None,
+) -> int:
+    """Report every rule that fires across the fleet."""
+    fleet = archetypes.load_fleet()
+    findings = audit.evaluate(fleet)
+    if axis:
+        findings = [f for f in findings if f.axis == axis]
+
+    by_rule = Counter(f.rule_id for f in findings)
+    rules = {r.rule_id: r for r in audit.RULES}
+
+    if as_json:
+        print(
+            json.dumps(
+                {
+                    "repos": len(fleet),
+                    "findings": len(findings),
+                    "by_rule": dict(by_rule),
+                    "detail": [f.__dict__ for f in findings],
+                },
+                indent=2,
+            )
+        )
+    else:
+        print(
+            f"# mitodl estate audit -- {len(fleet)} repos, {len(findings)} findings\n"
+        )
+        ordered = sorted(
+            by_rule,
+            key=lambda rid: (SEVERITY_ORDER[rules[rid].severity], -by_rule[rid]),
+        )
+        for rule_id in ordered:
+            rule = rules[rule_id]
+            total = audit.population(fleet, rule.scope)
+            share = f"{by_rule[rule_id] / total:.0%}" if total else "-"
+            print(
+                f"  {rule.severity:6} {rule_id:8} {by_rule[rule_id]:4} "
+                f"({share:>4} of {total} {rule.scope})  {rule.summary}"
+            )
+        print("\nWorst offenders, by number of findings:")
+        for repo, count in Counter(f.repo for f in findings).most_common(8):
+            print(f"     {count:4}  {repo}")
+
+    if fail_on:
+        threshold = SEVERITY_ORDER[fail_on]
+        blocking = [f for f in findings if SEVERITY_ORDER[f.severity] <= threshold]
+        if blocking:
+            print(
+                f"\n{len(blocking)} finding(s) at or above {fail_on}", file=sys.stderr
+            )
+            return 1
+    return 0
+
+
+@app.command
+def drift(
+    *,
+    cache: Annotated[
+        Path, cyclopts.Parameter(help="Crawl cache to compare against.")
+    ] = Path(".github-org-inventory-cache.json"),
+) -> int:
+    """Compare the committed fleet data against a fresh crawl.
+
+    This is what keeps the estate managed after the import: an out-of-band console
+    change shows up here. Refresh the cache first --
+
+        uv run bin/github-org-inventory report --refresh
+
+    -- because this command deliberately does not crawl on its own. Keeping the fetch
+    and the comparison separate means a drift report can be re-run against the same
+    snapshot while investigating, instead of shifting under you.
+
+    NOTE for when the phase-3.5 rulesets land: while they sit at `enforcement:
+    evaluate` they are invisible to the per-repo read endpoints, so `_ruleset_count`
+    will not see them. Any ruleset-aware drift check must enumerate
+    `/orgs/{org}/rulesets` directly -- see probe controls C6a/C6b.
+    """
+    if not cache.exists():
+        print(f"no crawl cache at {cache}; run `github-org-inventory report --refresh`")
+        return 1
+    live = {r["name"]: r for r in json.loads(cache.read_text())["repos"]}
+    declared = {r["name"]: r for r in archetypes.load_fleet()}
+
+    only_live = sorted(set(live) - set(declared))
+    only_declared = sorted(set(declared) - set(live))
+    changed: list[str] = []
+    # Compare only the fields the fleet data actually declares. Anything else is
+    # inventory that moves on its own (pushed_at, environment counts) and would make
+    # every run look like drift.
+    tracked = (
+        "description",
+        "default_branch",
+        "archived",
+        "allow_squash_merge",
+        "allow_merge_commit",
+        "allow_rebase_merge",
+        "allow_auto_merge",
+        "delete_branch_on_merge",
+        "has_issues",
+        "has_wiki",
+        "secret_scanning",
+        "secret_scanning_push_protection",
+        "teams",
+    )
+    for name in sorted(set(live) & set(declared)):
+        for field in tracked:
+            want = declared[name].get(field)
+            got = live[name].get(field)
+            if want is not None and want != got:
+                changed.append(f"{name}.{field}: declared {want!r}, live {got!r}")
+
+    for name in only_live:
+        print(f"  UNMANAGED   {name} exists on GitHub but has no fleet entry")
+    for name in only_declared:
+        print(f"  MISSING     {name} is declared but not on GitHub")
+    for line in changed:
+        print(f"  DRIFT       {line}")
+
+    total = len(only_live) + len(only_declared) + len(changed)
+    print(f"\n{total} difference(s) between the committed fleet and {cache}")
+    return 1 if total else 0
+
+
+if __name__ == "__main__":
+    app()

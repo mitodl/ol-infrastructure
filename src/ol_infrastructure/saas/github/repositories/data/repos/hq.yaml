@@ -2,6 +2,12 @@
 _actions_secret_names:
 - STANDUP_CAT_ID
 - STANDUP_REPO_ID
+_direct_collaborators:
+  rhysyngsun: admin
+_has_branch_protection: false
+_pushed_at: '2026-08-06T12:40:16Z'
+_ruleset_count: 0
+_visibility: private
 allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true

@@ -1,5 +1,9 @@
 ---
 _excluded_environments: 2
+_has_branch_protection: false
+_pushed_at: '2026-08-06T12:25:35Z'
+_ruleset_count: 0
+_visibility: public
 allow_auto_merge: false
 allow_merge_commit: false
 allow_rebase_merge: false

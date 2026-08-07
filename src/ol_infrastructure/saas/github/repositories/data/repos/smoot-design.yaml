@@ -1,7 +1,13 @@
 ---
 _actions_secret_names:
 - SEMANTIC_RELEASE_GITHUB_TOKEN
+_direct_collaborators:
+  ChristopherChudzicki: admin
 _excluded_environments: 2
+_has_branch_protection: true
+_pushed_at: '2026-08-05T19:38:49Z'
+_ruleset_count: 1
+_visibility: public
 allow_auto_merge: false
 allow_merge_commit: false
 allow_rebase_merge: false

@@ -1,4 +1,10 @@
 ---
+_direct_collaborators:
+  Anas12091101: admin
+_has_branch_protection: false
+_pushed_at: '2026-07-27T10:48:45Z'
+_ruleset_count: 0
+_visibility: public
 allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true
