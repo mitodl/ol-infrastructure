@@ -654,6 +654,51 @@ gwarek_common_env_from = [
 gwarek_replicas = gwarek_config.get_int("replicas") or 1
 
 # ---------------------------------------------------------------------------
+# One-off migration Job — runs `alembic upgrade head` against the admin
+# Vault DB role before the api/worker Deployments are expected to serve
+# traffic. Defined before those Deployments and referenced in their
+# depends_on below: Pulumi's Kubernetes provider awaits a Job's Complete
+# condition by default, so this ordering is enforced, not advisory --
+# confirmed the hard way when an image-only deploy raced the app pods'
+# Vault-issued DB credential (whose GRANT ALL statement only covers tables
+# that exist at credential-creation time) ahead of this Job creating
+# finding_tracking/issue_trackers, leaving the app role with zero privileges
+# on either until a manual GRANT.
+# ---------------------------------------------------------------------------
+gwarek_migration_job = batch.v1.Job(
+    f"gwarek-migration-job-{stack_info.env_suffix}",
+    metadata=meta.v1.ObjectMetaArgs(
+        name="gwarek-migrate",
+        namespace=gwarek_namespace,
+        labels=application_labels,
+    ),
+    spec=batch.v1.JobSpecArgs(
+        backoff_limit=2,
+        template=core.v1.PodTemplateSpecArgs(
+            metadata=meta.v1.ObjectMetaArgs(labels=application_labels),
+            spec=core.v1.PodSpecArgs(
+                restart_policy="Never",
+                containers=[
+                    core.v1.ContainerArgs(
+                        name="migrate",
+                        image=gwarek_api_image,
+                        command=[
+                            "/app/.venv/bin/python",
+                            "-m",
+                            "alembic",
+                            "upgrade",
+                            "head",
+                        ],
+                        env=_db_env(gwarek_db_admin_secret_k8s_name),
+                    ),
+                ],
+            ),
+        ),
+    ),
+    opts=ResourceOptions(depends_on=[gwarek_db_admin_secret]),
+)
+
+# ---------------------------------------------------------------------------
 # api Deployment + Service
 # ---------------------------------------------------------------------------
 gwarek_api_deployment = apps_v1.Deployment(
@@ -714,7 +759,12 @@ gwarek_api_deployment = apps_v1.Deployment(
         ),
     ),
     opts=ResourceOptions(
-        depends_on=[gwarek_db_app_secret, gwarek_app_secrets, gwarek_redis_creds]
+        depends_on=[
+            gwarek_db_app_secret,
+            gwarek_app_secrets,
+            gwarek_redis_creds,
+            gwarek_migration_job,
+        ]
     ),
 )
 
@@ -786,7 +836,12 @@ gwarek_worker_deployment = apps_v1.Deployment(
         ),
     ),
     opts=ResourceOptions(
-        depends_on=[gwarek_db_app_secret, gwarek_app_secrets, gwarek_redis_creds]
+        depends_on=[
+            gwarek_db_app_secret,
+            gwarek_app_secrets,
+            gwarek_redis_creds,
+            gwarek_migration_job,
+        ]
     ),
 )
 
@@ -866,47 +921,6 @@ gwarek_web_service = core.v1.Service(
         selector={"app": "gwarek", "component": "web"},
         ports=[core.v1.ServicePortArgs(port=3000, target_port=3000, name="http")],
     ),
-)
-
-# ---------------------------------------------------------------------------
-# One-off migration Job — runs `alembic upgrade head` against the admin
-# Vault DB role before the api/worker Deployments are expected to serve
-# traffic. Pulumi does not block on Job completion, so this ordering is
-# advisory only (via depends_on on the Job's own secret) — confirm the
-# migration actually completed before considering a deploy done (see the
-# plan's Phase 6/7 manual verification step).
-# ---------------------------------------------------------------------------
-gwarek_migration_job = batch.v1.Job(
-    f"gwarek-migration-job-{stack_info.env_suffix}",
-    metadata=meta.v1.ObjectMetaArgs(
-        name="gwarek-migrate",
-        namespace=gwarek_namespace,
-        labels=application_labels,
-    ),
-    spec=batch.v1.JobSpecArgs(
-        backoff_limit=2,
-        template=core.v1.PodTemplateSpecArgs(
-            metadata=meta.v1.ObjectMetaArgs(labels=application_labels),
-            spec=core.v1.PodSpecArgs(
-                restart_policy="Never",
-                containers=[
-                    core.v1.ContainerArgs(
-                        name="migrate",
-                        image=gwarek_api_image,
-                        command=[
-                            "/app/.venv/bin/python",
-                            "-m",
-                            "alembic",
-                            "upgrade",
-                            "head",
-                        ],
-                        env=_db_env(gwarek_db_admin_secret_k8s_name),
-                    ),
-                ],
-            ),
-        ),
-    ),
-    opts=ResourceOptions(depends_on=[gwarek_db_admin_secret]),
 )
 
 # ---------------------------------------------------------------------------
