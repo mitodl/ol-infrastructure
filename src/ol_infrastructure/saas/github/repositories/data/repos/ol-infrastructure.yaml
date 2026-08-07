@@ -24,9 +24,9 @@ name: ol-infrastructure
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
-  arbisoft-contractors: admin
+  arbisoft-contractors: push
   devops: admin
-  devops-contractors: admin
+  devops-contractors: push
   odl-engineering: maintain
 topics:
 - aws

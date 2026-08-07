@@ -25,9 +25,9 @@ name: open-discussions
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
-  arbisoft-contractors: admin
-  odl-engineering: admin
-  owners-mit-open: admin
+  arbisoft-contractors: push
+  odl-engineering: push
+  owners-mit-open: push
 topics:
 - community
 - mit
