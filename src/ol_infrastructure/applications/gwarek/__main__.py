@@ -655,16 +655,54 @@ gwarek_replicas = gwarek_config.get_int("replicas") or 1
 
 # ---------------------------------------------------------------------------
 # One-off migration Job — runs `alembic upgrade head` against the admin
-# Vault DB role before the api/worker Deployments are expected to serve
-# traffic. Defined before those Deployments and referenced in their
-# depends_on below: Pulumi's Kubernetes provider awaits a Job's Complete
-# condition by default, so this ordering is enforced, not advisory --
-# confirmed the hard way when an image-only deploy raced the app pods'
-# Vault-issued DB credential (whose GRANT ALL statement only covers tables
-# that exist at credential-creation time) ahead of this Job creating
-# finding_tracking/issue_trackers, leaving the app role with zero privileges
-# on either until a manual GRANT.
+# Vault DB role, then grants the *stable* "gwarek" role (every dynamic app
+# credential is a member of it) privileges on whatever tables now exist.
+#
+# The grant step is the actual fix for a real production incident: the
+# app-role Vault credential (gwarek_db_app_secret below) is a
+# VaultDynamicSecret reissued on Vault's own lease/TTL schedule, entirely
+# decoupled from any given `pulumi up` -- its one-time GRANT ALL creation
+# statement only covers tables that existed at *that* issuance time.
+# Ordering this Job before the api/worker Deployments (their depends_on
+# below) only changes when those pods start; it does nothing to make Vault
+# reissue a credential, so a long-lived, already-granted credential started
+# right back up with zero privileges on finding_tracking/issue_trackers
+# after they were added, regardless of deploy timing. Granting the stable
+# role directly here makes correctness independent of Vault's reissuance
+# schedule -- every migration run leaves it correct for the schema as it
+# stands, deterministically.
+#
+# Still defined before the Deployments and referenced in their depends_on:
+# Pulumi's Kubernetes provider awaits a Job's Complete condition by default,
+# so app pods won't start serving against a schema mid-migration -- a real
+# but separate concern from the privilege grant above.
 # ---------------------------------------------------------------------------
+_GWAREK_MIGRATE_AND_GRANT_SCRIPT = """
+import asyncio, os, subprocess, sys
+import asyncpg
+
+subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], check=True)
+
+async def _grant():
+    conn = await asyncpg.connect(
+        user=os.environ["DB_USERNAME"],
+        password=os.environ["DB_PASSWORD"],
+        host=os.environ["DB_HOST"],
+        database="gwarek",
+    )
+    try:
+        await conn.execute(
+            "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO gwarek"
+        )
+        await conn.execute(
+            "GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO gwarek"
+        )
+    finally:
+        await conn.close()
+
+asyncio.run(_grant())
+"""
+
 gwarek_migration_job = batch.v1.Job(
     f"gwarek-migration-job-{stack_info.env_suffix}",
     metadata=meta.v1.ObjectMetaArgs(
@@ -682,12 +720,13 @@ gwarek_migration_job = batch.v1.Job(
                     core.v1.ContainerArgs(
                         name="migrate",
                         image=gwarek_api_image,
+                        # subprocess, not a shell wrapper -- the DHI runtime
+                        # image this runs on ships no shell to chain `&&`
+                        # through.
                         command=[
                             "/app/.venv/bin/python",
-                            "-m",
-                            "alembic",
-                            "upgrade",
-                            "head",
+                            "-c",
+                            _GWAREK_MIGRATE_AND_GRANT_SCRIPT,
                         ],
                         env=_db_env(gwarek_db_admin_secret_k8s_name),
                     ),
