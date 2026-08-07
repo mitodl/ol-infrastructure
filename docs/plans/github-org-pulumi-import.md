@@ -277,8 +277,14 @@ src/ol_infrastructure/saas/github/
             └── …                 # one file per repo, 317 of them
 ```
 
-Single stack name `Production` in both — a GitHub org has no environments. This matches the
-short-stack-name convention in `src/ol_infrastructure/AGENTS.md`.
+Single stack name **`default`** in both. A GitHub org is a singleton — there is no QA
+org and no Production org, there is just the org — so a stack name that implies a choice
+between environments would be misleading. Created with:
+
+```sh
+pulumi stack init default \
+  --secrets-provider="awskms://alias/infrastructure-secrets-production"
+```
 
 **Why two projects and not one.** ~1,800–2,200 resources in a single stack means a refresh
 touching every one of them; previews run in the 10-minute range and every trivial topic change
@@ -719,6 +725,54 @@ Two corrections this verification produced that change the plan, not just the ta
    Relatedly, `RepositoryCustomProperty` requires `property_type` alongside the value, so the
    archetype resolver must carry each property's type from the schema definition rather than
    reading a bare value out of the repo YAML.
+
+### 5.2b Binding imports to the App provider
+
+`pulumi import` does **not** use the provider that `setup_github_provider()` attaches. That
+is a stack transformation, and it only applies to resources declared in code; imported
+resources go to the **default** provider for the package. With no default configured, the
+import falls back to whatever ambient `GITHUB_TOKEN` is around — during phase 2 that was a
+personal token, and every import failed with *"this resource can only be used in the
+context of an organization, `blarghmatey` is a user"*.
+
+Letting the import use the default provider anyway is worse than the error, because it
+succeeds: the resources land in state bound to `default_6_14_1`, the code declares them
+against `github-provider`, and every subsequent preview shows 15 provider-rebinding updates
+that no amount of correcting the inputs will clear.
+
+The sequence that produces a genuinely clean import:
+
+```sh
+# 1. Land the provider on its own. This creates no GitHub resource -- a provider
+#    instance is local configuration -- so it is safe to run before anything else.
+pulumi up --target \
+  'urn:pulumi:default::ol-saas-github-organization::pulumi:providers:github::github-provider' \
+  --yes
+
+# 2. Bind every entry in the payload to it. `--provider` cannot be combined with `-f`,
+#    so the binding goes in the file as a nameTable plus a per-resource reference. The
+#    URN is stack-specific, which is why the generator does not emit it.
+PROV=$(pulumi stack export |
+  jq -r '.deployment.resources[] | select(.type=="pulumi:providers:github") | .urn')
+jq --arg u "$PROV" '{nameTable: {"github-provider": $u},
+                     resources: (.resources | map(. + {provider: "github-provider"}))}' \
+  import-organization.json > import-bound.json
+
+# 3. Import. GITHUB_OWNER/GITHUB_TOKEN still have to be right: the engine previews the
+#    import before applying it, and that preview runs through the default provider.
+GITHUB_OWNER=mitodl GITHUB_TOKEN="$(...installation token...)" \
+  pulumi import -f import-bound.json --generate-code=false --yes
+```
+
+Phase 3 imports 1,067 resources and needs exactly the same treatment. The cost of skipping
+it is not a failed import, it is a stack that can never reach an empty diff.
+
+**A related trap, and the reason the generator emits the names it does.** The `name` field
+in the payload must match the logical name in the authored code. `pulumi import` derives the
+URN from it, so a mismatch imports the resource somewhere nothing declares it, and preview
+then shows a create for the declared resource *and* a delete for the imported one. The
+generator emits `mitodl-team-<slug>` and `mitodl-organization-settings` because that is what
+`saas/github/organization/` declares — they agree by construction (§5.1), not by luck.
 
 ### 5.3 Batching and rate limits
 
