@@ -94,6 +94,32 @@ ACTOR_TOKENS_FILENAME = "tokens.json"  # pragma: allowlist secret
 # the invariant ours instead of inherited.
 TMP_MOUNT_PATH = "/tmp"  # noqa: S108
 TMP_FS_GROUP = 1000
+
+# ToolHive v0.40.1 accepts `spec.resources` and never applies it to the backend
+# container. Verified 2026-08-07 against all three environments: this MCPServer
+# declares 500m/512Mi and `kubectl get sts witan -o jsonpath=
+# '{.spec.template.spec.containers[0].resources}'` returns `{}`. It is not the
+# podTemplateSpec below shadowing it — toolhive-swe/aws has NO podTemplateSpec at
+# all, declares 200m/256Mi, and renders `{}` just the same.
+#
+# The consequence is not cosmetic: with no requests the pod is **BestEffort QoS**,
+# first in line for eviction under node memory pressure, and with no limit a
+# runaway server can take its node's other pods with it. It also makes the CRD
+# actively misleading — an audit that reads `spec.resources` concludes the backend
+# is bounded when nothing bounds it.
+#
+# So the same values are restated on the `mcp` container in `podTemplateSpec`,
+# which the operator demonstrably DOES honour (that is how env and volumeMounts
+# arrive). `spec.resources` is deliberately left in place as the declaration of
+# intent for whenever upstream wires it up; the two must be kept in step, hence
+# one constant feeding both.
+#
+# Tracked as tk-toolhive-operator-drops-mcpserver-spec-resources-8ea1ff.
+# ★ Verify any change here against the RENDERED StatefulSet, never the CRD.
+WITAN_BACKEND_RESOURCES = {
+    "requests": {"cpu": "100m", "memory": "256Mi"},
+    "limits": {"cpu": "500m", "memory": "512Mi"},
+}
 # Sized for the server-side work, which is dominated by the graph export
 # `store_merge` takes of its OWN target to reconcile against — that grows with
 # the shared graph, not with the caller's upload (the client's batches are
@@ -279,10 +305,9 @@ def create_mcp_servers(  # noqa: PLR0913
                 "type": "builtin",
                 "name": "network",
             },
-            "resources": {
-                "requests": {"cpu": "100m", "memory": "256Mi"},
-                "limits": {"cpu": "500m", "memory": "512Mi"},
-            },
+            # Declared, but NOT what actually reaches the container — the
+            # operator drops it. See WITAN_BACKEND_RESOURCES.
+            "resources": WITAN_BACKEND_RESOURCES,
             # `volumes`/`volumeMounts` aren't first-class MCPServerSpec fields
             # beyond hostPath, so the actor-tokens Secret is mounted via the
             # documented escape hatch: a PodTemplateSpec merge-patch targeting
@@ -300,6 +325,11 @@ def create_mcp_servers(  # noqa: PLR0913
                             # is already how `spec.secrets` arrives as
                             # `secretKeyRef`.
                             "env": downward_api_env_dicts(),
+                            # The resources that actually take effect — the
+                            # operator ignores `spec.resources` above. Without
+                            # this the container renders `resources: {}` and
+                            # runs BestEffort. See WITAN_BACKEND_RESOURCES.
+                            "resources": WITAN_BACKEND_RESOURCES,
                             "volumeMounts": [
                                 {
                                     "name": "actor-tokens",
