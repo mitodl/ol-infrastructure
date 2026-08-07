@@ -19,12 +19,25 @@ from pulumi import Config, ResourceOptions, StackReference
 from bridge.lib.versions import (
     MCP_CONTEXT7_VERSION,
     MCP_GRAFANA_VERSION,
+    MCP_PROXY_FOR_AWS_VERSION,
     MCP_SENTRY_VERSION,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 # Name shared by the MCPGroup and every backend/virtual server that references it.
 MCP_GROUP_NAME = "swe-tools"
+
+# ServiceAccount the aws backend runs under. The OLEKSAuthBinding in __main__.py
+# creates it annotated with the IRSA role ARN; the EKS pod-identity webhook turns
+# that annotation into AWS_ROLE_ARN + AWS_WEB_IDENTITY_TOKEN_FILE on the pod,
+# which is all boto3 — and therefore mcp-proxy-for-aws — needs to sign SigV4.
+# Deliberately its own SA rather than a generic namespace one: the AWS read grant
+# should reach exactly one workload.
+AWS_MCP_SERVICE_ACCOUNT_NAME = "toolhive-swe-aws-mcp"
+
+# Regional endpoint of AWS's managed MCP server. us-east-1 is where OL resources
+# live; eu-central-1 is the only other endpoint AWS offers.
+AWS_MCP_ENDPOINT = "https://aws-mcp.us-east-1.api.aws/mcp"
 
 # K8s Secret holding the Grafana Cloud service account token, materialised from
 # encrypted stack config and injected into the grafana MCPServer via ToolHive's
@@ -50,12 +63,13 @@ class ToolhiveSWEMCPServers(NamedTuple):
     servers: list[kubernetes.apiextensions.CustomResource]
 
 
-def create_mcp_servers(
+def create_mcp_servers(  # noqa: PLR0913
     stack_info: StackInfo,
     namespace: str,
     k8s_global_labels: dict[str, str],
     cluster_stack: StackReference,
     toolhive_swe_config: Config,
+    aws_mcp_service_accounts: list[kubernetes.core.v1.ServiceAccount],
 ) -> ToolhiveSWEMCPServers:
     """Provision the MCPGroup and every backend MCPServer that joins it."""
     swe_mcpgroup = kubernetes.apiextensions.CustomResource(
@@ -347,6 +361,105 @@ def create_mcp_servers(
             opts=ResourceOptions(depends_on=[swe_mcpgroup, sentry_token_secret]),
         )
         servers.append(sentry_mcpserver)
+
+    # AWS backend: the managed AWS MCP Server (https://aws-mcp.us-east-1.api.aws/mcp,
+    # GA May 2026) reached through AWS's official `mcp-proxy-for-aws` SigV4 proxy.
+    # The proxy is a thin stdio bridge — every tool call executes on the AWS-hosted
+    # endpoint, not here.
+    #
+    # NOT the self-hostable awslabs `aws-api-mcp-server`: AWS has marked that one
+    # "entering end of development" and its tool descriptions now emit a deprecation
+    # notice to the agent on every call.
+    #
+    # Read-only is enforced ENTIRELY by the IRSA role's IAM (AWS-managed
+    # ReadOnlyAccess plus an explicit Deny on secret-material reads, authored in
+    # __main__.py). That matters because the operations account is the same AWS
+    # account in CI, QA and Production (no assumeRole separation anywhere in
+    # Pulumi.operations.*.yaml), so this role reads Production resources no matter
+    # which stack provisions it.
+    #
+    # The proxy's `--read-only` flag is deliberately NOT set, despite the name.
+    # It withholds every tool not annotated readOnlyHint=true, and the only tool
+    # that reaches AWS APIs at all — `aws___run_script`, which runs Python against
+    # the account — can never carry that annotation, since whether it writes
+    # depends on the code it is handed. Verified on the live CI backend: with the
+    # flag set the aggregate exposed six tools, all of them documentation/skills
+    # lookups, and nothing that could see an S3 bucket. On this server
+    # `--read-only` means "no account access", not "read-only account access", so
+    # it is mutually exclusive with the reason this backend exists.
+    #
+    # IAM is the better control anyway: AWS enforces it server-side on every API
+    # call, rather than by filtering a tool list the agent is offered. The write
+    # tools it re-admits are inert without permissions — `run_script` can call
+    # anything but only reads succeed, and `get_presigned_url` can only mint URLs
+    # for operations the role could already perform (ReadOnlyAccess grants no
+    # PutObject, and the Deny covers GetObject).
+    #
+    # Unlike every other backend here there is no token Secret: credentials come
+    # from IRSA via the boto3 default chain. Gated per-stack like sentry/context7:
+    #   pulumi config set toolhive_swe:aws_mcp_enabled true
+    if toolhive_swe_config.get_bool("aws_mcp_enabled"):
+        aws_mcpserver = kubernetes.apiextensions.CustomResource(
+            f"toolhive-swe-aws-mcpserver-{stack_info.env_suffix}",
+            api_version="toolhive.stacklok.dev/v1beta1",
+            kind="MCPServer",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name="aws",
+                namespace=namespace,
+                labels=k8s_global_labels,
+            ),
+            spec={
+                "image": (
+                    "public.ecr.aws/mcp-proxy-for-aws/mcp-proxy-for-aws:"
+                    f"{MCP_PROXY_FOR_AWS_VERSION}"
+                ),
+                # The proxy only speaks stdio; the ToolHive proxy wraps it and
+                # fronts it with streamable-http on proxyPort (no mcpPort for
+                # stdio), the same shape as the sentry and context7 backends.
+                "transport": "stdio",
+                "proxyPort": 8080,
+                "groupRef": {"name": MCP_GROUP_NAME},
+                # Appended to the image's `mcp-proxy-for-aws` ENTRYPOINT. The
+                # endpoint URL is POSITIONAL and must come first.
+                #
+                # `--metadata AWS_REGION` sets the default region for the AWS
+                # operations the managed server performs. Unset it defaults to
+                # us-east-1 anyway; stating it makes the default ours.
+                "args": [
+                    AWS_MCP_ENDPOINT,
+                    "--metadata",
+                    "AWS_REGION=us-east-1",
+                    "--disable-telemetry",
+                ],
+                # IRSA: this sets the SA on the MCP workload pod (the `mcp`
+                # container), which is where boto3 runs and signs SigV4.
+                "serviceAccount": AWS_MCP_SERVICE_ACCOUNT_NAME,
+                # Region for SigV4 signing and the STS call. The pod-identity
+                # webhook injects a region too, but setting it here makes the
+                # value ours rather than inherited.
+                "env": [{"name": "AWS_REGION", "value": "us-east-1"}],
+                # Needs outbound access to aws-mcp.us-east-1.api.aws AND to
+                # sts.us-east-1.amazonaws.com (AssumeRoleWithWebIdentity for
+                # IRSA). Tighten to an allow-list profile (.api.aws +
+                # .amazonaws.com, port 443) once the builtin profile proves out.
+                "permissionProfile": {
+                    "type": "builtin",
+                    "name": "network",
+                },
+                "resources": {
+                    "requests": {"cpu": "50m", "memory": "128Mi"},
+                    "limits": {"cpu": "200m", "memory": "256Mi"},
+                },
+            },
+            # The ServiceAccount stands in for the token Secret the other
+            # backends wait on: without it the operator reconciles this into a
+            # pod with no way to obtain credentials — and, since Kubernetes will
+            # not schedule a pod naming an absent ServiceAccount, into one that
+            # never starts at all. __main__.py creates it under the same gate as
+            # this block, so the list below is populated exactly when we get here.
+            opts=ResourceOptions(depends_on=[swe_mcpgroup, *aws_mcp_service_accounts]),
+        )
+        servers.append(aws_mcpserver)
 
     return ToolhiveSWEMCPServers(
         group=swe_mcpgroup,

@@ -29,3 +29,4 @@ config:
     secure: v1:6nOO1ObT6BhUYNC1:OETprMCV7BkNd72WQoV/wRuGLf/CtJUQXEfJvtsMzJL6HXoQPJPhM7K1/pRuYurI6f5h33cqWqp8ZikkxNs=
   toolhive_swe:sentry_enabled: "false"
   toolhive_swe:context7_enabled: "false"
+  toolhive_swe:aws_mcp_enabled: "false"
