@@ -27,7 +27,7 @@ from ol_infrastructure.lib.vault import setup_vault_provider
 stack_info = parse_stack()
 setup_vault_provider(stack_info, skip_child_token=True)
 setup_heroku_provider()
-sentry_stack = make_stack_reference(projects.SENTRY, "Production")
+sentry_stack = make_stack_reference(projects.SENTRY, "default")
 
 mit_open_config = Config("mit_open")
 heroku_config = Config("heroku")

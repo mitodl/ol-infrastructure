@@ -35,7 +35,7 @@ from ol_infrastructure.lib.pulumi_helper import (
 stack_info = parse_stack()
 
 cluster_stack = make_stack_reference(projects.EKS, f"applications.{stack_info.name}")
-sentry_stack = make_stack_reference(projects.SENTRY, "Production")
+sentry_stack = make_stack_reference(projects.SENTRY, "default")
 MIT_LEARN_NEXTJS_DOCKER_TAG = get_docker_image_tag("MIT_LEARN_NEXTJS")
 
 app_image = ecr_image_uri(

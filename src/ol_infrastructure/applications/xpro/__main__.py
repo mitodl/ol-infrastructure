@@ -111,7 +111,7 @@ operations_vpc = network_stack.require_output("operations_vpc")
 vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
-sentry_stack = make_stack_reference(projects.SENTRY, "Production")
+sentry_stack = make_stack_reference(projects.SENTRY, "default")
 aws_config = AWSBase(
     tags={
         "OU": "mitxpro",

@@ -100,7 +100,7 @@ kms_stack = make_stack_reference(projects.KMS, stack_info.name)
 vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
-sentry_stack = make_stack_reference(projects.SENTRY, "Production")
+sentry_stack = make_stack_reference(projects.SENTRY, "default")
 # Each edxapp deployment maps to its own Sentry project; mitx and
 # mitx-staging share the openedx-residential project.
 EDXAPP_SENTRY_DSN_OUTPUTS = {

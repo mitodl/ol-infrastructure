@@ -110,7 +110,7 @@ monitoring_stack = make_stack_reference(projects.MONITORING, "default")
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 opik_stack = make_stack_reference(projects.OPIK, stack_info.name)
 policy_stack = make_stack_reference(projects.POLICIES, "default")
-sentry_stack = make_stack_reference(projects.SENTRY, "Production")
+sentry_stack = make_stack_reference(projects.SENTRY, "default")
 vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
