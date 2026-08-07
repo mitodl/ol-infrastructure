@@ -45,18 +45,10 @@ Organization: `mit-office-of-digital-learning`
 - Dashboard widget IDs and query IDs are computed-only in the provider and are omitted from generated code.
 - Issue alert action/filter/condition maps are ignored after import because Sentry's issue-alert API/provider refresh currently normalizes imported rule body lists in a way that would otherwise cause destructive drift. `actionMatch` is still managed and null live values are generated as `any`.
 
-## Import command
-
-From `src/ol_infrastructure/infrastructure/sentry`:
-
-```bash
-pulumi stack select Production
-pulumi import --file sentry_imports.json --preview-only
-pulumi import --file sentry_imports.json
-pulumi preview --refresh --diff
-```
-
-The import file contains resource IDs only, not Sentry token values or DSNs.
+Re-running `bin/import-sentry-config generate` regenerates `__main__.py`,
+`sentry_imports.json`, and this file together from live Sentry
+configuration, then `pulumi import --file sentry_imports.json` followed by
+`pulumi preview --refresh --diff` applies any newly discovered resources.
 
 ## Hand-authored exceptions
 

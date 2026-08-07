@@ -135,11 +135,11 @@ vault_config = Config("vault")
 # Stack references -- data cluster, mirroring applications/dagster/__main__.py.
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
-# Sentry is a single SaaS org, not per-env infrastructure -- one Production
+# Sentry is a single SaaS org, not per-env infrastructure -- one default
 # stack backs every ol_analytics_api env (QA and Production both read the
 # same project/DSN; Sentry environments are distinguished by the
 # deployment.environment OTel/Sentry tag, not by separate Sentry projects).
-sentry_stack = make_stack_reference(projects.SENTRY, "Production")
+sentry_stack = make_stack_reference(projects.SENTRY, "default")
 
 data_vpc = network_stack.require_output("data_vpc")
 k8s_pod_subnet_cidrs = data_vpc["k8s_pod_subnet_cidrs"]
