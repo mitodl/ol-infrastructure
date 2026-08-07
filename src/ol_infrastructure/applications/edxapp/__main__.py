@@ -100,6 +100,15 @@ kms_stack = make_stack_reference(projects.KMS, stack_info.name)
 vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
+sentry_stack = make_stack_reference(projects.SENTRY, "Production")
+# Each edxapp deployment maps to its own Sentry project; mitx and
+# mitx-staging share the openedx-residential project.
+EDXAPP_SENTRY_DSN_OUTPUTS = {
+    "mitx": "openedx_residential_sentry_dsn",
+    "mitx-staging": "openedx_residential_sentry_dsn",
+    "mitxonline": "openedx_mitxonline_sentry_dsn",
+    "xpro": "openedx_mitxpro_sentry_dsn",
+}
 monitoring_stack = make_stack_reference(projects.MONITORING, "default")
 vector_log_proxy_stack = make_stack_reference(
     projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}"
@@ -546,13 +555,16 @@ edxapp_vault_mount = vault.Mount(
     ),
     type="kv",
 )
+edxapp_static_secrets = read_yaml_secrets(
+    Path(f"edxapp/{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
+)
 edxapp_secrets = vault.generic.Secret(
     "edxapp-static-secrets",
     path=edxapp_vault_mount.path.apply("{}/edxapp".format),
     data_json=Output.secret(
-        read_yaml_secrets(
-            Path(f"edxapp/{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
-        )
+        sentry_stack.require_output(
+            EDXAPP_SENTRY_DSN_OUTPUTS[stack_info.env_prefix]
+        ).apply(lambda dsn: {**edxapp_static_secrets, "sentry_dsn": dsn})
     ).apply(json.dumps),
 )
 forum_secrets = vault.generic.Secret(
