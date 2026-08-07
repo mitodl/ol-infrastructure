@@ -91,12 +91,14 @@ configuration, then `pulumi import --file sentry_imports.json` followed by
   (unused, zero Sentry events/issues in any of them). If `bin/import-sentry-config`
   is re-run against a `sentry_imports.json` that still lists these live
   projects, drop them from the import file first or the regenerated code will
-  recreate the resource blocks. **All eight resources (4 projects + 4 keys)
-  carry `protect=True` via the file-wide `sentry_opts`, so `pulumi up` will
-  fail on these deletes with "cannot be deleted because it is protected"
-  until each is unprotected first**, e.g.:
-  `pulumi state unprotect 'urn:pulumi:default::ol-infrastructure-sentry::sentry:index/sentryProject:SentryProject::project_airbyte'`
-  (repeat for the other 3 projects and 4 keys) -- confirmed via `pulumi preview`.
+  recreate the resource blocks. All eight resources (4 projects + 4 keys)
+  carried `protect=True` via the file-wide `sentry_opts`, which would have
+  made `pulumi up` fail on these deletes with "cannot be deleted because it
+  is protected" -- each was unprotected by hand ahead of merge with
+  `pulumi state unprotect '<urn>'` (e.g.
+  `urn:pulumi:default::ol-infrastructure-sentry::sentry:index/sentryProject:SentryProject::project_airbyte`),
+  confirmed clean with a subsequent `pulumi preview` (4 updates, 8 deletes,
+  no unexpected replacements).
 - `project_ocw_next` / `key_ocw_next_default_*`: the live Sentry project's
   `name`/`slug` were hand-changed from `ocw-next` to `ocw-site` (matching the
   `ocw_site` application) without renaming the Pulumi resource identifiers,
