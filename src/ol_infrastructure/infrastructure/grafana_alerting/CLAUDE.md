@@ -216,6 +216,13 @@ label is still evaluated and still recorded in `grafanacloud-alert-state-history
 deliberately, to calibrate new thresholds against real firing data at zero paging
 risk; promoting such a rule means adding a `severity` label and nothing else.
 
+That "nothing else" holds only if the rule's resource-identifying label is
+already in `NotificationPolicy.group_bies`. A rule aggregating `sum by (X)`
+carries `X` as its only such label, and if `X` is missing from that list every
+firing instance collapses into one notification group per rule — the bundling
+the list exists to prevent. `matched_host` was added there for
+`apisix_edge.py`; when adding a rule that groups by a new label, add it too.
+
 The same mechanism silently swallows rules that lost their label *by accident*:
 `HTTPRequestDurationTooHighAvg` fired 1,168 times in 30 days into `oblivion`
 before anyone noticed. When adding a rule, be explicit about which of the two

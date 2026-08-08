@@ -55,6 +55,14 @@ api.learn.mit.edu: it sat at 1.09% when these were written, just above the slow
 rule's 1% line, and needs a deliberate decision (raise the threshold to 2%, or
 accept it as the genuine signal its 304,860 absolute 502s/30d suggest).
 
+Adding that label is the *only* change promotion needs, but only because
+`matched_host` was added to `NotificationPolicy.group_bies` in alertmanager.py
+alongside these rules. These aggregate `sum by (matched_host)`, so that is the
+one resource-identifying label they carry; without it in the grouping list every
+firing host would collapse into a single notification group per rule and one
+host changing state would resend all the others. If you add a rule here that
+groups by something else, add that label there too.
+
 Measure with:
   sum by (ruleTitle) (count_over_time(
     {from="state-history"} | json | current =~ `Alerting.*` [14d]))
