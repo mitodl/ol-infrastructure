@@ -495,6 +495,66 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 ),
             ).apply(json.dumps),
         )
+
+        # Service account client for MIT Learn's use of the Keycloak Admin API.
+        # Kept separate from ol-mitlearn-client, which is the browser-flow client
+        # APISIX authenticates with and has no service account.
+        #
+        # Learn uses it to read a user's federated identities (to tell whether
+        # they authenticate through an external IdP, and so cannot change their
+        # email or password in Learn) and to push email opt-in changes onto the
+        # Keycloak user.
+        olapps_mitlearn_admin_client = keycloak.openid.Client(
+            "olapps-mitlearn-admin-client",
+            name="mitlearn-admin-client",
+            realm_id=ol_apps_realm.id,
+            client_id="mitlearn-admin-client",
+            enabled=True,
+            access_type="CONFIDENTIAL",
+            standard_flow_enabled=False,
+            implicit_flow_enabled=False,
+            direct_access_grants_enabled=False,
+            service_accounts_enabled=True,
+            valid_redirect_uris=[],
+            opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+        )
+        mitlearn_realm_management_client = keycloak.openid.get_client(
+            realm_id=ol_apps_realm.id,
+            client_id="realm-management",
+            opts=InvokeOptions(provider=keycloak_provider),
+        )
+        # Least privilege: view/query users is what reading federated identities
+        # needs, manage-users is what writing the email opt-in attribute needs.
+        # The realm-wide view-realm/manage-realm roles are deliberately omitted.
+        for resource_name, role in [
+            ("olapps-mitlearn-admin-client-view-users-role", "view-users"),
+            ("olapps-mitlearn-admin-client-query-users-role", "query-users"),
+            ("olapps-mitlearn-admin-client-manage-users-role", "manage-users"),
+        ]:
+            keycloak.openid.ClientServiceAccountRole(
+                resource_name,
+                realm_id=ol_apps_realm.id,
+                service_account_user_id=olapps_mitlearn_admin_client.service_account_user_id,
+                client_id=mitlearn_realm_management_client.id,
+                role=role,
+                opts=resource_options,
+            )
+        vault.generic.Secret(
+            "olapps-mitlearn-admin-client-vault-credentials",
+            # Nested under sso/mitlearn/ so the app's existing Vault policy
+            # ("secret-operations/sso/mitlearn/*") already grants read access.
+            # A sibling path such as sso/mitlearn-admin would not be matched.
+            path="secret-operations/sso/mitlearn/admin",
+            data_json=Output.all(
+                url=olapps_mitlearn_admin_client.realm_id.apply(
+                    lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+                ),
+                client_id=olapps_mitlearn_admin_client.client_id,
+                client_secret=olapps_mitlearn_admin_client.client_secret,
+                realm_id=olapps_mitlearn_admin_client.realm_id,
+                realm_name="olapps",
+            ).apply(json.dumps),
+        )
     # MIT LEARN [END]
 
     # OPEN DISCUSSIONS [START]
