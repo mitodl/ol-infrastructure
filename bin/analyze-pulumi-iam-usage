@@ -4,19 +4,27 @@
 Combines two real usage sources -- IAM Access Analyzer's CloudTrail-based
 policy generation (recent, precise) and its "unused access" finding history
 (long-tail, catches low-cadence actions like cert renewal) -- against the
-`policy_definition` in one of this repo's `iam_policies` modules, and reports
-actions that are used but not granted, or granted but never observed.
+`policy_definition` in this repo's `iam_policies` modules, and reports actions
+that are used but not granted, or granted but never observed.
 
-This is a report-only tool: it never modifies IAM or writes files. It exists
-to make the manual analysis behind PR #4873 (least-privilege replacement for
-the infra worker pool's IAM policy) repeatable, so policy drift can be caught
-on a schedule instead of discovered as a production AccessDenied.
+`analyze` is report-only: it never modifies IAM or writes files. `propose`
+additionally edits the target policy module in place so the drift can be
+reviewed as a diff -- it is what the scheduled `iam-policy-drift` Concourse
+pipeline runs before opening a PR (see
+src/ol_concourse/pipelines/infrastructure/iam_drift/pipeline.py).
+
+Neither command touches live IAM. A proposed change only takes effect once the
+PR is reviewed, merged, and applied by `pulumi up`.
 """
 
 import importlib
+import importlib.util
 import json
+import re
+import sys
 import time
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Annotated, Any
 
 import boto3
@@ -25,7 +33,7 @@ import cyclopts
 app = cyclopts.App(
     help=(
         "Diff a role's real AWS API usage (via IAM Access Analyzer) against the "
-        "granted actions in one of this repo's iam_policies modules."
+        "granted actions in this repo's iam_policies modules."
     )
 )
 
@@ -38,6 +46,7 @@ DEFAULT_ACCESS_ROLE_ARN = (
     "AccessAnalyzerMonitorServiceRole_XELK4E2HVP"  # pragma: allowlist secret
 )
 DEFAULT_TRAIL_ARN = "arn:aws:cloudtrail:us-east-1:610119931565:trail/odl-aws-cloudtrail"
+DEFAULT_ROLE_PATH = "/ol-applications/concourse/role/"
 # StartPolicyGeneration enforces a hard quota on the number of CloudTrail log
 # files it will process for an org-wide multi-region trail; 90 days is the
 # API's own ceiling, but a busy trail can still exceed the quota within that
@@ -48,14 +57,70 @@ DEFAULT_LOOKBACK_DAYS = 14
 # so this walks pages until either exhausted or this many results collected.
 MAX_UNUSED_ACCESS_FINDINGS = 200
 
+# Observed-but-ungranted actions matching these are never written into a policy
+# module automatically -- each either needs resource-level scoping to be safe
+# (adding it to a Resource: "*" statement would be a privilege escalation) or
+# belongs in a different, already resource-scoped statement. `propose` reports
+# them for a human to place by hand instead.
+MANUAL_REVIEW_ACTION_PREFIXES = ("iam:", "organizations:", "sts:AssumeRole")
+MANUAL_REVIEW_ACTIONS = frozenset(
+    {
+        "ecr:SetRepositoryPolicy",
+        "kms:PutKeyPolicy",
+        "lambda:AddPermission",
+        "s3:PutBucketAcl",
+        "s3:PutBucketPolicy",
+        "secretsmanager:PutResourcePolicy",
+        "sns:AddPermission",
+        "sqs:AddPermission",
+    }
+)
 
-def _load_granted_actions(policy_module: str) -> set[str]:
-    module = importlib.import_module(policy_module)
-    actions: set[str] = set()
-    for statement in module.policy_definition["Statement"]:
-        action = statement["Action"]
-        actions.update([action] if isinstance(action, str) else action)
-    return actions
+_ACTION_LINE = re.compile(r'^(?P<indent>\s*)"(?P<action>[^"]+)",\s*$')
+_ACTION_LIST_OPEN = re.compile(r'^\s*"Action": \[\s*$')
+
+
+def _statement_actions(statement: dict[str, Any]) -> list[str]:
+    action = statement.get("Action", [])
+    return [action] if isinstance(action, str) else list(action)
+
+
+def _load_granted_actions(policy_modules: list[str]) -> dict[str, set[str]]:
+    """Return the granted action set of each named iam_policies module."""
+    return {
+        policy_module: {
+            action
+            for statement in importlib.import_module(policy_module).policy_definition[
+                "Statement"
+            ]
+            for action in _statement_actions(statement)
+        }
+        for policy_module in policy_modules
+    }
+
+
+def _resolve_role_arn(role: str, role_path: str, region: str) -> str:
+    """Resolve a role name prefix to a full ARN, passing ARNs through unchanged.
+
+    Pulumi auto-names these roles with a random suffix, so a scheduled pipeline
+    can't hard-code the ARN without breaking the first time a role is replaced.
+    """
+    if role.startswith("arn:"):
+        return role
+    paginator = boto3.client("iam", region_name=region).get_paginator("list_roles")
+    matches = [
+        found["Arn"]
+        for page in paginator.paginate(PathPrefix=role_path)
+        for found in page["Roles"]
+        if found["RoleName"].startswith(role)
+    ]
+    if len(matches) != 1:
+        msg = (
+            f"Expected exactly one role under {role_path} with name prefix {role!r}, "
+            f"found {len(matches)}: {sorted(matches)}"
+        )
+        raise SystemExit(msg)
+    return matches[0]
 
 
 def _generate_policy_from_cloudtrail(
@@ -88,8 +153,7 @@ def _generate_policy_from_cloudtrail(
             for policy in result["generatedPolicyResult"]["generatedPolicies"]:
                 doc = json.loads(policy["policy"])
                 for statement in doc["Statement"]:
-                    action = statement["Action"]
-                    actions.update([action] if isinstance(action, str) else action)
+                    actions.update(_statement_actions(statement))
             return actions
         if status == "FAILED":
             error = result["jobDetails"].get("jobError", {})
@@ -139,40 +203,19 @@ def _unused_access_action_history(
     return actions
 
 
-@app.command
-def analyze(
-    role_arn: Annotated[
-        str, cyclopts.Parameter(help="IAM role ARN to analyze real usage for.")
-    ],
-    policy_module: Annotated[
-        str,
-        cyclopts.Parameter(
-            help=(
-                "Dotted path to the iam_policies module to diff against, e.g. "
-                "ol_infrastructure.applications.concourse.iam_policies.pulumi_infra"
-            )
-        ),
-    ],
+def _observed_actions(
+    role_arn: str,
     *,
-    analyzer_arn: str = DEFAULT_ANALYZER_ARN,
-    access_role_arn: str = DEFAULT_ACCESS_ROLE_ARN,
-    trail_arn: str = DEFAULT_TRAIL_ARN,
-    lookback_days: int = DEFAULT_LOOKBACK_DAYS,
-    region: str = "us-east-1",
-    poll_interval_seconds: int = 15,
-    timeout_seconds: int = 300,
-    skip_cloudtrail: bool = False,
-) -> None:
-    """Report actions used-but-ungranted and granted-but-unused for a role.
-
-    Requires accessanalyzer:StartPolicyGeneration, GetGeneratedPolicy,
-    ListFindingsV2, GetFindingV2, and iam:PassRole on --access-role-arn.
-    """
+    analyzer_arn: str,
+    access_role_arn: str,
+    trail_arn: str,
+    lookback_days: int,
+    region: str,
+    poll_interval_seconds: int,
+    timeout_seconds: int,
+    skip_cloudtrail: bool,
+) -> set[str]:
     client = boto3.client("accessanalyzer", region_name=region)
-
-    granted = _load_granted_actions(policy_module)
-    print(f"Granted actions in {policy_module}: {len(granted)}")
-
     used: set[str] = set()
     if not skip_cloudtrail:
         print(f"Generating policy from {lookback_days}d of CloudTrail history...")
@@ -187,14 +230,216 @@ def analyze(
         )
     print("Pulling unused-access finding history (catches low-cadence actions)...")
     used |= _unused_access_action_history(client, analyzer_arn, role_arn)
-    print(f"Total distinct actions observed in use: {len(used)}")
+    return used
 
+
+def _diff(granted: set[str], used: set[str]) -> tuple[list[str], list[str]]:
+    """Return (used-but-not-granted, granted-but-not-observed), case-insensitively."""
     granted_lower = {a.lower() for a in granted}
     used_lower = {a.lower() for a in used}
-
     missing = sorted(a for a in used if a.lower() not in granted_lower)
     unused = sorted(a for a in granted if a.lower() not in used_lower)
+    return missing, unused
 
+
+def _needs_manual_review(action: str) -> bool:
+    return action in MANUAL_REVIEW_ACTIONS or action.startswith(
+        MANUAL_REVIEW_ACTION_PREFIXES
+    )
+
+
+def _wildcard_statement_index(statements: list[dict[str, Any]]) -> int:
+    """Index of the first Resource: "*" statement -- where new actions belong.
+
+    Every other statement is resource-scoped deliberately, so an action added
+    to one of those would silently inherit a scope it was never observed under.
+    """
+    for index, statement in enumerate(statements):
+        if statement.get("Resource") == "*":
+            return index
+    msg = 'Target policy module has no Resource: "*" statement to add actions to'
+    raise SystemExit(msg)
+
+
+def _action_list_span(
+    lines: list[str], statement_index: int
+) -> tuple[int, str, list[str]]:
+    """Locate the ``"Action": [`` entries of the nth statement in a module source.
+
+    Returns ``(start, indent, entries)`` where ``start`` is the line index of the
+    first entry, so the block occupies ``lines[start:start + len(entries)]``.
+    """
+    opens = [i for i, line in enumerate(lines) if _ACTION_LIST_OPEN.match(line)]
+    if statement_index >= len(opens):
+        msg = (
+            f"Expected at least {statement_index + 1} '\"Action\": [' blocks in the "
+            f"target module source, found {len(opens)}"
+        )
+        raise SystemExit(msg)
+    start = opens[statement_index] + 1
+    indent = ""
+    entries: list[str] = []
+    for line in lines[start:]:
+        matched = _ACTION_LINE.match(line)
+        if matched is None:
+            break
+        indent = indent or matched["indent"]
+        entries.append(matched["action"])
+    if not entries:
+        msg = f"Statement {statement_index} has no literal action entries to extend"
+        raise SystemExit(msg)
+    return start, indent, entries
+
+
+def _add_actions_to_module(
+    module_path: Path,
+    statement_index: int,
+    statement_actions: list[str],
+    additions: list[str],
+) -> None:
+    """Insert actions into a policy module's nth statement, in alphabetical order."""
+    lines = module_path.read_text().splitlines(keepends=True)
+    start, indent, existing = _action_list_span(lines, statement_index)
+    # The imported statement is the source of truth for what the policy grants;
+    # if the source lines don't reproduce it exactly then this statement is
+    # built by something other than string literals and a textual edit would
+    # silently write to the wrong place.
+    if existing != statement_actions:
+        msg = (
+            f"Action entries parsed from {module_path} statement {statement_index} do "
+            "not match the imported policy_definition; refusing to edit it textually"
+        )
+        raise SystemExit(msg)
+
+    # Insert before the first entry that sorts after the new action, rather than
+    # re-sorting the whole list: these lists are only near-sorted (a few
+    # hand-appended entries sit out of order), and rewriting them would bury the
+    # one line that matters in a few hundred lines of reshuffling.
+    merged = list(existing)
+    for action in sorted(additions):
+        position = next(
+            (index for index, entry in enumerate(merged) if entry > action), len(merged)
+        )
+        merged.insert(position, action)
+    lines[start : start + len(existing)] = [
+        f'{indent}"{action}",\n' for action in merged
+    ]
+    module_path.write_text("".join(lines))
+
+
+def _report_markdown(
+    target_module: str, role_arn: str, lookback_days: int, drift: dict[str, list[str]]
+) -> str:
+    """Render the checked-in drift report.
+
+    Deliberately free of timestamps: a re-run that finds the same drift has to
+    produce a byte-identical file, or the pipeline would push a fresh commit
+    every week whether or not anything actually changed.
+    """
+    sections = [
+        f"# IAM usage drift: `{target_module}`",
+        "",
+        "Generated by the `iam-policy-drift` Concourse pipeline via "
+        "`bin/analyze-pulumi-iam-usage propose`. Don't edit this by hand -- edit the "
+        "policy module and the next run regenerates it.",
+        "",
+        f"- Role analyzed: `{role_arn}`",
+        f"- Observation window: {lookback_days} days of CloudTrail-derived policy "
+        "generation, merged with the full Access Analyzer unused-access finding "
+        "history.",
+        "",
+    ]
+    for title, preamble, actions in (
+        (
+            "Used but not granted -- needs manual placement",
+            "Observed in use, granted by nothing attached to the role, and too "
+            'escalation-prone to add to a `Resource: "*"` statement automatically. '
+            "Each needs a resource-scoped statement written by hand.",
+            drift["manual_additions"],
+        ),
+        (
+            "Granted but never observed in use",
+            "Candidates for removal from this module. **Not** applied automatically: "
+            "the observation window misses genuinely low-cadence actions (Packer AMI "
+            "builds run on this pool only on a version bump), so dropping one of "
+            "these without checking is how a pipeline breaks months later.",
+            drift["removal_candidates"],
+        ),
+    ):
+        sections.extend([f"## {title}", "", preamble, ""])
+        sections.extend(
+            [f"- `{action}`" for action in actions] if actions else ["_None._"]
+        )
+        sections.append("")
+    return "\n".join(sections)
+
+
+def _pr_body_markdown(
+    target_module: str, role_arn: str, lookback_days: int, drift: dict[str, list[str]]
+) -> str:
+    body = [
+        f"Automated least-privilege drift check for `{target_module}`, opened by the "
+        "`iam-policy-drift` Concourse pipeline.",
+        "",
+        f"Real usage for `{role_arn}` was collected from IAM Access Analyzer -- "
+        f"{lookback_days} days of CloudTrail-derived policy generation merged with "
+        "the full unused-access finding history -- and diffed against the union of "
+        "every `iam_policies` module attached to that role.",
+        "",
+    ]
+    for title, preamble, actions in (
+        (
+            "Added by this PR",
+            "Observed in use but granted by nothing attached to the role. Check that "
+            "each one is something this pool should legitimately be doing before "
+            "merging.",
+            drift["applied_additions"],
+        ),
+        (
+            "Used but not granted -- needs manual placement",
+            'Escalation-prone at `Resource: "*"`, so deliberately **not** added '
+            "automatically. Each needs a resource-scoped statement written by hand.",
+            drift["manual_additions"],
+        ),
+        (
+            "Granted but never observed in use",
+            "Removal candidates, **not** applied. Confirm the action isn't simply "
+            "lower-cadence than the observation window before dropping it.",
+            drift["removal_candidates"],
+        ),
+    ):
+        if not actions:
+            continue
+        body.extend(
+            [
+                f"### {title}",
+                "",
+                preamble,
+                "",
+                *(f"- `{action}`" for action in actions),
+                "",
+            ]
+        )
+    body.extend(
+        [
+            "### How can this be tested?",
+            "",
+            "`pulumi preview` on the `ol-application-concourse` `Production` stack "
+            "should show a new version of the "
+            f"`cicd-policy-{target_module.rsplit('.', 1)[-1]}-production` policy. "
+            "Parliament linting of the result runs as part of the stack.",
+            "",
+            "If an added action belongs to a service the infra pool didn't already "
+            "use, the preview will also show the worker's permissions boundary "
+            "picking up that service. The boundary deliberately can't be applied by "
+            "the role it caps, so that `pulumi up` has to be run with more privileged "
+            "credentials than the infra worker holds.",
+        ]
+    )
+    return "\n".join(body)
+
+
+def _print_drift(missing: list[str], unused: list[str]) -> None:
     print(f"\n=== Used but NOT granted ({len(missing)}) ===")
     for action in missing:
         print(f"  {action}")
@@ -207,5 +452,185 @@ def analyze(
         print("\nNo drift detected.")
 
 
+@app.command
+def analyze(
+    role: Annotated[
+        str,
+        cyclopts.Parameter(
+            help=(
+                "IAM role ARN to analyze real usage for, or a role name prefix to "
+                "resolve under --role-path."
+            )
+        ),
+    ],
+    *,
+    policy_module: Annotated[
+        list[str],
+        cyclopts.Parameter(
+            help=(
+                "Dotted path to an iam_policies module whose grants count as "
+                "'granted'. Repeat once per policy attached to the role, e.g. "
+                "ol_infrastructure.applications.concourse.iam_policies.pulumi_infra"
+            )
+        ),
+    ],
+    role_path: str = DEFAULT_ROLE_PATH,
+    analyzer_arn: str = DEFAULT_ANALYZER_ARN,
+    access_role_arn: str = DEFAULT_ACCESS_ROLE_ARN,
+    trail_arn: str = DEFAULT_TRAIL_ARN,
+    lookback_days: int = DEFAULT_LOOKBACK_DAYS,
+    region: str = "us-east-1",
+    poll_interval_seconds: int = 15,
+    timeout_seconds: int = 300,
+    skip_cloudtrail: bool = False,
+) -> None:
+    """Report actions used-but-ungranted and granted-but-unused for a role.
+
+    Requires access-analyzer:StartPolicyGeneration, GetGeneratedPolicy,
+    ListFindingsV2 and GetFindingV2, iam:PassRole on --access-role-arn, and
+    iam:ListRoles when --role is a name prefix rather than an ARN.
+    """
+    role_arn = _resolve_role_arn(role, role_path, region)
+    print(f"Analyzing {role_arn}")
+
+    granted = set().union(*_load_granted_actions(policy_module).values())
+    print(f"Granted actions across {len(policy_module)} module(s): {len(granted)}")
+
+    used = _observed_actions(
+        role_arn,
+        analyzer_arn=analyzer_arn,
+        access_role_arn=access_role_arn,
+        trail_arn=trail_arn,
+        lookback_days=lookback_days,
+        region=region,
+        poll_interval_seconds=poll_interval_seconds,
+        timeout_seconds=timeout_seconds,
+        skip_cloudtrail=skip_cloudtrail,
+    )
+    print(f"Total distinct actions observed in use: {len(used)}")
+
+    _print_drift(*_diff(granted, used))
+
+
+@app.command
+def propose(
+    role: Annotated[
+        str,
+        cyclopts.Parameter(
+            help=(
+                "IAM role ARN to analyze real usage for, or a role name prefix to "
+                "resolve under --role-path."
+            )
+        ),
+    ],
+    *,
+    policy_module: Annotated[
+        list[str],
+        cyclopts.Parameter(
+            help=(
+                "Dotted path to an iam_policies module whose grants count as "
+                "'granted'. Repeat once per policy attached to the role."
+            )
+        ),
+    ],
+    target_module: Annotated[
+        str,
+        cyclopts.Parameter(
+            help=(
+                "The one module out of --policy-module that proposed changes are "
+                "written to. Must also be listed in --policy-module."
+            )
+        ),
+    ],
+    repo_root: Annotated[
+        Path,
+        cyclopts.Parameter(help="Repository root that the drift report is written to."),
+    ] = Path(),
+    pr_body_file: Annotated[
+        Path | None,
+        cyclopts.Parameter(help="Write the generated pull request body here."),
+    ] = None,
+    role_path: str = DEFAULT_ROLE_PATH,
+    analyzer_arn: str = DEFAULT_ANALYZER_ARN,
+    access_role_arn: str = DEFAULT_ACCESS_ROLE_ARN,
+    trail_arn: str = DEFAULT_TRAIL_ARN,
+    lookback_days: int = DEFAULT_LOOKBACK_DAYS,
+    region: str = "us-east-1",
+    poll_interval_seconds: int = 15,
+    timeout_seconds: int = 300,
+    skip_cloudtrail: bool = False,
+) -> None:
+    """Rewrite the target policy module and drift report to match observed usage.
+
+    Additions that can be placed safely are written into the target module's
+    ``Resource: "*"`` statement. Removals, and additions that need resource-level
+    scoping, are only reported -- see MANUAL_REVIEW_ACTIONS and the report text
+    for why neither is applied automatically.
+    """
+    if target_module not in policy_module:
+        msg = f"--target-module {target_module} must also be given as --policy-module"
+        raise SystemExit(msg)
+    module_spec = importlib.util.find_spec(target_module)
+    if module_spec is None or module_spec.origin is None:
+        msg = f"Cannot locate the source file for {target_module}"
+        raise SystemExit(msg)
+    module_path = Path(module_spec.origin)
+
+    role_arn = _resolve_role_arn(role, role_path, region)
+    print(f"Analyzing {role_arn}")
+
+    granted_by_module = _load_granted_actions(policy_module)
+    used = _observed_actions(
+        role_arn,
+        analyzer_arn=analyzer_arn,
+        access_role_arn=access_role_arn,
+        trail_arn=trail_arn,
+        lookback_days=lookback_days,
+        region=region,
+        poll_interval_seconds=poll_interval_seconds,
+        timeout_seconds=timeout_seconds,
+        skip_cloudtrail=skip_cloudtrail,
+    )
+    missing, unused = _diff(set().union(*granted_by_module.values()), used)
+    _print_drift(missing, unused)
+
+    statements = importlib.import_module(target_module).policy_definition["Statement"]
+    statement_index = _wildcard_statement_index(statements)
+    drift = {
+        "applied_additions": [a for a in missing if not _needs_manual_review(a)],
+        "manual_additions": [a for a in missing if _needs_manual_review(a)],
+        # Only this module's own grants are proposed for removal; the rest of
+        # `unused` belongs to the sibling policies also attached to the role,
+        # which have their own drift targets (or deliberately have none).
+        "removal_candidates": [
+            a for a in unused if a in granted_by_module[target_module]
+        ],
+    }
+
+    if drift["applied_additions"]:
+        _add_actions_to_module(
+            module_path,
+            statement_index,
+            _statement_actions(statements[statement_index]),
+            drift["applied_additions"],
+        )
+        print(f"\nAdded {len(drift['applied_additions'])} action(s) to {module_path}")
+
+    report_path = (
+        repo_root / "docs" / "iam-drift" / f"{target_module.rsplit('.', 1)[-1]}.md"
+    )
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
+        _report_markdown(target_module, role_arn, lookback_days, drift)
+    )
+    print(f"Wrote drift report to {report_path}")
+
+    if pr_body_file:
+        pr_body_file.write_text(
+            _pr_body_markdown(target_module, role_arn, lookback_days, drift)
+        )
+        print(f"Wrote pull request body to {pr_body_file}")
+
+
 if __name__ == "__main__":
-    app()
+    sys.exit(app())
