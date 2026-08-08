@@ -36,6 +36,7 @@ Sub-modules
 -----------
   eks_general  — Source: grafana-alerts/cortex-rules/eks_general.yaml
   linux_host   — Source: grafana-alerts/cortex-rules/linux-host.yaml
+  apisix_edge  — New in 2026-08. Per-host 5xx rate at the APISIX edge.
 """
 
 import json
@@ -45,6 +46,7 @@ from pulumiverse_grafana import alerting
 from pulumiverse_grafana.oss.folder import Folder
 
 from ol_infrastructure.infrastructure.grafana_alerting.metric_rules import (
+    apisix_edge,
     eks_general,
     linux_host,
 )
@@ -146,3 +148,4 @@ def create(resource_opts: ResourceOptions) -> None:
 
     eks_general.create(alerts_folder.uid, rd, resource_opts)
     linux_host.create(alerts_folder.uid, rd, resource_opts)
+    apisix_edge.create(alerts_folder.uid, rd, resource_opts)

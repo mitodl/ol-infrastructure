@@ -80,6 +80,7 @@ Rootly). That path is independent of Grafana and is managed in
 | `metric_rules/base.py` | Mimir datasource UIDs, two-stage pipeline helper, folder creation, delegates to sub-modules. |
 | `metric_rules/eks_general.py` | EKS workload alert rules (replicas, node readiness, crash loops, OOM, jobs, HPA). |
 | `metric_rules/linux_host.py` | Linux host alert rules (CPU, memory, disk usage). |
+| `metric_rules/apisix_edge.py` | Per-host 5xx rate at the APISIX edge (`apisix_http_status`). Two windows (fast cliff / slow creep) with a minimum-traffic gate. Currently unlabelled → `oblivion` while calibrating. |
 | `log_rules/` | Package. Grafana-managed alert rule groups for log queries. Migrated from `grafana-alerts/loki-rules/`. |
 | `log_rules/base.py` | Loki datasource UIDs, two-stage pipeline helper, folder creation, delegates to sub-modules. |
 | `log_rules/cert_manager.py` | cert-manager ACME issuer and DNS challenge alert rules. |
@@ -208,6 +209,24 @@ The notification policy in `alertmanager.py` mirrors the original
 5. Default (catch-all) → `oblivion` (empty contact point, acts as drop sink).
 
 OpsGenie is no longer active. All actionable alerts route to Rootly.
+
+**Rule 5 is load-bearing, not just a fallback.** A rule carrying no `severity`
+label is still evaluated and still recorded in `grafanacloud-alert-state-history`
+— it is simply delivered nowhere. `metric_rules/apisix_edge.py` uses that
+deliberately, to calibrate new thresholds against real firing data at zero paging
+risk; promoting such a rule means adding a `severity` label and nothing else.
+
+That "nothing else" holds only if the rule's resource-identifying label is
+already in `NotificationPolicy.group_bies`. A rule aggregating `sum by (X)`
+carries `X` as its only such label, and if `X` is missing from that list every
+firing instance collapses into one notification group per rule — the bundling
+the list exists to prevent. `matched_host` was added there for
+`apisix_edge.py`; when adding a rule that groups by a new label, add it too.
+
+The same mechanism silently swallows rules that lost their label *by accident*:
+`HTTPRequestDurationTooHighAvg` fired 1,168 times in 30 days into `oblivion`
+before anyone noticed. When adding a rule, be explicit about which of the two
+you mean.
 
 ---
 
