@@ -135,8 +135,10 @@ def setup_external_dns(
                 },
                 "logLevel": "info",
                 "policy": "sync",
-                # Configure external-dns to only look at gateway resources
-                # disables support for monitoring services or legacy ingress resources
+                # Gateway API resources plus "service" -- the latter is load
+                # bearing: it publishes the apisix-gateway LoadBalancer hostnames
+                # carried on external-dns.alpha.kubernetes.io/hostname. Legacy
+                # ingress is intentionally absent.
                 "sources": [
                     "service",
                     "gateway-udproute",
@@ -149,20 +151,31 @@ def setup_external_dns(
                 "txtOwnerId": cluster_name,
                 # Limit the dns zones that external dns knows about
                 "domainFilters": eks_config.require_object("allowed_dns_zones"),
-                # request == limit leaves zero burst headroom: data-qa sat at
-                # 127.6Mi against the 128Mi ceiling and OOMKilled. Memory here
-                # scales with the number of Route53 records external-dns tracks,
-                # which grows as gateway routes are added, so the limit is set to
-                # 2x the request rather than matching it.
+                # Memory scales with cluster-wide POD COUNT, not with the number
+                # of DNS records. The "service" source above builds a Pod informer
+                # (needed to resolve headless services), so external-dns caches
+                # every pod in the cluster -- including completed Job pods.
+                # Measured steady state: ~30Mi at ~120 pods, ~92Mi at 1.3k pods,
+                # ~290Mi at 8.2k pods. data-production blew the old 256Mi ceiling
+                # and CrashLooped when a dagster burst added ~6.2k Job pods in an
+                # hour; those linger for ttlSecondsAfterFinished=24h, so the
+                # ceiling has to absorb a full day of job churn, not a steady state.
+                # GOMEMLIMIT (below) makes Go collect hard as it approaches the
+                # limit instead of getting OOMKilled outright.
                 "resources": {
                     "requests": {
-                        "memory": "128Mi",
+                        "memory": "256Mi",
                         "cpu": "10m",
                     },
                     "limits": {
-                        "memory": "256Mi",
+                        "memory": "1Gi",
                     },
                 },
+                "env": [
+                    # Soft limit ~90% of limits.memory: the Go runtime GCs more
+                    # aggressively rather than letting the cgroup OOMKiller win.
+                    {"name": "GOMEMLIMIT", "value": "900MiB"},
+                ],
             },
         ),
         opts=ResourceOptions(
