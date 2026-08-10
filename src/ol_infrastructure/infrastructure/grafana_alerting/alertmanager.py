@@ -135,6 +135,14 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
             "node",
             "job_name",
             "instance",
+            # The edge-level equivalent of the labels above: metric_rules/
+            # apisix_edge.py aggregates `sum by (matched_host)`, so this is the
+            # only resource-identifying label its alerts carry. Without it every
+            # firing host collapses into one notification group per rule, which
+            # is precisely the bundling this list exists to prevent. Added
+            # ahead of those rules being routed anywhere, so that promoting them
+            # really is only a matter of adding a `severity` label.
+            "matched_host",
         ],
         # "1m", not "60s" — Grafana normalizes durations to the largest unit and
         # a mismatched spelling shows as a perpetual diff on every preview.
