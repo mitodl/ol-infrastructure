@@ -412,7 +412,12 @@ def population(fleet: Iterable[dict[str, Any]], scope: Scope) -> int:
 
 
 #: Why a direct collaborator grant exists, which is what decides how to remove it.
-GrantKind = Literal["redundant", "level-only", "no-access", "outside"]
+GrantKind = Literal["redundant", "level-only", "owner-implicit", "no-access", "outside"]
+#: The kinds whose removal costs the person nothing. `no-access` and `outside` are
+#: deliberately absent: one revokes access, the other is a membership decision.
+REMOVABLE_KINDS: frozenset[str] = frozenset(
+    {"redundant", "level-only", "owner-implicit"}
+)
 
 
 def _team_members(rosters: dict[str, set[str]], parents: dict[str, str | None]) -> Any:
@@ -437,26 +442,38 @@ def classify_direct_grants(
     rosters: dict[str, set[str]],
     members: set[str],
     parents: dict[str, str | None] | None = None,
+    owners: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Explain every direct collaborator grant in terms of how to remove it.
 
     A flat count of direct grants (SEC-06) says how much there is to clean up but
-    nothing about how, and the four kinds need completely different handling:
+    nothing about how, and the five kinds need completely different handling:
 
-      redundant   the person's team access already meets or beats the direct grant.
-                  Delete it; nobody loses anything.
-      level-only  they keep team access, just at a lower rung. Since that lower rung
-                  IS the SEC-15 target, deleting is the intended outcome, not a loss.
-      no-access   the direct grant is their only path in. Deleting it without adding
-                  a team grant first REVOKES ACCESS -- these gate the cleanup.
-      outside     not an org member at all. A different decision entirely: invite
-                  them to the org and a team, or remove them.
+      redundant       the person's team access already meets or beats the direct
+                      grant. Delete it; nobody loses anything.
+      level-only      they keep team access, just at a lower rung. Since that lower
+                      rung IS the SEC-15 target, deleting is the intended outcome.
+      owner-implicit  the person is an ORG OWNER, so admin on every repo survives
+                      the deletion regardless of teams. Free to delete.
+      no-access       the direct grant is their only path in. Deleting it without a
+                      team grant first REVOKES ACCESS -- these gate the cleanup.
+      outside         not an org member at all. A different decision entirely:
+                      invite them to the org and a team, or remove them.
 
-    `rosters` is passed in rather than read from disk because team membership is NOT
-    committed: `vault-developer-access` and `vault-devops-access` are `privacy:
-    secret` precisely so membership is not advertised, and ol-infrastructure is a
-    PUBLIC repository. Callers fetch it live -- which is why the `access` command
-    needs credentials while `run` does not.
+    OWNERSHIP IS CHECKED BEFORE TEAMS, and that ordering is the point. Org ownership
+    is a third access path alongside teams and direct grants, and it is the one the
+    other two cannot take away: an owner keeps implicit admin no matter what happens
+    to a roster. Ranking a grant by teams alone put 10 owner-held grants in
+    `no-access` -- the bucket that means "removing this revokes access" -- and so
+    overstated the gating set by nearly half. `owner-implicit` also survives roster
+    churn in a way `redundant` does not, which is why owners get their own bucket
+    rather than being folded into it.
+
+    `rosters` and `owners` are passed in rather than read from disk because team
+    membership is NOT committed: `vault-developer-access` and `vault-devops-access`
+    are `privacy: secret` precisely so membership is not advertised, and
+    ol-infrastructure is a PUBLIC repository. Callers fetch them live -- which is why
+    the `access` command needs credentials while `run` does not.
     """
     expanded = _team_members(rosters, parents or {})
     rows: list[dict[str, Any]] = []
@@ -473,6 +490,8 @@ def classify_direct_grants(
             )
             if login not in members:
                 kind: GrantKind = "outside"
+            elif login in (owners or set()):
+                kind = "owner-implicit"
             elif via is None:
                 kind = "no-access"
             elif via >= PERMISSION_RANK[role]:

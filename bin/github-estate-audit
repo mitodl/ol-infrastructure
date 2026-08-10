@@ -204,7 +204,9 @@ def drift(
     return 1 if total else 0
 
 
-def _fetch_rosters() -> tuple[dict[str, set[str]], set[str], dict[str, str | None]]:
+def _fetch_rosters() -> tuple[
+    dict[str, set[str]], set[str], dict[str, str | None], set[str]
+]:
     """Team rosters, org members and team nesting, read live from the API.
 
     NOT read from committed data, and not cached to disk, because there is nowhere
@@ -241,6 +243,12 @@ def _fetch_rosters() -> tuple[dict[str, set[str]], set[str], dict[str, str | Non
         follow_redirects=True,
     ) as client:
         members = {m["login"] for m in paginate(client, f"/orgs/{org}/members")}
+        # Org OWNERS hold implicit admin on every repo -- a third access path beside
+        # teams and direct grants, and the only one the others cannot revoke. The
+        # plain members list does not distinguish them, so this is a separate call.
+        owners = {
+            m["login"] for m in paginate(client, f"/orgs/{org}/members?role=admin")
+        }
         teams = paginate(client, f"/orgs/{org}/teams")
         rosters = {
             t["slug"]: {
@@ -250,7 +258,7 @@ def _fetch_rosters() -> tuple[dict[str, set[str]], set[str], dict[str, str | Non
             for t in teams
         }
     parents = {t["slug"]: (t.get("parent") or {}).get("slug") for t in teams}
-    return rosters, members, parents
+    return rosters, members, parents, owners
 
 
 @app.command
@@ -271,8 +279,8 @@ def access(
     """
     fleet = archetypes.load_fleet()
     active = [r for r in fleet if not r.get("archived")]
-    rosters, members, parents = _fetch_rosters()
-    rows = audit.classify_direct_grants(fleet, rosters, members, parents)
+    rosters, members, parents, owners = _fetch_rosters()
+    rows = audit.classify_direct_grants(fleet, rosters, members, parents, owners)
     shapes = audit.grant_shapes(active)
     kinds = Counter(r["kind"] for r in rows)
 
@@ -309,11 +317,15 @@ def access(
     # order the cleanup should run in.
     for kind, note in (
         ("redundant", "team access already >= the grant; delete freely"),
-        ("level-only", "drops to team level, which is the SEC-15 target anyway"),
+        ("level-only", "repo reach kept, elevated rights dropped to team level"),
+        ("owner-implicit", "org owner; implicit admin survives the deletion"),
         ("no-access", "ONLY path in -- needs a team grant BEFORE removal"),
         ("outside", "not an org member; invite to a team, or remove"),
     ):
-        print(f"  {kind:11} {kinds[kind]:4}   {note}")
+        print(f"  {kind:14} {kinds[kind]:4}   {note}")
+    removable = sum(kinds[k] for k in audit.REMOVABLE_KINDS)
+    print(f"  {'':14} ---")
+    print(f"  {'':14} {removable:4}   removable with no new team work")
 
     blocked = [r for r in rows if r["kind"] == "no-access"]
     if blocked:

@@ -138,3 +138,139 @@ def test_findings_carry_remediation() -> None:
     for finding in findings:
         assert finding.remediation
         assert finding.expected
+
+
+def test_con12_fires_on_an_active_repo_with_no_team_grants() -> None:
+    """The 80-repo finding rests entirely on this, so it gets a case of its own.
+
+    The org's `default_repository_permission` is `none`, which is what makes an empty
+    `teams` block mean "nobody but an org owner can reach this" rather than nothing at
+    all. If that org setting ever changes, this rule stops measuring what it claims,
+    and this test is where to start looking.
+    """
+    assert "CON-12" in fired([repo(teams={})])
+    assert "CON-12" in fired([repo(teams=None)])
+    assert "CON-12" not in fired([repo(teams={"odl-engineering": "push"})])
+
+
+def test_con12_is_scoped_to_active_repos() -> None:
+    """Archived repos emit no TeamRepository at all, so the rule cannot act on them.
+
+    Without this case a scope regression would silently inflate the finding with the
+    archived repos that also grant nothing -- a number that reads as new work but is
+    unreachable by this project.
+    """
+    assert "CON-12" not in fired([repo(archived=True, teams={})])
+
+
+# --- classify_direct_grants -------------------------------------------------------
+#
+# These decide which grants get advertised as safe to delete, so each of the five
+# kinds is pinned. A misclassification here is not a wrong report, it is a deletion
+# that revokes someone's access.
+
+ROSTERS = {"odl-engineering": {"alice"}, "devops": {"bob"}, "copilot": {"carol"}}
+PARENTS: dict[str, str | None] = {
+    "copilot": "odl-engineering",
+    "odl-engineering": None,
+    "devops": None,
+}
+MEMBERS = {"alice", "bob", "carol", "owner"}
+OWNERS = {"owner"}
+
+
+def classify(**repo_overrides: Any) -> str:
+    """Classify the single direct grant on a one-repo fleet."""
+    rows = audit.classify_direct_grants(
+        [repo(**repo_overrides)], ROSTERS, MEMBERS, PARENTS, OWNERS
+    )
+    assert len(rows) == 1
+    return str(rows[0]["kind"])
+
+
+def test_grant_is_redundant_when_team_access_already_meets_it() -> None:
+    assert (
+        classify(
+            teams={"odl-engineering": "maintain"},
+            _direct_collaborators={"alice": "write"},
+        )
+        == "redundant"
+    )
+
+
+def test_grant_is_level_only_when_team_access_is_lower() -> None:
+    """Removal keeps repo reach and drops the elevated rights -- the SEC-15 target."""
+    assert (
+        classify(
+            teams={"odl-engineering": "push"},
+            _direct_collaborators={"alice": "admin"},
+        )
+        == "level-only"
+    )
+
+
+def test_grant_is_no_access_when_no_team_covers_the_person() -> None:
+    assert (
+        classify(teams={"devops": "admin"}, _direct_collaborators={"alice": "admin"})
+        == "no-access"
+    )
+
+
+def test_grant_is_outside_when_the_person_is_not_an_org_member() -> None:
+    assert classify(teams={}, _direct_collaborators={"stranger": "write"}) == "outside"
+
+
+def test_org_owners_are_classified_by_ownership_not_by_teams() -> None:
+    """Ownership is a third access path, and the one teams cannot take away.
+
+    Ranking by teams alone put 10 owner-held grants in `no-access` -- the bucket that
+    means "removing this revokes access" -- overstating the gating set by nearly half.
+    An owner keeps implicit admin whatever the rosters do, so the answer must not
+    depend on them: both cases below are the same verdict.
+    """
+    assert classify(teams={}, _direct_collaborators={"owner": "admin"}) == (
+        "owner-implicit"
+    )
+    assert (
+        classify(
+            teams={"odl-engineering": "push"},
+            _direct_collaborators={"owner": "admin"},
+        )
+        == "owner-implicit"
+    )
+
+
+def test_nested_team_members_inherit_the_parents_grant() -> None:
+    """`copilot` is a child of `odl-engineering`, so a grant to the parent covers it.
+
+    Matching team slugs exactly would classify every child-team member as having no
+    team access, manufacturing `no-access` findings for grants that are redundant.
+    """
+    assert (
+        classify(
+            teams={"odl-engineering": "admin"},
+            _direct_collaborators={"carol": "admin"},
+        )
+        == "redundant"
+    )
+
+
+def test_write_and_push_are_the_same_rung() -> None:
+    """GitHub says `write` for collaborators and `push` for teams.
+
+    Comparing the raw strings would score every write grant as unmatched against a
+    push team, and report it as an elevation that needs removing.
+    """
+    assert (
+        classify(
+            teams={"odl-engineering": "push"},
+            _direct_collaborators={"alice": "write"},
+        )
+        == "redundant"
+    )
+
+
+def test_removable_kinds_exclude_the_two_that_cost_something() -> None:
+    """The headline "N removable today" is summed over this set."""
+    assert "no-access" not in audit.REMOVABLE_KINDS
+    assert "outside" not in audit.REMOVABLE_KINDS

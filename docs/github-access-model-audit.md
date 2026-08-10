@@ -91,8 +91,8 @@ that proves the mechanism — same pattern, grant present, works.
 
 ### Permission levels are inconsistent per team
 
-Two teams hold three different levels across the fleet, which is variance with no evident
-rationale:
+Three teams hold more than one level across the fleet, and `arbisoft-contractors` holds
+three. That is variance with no evident rationale:
 
 | Team | Active repos | Levels |
 |---|---|---|
@@ -110,20 +110,32 @@ because it looks like it should be. The team has 8 members and the org has 9 own
 they only overlap on 5 — `annagav`, `jkachel` and `odlbot` are in the team without being
 org owners, so the grant is their only admin path.
 
-## Direct user grants: 80 grants, 19 people, 4 kinds
+## Direct user grants: 80 grants, 19 people, 5 kinds
 
 SEC-06 counts 69 repos carrying direct grants. That number says how much there is to clean
 up and nothing about how. Splitting by *what removal would actually do*:
 
 | Kind | Count | What it means |
 |---|---|---|
-| `redundant` | 25 | Team access already meets or beats the direct grant. Delete freely. |
-| `level-only` | 24 | They keep team access at a lower rung — and that rung is the SEC-15 target anyway. |
-| `no-access` | 23 | The direct grant is the **only** path in. Removing it revokes access. |
+| `owner-implicit` | 37 | The holder is an **org owner**. Implicit admin on every repo survives the deletion, whatever the teams say. |
+| `redundant` | 25 → 8 | Team access already meets or beats the direct grant. Delete freely. |
+| `level-only` | 24 → 14 | Repo reach is kept; the **elevated rights** drop to the team's level — which is the SEC-15 target. |
+| `no-access` | 23 → 13 | The direct grant is the **only** path in. Removing it revokes access. |
 | `outside` | 8 | Not an org member at all. |
 
-**49 of 80 can be removed with no new team work.** The other 23 gate the cleanup: each one
+**59 of 80 can be removed with no new team work.** The other 13 gate the cleanup: each one
 needs a team grant added first, which for most of them means fixing CON-12 on that repo.
+
+The arrows are a correction, not a change in the estate. An earlier pass ranked every grant
+by team membership alone, which ignored **org ownership as a third access path** — the one
+the other two cannot revoke. That put 10 owner-held grants in `no-access`, the bucket whose
+whole meaning is "removing this revokes access", and so overstated the gating set by nearly
+half. Owners get their own bucket rather than being folded into `redundant` because implicit
+admin survives roster churn and a redundancy verdict does not.
+
+Note what `level-only` does and does not preserve: the person keeps their reach into the
+repository, and **loses the elevated permission**. That is the intended outcome under the
+SEC-15 policy, not a no-op.
 
 Concentration is high — three people hold 44% of all direct grants:
 
@@ -197,10 +209,12 @@ whether "reachable only by an org owner" is deliberate on any of the 66.
 
 1. **Fix `owners-mit-learn`** on `mit-learn` and `learn-ai`. Two grants; fixes a silent
    failure. No downside.
-2. **Delete the 49 free direct grants** (`redundant` + `level-only`). No access lost.
-3. **Decide the uniform model**, then apply it — which closes CON-12 and unblocks the 23
+2. **Delete the 59 free direct grants** (`redundant` + `level-only` + `owner-implicit`).
+   Nobody loses their reach into a repository. The 14 `level-only` grants do lose their
+   elevated permission, which is the SEC-15 target rather than a side effect.
+3. **Decide the uniform model**, then apply it — which closes CON-12 and unblocks the 13
    `no-access` grants.
-4. **Remove the remaining 23** once their repos have team grants.
+4. **Remove the remaining 13** once their repos have team grants.
 5. **Decide on the 4 outside collaborators** — invite or remove.
 
 Steps 1 and 2 are safe today. Step 3 is the one that needs a decision.
