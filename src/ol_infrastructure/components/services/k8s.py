@@ -40,6 +40,70 @@ def truncate_k8s_metanames(name: str) -> str:
     return name[:MAXIMUM_K8S_NAME_LENGTH].rstrip("-_.")
 
 
+def webapp_deployment_name(application_name: str) -> str:
+    """Name of the webapp Deployment OLApplicationK8s creates."""
+    return truncate_k8s_metanames(f"{application_name}-app")
+
+
+def celery_worker_deployment_name(application_name: str, worker_name: str) -> str:
+    """Name of a celery worker Deployment OLApplicationK8s creates."""
+    return truncate_k8s_metanames(
+        f"{application_name}-{worker_name}-celery-worker".replace("_", "-")
+    )
+
+
+def celery_beat_deployment_name(application_name: str) -> str:
+    """Name of the celery beat Deployment OLApplicationK8s creates."""
+    return truncate_k8s_metanames(f"{application_name}-celery-beat".replace("_", "-"))
+
+
+def application_deployment_names(
+    application_name: str,
+    celery_worker_configs: "list[OLApplicationK8sCeleryWorkerConfig] | None" = None,
+    celery_beat_config: "OLApplicationK8sCeleryBeatConfig | None" = None,
+) -> list[str]:
+    """Deployment names OLApplicationK8s will create, without constructing it.
+
+    Same list as the ``all_deployment_names`` property, but computable *before*
+    the component exists, because the names depend only on the arguments here.
+
+    This exists to break an ordering cycle. Secrets consumed via
+    ``env_from_secret_names`` are mounted with ``envFrom``, so their values
+    become pod environment variables that are fixed at pod start -- updating the
+    Kubernetes Secret does not touch a running pod. The fix is
+    ``restart_targets`` on the ``OLVaultK8SSecret``, which needs the deployment
+    names; but those secrets must be created *before* the component, because the
+    component takes their names as input. Calling this first resolves it::
+
+        targets = [
+            OLVaultRestartTarget(kind="Deployment", name=name)
+            for name in application_deployment_names(
+                application_name=Services.xpro,
+                celery_worker_configs=worker_configs,
+                celery_beat_config=beat_config,
+            )
+        ]
+        secret_names, _ = create_secrets(..., restart_targets=targets)
+        app = OLApplicationK8s(OLApplicationK8sConfig(
+            env_from_secret_names=secret_names, ...
+        ))
+
+    Deliberately does NOT take the full ``OLApplicationK8sConfig``: that config
+    needs ``env_from_secret_names``, which is what the caller is still trying to
+    build. Pass only the three fields the names actually derive from.
+    """
+    names = [webapp_deployment_name(application_name)]
+    for worker_config in celery_worker_configs or []:
+        names.append(  # noqa: PERF401
+            celery_worker_deployment_name(
+                application_name, worker_config.worker_name or ""
+            )
+        )
+    if celery_beat_config is not None:
+        names.append(celery_beat_deployment_name(application_name))
+    return names
+
+
 class OLApplicationK8sCeleryWorkerConfig(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     application_name: str = "main.celery:app"
@@ -1198,8 +1262,8 @@ class OLApplicationK8s(ComponentResource):
                 ).hexdigest()
             )
 
-        _application_deployment_name = truncate_k8s_metanames(
-            f"{ol_app_k8s_config.application_name}-app"
+        _application_deployment_name = webapp_deployment_name(
+            ol_app_k8s_config.application_name
         )
 
         # Expose deployment names as public attributes so callers can reference them
@@ -1839,10 +1903,9 @@ class OLApplicationK8s(ComponentResource):
                     ol_app_k8s_config.slack_channel
                 )
 
-            _celery_deployment_name = truncate_k8s_metanames(
-                f"{ol_app_k8s_config.application_name}-{celery_worker_config.worker_name}-celery-worker".replace(
-                    "_", "-"
-                )
+            _celery_deployment_name = celery_worker_deployment_name(
+                ol_app_k8s_config.application_name,
+                celery_worker_config.worker_name or "",
             )
             self.celery_deployment_names.append(_celery_deployment_name)
             _celery_deployment = kubernetes.apps.v1.Deployment(
@@ -2023,8 +2086,8 @@ class OLApplicationK8s(ComponentResource):
                 beat_labels["ol.mit.edu/slack-channel"] = (
                     ol_app_k8s_config.slack_channel
                 )
-            _beat_deployment_name = truncate_k8s_metanames(
-                f"{ol_app_k8s_config.application_name}-celery-beat".replace("_", "-")
+            _beat_deployment_name = celery_beat_deployment_name(
+                ol_app_k8s_config.application_name
             )
             self.beat_deployment_name = _beat_deployment_name
             _beat_deployment = kubernetes.apps.v1.Deployment(
