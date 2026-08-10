@@ -79,7 +79,22 @@ nextjs_config = Config("nextjs")
 # an ever-larger, unneeded slice off the top as the limit grows.
 # The heap budget the container is provisioned around: V8's old-space ceiling is
 # derived from this, and it is also the memory request (what the scheduler reserves).
-nextjs_memory_request = "1Gi"
+#
+# Raised from 1Gi: at an 800MiB old-space ceiling, production pods rode with working
+# set pinned at ~900MiB for 20+ hours at a stretch, i.e. the heap sat permanently at
+# its cap. V8 answers that by running near-continuous mark-compact, and a major GC on
+# a full ~800MiB heap stops the world for seconds -- long enough that the synthetic
+# probe against the origin hit its 15s ceiling on ~3% of checks (11% in the worst
+# hour) and kubelet's own probes timed out. This buys the heap real room so GC is
+# occasional rather than constant.
+#
+# This is mitigation, not a fix: working set climbs monotonically from ~250MiB to
+# 900MiB+ over a few hours and never plateaus, so something is retaining memory
+# (the fetch/ISR data cache over high-cardinality search/topic query strings is the
+# leading suspect). More headroom buys hours between GC storms instead of minutes; it
+# does not stop the climb, and a larger heap makes each individual major GC longer.
+# Fixing the leak is the actual fix.
+nextjs_memory_request = "1536Mi"
 NEXTJS_NON_HEAP_OVERHEAD_MIB = 224
 nextjs_max_old_space_size_mib = (
     int(parse_quantity(nextjs_memory_request)) // (1024 * 1024)
@@ -92,7 +107,8 @@ nextjs_max_old_space_size_mib = (
 # while the heap was near full. The extra headroom here is deliberately NOT given to
 # V8 -- max_old_space_size stays pinned to the request-derived budget above -- so it
 # stays available to absorb non-heap spikes instead of being absorbed into the heap.
-nextjs_memory_limit = "1536Mi"
+# Kept at request + 512Mi as the request grew, preserving that absorption margin.
+nextjs_memory_limit = "2Gi"
 
 stay_updated_hubspot_form_ids = {
     "ci": "f201f3af-c2c0-4b7d-b297-ddbb75912cc1",
@@ -263,17 +279,48 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
                         ],
                         image_pull_policy="Always",
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                            requests={"cpu": "100m", "memory": nextjs_memory_request},
+                            # 100m was well under what these pods actually use: 100-270m
+                            # steady state and ~900m through startup. Because cpu.shares
+                            # is proportional to the request, that under-ask left this
+                            # pod with ~5% scheduling weight on 2-vCPU nodes already at
+                            # 90%+ CPU-requested and shared with edxapp/mitxonline,
+                            # so it lost every contention fight. Starving a
+                            # single-threaded Node server of CPU stretches its GC pauses
+                            # and blocks the event loop.
+                            #
+                            # Deliberately no CPU limit: SSR latency here is far more
+                            # sensitive to CFS throttling than the cluster is to this
+                            # pod bursting.
+                            requests={"cpu": "500m", "memory": nextjs_memory_request},
                             limits={"memory": nextjs_memory_limit},
                         ),
                         env=env_vars,
+                        # Both probes previously left timeout_seconds unset, silently
+                        # inheriting the 1s default. One second is not a meaningful
+                        # health signal for a single-threaded Node server: any GC pause
+                        # or burst of event-loop work trips it even though the process
+                        # is fine and will answer moments later. In production that
+                        # turned GC pauses into pod kills -- 14 container restarts in
+                        # 24h across 5 replicas, all exit 137 / "Error" (SIGKILL)
+                        # rather than OOMKilled, with memory sitting at only ~400-600MiB
+                        # of a 1536Mi limit at the time. Each kill also flapped the pod
+                        # out of the service endpoints, concentrating traffic onto the
+                        # remaining pods and accelerating their own heap growth.
+                        #
+                        # A tcp_socket liveness check is the worst fit for this failure
+                        # mode -- a blocked event loop cannot accept(), so a
+                        # healthy-but-pausing process fails it. Kept, since a genuinely
+                        # wedged process should still be replaced, but widened to ~3
+                        # minutes of continuous unresponsiveness before a kill -- far
+                        # longer than any GC pause.
                         liveness_probe=kubernetes.core.v1.ProbeArgs(
                             tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
                                 port=DEFAULT_NEXTJS_PORT,
                             ),
                             initial_delay_seconds=30,
                             period_seconds=30,
-                            failure_threshold=3,
+                            failure_threshold=6,
+                            timeout_seconds=10,
                         ),
                         readiness_probe=kubernetes.core.v1.ProbeArgs(
                             http_get=kubernetes.core.v1.HTTPGetActionArgs(
@@ -283,6 +330,7 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
                             initial_delay_seconds=15,
                             period_seconds=15,
                             failure_threshold=3,
+                            timeout_seconds=5,
                         ),
                         startup_probe=kubernetes.core.v1.ProbeArgs(
                             http_get=kubernetes.core.v1.HTTPGetActionArgs(
