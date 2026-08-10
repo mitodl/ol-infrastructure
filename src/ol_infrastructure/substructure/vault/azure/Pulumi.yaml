@@ -1,0 +1,6 @@
+---
+name: ol-substructure-vault-azure
+runtime: python
+description: Mount and configure the Vault Azure secrets engine for Azure OpenAI access
+backend:
+  url: s3://mitol-pulumi-state/

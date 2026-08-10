@@ -1,0 +1,5 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+config:
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci

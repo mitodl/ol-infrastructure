@@ -42,6 +42,7 @@ GCP = "ol-infrastructure-gcp"
 SFTP = "ol-infrastructure-aws-sftp"
 S3_SITES = "ol-infrastructure-aws-s3"
 GEMINI_API = "ol-infrastructure-gemini-api"
+AZURE_OPENAI = "ol-infrastructure-azure-openai"
 
 # ---------------------------------------------------------------------------
 # substructure/
@@ -55,6 +56,7 @@ VAULT_ENCRYPTION_MOUNTS = "ol-substructure-vault-encryption-mounts"
 VAULT_PKI = "ol-substructure-vault-pki"
 VAULT_APPROLES = "ol-substructure-vault-approles"
 VAULT_SECRETS = "ol-substructure-vault-secrets"  # pragma: allowlist secret
+VAULT_AZURE = "ol-substructure-vault-azure"
 CONSUL_SUB = "ol-substructure-consul"
 KEYCLOAK_SUB = "ol-substructure-keycloak"
 OPEN_METADATA_SUB = "ol-substructure-open-metadata"
@@ -149,6 +151,7 @@ LEGACY_STACK_REF_PREFIXES: dict[str, str] = {
     DATA_WAREHOUSE: "infrastructure.aws.data_warehouse",
     MONGODB_ATLAS: "infrastructure.mongodb_atlas",
     QDRANT_CLOUD: "infrastructure.qdrant_cloud",
+    AZURE_OPENAI: "infrastructure.azure.openai",
     GRAFANA_CLOUD: "infrastructure.grafana_cloud",
     SENTRY: "infrastructure.sentry",
     GCP: "infrastructure.gcp",
@@ -163,6 +166,7 @@ LEGACY_STACK_REF_PREFIXES: dict[str, str] = {
     VAULT_PKI: "substructure.vault.pki",
     VAULT_APPROLES: "substructure.vault.approles",
     VAULT_SECRETS: "substructure.vault.secrets",  # pragma: allowlist secret
+    VAULT_AZURE: "substructure.vault.azure",
     CONSUL_SUB: "substructure.consul",
     KEYCLOAK_SUB: "substructure.keycloak",
     OPEN_METADATA_SUB: "substructure.open_metadata",
