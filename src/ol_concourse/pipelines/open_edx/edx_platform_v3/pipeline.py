@@ -219,6 +219,12 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                     # edxapp's Pulumi code provisions Fastly resources; refresh
                     # calls the Fastly API and fails while the token is rotated.
                     refresh_stack=False,
+                    # Show what promoting will apply to the next environment in
+                    # the gate issue. edxapp is the largest blast radius in the
+                    # estate and its environments are the most likely to have
+                    # drifted, which is exactly what the deployed stack's own
+                    # diff cannot show. The preview cannot fail the deploy.
+                    preview_next_stack=True,
                     stack_names=[
                         f"{deployment.deployment_name}.{stage}"
                         for stage in deployment.envs_by_release(release_name)
