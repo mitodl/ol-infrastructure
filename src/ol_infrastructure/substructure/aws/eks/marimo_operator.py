@@ -30,12 +30,18 @@ MARIMO_OPERATOR_MANIFEST_URL = (
 )
 MARIMO_OPERATOR_NAMESPACE = "marimo-operator-system"
 
-# The upstream manifest ships the controller with memory request == limit == 128Mi.
-# That is too tight once the operator is reconciling real notebooks: on data-qa it
-# reached 117.5Mi against the 128Mi cap and entered an OOMKill/CrashLoopBackOff loop
-# that also took the Deployment unavailable. Raising the limit (leaving the upstream
-# request alone) restores burst headroom without over-reserving on the node.
-MARIMO_OPERATOR_MEMORY_LIMIT = "384Mi"
+# The upstream v0.3.0 manifest ships the controller at requests 10m/64Mi and
+# limits 500m/128Mi. That cap is too tight once the operator is reconciling real
+# notebooks: on data-qa it reached 117.5Mi and entered an OOMKill/CrashLoopBackOff
+# loop that also took the Deployment unavailable, which is why this was first
+# raised to 384Mi.
+#
+# 384Mi then failed the same way on data-production. The driver is not notebook
+# count: the controller-runtime cache is cluster-wide, so the operator's memory
+# tracks total pods in the cluster, and data-production retains ~4k completed
+# dagster Job pods. Only the limit is patched -- the upstream request is left
+# alone so this does not reserve capacity the operator never uses at rest.
+MARIMO_OPERATOR_MEMORY_LIMIT = "512Mi"
 
 
 def _patch_controller_memory_limit(doc: dict[str, Any]) -> dict[str, Any]:

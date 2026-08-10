@@ -120,13 +120,23 @@ def setup_starrocks(
                     "enabled": True,
                     "imagePullPolicy": "IfNotPresent",
                     "replicaCount": 1,
+                    # The operator's controller-runtime cache is cluster-wide by
+                    # default, so its memory tracks total pods in the cluster
+                    # rather than anything about StarRocks. data-production
+                    # retains ~4k completed dagster Job pods, which pushed it
+                    # past the old 512Mi ceiling and left the Deployment
+                    # unavailable. Only limits.memory is set here; the chart
+                    # default supplies limits.cpu (500m) via Helm's deep merge,
+                    # and the requests below deliberately undercut the chart's
+                    # 500m/400Mi so the operator does not reserve capacity it
+                    # never uses at rest.
                     "resources": {
                         "requests": {
                             "cpu": "10m",
                             "memory": "256Mi",
                         },
                         "limits": {
-                            "memory": "512Mi",
+                            "memory": "1Gi",
                         },
                     },
                 },
