@@ -18,6 +18,7 @@ claims. Each rule declares its own `scope`, and the reporter uses that as the
 denominator. Getting this wrong has already happened twice on this project.
 """
 
+from collections import Counter
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -36,6 +37,32 @@ ENVIRONMENT_SPRAWL_THRESHOLD = 10
 #: Teams sanctioned to hold `admin` (SEC-15). An ALLOWLIST on purpose: under a
 #: denylist a newly created team acquires admin silently and the rule stays quiet.
 ADMIN_TEAMS = frozenset({"odl-engineering-owners", "devops"})
+#: Teams that exist for something other than repository access, and are therefore
+#: expected to hold no grant. `copilot` assigns Copilot seats; the two `vault-*`
+#: teams gate Vault secrets and are `privacy: secret` (see organization/teams.py).
+#: Without this list, "holds no repo grant" would read as a finding on all three.
+NON_ACCESS_TEAMS = frozenset(
+    {"copilot", "vault-developer-access", "vault-devops-access"}
+)
+#: GitHub reports collaborator roles as `write`/`read` and team grants as
+#: `push`/`pull`. Same rung, different vocabulary -- comparing the raw strings
+#: would score every `write` collaborator as unmatched against a `push` team.
+PERMISSION_RANK: dict[str, int] = {
+    "read": 0,
+    "pull": 0,
+    "triage": 1,
+    "write": 2,
+    "push": 2,
+    "maintain": 3,
+    "admin": 4,
+}
+RANK_NAME: dict[int, str] = {
+    0: "read",
+    1: "triage",
+    2: "push",
+    3: "maintain",
+    4: "admin",
+}
 #: Archetypes exempt from the default-branch rule. Forks follow upstream's naming.
 DEFAULT_BRANCH_EXEMPT = frozenset({"fork", "archived"})
 FEATURE_ENABLED = "enabled"
@@ -180,6 +207,32 @@ RULES: tuple[Rule, ...] = (
                 "downgrade to push or maintain",
             )
             if _unsanctioned_admin(r)
+            else None
+        ),
+    ),
+    Rule(
+        "CON-12",
+        "security",
+        "high",
+        "active",
+        "no team grants -- reachable only by an org owner or a direct grant",
+        # The org's `default_repository_permission` is `none` (verified 2026-08-10),
+        # so org membership confers NOTHING. A repo with an empty `teams` block is
+        # therefore genuinely unreachable except by the nine org owners, who hold
+        # implicit admin, and by whoever holds a direct collaborator grant.
+        #
+        # THIS ONLY BECAME A FINDING WHEN THE DEFAULT WAS CHECKED. Under a `read` or
+        # `write` org default the same data would be cosmetic -- every member would
+        # already have access and an empty `teams` block would mean nothing. Whoever
+        # revisits this rule should re-check the org default first, because it
+        # silently decides whether the rule is measuring anything at all.
+        lambda r: (
+            (
+                "no team grants",
+                "at least one team grant",
+                "add the archetype's team block, or record why this repo is exempt",
+            )
+            if not (r.get("teams") or {})
             else None
         ),
     ),
@@ -356,3 +409,96 @@ def evaluate(fleet: Iterable[dict[str, Any]]) -> list[Finding]:
 def population(fleet: Iterable[dict[str, Any]], scope: Scope) -> int:
     """How many repos a scope covers -- the honest denominator for a percentage."""
     return sum(1 for repo in fleet if _in_scope(repo, scope))
+
+
+#: Why a direct collaborator grant exists, which is what decides how to remove it.
+GrantKind = Literal["redundant", "level-only", "no-access", "outside"]
+
+
+def _team_members(rosters: dict[str, set[str]], parents: dict[str, str | None]) -> Any:
+    """Expand each team to include the members of its descendant teams.
+
+    Nested teams inherit DOWNWARD on GitHub: a member of a child team counts as a
+    member of the parent for access purposes, so a grant to `odl-engineering` also
+    covers everyone in `copilot`, its child. Matching slugs exactly would classify
+    those people as having no team access and manufacture `no-access` findings.
+    """
+    expanded = {slug: set(members) for slug, members in rosters.items()}
+    for slug, members in rosters.items():
+        parent = parents.get(slug)
+        while parent:
+            expanded.setdefault(parent, set()).update(members)
+            parent = parents.get(parent)
+    return expanded
+
+
+def classify_direct_grants(
+    fleet: Iterable[dict[str, Any]],
+    rosters: dict[str, set[str]],
+    members: set[str],
+    parents: dict[str, str | None] | None = None,
+) -> list[dict[str, Any]]:
+    """Explain every direct collaborator grant in terms of how to remove it.
+
+    A flat count of direct grants (SEC-06) says how much there is to clean up but
+    nothing about how, and the four kinds need completely different handling:
+
+      redundant   the person's team access already meets or beats the direct grant.
+                  Delete it; nobody loses anything.
+      level-only  they keep team access, just at a lower rung. Since that lower rung
+                  IS the SEC-15 target, deleting is the intended outcome, not a loss.
+      no-access   the direct grant is their only path in. Deleting it without adding
+                  a team grant first REVOKES ACCESS -- these gate the cleanup.
+      outside     not an org member at all. A different decision entirely: invite
+                  them to the org and a team, or remove them.
+
+    `rosters` is passed in rather than read from disk because team membership is NOT
+    committed: `vault-developer-access` and `vault-devops-access` are `privacy:
+    secret` precisely so membership is not advertised, and ol-infrastructure is a
+    PUBLIC repository. Callers fetch it live -- which is why the `access` command
+    needs credentials while `run` does not.
+    """
+    expanded = _team_members(rosters, parents or {})
+    rows: list[dict[str, Any]] = []
+    for repo in fleet:
+        grants = repo.get("teams") or {}
+        for login, role in (repo.get("_direct_collaborators") or {}).items():
+            via = max(
+                (
+                    PERMISSION_RANK[perm]
+                    for team, perm in grants.items()
+                    if login in expanded.get(team, ())
+                ),
+                default=None,
+            )
+            if login not in members:
+                kind: GrantKind = "outside"
+            elif via is None:
+                kind = "no-access"
+            elif via >= PERMISSION_RANK[role]:
+                kind = "redundant"
+            else:
+                kind = "level-only"
+            rows.append(
+                {
+                    "repo": repo["name"],
+                    "archived": bool(repo.get("archived")),
+                    "login": login,
+                    "role": role,
+                    "via_teams": RANK_NAME[via] if via is not None else None,
+                    "kind": kind,
+                }
+            )
+    return rows
+
+
+def grant_shapes(
+    fleet: Iterable[dict[str, Any]],
+) -> Counter[tuple[tuple[str, str], ...]]:
+    """Count the distinct team-grant shapes in `fleet`.
+
+    One shape per distinct (team, permission) set. The number of shapes IS the
+    uniformity metric: 176 repos drawn from 4 shapes is a model, the same 176 drawn
+    from 27 is an accretion of one-off decisions.
+    """
+    return Counter(tuple(sorted((repo.get("teams") or {}).items())) for repo in fleet)
