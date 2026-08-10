@@ -653,6 +653,38 @@ escalation_level_r_8ee197b2_ffe5_4696_b4a0_760e5c84a343 = rootly.EscalationLevel
 # so they fall through unaffected -- exactly matching the review decision
 # from 2026-07-20 (demote 10 specific alertnames, business-hours page is
 # still acceptable for them, only overnight/weekend paging is not).
+# Shared by both deferral paths below. Extracted rather than duplicated because
+# the requirement is not "two paths that happen to have the same window" but
+# "Low is never held less than Medium" -- if these ever drift apart, the lower
+# tier silently becomes the noisier one, which is the exact bug the Low path
+# below exists to fix. One definition makes that impossible.
+OFF_HOURS_DEFERRAL_WINDOW = {
+    "ruleType": "deferral_window",
+    "timeZone": "America/New_York",
+    "timeBlocks": [
+        {
+            "monday": True,
+            "tuesday": True,
+            "wednesday": True,
+            "thursday": True,
+            "friday": True,
+            "startTime": "00:00",
+            "endTime": "09:00",
+        },
+        {
+            "monday": True,
+            "tuesday": True,
+            "wednesday": True,
+            "thursday": True,
+            "friday": True,
+            "startTime": "17:00",
+            "endTime": "23:59",
+        },
+        {"saturday": True, "allDay": True},
+        {"sunday": True, "allDay": True},
+    ],
+}
+
 escalation_path_defer_medium_urgency_off_hours = rootly.EscalationPath(
     "defer-medium-urgency-off-hours",
     name="Defer Medium urgency outside business hours",
@@ -665,32 +697,45 @@ escalation_path_defer_medium_urgency_off_hours = rootly.EscalationPath(
             "ruleType": "alert_urgency",
             "urgencyIds": ["fce5c971-6660-4ad9-90eb-e75122055f50"],
         },
+        OFF_HOURS_DEFERRAL_WINDOW,
+    ],
+    opts=rootly_opts,
+)
+
+# Low urgency had NO deferral, which made it *less* protected overnight than
+# Medium -- an inversion nobody chose. Alerts demoted to Low (the production
+# Grafana source demotes `severity=warning` this way, see
+# alert_source_urgency_rules_attributes above) match the unmanaged `Low Urgency`
+# escalation path, which is `notification_type: quiet` and has no time
+# restriction at all, so it fires at 3am like any other hour.
+#
+# "Quiet" is weaker than it sounds. It does not mean "does not page" -- it
+# selects which of each USER'S OWN notification rules fire, and those are
+# per-user and owned outside this stack. Measured 2026-08-10 on the two on-call
+# engineers with rules configured: one has quiet = non-critical push then SMS
+# (no call), the other has quiet = email + push + CALL + SMS all at zero delay.
+# For that second engineer, Low was *more* intrusive than High, whose audible
+# rules are push + email only. So the urgency ladder is not monotonic across
+# the rotation, and demoting an alert to Low is NOT a reliable way to stop it
+# waking someone -- which is why this change defers Low rather than trying to
+# make it quieter, and why routing to a policy with no paging level (see the
+# CI/QA Slack Notifications policy) remains the only dependable "do not page".
+#
+# Deliberately mirrors the Medium path exactly: same window, same
+# re_evaluate behaviour. Low must never be held less than Medium.
+escalation_path_defer_low_urgency_off_hours = rootly.EscalationPath(
+    "defer-low-urgency-off-hours",
+    name="Defer Low urgency outside business hours",
+    escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
+    path_type="deferral",
+    match_mode="match-all-rules",
+    after_deferral_behavior="re_evaluate",
+    rules=[
         {
-            "ruleType": "deferral_window",
-            "timeZone": "America/New_York",
-            "timeBlocks": [
-                {
-                    "monday": True,
-                    "tuesday": True,
-                    "wednesday": True,
-                    "thursday": True,
-                    "friday": True,
-                    "startTime": "00:00",
-                    "endTime": "09:00",
-                },
-                {
-                    "monday": True,
-                    "tuesday": True,
-                    "wednesday": True,
-                    "thursday": True,
-                    "friday": True,
-                    "startTime": "17:00",
-                    "endTime": "23:59",
-                },
-                {"saturday": True, "allDay": True},
-                {"sunday": True, "allDay": True},
-            ],
+            "ruleType": "alert_urgency",
+            "urgencyIds": ["d7ed8e91-ffa9-4cc4-b524-729d14a4425b"],
         },
+        OFF_HOURS_DEFERRAL_WINDOW,
     ],
     opts=rootly_opts,
 )
