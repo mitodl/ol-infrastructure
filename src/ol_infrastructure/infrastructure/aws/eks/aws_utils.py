@@ -343,14 +343,35 @@ def setup_aws_integrations(
                 "region": aws.get_region().name,
                 "podLabels": k8s_global_labels,
                 "tolerations": operations_tolerations,
+                # Sized for the cold-start Pod informer sync, not steady state.
+                # The controller builds a cluster-wide Pod cache (the "podInfo
+                # repo") for readiness gates and IP targets, so startup has to
+                # decode a LIST of every pod in the cluster before the cache is
+                # trimmed. Trimming keeps steady state cheap -- 66Mi at 4.2k pods
+                # in data-production vs ~30Mi at ~120 elsewhere -- but the
+                # transient during that first LIST is what blew the old 128Mi
+                # ceiling, killing the container one second in at "starting
+                # podInfo repo". Only cold starts failed, so the pod that synced
+                # before a dagster burst survived while every replacement
+                # CrashLooped, leaving the deployment one replica deep for days.
+                # That matters because mservice/mtargetgroupbinding are
+                # failurePolicy: Fail with no namespace selector: losing the last
+                # replica blocks Service and TargetGroupBinding admission
+                # cluster-wide, and a replacement cannot cold start to fix it.
                 "resources": {
                     "requests": {
                         "cpu": "25m",
-                        "memory": "128Mi",
+                        "memory": "256Mi",
                     },
                     "limits": {
-                        "memory": "128Mi",
+                        "memory": "1Gi",
                     },
+                },
+                # Soft limit ~90% of limits.memory so the Go runtime collects
+                # hard through the initial LIST instead of the cgroup OOMKiller
+                # winning. This chart takes env as a map, not a list.
+                "env": {
+                    "GOMEMLIMIT": "900MiB",
                 },
             },
             skip_await=False,
