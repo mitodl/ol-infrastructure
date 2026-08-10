@@ -1214,6 +1214,7 @@ env_vars = {
     "QDRANT_ENABLE_INDEXING_PLUGIN_HOOKS": True,
     "QDRANT_ENCODER": "vector_search.encoders.litellm.LiteLLMEncoder",
     "QDRANT_SPARSE_ENCODER_V2": "vector_search.encoders.qdrant_cloud.QdrantCloudEncoder",
+    "OCR_PDF_MAX_PAGE_THRESHOLD": 20,
     "QDRANT_SPARSE_MODEL_V2": "qdrant/bm25",
     "QDRANT_HOST_V2": qdrant_cloud_stack.require_output("cluster_url"),
     "QDRANT_SPARSE_ENCODER": "vector_search.encoders.qdrant_cloud.QdrantCloudEncoder",
