@@ -5,6 +5,7 @@ config:
   aws:region: us-east-1
   ocw_studio:vars:
     CONCOURSE_URL: https://cicd.odl.mit.edu
+    COURSE_V3_CANONICAL_DOMAIN: learn.mit.edu
     CONTENT_FILE_SEARCH_API_URL: 'https://mitopen.odl.mit.edu/api/v1/content_file_search/'
     COURSE_SEARCH_API_URL: 'https://mitopen.odl.mit.edu/api/v1/learning_resources_search/'
     DRIVE_SHARED_ID: 0AIZerpz9jimTUk9PVA
