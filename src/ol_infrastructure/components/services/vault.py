@@ -18,7 +18,7 @@ import httpx
 import pulumi_kubernetes as kubernetes
 from pulumi import ComponentResource, Output, ResourceOptions
 from pulumi_aws.acmpca import Certificate, CertificateValidityArgs
-from pulumi_vault import Mount, aws, database, generic, pkisecret
+from pulumi_vault import Mount, aws, azure, database, generic, pkisecret
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from bridge.lib.magic_numbers import (
@@ -285,6 +285,92 @@ class OLVaultAWSSecretsEngine(ComponentResource):
                 iam_tags=engine_config.iam_tags,
                 name=role_name,
                 policy_document=json.dumps(policy),
+                opts=resource_options,
+            )
+
+        self.register_outputs({})
+
+
+class OLVaultAzureRoleConfig(BaseModel):
+    """A single Azure role that Vault assigns to the service principals it mints."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    role_name: str
+    scope: str | Output[str]
+    # Vault's Azure engine takes Go duration strings here, unlike the AWS engine's
+    # integer seconds. Azure AD service principal creation is eventually consistent,
+    # so leases are measured in hours rather than minutes to keep rotation infrequent.
+    ttl: str = "24h"
+    max_ttl: str = "48h"
+
+
+class OLVaultAzureSecretsEngineConfig(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    app_name: str
+    subscription_id: str | Output[str]
+    tenant_id: str | Output[str]
+    client_id: str | Output[str]
+    client_secret: str | Output[str]
+    vault_backend_path: str = "azure-openai"
+    description: str
+    default_lease_ttl_seconds: int = ONE_MONTH_SECONDS
+    max_lease_ttl_seconds: int = ONE_MONTH_SECONDS * 3
+    roles: dict[str, OLVaultAzureRoleConfig]
+
+    @field_validator("vault_backend_path")
+    @classmethod
+    def is_valid_path(cls, vault_backend_path: str) -> str:
+        if vault_backend_path.startswith("/") or vault_backend_path.endswith("/"):
+            msg = f"The specified path value {vault_backend_path} can not start or end with a slash"  # noqa: E501
+            raise ValueError(msg)
+        return vault_backend_path
+
+
+class OLVaultAzureSecretsEngine(ComponentResource):
+    def __init__(
+        self,
+        engine_config: OLVaultAzureSecretsEngineConfig,
+        opts: ResourceOptions | None = None,
+    ):
+        super().__init__(
+            "ol:services:Vault:AzureSecretsEngine", engine_config.app_name, None, opts
+        )
+
+        resource_options = ResourceOptions(parent=self).merge(opts)
+
+        self.azure_secrets_engine = azure.Backend(
+            f"azure-{engine_config.app_name}",
+            subscription_id=engine_config.subscription_id,
+            tenant_id=engine_config.tenant_id,
+            client_id=engine_config.client_id,
+            client_secret=engine_config.client_secret,
+            environment="AzurePublicCloud",
+            path=engine_config.vault_backend_path,
+            description=engine_config.description,
+            default_lease_ttl_seconds=engine_config.default_lease_ttl_seconds,
+            max_lease_ttl_seconds=engine_config.max_lease_ttl_seconds,
+            opts=resource_options,
+        )
+
+        self.azure_secrets_engine_roles = {}
+        for role_name, role_config in engine_config.roles.items():
+            self.azure_secrets_engine_roles[role_name] = azure.BackendRole(
+                f"azure-{engine_config.app_name}-role-{role_name}",
+                # azure.BackendRole names the role with `role=`, not the `name=` used
+                # by aws.SecretBackendRole. Getting this wrong silently creates a role
+                # under an auto-generated name.
+                role=role_name,
+                backend=self.azure_secrets_engine.path,
+                azure_roles=[
+                    azure.BackendRoleAzureRoleArgs(
+                        role_name=role_config.role_name,
+                        scope=role_config.scope,
+                    )
+                ],
+                ttl=role_config.ttl,
+                max_ttl=role_config.max_ttl,
                 opts=resource_options,
             )
 
