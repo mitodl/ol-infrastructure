@@ -1370,6 +1370,25 @@ interpolated_vars = {
 env_vars.update(**interpolated_vars)
 env_vars.update(**mitlearn_config.get_object("vars"))
 
+# Non-secret half of the Azure OpenAI wiring; the client id and secret arrive as a
+# dynamic Vault secret (see k8s_secrets.py). Set mitlearn:azure_openai_tenant_id to
+# turn both halves on for an environment -- the tenant is the one value that cannot be
+# derived, since the endpoint follows from the account's custom subdomain, which the
+# infrastructure/azure/openai project sets to the account name.
+azure_openai_tenant_id = mitlearn_config.get("azure_openai_tenant_id")
+if azure_openai_tenant_id:
+    env_vars.update(
+        {
+            "AZURE_OPENAI_ENDPOINT": (
+                f"https://ol-openai-mitlearn-{stack_info.env_suffix}.openai.azure.com/"
+            ),
+            "AZURE_OPENAI_TENANT_ID": azure_openai_tenant_id,
+            "AZURE_OPENAI_API_VERSION": (
+                mitlearn_config.get("azure_openai_api_version") or "2024-10-21"
+            ),
+        }
+    )
+
 # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
 # carries organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(env_vars, k8s_app_labels)
