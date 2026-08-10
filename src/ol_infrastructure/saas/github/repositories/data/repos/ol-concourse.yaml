@@ -22,5 +22,8 @@ merge_commit_title: MERGE_MESSAGE
 name: ol-concourse
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
-teams: {}
+teams:
+  devops: admin
+  odl-engineering: push
+  odl-engineering-owners: admin
 web_commit_signoff_required: false

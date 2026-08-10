@@ -28,6 +28,7 @@ teams:
   devops: admin
   devops-contractors: push
   odl-engineering: maintain
+  odl-engineering-owners: admin
 topics:
 - aws
 - devops

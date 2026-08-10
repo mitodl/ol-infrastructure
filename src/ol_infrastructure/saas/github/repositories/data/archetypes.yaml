@@ -53,6 +53,11 @@ archetypes:
     # ARCHIVED repos that still grant admin, which no resource in this project can reach
     # -- archived repos emit no TeamRepository (repository.py) because GitHub rejects the
     # write. They need a separate mechanism, tracked as its own task.
+    #
+    # POLICY 2026-08-10: both of these belong on every PUBLIC repo, not just on the ones
+    # someone got around to. 149 repo files were filled in to match. The rule is scoped to
+    # public deliberately -- the 10 active private repos keep their narrower grants, since
+    # `access-forge` and `gwarek` being devops-only is the point rather than an oversight.
     teams:
       odl-engineering: push
       odl-engineering-owners: admin
@@ -81,13 +86,15 @@ archetypes:
     # archetype disagreed with both the policy and reality, so the rule was reporting a
     # divergence nobody intended to close.
     #
-    # `odl-engineering` is deliberately ABSENT, unlike in `base`. `teams` REPLACES the
-    # archetype's grants wholesale rather than merging into them, so listing it here
-    # would grant the broad engineering team push on every future infrastructure repo --
-    # a widening, not a preservation. All three current infrastructure repos declare
-    # their own `teams`, so this block only governs the next one.
+    # `odl-engineering` IS listed here, unlike in an earlier draft of this file which
+    # left it out to avoid widening access. Policy 2026-08-10 makes the widening the
+    # point: odl-engineering and odl-engineering-owners belong on every public repo.
+    # It has to be restated rather than inherited -- `teams` REPLACES the parent's
+    # grants wholesale rather than merging into them, so omitting it here would revoke
+    # it on any repo that takes this block.
     teams:
       devops: admin
+      odl-engineering: push
       odl-engineering-owners: admin
 
   # Upstream forks: edx-platform, XBlock, tutor, frontend-app-*, ...

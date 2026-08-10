@@ -26,4 +26,5 @@ squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   arbisoft-contractors: maintain
   odl-engineering: maintain
+  odl-engineering-owners: admin
 web_commit_signoff_required: false
