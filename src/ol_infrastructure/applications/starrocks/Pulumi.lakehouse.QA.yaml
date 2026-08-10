@@ -10,7 +10,11 @@ config:
   starrocks:oidc_enabled: "true"
   starrocks:fe_config:
     replicas: 3
-    cpu_request: 8000m
+    # See the prod stack: FE's observed peak CPU is a small fraction of the
+    # docs' 8-core sizing recommendation, and requesting the full 8 cores
+    # starves FE of scheduling room on the shared core nodegroup.
+    cpu_request: 1000m
+    cpu_limit: 8000m
     memory_request: 24Gi
     memory_limit: 24Gi
     # 75% of 24Gi container limit = 18Gi heap, leaving ~6Gi for JVM non-heap.
