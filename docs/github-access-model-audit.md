@@ -179,9 +179,10 @@ public, so "person X holds admin on repo Y" is already published. That predates 
 and the audit depends on it, but it deserves a decision of its own rather than inheritance
 by default.
 
-## A candidate uniform model
+## The uniform model
 
-Not applied — this is the proposal the numbers point at.
+Proposed here, decided 2026-08-10, applied in #5357 and #5360 — which are stacked on this
+PR's base, so the numbers above describe the estate *before* them.
 
 **Default, from the archetype, for every non-fork active repo:**
 
@@ -199,11 +200,33 @@ teams:
 - A product owners team (`owners-mit-learn`, `owners-mit-open`) at `push` on the repos
   whose CODEOWNERS name it. This is what fixes the silent-drop bug.
 
-That collapses 27 shapes to roughly 5 and closes CON-12, at the cost of granting
-`odl-engineering: push` on 80 repos that grant nothing today. **That is an access
-widening**, which is a different risk class from SEC-15's narrowing and is why nothing here
-is applied yet. The open questions are in the tracked tasks: what forks should get, and
-whether "reachable only by an org owner" is deliberate on any of the 66.
+Applying it granted `odl-engineering: push` on 80 repos that granted nothing. **That is an
+access widening**, a different risk class from SEC-15's narrowing, which is why it landed as
+its own reviewed change rather than folded into one.
+
+Outcome: distinct grant shapes across the 176 active repos went **27 → 20 → 14**, and repos
+with no team grants went **80 → 5**.
+
+### The three decisions, so they are not re-opened
+
+**Forks are in scope.** The rule is "every public repo", and forks are public — 67 of the 87
+new `odl-engineering` grants landed on them. CON-12 has no fork exemption, unlike CON-03.
+
+**The five remaining private repos stay as they are.** `alerting-omnibus`,
+`apisix-testbed`, `oldevops-scratch`, `open-collaboration` and `product` remain reachable
+only by the nine org owners. That is deliberate, not a gap the rule failed to close: the
+policy is scoped to public precisely because private is where a blanket grant is least
+appropriate — `access-forge` and `gwarek` are devops-only by design. **CON-12 therefore
+rests at 5, not 0, and 5 is the correct value.** Do not "fix" it by granting the two teams
+on private repos.
+
+**`default_repository_permission` stays `none`.** Setting it to `read` would change nothing
+for the 166 of 176 active repos that are public, while silently widening the deliberately
+narrow private ones — and `members_can_fork_private_repositories` is true, so it would mean
+read *and* fork on every private repo. It would also be invisible to per-repo audit tooling,
+since it lives at the org level, which is the one kind of divergence none of these rules can
+catch. The reasoning is recorded here rather than in `org_settings.py`, whose existing
+"Correct as-is" comment stands.
 
 ## Sequencing
 
@@ -212,9 +235,11 @@ whether "reachable only by an org owner" is deliberate on any of the 66.
 2. **Delete the 59 free direct grants** (`redundant` + `level-only` + `owner-implicit`).
    Nobody loses their reach into a repository. The 14 `level-only` grants do lose their
    elevated permission, which is the SEC-15 target rather than a side effect.
-3. **Decide the uniform model**, then apply it — which closes CON-12 and unblocks the 13
-   `no-access` grants.
-4. **Remove the remaining 13** once their repos have team grants.
-5. **Decide on the 4 outside collaborators** — invite or remove.
+3. ~~**Decide the uniform model**, then apply it.~~ Done — #5357 and #5360.
+4. **Remove the remaining `no-access` grants** now their repos have team grants. Re-run
+   `github-estate-audit access` first rather than reusing the 13 above: a grant classified
+   `no-access` becomes `level-only` the moment its repo gains a team grant, so the earlier
+   split is stale by construction once #5357 lands.
+5. **Decide on the 4 outside collaborators** — invite or remove. Still open.
 
-Steps 1 and 2 are safe today. Step 3 is the one that needs a decision.
+Steps 1, 2 and 4 are mechanical. Step 5 is the only one left needing a decision.
