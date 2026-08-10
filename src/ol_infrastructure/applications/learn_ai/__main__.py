@@ -710,7 +710,61 @@ opik_keycloak_secret = OLVaultK8SSecret(
     ),
 )
 
+# Dynamic Azure AD credentials for Azure OpenAI. Vault mints a service principal
+# scoped to learn-ai's own Cognitive Services account; the restart target matches the
+# db-creds secret above so a rotation actually reaches the running pods. Additive --
+# the existing OPENAI_API_KEY wiring and AI_DEFAULT_*_MODEL values are untouched.
+#
+# Gated on learn_ai:azure_openai_tenant_id so this is a no-op until the
+# substructure/vault/azure mount exists in the environment: reading a role from a
+# mount Vault does not have fails the VaultDynamicSecret.
+azure_openai_tenant_id = learn_ai_config.get("azure_openai_tenant_id")
+azure_openai_secret_name = (
+    "learn-ai-azure-openai-creds"  # pragma: allowlist secret  # noqa: S105
+)
+if azure_openai_tenant_id:
+    azure_openai_secret = OLVaultK8SSecret(
+        f"learn-ai-{stack_info.env_suffix}-azure-openai-secret",
+        OLVaultK8SDynamicSecretConfig(
+            name="learn-ai-azure-openai-creds",
+            namespace=learn_ai_namespace,
+            labels=k8s_global_labels,
+            dest_secret_name=azure_openai_secret_name,
+            dest_secret_labels=k8s_global_labels,
+            mount="azure-openai",
+            path="creds/ol-learn-ai-openai",
+            restart_target_kind="Deployment",
+            restart_target_name="learn-ai-app",
+            templates={
+                "AZURE_OPENAI_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+                "AZURE_OPENAI_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            parent=vault_k8s_resources,
+        ),
+    )
+
 env_vars = dict(learn_ai_config.require_object("env_vars") or {})
+
+# Non-secret half of the Azure OpenAI wiring. The endpoint is derived rather than read
+# from the azure stack: infrastructure/azure/openai sets each account's custom
+# subdomain to its own name, so the URL follows from the environment. The tenant is
+# the one value that cannot be derived, which is why it doubles as the enable switch.
+if azure_openai_tenant_id:
+    env_vars.update(
+        {
+            "AZURE_OPENAI_ENDPOINT": (
+                f"https://ol-openai-learn-ai-{stack_info.env_suffix}.openai.azure.com/"
+            ),
+            "AZURE_OPENAI_TENANT_ID": azure_openai_tenant_id,
+            "AZURE_OPENAI_API_VERSION": (
+                learn_ai_config.get("azure_openai_api_version") or "2024-10-21"
+            ),
+        }
+    )
 
 # Opik instrumentation (non-secret settings). OPIK_URL_OVERRIDE is derived from
 # the opik application stack's exported URL so it tracks the deployed instance
@@ -777,6 +831,7 @@ learn_ai_app_k8s = OLApplicationK8s(
             redis_creds_secret_name,
             static_secrets_name,
             opik_keycloak_secret_name,
+            *([azure_openai_secret_name] if azure_openai_tenant_id else []),
         ],
         application_security_group_id=learn_ai_application_security_group.id,
         # Use the fixed name used in the SecurityGroupPolicy spec
