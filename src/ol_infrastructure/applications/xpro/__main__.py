@@ -47,12 +47,14 @@ from ol_infrastructure.components.services.k8s import (
     OLApplicationK8sCeleryBeatConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
+    application_deployment_names,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
     OLVaultPostgresDatabaseConfig,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -509,6 +511,40 @@ if k8s_deploy:
         f":{DEFAULT_POSTGRES_PORT}"
     )
 
+    # Celery topology is declared up here, rather than inline in the
+    # OLApplicationK8s config below, because the static secrets need the
+    # resulting Deployment names before the component exists -- see below.
+    xpro_celery_worker_configs = [
+        OLApplicationK8sCeleryWorkerConfig(
+            application_name="mitxpro.celery:app",
+            worker_name="default",
+            redis_host=redis_cache.address,
+            redis_password=redis_config.require("password"),
+            resource_requests={"cpu": "100m", "memory": "1200Mi"},
+            resource_limits={"memory": "1200Mi"},
+        ),
+    ]
+    xpro_celery_beat_config = OLApplicationK8sCeleryBeatConfig(
+        application_name="mitxpro.celery:app",
+        resource_requests={"cpu": "10m", "memory": "384Mi"},
+        resource_limits={"memory": "384Mi"},
+    )
+
+    # Static secrets reach the app through env_from_secret_names, i.e. envFrom,
+    # so their values become pod environment variables that are fixed at pod
+    # start. Re-rendering the Kubernetes Secret does not touch a running pod --
+    # without these restart targets a credential change lands in the Secret and
+    # the pods keep serving the old value until something unrelated rolls them.
+    # That is exactly how the 2026-07-28 xPro Sheets outage went unnoticed.
+    xpro_secret_restart_targets = [
+        OLVaultRestartTarget(kind="Deployment", name=deployment_name)
+        for deployment_name in application_deployment_names(
+            application_name=Services.xpro,
+            celery_worker_configs=xpro_celery_worker_configs,
+            celery_beat_config=xpro_celery_beat_config,
+        )
+    ]
+
     # Create Kubernetes secrets
     secret_names, secret_resources = create_xpro_k8s_secrets(
         stack_info=stack_info,
@@ -519,6 +555,7 @@ if k8s_deploy:
         rds_endpoint=rds_endpoint,
         redis_password=redis_config.require("password"),
         redis_cache=redis_cache,
+        restart_targets=xpro_secret_restart_targets,
     )
 
     # Merge stack-level config vars into the app env vars
@@ -559,21 +596,8 @@ if k8s_deploy:
             pre_deploy_commands=[
                 ("migrate", ["python", "manage.py", "migrate", "--noinput"])
             ],
-            celery_worker_configs=[
-                OLApplicationK8sCeleryWorkerConfig(
-                    application_name="mitxpro.celery:app",
-                    worker_name="default",
-                    redis_host=redis_cache.address,
-                    redis_password=redis_config.require("password"),
-                    resource_requests={"cpu": "100m", "memory": "1200Mi"},
-                    resource_limits={"memory": "1200Mi"},
-                ),
-            ],
-            celery_beat_config=OLApplicationK8sCeleryBeatConfig(
-                application_name="mitxpro.celery:app",
-                resource_requests={"cpu": "10m", "memory": "384Mi"},
-                resource_limits={"memory": "384Mi"},
-            ),
+            celery_worker_configs=xpro_celery_worker_configs,
+            celery_beat_config=xpro_celery_beat_config,
             resource_requests={"cpu": "250m", "memory": "2Gi"},
             resource_limits={"memory": "2Gi"},
         ),

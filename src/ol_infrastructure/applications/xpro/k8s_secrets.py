@@ -19,6 +19,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
@@ -33,6 +34,7 @@ def _create_static_secret(
     templates: dict[str, str],
     vaultauth: str,
     mount_type: str = "kv-v1",
+    restart_targets: list[OLVaultRestartTarget] | None = None,
     opts: ResourceOptions | None = None,
 ) -> tuple[str, OLVaultK8SSecret]:
     """
@@ -48,6 +50,10 @@ def _create_static_secret(
         templates: Dictionary defining how Vault data maps to Kubernetes secret keys.
         vaultauth: Name of the Vault Kubernetes auth backend role.
         mount_type: Type of the Vault mount (e.g., "kv-v1", "kv-v2"). Defaults to "kv-v1".
+        restart_targets: Deployments to rolling-restart when this secret's contents
+            change. Required for anything consumed via ``env_from_secret_names``:
+            those values become pod environment variables fixed at pod start, so
+            re-rendering the Kubernetes Secret leaves running pods on the old value.
         opts: Optional Pulumi resource options.
 
     Returns:
@@ -69,6 +75,7 @@ def _create_static_secret(
             exclude_raw=True,
             templates=templates,
             vaultauth=vaultauth,
+            restart_targets=restart_targets,
         ),
         opts=opts,
     )
@@ -133,6 +140,7 @@ def create_xpro_k8s_secrets(
     rds_endpoint: str,
     redis_password: str,
     redis_cache: OLAmazonCache,
+    restart_targets: list[OLVaultRestartTarget] | None = None,
 ) -> tuple[list[str], list[OLVaultK8SSecret | kubernetes.core.v1.Secret]]:
     """
     Create all Kubernetes secrets required by the xPro application.
@@ -149,6 +157,12 @@ def create_xpro_k8s_secrets(
         rds_endpoint: The endpoint address of the RDS instance.
         redis_password: The password for the Redis cluster.
         redis_cache: The Redis cache resource for connection details.
+        restart_targets: Deployments to rolling-restart when a static secret's
+            contents change. These secrets are consumed via
+            ``env_from_secret_names``, so their values become pod environment
+            variables fixed at pod start; without this, a credential change
+            lands in the Kubernetes Secret and running pods keep the old value.
+            Build with ``application_deployment_names()``.
 
     Returns:
         A tuple containing a list of the names of the created Kubernetes secrets
@@ -367,6 +381,7 @@ def create_xpro_k8s_secrets(
             path=config["path"],
             templates=config["templates"],
             vaultauth=vaultauth,
+            restart_targets=restart_targets,
         )
         secret_names.append(secret_name)
         secret_resources.append(secret_resource)
@@ -392,6 +407,7 @@ def create_xpro_k8s_secrets(
             path=config["path"],
             templates=config["templates"],
             vaultauth=vaultauth,
+            restart_targets=restart_targets,
         )
         secret_names.append(secret_name)
         secret_resources.append(secret_resource)
