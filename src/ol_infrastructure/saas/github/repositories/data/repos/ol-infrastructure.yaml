@@ -27,7 +27,7 @@ teams:
   arbisoft-contractors: push
   devops: admin
   devops-contractors: push
-  odl-engineering: maintain
+  odl-engineering: push
   odl-engineering-owners: admin
 topics:
 - aws

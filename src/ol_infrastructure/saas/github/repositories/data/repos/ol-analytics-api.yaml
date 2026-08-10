@@ -24,6 +24,6 @@ name: ol-analytics-api
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
-  odl-engineering: maintain
+  odl-engineering: push
   odl-engineering-owners: admin
 web_commit_signoff_required: false
