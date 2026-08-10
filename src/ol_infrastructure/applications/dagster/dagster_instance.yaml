@@ -106,7 +106,7 @@ run_coordinator:
   module: dagster.core.run_coordinator
   class: QueuedRunCoordinator
   config:
-    max_concurrent_runs: 60
+    max_concurrent_runs: 200
 
 
 # Configures how long Dagster waits for code locations
