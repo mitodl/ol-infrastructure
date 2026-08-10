@@ -13,10 +13,12 @@ precedent this plan generalizes.
 
 ## What the sidecar actually does, per app
 
+(Struck-through rows no longer have a sidecar.)
+
 | | static from | `/media` | `hash.txt` | X-Forwarded-Proto | body cap | other |
 |---|---|---|---|---|---|---|
-| odl_video_service | *nothing* | — | — | passthrough | 500M | 5 YouTube redirects |
-| ocw_studio | `/src/staticfiles` | — | yes | passthrough | 25M | |
+| ~~odl_video_service~~ | *nothing* | — | — | passthrough | 500M | 5 YouTube redirects |
+| ~~ocw_studio~~ | `/src/staticfiles` | — | yes | passthrough | 25M | |
 | xpro | `/src/staticfiles` | — | yes | passthrough | 25M | |
 | micromasters | `$uri`, `/src/staticfiles` | — | yes | passthrough | 25M | |
 | learn_ai | `$uri`, `/src/staticfiles` | — | — | *unset* | — | `proxy_buffering off` |
@@ -74,28 +76,59 @@ sidecar removes the cap. Any app that relies on it needs an explicit
 ## Component gaps in `GranianConfig`
 
 `static_path_mounts` alone does not cover what the six static-serving apps need.
-Granian's CLI (verified against `granian/cli.py`) exposes `--static-path-mount`
-(repeatable), `--static-path-route` (repeatable, default `/static`) and
-`--static-path-expires` (default `86400`). `GranianConfig` only wires up the
-first. Concretely:
+Granian's CLI (verified against `granian/cli.py` at v2.7.4, the version in the
+ocw-studio image) exposes `--static-path-mount` (repeatable),
+`--static-path-route` (repeatable, default `/static`) and
+`--static-path-expires` (default `86400`). Concretely:
 
 1. **No `static_path_routes`.** mit_learn serves `/media/*` from
-   `/src/django_media`; that needs a second route/mount pair.
-2. **No `static_path_expires`.** Granian's 1-day default is a large regression
-   from nginx's `expires max` (10 years) on content-hashed assets.
+   `/src/django_media`; that needs a second route/mount pair. *Still open —
+   nothing before mit_learn needs it.*
+2. ~~**No `static_path_expires`.**~~ **Closed.** `GranianConfig.static_path_expires`
+   emits the flag; `STATIC_ASSET_MAX_AGE_SECONDS` (315360000) in
+   `bridge/lib/magic_numbers.py` is what nginx's `expires max` resolves to.
+   Granian's static handler emits `Cache-Control: max-age=<n>` and nothing else
+   (`src/files.rs`), so this reproduces the sidecar's directive but not its
+   legacy `Expires` header.
 3. **No per-file override.** `/static/hash.txt` (`expires -1`,
    `Cache-Control: private`) is not expressible in Granian. It needs an APISix
    route with `response-rewrite`, on ocw_studio, xpro, micromasters and
-   mitxonline.
-4. **No CORS header on Granian-served static.** Covered by the shared plugin
-   config where one is attached; must be verified per app rather than assumed.
+   mitxonline. *By design — this stays at the gateway.*
+4. **No CORS header on Granian-served static.** Confirmed: Granian sets no CORS
+   header at all. Apps with a shared plugin config get one from APISix; the rest
+   need an explicit `/static/*` route. Verify per app rather than assume.
 5. **Two-directory fallback unverified.** Five configs do
    `try_files $uri $uri/ /staticfiles/$1`, i.e. `/src/<uri>` *then*
    `/src/staticfiles/<uri>`. Whether two Granian mounts on the same route fall
    through to the second on a miss is not documented and needs a live test.
+   *Still open — gates micromasters, learn_ai, mitxonline, mit_learn.*
 
-`/.well-known/dnt-policy.txt → 204` needs one APISix route per app (or a decision
-to drop it).
+`/.well-known/dnt-policy.txt → 204` needs one APISix route per app. Kept rather
+than dropped: it costs one `mocking` plugin and keeps a crawled path off the
+Granian blocking-thread pool, where Django would answer it with a 404.
+
+### The named-port trap in `OLApisixHTTPRoute`
+
+Gateway API `backendRef.port` must be numeric, so
+`OLApisixHTTPRoute._resolve_backend_port` maps the port *name* `"http"` to a
+hardcoded `8071` — `DEFAULT_NGINX_PORT`. Apps on the Gateway API path
+(ocw_studio, xpro, learn_ai, and any other caller passing
+`application_lb_service_port_name`) therefore keep routing to the sidecar's port
+after the sidecar is gone, and 502 on every request, with nothing in the Pulumi
+diff to hint at it. `OLApplicationK8s` now publishes the resolved number as
+`application_lb_service_port`; every route on a sidecar-free app must use it.
+This does not affect the `ApisixRoute` CRD path (odl_video_service), which takes
+the number directly.
+
+### Probe ports follow the application port
+
+`OLApplicationK8sConfig.probe_configs` defaulted to a literal dict pinned to
+`DEFAULT_NGINX_PORT`, so every app dropping its sidecar had to restate all three
+probes just to change a port. It now defaults to `None` and the component builds
+them from the resolved application port via `default_probe_configs()`. Verified
+no-op: a `pulumi preview` of learn_ai (sidecar still on, default probes) shows no
+Deployment diff. The six apps that pass `probe_configs` explicitly are unchanged
+and still own the port they name.
 
 ## Proof of concept: odl_video_service
 
@@ -127,20 +160,55 @@ routes render with the intended priorities.
 
 ### Rollout note
 
-The Service port and the ApisixRoute `servicePort` change in the same update with
-no ordering guarantee between them, so there is a short window where the route
-points at a port the Service does not yet expose. Watch for 502s during the
-apply rather than trying to engineer around it.
+The Service port and the route's backend port (`servicePort` on ApisixRoute,
+`backendRefs[].port` on HTTPRoute) change in the same update with no ordering
+guarantee between them, so there is a short window where the route points at a
+port the Service does not yet expose. Watch for 502s during the apply rather
+than trying to engineer around it. This applies to every remaining app.
+
+## Stage 2: ocw_studio
+
+Done — see the accompanying commit. The first app to actually exercise Granian's
+`/static` serving (OVS had `dj_static.Cling` doing that already), and the first
+on the Gateway API route path.
+
+- `STATIC_ROOT` is the *relative* `"staticfiles"`, resolved against the image's
+  `WORKDIR /src`, so it lands on the same `/src/staticfiles` emptyDir the
+  collectstatic init container populates. `STATIC_URL` is `/static/`, which is
+  Granian's default route, so no route override is needed.
+- `hash.txt` is load-bearing here, not vestigial: the Dockerfile writes
+  `$GIT_REF` into `/src/static/hash.txt` and `useAppVersionCheck` polls
+  `/static/hash.txt` on every route change to force a reload after a deploy. Its
+  APISix route sets `Cache-Control: private, no-cache`, which is what nginx's
+  `expires -1` plus `add_header Cache-Control private` produced. The fetch
+  already passes `cache: "no-store"`, so this only matters for intermediaries —
+  and ocw_studio sits directly behind APISix with no CDN, so there are none
+  today.
+- The `/static/*` CORS route is *not* redundant here: ocw_studio has no shared
+  plugin config, so without it the header the sidecar added simply disappears.
+- Probes and the Service port move 8071 → 8073 via the component; the four
+  HTTPRoute rules name `application_lb_service_port` explicitly (see the
+  named-port trap above).
+
+`pulumi preview --stack CI`: 3 creates (one `PluginConfig` per new route), 8
+updates, 1 delete (the `nginx-config` ConfigMap), 104 unchanged. The webapp
+container drops the nginx sidecar and picks up `--static-path-mount
+/src/staticfiles --static-path-expires 315360000`.
 
 ## Rollout order
 
-1. **odl_video_service** — no static block, no shared plugin config, lowest
-   traffic. Validates the port move, the redirect translation, and Granian static
-   serving in one go.
-2. **ocw_studio, xpro** — single static directory (`try_files /staticfiles/$1`),
-   so no fallback question. Need `hash.txt` and dnt-policy routes.
-3. **micromasters, learn_ai** — two-directory static fallback; gated on gap 5.
-4. **mit_learn, mitxonline** — highest traffic, and mit_learn additionally needs
+1. ~~**odl_video_service**~~ — done, PR #5281.
+2. ~~**ocw_studio**~~ — done, this commit.
+3. **xpro** — the other single-static-directory app, the same shape as
+   ocw_studio. Deliberately *not* bundled with it: PR #5344 is concurrently
+   changing xpro's Granian concurrency, and overlapping two live changes on one
+   app makes any regression ambiguous. Do it once #5344 has landed and settled.
+   Note xpro's `hash.txt` block has no `try_files`, so it resolves against
+   `root /src` to `/src/static/hash.txt` — the source dir, not the collectstatic
+   output. Granian will serve `/src/staticfiles/hash.txt` instead: same content,
+   different file.
+4. **micromasters, learn_ai** — two-directory static fallback; gated on gap 5.
+5. **mit_learn, mitxonline** — highest traffic, and mit_learn additionally needs
    the `/media` route (gap 1) and the JSON gzip moved to the APISix `gzip` plugin.
 
 ## Out of scope

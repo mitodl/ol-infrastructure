@@ -104,6 +104,51 @@ def application_deployment_names(
     return names
 
 
+def default_probe_configs(port: int) -> dict[str, kubernetes.core.v1.ProbeArgs]:
+    """Probes against the django-health-check endpoints on ``port``.
+
+    Built per-instance rather than held as a class default so the port tracks
+    whatever the application container actually listens on. Apps with the nginx
+    sidecar are probed at the sidecar; apps without it are probed at Granian.
+    """
+    return {
+        # Liveness probe to check if the application is still running
+        "liveness_probe": kubernetes.core.v1.ProbeArgs(
+            http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                path="/health/liveness/",
+                port=port,
+            ),
+            initial_delay_seconds=30,  # Wait 30 seconds before first probe
+            period_seconds=30,
+            failure_threshold=3,  # Consider failed after 3 attempts
+            timeout_seconds=3,
+        ),
+        # Readiness probe to check if the application is ready to serve traffic
+        "readiness_probe": kubernetes.core.v1.ProbeArgs(
+            http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                path="/health/readiness/",
+                port=port,
+            ),
+            initial_delay_seconds=15,  # Wait 15 seconds before first probe
+            period_seconds=15,
+            failure_threshold=3,  # Consider failed after 3 attempts
+            timeout_seconds=3,
+        ),
+        # Startup probe to ensure the application is fully initialized before other probes start
+        "startup_probe": kubernetes.core.v1.ProbeArgs(
+            http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                path="/health/startup/",
+                port=port,
+            ),
+            initial_delay_seconds=10,  # Wait 10 seconds before first probe
+            period_seconds=10,  # Probe every 10 seconds
+            failure_threshold=12,  # Allow up to 2 minutes (12 x 10s) for startup
+            success_threshold=1,
+            timeout_seconds=5,
+        ),
+    }
+
+
 class OLApplicationK8sCeleryWorkerConfig(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     application_name: str = "main.celery:app"
@@ -253,6 +298,16 @@ class GranianConfig(BaseModel):
             "static path mounts simultaneously."
         ),
     )
+    static_path_expires: PositiveInt | None = Field(
+        default=None,
+        description=(
+            "Seconds to advertise in the 'Cache-Control: max-age' header Granian "
+            "attaches to statically served files ('--static-path-expires'). Granian's "
+            "own default is 86400, an order of magnitude shorter than the 'expires "
+            "max' the nginx sidecars used, so apps migrating off the sidecar should "
+            "set this explicitly rather than inherit the regression."
+        ),
+    )
 
     @field_validator("nginx_config_filename")
     @classmethod
@@ -339,6 +394,8 @@ class GranianConfig(BaseModel):
             ]
         for path in self.static_path_mounts:
             args += ["--static-path-mount", path]
+        if self.static_path_expires is not None:
+            args += ["--static-path-expires", str(self.static_path_expires)]
         args += ["--log-level", self.log_level, self.application_module]
         return args
 
@@ -544,42 +601,16 @@ class OLApplicationK8sConfig(BaseModel):
         default=None,
         description="A tuple of <job_name>, <job_command_array> for executing upon completion of the deployment updating",
     )
-    probe_configs: dict[str, kubernetes.core.v1.ProbeArgs] = {
-        # Liveness probe to check if the application is still running
-        "liveness_probe": kubernetes.core.v1.ProbeArgs(
-            http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                path="/health/liveness/",
-                port=DEFAULT_NGINX_PORT,
-            ),
-            initial_delay_seconds=30,  # Wait 30 seconds before first probe
-            period_seconds=30,
-            failure_threshold=3,  # Consider failed after 3 attempts
-            timeout_seconds=3,
+    probe_configs: dict[str, kubernetes.core.v1.ProbeArgs] | None = Field(
+        default=None,
+        description=(
+            "Probes for the application container. When omitted the component "
+            "generates django-health-check probes against the resolved application "
+            "port, so dropping the nginx sidecar moves them from the sidecar to "
+            "Granian without the caller restating them. Callers that supply this "
+            "own the port they name."
         ),
-        # Readiness probe to check if the application is ready to serve traffic
-        "readiness_probe": kubernetes.core.v1.ProbeArgs(
-            http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                path="/health/readiness/",
-                port=DEFAULT_NGINX_PORT,
-            ),
-            initial_delay_seconds=15,  # Wait 15 seconds before first probe
-            period_seconds=15,
-            failure_threshold=3,  # Consider failed after 3 attempts
-            timeout_seconds=3,
-        ),
-        # Startup probe to ensure the application is fully initialized before other probes start
-        "startup_probe": kubernetes.core.v1.ProbeArgs(
-            http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                path="/health/startup/",
-                port=DEFAULT_NGINX_PORT,
-            ),
-            initial_delay_seconds=10,  # Wait 10 seconds before first probe
-            period_seconds=10,  # Probe every 10 seconds
-            failure_threshold=12,  # Allow up to 2 minutes (12 x 10s) for startup
-            success_threshold=1,
-            timeout_seconds=5,
-        ),
-    }
+    )
     app_pdb_maximum_unavailable: NonNegativeInt | str = 1
     extra_container_ports: list[kubernetes.core.v1.ContainerPortArgs] = Field(
         default_factory=list,
@@ -939,6 +970,11 @@ class OLApplicationK8s(ComponentResource):
             application_port = DEFAULT_NGINX_PORT
         else:
             application_port = DEFAULT_WSGI_PORT
+        # Published so APISix route configs can name the numeric Service port
+        # instead of the port name. OLApisixHTTPRoute has to hand Gateway API a
+        # number and resolves the name "http" to DEFAULT_NGINX_PORT, which is
+        # wrong the moment an app drops its sidecar.
+        self.application_lb_service_port: int = application_port
 
         # Determine the full name of the container image
         if ol_app_k8s_config.application_image_digest:
@@ -1408,7 +1444,10 @@ class OLApplicationK8s(ComponentResource):
                 env=application_deployment_env_vars,
                 env_from=application_deployment_envfrom,
                 volume_mounts=webapp_volume_mounts,
-                **ol_app_k8s_config.probe_configs,
+                **(
+                    ol_app_k8s_config.probe_configs
+                    or default_probe_configs(application_port)
+                ),
             ),
         )
         # Append caller-supplied sidecar containers after the main app container

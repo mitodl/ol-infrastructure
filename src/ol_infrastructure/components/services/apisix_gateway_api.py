@@ -363,6 +363,12 @@ class OLApisixHTTPRoute(ComponentResource):
         Gateway API backendRef ports must be numeric. Named ports are mapped to
         APISIX's conventional defaults, matching the logic used when building
         backendRefs.
+
+        The "http" mapping assumes the nginx sidecar's port and has no way to see
+        what the backing Service actually publishes, so an app that drops the
+        sidecar keeps routing to 8071 and 502s. Pass
+        ``OLApplicationK8s.application_lb_service_port`` (the resolved number)
+        rather than the port name for any app without a sidecar.
         """
         if isinstance(port, str):
             port_mapping = {
