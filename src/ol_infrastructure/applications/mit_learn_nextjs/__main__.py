@@ -93,7 +93,7 @@ nextjs_config = Config("nextjs")
 # (the fetch/ISR data cache over high-cardinality search/topic query strings is the
 # leading suspect). More headroom buys hours between GC storms instead of minutes; it
 # does not stop the climb, and a larger heap makes each individual major GC longer.
-# The leak is the actual fix.
+# Fixing the leak is the actual fix.
 nextjs_memory_request = "1536Mi"
 NEXTJS_NON_HEAP_OVERHEAD_MIB = 224
 nextjs_max_old_space_size_mib = (
