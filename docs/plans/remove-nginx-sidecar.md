@@ -168,9 +168,11 @@ than trying to engineer around it. This applies to every remaining app.
 
 ## Stage 2: ocw_studio
 
-Done — see the accompanying commit. The first app to actually exercise Granian's
-`/static` serving (OVS had `dj_static.Cling` doing that already), and the first
-on the Gateway API route path.
+Done — see the accompanying commit. The first of the seven sidecar apps where
+Granian actually carries the `/static/*` traffic nginx used to serve (OVS had
+`dj_static.Cling` doing that already; edxapp LMS/Studio have been on Granian
+static in production since before this project started), and the first app on
+the Gateway API route path.
 
 - `STATIC_ROOT` is the *relative* `"staticfiles"`, resolved against the image's
   `WORKDIR /src`, so it lands on the same `/src/staticfiles` emptyDir the
