@@ -187,18 +187,49 @@ def setup_grafana(
                         "processors": {
                             "tailSampling": {
                                 "enabled": True,
-                                "decisionWait": "5s",
-                                "numTraces": 100,
-                                "expectedNewTracesPerSec": 10,
+                                # The sampler holds every in-flight trace in memory
+                                # until decisionWait elapses, then decides.  These
+                                # numbers must be sized against real trace volume:
+                                # APISIX alone fronts ~280 req/s, and each of those
+                                # is a distinct trace.  The previous values (100 /
+                                # 10) buffered ~0.4s of traffic, so traces were
+                                # evicted before their decision was ever made and
+                                # ~98% of them -- including nearly every APISIX root
+                                # span -- never reached Tempo.
+                                #
+                                # decisionWait also has to outlast the slowest
+                                # exporter feeding a trace.  APISIX batches spans on
+                                # a 2s timeout and the Django BatchSpanProcessor on
+                                # 5s, so a 5s window routinely closed before the
+                                # gateway's root span arrived, orphaning the trace.
+                                "decisionWait": "15s",
+                                "numTraces": 50000,
+                                "expectedNewTracesPerSec": 1000,
+                                # Keep decisions for trace IDs far longer than the
+                                # span data itself, so spans that arrive after a
+                                # trace has been released from memory inherit the
+                                # original decision instead of being re-judged.
+                                #
+                                # Do NOT raise either of these to 1_000_000 or
+                                # above: the chart renders them through Go's %v on a
+                                # float64, which switches to scientific notation at
+                                # 1e6 and emits `non_sampled_cache_size = 1e+06`
+                                # into the Alloy config.  Verified against chart
+                                # 4.3.2 with `helm template`; 999_999 renders as an
+                                # integer, 1_000_000 does not.
                                 "decisionCache": {
-                                    "sampledCacheSize": 1000,
-                                    "nonSampledCacheSize": 10000,
+                                    "sampledCacheSize": 500000,
+                                    "nonSampledCacheSize": 900000,
                                 },
                                 "policies": [
                                     {
+                                        # UNSET is the status of virtually every
+                                        # successful span, so including it here made
+                                        # this policy match all traffic and silently
+                                        # neutered the probabilistic policy below.
                                         "name": "keep-errors",
                                         "type": "status_code",
-                                        "status_codes": ["ERROR", "UNSET"],
+                                        "status_codes": ["ERROR"],
                                     },
                                     {
                                         "name": "sample-slow-traces",
@@ -220,6 +251,22 @@ def setup_grafana(
                                 # explicitly on the sampler collector to avoid this.
                                 "collector": {
                                     "remoteConfig": {"enabled": False},
+                                    # The chart ships the sampler with no requests
+                                    # or limits, which left it BestEffort -- first
+                                    # in line for eviction under node pressure.
+                                    # That is untenable now that numTraces buffers
+                                    # ~50k traces (order 1GiB) instead of 100.  No
+                                    # CPU limit: throttling the sampler stalls the
+                                    # trace pipeline for the whole cluster.
+                                    "alloy": {
+                                        "resources": {
+                                            "requests": {
+                                                "cpu": "500m",
+                                                "memory": "1Gi",
+                                            },
+                                            "limits": {"memory": "2Gi"},
+                                        },
+                                    },
                                 },
                             },
                         },
