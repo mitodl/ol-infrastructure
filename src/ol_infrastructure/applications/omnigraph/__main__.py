@@ -68,7 +68,10 @@ from ol_infrastructure.applications.omnigraph.maintenance import (
     DEFAULT_CLEANUP_SCHEDULE,
     DEFAULT_OPTIMIZE_SCHEDULE,
 )
-from ol_infrastructure.applications.omnigraph.storage import validate_storage_prefix
+from ol_infrastructure.applications.omnigraph.storage import (
+    validate_migration_target_prefix,
+    validate_storage_prefix,
+)
 from ol_infrastructure.applications.omnigraph.storage_migration import (
     create_storage_migration,
 )
@@ -155,7 +158,7 @@ MIGRATE_FROM_IMAGE: str = (omnigraph_config.get("migrate_from_image") or "").str
 #
 # Two knobs, in sequence: `migrate_to_prefix` while rebuilding, then
 # `storage_prefix` once the Job's verdict says the rebuild is good.
-MIGRATE_TO_PREFIX: str = validate_storage_prefix(
+MIGRATE_TO_PREFIX: str = validate_migration_target_prefix(
     omnigraph_config.get("migrate_to_prefix")
 )
 
@@ -779,17 +782,22 @@ if MIGRATE_FROM_IMAGE:
         k8s_global_labels=k8s_global_labels,
         old_image=MIGRATE_FROM_IMAGE,
         new_image=data_tier.server_image,
-        # The root the cluster serves *now*: the bucket root, never a prefixed
-        # one. `data_tier.storage_uri` carries STORAGE_PREFIX, which during a
-        # migration is still the OLD root — but once a cutover has happened it
-        # would not be, and reading the bucket directly keeps this honest
-        # about what "migrate from" means.
-        old_storage_root=data_tier.bucket.bucket_v2.bucket.apply(
-            lambda name: f"s3://{name}"
+        # SOURCE: the root the cluster serves right now, prefix and all. Only
+        # for a first migration is that the bare bucket; after one cutover it
+        # is s3://<bucket>/fmt<N>, and a second migration has to export from
+        # there. Reading the bucket directly (as this did) works exactly once
+        # and then silently exports from a path holding the pre-migration data.
+        old_storage_root=data_tier.storage_uri,
+        # DESTINATION: built from the bucket, NOT from the source — deriving it
+        # as f"{source}/{prefix}" nests roots on every migration after the
+        # first (s3://bucket/fmt5/fmt6).
+        new_storage_root=data_tier.bucket.bucket_v2.bucket.apply(
+            lambda name: f"s3://{name}/{MIGRATE_TO_PREFIX}"
         ),
         new_storage_prefix=MIGRATE_TO_PREFIX,
         cluster_configmap_name=CLUSTER_CONFIGMAP_NAME,
         service_account_name="omnigraph-server",
+        maintenance=data_tier.maintenance,
     )
     export("storage_migration_job", storage_migration.job.metadata.name)
 

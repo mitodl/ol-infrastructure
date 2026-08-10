@@ -39,6 +39,7 @@ from typing import NamedTuple
 import pulumi_kubernetes as kubernetes
 from pulumi import Output, ResourceOptions
 
+from ol_infrastructure.applications.omnigraph.maintenance import OmnigraphMaintenance
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 SCRIPT_FILENAME = "migrate_storage_format.py"
@@ -66,10 +67,20 @@ ACTIVE_DEADLINE_SECONDS = 21600
 # while nobody is reading the logs.
 BACKOFF_LIMIT = 0
 
-# Keep the finished pod. Its logs and `/tmp/migration-verdict.json` are the
-# evidence the cutover decision rests on, and a Job that tidied itself away on
-# success would take them with it.
+# Keep the finished pod. Its logs are the evidence the cutover decision rests
+# on, and a Job that tidied itself away on success would take them with it.
 TTL_SECONDS_AFTER_FINISHED = 604800
+
+# Disk for `/tmp`, which holds EVERY graph's JSONL export simultaneously —
+# requested so the scheduler places this pod somewhere that can hold them, and
+# capped so an overrun evicts this pod rather than the node.
+#
+# 20Gi is a deliberate over-provision against a cluster whose graphs the
+# upgrade runbook records as effectively unpopulated as of 2026-08-05. It is
+# not a measurement, and it is the number to revisit first if the Job is ever
+# evicted for disk: re-measure from a real export
+# (`wc -c /tmp/export/*.jsonl` in the pod) rather than doubling it blindly.
+EXPORT_STORAGE_SIZE = "20Gi"
 
 
 def script_source() -> str:
@@ -96,23 +107,37 @@ def create_storage_migration(  # noqa: PLR0913
     old_image: str,
     new_image: str | Output[str],
     old_storage_root: str | Output[str],
+    new_storage_root: str | Output[str],
     new_storage_prefix: str,
     cluster_configmap_name: str,
     service_account_name: str,
+    maintenance: OmnigraphMaintenance | None = None,
     opts: ResourceOptions | None = None,
 ) -> OmnigraphStorageMigration:
     """Provision the one-shot rebuild Job.
 
-    ``old_storage_root`` is the root the cluster serves *now*; the rebuild
-    lands at ``<old_storage_root>/<new_storage_prefix>``. Keeping the new root
-    inside the same bucket is what preserves the IRSA grant
-    (``<bucket-arn>/*``), the backups and the object versioning — a full URI
-    could aim the rebuild at storage nothing has granted access to, and that
-    failure would land mid-outage.
+    ``old_storage_root`` is the root the cluster serves **now** — which is the
+    bucket root only until the first cutover. After one, it is
+    ``s3://<bucket>/fmt<N>``, and the next migration has to export from there.
+    ``new_storage_root`` is where this rebuild writes.
 
-    ``new_storage_prefix`` is the same ``fmt<N>`` value that will later become
-    ``omnigraph:storage_prefix`` at cutover. Passing the prefix rather than a
-    whole URI means the two cannot disagree about the bucket.
+    THE TWO ARE SEPARATE INPUTS ON PURPOSE. Deriving the destination from the
+    source (``f"{old}/{prefix}"``) is correct exactly once: it produces
+    ``s3://bucket/fmt6`` from a bare bucket, and ``s3://bucket/fmt5/fmt6`` from
+    an already-migrated one — a nested root nobody serves, exported from the
+    wrong place. Both roots are computed by the caller from the *bucket*, which
+    is also what keeps them inside the IRSA grant (``<bucket-arn>/*``), the
+    backups and the object versioning.
+
+    ``new_storage_prefix`` is the same ``fmt<N>`` that will later become
+    ``omnigraph:storage_prefix`` at cutover; it names the Job so
+    ``kubectl get jobs`` says which rebuild this was.
+
+    ``maintenance`` is the pair of sweeps to order this Job behind. They write
+    directly to the store, so a tick between the export and the verification
+    mutates a root the migration has declared frozen — and Pulumi would
+    otherwise be free to create the Job in parallel with the updates that
+    suspend them.
     """
     script_config_map = kubernetes.core.v1.ConfigMap(
         f"omnigraph-storage-migration-script-{stack_info.env_suffix}",
@@ -125,8 +150,17 @@ def create_storage_migration(  # noqa: PLR0913
         opts=opts,
     )
 
-    new_storage_root = Output.from_input(old_storage_root).apply(
-        lambda root: f"{root.rstrip('/')}/{new_storage_prefix}"
+    # Ordered behind the suspension of both sweeps. `depends_on` is the only
+    # thing that sequences these — the Job references neither CronJob, so
+    # Pulumi is otherwise free to create it while `suspend=true` is still being
+    # applied, leaving a window in which a tick can fire against the old root.
+    job_opts = ResourceOptions.merge(
+        opts,
+        ResourceOptions(
+            depends_on=[maintenance.optimize, maintenance.cleanup]
+            if maintenance is not None
+            else []
+        ),
     )
 
     job = kubernetes.batch.v1.Job(
@@ -242,13 +276,30 @@ def create_storage_migration(  # noqa: PLR0913
                                     mount_path="/tmp",  # noqa: S108
                                 ),
                             ],
-                            # Sized for the exports, which are held on disk in
-                            # `/tmp` (an emptyDir) rather than streamed twice.
-                            # The memory ceiling is what a single graph's
-                            # load costs, not the whole cluster's.
+                            # Memory is sized for a single graph's load, not
+                            # the cluster's — the exports go to disk rather
+                            # than being held twice.
+                            #
+                            # EPHEMERAL-STORAGE IS REQUESTED, NOT JUST CAPPED.
+                            # `/tmp` holds EVERY graph's export at once, and an
+                            # emptyDir draws on the node's filesystem: without
+                            # a request the scheduler can place this on a node
+                            # that cannot hold the exports, and filling a node
+                            # evicts whatever else is running there. The
+                            # request makes it a scheduling constraint; the
+                            # limit and the volume's own `size_limit` make an
+                            # overrun evict this pod alone.
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                                requests={"cpu": "250m", "memory": "512Mi"},
-                                limits={"cpu": "2", "memory": "4Gi"},
+                                requests={
+                                    "cpu": "250m",
+                                    "memory": "512Mi",
+                                    "ephemeral-storage": EXPORT_STORAGE_SIZE,
+                                },
+                                limits={
+                                    "cpu": "2",
+                                    "memory": "4Gi",
+                                    "ephemeral-storage": EXPORT_STORAGE_SIZE,
+                                },
                             ),
                         )
                     ],
@@ -259,7 +310,9 @@ def create_storage_migration(  # noqa: PLR0913
                         ),
                         kubernetes.core.v1.VolumeArgs(
                             name="work",
-                            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
+                            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(
+                                size_limit=EXPORT_STORAGE_SIZE,
+                            ),
                         ),
                         kubernetes.core.v1.VolumeArgs(
                             name="script",
@@ -278,7 +331,7 @@ def create_storage_migration(  # noqa: PLR0913
                 ),
             ),
         ),
-        opts=opts,
+        opts=job_opts,
     )
 
     return OmnigraphStorageMigration(script_config_map=script_config_map, job=job)

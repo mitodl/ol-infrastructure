@@ -9,6 +9,7 @@ cluster, which is what the runbook rehearsal covers.
 """
 
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
@@ -72,7 +73,7 @@ def _schema_dir(tmp_path: Path) -> Path:
     return schemas
 
 
-def test_graph_ids_match_what_the_cluster_declares(tmp_path):
+def test_graph_ids_match_what_the_cluster_declares(tmp_path: Path) -> None:
     """Enumerated from the config, never re-derived from `managed_repos` — the
     `code-<repo>` ids are derived values, and rebuilding that list by hand is
     how a repo gets left behind at the old root.
@@ -86,7 +87,7 @@ def test_graph_ids_match_what_the_cluster_declares(tmp_path):
     assert "code-bridge" in found
 
 
-def test_policy_names_are_not_mistaken_for_graphs(tmp_path):
+def test_policy_names_are_not_mistaken_for_graphs(tmp_path: Path) -> None:
     """`policies:` sits directly below `graphs:` and its entries are indented
     identically. Reading them as graph ids would send the migration looking for
     stores named `memory_rules`.
@@ -96,7 +97,8 @@ def test_policy_names_are_not_mistaken_for_graphs(tmp_path):
     assert not [g for g in found if g.endswith("_rules")]
 
 
-def test_repoint_rewrites_only_the_storage_line(tmp_path):
+def test_repoint_rewrites_only_the_storage_line(tmp_path: Path) -> None:
+    """The rebuilt config must declare the same graphs at the new root."""
     config = migrate.build_rebuild_config(
         _cluster_yaml(tmp_path),
         tmp_path / "rebuild",
@@ -114,7 +116,7 @@ def test_repoint_rewrites_only_the_storage_line(tmp_path):
     assert config.read_text().count("schema:") == len(build_cluster_graphs(REPOS))
 
 
-def test_schemas_are_staged_beside_the_config(tmp_path):
+def test_schemas_are_staged_beside_the_config(tmp_path: Path) -> None:
     """`cluster apply` resolves `schema:` relative to the config directory, so
     the rebuild fails at the point of no return if these are not there.
     """
@@ -139,7 +141,7 @@ def test_schemas_are_staged_beside_the_config(tmp_path):
         "/ol-data-witan-ci/fmt6",  # not an S3 URI
     ],
 )
-def test_a_root_that_is_not_fmt_n_is_refused(tmp_path, bad_root):
+def test_a_root_that_is_not_fmt_n_is_refused(tmp_path: Path, bad_root: str) -> None:
     """The empty case is the one that matters most. `cluster validate` accepts a
     blank `storage:`, and the repoint check compares against
     `f"storage: {new_root}"` — which for an empty root is the very line it
@@ -155,7 +157,7 @@ def test_a_root_that_is_not_fmt_n_is_refused(tmp_path, bad_root):
         )
 
 
-def test_a_config_with_no_storage_line_is_refused(tmp_path):
+def test_a_config_with_no_storage_line_is_refused(tmp_path: Path) -> None:
     """A renamed or moved `storage:` key means the repoint silently did
     nothing, and the rebuild would land at whatever the config already said.
     """
@@ -174,7 +176,7 @@ def test_a_config_with_no_storage_line_is_refused(tmp_path):
         )
 
 
-def test_row_counts_are_parsed_per_table():
+def test_row_counts_are_parsed_per_table() -> None:
     """Verification compares per table. A total-row check would pass a rebuild
     that put every row in the wrong table.
     """
@@ -193,3 +195,97 @@ def test_row_counts_are_parsed_per_table():
 
     assert counts == {"edge:Supersedes": 0, "node:Memory": 41, "node:Task": 7}
     assert migrate.SNAPSHOT_SCHEMA_RE.search(snapshot).group(1) == "6"
+
+
+def _export(tmp_path: Path, nodes: int, edges: int = 0) -> Path:
+    """Build an export shaped like omnigraph's: node records, then edge records."""
+    path = tmp_path / "graph.jsonl"
+    lines = [
+        json.dumps({"type": "Memory", "data": {"slug": f"m-{i}"}}) for i in range(nodes)
+    ]
+    lines += [
+        json.dumps({"edge": "RelatesTo", "from": f"m-{i}", "to": f"m-{i + 1}"})
+        for i in range(edges)
+    ]
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
+def test_a_small_export_is_loaded_whole(tmp_path: Path) -> None:
+    """The common case stays one load, with no temporary files."""
+    export = _export(tmp_path, nodes=10)
+
+    assert migrate.chunk_export(export) == [export]
+
+
+def test_an_export_over_the_row_cap_is_split(tmp_path: Path) -> None:
+    """Omnigraph 0.9 caps a keyed write at 8,192 rows per table, so one `load`
+    of a populated graph fails outright.
+    """
+    export = _export(tmp_path, nodes=migrate.KEYED_ROW_CAP + 100)
+
+    batches = migrate.chunk_export(export)
+
+    assert len(batches) > 1
+    for batch in batches:
+        rows = [ln for ln in batch.read_text().splitlines() if ln.strip()]
+        assert len(rows) <= migrate.KEYED_ROW_CAP
+    total = sum(
+        len([ln for ln in b.read_text().splitlines() if ln.strip()]) for b in batches
+    )
+    assert total == migrate.KEYED_ROW_CAP + 100
+
+
+def test_every_node_precedes_every_edge_across_batches(tmp_path: Path) -> None:
+    """An edge resolves against nodes already persisted or present in the same
+    batch; an endpoint in neither fails the whole load with `dst '...' not
+    found`. That ordering outranks the row bound.
+    """
+    export = _export(tmp_path, nodes=migrate.KEYED_ROW_CAP + 10, edges=50)
+
+    seen_edge = False
+    for batch in migrate.chunk_export(export):
+        for line in batch.read_text().splitlines():
+            if not line.strip():
+                continue
+            if "edge" in json.loads(line):
+                seen_edge = True
+            else:
+                assert not seen_edge, "a node followed an edge across batches"
+    assert seen_edge
+
+
+def test_a_format_that_did_not_move_is_reported() -> None:
+    """Both images on one format means the outage bought nothing — or the wrong
+    image was named as migrate_from_image.
+    """
+    problems = migrate.check_format_moved({"council": 4}, {"council": 4})
+
+    assert problems
+    assert "did not move" in problems[0]
+
+
+def test_graphs_left_on_different_formats_are_reported() -> None:
+    """Cutting over onto a cluster the new binary can only partly open."""
+    problems = migrate.check_format_moved(
+        {"council": 4, "code-bridge": 4}, {"council": 6, "code-bridge": 4}
+    )
+
+    assert problems
+    assert "not all on one format" in problems[0]
+
+
+def test_a_clean_format_move_reports_nothing() -> None:
+    """Every graph moved to one new format — the shape a cutover needs."""
+    assert not migrate.check_format_moved(
+        {"council": 4, "code-bridge": 4}, {"council": 6, "code-bridge": 6}
+    )
+
+
+def test_bucket_is_extracted_from_either_root_shape() -> None:
+    """The source root is the bare bucket only before the first cutover; after
+    one it carries a prefix. Both must resolve to the same bucket, which is what
+    the migration checks instead of containment.
+    """
+    assert migrate.bucket_of("s3://ol-data-witan-ci") == "ol-data-witan-ci"
+    assert migrate.bucket_of("s3://ol-data-witan-ci/fmt5") == "ol-data-witan-ci"

@@ -14,6 +14,12 @@ import re
 # validate_storage_prefix for why this is stricter than S3 requires.
 _PREFIX_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
+# A migration target root, `fmt<N>` — N being the NEW internal-schema number.
+# The worker (scripts/migrate_storage_format.py) enforces the same shape on the
+# full URI; this is the same rule applied early enough to fail a `pulumi
+# preview` rather than a Job.
+_MIGRATION_PREFIX_RE = re.compile(r"fmt[0-9]+")
+
 
 def validate_storage_prefix(prefix: str | None) -> str:
     """Normalize and check ``omnigraph:storage_prefix``; return "" when unset.
@@ -49,6 +55,36 @@ def validate_storage_prefix(prefix: str | None) -> str:
             f"omnigraph:storage_prefix must be a single path segment of "
             f"[A-Za-z0-9._-] starting alphanumeric: {cleaned!r}. An "
             "unsubstituted placeholder such as 'fmt<N>' lands here."
+        )
+        raise ValueError(msg)
+    return cleaned
+
+
+def validate_migration_target_prefix(prefix: str | None) -> str:
+    """Normalize and check ``omnigraph:migrate_to_prefix``; return "" when unset.
+
+    STRICTER THAN ``validate_storage_prefix`` ON PURPOSE, and the gap is what
+    this exists to close. That one accepts any single path segment, because a
+    storage root is free to be named anything. The migration worker, though,
+    hard-requires ``fmt<N>`` — the digits are the new internal-schema number,
+    and the runbook's guards match on that shape.
+
+    So ``migrate_to_prefix = "v2.1"`` or ``"migration-2026-08"`` passes the
+    looser check, survives ``pulumi preview``, arms the outage, suspends the
+    maintenance sweeps, and creates a Job whose first act is to refuse the root
+    it was given. Failing here instead means it never gets that far.
+
+    Raises ``ValueError`` on anything that is not ``fmt`` followed by digits.
+    """
+    cleaned = validate_storage_prefix(prefix)
+    if not cleaned:
+        return ""
+    if not _MIGRATION_PREFIX_RE.fullmatch(cleaned):
+        msg = (
+            f"omnigraph:migrate_to_prefix must be fmt<N> where N is the new "
+            f"internal-schema number (e.g. fmt6): {cleaned!r}. The migration "
+            "worker rejects anything else, so this would arm an outage for a "
+            "Job that cannot run."
         )
         raise ValueError(msg)
     return cleaned

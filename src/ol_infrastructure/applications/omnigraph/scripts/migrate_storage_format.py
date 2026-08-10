@@ -41,6 +41,7 @@ import re
 import shutil
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 
 # `s3://<bucket>/fmt<N>`, where N is the NEW internal-schema number. Anchored
@@ -58,6 +59,14 @@ SNAPSHOT_ROW_RE = re.compile(r"^(?P<table>\S+)\s+.*\brows=(?P<rows>\d+)", re.MUL
 SNAPSHOT_SCHEMA_RE = re.compile(r"^internal_schema_version:\s*(\d+)", re.MULTILINE)
 
 VERDICT_PATH = Path("/tmp/migration-verdict.json")  # noqa: S108
+
+# omnigraph >= 0.9 refuses a keyed write staging more than this many rows in
+# one table, engine-side, on local stores as well as served ones. `--mode
+# overwrite` is exempt, but this loads with `merge` (see `rebuild`).
+KEYED_ROW_CAP = 8192
+# Rows per batch, under the cap with headroom — the cap belongs to a binary
+# this script does not control, and the cost of headroom is one extra commit.
+LOAD_ROW_BATCH = 8000
 
 LOG = logging.getLogger("migrate-storage-format")
 
@@ -108,16 +117,121 @@ def run(
 
 
 def snapshot_tables(binary: str, store: str) -> dict[str, int]:
-    """Return per-table row counts for ``store`` — the baseline and the check."""
+    """Return per-table row counts for ``store`` — the baseline and the check.
+
+    AN EMPTY PARSE IS AN ERROR, not an empty store. A cluster graph always
+    declares tables, so ``{}`` means the regex stopped matching ``snapshot``'s
+    output, not that there is nothing there — and an unrecognised format would
+    produce ``{}`` on BOTH sides, making verification compare nothing to
+    nothing and report success over a rebuild it never checked. That is the
+    single worst outcome available here: a green migration with no evidence
+    behind it.
+    """
     out = run([binary, "snapshot", "--store", store]).stdout
-    return {m["table"]: int(m["rows"]) for m in SNAPSHOT_ROW_RE.finditer(out)}
+    tables = {m["table"]: int(m["rows"]) for m in SNAPSHOT_ROW_RE.finditer(out)}
+    if not tables:
+        sys.exit(
+            f"!!! parsed no per-table row counts from `snapshot` for {store}.\n"
+            "Verification compares these counts, so an unparsed snapshot would "
+            "make it compare {} to {} and pass without checking anything. The "
+            f"output was:\n{out}"
+        )
+    return tables
 
 
-def snapshot_schema_version(binary: str, store: str) -> int | None:
-    """Return the on-disk format version ``store`` is stamped at."""
+def snapshot_schema_version(binary: str, store: str) -> int:
+    """Return the on-disk format version ``store`` is stamped at.
+
+    Raises rather than returning ``None``: the caller compares these to prove
+    the format actually moved, and a comparison against "unknown" that quietly
+    passes defeats the check.
+    """
     out = run([binary, "snapshot", "--store", store]).stdout
     match = SNAPSHOT_SCHEMA_RE.search(out)
-    return int(match.group(1)) if match else None
+    if match is None:
+        sys.exit(
+            f"!!! `snapshot` reported no internal_schema_version for {store}. "
+            "The migration cannot confirm the storage format moved without "
+            f"it. Output was:\n{out}"
+        )
+    return int(match.group(1))
+
+
+def bucket_of(root: str) -> str:
+    """Return the bucket name from an ``s3://<bucket>/...`` root."""
+    return root.removeprefix("s3://").split("/", 1)[0]
+
+
+def check_format_moved(
+    old_formats: dict[str, int], new_formats: dict[str, int]
+) -> list[str]:
+    """Return the reasons the storage format did not move as a migration needs.
+
+    Two failures, both of which end with a cutover onto something unusable:
+    graphs left on differing formats (the new binary can open only some of
+    them), and a format that did not change at all — which means either the
+    two images share a storage format and the outage bought nothing, or the
+    wrong image was named as ``migrate_from_image``.
+    """
+    problems: list[str] = []
+    if len(set(new_formats.values())) != 1:
+        problems.append(f"the rebuilt graphs are not all on one format: {new_formats}")
+    elif set(new_formats.values()) == set(old_formats.values()):
+        problems.append(
+            f"the format did not move — old and new are both "
+            f"{next(iter(new_formats.values()))}. Either the two images share "
+            "a storage format, in which case no migration was needed, or the "
+            "wrong image was named as migrate_from_image."
+        )
+    return problems
+
+
+def chunk_export(export: Path) -> list[Path]:
+    """Split one graph's export into loads omnigraph 0.9 will accept.
+
+    0.9 caps a keyed write at ``KEYED_ROW_CAP`` rows PER TABLE, enforced by the
+    engine on local and remote stores alike. One `load` of a populated graph
+    therefore fails outright — the same cap that forced row-bounded chunking
+    into agent-kit's ``witan_core.chunking``
+    (https://github.com/mitodl/agent-kit/pull/217).
+
+    EVERY NODE BEFORE ANY EDGE, and that ordering outranks the row bound. An
+    edge resolves against nodes already persisted or present in the same batch;
+    an endpoint in neither fails the whole load with ``dst '...' not found``.
+    Exports are not sorted, and a graph's edges routinely point at nodes
+    appearing later in the file, so slicing the file as-is would break loads
+    that work today — unpredictably, depending on the export's order.
+
+    Returns the original path unchanged when nothing needs splitting, so the
+    common case stays a single load with no temporary files.
+    """
+    nodes: list[str] = []
+    edges: list[str] = []
+    per_table: Counter[str] = Counter()
+    with export.open() as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            table = record.get("type") or record.get("edge") or ""
+            per_table[table] += 1
+            (nodes if "type" in record else edges).append(line)
+
+    if not per_table or max(per_table.values()) <= LOAD_ROW_BATCH:
+        return [export]
+
+    LOG.info(
+        "     splitting: largest table has %d rows (cap %d per keyed write)",
+        max(per_table.values()),
+        KEYED_ROW_CAP,
+    )
+    batches: list[Path] = []
+    for group in (nodes, edges):
+        for start in range(0, len(group), LOAD_ROW_BATCH):
+            part = export.with_name(f"{export.stem}.{len(batches):03d}.jsonl")
+            part.write_text("".join(group[start : start + LOAD_ROW_BATCH]))
+            batches.append(part)
+    return batches
 
 
 def graph_ids_from_cluster_config(cluster_yaml: Path) -> list[str]:
@@ -256,23 +370,27 @@ def rebuild(  # noqa: PLR0913
 
     for graph in graphs:
         LOG.info("  -- %s", graph)
+        store = f"{new_root}/graphs/{graph}.omni"
         # `merge` into a freshly-created empty graph is a full load and is the
         # safe choice: `overwrite` is destructive and buys nothing against an
         # empty table. `--yes` because a non-local destructive write refuses
         # without a TTY, and there is none here.
-        run(
-            [
-                new_binary,
-                "load",
-                "--store",
-                f"{new_root}/graphs/{graph}.omni",
-                "--data",
-                str(export_dir / f"{graph}.jsonl"),
-                "--mode",
-                "merge",
-                "--yes",
-            ]
-        )
+        for batch, path in enumerate(chunk_export(export_dir / f"{graph}.jsonl")):
+            if batch:
+                LOG.info("     batch %d", batch + 1)
+            run(
+                [
+                    new_binary,
+                    "load",
+                    "--store",
+                    store,
+                    "--data",
+                    str(path),
+                    "--mode",
+                    "merge",
+                    "--yes",
+                ]
+            )
 
 
 def verify(
@@ -327,11 +445,23 @@ def main() -> int:
             f"!!! OMNIGRAPH_NEW_ROOT {new_root!r} is malformed — expected "
             "s3://<bucket>/fmt<N> with real digits"
         )
-    if not new_root.startswith(f"{old_root}/"):
+    # SAME BUCKET, DIFFERENT ROOT — not "new is inside old". The source is
+    # whatever the cluster serves now, which after one cutover is already
+    # `s3://bucket/fmt5`; requiring containment would then demand
+    # `s3://bucket/fmt5/fmt6`, a nested root nobody serves. What actually has
+    # to hold is that both live in the managed bucket, since the IRSA grant,
+    # the backups and the object versioning are all keyed to it.
+    if bucket_of(old_root) != bucket_of(new_root):
         sys.exit(
-            f"!!! OMNIGRAPH_NEW_ROOT {new_root!r} must be a prefix inside "
-            f"{old_root!r}. Rebuilding outside the managed bucket loses the "
-            "IRSA grant and the backups."
+            f"!!! OMNIGRAPH_NEW_ROOT {new_root!r} is in a different bucket "
+            f"from OMNIGRAPH_OLD_ROOT {old_root!r}. Rebuilding outside the "
+            "managed bucket loses the IRSA grant and the backups."
+        )
+    if new_root == old_root:
+        sys.exit(
+            f"!!! OMNIGRAPH_OLD_ROOT and OMNIGRAPH_NEW_ROOT are both "
+            f"{new_root!r} — the migration would export from the root it is "
+            "writing to."
         )
 
     for label, binary in (("old", old_binary), ("new", new_binary)):
@@ -356,21 +486,49 @@ def main() -> int:
     )
     report, mismatched = verify(new_binary, new_root, graphs, baseline)
 
-    VERDICT_PATH.write_text(
-        json.dumps(
-            {
-                "ok": not mismatched,
-                "old_root": old_root,
-                "new_root": new_root,
-                "graphs": report,
-                "new_internal_schema": snapshot_schema_version(
-                    new_binary, f"{new_root}/graphs/{graphs[0]}.omni"
-                ),
-            },
-            indent=2,
-            sort_keys=True,
+    # THE FORMAT MUST HAVE ACTUALLY MOVED, on EVERY graph. Recording one
+    # graph's version and never comparing it — which is what this did — lets
+    # the Job report success when the two images share a format (so the whole
+    # outage bought nothing and the cutover is pointless), and when one graph
+    # is left behind on the old format (so the cutover serves a cluster the new
+    # binary cannot open). Manual step 6 checks this by hand; there is no
+    # reason for the automated path to check less.
+    old_formats = {
+        g: snapshot_schema_version(old_binary, f"{old_root}/graphs/{g}.omni")
+        for g in graphs
+    }
+    new_formats = {
+        g: snapshot_schema_version(new_binary, f"{new_root}/graphs/{g}.omni")
+        for g in graphs
+    }
+    format_problems = check_format_moved(old_formats, new_formats)
+
+    verdict = {
+        "ok": not mismatched and not format_problems,
+        "old_root": old_root,
+        "new_root": new_root,
+        "graphs": report,
+        "old_internal_schema": old_formats,
+        "new_internal_schema": new_formats,
+        "format_problems": format_problems,
+    }
+    rendered = json.dumps(verdict, indent=2, sort_keys=True)
+    VERDICT_PATH.write_text(rendered)
+    # ALSO to stdout. The pod's filesystem is an emptyDir that goes away with
+    # the container, and `kubectl exec`/`cp` cannot reach a completed pod — so
+    # the file alone is unreadable by the time anyone wants it. The logs are
+    # what survive, so the verdict has to be in them for anything (a human or a
+    # pipeline step) to gate the cutover on it.
+    LOG.info("migration verdict:\n%s", rendered)
+
+    if format_problems:
+        for problem in format_problems:
+            LOG.error("STORAGE FORMAT CHECK FAILED: %s", problem)
+        LOG.error(
+            "Row counts %s. Not repointing on this — see the verdict above.",
+            "also mismatched" if mismatched else "matched",
         )
-    )
+        return 1
 
     if mismatched:
         LOG.error(

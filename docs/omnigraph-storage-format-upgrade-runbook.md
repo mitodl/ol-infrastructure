@@ -201,6 +201,20 @@ in-cluster Job. Use it. The manual procedure that follows is kept as the
 reference for what the Job does, and as the fallback when something in the
 middle needs picking apart by hand.
 
+**Do step 1 first.** The Job takes its baseline and exports by reading the old
+root directly, and it has no way to stop the server writing underneath it — a
+snapshot taken while the Deployment is still serving is a baseline of a moving
+target, and the export that follows can disagree with it. Scaling to zero is
+not optional just because the rest is automated:
+
+```shell
+kubectl -n omnigraph scale deploy/omnigraph-server --replicas=0
+kubectl -n omnigraph wait --for=delete pod \
+  -l app.kubernetes.io/name=omnigraph-server --timeout=120s
+```
+
+Then arm and run it:
+
 ```shell
 cd src/ol_infrastructure/applications/omnigraph
 
@@ -209,11 +223,17 @@ cd src/ol_infrastructure/applications/omnigraph
 #   -o jsonpath='{.spec.template.spec.containers[0].image}'`
 pulumi config set omnigraph:migrate_from_image <OLD-image-ref> --stack <CI|QA|Production>
 # Where the rebuild lands. Digits = the NEW internal-schema number.
+# Rejected at preview unless it matches fmt<N>, so a typo cannot arm an outage
+# for a Job that would refuse the root it was given.
 pulumi config set omnigraph:migrate_to_prefix fmt6 --stack <CI|QA|Production>
 
 pulumi up --stack <CI|QA|Production>     # creates the Job; suspends both sweeps
 kubectl -n omnigraph logs -f job/omnigraph-migrate-fmt6
 ```
+
+The Job is ordered behind the two CronJob suspensions, so it cannot start while
+maintenance is still schedulable. Scaling the Deployment down stays yours —
+Pulumi does not manage the replica count during a migration.
 
 **Two config knobs, and the distinction is the point.**
 `migrate_to_prefix` is where the rebuild WRITES. `storage_prefix` is what the
@@ -233,12 +253,24 @@ It also **suspends `optimize` and `cleanup`** for the duration, because both
 write directly to the store and scaling the Deployment to zero does not stop
 them. Clearing `migrate_from_image` resumes them in the same `pulumi up`.
 
+It verifies two things before reporting success: per-table row counts match for
+every graph, and the storage format actually moved — to one version, the same
+across all of them. A format that did not change means either the two images
+share one, so the outage bought nothing, or the wrong `migrate_from_image`.
+
 The Job stops after verification. It does **not** cut over: that is
 `pulumi config set omnigraph:storage_prefix`, which needs Pulumi credentials a
 workload has no business holding, and writing the ConfigMap instead would make
 it a second writer of a path Pulumi owns. On success it prints the exact
-cutover command and writes `/tmp/migration-verdict.json` (per-graph, per-table
-before/after counts) for anything that wants to gate on it.
+cutover command, and emits the verdict — per-graph, per-table before/after
+counts plus the old and new formats — **to its logs** as well as to
+`/tmp/migration-verdict.json`. Read it from the logs: the file lives on an
+`emptyDir` that goes with the container, and neither `kubectl exec` nor
+`kubectl cp` reaches a completed pod.
+
+```shell
+kubectl -n omnigraph logs job/omnigraph-migrate-fmt6 | sed -n '/migration verdict:/,$p'
+```
 
 Then continue at **step 5** below, and finish with step 7.
 
@@ -283,11 +315,16 @@ server pod to `exec` into either, so each step below says which of the two
 workspace pods it runs in. Commands starting with `kubectl` are the ones you
 run locally.
 
-> **The image ships only `omnigraph`, `omnigraph-server`, and its entrypoint.**
-> No `aws`, no `curl`, no `python3`. Anything moving data in or out of a
-> workspace pod goes through `kubectl exec`, not an S3 round trip — which is why
-> steps 3 and 4 hand the exports across rather than staging them in the bucket.
-> `aws` commands in this runbook run on your **workstation**.
+> **The image ships `omnigraph`, `omnigraph-server`, its entrypoint, and a
+> minimal `python3`** (`python3-minimal` + `python3-yaml`, there for the
+> entrypoint's `render_groups.py` — and what the automated path's migration
+> script runs on). There is no `aws` and no `curl`, so anything moving data in
+> or out of a workspace pod goes through `kubectl exec`, not an S3 round trip —
+> which is why steps 3 and 4 hand the exports across rather than staging them
+> in the bucket. `aws` commands in this runbook run on your **workstation**.
+>
+> The upstream `modernrelay/omnigraph-server` image carries no `python3`; ours
+> is built from `docker/omnigraph-server.Dockerfile` in agent-kit and does.
 
 Two pods, because the migration spans two binaries: `omnigraph-migrate-old`
 (step 2, baseline + export) and `omnigraph-migrate-new` (step 4, rebuild).
@@ -393,11 +430,6 @@ done
 Then pull them onto your workstation, which is where step 4 pushes them from.
 **The image has no `aws` or `curl`**, so the transfer goes through `kubectl`,
 not an S3 round trip:
-
-> The image *does* carry `python3` (`python3-minimal` + `python3-yaml`, added
-> for the entrypoint's `render_groups.py`) — an earlier version of this note
-> said otherwise, which is true of the upstream `modernrelay/omnigraph-server`
-> image but not of ours. That is what the automated path's script runs on.
 
 ```shell
 mkdir -p /tmp/export
