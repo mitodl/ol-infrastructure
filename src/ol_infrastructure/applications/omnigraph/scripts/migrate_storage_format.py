@@ -112,7 +112,14 @@ def run(
         returncode = captured.returncode
         stderr, stdout = captured.stderr, captured.stdout
     if check and returncode != 0:
-        sys.exit(f"!!! command failed ({returncode}): {printable}\n{stderr}")
+        # BOTH streams. omnigraph does not put every diagnostic on stderr —
+        # `cluster validate` failed with its reason on stdout, and a message
+        # that printed only stderr reported an exit code and nothing else,
+        # from inside a pod whose filesystem is gone once it exits.
+        sys.exit(
+            f"!!! command failed ({returncode}): {printable}\n"
+            f"--- stdout ---\n{stdout}\n--- stderr ---\n{stderr}"
+        )
     return subprocess.CompletedProcess(argv, returncode, stdout, stderr)
 
 
@@ -288,8 +295,20 @@ def build_rebuild_config(
             "expected s3://<bucket>/fmt<N>"
         )
     rebuild_dir.mkdir(parents=True, exist_ok=True)
-    for schema in schema_dir.glob("*.pg"):
-        shutil.copy2(schema, rebuild_dir / schema.name)
+    # EVERY file the cluster config can reference, not just the schemas. The
+    # `policies:` block names `./memory.policy.yaml` and friends, which live in
+    # this same baked directory — staging only `*.pg` left those references
+    # unresolvable and `cluster validate` refused the rebuilt config. Found on
+    # the first real run against CI, after a clean 16-graph export.
+    #
+    # Copy-everything rather than a second glob: the cluster config is
+    # generated elsewhere (ol-infrastructure's `build_cluster_policies`) and can
+    # grow a new kind of referenced artifact without this script being touched.
+    # `cluster.yaml` is the one exclusion — it is rewritten below, and the
+    # mounted original must not shadow the repointed copy.
+    for artifact in sorted(schema_dir.iterdir()):
+        if artifact.is_file() and artifact.name != "cluster.yaml":
+            shutil.copy2(artifact, rebuild_dir / artifact.name)
 
     lines = source_cluster_yaml.read_text().splitlines()
     repointed = [
@@ -365,7 +384,17 @@ def rebuild(  # noqa: PLR0913
     # (`state_missing ... run cluster import to bootstrap state`). This bites
     # only on the first apply against a new root — which is exactly what this
     # is, at the point of no return.
-    run([new_binary, "cluster", "import", "--config", str(rebuild_dir), "--as", actor])
+    # `import` TAKES NO `--as`; `apply` DOES. omnigraph 0.9 validates scope
+    # flags per verb — "a flag a command never reads is rejected instead of
+    # silently ignored" — and `cluster import` is one that never read it. 0.8.1
+    # accepted the flag and ignored it, so the runbook's manual procedure
+    # carries `--as` on both lines and worked; on 0.9 the import fails with
+    # "`cluster` is a cluster control command; --as ... does not apply".
+    #
+    # `apply` keeps it: the deploy-time cluster-apply Job runs
+    # `cluster apply --config ... --as svc-witan-admin` against this same 0.9
+    # image successfully, and the actor is what attributes its writes.
+    run([new_binary, "cluster", "import", "--config", str(rebuild_dir)])
     run([new_binary, "cluster", "apply", "--config", str(rebuild_dir), "--as", actor])
 
     for graph in graphs:

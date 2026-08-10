@@ -289,3 +289,47 @@ def test_bucket_is_extracted_from_either_root_shape() -> None:
     """
     assert migrate.bucket_of("s3://ol-data-witan-ci") == "ol-data-witan-ci"
     assert migrate.bucket_of("s3://ol-data-witan-ci/fmt5") == "ol-data-witan-ci"
+
+
+def test_policy_bundles_are_staged_alongside_the_schemas(tmp_path: Path) -> None:
+    """The generated cluster.yaml's `policies:` block references
+    `./memory.policy.yaml` and friends, which sit in the same baked directory
+    as the schemas. Staging only `*.pg` left those unresolvable and
+    `omnigraph cluster validate` refused the rebuilt config — after a clean
+    16-graph export, at the point of no return, on the first real run.
+    """
+    schemas = _schema_dir(tmp_path)
+    for policy in (
+        "memory.policy.yaml",
+        "code-graph.policy.yaml",
+        "bridge.policy.yaml",
+        "server.policy.yaml",
+    ):
+        (schemas / policy).write_text("version: 1\nrules: []\n")
+    rebuild = tmp_path / "rebuild"
+
+    migrate.build_rebuild_config(
+        _cluster_yaml(tmp_path), rebuild, schemas, "s3://b/fmt6"
+    )
+
+    staged = {p.name for p in rebuild.iterdir()}
+    assert {"memory.policy.yaml", "code-graph.policy.yaml"} <= staged
+    assert {"schema.pg", "code-schema.pg", "bridge-schema.pg"} <= staged
+
+
+def test_the_source_cluster_yaml_never_shadows_the_repointed_one(
+    tmp_path: Path,
+) -> None:
+    """The staging copy must not bring the original cluster.yaml across — it
+    would overwrite the repointed one and send the rebuild at the OLD root.
+    """
+    schemas = _schema_dir(tmp_path)
+    (schemas / "cluster.yaml").write_text("storage: s3://ol-data-witan-ci\n")
+    rebuild = tmp_path / "rebuild"
+
+    config = migrate.build_rebuild_config(
+        _cluster_yaml(tmp_path), rebuild, schemas, "s3://b/fmt6"
+    )
+
+    assert "storage: s3://b/fmt6" in config.read_text().splitlines()
+    assert "storage: s3://ol-data-witan-ci" not in config.read_text().splitlines()
