@@ -77,6 +77,15 @@ class OLApisixHTTPRouteConfig(BaseModel):
     plugins: list[OLApisixPluginConfig] = []
     hosts: list[str] = []
     paths: list[str] = []
+    path_match_type: Literal["PathPrefix", "Exact"] = "PathPrefix"
+    """How every path in ``paths`` is matched.
+
+    ``PathPrefix`` (the default, and what this component always did) matches the
+    path and everything below it, element-wise: ``/static`` matches ``/static``
+    and ``/static/app.js`` but not ``/staticfoo``. Use ``Exact`` to translate an
+    nginx ``location = /path`` block, where a descendant like ``/path/anything``
+    must NOT match. A trailing ``*`` is stripped from each path either way, so
+    an ``Exact`` route should not carry one."""
     backend_service_name: str | None = None
     backend_service_port: str | NonNegativeInt | None = None
     backend_resolve_granularity: Literal["endpoint", "service"] = (
@@ -470,7 +479,7 @@ class OLApisixHTTPRoute(ComponentResource):
 
                 match = {
                     "path": {
-                        "type": "PathPrefix",
+                        "type": route_config.path_match_type,
                         "value": path_value,
                     }
                 }

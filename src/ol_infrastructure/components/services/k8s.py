@@ -298,14 +298,17 @@ class GranianConfig(BaseModel):
             "static path mounts simultaneously."
         ),
     )
-    static_path_expires: PositiveInt | None = Field(
+    static_path_expires: NonNegativeInt | None = Field(
         default=None,
         description=(
             "Seconds to advertise in the 'Cache-Control: max-age' header Granian "
             "attaches to statically served files ('--static-path-expires'). Granian's "
             "own default is 86400, an order of magnitude shorter than the 'expires "
             "max' the nginx sidecars used, so apps migrating off the sidecar should "
-            "set this explicitly rather than inherit the regression."
+            "set this explicitly rather than inherit the regression. Zero is a "
+            "meaningful value upstream -- it disables the header entirely -- so this "
+            "is NonNegativeInt; use None to leave the flag off and take Granian's "
+            "default."
         ),
     )
 
@@ -1444,9 +1447,14 @@ class OLApplicationK8s(ComponentResource):
                 env=application_deployment_env_vars,
                 env_from=application_deployment_envfrom,
                 volume_mounts=webapp_volume_mounts,
+                # `is None` rather than a falsy check: an explicitly supplied
+                # empty mapping means "no probes at all", which the literal-dict
+                # default used to allow and `or` would silently override with
+                # the defaults.
                 **(
-                    ol_app_k8s_config.probe_configs
-                    or default_probe_configs(application_port)
+                    default_probe_configs(application_port)
+                    if ol_app_k8s_config.probe_configs is None
+                    else ol_app_k8s_config.probe_configs
                 ),
             ),
         )
@@ -1923,6 +1931,7 @@ class OLApplicationK8s(ComponentResource):
                 )
             ),
         )
+        self.application_service: kubernetes.core.v1.Service = _application_service
 
         for celery_worker_config in ol_app_k8s_config.celery_worker_configs:
             celery_labels = ol_app_k8s_config.k8s_global_labels | {

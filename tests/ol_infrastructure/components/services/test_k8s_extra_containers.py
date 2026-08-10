@@ -23,6 +23,8 @@ Note:
 from __future__ import annotations
 
 import asyncio
+import tempfile
+from pathlib import Path
 
 import pulumi
 
@@ -47,6 +49,10 @@ import pulumi_kubernetes as kubernetes  # noqa: E402
 import pytest  # noqa: E402
 from pydantic import ValidationError  # noqa: E402
 
+from bridge.lib.magic_numbers import (  # noqa: E402
+    DEFAULT_NGINX_PORT,
+    DEFAULT_WSGI_PORT,
+)
 from ol_infrastructure.components.services.k8s import (  # noqa: E402
     GranianConfig,
     OLApplicationK8s,
@@ -54,6 +60,7 @@ from ol_infrastructure.components.services.k8s import (  # noqa: E402
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
     OLApplicationK8sKedaWebappScalingConfig,
+    default_probe_configs,
 )
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -127,6 +134,54 @@ def test_granian_config_static_path_mounts_before_log_level():
     mount_idx = args.index("--static-path-mount")
     log_idx = args.index("--log-level")
     assert mount_idx < log_idx
+
+
+# ─── GranianConfig.static_path_expires ────────────────────────────────────────
+
+
+def test_granian_config_no_static_path_expires():
+    """Omitted by default, so Granian keeps its own 86400 default."""
+    gc = GranianConfig(application_module="myapp.wsgi:application")
+    assert "--static-path-expires" not in gc.build_args()
+
+
+def test_granian_config_static_path_expires_emitted():
+    gc = GranianConfig(
+        application_module="myapp.wsgi:application",
+        static_path_mounts=["/staticfiles"],
+        static_path_expires=315360000,
+    )
+    args = gc.build_args()
+    idx = args.index("--static-path-expires")
+    assert args[idx + 1] == "315360000"
+
+
+def test_granian_config_static_path_expires_accepts_zero():
+    """Zero is meaningful upstream -- it disables the Cache-Control header."""
+    gc = GranianConfig(
+        application_module="myapp.wsgi:application",
+        static_path_expires=0,
+    )
+    args = gc.build_args()
+    idx = args.index("--static-path-expires")
+    assert args[idx + 1] == "0"
+
+
+def test_granian_config_static_path_expires_rejects_negative():
+    with pytest.raises(ValidationError):
+        GranianConfig(
+            application_module="myapp.wsgi:application",
+            static_path_expires=-1,
+        )
+
+
+def test_granian_config_static_path_expires_before_log_level():
+    gc = GranianConfig(
+        application_module="myapp.wsgi:application",
+        static_path_expires=60,
+    )
+    args = gc.build_args()
+    assert args.index("--static-path-expires") < args.index("--log-level")
 
 
 # ─── OLApplicationK8sCeleryBeatConfig.application_name ────────────────────────
@@ -632,3 +687,157 @@ def test_application_port_none_ok():
         application_port=None,
     )
     assert cfg.application_port is None
+
+
+# ─── Application port alignment ───────────────────────────────────────────────
+#
+# The Service port, the exported application_lb_service_port, the container
+# port and the default probe ports all have to agree. They are computed in
+# four different places, and when they disagree the symptom is a 502 on every
+# request with nothing in the Pulumi diff to point at it -- the route resource
+# does not change at all. Hence asserting on all four together.
+
+
+# Under Pulumi mocks the resource inputs come back keyed by the Python argument
+# names (liveness_probe, container_port) rather than the camelCase Kubernetes
+# wire format, so these use snake_case throughout. Getting this wrong makes the
+# "probe is absent" assertions below silently vacuous.
+_PROBE_KEYS = ("liveness_probe", "readiness_probe", "startup_probe")
+
+
+def _probe_ports(container) -> set[int]:
+    return {container[key]["http_get"]["port"] for key in _PROBE_KEYS}
+
+
+def _app_container(containers, application_name="myapp"):
+    return next(c for c in containers if c["name"] == f"{application_name}-app")
+
+
+def test_default_probe_configs_follow_port():
+    """The generated probes all target the port they were built for."""
+    probes = default_probe_configs(9999)
+    assert set(probes) == {"liveness_probe", "readiness_probe", "startup_probe"}
+    for probe in probes.values():
+        assert probe.http_get.port == 9999
+
+
+def test_default_probe_configs_paths_unchanged():
+    """django-health-check endpoints, one per probe kind."""
+    probes = default_probe_configs(DEFAULT_WSGI_PORT)
+    assert probes["liveness_probe"].http_get.path == "/health/liveness/"
+    assert probes["readiness_probe"].http_get.path == "/health/readiness/"
+    assert probes["startup_probe"].http_get.path == "/health/startup/"
+
+
+@pulumi.runtime.test
+def test_ports_align_without_nginx_sidecar():
+    """No sidecar: container, probes and Service all land on DEFAULT_WSGI_PORT."""
+    app = OLApplicationK8s(_base_config(application_name="noproxy"))
+    assert app.application_lb_service_port == DEFAULT_WSGI_PORT
+
+    def check(args):
+        containers, service_ports = args
+        container = _app_container(containers, "noproxy")
+        assert container["ports"][0]["container_port"] == DEFAULT_WSGI_PORT
+        assert _probe_ports(container) == {DEFAULT_WSGI_PORT}
+        assert service_ports[0]["port"] == DEFAULT_WSGI_PORT
+        assert service_ports[0]["target_port"] == DEFAULT_WSGI_PORT
+
+    return pulumi.Output.all(
+        app.application_deployment.spec.template.spec.containers,
+        app.application_service.spec.ports,
+    ).apply(check)
+
+
+@pulumi.runtime.test
+def test_ports_align_with_nginx_sidecar():
+    """Sidecar on: the app container and probes stay on the nginx port.
+
+    The regression guard for the six apps that still have a sidecar -- the
+    probe-config refactor must not move them off 8071.
+    """
+    project_root = Path(tempfile.mkdtemp())
+    (project_root / "files").mkdir()
+    (project_root / "files" / "web.conf").write_text("server { listen 8071; }\n")
+
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="sidecarapp",
+            project_root=project_root,
+            import_nginx_config=True,
+        )
+    )
+    assert app.application_lb_service_port == DEFAULT_NGINX_PORT
+
+    def check(args):
+        containers, service_ports = args
+        container = _app_container(containers, "sidecarapp")
+        assert container["ports"][0]["container_port"] == DEFAULT_NGINX_PORT
+        assert _probe_ports(container) == {DEFAULT_NGINX_PORT}
+        assert service_ports[0]["port"] == DEFAULT_NGINX_PORT
+
+    return pulumi.Output.all(
+        app.application_deployment.spec.template.spec.containers,
+        app.application_service.spec.ports,
+    ).apply(check)
+
+
+@pulumi.runtime.test
+def test_ports_align_with_explicit_application_port():
+    """An explicit application_port drags the Service and the probes with it."""
+    app = OLApplicationK8s(
+        _base_config(application_name="customport", application_port=8123)
+    )
+    assert app.application_lb_service_port == 8123
+
+    def check(args):
+        containers, service_ports = args
+        container = _app_container(containers, "customport")
+        assert container["ports"][0]["container_port"] == 8123
+        assert _probe_ports(container) == {8123}
+        assert service_ports[0]["port"] == 8123
+
+    return pulumi.Output.all(
+        app.application_deployment.spec.template.spec.containers,
+        app.application_service.spec.ports,
+    ).apply(check)
+
+
+@pulumi.runtime.test
+def test_explicit_probe_configs_are_not_overridden():
+    """A caller that supplies probes owns the port it names."""
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="ownprobes",
+            probe_configs={
+                "liveness_probe": kubernetes.core.v1.ProbeArgs(
+                    http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                        path="/custom/", port=7777
+                    )
+                )
+            },
+        )
+    )
+
+    def check(containers):
+        container = _app_container(containers, "ownprobes")
+        assert container["liveness_probe"]["http_get"]["port"] == 7777
+        assert container["liveness_probe"]["http_get"]["path"] == "/custom/"
+        assert "readiness_probe" not in container
+        assert "startup_probe" not in container
+
+    return app.application_deployment.spec.template.spec.containers.apply(check)
+
+
+@pulumi.runtime.test
+def test_empty_probe_configs_disables_probes():
+    """An explicit empty mapping means no probes, not 'give me the defaults'."""
+    app = OLApplicationK8s(_base_config(application_name="noprobes", probe_configs={}))
+
+    def check(containers):
+        container = _app_container(containers, "noprobes")
+        # _PROBE_KEYS is the same tuple the alignment tests above index with, so
+        # a wrong spelling fails there rather than making this pass vacuously.
+        assert not any(key in container for key in _PROBE_KEYS)
+
+    return app.application_deployment.spec.template.spec.containers.apply(check)

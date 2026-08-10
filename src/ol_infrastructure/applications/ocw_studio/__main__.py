@@ -719,6 +719,10 @@ ocw_studio_apisix_httproute = OLApisixHTTPRoute(
         # file under /static that must not inherit the 10-year max-age Granian
         # now stamps on that directory. nginx did this with `expires -1` plus an
         # `add_header Cache-Control private`.
+        #
+        # Left as a prefix match, unlike dnt-policy below: nginx matched this one
+        # with a `location ~*` regex, which caught descendants too, so a prefix
+        # is the closer translation.
         OLApisixHTTPRouteConfig(
             route_name="static-hash",
             hosts=[app_domain],
@@ -758,10 +762,20 @@ ocw_studio_apisix_httproute = OLApisixHTTPRoute(
         # published". Kept as a mock so the crawlers that request it are
         # answered at the gateway rather than burning a Granian blocking thread
         # on a Django 404.
+        #
+        # Exact, not prefix: this replaces an nginx `location = ` block, so
+        # /.well-known/dnt-policy.txt/anything must fall through to Django
+        # rather than collect a mocked 204.
+        #
+        # The empty response_example is not decoration -- the APISix mocking
+        # plugin schema is `anyOf: [required: response_example, required:
+        # response_schema]`, so a config with neither fails validation and the
+        # route never serves anything.
         OLApisixHTTPRouteConfig(
             route_name="dnt-policy",
             hosts=[app_domain],
             paths=["/.well-known/dnt-policy.txt"],
+            path_match_type="Exact",
             backend_service_name=ocw_studio_k8s_app.application_lb_service_name,
             backend_service_port=ocw_studio_k8s_app.application_lb_service_port,
             plugins=[
@@ -770,6 +784,8 @@ ocw_studio_apisix_httproute = OLApisixHTTPRoute(
                     secretRef=None,
                     config={
                         "response_status": 204,
+                        "response_example": "",
+                        "content_type": "text/plain",
                         "with_mock_header": False,
                     },
                 ),
