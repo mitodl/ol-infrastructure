@@ -1,0 +1,5 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+config:
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production
