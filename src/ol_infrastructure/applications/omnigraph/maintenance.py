@@ -170,6 +170,8 @@ def _cron_job(  # noqa: PLR0913
     schedule: str,
     script: str,
     depends_on: list[Resource],
+    *,
+    suspend: bool = False,
 ) -> kubernetes.batch.v1.CronJob:
     """Build one maintenance CronJob around ``script``."""
     return kubernetes.batch.v1.CronJob(
@@ -181,6 +183,19 @@ def _cron_job(  # noqa: PLR0913
         ),
         spec=kubernetes.batch.v1.CronJobSpecArgs(
             schedule=schedule,
+            # Held off entirely while a storage-format migration is armed.
+            # Both sweeps write DIRECTLY to the store, bypassing the server, so
+            # scaling the Deployment to zero does not stop them: `optimize`
+            # rewrites Lance fragments on a root the migration has declared
+            # frozen, and would do it between the export and the verification.
+            # The runbook's manual form only *checks* for a run in flight,
+            # which cannot stop one that starts a minute later.
+            #
+            # Declared here rather than left to `kubectl patch` because a
+            # migration can span days, and any unrelated `pulumi up` in that
+            # window would quietly reconcile a hand-patched CronJob back to
+            # running.
+            suspend=suspend,
             # Two concurrent runs of the same command would contend on the same
             # per-graph storage lock, and the loser would fail the whole sweep
             # after doing real work. Skipping a tick because the previous one is
@@ -280,12 +295,19 @@ def create_maintenance(  # noqa: PLR0913
     cleanup_schedule: str,
     cleanup_older_than: str,
     depends_on: list[Resource],
+    *,
+    suspend: bool = False,
 ) -> OmnigraphMaintenance:
     """Provision the scheduled optimize and cleanup sweeps.
 
     ``graph_ids`` must be the ids cluster.yaml declares — pass the keys of the
     same ``build_cluster_graphs`` result the ConfigMap is rendered from, so a
     graph can never exist without being swept or be swept without existing.
+
+    ``suspend`` holds both sweeps off for the duration of a storage-format
+    migration. Set together, never individually: they run an hour apart
+    precisely so they cannot overlap each other, and suspending one alone would
+    leave the other writing to a root the migration needs frozen.
     """
     optimize_cron_job = _cron_job(
         name="optimize",
@@ -301,6 +323,7 @@ def create_maintenance(  # noqa: PLR0913
         # Non-destructive, so no --confirm and no confirmation prompt to skip.
         script=_sweep_script("optimize", [], graph_ids),
         depends_on=depends_on,
+        suspend=suspend,
     )
 
     # `--confirm` arms the destructive run; `--yes` is separately required
@@ -325,6 +348,7 @@ def create_maintenance(  # noqa: PLR0913
             graph_ids,
         ),
         depends_on=depends_on,
+        suspend=suspend,
     )
 
     return OmnigraphMaintenance(

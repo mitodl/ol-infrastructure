@@ -194,6 +194,11 @@ class OmnigraphDataTier(NamedTuple):
     # program can export what is actually being served rather than the config
     # knob that shaped it.
     storage_uri: Output[str]
+    # The fully-resolved image ref this deploy runs, digest and all. Exposed
+    # rather than recomputed by callers so anything that must run the SAME
+    # binary as the server — the storage-format migration Job loads with it —
+    # cannot drift onto a different one.
+    server_image: str | Output[str]
 
 
 def create_data_tier(  # noqa: PLR0913
@@ -209,6 +214,8 @@ def create_data_tier(  # noqa: PLR0913
     cleanup_schedule: str,
     cleanup_older_than: str,
     storage_prefix: str = "",
+    *,
+    suspend_maintenance: bool = False,
 ) -> OmnigraphDataTier:
     """Provision the S3 bucket, IRSA policy, ECR repo, ConfigMap, and Deployment.
 
@@ -776,6 +783,7 @@ def create_data_tier(  # noqa: PLR0913
         cleanup_schedule=cleanup_schedule,
         cleanup_older_than=cleanup_older_than,
         depends_on=[cluster_apply_job, *auth_binding.irsa_service_accounts],
+        suspend=suspend_maintenance,
     )
 
     return OmnigraphDataTier(
@@ -786,4 +794,5 @@ def create_data_tier(  # noqa: PLR0913
         cluster_apply_job=cluster_apply_job,
         maintenance=omnigraph_maintenance,
         storage_uri=storage_uri,
+        server_image=omnigraph_server_image,
     )

@@ -58,6 +58,7 @@ from ol_infrastructure.applications.omnigraph.cluster_config import (
     COUNCIL_GRAPH_ID,
 )
 from ol_infrastructure.applications.omnigraph.data_tier import (
+    CLUSTER_CONFIGMAP_NAME,
     OMNIGRAPH_SERVER_SERVICE_NAME,
     create_data_tier,
     omnigraph_server_addr,
@@ -68,6 +69,9 @@ from ol_infrastructure.applications.omnigraph.maintenance import (
     DEFAULT_OPTIMIZE_SCHEDULE,
 )
 from ol_infrastructure.applications.omnigraph.storage import validate_storage_prefix
+from ol_infrastructure.applications.omnigraph.storage_migration import (
+    create_storage_migration,
+)
 from ol_infrastructure.applications.omnigraph.token_sync import (
     ACTOR_TOKENS_VAULT_PATH,
     DEFAULT_SYNC_SCHEDULE,
@@ -135,6 +139,25 @@ MANAGED_REPOS: list[str] = omnigraph_config.get_object("managed_repos") or []
 # — it just builds the graphs somewhere nobody looks. See the runbook's
 # "cluster validate does not catch an empty storage:" note.
 STORAGE_PREFIX: str = validate_storage_prefix(omnigraph_config.get("storage_prefix"))
+
+# The image to migrate FROM — the one currently deployed, whose binary can
+# still read the old root. Set only while a storage-format migration is being
+# run; unset (the steady state) means no migration Job exists at all. See the
+# `if MIGRATE_FROM_IMAGE:` block below and storage_migration.py.
+MIGRATE_FROM_IMAGE: str = (omnigraph_config.get("migrate_from_image") or "").strip()
+
+# Where the migration REBUILDS INTO. Deliberately NOT `storage_prefix`, which
+# is what the live cluster SERVES: setting that is the cutover, and it takes
+# effect the moment it is set — `pulumi preview` shows storage_uri moving, the
+# Deployment's config hash rolling and both maintenance CronJobs following. So
+# arming the migration on `storage_prefix` would repoint the running server at
+# an empty root before the rebuild had written a single row.
+#
+# Two knobs, in sequence: `migrate_to_prefix` while rebuilding, then
+# `storage_prefix` once the Job's verdict says the rebuild is good.
+MIGRATE_TO_PREFIX: str = validate_storage_prefix(
+    omnigraph_config.get("migrate_to_prefix")
+)
 
 # Keycloak realm -> actor-token sync. Set `omnigraph:keycloak_url` for an
 # environment to turn it on; leaving it unset keeps that environment on the
@@ -702,7 +725,73 @@ data_tier = create_data_tier(
     cleanup_schedule=CLEANUP_SCHEDULE,
     cleanup_older_than=CLEANUP_OLDER_THAN,
     storage_prefix=STORAGE_PREFIX,
+    # Arming a migration suspends both maintenance sweeps for its duration.
+    # They write directly to the store, so scaling the Deployment to zero does
+    # not stop them, and `optimize` rewriting fragments between the export and
+    # the verification is a write to a root the migration needs frozen. Tied to
+    # the same config that creates the Job so the two cannot drift: clearing
+    # `migrate_from_image` resumes them in the same `pulumi up`.
+    suspend_maintenance=bool(MIGRATE_FROM_IMAGE),
 )
+
+#########################################
+#   storage-format migration (opt-in)   #
+#########################################
+# Absent unless an operator is deliberately running a migration. Setting
+# `omnigraph:migrate_from_image` (the CURRENTLY-DEPLOYED image ref) together
+# with `omnigraph:migrate_to_prefix` creates a one-shot Job that rebuilds every
+# graph at `s3://<bucket>/<migrate_to_prefix>`, exporting with the old image's
+# binary and loading with this deploy's. Clearing the config removes the Job.
+#
+# ARMING THIS DOES NOT CUT OVER, and that separation is the whole point.
+# `storage_prefix` is what the cluster SERVES; setting it moves storage_uri,
+# rolls the Deployment's config hash and redirects both maintenance CronJobs,
+# immediately. If the migration reused it, arming would point the running
+# server at an empty root before the rebuild wrote anything. So the rebuild
+# target is its own knob, and the sequence is: migrate_to_prefix -> run the Job
+# -> read the verdict -> storage_prefix.
+#
+# The Job rebuilds and verifies per-table row counts, then stops — see
+# storage_migration.py and docs/omnigraph-storage-format-upgrade-runbook.md.
+if MIGRATE_FROM_IMAGE:
+    if not MIGRATE_TO_PREFIX:
+        MIGRATION_MSG = (
+            "omnigraph:migrate_from_image is set but "
+            "omnigraph:migrate_to_prefix is not. The migration needs a target "
+            "root to rebuild into (fmt<N>, N being the NEW internal-schema "
+            "number) — without one the only root it could write is the one it "
+            "is migrating away from."
+        )
+        raise ValueError(MIGRATION_MSG)
+    if MIGRATE_TO_PREFIX == STORAGE_PREFIX:
+        CUTOVER_MSG = (
+            f"omnigraph:migrate_to_prefix and omnigraph:storage_prefix are "
+            f"both {MIGRATE_TO_PREFIX!r}, so the cluster is already serving "
+            "the root this migration would rebuild into — it would export "
+            "from the root it is writing to. If the cutover is done, clear "
+            "migrate_from_image/migrate_to_prefix; if it is not, clear "
+            "storage_prefix."
+        )
+        raise ValueError(CUTOVER_MSG)
+    storage_migration = create_storage_migration(
+        stack_info=stack_info,
+        namespace=NAMESPACE,
+        k8s_global_labels=k8s_global_labels,
+        old_image=MIGRATE_FROM_IMAGE,
+        new_image=data_tier.server_image,
+        # The root the cluster serves *now*: the bucket root, never a prefixed
+        # one. `data_tier.storage_uri` carries STORAGE_PREFIX, which during a
+        # migration is still the OLD root — but once a cutover has happened it
+        # would not be, and reading the bucket directly keeps this honest
+        # about what "migrate from" means.
+        old_storage_root=data_tier.bucket.bucket_v2.bucket.apply(
+            lambda name: f"s3://{name}"
+        ),
+        new_storage_prefix=MIGRATE_TO_PREFIX,
+        cluster_configmap_name=CLUSTER_CONFIGMAP_NAME,
+        service_account_name="omnigraph-server",
+    )
+    export("storage_migration_job", storage_migration.job.metadata.name)
 
 export("namespace", NAMESPACE)
 export("omnigraph_server_addr", omnigraph_server_addr(NAMESPACE))
