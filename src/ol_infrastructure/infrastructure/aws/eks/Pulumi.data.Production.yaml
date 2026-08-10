@@ -72,10 +72,15 @@ config:
         ondemand: true
         ol.mit.edu/core_node: true
       node_group_options: {}
+      # 4, not 3, for two reasons (incident 2026-08-05): the ASG spans 4 AZs, so
+      # at desired=3 one AZ has no core node and any FE whose EBS volumes live
+      # there becomes permanently unschedulable; and StarRocks FE runs 3
+      # replicas with hostname anti-affinity, so at 3 nodes each FE has exactly
+      # one candidate node and no room to reschedule if that node fills up.
       scaling:
-        desired: 3
+        desired: 4
         max: 5
-        min: 3
+        min: 4
       tags: {}
       taints: {}
       version:

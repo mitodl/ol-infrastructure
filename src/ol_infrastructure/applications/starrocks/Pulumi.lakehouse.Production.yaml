@@ -11,7 +11,11 @@ config:
   starrocks:oidc_enabled: "true"
   starrocks:fe_config:
     replicas: 3
-    cpu_request: 8000m
+    # Observed 7-day peak FE CPU is ~150m. An 8000m request reserved ~50x that
+    # and left FE unschedulable on the shared core nodegroup for 5 days
+    # (incident 2026-08-05). Burst headroom is preserved via cpu_limit.
+    cpu_request: 1000m
+    cpu_limit: 8000m
     memory_request: 24Gi
     memory_limit: 24Gi
     # 75% of 24Gi container limit = 18Gi heap, leaving ~6Gi for JVM non-heap.
