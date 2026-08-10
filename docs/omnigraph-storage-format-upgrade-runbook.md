@@ -194,7 +194,92 @@ omnigraph snapshot --store s3://ol-data-witan-ci/graphs/council.omni
 
 The cluster's own state ledger lives at `<root>/__cluster/state.json`.
 
-## Procedure
+## The automated path (preferred)
+
+Steps 2, 3, 4 and 6 below — baseline, export, rebuild, verify — run as a single
+in-cluster Job. Use it. The manual procedure that follows is kept as the
+reference for what the Job does, and as the fallback when something in the
+middle needs picking apart by hand.
+
+**Do step 1 first.** The Job takes its baseline and exports by reading the old
+root directly, and it has no way to stop the server writing underneath it — a
+snapshot taken while the Deployment is still serving is a baseline of a moving
+target, and the export that follows can disagree with it. Scaling to zero is
+not optional just because the rest is automated:
+
+```shell
+kubectl -n omnigraph scale deploy/omnigraph-server --replicas=0
+kubectl -n omnigraph wait --for=delete pod \
+  -l app.kubernetes.io/name=omnigraph-server --timeout=120s
+```
+
+Then arm and run it:
+
+```shell
+cd src/ol_infrastructure/applications/omnigraph
+
+# The image currently deployed — its binary is the only one that can still read
+# the old root. `kubectl -n omnigraph get deploy/omnigraph-server \
+#   -o jsonpath='{.spec.template.spec.containers[0].image}'`
+pulumi config set omnigraph:migrate_from_image <OLD-image-ref> --stack <CI|QA|Production>
+# Where the rebuild lands. Digits = the NEW internal-schema number.
+# Rejected at preview unless it matches fmt<N>, so a typo cannot arm an outage
+# for a Job that would refuse the root it was given.
+pulumi config set omnigraph:migrate_to_prefix fmt6 --stack <CI|QA|Production>
+
+pulumi up --stack <CI|QA|Production>     # creates the Job; suspends both sweeps
+kubectl -n omnigraph logs -f job/omnigraph-migrate-fmt6
+```
+
+The Job is ordered behind the two CronJob suspensions, so it cannot start while
+maintenance is still schedulable. Scaling the Deployment down stays yours —
+Pulumi does not manage the replica count during a migration.
+
+**Two config knobs, and the distinction is the point.**
+`migrate_to_prefix` is where the rebuild WRITES. `storage_prefix` is what the
+cluster SERVES — setting it *is* the cutover, and it takes effect immediately
+(`pulumi preview` shows `storage_uri` moving, the Deployment's config hash
+rolling and both CronJobs following). Arming the migration on `storage_prefix`
+would point the running server at an empty root before the rebuild had written
+a row. The program refuses if both name the same prefix.
+
+The Job runs one pod carrying **both** binaries: an initContainer on the old
+image copies its `omnigraph` into a shared volume, and the main container runs
+the new image. So every byte goes S3 → pod → S3, and the `kubectl exec`
+transfer in steps 2–4 — the slowest part of the manual path, and the only step
+that fails silently — does not happen at all.
+
+It also **suspends `optimize` and `cleanup`** for the duration, because both
+write directly to the store and scaling the Deployment to zero does not stop
+them. Clearing `migrate_from_image` resumes them in the same `pulumi up`.
+
+It verifies two things before reporting success: per-table row counts match for
+every graph, and the storage format actually moved — to one version, the same
+across all of them. A format that did not change means either the two images
+share one, so the outage bought nothing, or the wrong `migrate_from_image`.
+
+The Job stops after verification. It does **not** cut over: that is
+`pulumi config set omnigraph:storage_prefix`, which needs Pulumi credentials a
+workload has no business holding, and writing the ConfigMap instead would make
+it a second writer of a path Pulumi owns. On success it prints the exact
+cutover command, and emits the verdict — per-graph, per-table before/after
+counts plus the old and new formats — **to its logs** as well as to
+`/tmp/migration-verdict.json`. Read it from the logs: the file lives on an
+`emptyDir` that goes with the container, and neither `kubectl exec` nor
+`kubectl cp` reaches a completed pod.
+
+```shell
+kubectl -n omnigraph logs job/omnigraph-migrate-fmt6 | sed -n '/migration verdict:/,$p'
+```
+
+Then continue at **step 5** below, and finish with step 7.
+
+If the Job fails, it fails clean: the old root is untouched, the cluster still
+serves it, and the exports are still on the pod. Read the logs before deleting
+it — `ttlSecondsAfterFinished` keeps it for a week precisely so the evidence
+outlives the run.
+
+## Procedure (manual)
 
 Set these first, **on your workstation** — steps 5, 6 and 7 use them there:
 
@@ -230,11 +315,16 @@ server pod to `exec` into either, so each step below says which of the two
 workspace pods it runs in. Commands starting with `kubectl` are the ones you
 run locally.
 
-> **The image ships only `omnigraph`, `omnigraph-server`, and its entrypoint.**
-> No `aws`, no `curl`, no `python3`. Anything moving data in or out of a
-> workspace pod goes through `kubectl exec`, not an S3 round trip — which is why
-> steps 3 and 4 hand the exports across rather than staging them in the bucket.
-> `aws` commands in this runbook run on your **workstation**.
+> **The image ships `omnigraph`, `omnigraph-server`, its entrypoint, and a
+> minimal `python3`** (`python3-minimal` + `python3-yaml`, there for the
+> entrypoint's `render_groups.py` — and what the automated path's migration
+> script runs on). There is no `aws` and no `curl`, so anything moving data in
+> or out of a workspace pod goes through `kubectl exec`, not an S3 round trip —
+> which is why steps 3 and 4 hand the exports across rather than staging them
+> in the bucket. `aws` commands in this runbook run on your **workstation**.
+>
+> The upstream `modernrelay/omnigraph-server` image carries no `python3`; ours
+> is built from `docker/omnigraph-server.Dockerfile` in agent-kit and does.
 
 Two pods, because the migration spans two binaries: `omnigraph-migrate-old`
 (step 2, baseline + export) and `omnigraph-migrate-new` (step 4, rebuild).
@@ -255,13 +345,26 @@ exits it is still a writer against the old root. `rollout status` reports the
 Deployment converged and would let you proceed with the server still up.
 
 Nothing may write to the old root from here until the migration completes or
-rolls back. Confirm no maintenance job is mid-run — `optimize`/`cleanup` write
-directly to the store, bypassing the server entirely:
+rolls back. `optimize`/`cleanup` write directly to the store, bypassing the
+server entirely, so scaling the Deployment to zero does **not** stop them.
+
+The automated path suspends both when `migrate_from_image` is set. If you are
+running the manual procedure, suspend them yourself — and note this is a real
+exposure, not a formality: `optimize` rewrites Lance fragments, and a tick
+landing between the step-3 export and the step-6 verification is a write to a
+root this procedure has declared frozen.
 
 ```shell
-kubectl -n omnigraph get jobs
+kubectl -n omnigraph patch cronjob/omnigraph-optimize -p '{"spec":{"suspend":true}}'
+kubectl -n omnigraph patch cronjob/omnigraph-cleanup  -p '{"spec":{"suspend":true}}'
+kubectl -n omnigraph get jobs            # and confirm none is already mid-run
 kubectl -n omnigraph get pods            # expect no omnigraph-server pod at all
 ```
+
+> A hand-patched CronJob is reverted by the next `pulumi up` for anything at
+> all, and a Production migration can span days. Prefer the config-driven
+> suspension even if you are otherwise working through this manually — set
+> `omnigraph:migrate_from_image` and the sweeps stay down until you clear it.
 
 ### 2. Start the OLD-image workspace pod
 
@@ -325,8 +428,8 @@ done
 ```
 
 Then pull them onto your workstation, which is where step 4 pushes them from.
-**The image has no `aws`, `curl`, or `python3` — only the `omnigraph` binaries** —
-so the transfer goes through `kubectl`, not an S3 round trip:
+**The image has no `aws` or `curl`**, so the transfer goes through `kubectl`,
+not an S3 round trip:
 
 ```shell
 mkdir -p /tmp/export
@@ -570,6 +673,20 @@ is a stray identity with write access to the bucket:
 kubectl -n omnigraph delete pod omnigraph-migrate-old omnigraph-migrate-new --ignore-not-found
 ```
 
+**Resume the maintenance sweeps.** Clearing the migration config does both —
+it removes the Job and un-suspends `optimize`/`cleanup` in one `pulumi up`:
+
+```shell
+pulumi config rm omnigraph:migrate_from_image --stack <CI|QA|Production>
+pulumi config rm omnigraph:migrate_to_prefix  --stack <CI|QA|Production>
+pulumi up --stack <CI|QA|Production>
+kubectl -n omnigraph get cronjob    # SUSPEND must read False for both
+```
+
+Left suspended, the first symptom is fragment bloat degrading query latency
+weeks later, with nothing pointing back at the migration that caused it. If you
+suspended by hand instead, un-patch by hand.
+
 The old root itself waits. **Not the same day** — leave `$OLD_ROOT/graphs/`
 untouched through at least one full soak (a week for Production), because it is
 the only fast rollback. Delete it, and the workstation copy of the exports in
@@ -636,6 +753,12 @@ because it looks like success.
   two-tier deployment this operates on; see its storage-format addendum.
 - `src/ol_infrastructure/applications/omnigraph/data_tier.py` — the Deployment,
   `Recreate` strategy, cluster.yaml generation, and `cluster apply` Job.
+- `src/ol_infrastructure/applications/omnigraph/storage_migration.py` — the
+  migration Job, its initContainer, and why it stops short of the cutover.
+- `src/ol_infrastructure/applications/omnigraph/scripts/migrate_storage_format.py`
+  — what the Job actually runs: baseline, export, rebuild, verify.
+- `src/ol_infrastructure/applications/omnigraph/maintenance.py` — the two
+  sweeps and the `suspend` flag a migration sets.
 - `src/ol_concourse/pipelines/infrastructure/omnigraph/pipeline.py` — the
   build-and-promote chain to pause.
 - [witan token sync runbook](witan-token-sync-runbook.md) — the other
