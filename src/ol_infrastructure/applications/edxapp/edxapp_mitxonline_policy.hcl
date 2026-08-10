@@ -6,6 +6,14 @@ path "mariadb-mitxonline/creds/edxapp-csmh" {
   capabilities = ["read"]
 }
 
+path "azure-openai/creds/ol-mitxonline-openai" {
+  capabilities = ["read"]
+}
+
+path "azure-openai/creds/ol-mitxonline-openai/*" {
+  capabilities = ["read"]
+}
+
 path "mongodb-mitxonline/creds/edxapp" {
   capabilities = ["read"]
 }

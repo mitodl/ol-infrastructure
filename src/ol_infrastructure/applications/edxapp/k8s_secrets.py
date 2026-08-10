@@ -1,4 +1,4 @@
-# ruff: noqa: E501, S105, PLR0913, PLR0915
+# ruff: noqa: E501, S105, PLR0912, PLR0913, PLR0915
 # mypy: ignore-errors
 """Kubernetes secrets for edxapp using Vault integration.
 
@@ -53,6 +53,7 @@ class EdxappSecrets:
     webhook_tokens: OLVaultK8SSecret | None
     meilisearch: OLVaultK8SSecret | None
     typesense: OLVaultK8SSecret | None
+    azure_openai: OLVaultK8SSecret | None
 
     db_creds_secret_name: str
     db_connections_secret_name: str
@@ -69,6 +70,7 @@ class EdxappSecrets:
     webhook_tokens_secret_name: str | None
     meilisearch_secret_name: str | None
     typesense_secret_name: str | None
+    azure_openai_secret_name: str | None
 
 
 def create_k8s_secrets(
@@ -136,6 +138,7 @@ def create_k8s_secrets(
     meilisearch_secret_name = "15-meilisearch-yaml"  # pragma: allowlist secret
     typesense_secret_name = "16-typesense-yaml"  # pragma: allowlist secret
     webhook_tokens_secret_name = "17-webhook-tokens-yaml"  # pragma: allowlist secret
+    azure_openai_secret_name = "18-azure-openai-yaml"  # pragma: allowlist secret
 
     # Database credentials secret (dynamic - depends on DB outputs)
     _db_restart_targets = (
@@ -413,6 +416,51 @@ def create_k8s_secrets(
     else:
         translations_providers_secret = None
 
+    # Azure OpenAI credentials, minted per-lease by Vault and scoped to mitxonline's
+    # own Cognitive Services account. mitxonline-only, matching the translations
+    # providers secret above.
+    #
+    # These are delivered as flat top-level settings in their own config source rather
+    # than as another `TRANSLATIONS_PROVIDERS:` block. The init container concatenates
+    # the config sources with `cat` (see k8s_resources.py) instead of deep-merging
+    # them, so a second file emitting that key would silently clobber the deepl /
+    # openai / gemini / mistral providers -- last one wins. The edx-extensions plugin
+    # folds these into TRANSLATIONS_PROVIDERS in Python, at Django settings load.
+    #
+    # Gated on edxapp:azure_openai_tenant_id: a VaultDynamicSecret pointed at a mount
+    # Vault does not have yet fails rather than degrading, so the switch is per
+    # environment and happens after substructure/vault/azure is deployed there.
+    azure_openai_tenant_id = edxapp_config.get("azure_openai_tenant_id")
+    if stack_info.env_prefix == "mitxonline" and azure_openai_tenant_id:
+        azure_openai_endpoint = (
+            f"https://ol-openai-mitxonline-{stack_info.env_suffix}.openai.azure.com/"
+        )
+        azure_openai_secret = OLVaultK8SSecret(
+            f"edxapp-{stack_info.env_prefix}-{stack_info.env_suffix}-azure-openai-secret",
+            OLVaultK8SDynamicSecretConfig(
+                name="azure-openai-secrets",
+                namespace=namespace,
+                labels=k8s_global_labels,
+                dest_secret_name=azure_openai_secret_name,
+                dest_secret_labels=k8s_global_labels,
+                mount="azure-openai",
+                path="creds/ol-mitxonline-openai",
+                templates={
+                    "18-azure-openai-secrets.yaml": textwrap.dedent(f"""
+                        AZURE_OPENAI_CLIENT_ID: {{{{ get .Secrets "client_id" }}}}
+                        AZURE_OPENAI_CLIENT_SECRET: {{{{ get .Secrets "client_secret" }}}}
+                        AZURE_OPENAI_TENANT_ID: {azure_openai_tenant_id}
+                        AZURE_OPENAI_ENDPOINT: {azure_openai_endpoint}
+                        AZURE_OPENAI_API_VERSION: {edxapp_config.get("azure_openai_api_version") or "2024-10-21"}
+                        AZURE_OPENAI_DEFAULT_DEPLOYMENT: {edxapp_config.get("azure_openai_default_deployment") or "gpt-5.2"}
+                    """),
+                },
+                vaultauth=vault_k8s_resources.auth_name,
+            ),
+        )
+    else:
+        azure_openai_secret = None
+
     meilisearch_config = Config("meilisearch")
     if meilisearch_config.get_bool("enabled"):
         meilisearch_secret = builder.create_static(
@@ -486,6 +534,7 @@ def create_k8s_secrets(
         webhook_tokens=webhook_tokens_secret,
         meilisearch=meilisearch_secret,
         typesense=typesense_secret,
+        azure_openai=azure_openai_secret,
         db_creds_secret_name=db_creds_secret_name,
         db_connections_secret_name=db_connections_secret_name,
         mongo_db_creds_secret_name=mongo_db_creds_secret_name,
@@ -506,4 +555,7 @@ def create_k8s_secrets(
         else None,
         meilisearch_secret_name=meilisearch_secret_name,
         typesense_secret_name=typesense_secret_name,
+        azure_openai_secret_name=azure_openai_secret_name
+        if azure_openai_secret
+        else None,
     )
