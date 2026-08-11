@@ -39,6 +39,22 @@ run_launcher:
       pod_template_spec_metadata:
         annotations:
           karpenter.sh/do-not-disrupt: "true"
+      job_spec_config:
+        # Overrides dagster_k8s' DEFAULT_K8S_JOB_TTL_SECONDS_AFTER_FINISHED of
+        # 24h. Retained run pods are pure API objects, but every cluster-wide
+        # informer caches them, so cluster memory footprint is (retention x
+        # completion rate) -- not a function of live workload. At the rate
+        # data-production sustains post-backlog-clear that ceiling was ~7-12k
+        # pod objects, which OOMKilled the jupyterhub user-scheduler and the
+        # vantage agent and left external-dns and all three VPA components
+        # sized around the garbage.
+        #
+        # A finished run pod is only worth keeping for infrastructure-level
+        # failures that produce no Dagster events (OOMKill, image pull error,
+        # scheduling failure); run history and the event log are in Postgres
+        # and compute logs are in S3, so an hour is enough to catch a page and
+        # still `kubectl describe` the pod.
+        ttl_seconds_after_finished: 3600
     load_incluster_config: true
     job_namespace: dagster
     image_pull_policy: IfNotPresent
@@ -47,13 +63,12 @@ run_launcher:
     instance_config_map: "dagster-instance"
     postgres_password_secret: "dagster-postgresql-secret" # pragma: allowlist secret
     env_secrets:
-    - dagster-static-secrets
-    - dagster-dbt-secrets
-    - dagster-postgresql-secret
-    # Ops execute in run worker pods, not in the code location pods, so the
-    # Sentry DSN has to reach them here as well.
-    - dagster-sentry-secrets
-
+      - dagster-static-secrets
+      - dagster-dbt-secrets
+      - dagster-postgresql-secret
+      # Ops execute in run worker pods, not in the code location pods, so the
+      # Sentry DSN has to reach them here as well.
+      - dagster-sentry-secrets
 
 run_storage:
   module: dagster_postgres.run_storage
@@ -107,7 +122,6 @@ run_coordinator:
   class: QueuedRunCoordinator
   config:
     max_concurrent_runs: 100
-
 
 # Configures how long Dagster waits for code locations
 # to load before timing out.
