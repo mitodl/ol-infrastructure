@@ -47,6 +47,16 @@ config:
   eks:apisix_min_replicas: '5'
   eks:apisix_max_replicas: '24'
   eks:apisix_target_cpu_utilization_percentage: '65'
+  # HPA scale-out point = target_cpu_utilization x this request (65% x 250m =
+  # 162.5m/pod). Calibrated from 2026-08-08..11 measurements: at the previous
+  # default request (100m, scale-out at 65m/pod) the gateway sat pinned at
+  # maxReplicas=24 for ~3 days while total fleet CPU peaked at 1.9 cores (122m
+  # max on any single pod) and gateway-added p95 latency held at 2-13ms -- "at
+  # max" was reachable at ~1.6 cores of real work and HPAAtMaxReplicasCritical
+  # carried no saturation signal. At 250m that same event runs at ~8-12
+  # replicas, and the alert only fires when the fleet genuinely needs >3.9
+  # cores (>2x the worst peak observed).
+  eks:apisix_cpu: 250m
   eks:apisix_memory: 1500Mi
   eks:developer_role_policy_name: AmazonEKSClusterAdminPolicy
   eks:developer_role_kubernetes_groups:
