@@ -10,6 +10,7 @@ This deployment uses:
 - APISix ingress with OpenID Connect for authentication
 """
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -1190,6 +1191,21 @@ for location in code_locations:
 dagster_instance_yaml = (
     Path(__file__).parent.joinpath("dagster_instance.yaml").read_text()
 )
+# The daemon and webserver mount dagster.yaml from the dagster-instance
+# ConfigMap via subPath, which kubelet never live-refreshes, and the chart's
+# built-in checksum/dagster-instance rollout trigger hashes only its OWN
+# values-rendered instance template -- not the extraManifests override below
+# that actually carries this file. Without this annotation, edits to
+# dagster_instance.yaml deploy the ConfigMap but silently never reach the
+# running processes until someone manually restarts them (bit us on the run
+# Job TTL fix, #5373): injecting our own content hash into both pod templates
+# makes a config edit roll the pods the same way the chart's native checksum
+# does.
+dagster_instance_checksum_annotation = {
+    "checksum/ol-dagster-instance": hashlib.sha256(
+        dagster_instance_yaml.encode()
+    ).hexdigest(),
+}
 
 # Get dagster-k8s image tag from environment variable (set by Concourse)
 dagster_k8s_image_tag = os.environ.get("DAGSTER_K8S_IMAGE_TAG")
@@ -1221,6 +1237,7 @@ dagster_helm_values = {
     },
     # Dagster webserver (UI)
     "dagsterWebserver": {
+        "annotations": dagster_instance_checksum_annotation,
         "image": dagster_k8s_image_config,
         "workspace": {
             "enabled": True,
@@ -1305,6 +1322,7 @@ dagster_helm_values = {
     },
     # Dagster daemon (background job scheduler)
     "dagsterDaemon": {
+        "annotations": dagster_instance_checksum_annotation,
         "image": dagster_k8s_image_config,
         "env": [
             {
