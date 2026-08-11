@@ -1384,6 +1384,35 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
             ),
         )
 
+        # MASAI SCHOOL [START]
+        # Masai School authenticates us via private_key_jwt (no client secret
+        # issued); they validate our assertions against our realm's live
+        # JWKS, so omitting client_secret here is required, not optional, to
+        # get onboard_oidc_org to configure private_key_jwt auth.
+        onboard_oidc_org(
+            OIDCIdpConfig(
+                idp_alias="MASAI",
+                idp_display_name="Masai School",
+                org_oidc_metadata_url="https://admissions-api.masaischool.com/oidc/.well-known/openid-configuration",
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                client_id="mit-learn",
+            ),
+            org=OrgConfig(
+                # Same as upGrad: Masai School users log in via a direct
+                # kc_idp_hint link, not domain-based home-realm discovery,
+                # so no domain is needed to gate access.
+                org_domains=[],
+                org_name="Masai School",
+                org_alias="MASAI",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
+        # MASAI SCHOOL [END]
+
     # B2B Organizations [END]
 
     if stack_info.env_suffix in ["ci", "qa"]:
