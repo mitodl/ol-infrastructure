@@ -239,11 +239,11 @@ def create_mitlearn_k8s_secrets(
             "templates": {
                 "SOCIAL_AUTH_OL_OIDC_SECRET": '{{ get .Secrets "client_secret" }}',
                 # Used to start Keycloak account actions (change email / change
-                # password) and to exchange the resulting authorization code.
-                # Same client APISIX authenticates with, so the callback URL is
-                # already covered by its registered redirect URIs.
+                # password). Same client APISIX authenticates with, so the
+                # callback URL is already covered by its registered redirect
+                # URIs. Only the id is needed — the redirect is unauthenticated
+                # and mit-learn never exchanges a token with this client.
                 "KEYCLOAK_CLIENT_ID": '{{ get .Secrets "client_id" }}',
-                "KEYCLOAK_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
             },
         },
         {
