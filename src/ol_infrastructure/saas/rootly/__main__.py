@@ -695,6 +695,53 @@ escalation_path_defer_medium_urgency_off_hours = rootly.EscalationPath(
     opts=rootly_opts,
 )
 
+# Medium urgency alerts used to page. The deferral path above only holds them
+# outside business hours, and the "Low Urgency" path matches Low only, so paths
+# being evaluated top-to-bottom with the first match winning meant a Medium
+# alert arriving mid-workday fell through to the audible Default Escalation
+# Path: on-call paged, posted to #devops-alerts. This path claims Medium first
+# and notifies only #devops-warnings -- Slack-visible, nobody paged.
+#
+# Scoped by urgency rather than by alert source on purpose, so it covers both
+# routes that reach this policy (the Grafana Production Catch-All Route hands
+# off to it directly; the Service Route hands off to Services that use it) as
+# well as the CloudWatch -qa-/-ci- demotions at the top of this file, which
+# were demoted to Medium for the same "must not page" reason.
+escalation_path_medium_urgency_slack_only = rootly.EscalationPath(
+    "medium-urgency-slack-warnings",
+    name="Medium urgency to #devops-warnings",
+    escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
+    path_type="escalation",
+    match_mode="match-all-rules",
+    notification_type="quiet",
+    # Between the Low Urgency path (1) and the default fallback path (3).
+    position=2,
+    # Nobody acknowledges a Slack-only notification, so repeating would just
+    # re-post to the channel until the alert resolved.
+    repeat=False,
+    rules=[
+        {
+            "ruleType": "alert_urgency",
+            "urgencyIds": ["fce5c971-6660-4ad9-90eb-e75122055f50"],
+        },
+    ],
+    opts=rootly_opts,
+)
+
+escalation_level_medium_urgency_slack_only = rootly.EscalationLevel(
+    "medium-urgency-slack-warnings-escalation-level",
+    escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
+    escalation_policy_path_id=escalation_path_medium_urgency_slack_only.id,
+    position=1,
+    notification_target_params=[
+        {
+            "type": "slack_channel",
+            "id": "C0BK6BHUCDP",  # #devops-warnings
+        },
+    ],
+    opts=rootly_opts,
+)
+
 # Services imported from the existing Rootly account.
 service_api_authentication = rootly.Service(
     "api-authentication",
