@@ -557,9 +557,12 @@ escalation_policy_exampledeleteme_escalationpolicy = rootly.EscalationPolicy(
 # integration setting. Discovered 2026-07-22: that global setting posts every
 # alert account-wide unconditionally, independent of routing/escalation, which
 # is why CI/QA alerts (routed separately to their own Slack-only escalation
-# policy) were also still landing in #devops-alerts. Once this level -- and
-# its counterpart below on the other escalation path -- are confirmed working,
-# the global toggle can be turned off to fully separate the two channels.
+# policy) were also still landing in #devops-alerts. Once this level is
+# confirmed working, the global toggle can be turned off to fully separate the
+# two channels. This is now the only level that targets #devops-alerts: High
+# urgency is all that still pages, and Medium and Low both go to
+# #devops-warnings instead (see the Low Urgency level and the Medium urgency
+# escalation path below).
 escalation_level_b94aa0a3_cda6_4ee6_bcb1_cddf33c69088 = rootly.EscalationLevel(
     "b94aa0a3-cda6-4ee6-bcb1-cddf33c69088",
     delay=5,
@@ -594,9 +597,16 @@ escalation_level_r_4351b5b9_00d3_46ae_a044_05930cfbe0e2 = rootly.EscalationLevel
     opts=rootly_opts,
 )
 
-# See the comment on escalation_level_b94aa0a3_cda6_4ee6_bcb1_cddf33c69088
-# above -- this is the equivalent position-1 level on the Default Escalation
-# Policy's other escalation path, updated the same way for the same reason.
+# The only level on the "Low Urgency" escalation path (which is unmanaged --
+# only this level is modeled here). Low urgency alerts used to notify the
+# on-call schedule here and post to #devops-alerts. The path is "quiet", so
+# those pages respected Do Not Disturb, but they were still pages, for the
+# least urgent tier we have -- Grafana severity=warning maps to Low. Both
+# targets are now replaced by #devops-warnings alone, matching the Medium
+# urgency path below: Slack-visible, nobody paged.
+#
+# The schedule target is gone, so the paging strategy fields that governed it
+# are gone with it -- they only apply to schedule targets.
 escalation_level_r_75bc919c_824c_46a1_9589_0fc8b85e0d77 = rootly.EscalationLevel(
     "r-75bc919c-824c-46a1-9589-0fc8b85e0d77",
     delay=5,
@@ -604,17 +614,10 @@ escalation_level_r_75bc919c_824c_46a1_9589_0fc8b85e0d77 = rootly.EscalationLevel
     escalation_policy_path_id="67658f83-7fac-4a19-8e2a-0d8eee57f0a8",
     notification_target_params=[
         {
-            "id": "fad27d50-f0e4-4d21-9b6d-57eb2dec648b",
-            "teamMembers": "all",
-            "type": "schedule",
-        },
-        {
-            "id": "GBDLJJX51",  # #devops-alerts
+            "id": "C0BK6BHUCDP",  # #devops-warnings
             "type": "slack_channel",
         },
     ],
-    paging_strategy_configuration_schedule_strategy="on_call_only",
-    paging_strategy_configuration_strategy="default",
     position=1,
     opts=rootly_opts,
 )
@@ -690,6 +693,53 @@ escalation_path_defer_medium_urgency_off_hours = rootly.EscalationPath(
                 {"saturday": True, "allDay": True},
                 {"sunday": True, "allDay": True},
             ],
+        },
+    ],
+    opts=rootly_opts,
+)
+
+# Medium urgency alerts used to page. The deferral path above only holds them
+# outside business hours, and the "Low Urgency" path matches Low only, so paths
+# being evaluated top-to-bottom with the first match winning meant a Medium
+# alert arriving mid-workday fell through to the audible Default Escalation
+# Path: on-call paged, posted to #devops-alerts. This path claims Medium first
+# and notifies only #devops-warnings -- Slack-visible, nobody paged.
+#
+# Scoped by urgency rather than by alert source on purpose, so it covers both
+# routes that reach this policy (the Grafana Production Catch-All Route hands
+# off to it directly; the Service Route hands off to Services that use it) as
+# well as the CloudWatch -qa-/-ci- demotions at the top of this file, which
+# were demoted to Medium for the same "must not page" reason.
+escalation_path_medium_urgency_slack_only = rootly.EscalationPath(
+    "medium-urgency-slack-warnings",
+    name="Medium urgency to #devops-warnings",
+    escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
+    path_type="escalation",
+    match_mode="match-all-rules",
+    notification_type="quiet",
+    # Between the Low Urgency path (1) and the default fallback path (3).
+    position=2,
+    # Nobody acknowledges a Slack-only notification, so repeating would just
+    # re-post to the channel until the alert resolved.
+    repeat=False,
+    rules=[
+        {
+            "ruleType": "alert_urgency",
+            "urgencyIds": ["fce5c971-6660-4ad9-90eb-e75122055f50"],
+        },
+    ],
+    opts=rootly_opts,
+)
+
+escalation_level_medium_urgency_slack_only = rootly.EscalationLevel(
+    "medium-urgency-slack-warnings-escalation-level",
+    escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
+    escalation_policy_path_id=escalation_path_medium_urgency_slack_only.id,
+    position=1,
+    notification_target_params=[
+        {
+            "type": "slack_channel",
+            "id": "C0BK6BHUCDP",  # #devops-warnings
         },
     ],
     opts=rootly_opts,
