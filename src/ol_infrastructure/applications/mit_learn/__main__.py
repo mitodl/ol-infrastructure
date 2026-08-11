@@ -1161,6 +1161,7 @@ env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
 # Values that are generally unchanging across environments
 env_vars = {
     "ALLOWED_HOSTS": '["*"]',
+    "OVS_ALLOWED_MEDIA_HOSTS": '[".cloudfront.net"]',
     "AWS_STORAGE_BUCKET_NAME": f"ol-mitlearn-app-storage-{env_name}",
     "CANVAS_PDF_TRANSCRIPTION_MODEL": "gpt-4o",
     "CONTENT_FILE_EMBEDDING_CHUNK_OVERLAP": 51,
