@@ -63,12 +63,12 @@ run_launcher:
     instance_config_map: "dagster-instance"
     postgres_password_secret: "dagster-postgresql-secret" # pragma: allowlist secret
     env_secrets:
-      - dagster-static-secrets
-      - dagster-dbt-secrets
-      - dagster-postgresql-secret
+    - dagster-static-secrets
+    - dagster-dbt-secrets
+    - dagster-postgresql-secret
       # Ops execute in run worker pods, not in the code location pods, so the
       # Sentry DSN has to reach them here as well.
-      - dagster-sentry-secrets
+    - dagster-sentry-secrets
 
 run_storage:
   module: dagster_postgres.run_storage
