@@ -28,14 +28,13 @@ GRAPHS = ["council", "code-bridge", "code-github-com-mitodl-ol-django"]
 
 CLEANUP_ARGS = ["--older-than", DEFAULT_CLEANUP_OLDER_THAN, "--confirm", "--yes"]
 
-# Deliberately NOT the real bucket or actor. Both reach the script through the
-# environment, and what is under test is that it passes them through unaltered —
-# nothing here pins a naming convention. The real values are built in
-# data_tier.py (`ol-data-witan-<env>` from the OLBucket, and CLUSTER_APPLY_ACTOR),
-# so a realistic-looking literal here would only send someone renaming the bucket
+# Deliberately NOT the real bucket. It reaches the script through the
+# environment, and what is under test is that it passes through unaltered —
+# nothing here pins a naming convention. The real value is built in
+# data_tier.py (`ol-data-witan-<env>` from the OLBucket), so a
+# realistic-looking literal here would only send someone renaming the bucket
 # to a test that never needed to change.
 STORAGE_ROOT = "s3://test-storage-root"
-MAINTENANCE_ACTOR = "test-actor"
 
 
 class SweepResult:
@@ -92,7 +91,6 @@ def run_sweep(tmp_path: Path):
             env={
                 "PATH": str(bin_dir),
                 "OMNIGRAPH_STORAGE_ROOT": STORAGE_ROOT,
-                "OMNIGRAPH_MAINTENANCE_ACTOR": MAINTENANCE_ACTOR,
             },
             check=False,
         )
@@ -131,9 +129,26 @@ def test_sweep_addresses_the_cluster_root_not_a_bare_uri(run_sweep):
         STORAGE_ROOT,
         "--graph",
         "council",
-        "--as",
-        MAINTENANCE_ACTOR,
     ]
+
+
+def test_sweeps_never_pass_an_actor():
+    """``--as`` is rejected outright by 0.9.0 on a storage-native command.
+
+    Both sweeps are direct-engine commands, and 0.9.0 answers an actor on one
+    with::
+
+        `optimize` is a direct (storage-native) command; --as sets the actor
+        for a direct-engine or actor-bound cluster operation and does not
+        apply.
+
+    0.8.x accepted and ignored the flag, so this stayed invisible until the
+    0.9.0 image rolled and every nightly optimize began failing against all 16
+    graphs at once. Asserted on the rendered script rather than a captured call
+    so it covers both commands and holds even if the argv order changes.
+    """
+    for command, extra in (("optimize", []), ("cleanup", CLEANUP_ARGS)):
+        assert "--as" not in _sweep_script(command, extra, GRAPHS)
 
 
 def test_cleanup_passes_confirm_and_yes(run_sweep):
@@ -202,8 +217,6 @@ def test_shell_metacharacters_in_config_do_not_escape_the_argument(run_sweep):
         STORAGE_ROOT,
         "--graph",
         "council",
-        "--as",
-        MAINTENANCE_ACTOR,
         "--older-than",
         hostile,
         "--confirm",
