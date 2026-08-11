@@ -46,5 +46,16 @@ config:
   aws:region: us-east-1
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
+  # The storage-format generation this cluster serves. CI was migrated from
+  # format 4 to format 6 (omnigraph 0.9.0) on 2026-08-10; the rebuilt graphs
+  # live under `<bucket>/fmt6` and the pre-migration format-4 graphs remain at
+  # `<bucket>/graphs` as the rollback.
+  #
+  # This MUST be committed, not just `pulumi config set` locally. A cutover
+  # that exists only in a working copy is reverted by the next pipeline
+  # deploy, which repoints the cluster at the old root while the server image
+  # can only read the new format — every graph then fails to open and the
+  # server crashloops. That is exactly what happened here for ~12h.
+  omnigraph:storage_prefix: fmt6
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagHdMkilOMMReBzl5ZFVAxo4AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMp4JVj0Zbv48c45+qAgEQgDt/KPJs42c+WEXeS2IPS6gVYHOCM2L51SVYdqGNpSII1XjPkxQgj6ypYwhz6wdA7GrvJjK9P89/US3Nww==
