@@ -777,7 +777,6 @@ def create_data_tier(  # noqa: PLR0913
         service_account_name=OMNIGRAPH_SERVICE_ACCOUNT_NAME,
         aws_region=aws_config.region,
         storage_uri=storage_uri,
-        maintenance_actor=CLUSTER_APPLY_ACTOR,
         graph_ids=list(cluster_graphs),
         optimize_schedule=optimize_schedule,
         cleanup_schedule=cleanup_schedule,

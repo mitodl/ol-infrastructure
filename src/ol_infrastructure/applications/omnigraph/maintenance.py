@@ -132,6 +132,20 @@ def _sweep_script(command: str, extra_args: list[str], graph_ids: list[str]) -> 
     ``code_graph_id``, so quoting them is a no-op today and stays correct if
     that normalization ever loosens — quoting each id individually preserves
     the word list the ``for`` loop needs.
+
+    NO ``--as``. Both sweeps are storage-native (direct-engine) commands, and
+    omnigraph 0.9.0 rejects an actor on those outright::
+
+        `optimize` is a direct (storage-native) command; --as sets the actor
+        for a direct-engine or actor-bound cluster operation and does not
+        apply. Pass a storage URI, or --cluster <dir> --graph <id>.
+
+    0.8.x accepted and ignored the flag, so this only became visible when the
+    0.9.0 image rolled — every optimize run then failed against all 16 graphs.
+    Addressing (``--cluster`` + ``--graph``) was never the problem and is
+    unchanged. Verified against both binaries before removing it: 0.9.0 without
+    ``--as`` compacts, and 0.8.1 without ``--as`` also compacts, so the sweeps
+    work on either side of the upgrade.
     """
     graph_list = " ".join(shlex.quote(graph) for graph in graph_ids)
     args = " ".join(shlex.quote(arg) for arg in extra_args)
@@ -141,8 +155,7 @@ for graph in {graph_list}; do
     echo "=== omnigraph {command} ${{graph}}"
     if omnigraph {command} \\
         --cluster "${{OMNIGRAPH_STORAGE_ROOT}}" \\
-        --graph "${{graph}}" \\
-        --as "${{OMNIGRAPH_MAINTENANCE_ACTOR}}" {args}; then
+        --graph "${{graph}}" {args}; then
         :
     else
         echo "!!! omnigraph {command} failed for ${{graph}}" >&2
@@ -166,7 +179,6 @@ def _cron_job(  # noqa: PLR0913
     service_account_name: str,
     aws_region: str,
     storage_uri: Output[str],
-    maintenance_actor: str,
     schedule: str,
     script: str,
     depends_on: list[Resource],
@@ -248,10 +260,6 @@ def _cron_job(  # noqa: PLR0913
                                             name="OMNIGRAPH_STORAGE_ROOT",
                                             value=storage_uri,
                                         ),
-                                        kubernetes.core.v1.EnvVarArgs(
-                                            name="OMNIGRAPH_MAINTENANCE_ACTOR",
-                                            value=maintenance_actor,
-                                        ),
                                     ],
                                     # Compaction rewrites fragments through
                                     # memory, so this is the one job here with a
@@ -289,7 +297,6 @@ def create_maintenance(  # noqa: PLR0913
     service_account_name: str,
     aws_region: str,
     storage_uri: Output[str],
-    maintenance_actor: str,
     graph_ids: list[str],
     optimize_schedule: str,
     cleanup_schedule: str,
@@ -318,7 +325,6 @@ def create_maintenance(  # noqa: PLR0913
         service_account_name=service_account_name,
         aws_region=aws_region,
         storage_uri=storage_uri,
-        maintenance_actor=maintenance_actor,
         schedule=optimize_schedule,
         # Non-destructive, so no --confirm and no confirmation prompt to skip.
         script=_sweep_script("optimize", [], graph_ids),
@@ -340,7 +346,6 @@ def create_maintenance(  # noqa: PLR0913
         service_account_name=service_account_name,
         aws_region=aws_region,
         storage_uri=storage_uri,
-        maintenance_actor=maintenance_actor,
         schedule=cleanup_schedule,
         script=_sweep_script(
             "cleanup",
