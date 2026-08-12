@@ -1322,24 +1322,28 @@ def _build_release_resource_app_pipeline(
             },
         ),
         # Merge the release branch back into the main branch and delete it so
-        # subsequent check calls no longer see a release as in-flight. Wrapped
-        # in a try since this job can be retriggered by an infra-only merge
-        # (QA re-runs on any change under the watched Pulumi paths, and its
-        # release_issue put edits the already-closed release_gate issue,
-        # which Concourse's version="every" get treats as a new trigger for
-        # this job) with no new app release -- the finish action then tries
-        # to fetch a release branch that a prior successful finish already
-        # deleted, and fails every time. That failure is safe to swallow:
-        # the release was already finished, there's nothing left to do.
-        TryStep(
-            try_=PutStep(
-                put=release_res.name,
-                params={
-                    "action": "finish",
-                    "repo_dir": str(main_repo.name),
-                    "version_file": f"{release_res.name}/version",
-                },
-            )
+        # subsequent check calls no longer see a release as in-flight.
+        #
+        # Deliberately NOT wrapped in a `try`. It used to be, because this job
+        # can be retriggered by an infra-only merge (QA re-runs on any change
+        # under the watched Pulumi paths, and its release_issue put edits the
+        # already-closed release_gate issue, which Concourse's version="every"
+        # get treats as a new trigger here) with no new app release -- and
+        # finish then failed trying to fetch a release branch that a prior
+        # finish had already deleted. The release resource now no-ops in that
+        # case instead of failing, so the `try` buys nothing and costs
+        # everything: it equally swallowed *genuine* finish failures. That is
+        # how ol-analytics-api sat with an unmerged releases/2026.8.3.1 branch
+        # -- and therefore a frozen release version -- from 2026-08-03 onward,
+        # with no red build to show for it. A failure here now means a real
+        # release that never finished, and should stop the job.
+        PutStep(
+            put=release_res.name,
+            params={
+                "action": "finish",
+                "repo_dir": str(main_repo.name),
+                "version_file": f"{release_res.name}/version",
+            },
         ),
     ]
     additional_post_steps: dict[int, list[GetStep | PutStep | TaskStep | TryStep]] = {

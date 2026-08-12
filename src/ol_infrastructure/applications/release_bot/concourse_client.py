@@ -72,12 +72,40 @@ async def trigger_job(pipeline: str, job: str) -> str:
     return f"{CONCOURSE_URL}/builds/{build['id']}"
 
 
-async def check_resource(pipeline: str, resource: str) -> None:
-    """Trigger an immediate check of a resource instead of waiting for its interval.
+_CHECK_POLL_SECONDS = 2
+_CHECK_TIMEOUT_SECONDS = 180
+_TERMINAL_BUILD_STATUSES = frozenset({"succeeded", "failed", "errored", "aborted"})
 
-    Used after closing a release issue so the production `-release-gate`
-    resource picks up the closed issue right away, rather than leaving the
-    production deploy stalled for up to its normal check_every interval.
+
+async def _get_build_status(build_id: int) -> str:
+    token = await _get_token()
+    url = f"{CONCOURSE_URL}/api/v1/builds/{build_id}"
+    async with (
+        aiohttp.ClientSession() as session,
+        session.get(url, headers={"Authorization": f"Bearer {token}"}) as resp,
+    ):
+        resp.raise_for_status()
+        build = await resp.json()
+    return build["status"]
+
+
+async def check_resource(pipeline: str, resource: str) -> None:
+    """Run a resource check and wait for it to finish.
+
+    Used to make a resource pick up new versions immediately rather than
+    waiting for its `check_every` interval — after closing a release issue so
+    the production `-release-gate` sees it right away, and before triggering a
+    release so the build binds the current version.
+
+    **Waits for the check build to succeed.** The POST only creates the build
+    and returns `201` straight away (`fly check-resource` separately streams
+    that build's events unless `--async` is passed). Returning here as soon as
+    the POST came back would let a caller trigger a job before the new version
+    was recorded, which is exactly the stale-version binding this is meant to
+    prevent.
+
+    :raises RuntimeError: If the check build fails, is aborted, or does not
+        finish within `_CHECK_TIMEOUT_SECONDS`.
     """
     token = await _get_token()
     url = (
@@ -91,3 +119,32 @@ async def check_resource(pipeline: str, resource: str) -> None:
         ) as resp,
     ):
         resp.raise_for_status()
+        build = await resp.json()
+
+    # Older Concourse versions answer this endpoint with no build body. There
+    # is nothing to wait on in that case, so preserve the previous behaviour
+    # rather than failing.
+    build_id = build.get("id") if isinstance(build, dict) else None
+    if build_id is None:
+        return
+
+    deadline = time.monotonic() + _CHECK_TIMEOUT_SECONDS
+    while True:
+        status = await _get_build_status(build_id)
+        if status in _TERMINAL_BUILD_STATUSES:
+            break
+        if time.monotonic() >= deadline:
+            msg = (
+                f"Check of {pipeline}/{resource} did not finish within "
+                f"{_CHECK_TIMEOUT_SECONDS}s (last status: {status!r}). "
+                f"{CONCOURSE_URL}/builds/{build_id}"
+            )
+            raise RuntimeError(msg)
+        await asyncio.sleep(_CHECK_POLL_SECONDS)
+
+    if status != "succeeded":
+        msg = (
+            f"Check of {pipeline}/{resource} {status}. "
+            f"{CONCOURSE_URL}/builds/{build_id}"
+        )
+        raise RuntimeError(msg)
