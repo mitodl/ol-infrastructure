@@ -419,7 +419,10 @@ class OLAmazonDB(pulumi.ComponentResource):
             )
         ):
             db_instance_identifier = current_db_state.get("DBInstanceIdentifier")
-            turn_off_deletion_protection(db_instance_identifier)
+            turn_off_deletion_protection(
+                db_instance_identifier,
+                currently_protected=bool(current_db_state.get("DeletionProtection")),
+            )
             deletion_protection_for_primary = False
             custom_timeouts = pulumi.CustomTimeouts(
                 create=f"{db_config.blue_green_timeout_minutes}m",
