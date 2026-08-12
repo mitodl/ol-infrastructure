@@ -124,7 +124,7 @@ def setup_grafana(
         },
     ]
 
-    kubernetes.helm.v3.Release(
+    grafana_k8s_monitoring_release = kubernetes.helm.v3.Release(
         f"{cluster_name}-grafana-k8s-monitoring-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
             name="grafana-k8s-monitoring",
@@ -411,4 +411,56 @@ def setup_grafana(
             },
         ),
         opts=ResourceOptions(provider=k8s_provider, delete_before_replace=True),
+    )
+
+    # The alloy-metrics collector already auto-discovers PodMonitor/ServiceMonitor
+    # CRDs cluster-wide via prometheusOperatorObjects (above), but nothing scrapes
+    # the collectors' own :12345/metrics endpoint. That endpoint carries the
+    # otelcol_* series (receiver/processor/exporter throughput, queue depth,
+    # refused/dropped spans) that are the only signal for whether the trace
+    # pipeline itself -- including the tail-sampling collector -- is healthy.
+    # Every collector Deployment/StatefulSet the chart creates (alloy-logs,
+    # alloy-metrics, alloy-receiver, alloy-singleton, and the tail-sampling
+    # collector, which the alloy-operator names plain "alloy") shares this
+    # http-metrics port name; verified against the live applications-production
+    # Service objects.
+    kubernetes.apiextensions.CustomResource(
+        f"{cluster_name}-grafana-alloy-collectors-pod-monitor",
+        api_version="monitoring.coreos.com/v1",
+        kind="PodMonitor",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="alloy-collectors",
+            namespace="grafana",
+        ),
+        spec={
+            "selector": {
+                "matchExpressions": [
+                    {
+                        "key": "app.kubernetes.io/name",
+                        "operator": "In",
+                        "values": [
+                            "alloy",
+                            "alloy-logs",
+                            "alloy-metrics",
+                            "alloy-receiver",
+                            "alloy-singleton",
+                        ],
+                    },
+                ],
+            },
+            "namespaceSelector": {"matchNames": ["grafana"]},
+            "podMetricsEndpoints": [
+                {
+                    "port": "http-metrics",
+                    "path": "/metrics",
+                    "scheme": "http",
+                    "interval": "30s",
+                    "scrapeTimeout": "10s",
+                },
+            ],
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            depends_on=[grafana_k8s_monitoring_release],
+        ),
     )
