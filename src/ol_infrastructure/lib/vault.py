@@ -194,23 +194,6 @@ postgres_role_statements = {
                 """
             ),
             Template("""RESET ROLE;"""),
-            # Grant rds_iam so any user in this role can authenticate via AWS IAM
-            # on RDS instances that have IAM DB authentication enabled.
-            # The DO block is a no-op on non-RDS Postgres where the role doesn't exist.
-            Template(
-                """
-                DO
-                $$do$$
-                BEGIN
-                    IF EXISTS (
-                        SELECT FROM pg_catalog.pg_roles WHERE rolname = 'rds_iam'
-                    ) THEN
-                        GRANT rds_iam TO "read_only_role";
-                    END IF;
-                END
-                $$do$$;
-                """
-            ),
             # Create the read-only user and put it into the read-only-role
             Template(
                 """
@@ -245,6 +228,29 @@ postgres_role_statements = {
         "rollback": [],
     },
 }
+
+# Opt-in addition for postgres_role_statements["readonly"]["create"] on
+# instances where a consumer specifically authenticates via AWS IAM tokens
+# (e.g. rds-db:connect) rather than a Vault-issued password. On RDS Postgres,
+# once a role is a member of rds_iam, RDS enforces IAM-token auth for that
+# role and rejects plain password auth with "FATAL: PAM authentication
+# failed" - so this must NOT be added to postgres_role_statements directly,
+# only appended to a per-app copy (see open_metadata/__main__.py) whose
+# readonly consumers actually use IAM tokens instead of Vault passwords.
+RDS_IAM_READONLY_GRANT_STATEMENT = Template(
+    """
+    DO
+    $$do$$
+    BEGIN
+        IF EXISTS (
+            SELECT FROM pg_catalog.pg_roles WHERE rolname = 'rds_iam'
+        ) THEN
+            GRANT rds_iam TO "read_only_role";
+        END IF;
+    END
+    $$do$$;
+    """
+)
 
 mysql_role_statements = {
     "admin": {

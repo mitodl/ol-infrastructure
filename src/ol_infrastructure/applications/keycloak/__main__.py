@@ -320,6 +320,12 @@ keycloak_db_config = OLPostgresDBConfig(
     db_name="keycloak",
     tags=aws_config.tags,
     use_blue_green=keycloak_config.get_bool("db_use_blue_green") or False,
+    # Vault-issued readonly credentials (e.g. the keycloak_ingest dlt asset)
+    # authenticate with a plain password, never an IAM token. RDS enforces
+    # IAM-token auth for any role granted rds_iam, so IAM DB auth must stay
+    # off here or those connections fail with "FATAL: PAM authentication
+    # failed".
+    enable_iam_auth=False,
     **rds_defaults,
 )
 keycloak_db = OLAmazonDB(keycloak_db_config)
