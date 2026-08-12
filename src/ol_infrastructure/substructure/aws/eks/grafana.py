@@ -119,12 +119,61 @@ stage.match {
     expression = `identity_provider="(?P<identity_provider>[^"]+)"`
   }
 
+  // metric.counter needs BOTH of these, for two unrelated reasons:
+  //   - source: when unset, it defaults to the metric's own `name`, which
+  //     is never a key in the extracted map -- so the counter would look
+  //     for a field that doesn't exist and silently never increment.
+  //     Setting it to "identity_provider" makes it require that (real)
+  //     extracted field's presence instead.
+  //   - stage.labels: source only *gates* on the extracted map, it doesn't
+  //     attach the extracted field as a label on the resulting metric.
+  //     Without this, every login (any IdP) increments one undifferentiated
+  //     series. This promotes identity_provider to an actual label on the
+  //     log entry first, so stage.metrics carries it as a metric label too.
+  stage.labels {
+    values = {
+      identity_provider = "",
+    }
+  }
+
   stage.metrics {
     metric.counter {
       name        = "keycloak_olapps_idp_login_total"
       description = "Successful olapps realm logins brokered through an external identity provider, by IdP alias"
       source      = "identity_provider"
       action      = "inc"
+      // max_idle_duration defaults to "5m": a counter with no matching line
+      // for 5 minutes is dropped, and the next matching login starts a
+      // fresh series back at 1. When a reset lands on the same value as
+      // before the gap (e.g. 1 -> idle-dropped -> next login recreates it
+      // at 1), Prometheus's increase() can't tell a reset happened -- it
+      // only detects resets via a *decrease* between consecutive samples,
+      // not a gap -- so it silently reports zero increase across that
+      // boundary, for any window width, confirmed directly against two
+      // real test logins ~7m apart.
+      //
+      // There's no duration that makes this fully watertight -- any IdP
+      // whose login gap exceeds max_idle_duration hits the same silent
+      // undercount, just at a longer interval. 2160h (90 days -- Alloy's
+      // River duration parser has no "d" unit, only up to "h"; a literal
+      // "90d" fails to parse and silently breaks the whole containing
+      // loki.process component on every reload, confirmed the hard way)
+      // is chosen to comfortably outlast the widest range anyone would
+      // realistically view this dashboard at (default is 7d; even a
+      // manually-widened 30-60d query stays inside a single continuous
+      // series). It only misses a login if a given IdP goes completely
+      // unused for >90d *and* someone then queries a range spanning that
+      // exact gap -- an accepted, bounded tradeoff rather than a full fix.
+      max_idle_duration = "2160h"
+      // metric.counter defaults prefix to "loki_process_custom_", and an
+      // explicit empty string does not override that (Alloy appears to
+      // treat "" the same as unset). So the real exposed/exported name is
+      // loki_process_custom_keycloak_olapps_idp_login_total -- confirmed
+      // directly on Alloy's own /metrics endpoint -- not the bare name
+      // this block sets via `name`. Every consumer (the includeMetrics
+      // allowlist entry below, and every PromQL query in
+      // dashboards/keycloak_olapps_idp_logins.py) must use the full
+      // loki_process_custom_-prefixed name, not this bare one.
     }
   }
 }
@@ -143,12 +192,21 @@ stage.match {
     expression = `identity_provider="(?P<identity_provider>[^"]+)"`
   }
 
+  stage.labels {
+    values = {
+      identity_provider = "",
+    }
+  }
+
   stage.metrics {
     metric.counter {
       name        = "keycloak_olapps_idp_login_failure_total"
       description = "Failed olapps realm logins brokered through an external identity provider, by IdP alias"
       source      = "identity_provider"
       action      = "inc"
+      // See the max_idle_duration comment on the success counter above --
+      // same reasoning applies here.
+      max_idle_duration = "2160h"
     }
   }
 }
@@ -461,6 +519,14 @@ def setup_grafana(
                     # reaching Mimir: confirmed present on Alloy's own
                     # /metrics endpoint but absent from Mimir at every range
                     # queried, however wide.
+                    #
+                    # Note the loki_process_custom_ prefix: metric.counter
+                    # defaults to that prefix and an explicit `prefix = ""`
+                    # does not override it (confirmed directly against
+                    # Alloy's /metrics endpoint), so the real exported names
+                    # are loki_process_custom_keycloak_olapps_idp_login_total
+                    # and its _failure_total counterpart, not the bare names
+                    # set via metric.counter's `name` attribute.
                     "alloy": {
                         "instances": [
                             {
@@ -483,8 +549,8 @@ def setup_grafana(
                                             "otelcol_processor_tail_sampling_new_trace_id_received",
                                             "otelcol_processor_tail_sampling_sampling_traces_on_memory",
                                             "otelcol_processor_tail_sampling_sampling_policy_evaluation_error",
-                                            "keycloak_olapps_idp_login_total",
-                                            "keycloak_olapps_idp_login_failure_total",
+                                            "loki_process_custom_keycloak_olapps_idp_login_total",
+                                            "loki_process_custom_keycloak_olapps_idp_login_failure_total",
                                         ],
                                     },
                                 },
