@@ -68,6 +68,93 @@ stage.match {
 """
 
 
+def _keycloak_olapps_idp_login_metrics_alloy_config() -> str:
+    """
+    Alloy River stages that turn olapps-realm brokered-login events into
+    per-IdP Prometheus counters, without shipping login records (or the PII
+    they carry) to Loki.
+
+    Keycloak's jboss-logging event listener is configured (see
+    applications/keycloak/__main__.py) with success-level=info so that
+    successful LOGIN/IDENTITY_PROVIDER_LOGIN events reach our logs; that
+    setting is all-or-nothing per Keycloak, logging every successful event
+    type (CODE_TO_TOKEN, REFRESH_TOKEN, LOGOUT, REGISTER, ...) across every
+    realm on the shared instance, not just logins on olapps. Those events
+    also carry username and identity_provider_identity (the federated
+    email) -- fields the dashboard doesn't need, since it only wants a
+    per-IdP count.
+
+    So rather than filter down to the wanted events and ship them to Loki,
+    this pipeline extracts what's needed as metrics and ships no
+    olapps-brokered-login records to Loki at all:
+
+    1. Match INFO-level LOGIN/IDENTITY_PROVIDER_LOGIN events on olapps that
+       carry an identity_provider detail (i.e. were actually brokered
+       through an external IdP, not a direct username/password login), and
+       increment keycloak_olapps_idp_login_total{identity_provider=...}.
+    2. Unconditionally drop every remaining INFO-level org.keycloak.events
+       line -- covering both the events just counted (no login record, only
+       the counter, reaches Loki) and the rest of the noisy INFO volume
+       (CODE_TO_TOKEN, REFRESH_TOKEN, etc.) that success-level=info produces.
+    3. Match WARN-level LOGIN_ERROR/IDENTITY_PROVIDER_LOGIN_ERROR events on
+       olapps that carry an identity_provider detail, and increment
+       keycloak_olapps_idp_login_failure_total{identity_provider=...}. This
+       stage has no drop action: WARN/ERROR events are the pre-existing
+       failure logs already relied on for debugging (e.g. diagnosing a
+       broken IdP integration) and carry materially less PII than the
+       success events, so they keep flowing to Loki unchanged -- this stage
+       only adds a metric as a side effect.
+
+    Each stage's selector independently re-checks the INFO/WARN level
+    marker and the olapps realm, rather than relying on another stage
+    having already scoped the pipeline, so this is correct regardless of
+    stage ordering.
+    """
+    return r"""
+stage.match {
+  selector = "{namespace=\"keycloak\", container=\"keycloak\"} |= \"INFO  [org.keycloak.events]\" |= \"realmId=\\\"olapps\\\"\" |~ \"type=\\\"(LOGIN|IDENTITY_PROVIDER_LOGIN)\\\"\" |= \"identity_provider=\\\"\""
+  pipeline_name = "keycloak_olapps_login_success_metric"
+
+  stage.regex {
+    expression = `identity_provider="(?P<identity_provider>[^"]+)"`
+  }
+
+  stage.metrics {
+    metric.counter {
+      name        = "keycloak_olapps_idp_login_total"
+      description = "Successful olapps realm logins brokered through an external identity provider, by IdP alias"
+      source      = "identity_provider"
+      action      = "inc"
+    }
+  }
+}
+
+stage.match {
+  selector = "{namespace=\"keycloak\", container=\"keycloak\"} |= \"INFO  [org.keycloak.events]\""
+  action = "drop"
+  drop_counter_reason = "keycloak_info_event"
+}
+
+stage.match {
+  selector = "{namespace=\"keycloak\", container=\"keycloak\"} |= \"WARN  [org.keycloak.events]\" |= \"realmId=\\\"olapps\\\"\" |~ \"type=\\\"(LOGIN_ERROR|IDENTITY_PROVIDER_LOGIN_ERROR)\\\"\" |= \"identity_provider=\\\"\""
+  pipeline_name = "keycloak_olapps_login_failure_metric"
+
+  stage.regex {
+    expression = `identity_provider="(?P<identity_provider>[^"]+)"`
+  }
+
+  stage.metrics {
+    metric.counter {
+      name        = "keycloak_olapps_idp_login_failure_total"
+      description = "Failed olapps realm logins brokered through an external identity provider, by IdP alias"
+      source      = "identity_provider"
+      action      = "inc"
+    }
+  }
+}
+"""
+
+
 def setup_grafana(
     cluster_name: str,
     stack_info: StackInfo,
@@ -297,7 +384,8 @@ def setup_grafana(
                 "podLogsViaLoki": {
                     "enabled": True,
                     "collector": "alloy-logs",
-                    "extraLogProcessingStages": _apisix_cookie_metrics_alloy_config(),
+                    "extraLogProcessingStages": _apisix_cookie_metrics_alloy_config()
+                    + _keycloak_olapps_idp_login_metrics_alloy_config(),
                 },
                 "applicationObservability": {
                     "enabled": True,
