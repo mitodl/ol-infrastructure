@@ -330,6 +330,54 @@ def setup_grafana(
                             }
                         ],
                     },
+                    # Chart-native self-monitoring for the Alloy collectors
+                    # themselves (feature-integrations' integrations.alloy).
+                    # Discovers every collector Deployment/StatefulSet the
+                    # chart creates (alloy-logs, alloy-metrics,
+                    # alloy-receiver, alloy-singleton, and the tail-sampling
+                    # collector, which the alloy-operator names plain
+                    # "alloy") on their shared http-metrics/12345 port --
+                    # verified against the live applications-production
+                    # Service objects and this chart version's default
+                    # port_name (also http-metrics).
+                    #
+                    # useDefaultAllowList (on by default) keeps this to the
+                    # chart's curated ~90-series set instead of scraping
+                    # every alloy_component_* and go runtime metric
+                    # unfiltered. includeMetrics extends that allowlist with
+                    # the tail-sampling processor's own counters, which
+                    # aren't in the default set: these are what would have
+                    # surfaced the tail-sampler sizing bug (traces evicted
+                    # before a decision was made, buffer occupancy far past
+                    # the old 100-trace cap) instead of it going unnoticed.
+                    "alloy": {
+                        "instances": [
+                            {
+                                "name": "alloy-collectors",
+                                "labelSelectors": {
+                                    "app.kubernetes.io/name": [
+                                        "alloy",
+                                        "alloy-logs",
+                                        "alloy-metrics",
+                                        "alloy-receiver",
+                                        "alloy-singleton",
+                                    ],
+                                },
+                                "namespaces": ["grafana"],
+                                "metrics": {
+                                    "tuning": {
+                                        "includeMetrics": [
+                                            "otelcol_processor_tail_sampling_count_traces_sampled",
+                                            "otelcol_processor_tail_sampling_sampling_trace_dropped_too_early",
+                                            "otelcol_processor_tail_sampling_new_trace_id_received",
+                                            "otelcol_processor_tail_sampling_sampling_traces_on_memory",
+                                            "otelcol_processor_tail_sampling_sampling_policy_evaluation_error",
+                                        ],
+                                    },
+                                },
+                            },
+                        ],
+                    },
                 },
                 # v4: kepler and kube-state-metrics moved to telemetryServices;
                 #     opencost moved here from clusterMetrics
