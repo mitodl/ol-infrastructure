@@ -435,9 +435,11 @@ CREATE ROLE IF NOT EXISTS ol_business_analyst;
 
 GRANT USAGE ON CATALOG default_catalog TO ROLE readonly;
 GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE readonly;
+GRANT SELECT ON ALL MATERIALIZED VIEWS IN ALL DATABASES TO ROLE readonly;
 
 GRANT USAGE ON CATALOG default_catalog TO ROLE app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN ALL DATABASES TO ROLE app;
+GRANT SELECT ON ALL MATERIALIZED VIEWS IN ALL DATABASES TO ROLE app;
 
 GRANT cluster_admin TO ROLE admin;
 GRANT db_admin TO ROLE admin;
@@ -529,13 +531,20 @@ roles_setup_cmd = command.local.Command(
 
 # --- b2b_analytics database ---------------------------------------------
 # Dedicated database (default_catalog) backing the B2B self-serve analytics
-# StarRocks MVs (see hq#10006 / hq#10012). The `app` role already has
-# SELECT/INSERT/UPDATE/DELETE ON ALL TABLES IN ALL DATABASES from the base
-# roles SQL above, which covers dbt's write path once tables/MVs exist in
-# this database. What's missing — and StarRocks-specific — is that creating
-# new tables/materialized views requires its own CREATE TABLE / CREATE
-# MATERIALIZED VIEW privilege, granted at the database level, distinct from
-# the table-level DML privileges above.
+# StarRocks MVs (see hq#10006 / hq#10012). The `app` role has
+# SELECT/INSERT/UPDATE/DELETE ON ALL TABLES IN ALL DATABASES plus (see base
+# roles SQL above) SELECT ON ALL MATERIALIZED VIEWS IN ALL DATABASES, which
+# together cover dbt's write path and ol-analytics-api's read path once
+# tables/MVs exist in this database. MATERIALIZED VIEW is its own privilege
+# object type in StarRocks, distinct from TABLE for both DDL and DML/SELECT
+# grants -- an "ALL TABLES" grant alone does not grant SELECT on MVs (this
+# was the cause of ol-analytics-api's "Access denied ... SELECT privilege(s)
+# on MATERIALIZED VIEW" errors querying mv_b2b_program_funnel and friends
+# before the explicit MV grant was added above). What's missing beyond that
+# — and StarRocks-specific — is that creating new tables/materialized views
+# requires its own CREATE TABLE / CREATE MATERIALIZED VIEW privilege,
+# granted at the database level, distinct from the table-level DML
+# privileges above.
 _b2b_analytics_db_sql = """\
 CREATE DATABASE IF NOT EXISTS b2b_analytics;
 GRANT CREATE TABLE ON DATABASE b2b_analytics TO ROLE app;
