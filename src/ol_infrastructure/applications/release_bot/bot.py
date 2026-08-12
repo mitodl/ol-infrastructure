@@ -360,12 +360,15 @@ async def _watch_checkboxes(app, app_name, cfg, channel) -> None:
             issue = issues[0]
             outstanding = github.unchecked_authors(issue["body"])
             if not outstanding:
-                await app.client.chat_postMessage(
-                    channel=channel,
-                    text=(
-                        f"✅ `{app_name}`: all checkboxes are checked off. "
-                        f"<{issue['url']}|Release issue> is ready to promote."
-                    ),
+                # Stop silently. `_notify_ready_to_promote` polls every open
+                # release issue and posts the ready message *with the promote
+                # button*, deduped by label -- announcing it here as well would
+                # put two ready notifications in the channel, one of them
+                # without the button.
+                log.info(
+                    "Checkbox watch: %s is fully checked; leaving the "
+                    "ready-to-promote notification to the poller",
+                    app_name,
                 )
                 return
 
@@ -375,8 +378,10 @@ async def _watch_checkboxes(app, app_name, cfg, channel) -> None:
                 refreshed = await github.open_release_issues(cfg.repo)
             except Exception:
                 log.exception("Checkbox watch: failed to refresh %s", app_name)
+                await asyncio.sleep(_CHECKBOX_POLL_SECONDS)
                 continue
             if not refreshed:
+                await asyncio.sleep(_CHECKBOX_POLL_SECONDS)
                 continue
             still_outstanding = github.unchecked_authors(refreshed[0]["body"])
             newly_done = outstanding - still_outstanding
@@ -402,10 +407,16 @@ def _checkbox_watch_preflight(repos, app_name):
             f"No Slack channel configured for `{app_name}`, so there is nowhere "
             "to post checklist progress."
         )
-    if app_name in _checkbox_watchers:
-        return None, f"Already watching `{app_name}`'s release checklist."
     if _slack_app is None:
         return None, "Bot is still starting up; try again in a moment."
+    if app_name in _checkbox_watchers:
+        return None, f"Already watching `{app_name}`'s release checklist."
+    # Reserve the slot here rather than after the GitHub lookup below. Nothing
+    # awaits between this check and the add, so it is atomic on the event loop;
+    # claiming it later would let two concurrent invocations both pass this
+    # check, interleave at open_release_issues, and start duplicate watchers
+    # that post every progress message twice.
+    _checkbox_watchers.add(app_name)
     return channel, None
 
 
@@ -423,9 +434,11 @@ async def _cmd_wait_for_checkboxes(repos, ack, respond, command, _context):
         issues = await github.open_release_issues(cfg.repo)
     except Exception:
         log.exception("Failed to fetch release issues for %s", app_name)
+        _checkbox_watchers.discard(app_name)
         await respond(f"❌ Failed to fetch release issues for `{app_name}`.")
         return
     if not issues:
+        _checkbox_watchers.discard(app_name)
         await respond(f"No open release issue found for `{app_name}`.")
         return
 
@@ -433,13 +446,13 @@ async def _cmd_wait_for_checkboxes(repos, ack, respond, command, _context):
     outstanding = github.unchecked_authors(issue["body"])
     checked, total = github.checklist_status(issue["body"])
     if not outstanding:
+        _checkbox_watchers.discard(app_name)
         await respond(
             f"✅ `{app_name}`: all {total} checkboxes are already checked off. "
             f"<{issue['url']}|Release issue> is ready to promote."
         )
         return
 
-    _checkbox_watchers.add(app_name)
     asyncio.create_task(  # noqa: RUF006
         _watch_checkboxes(_slack_app, app_name, cfg, channel)
     )

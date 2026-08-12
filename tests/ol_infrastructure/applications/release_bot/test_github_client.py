@@ -585,3 +585,29 @@ def test_unchecked_authors_handles_a_description_containing_by():
     """The greedy match must bind to the trailing author, not an inner ' by '."""
     body = "- [ ] **Sort results by name** (#3) by dev@example.com\n"
     assert github.unchecked_authors(body) == {"dev@example.com"}
+
+
+def test_release_tags_scans_the_whole_listing(fake_repo):
+    """Selection sorts by version, so a truncated scan can hide the max.
+
+    The previous 100-tag cap meant the numerically highest tag could fall
+    outside an arbitrary prefix of an unordered listing, silently restoring
+    the stale-baseline bug this fixed.
+    """
+    tags = [_FakeTag(f"2026.1.{d}.1") for d in range(1, 29)] * 5  # 140 tags
+    tags.append(_FakeTag("2026.12.31.9"))
+    repo = _FakeRepo(tags=tags)
+    fake_repo(repo)
+    assert github._latest_release_tag(repo) == "2026.12.31.9"
+
+
+def test_release_tags_warns_when_the_scan_cap_is_reached(
+    fake_repo, monkeypatch, caplog
+):
+    """Truncation must be logged, not silent -- the baseline may be wrong."""
+    monkeypatch.setattr(github, "_TAG_SCAN_LIMIT", 3)
+    repo = _FakeRepo(tags=[_FakeTag(f"2026.1.{d}.1") for d in range(1, 6)])
+    fake_repo(repo)
+    with caplog.at_level("WARNING"):
+        github._release_tags(repo)
+    assert "Stopped scanning tags" in caplog.text

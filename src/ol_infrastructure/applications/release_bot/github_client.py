@@ -51,7 +51,12 @@ _VERSION_HEADER_RE = re.compile(r"^## Release (?P<version>\S+)", re.MULTILINE)
 # a "have we already posted about this" marker for the bot.
 PROMOTE_READY_LABEL = "promote-ready"
 
-_TAG_SCAN_LIMIT = 100
+# Cap on tags scanned when picking the release baseline. Selection sorts by
+# parsed version rather than trusting GitHub's tag ordering, so this must cover
+# *all* release tags to be correct -- truncating an unordered listing can hide
+# the highest tag and silently restore the stale-baseline bug. Set high enough
+# that release repositories never reach it; hitting it is logged, not silent.
+_TAG_SCAN_LIMIT = 5000
 _COMMIT_LIST_LIMIT = 50
 
 _client: Github | None = None
@@ -101,19 +106,32 @@ def release_tag_sort_key(tag: str) -> tuple[int, int, int, int]:
     return tuple(int(part) for part in match.groups())  # type: ignore[return-value]
 
 
-def _latest_release_tag(repo: Any) -> str | None:
-    """Return the highest YYYY.M.D.N tag, or None if none exists.
+def _release_tags(repo: Any) -> list[str]:
+    """Return every YYYY.M.D.N tag on *repo*, up to `_TAG_SCAN_LIMIT`.
 
-    Sorts by parsed version rather than trusting the order GitHub's tag
-    listing happens to come back in -- that order is not documented to be
-    chronological, and taking the first match made the release baseline depend
-    on it.
+    Ordering from `get_tags()` is not documented to be chronological, so the
+    whole listing has to be considered before picking a maximum -- a truncated
+    scan can omit the highest tag and reinstate the stale baseline this is
+    meant to fix.
     """
-    tags = [
-        tag.name
-        for tag in itertools.islice(repo.get_tags(), _TAG_SCAN_LIMIT)
-        if _RELEASE_TAG_RE.match(tag.name)
-    ]
+    scanned = 0
+    tags = []
+    for tag in itertools.islice(repo.get_tags(), _TAG_SCAN_LIMIT):
+        scanned += 1
+        if _RELEASE_TAG_RE.match(tag.name):
+            tags.append(tag.name)
+    if scanned == _TAG_SCAN_LIMIT:
+        log.warning(
+            "Stopped scanning tags at the %s-tag cap; the release baseline may "
+            "be wrong because GitHub's tag order is not version-ordered",
+            _TAG_SCAN_LIMIT,
+        )
+    return tags
+
+
+def _latest_release_tag(repo: Any) -> str | None:
+    """Return the highest YYYY.M.D.N tag, or None if none exists."""
+    tags = _release_tags(repo)
     if not tags:
         return None
     return max(tags, key=release_tag_sort_key)
@@ -218,11 +236,7 @@ def _branch_commit_date(branch: Any) -> datetime | None:
 def _release_preview_sync(repo_slug: str) -> dict[str, Any]:
     """Return what the next release would contain, without creating anything."""
     repo = _get_client().get_repo(repo_slug)
-    tags = [
-        tag.name
-        for tag in itertools.islice(repo.get_tags(), _TAG_SCAN_LIMIT)
-        if _RELEASE_TAG_RE.match(tag.name)
-    ]
+    tags = _release_tags(repo)
     latest_tag = max(tags, key=release_tag_sort_key) if tags else None
     return {
         "version": next_release_version(tags, datetime.now(tz=UTC).date()),

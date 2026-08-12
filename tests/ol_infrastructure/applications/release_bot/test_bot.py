@@ -5,7 +5,7 @@ can be driven directly with async stubs -- no Slack app or socket needed.
 """
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import bot
 import bot_config
@@ -405,3 +405,123 @@ async def test_wait_for_checkboxes_does_not_start_a_second_watcher(
 
     assert "Already watching" in slack.said
     assert not started
+
+
+async def test_wait_for_checkboxes_releases_its_slot_when_nothing_starts(
+    repos, slack, monkeypatch
+):
+    """A preflight reservation must not leak when no watcher is started.
+
+    The slot is claimed before the GitHub lookup so two concurrent invocations
+    cannot both pass; every path that then declines to start a watcher has to
+    give it back, or the app is locked out until the process restarts.
+    """
+    monkeypatch.setattr(bot.github, "open_release_issues", AsyncMock(return_value=[]))
+    started: list[object] = []
+    monkeypatch.setattr(bot.asyncio, "create_task", started.append)
+
+    await bot._cmd_wait_for_checkboxes(
+        repos, slack.ack, slack.respond, _command("my-app"), {}
+    )
+
+    assert not started
+    assert "my-app" not in bot._checkbox_watchers, (
+        "The reservation must be released when no watcher was started"
+    )
+
+
+async def test_wait_for_checkboxes_claims_its_slot_before_awaiting(
+    repos, slack, monkeypatch
+):
+    """The slot must be taken before the first await, or the guard is a TOCTOU.
+
+    Two concurrent Slack invocations would otherwise both pass preflight,
+    interleave at open_release_issues, and each start a watcher -- posting
+    every progress message twice.
+    """
+    claimed_during_lookup = []
+
+    async def _issues(_repo):
+        claimed_during_lookup.append("my-app" in bot._checkbox_watchers)
+        return []
+
+    monkeypatch.setattr(bot.github, "open_release_issues", _issues)
+    monkeypatch.setattr(bot.asyncio, "create_task", lambda _coro: None)
+
+    await bot._cmd_wait_for_checkboxes(
+        repos, slack.ack, slack.respond, _command("my-app"), {}
+    )
+
+    assert claimed_during_lookup == [True]
+
+
+async def test_watch_checkboxes_leaves_the_ready_message_to_the_poller(
+    repos, monkeypatch
+):
+    """The watcher must not post its own ready notification.
+
+    `_notify_ready_to_promote` already posts one *with the promote button*,
+    deduped by label. A second announcement here would put two ready messages
+    in the channel, one of them without the button.
+    """
+    monkeypatch.setattr(
+        bot.github,
+        "open_release_issues",
+        AsyncMock(
+            return_value=[
+                {
+                    "number": 1,
+                    "title": "Release my-app",
+                    "url": "https://github.com/mitodl/my-app/issues/1",
+                    "body": "- [x] **A** (#1) by alice@example.com\n",
+                    "labels": ["release"],
+                }
+            ]
+        ),
+    )
+    app = MagicMock()
+    app.client.chat_postMessage = AsyncMock()
+
+    await bot._watch_checkboxes(app, "my-app", repos["my-app"], "C123")
+
+    app.client.chat_postMessage.assert_not_called()
+    assert "my-app" not in bot._checkbox_watchers
+
+
+async def test_watch_checkboxes_sleeps_before_retrying_a_failed_refresh(
+    repos, monkeypatch
+):
+    """Every loop path must pace itself against the GitHub API."""
+    issue = {
+        "number": 1,
+        "title": "Release my-app",
+        "url": "https://github.com/mitodl/my-app/issues/1",
+        "body": "- [ ] **A** (#1) by alice@example.com\n",
+        "labels": ["release"],
+    }
+    done = {"body": "- [x] **A** (#1) by alice@example.com\n"}
+    calls = {"n": 0}
+
+    async def _issues(_repo):
+        calls["n"] += 1
+        if calls["n"] == 2:  # the refresh
+            msg = "GitHub is down"
+            raise RuntimeError(msg)
+        if calls["n"] >= 3:
+            return [{**issue, **done}]
+        return [issue]
+
+    sleeps = []
+
+    async def _sleep(seconds):
+        sleeps.append(seconds)
+
+    monkeypatch.setattr(bot.github, "open_release_issues", _issues)
+    monkeypatch.setattr(bot.asyncio, "sleep", _sleep)
+    app = MagicMock()
+    app.client.chat_postMessage = AsyncMock()
+
+    await bot._watch_checkboxes(app, "my-app", repos["my-app"], "C123")
+
+    # One sleep for the normal cadence, one after the failed refresh.
+    assert sleeps == [bot._CHECKBOX_POLL_SECONDS, bot._CHECKBOX_POLL_SECONDS]
