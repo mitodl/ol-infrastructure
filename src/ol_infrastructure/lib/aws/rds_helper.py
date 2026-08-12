@@ -3,6 +3,7 @@ from enum import StrEnum, unique
 from functools import lru_cache
 
 import boto3
+import pulumi
 
 rds_client = boto3.client("rds")
 
@@ -119,15 +120,29 @@ def get_rds_instance(instance_name: str) -> dict[str, str]:
     return db_instance
 
 
-def turn_off_deletion_protection(db_identifier: str):
+def turn_off_deletion_protection(
+    db_identifier: str, *, currently_protected: bool = True
+):
     """Disable deletion protection for the specified RDS database instance.
+
+    ModifyDBInstance is a live, privileged write against the target database, so it is
+    skipped during a `pulumi preview` and when protection is already off. A preview that
+    performs this call fails outright wherever the worker lacks rds:ModifyDBInstance,
+    and under the preview-gated Concourse topology a failed preview means the promotion
+    gate is never opened and the environment cannot be deployed at all.
 
     :param db_identifier: The identifier of the RDS database instance.
     :type db_identifier: str
 
+    :param currently_protected: Whether the live instance currently has deletion
+        protection enabled, as reported by DescribeDBInstances.
+    :type currently_protected: bool
+
     :raises botocore.exceptions.ClientError: If the AWS API call fails or the instance
     does not exist.
     """
+    if pulumi.runtime.is_dry_run() or not currently_protected:
+        return
     try:
         rds_client.modify_db_instance(
             DBInstanceIdentifier=db_identifier,
