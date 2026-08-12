@@ -53,7 +53,12 @@ def create_olapps_dev_realm(  # noqa: PLR0913
 
     realm = keycloak.Realm(
         "olapps",
-        access_code_lifespan="30m",
+        # Kept in sync with the production olapps realm (see the comment on
+        # this field in substructure/keycloak/olapps.py): Keycloak reuses
+        # this value as the `exp` claim on private_key_jwt client assertions
+        # sent to brokered IdPs, so it shouldn't be raised without checking
+        # that mirrored comment first.
+        access_code_lifespan="5m",
         access_code_lifespan_user_action="15m",
         attributes={"business_unit": "operations-local"},
         display_name="MIT Learn",
