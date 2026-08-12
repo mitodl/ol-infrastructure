@@ -41,7 +41,20 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     captcha_domain = "www.recaptcha.net"
     ol_apps_realm = keycloak.Realm(
         "olapps",
-        access_code_lifespan="30m",
+        # Labeled "Client Login Timeout" in the admin console's Tokens tab
+        # (Keycloak renamed accessCodeLifespan in the UI, the underlying API
+        # field is unchanged). This is the TTL for the intermediate OAuth
+        # `code` between issuance and its machine-to-machine redemption for
+        # a token at a token endpoint -- a server-to-server exchange with no
+        # user interaction, normally completing in well under a second. Per
+        # AbstractOAuth2IdentityProvider.generateToken(), Keycloak also
+        # reuses this same value as the `exp` claim on the private_key_jwt
+        # client assertions it sends to external OIDC IdPs when brokering
+        # login. Raising it re-widens that assertion's validity window and
+        # can cause some IdPs, which enforce a stricter freshness check on
+        # that claim, to reject the assertion with `invalid_client: Client
+        # assertion verification failed`.
+        access_code_lifespan="5m",
         access_code_lifespan_user_action="15m",
         attributes={
             "business_unit": f"operations-{env_name}",
