@@ -74,6 +74,7 @@ GPU_ENABLED_COURSES = {
     "uai_source-uai.se1",
     "uai_source-uai.haim1",
     "uai_source-uai.15",
+    "uai_source-uai.scm2",
 }
 
 
