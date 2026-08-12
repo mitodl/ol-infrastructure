@@ -26,6 +26,6 @@ name: mitxonline
 squash_merge_commit_message: BLANK
 squash_merge_commit_title: PR_TITLE
 teams:
-  arbisoft-contractors: admin
-  odl-engineering: admin
+  arbisoft-contractors: push
+  odl-engineering: push
 web_commit_signoff_required: false

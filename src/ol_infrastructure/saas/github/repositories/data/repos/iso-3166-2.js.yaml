@@ -23,6 +23,6 @@ name: iso-3166-2.js
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
-  arbisoft-contractors: admin
-  odl-engineering: admin
+  arbisoft-contractors: push
+  odl-engineering: push
 web_commit_signoff_required: false
