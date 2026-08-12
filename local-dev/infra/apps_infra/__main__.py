@@ -18,7 +18,6 @@ import pulumi_kubernetes as k8s
 # Add parent directory to sys.path to import shared modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import pulumi
 from modules.helpers import make_resource_opts
 from modules.keycloak import create_olapps_dev_realm
 from pulumi import Config
@@ -38,25 +37,6 @@ root_domain = config.get("root_domain") or os.environ.get(
 
 keycloak_hostname = config.get("keycloak_hostname") or f"sso.ol.{root_domain}"
 keycloak_url = config.get("keycloak_url") or f"https://{keycloak_hostname}"
-
-# Client redirect URIs in modules/keycloak.py are written against the default
-# mit.dev domain. Rewriting them here rather than there keeps this patch off a
-# high-churn file and picks up any clients added upstream later.
-if root_domain != "mit.dev":
-
-    def _retarget_domain(
-        args: pulumi.ResourceTransformArgs,
-    ) -> pulumi.ResourceTransformResult:
-        props = dict(args.props)
-        # Transform props carry provider wire names, not the Python
-        # snake_case ones.
-        for key in ("validRedirectUris", "validPostLogoutRedirectUris"):
-            uris = props.get(key)
-            if uris:
-                props[key] = [u.replace("mit.dev", root_domain) for u in uris]
-        return pulumi.ResourceTransformResult(props, args.opts)
-
-    pulumi.runtime.register_resource_transform(_retarget_domain)
 
 # Mirrors production by default; override locally (uncommitted) with:
 #   pulumi config set --stack local-dev.apps-infra.Dev verify_email false
@@ -116,6 +96,7 @@ create_olapps_dev_realm(
     learn_ai_client_secret=learn_ai_client_secret,
     mitxonline_client_secret=mitxonline_client_secret,
     unified_ecommerce_client_secret=unified_ecommerce_client_secret,
+    root_domain=root_domain,
     verify_email=verify_email,
 )
 
