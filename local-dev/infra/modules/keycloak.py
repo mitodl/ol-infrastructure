@@ -34,6 +34,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     mitxonline_client_secret: Output,
     unified_ecommerce_client_secret: Output,
     *,
+    root_domain: str,
     verify_email: bool = True,
 ) -> None:
     """
@@ -43,6 +44,9 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     (no Vault dependency). The realm mirrors production configuration but omits
     production-only IdPs. Email verification is configurable via the
     ``verify_email`` argument (defaults to enabled, mirroring production).
+
+    All client hostnames derive from ``root_domain``, which must match the
+    domain the APISIX routes and the TLS certificate were built from.
     """
     kc_opts = ResourceOptions(provider=keycloak_provider)
     k8s_opts = ResourceOptions(provider=k8s_provider)
@@ -112,7 +116,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         # Use Mailpit for local SMTP. No auth needed — omitting auth block
         # entirely avoids a provider panic when empty credentials are passed.
         smtp_server=keycloak.RealmSmtpServerArgs(
-            from_="noreply@mit.dev",
+            from_=f"noreply@{root_domain}",
             from_display_name="MIT Learn Local",
             host="mailpit.local-infra.svc.cluster.local",
             port="1025",
@@ -397,8 +401,8 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         standard_flow_enabled=True,
         implicit_flow_enabled=False,
         service_accounts_enabled=False,
-        valid_redirect_uris=["https://unified-ecommerce.mit.dev/*"],
-        valid_post_logout_redirect_uris=["https://unified-ecommerce.mit.dev/*"],
+        valid_redirect_uris=[f"https://unified-ecommerce.{root_domain}/*"],
+        valid_post_logout_redirect_uris=[f"https://unified-ecommerce.{root_domain}/*"],
         opts=kc_opts.merge(ResourceOptions(delete_before_replace=True)),
     )
     keycloak.openid.ClientDefaultScopes(
@@ -429,7 +433,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         implicit_flow_enabled=False,
         service_accounts_enabled=False,
         valid_redirect_uris=[
-            "https://ai.learn.mit.dev/*",
+            f"https://ai.learn.{root_domain}/*",
         ],
         opts=kc_opts.merge(ResourceOptions(delete_before_replace=True)),
     )
@@ -461,8 +465,8 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         implicit_flow_enabled=False,
         service_accounts_enabled=False,
         valid_redirect_uris=[
-            "https://learn.mit.dev/*",
-            "https://api.learn.mit.dev/*",
+            f"https://learn.{root_domain}/*",
+            f"https://api.learn.{root_domain}/*",
         ],
         web_origins=["+"],
         opts=kc_opts.merge(ResourceOptions(delete_before_replace=True)),
@@ -503,8 +507,8 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         implicit_flow_enabled=False,
         service_accounts_enabled=True,
         valid_redirect_uris=[
-            "https://mitxonline.mit.dev/*",
-            "https://api.mitxonline.mit.dev/*",
+            f"https://mitxonline.{root_domain}/*",
+            f"https://api.mitxonline.{root_domain}/*",
         ],
         opts=kc_opts.merge(ResourceOptions(delete_before_replace=True)),
     )

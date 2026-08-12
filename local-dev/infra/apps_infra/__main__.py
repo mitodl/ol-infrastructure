@@ -96,6 +96,7 @@ create_olapps_dev_realm(
     learn_ai_client_secret=learn_ai_client_secret,
     mitxonline_client_secret=mitxonline_client_secret,
     unified_ecommerce_client_secret=unified_ecommerce_client_secret,
+    root_domain=root_domain,
     verify_email=verify_email,
 )
 

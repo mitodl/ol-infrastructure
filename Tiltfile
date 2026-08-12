@@ -11,7 +11,6 @@ config.define_bool("per_app_databases", usage="Deploy isolated DB/Valkey per app
 # local-dev/apps/openedx/Tiltfile is not yet included by the APPS loop below.
 config.define_string("openedx_mode", usage="qa (default) or local (Tutor)")
 config.define_string_list("prebuilt_tags", usage="Prebuilt image tag overrides per app, e.g. mit-learn=0.62.0 learn-ai=0.28.3")
-config.define_string("root_domain", usage="Root DNS domain for all local-dev services (default: mit.dev). Overrides LOCAL_DEV_ROOT_DOMAIN env var.")
 config.define_string("disk_keep_tags", usage="Newest tilt-built image tags kept per repo by the disk janitor (default: 3). Overrides LOCAL_DEV_DISK_KEEP_TAGS env var.")
 config.define_string("disk_buildcache_max_gb", usage="Docker build-cache size cap in GB (default: 10% of total disk; 0 disables). Overrides LOCAL_DEV_BUILDCACHE_MAX_GB env var.")
 cfg = config.parse()
@@ -20,12 +19,27 @@ enabled_apps = cfg.get("enabled_apps", ["mit-learn", "learn-ai", "mitxonline", "
 per_app_databases = cfg.get("per_app_databases", False)
 openedx_mode = cfg.get("openedx_mode", "qa")
 
-# Root domain: configurable via tilt config or LOCAL_DEV_ROOT_DOMAIN env var.
-# All service hostnames are derived from this value — changing it rewires
-# every URL, CORS origin, APISIX route, and Keycloak redirect URI at once.
-# NOTE: root_domain is passed to Pulumi and k8s manifests via LOCAL_DEV_ROOT_DOMAIN;
-# tilt config root_domain takes precedence over the env var.
-root_domain = cfg.get("root_domain") or os.environ.get("LOCAL_DEV_ROOT_DOMAIN", "mit.dev")
+# Every service hostname, CORS origin, APISIX route, and Keycloak redirect URI
+# derives from this value. local-dev/tiltlib.star reads the same environment
+# variable when applying app manifests.
+root_domain = os.environ.get("LOCAL_DEV_ROOT_DOMAIN", "mit.dev")
+
+# The TLS certificate covers only this domain, so an unresolvable hostname means
+# nothing the stack serves is reachable. DNS and /etc/hosts both satisfy this.
+_probe_host = "sso.ol." + root_domain
+if str(local(
+    "python3 -c 'import socket,sys; socket.getaddrinfo(sys.argv[1], None)' %s >/dev/null 2>&1 && echo ok || echo missing" % _probe_host,
+    quiet=True, echo_off=True,
+)).strip() != "ok":
+    fail(
+        ("%s does not resolve, so nothing in the stack will be reachable.\n" +
+         "  LOCAL_DEV_ROOT_DOMAIN is currently '%s'.\n" +
+         "  Fix by either:\n" +
+         "    - running ./local-dev/scripts/setup.sh (adds 127.0.0.1 entries to /etc/hosts), or\n" +
+         "    - pointing DNS for *.%s at this host, or\n" +
+         "    - unsetting LOCAL_DEV_ROOT_DOMAIN to use the mit.dev default.")
+        % (_probe_host, root_domain, root_domain)
+    )
 
 # Parse prebuilt_tags list (["app=tag", ...]) into a lookup dict.
 prebuilt_tags = {
