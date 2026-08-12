@@ -44,9 +44,15 @@ archetypes:
     # direct permission on a repo (§4.7). That makes the LEVEL here the whole access
     # story rather than a detail.
     #
-    # `odl-engineering` is capped at push (maintain is also acceptable; admin is not --
-    # policy 2026-08-05, audited as SEC-15). It is the broad engineering team, and admin
-    # carries repo deletion, settings changes and ruleset bypass.
+    # `odl-engineering` is PINNED at push -- not "push or maintain", which the
+    # 2026-08-05 policy allowed and 2026-08-10 tightened. It is the broad engineering
+    # team, and maintain carries repo settings including the merge flags, description
+    # and topics this project declares, so it hands back the drift surface the import
+    # closed. admin additionally carries deletion and ruleset bypass.
+    #
+    # `arbisoft-contractors` is pinned at push for the same reason wherever it appears.
+    # Neither team should sit at more than one level across the fleet: a spread with no
+    # recorded rationale is indistinguishable from an accident.
     #
     # NOT ASPIRATIONAL ANY MORE. The SEC-15 wave rewrote the 62 active repos that granted
     # `odl-engineering: admin` down to `push`. What remains above this line is the 55

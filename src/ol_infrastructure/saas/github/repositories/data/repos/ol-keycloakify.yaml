@@ -24,6 +24,6 @@ squash_merge_commit_message: PR_BODY
 squash_merge_commit_title: PR_TITLE
 teams:
   devops: admin
-  odl-engineering: maintain
+  odl-engineering: push
   odl-engineering-owners: admin
 web_commit_signoff_required: false
