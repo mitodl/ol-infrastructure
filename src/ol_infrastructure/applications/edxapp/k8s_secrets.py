@@ -445,6 +445,11 @@ def create_k8s_secrets(
                 dest_secret_labels=k8s_global_labels,
                 mount="azure-openai",
                 path="creds/ol-mitxonline-openai",
+                # Same restart targets as the database credentials: these are
+                # read out of a generated settings file at process start, so
+                # without a rollout the LMS and CMS keep using the credentials
+                # from the expired lease until some unrelated deploy happens.
+                restart_targets=_db_restart_targets,
                 templates={
                     "18-azure-openai-secrets.yaml": textwrap.dedent(f"""
                         AZURE_OPENAI_CLIENT_ID: {{{{ get .Secrets "client_id" }}}}
