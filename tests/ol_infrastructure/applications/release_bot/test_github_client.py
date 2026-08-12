@@ -2,6 +2,8 @@
 selection, and PyGithub-backed API wrappers.
 """
 
+from datetime import UTC, date, datetime
+
 import github_client as github
 import pytest
 from github import Auth
@@ -153,14 +155,15 @@ class _FakeLabel:
 
 
 class _FakeAuthor:
-    def __init__(self, name):
+    def __init__(self, name, date=None):
         self.name = name
+        self.date = date
 
 
 class _FakeGitCommit:
-    def __init__(self, message, author_name):
+    def __init__(self, message, author_name, commit_date=None):
         self.message = message
-        self.author = _FakeAuthor(author_name)
+        self.author = _FakeAuthor(author_name, commit_date)
 
 
 class _FakeCommit:
@@ -173,6 +176,13 @@ class _FakeCommit:
 class _FakeTag:
     def __init__(self, name):
         self.name = name
+
+
+class _FakeBranch:
+    def __init__(self, name, commit_date=None):
+        self.name = name
+        self.commit = _FakeCommit("sha", "Release", "ci", "https://x/sha")
+        self.commit.commit = _FakeGitCommit("Release", "ci", commit_date)
 
 
 class _FakeComparison:
@@ -205,14 +215,18 @@ class _FakeIssue:
 class _FakeRepo:
     default_branch = "main"
 
-    def __init__(self, tags=(), comparison=None, commits=(), issues=()):
+    def __init__(self, tags=(), comparison=None, commits=(), issues=(), branches=()):
         self._tags = tags
         self._comparison = comparison
         self._commits = commits
+        self._branches = branches
         self._issues = {issue.number: issue for issue in issues}
 
     def get_tags(self):
         return list(self._tags)
+
+    def get_branches(self):
+        return list(self._branches)
 
     def compare(self, base, head):
         assert base in {t.name for t in self._tags}
@@ -349,3 +363,225 @@ def test_close_release_issue_comments_and_closes(fake_repo):
     issue = repo.get_issue(42)
     assert issue.comments == ["Promoted by @tmacey."]
     assert issue.state == "closed"
+
+
+# ---------------------------------------------------------------------------
+# Release tag matching
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "tag",
+    [
+        "2026.8.3.1",  # the shape every current release actually has
+        "2026.12.25.4",
+        "2026.08.03.1",  # legacy zero-padded tags must still match
+    ],
+)
+def test_release_tag_re_matches_padded_and_unpadded_calver(tag):
+    assert github._RELEASE_TAG_RE.match(tag)
+
+
+@pytest.mark.parametrize(
+    "tag", ["v1.2.3", "2026.8.3", "not-a-release-tag", "2026.8.3.1-rc1"]
+)
+def test_release_tag_re_rejects_non_release_tags(tag):
+    assert not github._RELEASE_TAG_RE.match(tag)
+
+
+def test_latest_release_tag_finds_unpadded_calver(fake_repo):
+    """The regression that silently broke release notes.
+
+    The pattern required zero-padded month and day, but the release resource
+    emits PEP 440 calver (2026.8.3.1). No tag matched, so this returned None
+    and callers fell back to listing the last 50 commits of all history. The
+    old fixtures only ever used padded tags, so nothing caught it.
+    """
+    repo = _FakeRepo(tags=[_FakeTag("2026.8.3.1"), _FakeTag("not-a-release-tag")])
+    fake_repo(repo)
+    assert github._latest_release_tag(repo) == "2026.8.3.1"
+
+
+def test_latest_release_tag_picks_highest_not_first(fake_repo):
+    """Tag order from the GitHub API is not documented to be chronological."""
+    repo = _FakeRepo(
+        tags=[
+            _FakeTag("2026.7.30.1"),
+            _FakeTag("2026.8.3.1"),
+            _FakeTag("2026.7.22.1"),
+        ]
+    )
+    fake_repo(repo)
+    assert github._latest_release_tag(repo) == "2026.8.3.1"
+
+
+def test_latest_release_tag_compares_numerically_not_lexically(fake_repo):
+    """2026.8.3.1 is newer than 2026.12.1.1 lexically but older numerically."""
+    repo = _FakeRepo(tags=[_FakeTag("2026.8.3.1"), _FakeTag("2026.12.1.1")])
+    fake_repo(repo)
+    assert github._latest_release_tag(repo) == "2026.12.1.1"
+
+
+def test_latest_release_tag_returns_none_without_release_tags(fake_repo):
+    repo = _FakeRepo(tags=[_FakeTag("v1.0.0")])
+    fake_repo(repo)
+    assert github._latest_release_tag(repo) is None
+
+
+# ---------------------------------------------------------------------------
+# Next version computation
+# ---------------------------------------------------------------------------
+
+
+def test_next_release_version_starts_at_one_for_a_new_day():
+    assert (
+        github.next_release_version(["2026.8.11.3"], date(2026, 8, 12)) == "2026.8.12.1"
+    )
+
+
+def test_next_release_version_increments_within_the_same_day():
+    assert (
+        github.next_release_version(["2026.8.12.1", "2026.8.12.2"], date(2026, 8, 12))
+        == "2026.8.12.3"
+    )
+
+
+def test_next_release_version_is_unpadded_for_pep440():
+    """Uv rejects leading zeros, so months and days must not be padded."""
+    assert github.next_release_version([], date(2026, 8, 3)) == "2026.8.3.1"
+
+
+def test_next_release_version_ignores_other_days():
+    assert (
+        github.next_release_version(["2026.8.12.7", "2026.8.11.9"], date(2026, 8, 13))
+        == "2026.8.13.1"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Release-machinery filtering
+# ---------------------------------------------------------------------------
+
+
+def test_commits_since_last_tag_drops_release_machinery(fake_repo):
+    """A finished release must not read as two commits waiting to be released.
+
+    The tag sits on the pre-bump HEAD and `finish` lands "Release X" and
+    "Merge releases/X" on the default branch afterwards, so the comparison is
+    never empty once a release completes.
+    """
+    fake_repo(
+        _FakeRepo(
+            tags=[_FakeTag("2026.8.3.1")],
+            comparison=_FakeComparison(
+                "ahead",
+                [
+                    _FakeCommit(
+                        "aaa", "Merge releases/2026.8.3.1", "ci", "https://x/aaa"
+                    ),
+                    _FakeCommit("bbb", "Release 2026.8.3.1", "ci", "https://x/bbb"),
+                    _FakeCommit("ccc", "fix: real work", "dev", "https://x/ccc"),
+                ],
+            ),
+        )
+    )
+    commits = github._commits_since_last_tag_sync("mitodl/thing")
+    assert [c["message"] for c in commits] == ["fix: real work"]
+
+
+def test_commits_since_last_tag_keeps_lookalike_subjects(fake_repo):
+    """Only this resource's own commits are dropped, not anything mentioning them."""
+    fake_repo(
+        _FakeRepo(
+            tags=[_FakeTag("2026.8.3.1")],
+            comparison=_FakeComparison(
+                "ahead",
+                [
+                    _FakeCommit(
+                        "aaa", "Revert Release 2026.8.3.1", "dev", "https://x/aaa"
+                    ),
+                    _FakeCommit("bbb", "feat: release page", "dev", "https://x/bbb"),
+                ],
+            ),
+        )
+    )
+    commits = github._commits_since_last_tag_sync("mitodl/thing")
+    assert len(commits) == 2
+
+
+# ---------------------------------------------------------------------------
+# In-flight release detection
+# ---------------------------------------------------------------------------
+
+
+def test_in_flight_release_reports_an_unfinished_release(fake_repo):
+    """A releases/ branch outliving production means finish never completed."""
+    cut = datetime(2026, 8, 3, tzinfo=UTC)
+    fake_repo(
+        _FakeRepo(
+            branches=[
+                _FakeBranch("main"),
+                _FakeBranch("releases/2026.8.3.1", commit_date=cut),
+            ]
+        )
+    )
+    in_flight = github._in_flight_release_sync("mitodl/thing")
+    assert in_flight["version"] == "2026.8.3.1"
+    assert in_flight["branch"] == "releases/2026.8.3.1"
+    assert in_flight["cut_at"] == cut
+    assert "releases/2026.8.3.1" in in_flight["url"]
+
+
+def test_in_flight_release_is_none_without_a_release_branch(fake_repo):
+    fake_repo(_FakeRepo(branches=[_FakeBranch("main"), _FakeBranch("some-feature")]))
+    assert github._in_flight_release_sync("mitodl/thing") is None
+
+
+def test_in_flight_release_ignores_non_version_release_branches(fake_repo):
+    fake_repo(
+        _FakeRepo(
+            branches=[
+                _FakeBranch("releases/my-experiment"),
+                _FakeBranch("releases/2026.8.3.1"),
+            ]
+        )
+    )
+    assert github._in_flight_release_sync("mitodl/thing")["version"] == "2026.8.3.1"
+
+
+def test_in_flight_release_survives_an_unreadable_commit_date(fake_repo):
+    """cut_at only decorates the message; losing it must not lose the report."""
+    branch = _FakeBranch("releases/2026.8.3.1")
+    del branch.commit
+    fake_repo(_FakeRepo(branches=[branch]))
+    in_flight = github._in_flight_release_sync("mitodl/thing")
+    assert in_flight["version"] == "2026.8.3.1"
+    assert in_flight["cut_at"] is None
+
+
+# ---------------------------------------------------------------------------
+# Checklist authors
+# ---------------------------------------------------------------------------
+
+
+def test_unchecked_authors_names_who_is_outstanding():
+    body = (
+        "## Release 2026.8.3.1\n\n"
+        "### Alice\n\n"
+        "- [x] **Done thing** (#1) by alice@example.com\n"
+        "- [ ] **Pending thing** (#2) by alice@example.com\n"
+        "### Bob\n\n"
+        "- [x] `abc1234` finished by bob@example.com\n"
+    )
+    assert github.unchecked_authors(body) == {"alice@example.com"}
+
+
+def test_unchecked_authors_empty_when_all_checked():
+    body = "- [x] **A** (#1) by alice@example.com\n- [x] **B** (#2) by bob@x.com\n"
+    assert github.unchecked_authors(body) == set()
+
+
+def test_unchecked_authors_handles_a_description_containing_by():
+    """The greedy match must bind to the trailing author, not an inner ' by '."""
+    body = "- [ ] **Sort results by name** (#3) by dev@example.com\n"
+    assert github.unchecked_authors(body) == {"dev@example.com"}
