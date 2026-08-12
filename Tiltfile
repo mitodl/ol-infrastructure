@@ -28,9 +28,8 @@ root_domain = os.environ.get("LOCAL_DEV_ROOT_DOMAIN", "mit.dev")
 # nothing the stack serves is reachable. DNS and /etc/hosts both satisfy this.
 _probe_host = "sso.ol." + root_domain
 if str(local(
-    "getent hosts %s >/dev/null 2>&1 && echo ok || echo missing" % _probe_host,
-    quiet=True,
-    echo_off=True,
+    "python3 -c 'import socket,sys; socket.getaddrinfo(sys.argv[1], None)' %s >/dev/null 2>&1 && echo ok || echo missing" % _probe_host,
+    quiet=True, echo_off=True,
 )).strip() != "ok":
     fail(
         ("%s does not resolve, so nothing in the stack will be reachable.\n" +
