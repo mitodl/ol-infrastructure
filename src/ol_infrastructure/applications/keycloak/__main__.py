@@ -548,6 +548,20 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
                 "value": "scim",
             },
             {"name": "spi-login--provider", "value": "ol-freemarker"},
+            # The jboss-logging event listener defaults successful-event
+            # logging to DEBUG (only failures log at WARN), so successful
+            # logins never reach our INFO-level server logs / Loki even with
+            # realm events enabled. This raises just that listener's
+            # success-event level to INFO so successful LOGIN and
+            # IDENTITY_PROVIDER_LOGIN events become visible for dashboarding,
+            # without touching any other logging category. This is
+            # server-wide (applies to every realm on this Keycloak instance)
+            # and increases log volume noticeably, since it now logs every
+            # successful auth-related event, not just logins.
+            {
+                "name": "spi-events-listener--jboss-logging--success-level",
+                "value": "info",
+            },
         ],
         "tracing": tracing_config,
         "hostname": {

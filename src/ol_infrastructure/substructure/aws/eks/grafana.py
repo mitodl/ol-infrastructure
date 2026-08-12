@@ -68,6 +68,45 @@ stage.match {
 """
 
 
+def _keycloak_events_log_filter_alloy_config() -> str:
+    """
+    Alloy River stages that drop noisy Keycloak success-event log lines
+    before they're shipped to Loki.
+
+    Keycloak's jboss-logging event listener is configured (see
+    applications/keycloak/__main__.py) with success-level=info so that
+    successful LOGIN and IDENTITY_PROVIDER_LOGIN events -- needed for a
+    per-IdP login dashboard on the olapps realm -- reach our logs. That
+    setting is all-or-nothing per Keycloak: it logs every successful event
+    type at INFO (CODE_TO_TOKEN, REFRESH_TOKEN, LOGOUT, REGISTER, etc.), not
+    just logins, across every realm on the shared instance (olapps,
+    ol-platform-engineering, ol-mit, master, ...). These two stages keep
+    only (LOGIN or IDENTITY_PROVIDER_LOGIN) events on the olapps realm and
+    drop the rest of that INFO-level volume before it leaves the node, so
+    Loki ingestion volume doesn't blow up.
+
+    Each stage independently re-checks for the "INFO  [org.keycloak.events]"
+    substring (rather than relying on the other stage's filtering) so that
+    WARN/ERROR-level events -- the pre-existing failure events, for every
+    realm -- never match either selector and always pass through untouched.
+    Per Alloy's stage.drop docs, expressing this OR-of-drop-conditions
+    requires two sequential drop stages rather than one compound selector.
+    """
+    return r"""
+stage.match {
+  selector = "{namespace=\"keycloak\", container=\"keycloak\"} |= \"INFO  [org.keycloak.events]\" != \"type=\\\"LOGIN\\\"\" != \"type=\\\"IDENTITY_PROVIDER_LOGIN\\\"\""
+  action = "drop"
+  drop_counter_reason = "keycloak_non_login_info_event"
+}
+
+stage.match {
+  selector = "{namespace=\"keycloak\", container=\"keycloak\"} |= \"INFO  [org.keycloak.events]\" != \"realmId=\\\"olapps\\\"\""
+  action = "drop"
+  drop_counter_reason = "keycloak_login_event_other_realm"
+}
+"""
+
+
 def setup_grafana(
     cluster_name: str,
     stack_info: StackInfo,
@@ -297,7 +336,8 @@ def setup_grafana(
                 "podLogsViaLoki": {
                     "enabled": True,
                     "collector": "alloy-logs",
-                    "extraLogProcessingStages": _apisix_cookie_metrics_alloy_config(),
+                    "extraLogProcessingStages": _apisix_cookie_metrics_alloy_config()
+                    + _keycloak_events_log_filter_alloy_config(),
                 },
                 "applicationObservability": {
                     "enabled": True,
