@@ -90,7 +90,9 @@ def setup_traefik(
             skip_crds=False,
             cleanup_on_fail=True,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-                repo="https://helm.traefik.io/traefik",
+                # helm.traefik.io was retired and now 404s on index.yaml, which
+                # fails the release at resolve time rather than degrading.
+                repo="https://traefik.github.io/charts",
             ),
             values={
                 "image": {
