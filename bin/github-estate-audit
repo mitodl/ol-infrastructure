@@ -18,7 +18,7 @@ import json
 import sys
 from collections import Counter
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import cyclopts
 
@@ -202,6 +202,138 @@ def drift(
     total = len(only_live) + len(only_declared) + len(changed)
     print(f"\n{total} difference(s) between the committed fleet and {cache}")
     return 1 if total else 0
+
+
+def _fetch_rosters() -> tuple[
+    dict[str, set[str]], set[str], dict[str, str | None], set[str]
+]:
+    """Team rosters, org members and team nesting, read live from the API.
+
+    NOT read from committed data, and not cached to disk, because there is nowhere
+    safe to put it: `vault-developer-access` and `vault-devops-access` are declared
+    `privacy: secret` in organization/teams.py so their membership is not advertised
+    even inside the org, and ol-infrastructure is a PUBLIC repository. Committing
+    rosters here would publish exactly what that setting exists to withhold.
+    """
+    import httpx  # noqa: PLC0415 -- only `access` needs the API; `run` must stay clean
+
+    from ol_infrastructure.lib.github_helper import (  # noqa: PLC0415
+        API_HEADERS,
+        GITHUB_API,
+        get_installation_token,
+    )
+
+    org = "mitodl"
+    token = get_installation_token()
+
+    def paginate(client: httpx.Client, path: str) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        url: str | None = f"{path}{'&' if '?' in path else '?'}per_page=100"
+        while url:
+            response = client.get(url)
+            response.raise_for_status()
+            out.extend(response.json())
+            url = response.links.get("next", {}).get("url")
+        return out
+
+    with httpx.Client(
+        base_url=GITHUB_API,
+        headers={**API_HEADERS, "Authorization": f"Bearer {token}"},
+        timeout=60,
+        follow_redirects=True,
+    ) as client:
+        members = {m["login"] for m in paginate(client, f"/orgs/{org}/members")}
+        # Org OWNERS hold implicit admin on every repo -- a third access path beside
+        # teams and direct grants, and the only one the others cannot revoke. The
+        # plain members list does not distinguish them, so this is a separate call.
+        owners = {
+            m["login"] for m in paginate(client, f"/orgs/{org}/members?role=admin")
+        }
+        teams = paginate(client, f"/orgs/{org}/teams")
+        rosters = {
+            t["slug"]: {
+                m["login"]
+                for m in paginate(client, f"/orgs/{org}/teams/{t['slug']}/members")
+            }
+            for t in teams
+        }
+    parents = {t["slug"]: (t.get("parent") or {}).get("slug") for t in teams}
+    return rosters, members, parents, owners
+
+
+@app.command
+def access(
+    *,
+    as_json: Annotated[
+        bool, cyclopts.Parameter(name=["--json"], help="Emit JSON instead of text.")
+    ] = False,
+) -> int:
+    """Report team-grant uniformity and explain every direct collaborator grant.
+
+    NEEDS CREDENTIALS, unlike `run`. Classifying a direct grant means knowing who is
+    in which team, and rosters are deliberately not committed -- see `_fetch_rosters`.
+
+    Read the two halves together. The shape count says how far the fleet is from a
+    model; the direct-grant split says how much of the cleanup is free (`redundant`
+    and `level-only`) versus how much needs a team grant added first (`no-access`).
+    """
+    fleet = archetypes.load_fleet()
+    active = [r for r in fleet if not r.get("archived")]
+    rosters, members, parents, owners = _fetch_rosters()
+    rows = audit.classify_direct_grants(fleet, rosters, members, parents, owners)
+    shapes = audit.grant_shapes(active)
+    kinds = Counter(r["kind"] for r in rows)
+
+    if as_json:
+        print(
+            json.dumps(
+                {
+                    "active_repos": len(active),
+                    "distinct_shapes": len(shapes),
+                    "shapes": [
+                        {"teams": dict(shape), "repos": n}
+                        for shape, n in shapes.most_common()
+                    ],
+                    "direct_grants": rows,
+                    "by_kind": dict(kinds),
+                },
+                indent=2,
+            )
+        )
+        return 0
+
+    print(
+        f"# team grant shapes -- {len(shapes)} distinct across {len(active)} active repos\n"
+    )
+    for shape, count in shapes.most_common():
+        label = ", ".join(f"{t}:{p}" for t, p in shape) or "(NO TEAM GRANTS)"
+        print(f"  {count:4}  {label}")
+
+    print(
+        f"\n# direct collaborator grants -- {len(rows)} across "
+        f"{len({r['repo'] for r in rows})} repos, {len({r['login'] for r in rows})} people\n"
+    )
+    # Ordered by how much work removal takes, cheapest first, because that is the
+    # order the cleanup should run in.
+    for kind, note in (
+        ("redundant", "team access already >= the grant; delete freely"),
+        ("level-only", "repo reach kept, elevated rights dropped to team level"),
+        ("owner-implicit", "org owner; implicit admin survives the deletion"),
+        ("no-access", "ONLY path in -- needs a team grant BEFORE removal"),
+        ("outside", "not an org member; invite to a team, or remove"),
+    ):
+        print(f"  {kind:14} {kinds[kind]:4}   {note}")
+    removable = sum(kinds[k] for k in audit.REMOVABLE_KINDS)
+    print(f"  {'':14} ---")
+    print(f"  {'':14} {removable:4}   removable with no new team work")
+
+    blocked = [r for r in rows if r["kind"] == "no-access"]
+    if blocked:
+        print("\nGrants that gate the cleanup:")
+        for row in sorted(blocked, key=lambda r: (r["repo"], r["login"])):
+            tag = " [archived]" if row["archived"] else ""
+            print(f"  {row['repo']:38}{tag:11} {row['login']}:{row['role']}")
+    return 0
 
 
 if __name__ == "__main__":
