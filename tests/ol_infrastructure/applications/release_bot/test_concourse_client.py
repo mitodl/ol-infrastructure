@@ -1,14 +1,19 @@
 """Tests for release_bot's Concourse REST client.
 
-`check_resource` must not return until the check build it created has
-finished. The POST endpoint answers 201 as soon as the build is *created*, so
-returning then would let a caller trigger a job before the new resource
-version is recorded -- the stale-version binding the release flow exists to
-prevent.
+`check_resource` must not return until the check it started has finished. The
+POST endpoint answers as soon as the check is *created*, so returning then
+would let a caller trigger a job before the new resource version is recorded
+-- the stale-version binding the release flow exists to prevent.
+
+The endpoint's response shape differs by Concourse version, and getting that
+wrong took the command down in production: some versions return the check
+build as JSON, Concourse 8.2.5 returns `201` with an empty `text/plain` body.
+Both shapes are covered here.
 """
 
 from unittest.mock import AsyncMock
 
+import aiohttp
 import concourse_client as concourse
 import pytest
 
@@ -38,17 +43,21 @@ class _FakeResponse:
     def raise_for_status(self):
         return None
 
-    async def json(self):
+    async def json(self, content_type=None):  # noqa: ARG002
+        if isinstance(self._payload, Exception):
+            raise self._payload
         return self._payload
 
 
 class _FakeSession:
-    """Returns the queued POST payload, then GET payloads in order."""
+    """Serves GET payloads by URL kind, and one POST payload."""
 
-    def __init__(self, post_payload, get_payloads):
+    def __init__(self, post_payload, *, resource_states=(), build_states=()):
         self.post_payload = post_payload
-        self.get_payloads = list(get_payloads)
-        self.get_urls = []
+        self.resource_states = list(resource_states)
+        self.build_states = list(build_states)
+        self.get_urls: list[str] = []
+        self.post_urls: list[str] = []
 
     async def __aenter__(self):
         return self
@@ -56,50 +65,95 @@ class _FakeSession:
     async def __aexit__(self, *exc):
         return False
 
-    def post(self, _url, **_kwargs):
+    def post(self, url, **_kwargs):
+        self.post_urls.append(url)
         return _FakeResponse(self.post_payload)
 
     def get(self, url, **_kwargs):
         self.get_urls.append(url)
-        return _FakeResponse(self.get_payloads.pop(0))
+        if "/builds/" in url:
+            return _FakeResponse(self.build_states.pop(0))
+        # Resource reads repeat the final state once exhausted, so a test only
+        # has to describe the transitions it cares about.
+        state = (
+            self.resource_states.pop(0)
+            if len(self.resource_states) > 1
+            else self.resource_states[0]
+        )
+        return _FakeResponse(state)
 
 
-def _install(monkeypatch, post_payload, get_payloads):
-    session = _FakeSession(post_payload, get_payloads)
+def _install(monkeypatch, session):
     monkeypatch.setattr(concourse.aiohttp, "ClientSession", lambda *_a, **_kw: session)
     return session
 
 
-async def test_check_resource_waits_for_the_build_to_succeed(monkeypatch):
-    """Must poll past a running build rather than returning immediately."""
+# ---------------------------------------------------------------------------
+# Concourse 8.2.5: 201 with an empty text/plain body, no build to poll
+# ---------------------------------------------------------------------------
+
+
+async def test_check_resource_survives_a_bodyless_check_response(monkeypatch):
+    """The production failure: `resp.json()` raised ContentTypeError.
+
+    Concourse 8.2.5 answers the check endpoint with `201 text/plain` and no
+    body. Calling `.json()` unconditionally raised before the "no build"
+    branch could be reached, so `/doof release` reported that it could not
+    refresh the version and refused to trigger -- even though the check itself
+    had succeeded.
+    """
     session = _install(
         monkeypatch,
-        {"id": 42},
-        [{"status": "started"}, {"status": "started"}, {"status": "succeeded"}],
+        _FakeSession(
+            aiohttp.ContentTypeError(None, None),
+            resource_states=[{"last_checked": 100}, {"last_checked": 200}],
+        ),
     )
     await concourse.check_resource("my-app-pipeline", "my-app-release")
-    assert len(session.get_urls) == 3
-    assert session.get_urls[0].endswith("/api/v1/builds/42")
+    # Never tried to poll a build, since there was no build id to poll.
+    assert not any("/builds/" in u for u in session.get_urls)
 
 
-async def test_check_resource_raises_when_the_check_fails(monkeypatch):
-    """A failed check means the version was never refreshed -- do not swallow it."""
-    _install(monkeypatch, {"id": 42}, [{"status": "failed"}])
-    with pytest.raises(RuntimeError, match="failed"):
-        await concourse.check_resource("my-app-pipeline", "my-app-release")
+async def test_check_resource_waits_for_last_checked_to_advance(monkeypatch):
+    """With no build to poll, `last_checked` is the completion signal."""
+    session = _install(
+        monkeypatch,
+        _FakeSession(
+            None,
+            resource_states=[
+                {"last_checked": 100},  # before the POST
+                {"last_checked": 100},  # still running
+                {"last_checked": 100},
+                {"last_checked": 250},  # done
+            ],
+        ),
+    )
+    await concourse.check_resource("my-app-pipeline", "my-app-release")
+    assert len(session.get_urls) == 4
 
 
-async def test_check_resource_raises_when_the_check_errors(monkeypatch):
-    _install(monkeypatch, {"id": 42}, [{"status": "errored"}])
-    with pytest.raises(RuntimeError, match="errored"):
+async def test_check_resource_raises_on_a_resource_check_error(monkeypatch):
+    """A resource whose check errored must not be reported as refreshed."""
+    _install(
+        monkeypatch,
+        _FakeSession(
+            None,
+            resource_states=[
+                {"last_checked": 100},
+                {"last_checked": 100, "check_error": "no such ref"},
+            ],
+        ),
+    )
+    with pytest.raises(RuntimeError, match="no such ref"):
         await concourse.check_resource("my-app-pipeline", "my-app-release")
 
 
 async def test_check_resource_times_out_rather_than_polling_forever(monkeypatch):
-    """A check stuck 'started' must surface, not hang the Slack handler."""
-    _install(monkeypatch, {"id": 42}, [{"status": "started"}] * 50)
-    # The first reading sets the deadline; every later one is past it. Must not
-    # be an exhaustible iterator -- pytest's own teardown reads the clock too.
+    """A check that never lands must surface, not hang the Slack handler."""
+    _install(
+        monkeypatch,
+        _FakeSession(None, resource_states=[{"last_checked": 100}]),
+    )
     readings = {"n": 0}
 
     def fake_monotonic():
@@ -111,8 +165,40 @@ async def test_check_resource_times_out_rather_than_polling_forever(monkeypatch)
         await concourse.check_resource("my-app-pipeline", "my-app-release")
 
 
-async def test_check_resource_tolerates_a_bodyless_response(monkeypatch):
-    """Older Concourse answers with no build; there is nothing to wait on."""
-    session = _install(monkeypatch, {}, [])
+# ---------------------------------------------------------------------------
+# Versions that do return the check build as JSON
+# ---------------------------------------------------------------------------
+
+
+async def test_check_resource_polls_the_build_when_one_is_returned(monkeypatch):
+    session = _install(
+        monkeypatch,
+        _FakeSession(
+            {"id": 42},
+            resource_states=[{"last_checked": 100}],
+            build_states=[
+                {"status": "started"},
+                {"status": "started"},
+                {"status": "succeeded"},
+            ],
+        ),
+    )
     await concourse.check_resource("my-app-pipeline", "my-app-release")
-    assert session.get_urls == []
+    build_reads = [u for u in session.get_urls if "/builds/42" in u]
+    assert len(build_reads) == 3
+
+
+@pytest.mark.parametrize("status", ["failed", "errored", "aborted"])
+async def test_check_resource_raises_when_the_build_does_not_succeed(
+    monkeypatch, status
+):
+    _install(
+        monkeypatch,
+        _FakeSession(
+            {"id": 42},
+            resource_states=[{"last_checked": 100}],
+            build_states=[{"status": status}],
+        ),
+    )
+    with pytest.raises(RuntimeError, match=status):
+        await concourse.check_resource("my-app-pipeline", "my-app-release")
