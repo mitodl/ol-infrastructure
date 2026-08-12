@@ -20,6 +20,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
@@ -85,6 +86,7 @@ def _create_dynamic_secret(
     path: str,
     templates: dict[str, str | Output[str]],
     vaultauth: str,
+    restart_targets: list[OLVaultRestartTarget] | None = None,
     opts: ResourceOptions | None = None,
 ) -> tuple[str, OLVaultK8SSecret]:
     """
@@ -99,6 +101,10 @@ def _create_dynamic_secret(
         path: Path within the Vault mount to generate credentials (e.g., creds/role).
         templates: Dictionary defining how Vault data maps to Kubernetes secret keys.
         vaultauth: Name of the Vault Kubernetes auth backend role.
+        restart_targets: Workloads to roll when Vault replaces the credential.
+            Pods read these values into their environment once at start, so
+            anything consuming the secret keeps using the expired lease's
+            credentials until it restarts.
         opts: Optional Pulumi resource options.
 
     Returns:
@@ -117,6 +123,7 @@ def _create_dynamic_secret(
             path=path,
             excludes=[".*"],
             exclude_raw=True,
+            restart_targets=restart_targets,
             templates=templates,
             vaultauth=vaultauth,
         ),
@@ -371,6 +378,20 @@ def create_mitlearn_k8s_secrets(
             labels=k8s_global_labels,
             mount="azure-openai",
             path="creds/ol-mitlearn-openai",
+            # Every workload receiving this secret through envFrom has to roll
+            # when Vault replaces it, otherwise running pods keep the expired
+            # lease's client id and secret in their environment. Names verified
+            # against the deployments in the mitlearn namespace.
+            restart_targets=[
+                OLVaultRestartTarget(kind="Deployment", name=name)
+                for name in (
+                    "mitlearn-app",
+                    "mitlearn-default-celery-worker",
+                    "mitlearn-edx-content-celery-worker",
+                    "mitlearn-embeddings-celery-worker",
+                    "mitlearn-celery-beat",
+                )
+            ],
             templates={
                 "AZURE_OPENAI_CLIENT_ID": '{{ get .Secrets "client_id" }}',
                 "AZURE_OPENAI_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',

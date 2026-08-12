@@ -64,6 +64,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResourcesConfig,
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -735,8 +736,20 @@ if azure_openai_tenant_id:
             dest_secret_labels=k8s_global_labels,
             mount="azure-openai",
             path="creds/ol-learn-ai-openai",
-            restart_target_kind="Deployment",
-            restart_target_name="learn-ai-app",
+            # Every workload below gets this secret through the component-wide
+            # env_from_secret_names, so all of them have to restart on rotation,
+            # not just the webapp. Names match what OLApplicationK8s generates:
+            # "{app}-app" for the webapp, "{app}-{worker_name}-celery-worker"
+            # per worker (underscores become dashes), "{app}-celery-beat".
+            restart_targets=[
+                OLVaultRestartTarget(kind="Deployment", name=name)
+                for name in (
+                    "learn-ai-app",
+                    "learn-ai-default-celery-worker",
+                    "learn-ai-edx-content-celery-worker",
+                    "learn-ai-celery-beat",
+                )
+            ],
             templates={
                 "AZURE_OPENAI_CLIENT_ID": '{{ get .Secrets "client_id" }}',
                 "AZURE_OPENAI_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
