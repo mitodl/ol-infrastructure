@@ -56,9 +56,9 @@ async def _cmd_release(repos, ack, respond, command, _context):
         return
     cfg = repos[app_name]
 
-    # Report a release that was cut but never shipped. Cutting a new one
-    # supersedes it -- the release resource deletes its branch and tag on
-    # action=create -- so say so rather than letting it happen silently.
+    # Report a release that was cut but never finished. Cutting a new one
+    # supersedes it on action=create, so say so rather than letting a branch
+    # (and possibly a tag) be deleted silently.
     in_flight = None
     try:
         in_flight = await github.in_flight_release(cfg.repo)
@@ -95,9 +95,13 @@ async def _cmd_release(repos, ack, respond, command, _context):
 
     message = f"🚀 Release triggered for `{app_name}`. Build: {build_url}"
     if in_flight:
+        # The tag is only deleted when that release never reached production;
+        # one whose deploy succeeded and whose `finish` failed keeps its tag,
+        # since it is the only marker of what production is running.
         message += (
             f"\n⚠️ Superseding in-flight release {_describe_in_flight(in_flight)} — "
-            "its branch and tag will be deleted."
+            "its release branch will be deleted, and its tag too if it never "
+            "reached production."
         )
     await respond(message)
 
@@ -126,8 +130,8 @@ async def _cmd_preview(repos, ack, respond, command, _context):
     ]
     if preview["in_flight"]:
         lines.append(
-            f"⚠️ In flight: {_describe_in_flight(preview['in_flight'])} — not yet "
-            "in production. Cutting a new release supersedes it."
+            f"⚠️ In flight: {_describe_in_flight(preview['in_flight'])} — cut but "
+            "not finished. Cutting a new release supersedes it."
         )
     if commits:
         lines += [
