@@ -1027,9 +1027,16 @@ witan_virtualmcpserver = kubernetes.apiextensions.CustomResource(
 #
 # Only the two workloads whose containers this stack actually declares. The
 # ToolHive proxy runner Deployment is left alone: it showed ~20Mi against a
-# 512Mi limit, its resources are not settable through the MCPServer CRD (
-# `resourceOverrides` covers annotations and labels only), and adding a VPA to a
-# workload under no pressure is churn for its own sake.
+# 512Mi limit, its RESOURCES are not settable through the MCPServer CRD, and
+# adding a VPA to a workload under no pressure is churn for its own sake.
+#
+# Resources specifically, not the whole resource. `resourceOverrides
+# .proxyDeployment` carries annotations, labels, podTemplateMetadataOverrides,
+# `env` and imagePullSecrets — there is simply no resources/limits field among
+# them, and no podTemplateSpec either (the one on MCPServer patches the MCP
+# workload's StatefulSet, not this Deployment). The `env` half is load-bearing
+# elsewhere: WITAN_PROXY_HEALTH_ENV in mcp_servers.py rides it to stop a write
+# burst getting this same container killed by its own liveness probe.
 make_vpa(
     f"witan-vmcp-vpa-{stack_info.env_suffix}",
     namespace=NAMESPACE,
