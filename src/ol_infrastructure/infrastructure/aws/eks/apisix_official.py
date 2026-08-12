@@ -405,7 +405,16 @@ def setup_apisix(
                 # request over time via apisix_memory/apisix_max_memory.
                 "resources": {
                     "requests": {
-                        "cpu": "100m",
+                        # The CPU request is the HPA's denominator: the
+                        # autoscaler above targets
+                        # targetCPUUtilizationPercentage of THIS value, so the
+                        # per-pod scale-out point is target% x request. A
+                        # request far below real per-pod usage makes
+                        # maxReplicas reachable at trivial absolute load and
+                        # turns HPAAtMaxReplicas alerts into noise. Size it per
+                        # stack (apisix_cpu) from measured per-pod usage, not
+                        # as a placeholder.
+                        "cpu": eks_config.get("apisix_cpu") or "100m",
                         "memory": eks_config.get("apisix_memory") or "400Mi",
                     },
                     "limits": {
