@@ -320,6 +320,17 @@ def setup_grafana(
                     },
                 },
                 "integrations": {
+                    # Without this, collectors.getCollectorForFeature falls
+                    # back to "use the only enabled collector" -- which is
+                    # ambiguous here (4 named collectors), so it resolves to
+                    # an empty collector name and the *entire* integrations
+                    # feature (this alloy integration AND the pre-existing
+                    # dcgm-exporter one) is silently dropped from every
+                    # collector's rendered config. Confirmed live: neither
+                    # integration appeared in any of the 4 collector
+                    # ConfigMaps in applications-production despite the Helm
+                    # release values matching desired state.
+                    "collector": "alloy-metrics",
                     "dcgm-exporter": {
                         "instances": [
                             {
