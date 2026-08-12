@@ -119,19 +119,61 @@ SERVER_MEMORY_LIMIT = "2Gi"
 # beyond that — this bounds the single-runaway-actor case, which is the one
 # that actually shows up (a CI reindex streaming a large NDJSON load).
 #
-# The in-flight COUNT comes down from 16 to 8 for the same reason: against a
-# 1-CPU pod, 16 concurrent writes from one actor only queue. An interactive
-# witan session issues one write at a time, so 8 is still far above any
-# legitimate single-user pattern while halving what one bursty indexer can pin.
+# ★ THE COUNT IS NOW SIZED AGAINST THE DEADLINE, NOT AGAINST MEMORY. ★
+# It was 8, derived from this pod's memory limit and described as "far above any
+# legitimate single-user pattern" — true of memory, false of time, and time is
+# what kills these calls. MEASURED 2026-08-12 against the CI data tier directly
+# (port-forward to svc/omnigraph-server, N threads released from a barrier, no
+# vMCP and no APISIX in the path), single-row inserts into a 1,045-row graph:
 #
-# These are a deliberate starting point, not a measurement. Revisit from
-# observed 429 rates and in-flight-byte peaks once the shared service has
-# metrics (tk-observability-for-shared-witan-service-ad3dba) — and note that
-# witan's client-side retry cannot read the server's Retry-After header (the
-# omnigraph CLI's error path discards response headers), so the sizing signal
-# has to come from server-side metrics, not from the client.
-PER_ACTOR_INFLIGHT_MAX = 8
-PER_ACTOR_BYTES_MAX = 256 * 1024 * 1024
+#     n=1  wall  3.45s      n=4  wall 15.54s      n=8  wall 51.08s, p50 33.29s
+#     n=2  wall  6.49s      n=6  wall 31.20s
+#
+# Writes are strictly serialised per graph and get *worse* per write as writers
+# are added (throughput falls 0.31 → 0.16 req/s), because one single-row insert
+# is a full Lance commit against S3 plus a FilteredRead of the whole table. The
+# tool call carrying a write is cut at 30s by three hardcoded ToolHive constants
+# (tk-toolhive-s-vmcp-operational-timeouts-crd-field-i-c44c7a), so:
+#
+#   at 4, every admitted write still lands inside the deadline
+#   at 6, the slowest is already past it
+#   at 8 — exactly the old cap — the MEDIAN is past it, and the server admitted
+#          all eight and 429'd none. It queued them for 51 seconds instead.
+#
+# A cap that admits work it cannot serve is doing the opposite of its job: what
+# the caller gets is not a slow write but a 502 whose outcome nobody can
+# determine (tk-a-502-from-the-deployed-witan-does-not-mean-the--f76dcb).
+#
+# CAVEAT, deliberately accepted: the serialisation is per GRAPH while this cap
+# is per ACTOR, so an actor writing to several graphs at once is bound more
+# tightly than the store requires (4 across two graphs would have completed in
+# parallel). That direction is safe — a 429 with Retry-After is unambiguous and
+# the client retries it — and the case that matters, many writers on the shared
+# `council` graph, is bound correctly.
+#
+# ★ AND A PER-ACTOR CAP CANNOT BOUND A MULTI-USER SERVICE AT ALL. Ten users at
+# one write each is ten in flight, past the knee, with every per-actor cap
+# satisfied. The global bound lives client-side in agent-kit's OmnigraphClient
+# (`_REMOTE_WRITE_MAX_INFLIGHT`, per graph, in the single-replica witan MCP pod
+# every user's write passes through). This cap is the backstop beneath it, for
+# the paths that do not go through that process — the CLI subprocess transport,
+# the migration Job, any other client.
+#
+# Revisit from observed 429 rates and in-flight-byte peaks once the shared
+# service has metrics (tk-observability-for-shared-witan-service-ad3dba). The
+# client CAN now read the Retry-After header over the HTTP transport (it is the
+# omnigraph *CLI* that discards response headers), and refuses immediately
+# rather than sleeping when the hint is longer than its own deadline allows —
+# so a Retry-After well above ~4s reaches users as an error, not as a wait.
+#
+# ★ DEFAULTS, not settings. Both are overridable per environment via
+# `omnigraph:per_actor_inflight_max` / `per_actor_bytes_max` stack config (see
+# __main__.py). Named DEFAULT_ so nothing reads the module constant and believes
+# it knows what a running cluster is configured with — the env var on the
+# Deployment is the source of truth, and `kubectl set env` is a legitimate way
+# to move it in an incident ahead of committing the config.
+DEFAULT_PER_ACTOR_INFLIGHT_MAX = 4
+DEFAULT_PER_ACTOR_BYTES_MAX = 256 * 1024 * 1024
 
 # ── Startup behaviour on an unopenable graph ─────────────────────────────────
 #
@@ -214,6 +256,8 @@ def create_data_tier(  # noqa: PLR0913
     cleanup_schedule: str,
     cleanup_older_than: str,
     storage_prefix: str = "",
+    per_actor_inflight_max: int = DEFAULT_PER_ACTOR_INFLIGHT_MAX,
+    per_actor_bytes_max: int = DEFAULT_PER_ACTOR_BYTES_MAX,
     *,
     suspend_maintenance: bool = False,
 ) -> OmnigraphDataTier:
@@ -226,6 +270,14 @@ def create_data_tier(  # noqa: PLR0913
     rebuilt under a new root and the cluster is then repointed at it, leaving
     the old root intact as the rollback. Empty (the default) means the bucket
     root, which is the steady state.
+
+    ``per_actor_inflight_max`` / ``per_actor_bytes_max`` default to the measured
+    constants above and exist as parameters so a stack can retune admission
+    control from config. The defaults were derived from one measurement of one
+    environment; QA and Production have different graph sizes and therefore a
+    different knee, and the write cost itself is expected to move (upstream
+    task tk-upstream-omnigraph-a-single-row-insert-costs-a-f-eeeae3). Retuning
+    should be a `pulumi config set` away, not a code change.
     """
     # The bucket is named for its tenant (witan's graphs), not the omnigraph
     # service — omnigraph is generic and a future second instance would get its
@@ -557,14 +609,17 @@ def create_data_tier(  # noqa: PLR0913
                                 # Per-actor admission caps, set deliberately
                                 # rather than inherited — the upstream byte
                                 # default is twice this pod's memory limit and
-                                # therefore unreachable. See the constants.
+                                # therefore unreachable. See the constants for
+                                # the sizing, and the stack's
+                                # `omnigraph:per_actor_*` config to retune an
+                                # environment without a code change.
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="OMNIGRAPH_PER_ACTOR_INFLIGHT_MAX",
-                                    value=str(PER_ACTOR_INFLIGHT_MAX),
+                                    value=str(per_actor_inflight_max),
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="OMNIGRAPH_PER_ACTOR_BYTES_MAX",
-                                    value=str(PER_ACTOR_BYTES_MAX),
+                                    value=str(per_actor_bytes_max),
                                 ),
                             ],
                             ports=[
@@ -680,8 +735,10 @@ def create_data_tier(  # noqa: PLR0913
                                 initial_delay_seconds=0,
                                 period_seconds=20,
                             ),
-                            # The memory limit is what PER_ACTOR_BYTES_MAX is
-                            # sized against — change one and revisit the other.
+                            # The memory limit is what the byte cap is sized
+                            # against (DEFAULT_PER_ACTOR_BYTES_MAX, and any
+                            # per-stack override of it) — change one and
+                            # revisit the other.
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={"cpu": "250m", "memory": "512Mi"},
                                 limits={"cpu": "1", "memory": SERVER_MEMORY_LIMIT},

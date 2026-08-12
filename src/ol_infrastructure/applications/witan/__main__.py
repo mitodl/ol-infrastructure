@@ -307,6 +307,23 @@ WITAN_CI_INDEX_SCHEDULE = (
     witan_config.get("ci_index_schedule") or DEFAULT_INDEX_SCHEDULE
 )
 
+# Client-side write admission, applied inside the MCP tier before a write is
+# sent to the data tier (agent-kit `witan_core.omnigraph._WriteGate`). This is
+# the GLOBAL bound the data tier's per-actor cap cannot be: every user's write
+# passes through this single-replica pod, so it is the one place total in-flight
+# concurrency is visible. Past ~4 writes in flight against one graph, a write
+# cannot finish inside ToolHive's hardcoded 30s deadline, and what the caller
+# gets is not a slow write but a 502 whose outcome is indeterminate — so the
+# tier refuses with a sentence instead, before anything is sent.
+#
+# Empty here means "use the code default" (4 writes, 10s queue wait). Set per
+# stack when an environment's measured knee differs — Production's larger graphs
+# make each write slower, and the write cost itself is expected to change
+# upstream. Both are read per call inside witan, so `kubectl set env` moves them
+# on a live pod ahead of committing the config.
+WITAN_REMOTE_WRITE_MAX_INFLIGHT = witan_config.get("remote_write_max_inflight") or ""
+WITAN_REMOTE_WRITE_QUEUE_SECONDS = witan_config.get("remote_write_queue_seconds") or ""
+
 # The GitHub App the CI indexer clones as, when one is configured. All three
 # values come from one SOPS file rather than splitting the ids into plain
 # Pulumi config: they are obtained together, in one sitting, when the App is
@@ -747,6 +764,8 @@ mcp_servers = create_mcp_servers(
     witan_code_token_secret=witan_code_token_secret,
     migration_job=witan_migration_job,
     service_version=witan_service_version,
+    remote_write_max_inflight=WITAN_REMOTE_WRITE_MAX_INFLIGHT,
+    remote_write_queue_seconds=WITAN_REMOTE_WRITE_QUEUE_SECONDS,
 )
 
 #########################################

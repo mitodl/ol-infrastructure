@@ -59,6 +59,8 @@ from ol_infrastructure.applications.omnigraph.cluster_config import (
 )
 from ol_infrastructure.applications.omnigraph.data_tier import (
     CLUSTER_CONFIGMAP_NAME,
+    DEFAULT_PER_ACTOR_BYTES_MAX,
+    DEFAULT_PER_ACTOR_INFLIGHT_MAX,
     OMNIGRAPH_SERVER_SERVICE_NAME,
     create_data_tier,
     omnigraph_server_addr,
@@ -210,6 +212,21 @@ OPTIMIZE_SCHEDULE = (
 CLEANUP_SCHEDULE = omnigraph_config.get("cleanup_schedule") or DEFAULT_CLEANUP_SCHEDULE
 CLEANUP_OLDER_THAN = (
     omnigraph_config.get("cleanup_older_than") or DEFAULT_CLEANUP_OLDER_THAN
+)
+
+# Per-actor admission caps (data_tier.py). Overridable per environment for the
+# same reason the schedules above are, and a sharper one: the count's default is
+# derived from ONE measurement of ONE environment (CI, 2026-08-12), and the knee
+# it encodes moves with graph size — a single-row insert costs a full-table read,
+# so Production's larger tables are slower per write and saturate sooner. It will
+# move again when that cost is attacked upstream. Retuning admission control
+# during an incident must not mean editing this repo, cutting a release and
+# rolling an image.
+PER_ACTOR_INFLIGHT_MAX = (
+    omnigraph_config.get_int("per_actor_inflight_max") or DEFAULT_PER_ACTOR_INFLIGHT_MAX
+)
+PER_ACTOR_BYTES_MAX = (
+    omnigraph_config.get_int("per_actor_bytes_max") or DEFAULT_PER_ACTOR_BYTES_MAX
 )
 
 cluster_stack = make_stack_reference(projects.EKS, f"operations.{stack_info.name}")
@@ -728,6 +745,8 @@ data_tier = create_data_tier(
     cleanup_schedule=CLEANUP_SCHEDULE,
     cleanup_older_than=CLEANUP_OLDER_THAN,
     storage_prefix=STORAGE_PREFIX,
+    per_actor_inflight_max=PER_ACTOR_INFLIGHT_MAX,
+    per_actor_bytes_max=PER_ACTOR_BYTES_MAX,
     # Arming a migration suspends both maintenance sweeps for its duration.
     # They write directly to the store, so scaling the Deployment to zero does
     # not stop them, and `optimize` rewriting fragments between the export and
