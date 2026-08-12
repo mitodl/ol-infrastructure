@@ -90,6 +90,63 @@ def _check_permission_values(fleet: list[dict[str, Any]]) -> None:
         raise ValueError(message)
 
 
+#: Every PUBLIC repo grants these, per policy 2026-08-10. Enforced rather than
+#: documented, because the failure is silent and expensive: `teams` REPLACES an
+#: archetype's grants wholesale, so a repo file that declares its own block and omits
+#: these revokes the whole engineering organisation with no error anywhere.
+REQUIRED_PUBLIC_TEAMS = frozenset({"odl-engineering", "odl-engineering-owners"})
+
+
+def _check_public_repo_teams(fleet: list[dict[str, Any]]) -> None:
+    """Fail if an active public repo does not grant the two required teams.
+
+    Scoped to ACTIVE PUBLIC repos, matching the policy exactly:
+
+      archived  repository.py emits no TeamRepository for them, so there is nothing
+                to enforce and a failure here would be unfixable.
+      private   deliberately exempt. `access-forge` and `gwarek` are devops-only
+                because that is the intent, not an oversight.
+
+    VISIBILITY IS REQUIRED, NOT ASSUMED. A repo with no visibility signal cannot be
+    checked, and silently skipping it is the failure mode this project keeps hitting --
+    unmeasured and compliant look identical. `_visibility` is written on every repo by
+    the crawl and `visibility` comes from the archetype, so an active repo missing both
+    is hand-authored data that has to say which it is.
+    """
+    unknown: list[str] = []
+    missing: list[str] = []
+    for repo in fleet:
+        if repo.get("archived"):
+            continue
+        visibility = repo.get("_visibility") or repo.get("visibility")
+        if not visibility:
+            unknown.append(repo["name"])
+            continue
+        if visibility != "public":
+            continue
+        absent = REQUIRED_PUBLIC_TEAMS - set(repo.get("teams") or {})
+        if absent:
+            missing.append(f"{repo['name']}: missing {sorted(absent)}")
+    if unknown:
+        message = (
+            "active repos with no visibility recorded, so the public-team policy "
+            "cannot be checked:\n  "
+            + "\n  ".join(sorted(unknown))
+            + "\nAdd `_visibility` (or `visibility`), or re-run "
+            "`bin/github-org-inventory crawl --refresh`."
+        )
+        raise ValueError(message)
+    if missing:
+        message = (
+            "public repos must grant "
+            f"{sorted(REQUIRED_PUBLIC_TEAMS)} (policy 2026-08-10):\n  "
+            + "\n  ".join(sorted(missing))
+            + "\n`teams` REPLACES the archetype's grants rather than merging into "
+            "them, so a repo declaring its own block must restate both."
+        )
+        raise ValueError(message)
+
+
 def _check_team_references(fleet: list[dict[str, Any]]) -> None:
     """Fail if any repo grants to a team slug absent from teams.yaml.
 
@@ -147,6 +204,7 @@ def load_fleet() -> list[dict[str, Any]]:
 
     _check_team_references(fleet)
     _check_permission_values(fleet)
+    _check_public_repo_teams(fleet)
 
     # The dotfile trap is silent by construction, so assert rather than trust.
     assignments = yaml.safe_load((DATA_DIR / "archetypes-proposed.yaml").read_text())

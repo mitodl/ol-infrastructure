@@ -31,4 +31,5 @@ teams:
   arbisoft-contractors: push
   devops: admin
   odl-engineering: push
+  odl-engineering-owners: admin
 web_commit_signoff_required: false

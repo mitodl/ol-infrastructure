@@ -22,6 +22,8 @@ merge_commit_title: MERGE_MESSAGE
 name: brand-mitol-residential
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
-teams: {}
+teams:
+  odl-engineering: push
+  odl-engineering-owners: admin
 vulnerability_alerts: false
 web_commit_signoff_required: false

@@ -30,6 +30,7 @@ squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   arbisoft-contractors: push
   odl-engineering: push
+  odl-engineering-owners: admin
 topics:
 - ocw
 - opencourseware
