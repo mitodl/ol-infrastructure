@@ -4,6 +4,7 @@ Bootstraps the Grafana provider and delegates to submodules:
   alertmanager  — contact points + notification policy (all stacks)
   metric_rules  — Prometheus/Mimir metric alert rule groups (all stacks)
   log_rules     — Loki log-based alert rule groups (all stacks)
+  dashboards    — Grafana dashboards (all stacks)
   pingdom_checks — Pingdom uptime checks via dynamic provider (production stack only)
 
 See CLAUDE.md in this directory for a full description of the architecture.
@@ -17,6 +18,7 @@ from pulumi import Output, ResourceOptions
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.infrastructure.grafana_alerting import (
     alertmanager,
+    dashboards,
     log_rules,
     metric_rules,
     pingdom_checks,
@@ -41,6 +43,7 @@ resource_opts = ResourceOptions(provider=grafana_provider)
 alertmanager.create(grafana_secrets, resource_opts)
 metric_rules.create(resource_opts)
 log_rules.create(resource_opts)
+dashboards.create(resource_opts)
 
 # Pingdom checks are account-wide — only create from the production stack.
 if is_production:

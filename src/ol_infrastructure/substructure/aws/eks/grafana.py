@@ -449,6 +449,18 @@ def setup_grafana(
                     # surfaced the tail-sampler sizing bug (traces evicted
                     # before a decision was made, buffer occupancy far past
                     # the old 100-trace cap) instead of it going unnoticed.
+                    #
+                    # Also extended with the two keycloak_olapps_idp_login_*
+                    # counters (see dashboards/keycloak_olapps_idp_logins.py
+                    # and substructure/aws/eks/grafana.py's
+                    # _keycloak_olapps_idp_login_metrics_alloy_config) --
+                    # custom stage.metrics counters are exactly the
+                    # "unfiltered alloy_component_*" case this allowlist
+                    # exists to block by default, so without an explicit
+                    # entry here they're silently dropped before ever
+                    # reaching Mimir: confirmed present on Alloy's own
+                    # /metrics endpoint but absent from Mimir at every range
+                    # queried, however wide.
                     "alloy": {
                         "instances": [
                             {
@@ -471,6 +483,8 @@ def setup_grafana(
                                             "otelcol_processor_tail_sampling_new_trace_id_received",
                                             "otelcol_processor_tail_sampling_sampling_traces_on_memory",
                                             "otelcol_processor_tail_sampling_sampling_policy_evaluation_error",
+                                            "keycloak_olapps_idp_login_total",
+                                            "keycloak_olapps_idp_login_failure_total",
                                         ],
                                     },
                                 },

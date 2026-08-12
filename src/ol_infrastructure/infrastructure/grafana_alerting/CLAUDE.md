@@ -88,6 +88,9 @@ Rootly). That path is independent of Grafana and is managed in
 | `log_rules/heroku.py` | Heroku application log alert rules (invalid AWS keys, OCW Studio, Keycloak). |
 | `log_rules/mit_learn.py` | MIT Learn and MITx Online 5xx error rate alert rules. |
 | `log_rules/vault.py` | Vault secret-absent and auth-failure alert rules. |
+| `dashboards/` | Package. Grafana dashboards. |
+| `dashboards/base.py` | Mimir datasource UID, shared panel-builder helpers, folder creation, delegates to sub-modules. |
+| `dashboards/keycloak_olapps_idp_logins.py` | Per-identity-provider login counts (success + failure) for the olapps realm. |
 | `pingdom_checks.py` | Pingdom uptime checks via Pulumi dynamic provider. Runs in the production stack only. |
 | `CLAUDE.md` | This file. |
 
@@ -103,6 +106,7 @@ needed is passed as a parameter.
 alertmanager.create(grafana_secrets: dict, resource_opts: ResourceOptions)
 metric_rules.create(resource_opts: ResourceOptions)
 log_rules.create(resource_opts: ResourceOptions)
+dashboards.create(resource_opts: ResourceOptions)
 pingdom_checks.create(api_token: Input[str], integration_ids: list[int])
 ```
 
@@ -112,6 +116,14 @@ UID and a pre-bound `rd(expr)` helper from its package `base.py`:
 ```python
 # sub-module signature (metric_rules/* and log_rules/*)
 create(folder_uid: Input[str], rd: Callable[[str], list[RuleGroupRuleDataArgs]], resource_opts: ResourceOptions)
+```
+
+Within `dashboards/`, each sub-module receives the folder UID, the shared
+panel-builder helpers, and a `create_dashboard` helper from `base.py`:
+
+```python
+# sub-module signature (dashboards/*)
+create(folder_uid, timeseries_panel: Callable[..., dict], bar_gauge_panel: Callable[..., dict], create_dashboard: Callable[..., None], resource_opts: ResourceOptions)
 ```
 
 ---
@@ -149,6 +161,43 @@ Same pattern, but open the relevant file in `log_rules/` and use a LogQL
 expression. The expression must be metric-producing (use `count_over_time`,
 `rate`, `sum`, etc. with a threshold baked in). Bare log stream queries must
 be wrapped: `count_over_time({...} |= "pattern" [5m]) > 0`.
+
+---
+
+## Dashboards (dashboards/)
+
+Each Grafana dashboard is its own file, one dashboard per file -- not one
+file per product/platform. `metric_rules/` and `log_rules/` group several
+related *rules* into one file per category (`eks_general.py`, `heroku.py`);
+dashboards don't follow that grouping, because a single growing "keycloak.py"
+holding every current and future Keycloak dashboard just recreates the same
+"one file for everything in this topic" problem the `dashboards/` package
+(vs. a single `dashboards.py`) already exists to avoid.
+
+**Naming**: `<system>_<what-it-shows>.py`, e.g. `keycloak_olapps_idp_logins.py`.
+The `<system>` prefix (`keycloak`, in this case) is shared across every
+dashboard for that system so they sort and grep together, but each distinct
+dashboard -- a different concern, a different realm, whatever varies -- gets
+its own file under that same prefix rather than being added to an existing
+one. A second Keycloak dashboard about something unrelated (say, session
+counts) would be `keycloak_session_counts.py`, not a new function inside
+`keycloak_olapps_idp_logins.py`.
+
+### Adding a new dashboard
+
+1. Add `dashboards/<system>_<what_it_shows>.py` with a `_dashboard_json(...)`
+   builder and a `create(folder_uid, timeseries_panel, bar_gauge_panel,
+   create_dashboard, resource_opts)` function, matching the signature in
+   [Submodule API](#submodule-api) above.
+2. Use the `timeseries_panel`/`bar_gauge_panel` helpers passed in from
+   `base.py` (querying the shared Mimir datasource UID) rather than building
+   panel dicts by hand, so styling stays consistent across dashboards.
+3. Import the new sub-module in `base.py` and call its `create(...)` from
+   `base.create(...)`, passing the shared folder UID and helpers.
+4. All dashboards in this package currently share one folder (`"Keycloak"`,
+   uid `keycloak-dashboards`). If a new dashboard belongs to an unrelated
+   system, create a second folder in `base.py` rather than dropping it into
+   the Keycloak one.
 
 ---
 
