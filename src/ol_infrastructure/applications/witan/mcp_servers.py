@@ -127,6 +127,73 @@ WITAN_BACKEND_RESOURCES = {
 # clear of a council graph's export today and far below the indexer's 8Gi.
 TMP_SIZE_LIMIT = "2Gi"
 
+# ── Proxy-runner health checking ─────────────────────────────────────────────
+#
+# WHY THIS BLOCK EXISTS: without it, a burst of concurrent WRITES takes the
+# whole service down — readers included — and it is not a crash, a leak, or a
+# resource limit. Observed live in CI on 2026-08-12 at 16 concurrent
+# `memory_store` calls, and the chain runs entirely through health checking:
+#
+#   1. witan serialises writes on one graph at ~2s each, so the queue outlives
+#      any single request.
+#   2. The proxy runner's `/health` handler SYNCHRONOUSLY pings the MCP backend
+#      (upstream `pkg/healthcheck/healthcheck.go:CheckHealth`). A saturated
+#      backend does not answer, so `/health` hangs rather than returning.
+#   3. The kubelet's liveness probe on the proxy container — `/health`,
+#      `timeoutSeconds: 5`, `failureThreshold: 3` — kills the container.
+#      ("Container toolhive failed liveness probe, will be restarted", with
+#      `lastState.terminated{exitCode: 0, reason: Completed}`.)
+#   4. While it restarts, `mcp-witan-proxy:8080` has no ready endpoint, so the
+#      vMCP's own backend check gets `connect: connection refused`, marks the
+#      only backend unhealthy, and terminates EVERY session with "no backends
+#      returned capabilities". ~60s of total outage from a 30s write burst.
+#
+# ★ THE ROOT CAUSE IS TWO CONSTANTS THAT HAPPEN TO BE EQUAL. Upstream's
+# `DefaultPingerTimeout` is 5s (pkg/transport/proxy/transparent/pinger.go:26)
+# and the liveness probe the SAME repo generates uses `timeoutSeconds: 5`
+# (cmd/thv-operator/controllers/mcpserver_controller.go). The inner ping and the
+# outer probe expire together, so the probe can never win that race.
+#
+# ★ AND THE FIX IS FREE, BECAUSE A DEGRADED BACKEND STILL ANSWERS 200.
+# `healthcheck.go` maps StatusDegraded to `http.StatusOK` ("Still return 200 for
+# degraded state"); only StatusUnhealthy is 503. So the container is killed when
+# `/health` HANGS, never when it reports the backend degraded. Making the ping
+# give up well inside the probe's 5s budget keeps liveness green through exactly
+# the load that currently kills it, and costs nothing when the backend is fine.
+#
+# BOTH values are required and shipping only the first is worse than shipping
+# neither. The same pinger drives the proxy's own internal health loop, which
+# initiates SHUTDOWN after `FAILURE_THRESHOLD` consecutive failures at
+# `DefaultHealthCheckInterval` (10s). A shorter ping timeout makes that loop
+# fail sooner, so the threshold must rise to compensate — otherwise the proxy
+# trades a liveness kill for a self-inflicted shutdown that looks identical from
+# outside. 12 x 10s tolerates ~120s of backend saturation, against the ~60s
+# window actually observed. A genuinely dead backend is still noticed, and
+# restarting the PROXY was never going to revive it anyway — the backend is a
+# different pod.
+#
+# ★ INVALID VALUES ARE IGNORED SILENTLY. Upstream parses these with
+# `time.ParseDuration` / `strconv.Atoi` and falls back to the default with only
+# a WARN log, so a typo here reads as "configured" while changing nothing.
+# Verify against the running proxy, not against this file.
+#
+# Delivered through `spec.resourceOverrides.proxyDeployment.env`, which is the
+# ONLY lever available: the probes themselves are hardcoded by the operator
+# (`ProxyDeploymentOverrides` carries annotations, labels, podTemplateMetadata,
+# env and imagePullSecrets — no probe fields), and the `podTemplateSpec` used
+# above patches the MCP workload's StatefulSet, not this Deployment.
+#
+# Tracked as tk-a-write-burst-takes-the-whole-deployed-witan-dow-fc2ce7.
+# The underlying write throughput is a separate problem — see
+# tk-upstream-omnigraph-a-single-row-insert-costs-a-f-eeeae3. This change makes
+# saturation degrade instead of outage; it does not make writes faster.
+WITAN_PROXY_HEALTH_ENV = [
+    # Upstream default 5s, equal to the liveness probe's timeoutSeconds.
+    {"name": "TOOLHIVE_HEALTH_CHECK_PING_TIMEOUT", "value": "2s"},
+    # Upstream default 5, i.e. ~50s at the 10s check interval.
+    {"name": "TOOLHIVE_HEALTH_CHECK_FAILURE_THRESHOLD", "value": "12"},
+]
+
 
 class WitanMCPServers(NamedTuple):
     """Handles to the group and backend server CRs for depends_on wiring."""
@@ -308,6 +375,12 @@ def create_mcp_servers(  # noqa: PLR0913
             # Declared, but NOT what actually reaches the container — the
             # operator drops it. See WITAN_BACKEND_RESOURCES.
             "resources": WITAN_BACKEND_RESOURCES,
+            # Keeps a write burst from getting the proxy container killed by its
+            # own liveness probe, which is what turns backend saturation into a
+            # service-wide outage. See WITAN_PROXY_HEALTH_ENV.
+            "resourceOverrides": {
+                "proxyDeployment": {"env": WITAN_PROXY_HEALTH_ENV},
+            },
             # `volumes`/`volumeMounts` aren't first-class MCPServerSpec fields
             # beyond hostPath, so the actor-tokens Secret is mounted via the
             # documented escape hatch: a PodTemplateSpec merge-patch targeting
