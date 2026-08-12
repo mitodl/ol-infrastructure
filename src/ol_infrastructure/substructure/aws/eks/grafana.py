@@ -124,7 +124,7 @@ def setup_grafana(
         },
     ]
 
-    grafana_k8s_monitoring_release = kubernetes.helm.v3.Release(
+    kubernetes.helm.v3.Release(
         f"{cluster_name}-grafana-k8s-monitoring-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
             name="grafana-k8s-monitoring",
@@ -330,6 +330,54 @@ def setup_grafana(
                             }
                         ],
                     },
+                    # Chart-native self-monitoring for the Alloy collectors
+                    # themselves (feature-integrations' integrations.alloy).
+                    # Discovers every collector Deployment/StatefulSet the
+                    # chart creates (alloy-logs, alloy-metrics,
+                    # alloy-receiver, alloy-singleton, and the tail-sampling
+                    # collector, which the alloy-operator names plain
+                    # "alloy") on their shared http-metrics/12345 port --
+                    # verified against the live applications-production
+                    # Service objects and this chart version's default
+                    # port_name (also http-metrics).
+                    #
+                    # useDefaultAllowList (on by default) keeps this to the
+                    # chart's curated ~90-series set instead of scraping
+                    # every alloy_component_* and go runtime metric
+                    # unfiltered. includeMetrics extends that allowlist with
+                    # the tail-sampling processor's own counters, which
+                    # aren't in the default set: these are what would have
+                    # surfaced the tail-sampler sizing bug (traces evicted
+                    # before a decision was made, buffer occupancy far past
+                    # the old 100-trace cap) instead of it going unnoticed.
+                    "alloy": {
+                        "instances": [
+                            {
+                                "name": "alloy-collectors",
+                                "labelSelectors": {
+                                    "app.kubernetes.io/name": [
+                                        "alloy",
+                                        "alloy-logs",
+                                        "alloy-metrics",
+                                        "alloy-receiver",
+                                        "alloy-singleton",
+                                    ],
+                                },
+                                "namespaces": ["grafana"],
+                                "metrics": {
+                                    "tuning": {
+                                        "includeMetrics": [
+                                            "otelcol_processor_tail_sampling_count_traces_sampled",
+                                            "otelcol_processor_tail_sampling_sampling_trace_dropped_too_early",
+                                            "otelcol_processor_tail_sampling_new_trace_id_received",
+                                            "otelcol_processor_tail_sampling_sampling_traces_on_memory",
+                                            "otelcol_processor_tail_sampling_sampling_policy_evaluation_error",
+                                        ],
+                                    },
+                                },
+                            },
+                        ],
+                    },
                 },
                 # v4: kepler and kube-state-metrics moved to telemetryServices;
                 #     opencost moved here from clusterMetrics
@@ -411,56 +459,4 @@ def setup_grafana(
             },
         ),
         opts=ResourceOptions(provider=k8s_provider, delete_before_replace=True),
-    )
-
-    # The alloy-metrics collector already auto-discovers PodMonitor/ServiceMonitor
-    # CRDs cluster-wide via prometheusOperatorObjects (above), but nothing scrapes
-    # the collectors' own :12345/metrics endpoint. That endpoint carries the
-    # otelcol_* series (receiver/processor/exporter throughput, queue depth,
-    # refused/dropped spans) that are the only signal for whether the trace
-    # pipeline itself -- including the tail-sampling collector -- is healthy.
-    # Every collector Deployment/StatefulSet the chart creates (alloy-logs,
-    # alloy-metrics, alloy-receiver, alloy-singleton, and the tail-sampling
-    # collector, which the alloy-operator names plain "alloy") shares this
-    # http-metrics port name; verified against the live applications-production
-    # Service objects.
-    kubernetes.apiextensions.CustomResource(
-        f"{cluster_name}-grafana-alloy-collectors-pod-monitor",
-        api_version="monitoring.coreos.com/v1",
-        kind="PodMonitor",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="alloy-collectors",
-            namespace="grafana",
-        ),
-        spec={
-            "selector": {
-                "matchExpressions": [
-                    {
-                        "key": "app.kubernetes.io/name",
-                        "operator": "In",
-                        "values": [
-                            "alloy",
-                            "alloy-logs",
-                            "alloy-metrics",
-                            "alloy-receiver",
-                            "alloy-singleton",
-                        ],
-                    },
-                ],
-            },
-            "namespaceSelector": {"matchNames": ["grafana"]},
-            "podMetricsEndpoints": [
-                {
-                    "port": "http-metrics",
-                    "path": "/metrics",
-                    "scheme": "http",
-                    "interval": "30s",
-                    "scrapeTimeout": "10s",
-                },
-            ],
-        },
-        opts=ResourceOptions(
-            provider=k8s_provider,
-            depends_on=[grafana_k8s_monitoring_release],
-        ),
     )
