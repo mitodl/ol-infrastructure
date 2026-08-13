@@ -87,6 +87,15 @@ from ol_infrastructure.lib.pulumi_helper import (
 # is what mitodl/hq#11978 was.
 HIGH_MEM_CELERY_TERMINATION_GRACE_PERIOD_SECONDS = 4 * 60 * 60
 
+# The default lms/cms queues carry shorter-but-not-instant tasks (bulk email, OLX
+# course import/export, etc). The 30s Kubernetes default isn't enough for a warm
+# shutdown to finish these, and both deployments also get scaled down by KEDA as queue
+# depth drops -- not just rolled during a deploy -- so a busy worker can be deleted
+# mid-task with only the default grace period. 10 minutes covers the common case
+# without leaving a pod stuck Terminating for hours the way the high_mem grace period
+# would if reused here.
+DEFAULT_CELERY_TERMINATION_GRACE_PERIOD_SECONDS = 10 * 60
+
 
 def create_k8s_resources(  # noqa: C901
     aws_config: AWSBase,
@@ -1179,17 +1188,6 @@ def create_k8s_resources(  # noqa: C901
         if vm.name != configmaps.uwsgi_ini_config_name
     ]
 
-    celery_env_vars = [
-        kubernetes.core.v1.EnvVarArgs(
-            name="CELERY_TASK_ACKS_LATE",
-            value="True",
-        ),
-        kubernetes.core.v1.EnvVarArgs(
-            name="CELERY_TASK_REJECT_ON_WORKER_LOST",
-            value="True",
-        ),
-    ]
-
     # Selector labels must match the existing Deployment's spec.selector (immutable).
     # The old SGP label (pod-security-group) is kept in the selector; the new
     # edxapp-celery-sg label is added only to the pod template so the
@@ -1215,6 +1213,7 @@ def create_k8s_resources(  # noqa: C901
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=lms_celery_labels),
                 spec=kubernetes.core.v1.PodSpecArgs(
+                    termination_grace_period_seconds=DEFAULT_CELERY_TERMINATION_GRACE_PERIOD_SECONDS,
                     affinity=kubernetes.core.v1.AffinityArgs(
                         pod_anti_affinity=kubernetes.core.v1.PodAntiAffinityArgs(
                             preferred_during_scheduling_ignored_during_execution=[
@@ -1297,7 +1296,6 @@ def create_k8s_resources(  # noqa: C901
                                     name="DJANGO_SETTINGS_MODULE",
                                     value="lms.envs.production",
                                 ),
-                                *celery_env_vars,
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={
@@ -1475,7 +1473,6 @@ def create_k8s_resources(  # noqa: C901
                                     name="DJANGO_SETTINGS_MODULE",
                                     value="lms.envs.production",
                                 ),
-                                *celery_env_vars,
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={
@@ -1751,6 +1748,7 @@ def create_k8s_resources(  # noqa: C901
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=cms_celery_labels),
                 spec=kubernetes.core.v1.PodSpecArgs(
+                    termination_grace_period_seconds=DEFAULT_CELERY_TERMINATION_GRACE_PERIOD_SECONDS,
                     affinity=kubernetes.core.v1.AffinityArgs(
                         pod_anti_affinity=kubernetes.core.v1.PodAntiAffinityArgs(
                             preferred_during_scheduling_ignored_during_execution=[
@@ -1829,7 +1827,6 @@ def create_k8s_resources(  # noqa: C901
                                     name="DJANGO_SETTINGS_MODULE",
                                     value="cms.envs.production",
                                 ),
-                                *celery_env_vars,
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={
