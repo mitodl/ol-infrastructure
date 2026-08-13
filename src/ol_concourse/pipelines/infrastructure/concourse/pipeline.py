@@ -4,6 +4,7 @@ from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
 from ol_concourse.lib.resources import git_repo, github_release
 
+from bridge.lib.versions import CONCOURSE_VERSION
 from ol_concourse.pipelines.constants import (
     PACKER_WATCHED_PATHS,
     PULUMI_CODE_PATH,
@@ -19,8 +20,19 @@ from ol_concourse.pipelines.versions_map import (
 #############
 # RESOURCES #
 #############
+# Pinned to CONCOURSE_VERSION (src/bridge/lib/versions.py) rather than tracking
+# upstream's latest release. Previously this resource had no tag_filter, so any
+# new upstream release auto-triggered a build+deploy through CI->QA->Production
+# with no human gate -- that's how 8.3.0 reached production and broke every
+# worker (see PR #5401). Bumping the pin is now what triggers a rebuild, via
+# concourse_image_code watching its version pin (image_version_paths("concourse")
+# below) rather than the raw versions.py file -- see PR #5407.
 concourse_release = github_release(
-    Identifier("concourse-release"), "concourse", "concourse", github_token=""
+    Identifier("concourse-release"),
+    "concourse",
+    "concourse",
+    github_token="",
+    tag_filter=CONCOURSE_VERSION,
 )
 concourse_image_code = git_repo(
     Identifier("ol-infrastructure-packer"),
