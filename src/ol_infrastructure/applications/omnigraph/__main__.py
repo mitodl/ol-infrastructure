@@ -59,6 +59,8 @@ from ol_infrastructure.applications.omnigraph.cluster_config import (
 )
 from ol_infrastructure.applications.omnigraph.data_tier import (
     CLUSTER_CONFIGMAP_NAME,
+    DEFAULT_PER_ACTOR_BYTES_MAX,
+    DEFAULT_PER_ACTOR_INFLIGHT_MAX,
     OMNIGRAPH_SERVER_SERVICE_NAME,
     create_data_tier,
     omnigraph_server_addr,
@@ -210,6 +212,63 @@ OPTIMIZE_SCHEDULE = (
 CLEANUP_SCHEDULE = omnigraph_config.get("cleanup_schedule") or DEFAULT_CLEANUP_SCHEDULE
 CLEANUP_OLDER_THAN = (
     omnigraph_config.get("cleanup_older_than") or DEFAULT_CLEANUP_OLDER_THAN
+)
+
+# Per-actor admission caps (data_tier.py). Overridable per environment for the
+# same reason the schedules above are, and a sharper one: the count's default is
+# derived from ONE measurement of ONE environment (CI, 2026-08-12), and the knee
+# it encodes moves with graph size — a single-row insert costs a full-table read,
+# so Production's larger tables are slower per write and saturate sooner. It will
+# move again when that cost is attacked upstream. Retuning admission control
+# during an incident must not mean editing this repo, cutting a release and
+# rolling an image.
+#
+# ★ VALIDATED, and NOT with `or`. Two distinct traps, both silent:
+#
+#   `or` cannot tell 0 from unset. Zero is a MEANINGFUL setting here — it is how
+#   an operator says "admit nothing", a real incident answer — and `or` would
+#   quietly hand back the default, re-enabling the writes somebody was trying to
+#   stop. `is None` is the only test that distinguishes them.
+#
+#   The server parses these into Rust `u32`/`u64`. A negative or oversized value
+#   is not rejected loudly; omnigraph falls back to its own upstream defaults
+#   (16 in flight, 4 GiB), which are far LOOSER than ours — so a typo does not
+#   tighten the cap or crash the pod, it silently removes both safeguards. That
+#   is the worst of the three outcomes and the one nothing downstream reports,
+#   so it is refused here, at the point where the value is still readable.
+_U32_MAX = 2**32 - 1
+_U64_MAX = 2**64 - 1
+
+
+def _bounded_cap(name: str, value: int | None, default: int, ceiling: int) -> int:
+    """Return a stack-config admission cap, or the default.
+
+    Refuses what omnigraph would silently discard — see the note above on the
+    u32/u64 fallback.
+    """
+    if value is None:
+        return default
+    if not 0 <= value <= ceiling:
+        msg = (
+            f"omnigraph:{name}={value} is outside the range the server accepts "
+            f"(0..{ceiling}). Out of range, omnigraph ignores it and reverts to "
+            f"its own default, which is looser than the cap being set here."
+        )
+        raise ValueError(msg)
+    return value
+
+
+PER_ACTOR_INFLIGHT_MAX = _bounded_cap(
+    "per_actor_inflight_max",
+    omnigraph_config.get_int("per_actor_inflight_max"),
+    DEFAULT_PER_ACTOR_INFLIGHT_MAX,
+    _U32_MAX,
+)
+PER_ACTOR_BYTES_MAX = _bounded_cap(
+    "per_actor_bytes_max",
+    omnigraph_config.get_int("per_actor_bytes_max"),
+    DEFAULT_PER_ACTOR_BYTES_MAX,
+    _U64_MAX,
 )
 
 cluster_stack = make_stack_reference(projects.EKS, f"operations.{stack_info.name}")
@@ -728,6 +787,8 @@ data_tier = create_data_tier(
     cleanup_schedule=CLEANUP_SCHEDULE,
     cleanup_older_than=CLEANUP_OLDER_THAN,
     storage_prefix=STORAGE_PREFIX,
+    per_actor_inflight_max=PER_ACTOR_INFLIGHT_MAX,
+    per_actor_bytes_max=PER_ACTOR_BYTES_MAX,
     # Arming a migration suspends both maintenance sweeps for its duration.
     # They write directly to the store, so scaling the Deployment to zero does
     # not stop them, and `optimize` rewriting fragments between the export and

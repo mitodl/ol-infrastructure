@@ -222,8 +222,24 @@ def create_mcp_servers(  # noqa: PLR0913
     witan_code_token_secret: Resource,
     migration_job: Resource,
     service_version: str,
+    remote_write_max_inflight: str = "",
+    remote_write_queue_seconds: str = "",
+    remote_call_budget_seconds: str = "",
 ) -> WitanMCPServers:
-    """Provision the witan-tools MCPGroup and the witan MCPServer backend."""
+    """Provision the witan-tools MCPGroup and the witan MCPServer backend.
+
+    ``remote_write_max_inflight`` / ``remote_write_queue_seconds`` retune
+    witan's client-side write admission. Empty (the default) leaves witan's own
+    defaults in force — the env var is omitted entirely rather than set to an
+    empty string, so "unset" and "set to nothing" cannot diverge between what
+    Pulumi declares and what witan reads.
+
+    ``remote_call_budget_seconds`` tells witan how long a tool call has here
+    before ToolHive stops waiting for it, so it can refuse a write it cannot
+    finish rather than be cut off mid-call. witan-core assumes no deadline of
+    its own — the same library runs from a CLI and from a batch Job — so this
+    is the deployment declaring one. See the note at its call site.
+    """
     witan_mcpgroup = kubernetes.apiextensions.CustomResource(
         f"witan-mcpgroup-{stack_info.env_suffix}",
         api_version="toolhive.stacklok.dev/v1beta1",
@@ -312,6 +328,48 @@ def create_mcp_servers(  # noqa: PLR0913
                 # boundary from claiming a graph's shared default-branch view;
                 # only the in-cluster CI indexer Job declares itself `ci`.
                 {"name": "WITAN_CODE_SERVER", "value": omnigraph_server_addr},
+                # Client-side write admission, per graph, inside this pod —
+                # the global bound the data tier's PER-ACTOR cap cannot be,
+                # since every user's write funnels through this single replica
+                # and the 30s deadline sees total concurrency, not one actor's
+                # share. Only emitted when the stack sets a value: witan's own
+                # defaults (4 in flight, 10s of queue) are the measured ones,
+                # and an env var present-but-empty would only invite a debate
+                # about which layer's default is in force.
+                *(
+                    [
+                        {
+                            "name": "WITAN_REMOTE_WRITE_MAX_INFLIGHT",
+                            "value": str(remote_write_max_inflight),
+                        }
+                    ]
+                    if remote_write_max_inflight
+                    else []
+                ),
+                *(
+                    [
+                        {
+                            "name": "WITAN_REMOTE_WRITE_QUEUE_SECONDS",
+                            "value": str(remote_write_queue_seconds),
+                        }
+                    ]
+                    if remote_write_queue_seconds
+                    else []
+                ),
+                # The deadline THIS deployment imposes, told to witan so it can
+                # refuse a write it has no time left to finish. Set here rather
+                # than defaulted in witan-core because it is a fact about
+                # ToolHive, not about the client library — see the call site.
+                *(
+                    [
+                        {
+                            "name": "WITAN_REMOTE_CALL_BUDGET_SECONDS",
+                            "value": str(remote_call_budget_seconds),
+                        }
+                    ]
+                    if remote_call_budget_seconds
+                    else []
+                ),
                 # Structured logging + OTel. Appended from a shared helper
                 # rather than spelled out here so this workload, the CI
                 # indexer, and anything added later cannot drift into
