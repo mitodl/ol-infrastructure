@@ -1759,7 +1759,13 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
     route_configs=[
         OLApisixRouteConfig(
             route_name="fastly-passauth",
-            priority=40,
+            # Lower priority than browser-* (see below): browser requests via
+            # Fastly carry both Origin and Fastly-Client-IP, so the more
+            # specific browser-* match must be evaluated first or the
+            # broader ".+"  Fastly-Client-IP match here swallows all browser
+            # traffic and the rate-limited routes never trigger (found by
+            # Sentry AI review on this PR).
+            priority=20,
             shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
             plugins=[
                 proxy_rewrite_plugin_config,
@@ -1775,7 +1781,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
         ),
         OLApisixRouteConfig(
             route_name="fastly-logout-redirect",
-            priority=50,
+            priority=30,
             shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
             plugins=[
                 OLApisixPluginConfig(
@@ -1790,7 +1796,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
         ),
         OLApisixRouteConfig(
             route_name="fastly-reqauth",
-            priority=50,
+            priority=30,
             shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
             plugins=[
                 proxy_rewrite_plugin_config,
@@ -1810,7 +1816,10 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
         ),
         OLApisixRouteConfig(
             route_name="browser-passauth",
-            priority=20,
+            # Higher priority than fastly-* above: Origin is the more
+            # specific signal for direct browser traffic and must win the
+            # match before the broad Fastly-Client-IP presence check.
+            priority=40,
             shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
             plugins=[
                 proxy_rewrite_plugin_config,
@@ -1826,7 +1835,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
         ),
         OLApisixRouteConfig(
             route_name="browser-logout-redirect",
-            priority=30,
+            priority=50,
             shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
             plugins=[
                 OLApisixPluginConfig(
@@ -1841,7 +1850,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
         ),
         OLApisixRouteConfig(
             route_name="browser-reqauth",
-            priority=30,
+            priority=50,
             shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
             plugins=[
                 proxy_rewrite_plugin_config,
@@ -1920,7 +1929,10 @@ learn_external_service_apisix_route = OLApisixRoute(
     route_configs=[
         OLApisixRouteConfig(
             route_name="fastly-passauth",
-            priority=40,
+            # See the matching comment on the no-prefix route set above:
+            # lower priority than browser-* so the more specific Origin
+            # match is evaluated first.
+            priority=20,
             shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
             plugins=[
                 proxy_rewrite_plugin_config,
@@ -1936,7 +1948,7 @@ learn_external_service_apisix_route = OLApisixRoute(
         ),
         OLApisixRouteConfig(
             route_name="fastly-logout-redirect",
-            priority=50,
+            priority=30,
             shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
             plugins=[
                 OLApisixPluginConfig(
@@ -1951,7 +1963,7 @@ learn_external_service_apisix_route = OLApisixRoute(
         ),
         OLApisixRouteConfig(
             route_name="fastly-reqauth",
-            priority=50,
+            priority=30,
             shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
             plugins=[
                 proxy_rewrite_plugin_config,
@@ -1971,7 +1983,9 @@ learn_external_service_apisix_route = OLApisixRoute(
         ),
         OLApisixRouteConfig(
             route_name="browser-passauth",
-            priority=20,
+            # Higher priority than fastly-* above: see the matching comment
+            # on the no-prefix route set.
+            priority=40,
             shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
             plugins=[
                 proxy_rewrite_plugin_config,
@@ -1987,7 +2001,7 @@ learn_external_service_apisix_route = OLApisixRoute(
         ),
         OLApisixRouteConfig(
             route_name="browser-logout-redirect",
-            priority=30,
+            priority=50,
             shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
             plugins=[
                 OLApisixPluginConfig(
@@ -2002,7 +2016,7 @@ learn_external_service_apisix_route = OLApisixRoute(
         ),
         OLApisixRouteConfig(
             route_name="browser-reqauth",
-            priority=30,
+            priority=50,
             shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
             plugins=[
                 proxy_rewrite_plugin_config,
