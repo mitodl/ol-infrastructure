@@ -167,13 +167,32 @@ a confusing NoData state.
 ### Adopting a rule that was created in the UI
 
 Rule groups import with `{{ folderUID }}:{{ title }}`, where `title` is the rule
-*group* name, not the rule name:
+*group* name, not the rule name.
+
+**Export the Grafana credentials first.** `pulumi import` resolves the resource
+against the CLI's *default* provider rather than the explicit `grafana.Provider`
+that `__main__.py` builds, and passing `--provider` does not change that. Without
+configuration it fails with:
 
 ```
+the Grafana client is required for this resource.
+Set the auth and url provider attributes
+```
+
+Give the default provider the same credentials the program reads:
+
+```
+export GRAFANA_URL="$(sops -d src/bridge/secrets/grafana_cloud/api.production.yaml | yq -r '.grafana_url')"
+export GRAFANA_AUTH="$(sops -d src/bridge/secrets/grafana_cloud/api.production.yaml | yq -r '.grafana_api_token')"
+
 pulumi stack select Production
 pulumi import grafana:alerting/ruleGroup:RuleGroup \
   <pulumi-resource-name> "<folder-uid>:<rule-group-name>"
 ```
+
+Importing through the default provider does not strand the resource there: the
+next `pulumi preview` shows the group as an update under the program's own
+provider, not a replacement. Check that it does before applying.
 
 Import the group before the first `pulumi up` that declares it — an apply
 against an undeclared existing group fails as already-exists rather than
