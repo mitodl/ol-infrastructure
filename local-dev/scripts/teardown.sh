@@ -68,6 +68,49 @@ with open('${win_hosts}', 'w') as f:
     fi
 }
 
+# Destroy one Pulumi stack, and make sure its state cannot outlive the
+# cluster. Everything these stacks manage lives inside the cluster that gets
+# deleted below, but the state lives in this checkout and survives — so a
+# failed destroy leaves Pulumi believing resources exist that are already
+# gone, and the next `pulumi up` skips creating them.
+#
+# That is not hypothetical: on 2026-08-13 a broken registry kept Keycloak
+# from starting, the apps_infra destroy failed, `|| true` reported success
+# anyway, and the first `pulumi up` against the rebuilt cluster died with
+# 404 "Realm not found" while creating a child of a realm Pulumi thought it
+# already had.
+#
+# `pulumi stack rm` deletes Pulumi.<stack>.yaml along with the state, and
+# that config file is checked into this repo — save and restore it.
+destroy_stack() {
+    local dir="$1" stack="$2" label="$3"
+    local config="Pulumi.${stack}.yaml"
+
+    cd "${REPO_ROOT}/${dir}"
+    if ! pulumi stack ls 2>/dev/null | grep -q "${stack}"; then
+        ok "    No ${label} state found."
+        return
+    fi
+
+    if PULUMI_CONFIG_PASSPHRASE='' pulumi destroy --stack "${stack}" --yes --logtostderr; then
+        ok "    ${label} destroyed."
+        return
+    fi
+
+    warn "    'pulumi destroy' failed for ${label} — discarding its state."
+    warn "    Keeping it would make the next 'pulumi up' skip resources it"
+    warn "    wrongly believes still exist in the deleted cluster."
+    [[ -f "${config}" ]] && cp "${config}" "${config}.teardown-bak"
+    if PULUMI_CONFIG_PASSPHRASE='' pulumi stack rm "${stack}" --force --yes >/dev/null 2>&1; then
+        ok "    ${label} state discarded (stack config preserved)."
+    else
+        warn "    Could not remove stack '${stack}'. Remove it by hand before the"
+        warn "    next 'tilt up':  cd ${dir} && pulumi stack rm ${stack} --force --yes"
+    fi
+    [[ -f "${config}.teardown-bak" ]] && mv "${config}.teardown-bak" "${config}"
+    return 0
+}
+
 log "Destroying k3d cluster '${CLUSTER_NAME}'..."
 if k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}"; then
     # Ensure cluster is running before destroying Pulumi resources
@@ -86,23 +129,11 @@ if k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}"; then
 
     # Destroy apps_infra stack first (it depends on core stack)
     log "  Destroying apps_infra stack..."
-    cd "${REPO_ROOT}/local-dev/infra/apps_infra"
-    if pulumi stack ls 2>/dev/null | grep -q "local-dev.apps-infra"; then
-        PULUMI_CONFIG_PASSPHRASE='' pulumi destroy --stack local-dev.apps-infra.Dev --yes --logtostderr || true
-        ok "    Apps infrastructure destroyed."
-    else
-        ok "    No apps_infra state found."
-    fi
+    destroy_stack "local-dev/infra/apps_infra" "local-dev.apps-infra.Dev" "Apps infrastructure"
 
     # Destroy core stack (after apps_infra is gone)
     log "  Destroying core stack..."
-    cd "${REPO_ROOT}/local-dev/infra/core"
-    if pulumi stack ls 2>/dev/null | grep -q "local-dev.core"; then
-        PULUMI_CONFIG_PASSPHRASE='' pulumi destroy --stack local-dev.core.Dev --yes --logtostderr || true
-        ok "    Core infrastructure destroyed."
-    else
-        ok "    No core state found."
-    fi
+    destroy_stack "local-dev/infra/core" "local-dev.core.Dev" "Core infrastructure"
 
     cd "${REPO_ROOT}"
 
