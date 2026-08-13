@@ -26,6 +26,7 @@ from ol_concourse.pipelines.constants import (
 )
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
+from ol_concourse.pipelines.versions_map import project_version_paths
 
 
 def build_superset_docker_pipeline() -> Pipeline:
@@ -54,6 +55,7 @@ def build_superset_docker_pipeline() -> Pipeline:
         paths=[
             *PULUMI_WATCHED_PATHS,
             "src/ol_infrastructure/applications/superset/",
+            *project_version_paths("applications/superset/"),
             *project_secrets_paths("applications/superset/"),
         ],
     )

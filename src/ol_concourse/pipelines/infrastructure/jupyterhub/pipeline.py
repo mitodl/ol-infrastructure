@@ -8,6 +8,7 @@ from ol_concourse.pipelines.constants import (
 )
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
+from ol_concourse.pipelines.versions_map import project_version_paths
 
 jupyterhub_pulumi_code = git_repo(
     name=Identifier("ol-infrastructure-pulumi"),
@@ -15,6 +16,7 @@ jupyterhub_pulumi_code = git_repo(
     paths=[
         *PULUMI_WATCHED_PATHS,
         "src/ol_infrastructure/applications/jupyterhub/",
+        *project_version_paths("applications/jupyterhub/"),
         *project_secrets_paths("applications/jupyterhub/"),
     ],
 )

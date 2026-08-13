@@ -221,6 +221,67 @@ def test_registry_covers_every_version_the_image_reads(image: str) -> None:
     )
 
 
+def _paths_lists(tree: ast.Module) -> list[ast.List]:
+    """Every ``paths=[...]`` literal passed to a call in a pipeline module."""
+    return [
+        keyword.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        for keyword in node.keywords
+        if keyword.arg == "paths" and isinstance(keyword.value, ast.List)
+    ]
+
+
+def _helper_args(paths_list: ast.List, helper: str) -> set[str]:
+    """Arguments a helper is starred into a ``paths=[...]`` list with."""
+    return {
+        ast.unparse(element.value.args[0])
+        for element in paths_list.elts
+        if isinstance(element, ast.Starred)
+        and isinstance(element.value, ast.Call)
+        and isinstance(element.value.func, ast.Name)
+        and element.value.func.id == helper
+        and element.value.args
+    }
+
+
+def _pipeline_modules() -> list[str]:
+    """Every pipeline definition module under ``src/ol_concourse/pipelines/``."""
+    root = SRC / "ol_concourse" / "pipelines"
+    return sorted(str(p.relative_to(REPO_ROOT)) for p in root.rglob("pipeline.py"))
+
+
+@pytest.mark.parametrize("module", _pipeline_modules())
+def test_watched_secrets_and_version_pins_stay_paired(module: str) -> None:
+    """A git resource watching a project's secrets also watches its pins.
+
+    The registry alone does not narrow anything -- a pipeline has to call
+    ``project_version_paths``.  Bespoke pipelines (JupyterHub, Superset,
+    Kubewatch, the Open edX and k8s_apps factories) each build their own
+    ``paths`` list, so it is easy to add one helper and forget the other and
+    quietly ship a pipeline that never redeploys on a version bump.  Every
+    Pulumi git resource already watches its project's secrets, so pairing the
+    two calls is the invariant that keeps the guarantee true.
+    """
+    tree = ast.parse((REPO_ROOT / module).read_text())
+    unpaired = sorted(
+        f"{secrets_helper}({arg})"
+        for paths_list in _paths_lists(tree)
+        for secrets_helper, versions_helper in (
+            ("project_secrets_paths", "project_version_paths"),
+            ("combined_secrets_paths", "combined_version_paths"),
+        )
+        for arg in _helper_args(paths_list, secrets_helper)
+        - _helper_args(paths_list, versions_helper)
+    )
+    assert not unpaired, (
+        f"{module} watches secrets without watching version pins: {unpaired}. "
+        "Add the matching project_version_paths(...)/combined_version_paths(...) "
+        "call to the same paths list, otherwise that resource will not "
+        "re-trigger when a version the project pins changes."
+    )
+
+
 def test_registry_has_no_stale_entries() -> None:
     """The registry does not list projects or images that no longer exist."""
     stale = sorted(

@@ -48,6 +48,7 @@ def build_keycloak_substructure_pipeline() -> PipelineFragment:
         paths=[
             *PULUMI_WATCHED_PATHS,
             str(PULUMI_CODE_PATH.joinpath("substructure/keycloak/")),
+            *project_version_paths("substructure/keycloak/"),
             *project_secrets_paths("substructure/keycloak/"),
         ],
     )

@@ -229,9 +229,23 @@ def project_version_paths(project_path: str) -> list[str]:
     :returns: Repo-relative paths under ``src/bridge/lib/version_pins/``.
         Empty for projects that read no version constants, which is the point:
         their pipeline stops re-triggering on unrelated version bumps.
+    :raises KeyError: If the project has never been audited -- add it to
+        :data:`PROJECT_VERSIONS` (an empty list is a valid answer).  Failing
+        loudly at render time beats generating a pipeline that quietly watches
+        nothing and stops deploying.
     """
     key = project_path if project_path.endswith("/") else f"{project_path}/"
-    return version_pin_paths(*PROJECT_VERSIONS.get(key, []))
+    try:
+        names = PROJECT_VERSIONS[key]
+    except KeyError:
+        msg = (
+            f"Pulumi project {key!r} is missing from PROJECT_VERSIONS in "
+            "src/ol_concourse/pipelines/versions_map.py. Add it (an empty list "
+            "is correct for projects that read no version constants) so its "
+            "pipeline watches the right version pins."
+        )
+        raise KeyError(msg) from None
+    return version_pin_paths(*names)
 
 
 def combined_version_paths(*project_paths: str) -> list[str]:
@@ -254,5 +268,17 @@ def image_version_paths(image_name: str) -> list[str]:
     :param image_name: Directory name under ``src/bilder/images/``, e.g.
         ``"docker_baseline_ami"``.
     :returns: Repo-relative paths under ``src/bridge/lib/version_pins/``.
+    :raises KeyError: If the image has never been audited -- add it to
+        :data:`IMAGE_VERSIONS` (an empty list is a valid answer).
     """
-    return version_pin_paths(*IMAGE_VERSIONS.get(image_name, []))
+    try:
+        names = IMAGE_VERSIONS[image_name]
+    except KeyError:
+        msg = (
+            f"Packer image {image_name!r} is missing from IMAGE_VERSIONS in "
+            "src/ol_concourse/pipelines/versions_map.py. Add it (an empty list "
+            "is correct for images that bake in no pinned version) so its AMI "
+            "rebuilds when a version it installs changes."
+        )
+        raise KeyError(msg) from None
+    return version_pin_paths(*names)

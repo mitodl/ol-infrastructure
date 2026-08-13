@@ -19,6 +19,7 @@ from ol_concourse.pipelines.constants import (
 )
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
+from ol_concourse.pipelines.versions_map import project_version_paths
 
 
 def build_kubewatch_webhook_handler_pipeline() -> PipelineFragment:
@@ -33,6 +34,7 @@ def build_kubewatch_webhook_handler_pipeline() -> PipelineFragment:
         paths=[
             *PULUMI_WATCHED_PATHS,
             str(PULUMI_CODE_PATH.joinpath("applications/kubewatch_webhook_handler/")),
+            *project_version_paths("applications/kubewatch_webhook_handler/"),
             *project_secrets_paths("applications/kubewatch_webhook_handler/"),
         ],
     )
@@ -110,6 +112,7 @@ def build_kubewatch_pipeline() -> PipelineFragment:
         paths=[
             *PULUMI_WATCHED_PATHS,
             str(PULUMI_CODE_PATH.joinpath("applications/kubewatch/")),
+            *project_version_paths("applications/kubewatch/"),
             *project_secrets_paths("applications/kubewatch/"),
         ],
     )
