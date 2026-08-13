@@ -12,13 +12,26 @@ TLSTargetCertificateCloseToExpiring). Those are generated and owned by the
 grafana-synthetic-monitoring-app plugin. Leave them alone -- Pulumi does not
 manage them and adopting them would fight the plugin.
 
-Folder
-------
+Folder, and why this is production-only
+---------------------------------------
 `_SM_FOLDER_UID` is the plugin's own folder, not a Pulumi-created one, so this
 module takes no `folder_uid` parameter (unlike every other metric_rules
 sub-module). The rules must stay in that folder: the folder UID is half the
 import identity, so moving them to "Infrastructure Alerts" would destroy and
 recreate all three, losing their alert-state history and any live silences.
+
+That folder UID only exists on the production Grafana stack. QA has no Synthetic
+Monitoring folder at all, and CI's is `ffqmgh1ukxam8a` (plus a legacy
+`6GJToXwnz`) -- the UID is per-stack, unlike the `grafanacloud-prom` datasource
+UID that is deliberately uniform everywhere. Registering these outside
+production would fail against a folder that is not there, and the pipeline
+deploys CI -> QA -> Production, so it would break at the first stage.
+
+The endpoints are production hosts regardless (learn.mit.edu,
+api.learn.mit.edu, next.learn.mit.edu), and the Synthetic Monitoring checks
+feeding `probe_success` are only configured on the production stack, so there is
+nothing for these rules to evaluate elsewhere. Hence the early return below,
+matching how `__main__.py` gates `pingdom_checks` on the same condition.
 
 Why the expression is inverted
 ------------------------------
@@ -145,6 +158,8 @@ from dataclasses import dataclass
 
 from pulumi import ResourceOptions
 from pulumiverse_grafana import alerting
+
+from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 # The Synthetic Monitoring plugin's folder. Referenced, never created -- see the
 # module docstring.
@@ -324,8 +339,13 @@ def create(
     """Create the MIT Learn synthetic monitoring alert rule groups.
 
     Takes no `folder_uid`: these rules live in the Synthetic Monitoring plugin's
-    folder, not the Pulumi-created "Infrastructure Alerts" one.
+    folder, not the Pulumi-created "Infrastructure Alerts" one. Production only
+    -- that folder's UID differs per Grafana stack and the checks these watch
+    exist nowhere else. See the module docstring.
     """
+    if parse_stack().env_suffix != "production":
+        return
+
     for check in _CHECKS:
         alerting.RuleGroup(
             check.resource_name,
