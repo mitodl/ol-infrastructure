@@ -20,11 +20,13 @@
 #      whose effect is not scoped to local-dev (the cost is only rebuild
 #      speed, never correctness). Set the cap to 0 to opt out and manage the
 #      pool yourself (e.g. daemon builder.gc config).
+#   3. k3d registry: remove repo directories that hold no manifest — the one
+#      case zot's own GC provably cannot reclaim (see prune_orphan_repos).
 #
-# The other two image stores clean themselves and are intentionally NOT
-# handled here:
-#   - k3d registry: zot enforces its own retention + GC declaratively
-#     (local-dev/cluster/zot-config.json).
+# Everything else in the registry, and the k3s node containerd stores, clean
+# themselves and are intentionally NOT handled here:
+#   - k3d registry: zot enforces retention + GC declaratively for every repo
+#     it has metadata for (local-dev/cluster/zot-config.json).
 #   - k3s node containerd stores: kubelet's image GC owns those (thresholds
 #     in local-dev/cluster/k3d-config.yaml).
 #
@@ -107,8 +109,69 @@ prune_build_cache() {
 }
 
 # ---------------------------------------------------------------------------
-# Registry backend check. This janitor deliberately does NOT prune the
-# registry — zot does that itself — so a machine still on the pre-2026-07
+# 3. Registry: drop repo directories that contain no manifest.
+#
+# zot's retention/GC is driven by its metadata DB, but the GC scheduler walks
+# the storage directory — so it enqueues a task for every repo dir on disk and
+# then fails the ones metadata has never heard of:
+#
+#   "failed to run GC for /var/lib/zot/<repo>"
+#   error: "repo metadata not found for given repo name"
+#
+# A repo lands in that state when layer uploads succeed but the manifest PUT
+# that would register it never happens — any interrupted push (Ctrl-C, a
+# cancelled Tilt build, a push that times out). The completed layers are left
+# behind as blobs that are unreachable (no manifest refers to them) and
+# permanently un-collectable (GC bails before it can reclaim them), so they
+# occupy multiple GB until someone wipes the whole registry by hand. zot
+# cannot self-heal this; it is the one registry case the janitor must own.
+#
+# Two guards keep this from touching a live push, which passes transiently
+# through exactly this state (index.json is only written at the end, by the
+# manifest PUT): only repos whose index.json lists no manifests at all, and
+# only those with no filesystem activity anywhere in the tree for
+# ORPHAN_REPO_MIN_AGE_MINS. Anything unparseable is left alone — a format
+# change upstream must fail towards keeping data, not deleting it.
+#
+# Deleting is safe by construction: with no manifest there is nothing
+# pullable in the directory, and a subsequent push just re-uploads the layers.
+# --volumes-from reads the storage path from the registry container, so it
+# needs no knowledge of the volume name setup.sh chose.
+# ---------------------------------------------------------------------------
+ORPHAN_REPO_MIN_AGE_MINS=60
+
+prune_orphan_repos() {
+    local image
+    image="$(docker inspect k3d-registry.localhost --format '{{.Config.Image}}' 2>/dev/null)" || return 0
+    case "$image" in *zot*) ;; *) return 0 ;; esac
+
+    local removed line
+    removed=0
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        log "  registry: removed manifest-less repo '$line' (interrupted push)"
+        removed=$((removed + 1))
+    done < <(
+        docker run --rm --volumes-from k3d-registry.localhost alpine sh -c '
+            for d in /var/lib/zot/*/; do
+                [ -d "$d" ] || continue
+                idx="${d}index.json"
+                # No index.json yet, or one whose manifest list is empty
+                # ("null" for a nil slice, "[]" for an empty one).
+                [ -f "$idx" ] && ! grep -qE "\"manifests\":(null|\[\])" "$idx" && continue
+                [ -n "$(find "$d" -mmin -'"$ORPHAN_REPO_MIN_AGE_MINS"' 2>/dev/null | head -n1)" ] && continue
+                name="${d#/var/lib/zot/}"
+                rm -rf "$d" && echo "${name%/}"
+            done
+        ' 2>/dev/null
+    )
+    (( removed > 0 )) && log "registry: reclaimed $removed orphaned repo dir(s)"
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# Registry backend check. Apart from the orphan sweep above, this janitor
+# leaves the registry to zot — so a machine still on the pre-2026-07
 # registry:2 container has NO registry retention at all and will regrow
 # unbounded. setup.sh prints migration instructions, but plenty of setups
 # never re-run it; this warning runs where everyone actually is (tilt up).
@@ -126,6 +189,7 @@ run_cycle() {
     warn_if_not_zot
     prune_local_tags
     prune_build_cache
+    prune_orphan_repos
 }
 
 log "disk-janitor starting (keep_tags=${KEEP_TAGS}, buildcache_max_gb=${JANITOR_BUILDCACHE_MAX_GB:-auto}, interval=${INTERVAL}s)"

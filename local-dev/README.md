@@ -346,7 +346,7 @@ Each store is bounded by retention config owned by the component that enforces i
 
 | Mechanism | Covers | Where |
 |---|---|---|
-| `disk-janitor` (automatic, runs with every `tilt up`) | Old tilt-built image tags in the local daemon; build-cache size cap | `local-dev/scripts/disk-janitor.sh`, wired as a `serve_cmd` resource in the root Tiltfile |
+| `disk-janitor` (automatic, runs with every `tilt up`) | Old tilt-built image tags in the local daemon; build-cache size cap; registry repos left manifest-less by an interrupted push | `local-dev/scripts/disk-janitor.sh`, wired as a `serve_cmd` resource in the root Tiltfile |
 | zot registry retention + GC | The k3d registry — zot keeps the 10 most recently pushed tags per repo and garbage-collects the rest itself | `local-dev/cluster/zot-config.json` (the registry image is [zot](https://zotregistry.dev), not registry:2; created by `setup.sh`) |
 | kubelet image GC | Node containerd stores | Thresholds in `local-dev/cluster/k3d-config.yaml` (applies at cluster creation; existing clusters keep the old 85/80 until you run `local-dev/scripts/migrate-kubelet-gc-thresholds.sh`) |
 | `prune-docker` (manual, break-glass) | Local daemon + registry, destructively (node stores only with `--sweep-nodes` — read the script header first; it orphans running containers) | Tilt UI button / `tilt trigger prune-docker`, or run `local-dev/scripts/prune-docker.sh` directly |
@@ -365,7 +365,9 @@ Retention (keep the newest N) is safe to apply at any moment — unlike a wipe, 
 - `disk_keep_tags` / `LOCAL_DEV_DISK_KEEP_TAGS` — tags kept per image (default 3). Old tags are nearly pure waste: pods only reference the current tag, and rebuild speed comes from the build cache, not old tags.
 - `disk_buildcache_max_gb` / `LOCAL_DEV_BUILDCACHE_MAX_GB` — build-cache cap in GB (default: 10% of total disk). **This is the one knob whose effect is not scoped to local-dev**: BuildKit keeps a single daemon-wide cache pool, so eviction can slow rebuilds of unrelated projects on your machine (speed only, never correctness). Set to `0` to opt out and manage the pool yourself (e.g. `builder.gc` in your Docker engine config).
 
-If images ever pile up again despite the janitor, `tilt docker-prune --debug` prints Tilt's own per-image skip reasons and is the fastest way to see why something isn't being reclaimed. To check whether zot is doing its part, `docker logs k3d-registry.localhost` shows its retention decisions (`"module":"retention"` lines, logged at info level).
+If images ever pile up again despite the janitor, `tilt docker-prune --debug` prints Tilt's own per-image skip reasons and is the fastest way to see why something isn't being reclaimed. To check whether zot is doing its part, `docker logs k3d-registry.localhost` shows its retention decisions (`"module":"retention"` lines, logged at info level) and its GC results (`"module":"gc"`, one `gc successfully completed` per repo).
+
+One registry case zot cannot reclaim on its own is a repo left with no manifest by an interrupted push — see [zot logs "repo metadata not found"](#zot-logs-repo-metadata-not-found-for-given-repo-name). The janitor sweeps those.
 
 ---
 
@@ -547,6 +549,31 @@ docker logs k3d-registry.localhost 2>&1 | grep -o '"ReadTimeout":[0-9]*' | tail 
 # "ReadTimeout":1800000000000   <- nanoseconds; 60000000000 means the default is still in effect
 docker restart k3d-registry.localhost
 ```
+
+### zot logs `repo metadata not found for given repo name`
+
+The registry log shows GC failing for one repo, on every zot start and every hourly GC pass:
+
+```
+"failed to run GC for /var/lib/zot/mitodl_mit-learn-nextjs-app"
+error: "repo metadata not found for given repo name"
+"gc unsuccessfully completed for /var/lib/zot/mitodl_mit-learn-nextjs-app"
+```
+
+zot's GC scheduler walks the *storage directory* but its retention logic is driven by the *metadata DB*, so it enqueues a task for every repo dir on disk and then fails on any the metadata DB has never heard of. A repo gets into that state when layer uploads land but the manifest PUT that registers them never does — i.e. any interrupted push (Ctrl-C, cancelled Tilt build, or the 60s upload timeout above). The completed layers stay on disk as blobs no manifest refers to, and GC bails before it can collect them, so they are unreachable *and* un-collectable: multiple GB that nothing reclaims.
+
+`disk-janitor.sh` sweeps these automatically (repo dirs whose `index.json` lists no manifests, untouched for 60 minutes so a live push is never at risk). To clear one immediately:
+
+```bash
+# list repos with no manifest
+docker run --rm --volumes-from k3d-registry.localhost alpine sh -c \
+  'for d in /var/lib/zot/*/; do grep -qE "\"manifests\":(null|\[\])" "$d/index.json" 2>/dev/null && echo "$d"; done'
+
+# remove one (safe: with no manifest there is nothing pullable in it)
+docker run --rm --volumes-from k3d-registry.localhost alpine rm -rf /var/lib/zot/<repo>
+```
+
+The push that follows re-uploads those layers. Note the error names the repo whose push broke — fixing the push (usually the timeout above) stops it recurring.
 
 ### `kubectl exec` fails with a 502 (wedged kubelet streaming)
 
