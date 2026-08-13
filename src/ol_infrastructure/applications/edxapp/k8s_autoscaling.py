@@ -259,6 +259,27 @@ def create_celery_autoscaling_resources(
         opts=pulumi.ResourceOptions(depends_on=[lms_high_mem_celery_deployment]),
     )
 
+    # This was the only celery ScaledObject with no behavior block, so it ran on the
+    # HPA defaults: a 300s scale-down window and an unbounded scale-up that doubles
+    # replicas every 15s. A bulk course publish drove the observed sequence
+    # 1 -> 4 -> 8 -> 16 -> 20 -> 1 -> 20 inside a couple of hours.
+    #
+    # Every one of those cycles is expensive out of proportion to the work it absorbs.
+    # The edxapp image is ~2GB and a cold pull was measured at 3m56s, so a pod
+    # summoned by a burst routinely becomes ready after the burst it was meant to
+    # serve has already drained. Karpenter then scales the node back out from under
+    # it -- one pod was evicted as "Underutilized" 8 minutes after being created.
+    #
+    # scaleUp at 300s: match the shared LMS worker. A CMS publish burst that is still
+    # queued five minutes later is a real backlog; anything shorter is absorbed by the
+    # replicas already running and would only buy an image pull that lands too late.
+    #
+    # scaleDown at 1800s with a 1-pod/300s policy: bleed replicas off gradually rather
+    # than dropping 20 -> 1 the moment the queue reads empty. Queue depth goes to zero
+    # as soon as tasks are picked up, not when they finish, so an empty
+    # edx.cms.core.default is a poor signal that the work is done -- and the git export
+    # tasks that dominate these bursts run 30-113s each. Bleeding down also keeps warm
+    # pods around for the next burst, which is what actually breaks the flapping cycle.
     cms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
         f"ol-{stack_info.env_prefix}-edxapp-cms-celery-scaledobject-{stack_info.env_suffix}",
         api_version="keda.sh/v1alpha1",
@@ -277,6 +298,19 @@ def create_celery_autoscaling_resources(
             "cooldownPeriod": 300,
             "minReplicaCount": replicas_dict["celery"]["cms"]["min"],
             "maxReplicaCount": replicas_dict["celery"]["cms"]["max"],
+            "advanced": {
+                "horizontalPodAutoscalerConfig": {
+                    "behavior": {
+                        "scaleUp": {"stabilizationWindowSeconds": 300},
+                        "scaleDown": {
+                            "stabilizationWindowSeconds": 1800,
+                            "policies": [
+                                {"type": "Pods", "value": 1, "periodSeconds": 300},
+                            ],
+                        },
+                    }
+                }
+            },
             "triggers": [
                 {
                     "type": "redis",
