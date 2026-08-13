@@ -20,16 +20,28 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
 _ROOT_DOMAIN="${LOCAL_DEV_ROOT_DOMAIN:-mit.dev}"
 KC_URL="${KC_URL:-https://sso.ol.${_ROOT_DOMAIN}}"
 REALM="olapps"
 KC_USER="admin"
 KC_PASS="admin"  # pragma: allowlist secret
 
+# mkcert's root CA is not in the system trust store; see kc-seed-users.sh for
+# why an unvalidated curl here surfaces as a misleading "waiting for Keycloak".
+KC_CACERT="${KC_CACERT:-${REPO_ROOT}/local-dev/certs/rootCA.pem}"
+if [ ! -f "${KC_CACERT}" ]; then
+    echo "[kc-fix-flow-bindings] ERROR: CA certificate not found at ${KC_CACERT}" >&2
+    echo "[kc-fix-flow-bindings] Run local-dev/scripts/setup.sh to generate the local certs." >&2
+    exit 1
+fi
+
 get_token() {
     local token attempt
     for attempt in 1 2 3 4 5; do
-        token=$(curl -sf --max-time 10 \
+        token=$(curl -sf --cacert "${KC_CACERT}" --max-time 10 \
             -X POST "${KC_URL}/realms/master/protocol/openid-connect/token" \
             -d "client_id=admin-cli" \
             -d "grant_type=password" \
@@ -50,7 +62,7 @@ get_token() {
 echo "[kc-fix-flow-bindings] Connecting to Keycloak at ${KC_URL} ..."
 TOKEN=$(get_token)
 
-CURRENT=$(curl -sf --max-time 10 \
+CURRENT=$(curl -sf --cacert "${KC_CACERT}" --max-time 10 \
     -H "Authorization: Bearer ${TOKEN}" \
     "${KC_URL}/admin/realms/${REALM}" 2>/dev/null)
 
@@ -64,7 +76,7 @@ fi
 
 echo "[kc-fix-flow-bindings] Flow bindings drifted (browserFlow=${BROWSER_FLOW}, firstBrokerLoginFlow=${FIRST_BROKER_FLOW}); re-asserting ..."
 PATCHED=$(echo "$CURRENT" | jq '.browserFlow = "Organization browser" | .firstBrokerLoginFlow = "Organization first broker login"')
-curl -sf --max-time 10 \
+curl -sf --cacert "${KC_CACERT}" --max-time 10 \
     -X PUT \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
