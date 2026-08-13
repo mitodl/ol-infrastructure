@@ -1,10 +1,18 @@
 """Per-identity-provider login dashboard for the olapps Keycloak realm.
 
-Backed by the keycloak_olapps_idp_login_total /
-keycloak_olapps_idp_login_failure_total Prometheus counters that Alloy
-extracts from Keycloak's own login events (see substructure/aws/eks/grafana.py)
--- no login record, or the PII it carries, is shipped to Loki for this; only
-the aggregate counters are.
+Backed directly by Keycloak's own login events in Loki (see
+substructure/aws/eks/grafana.py for the Alloy stage that redacts username and
+identity_provider_identity -- the only PII these events carry -- before they
+reach Loki; identity_provider itself is just an IdP alias, not PII).
+
+This intentionally counts from raw logs via LogQL's count_over_time rather
+than from an Alloy-derived Prometheus counter. A `metric.counter` component
+only exists once it's been incremented, so Prometheus's increase() can't see
+its first-ever appearance (no prior "0" sample to diff against), and the
+counter itself gets dropped and recreated after any idle gap or Alloy
+reload -- both silently undercounting. count_over_time reads straight from
+Loki's stored log lines at query time instead: no persistent counter state,
+so no cold-start gap and no eviction/reload resets to work around.
 """
 
 from collections.abc import Callable
@@ -12,35 +20,31 @@ from typing import Any
 
 from pulumi import ResourceOptions
 
+from ol_infrastructure.infrastructure.grafana_alerting.dashboards.datasources import (
+    LOKI_DATASOURCE_REF,
+)
 
-def _increase_expr(metric: str, window: str) -> str:
-    """PromQL for "count of new increments within the window," robust to a
-    counter appearing partway through it.
 
-    Alloy's metric.counter is created lazily -- a per-IdP series only exists
-    on /metrics once it's been incremented at least once. Prometheus's
-    increase() computes a delta from a prior sample, so a series' very first
-    appearance (right after any Alloy reload, or after being idle-evicted
-    past max_idle_duration) is invisible to it: there's no earlier "0" sample
-    to diff against, so it reports zero increase even though a login just
-    happened. That's silent and looks like the pipeline is broken.
+def _login_count_expr(*, level: str, event_types: str, window: str) -> str:
+    """LogQL counting olapps IdP-brokered login events by identity_provider.
 
-    `metric - metric offset window` sidesteps this: it's plain subtraction,
-    not increase()'s reset-aware extrapolation. When the series existed
-    `window` ago, this gives the correct in-window delta. When it didn't
-    (the cold-start case), the offset lookup matches nothing, so the whole
-    subtraction is absent for that series -- not zero -- letting `or metric`
-    fall through to the counter's current raw value, which for a
-    just-appeared series *is* the correct in-window count. clamp_min guards
-    against a spurious negative from the rare case of a reset landing inside
-    the window (max_idle_duration is long enough that this should be rare).
+    `event_types` is a regex alternation (e.g. "LOGIN|IDENTITY_PROVIDER_LOGIN")
+    matched against Keycloak's own `type="..."` field. Restricting to lines
+    that also carry `identity_provider="` scopes this to logins actually
+    brokered through an external IdP, excluding direct username/password
+    logins to olapps (which have no identity_provider and aren't this
+    dashboard's concern).
     """
-    current = f'{metric}{{identity_provider!=""}}'
+    selector = (
+        '{namespace="keycloak", container="keycloak"} '
+        f'|= "{level}  [org.keycloak.events]" '
+        '|= `realmId="olapps"` '
+        f'|~ `type="({event_types})"` '
+        '|= `identity_provider="`'
+    )
+    extract = ' | regexp `identity_provider="(?P<identity_provider>[^"]+)"`'
     return (
-        f"round(clamp_min(sum by (identity_provider) ("
-        f"({current} - {current} offset {window}) "
-        f"or {current}"
-        f"), 0))"
+        f"sum by (identity_provider) (count_over_time({selector}{extract}[{window}]))"
     )
 
 
@@ -48,14 +52,20 @@ def _dashboard_json(
     timeseries_panel: Callable[..., dict[str, Any]],
     bar_gauge_panel: Callable[..., dict[str, Any]],
 ) -> dict[str, Any]:
+    success_kwargs = {"level": "INFO", "event_types": "LOGIN|IDENTITY_PROVIDER_LOGIN"}
+    failure_kwargs = {
+        "level": "WARN",
+        "event_types": "LOGIN_ERROR|IDENTITY_PROVIDER_LOGIN_ERROR",
+    }
     return {
         "uid": "keycloak-olapps-idp-logins",
         "title": "Keycloak - olapps IdP Logins",
         "description": (
             "Per-identity-provider login counts for the olapps realm. "
-            "Sourced from Prometheus counters Alloy extracts from Keycloak's "
-            "own success/failure login events -- no login record, or the "
-            "PII it carries, is shipped to Loki for this."
+            "Sourced directly from Keycloak's own success/failure login "
+            "events in Loki -- username and identity_provider_identity are "
+            "redacted by Alloy before ingestion; no other PII is shipped or "
+            "queried for this."
         ),
         "tags": ["keycloak", "olapps"],
         "timezone": "browser",
@@ -67,35 +77,27 @@ def _dashboard_json(
         "panels": [
             timeseries_panel(
                 title="Successful logins by identity provider",
-                expr=_increase_expr(
-                    "loki_process_custom_keycloak_olapps_idp_login_total",
-                    "$__interval",
-                ),
+                expr=_login_count_expr(**success_kwargs, window="$__interval"),
                 grid_pos={"h": 9, "w": 12, "x": 0, "y": 0},
+                datasource_ref=LOKI_DATASOURCE_REF,
             ),
             timeseries_panel(
                 title="Failed logins by identity provider",
-                expr=_increase_expr(
-                    "loki_process_custom_keycloak_olapps_idp_login_failure_total",
-                    "$__interval",
-                ),
+                expr=_login_count_expr(**failure_kwargs, window="$__interval"),
                 grid_pos={"h": 9, "w": 12, "x": 12, "y": 0},
+                datasource_ref=LOKI_DATASOURCE_REF,
             ),
             bar_gauge_panel(
                 title="Total successful logins (selected range)",
-                expr=_increase_expr(
-                    "loki_process_custom_keycloak_olapps_idp_login_total",
-                    "$__range",
-                ),
+                expr=_login_count_expr(**success_kwargs, window="$__range"),
                 grid_pos={"h": 8, "w": 12, "x": 0, "y": 9},
+                datasource_ref=LOKI_DATASOURCE_REF,
             ),
             bar_gauge_panel(
                 title="Total failed logins (selected range)",
-                expr=_increase_expr(
-                    "loki_process_custom_keycloak_olapps_idp_login_failure_total",
-                    "$__range",
-                ),
+                expr=_login_count_expr(**failure_kwargs, window="$__range"),
                 grid_pos={"h": 8, "w": 12, "x": 12, "y": 9},
+                datasource_ref=LOKI_DATASOURCE_REF,
             ),
         ],
     }

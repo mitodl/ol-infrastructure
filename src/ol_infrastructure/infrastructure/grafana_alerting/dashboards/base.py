@@ -1,9 +1,9 @@
 """Grafana dashboards.
 
-Every Grafana Cloud stack provisions its own Mimir datasource under the same
-generic UID (see metric_rules/base.py), so a dashboard defined here renders
-each stack's own data once deployed there -- no per-environment branching
-needed.
+Every Grafana Cloud stack provisions its own Mimir and Loki datasource under
+the same generic UIDs (see metric_rules/base.py and log_rules/base.py), so a
+dashboard defined here renders each stack's own data once deployed there --
+no per-environment branching needed.
 
 Sub-modules
 -----------
@@ -21,22 +21,24 @@ from pulumiverse_grafana.oss.folder import Folder
 from ol_infrastructure.infrastructure.grafana_alerting.dashboards import (
     keycloak_olapps_idp_logins,
 )
-
-# Every Grafana Cloud stack provisions its own Mimir datasource with this same
-# generic UID. The per-stack slug (e.g. grafanacloud-mitolci-prom) is only the
-# datasource *name*; referencing it as a UID fails with "data source not found".
-_MIMIR_DATASOURCE_UID = "grafanacloud-prom"
-_DATASOURCE_REF = {"type": "prometheus", "uid": _MIMIR_DATASOURCE_UID}
+from ol_infrastructure.infrastructure.grafana_alerting.dashboards.datasources import (
+    MIMIR_DATASOURCE_REF,
+)
 
 
 def _timeseries_panel(
-    *, title: str, expr: str, grid_pos: dict[str, Any]
+    *,
+    title: str,
+    expr: str,
+    grid_pos: dict[str, Any],
+    datasource_ref: dict[str, str] = MIMIR_DATASOURCE_REF,
+    legend_format: str = "{{identity_provider}}",
 ) -> dict[str, Any]:
-    """Build a time-series panel model querying the shared Mimir datasource."""
+    """Build a time-series panel model querying a shared datasource."""
     return {
         "title": title,
         "type": "timeseries",
-        "datasource": _DATASOURCE_REF,
+        "datasource": datasource_ref,
         "gridPos": grid_pos,
         "fieldConfig": {
             "defaults": {
@@ -62,9 +64,9 @@ def _timeseries_panel(
         },
         "targets": [
             {
-                "datasource": _DATASOURCE_REF,
+                "datasource": datasource_ref,
                 "expr": expr,
-                "legendFormat": "{{identity_provider}}",
+                "legendFormat": legend_format,
                 "refId": "A",
             }
         ],
@@ -72,13 +74,18 @@ def _timeseries_panel(
 
 
 def _bar_gauge_panel(
-    *, title: str, expr: str, grid_pos: dict[str, Any]
+    *,
+    title: str,
+    expr: str,
+    grid_pos: dict[str, Any],
+    datasource_ref: dict[str, str] = MIMIR_DATASOURCE_REF,
+    legend_format: str = "{{identity_provider}}",
 ) -> dict[str, Any]:
-    """Build a bar-gauge panel model querying the shared Mimir datasource."""
+    """Build a bar-gauge panel model querying a shared datasource."""
     return {
         "title": title,
         "type": "bargauge",
-        "datasource": _DATASOURCE_REF,
+        "datasource": datasource_ref,
         "gridPos": grid_pos,
         "fieldConfig": {
             "defaults": {
@@ -95,9 +102,9 @@ def _bar_gauge_panel(
         },
         "targets": [
             {
-                "datasource": _DATASOURCE_REF,
+                "datasource": datasource_ref,
                 "expr": expr,
-                "legendFormat": "{{identity_provider}}",
+                "legendFormat": legend_format,
                 "refId": "A",
                 "instant": True,
             }

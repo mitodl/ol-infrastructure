@@ -89,8 +89,9 @@ Rootly). That path is independent of Grafana and is managed in
 | `log_rules/mit_learn.py` | MIT Learn and MITx Online 5xx error rate alert rules. |
 | `log_rules/vault.py` | Vault secret-absent and auth-failure alert rules. |
 | `dashboards/` | Package. Grafana dashboards. |
-| `dashboards/base.py` | Mimir datasource UID, shared panel-builder helpers, folder creation, delegates to sub-modules. |
-| `dashboards/keycloak_olapps_idp_logins.py` | Per-identity-provider login counts (success + failure) for the olapps realm. |
+| `dashboards/base.py` | Shared panel-builder helpers, folder creation, delegates to sub-modules. |
+| `dashboards/datasources.py` | Mimir/Loki datasource ref constants, importable directly by sub-modules without a circular import through `base.py`. |
+| `dashboards/keycloak_olapps_idp_logins.py` | Per-identity-provider login counts (success + failure) for the olapps realm, from Loki via LogQL. |
 | `pingdom_checks.py` | Pingdom uptime checks via Pulumi dynamic provider. Runs in the production stack only. |
 | `CLAUDE.md` | This file. |
 
@@ -190,8 +191,18 @@ counts) would be `keycloak_session_counts.py`, not a new function inside
    create_dashboard, resource_opts)` function, matching the signature in
    [Submodule API](#submodule-api) above.
 2. Use the `timeseries_panel`/`bar_gauge_panel` helpers passed in from
-   `base.py` (querying the shared Mimir datasource UID) rather than building
-   panel dicts by hand, so styling stays consistent across dashboards.
+   `base.py` rather than building panel dicts by hand, so styling stays
+   consistent across dashboards. They default to the shared Mimir datasource;
+   for a Loki-backed panel (LogQL, e.g. `count_over_time`), pass
+   `datasource_ref=LOKI_DATASOURCE_REF` (import it from `datasources.py`,
+   not `base.py`, to avoid a circular import). Prefer counting straight from
+   Loki over deriving a Prometheus counter via an Alloy `stage.metrics`
+   block: a `metric.counter` only exists once incremented, so a low-volume
+   counter's first-ever appearance is invisible to PromQL's increase() (no
+   prior sample to diff against), and it gets evicted and reset after any
+   gap longer than `max_idle_duration` -- both silently undercount. LogQL's
+   `count_over_time` reads directly from Loki's stored lines at query time:
+   no persistent counter state, so neither failure mode applies.
 3. Import the new sub-module in `base.py` and call its `create(...)` from
    `base.create(...)`, passing the shared folder UID and helpers.
 4. All dashboards in this package currently share one folder (`"Keycloak"`,
