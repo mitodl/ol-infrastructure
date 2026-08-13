@@ -524,6 +524,30 @@ The Next.js build needs ~4 GB of memory. If it OOMs:
 - Increase the Docker VM memory allocation (see [Prerequisites](#prerequisites))
 - Or use a prebuilt image by removing `mit-learn` from `enabled_apps` in `tilt_config.json` and letting Tilt use the `prebuilt_tags` value instead
 
+### Image push retries forever on the last layer
+
+Tilt's push stalls partway through one big layer, restarts from zero, and eventually gives up:
+
+```
+89076705fa1d: Pushing [==================>       ]  1.156GB/3.169GB
+```
+
+zot defaults `http.readTimeout` to 60s, and Go's `ReadTimeout` is a deadline on the *entire* request including its body — not an idle timeout. A monolithic blob upload that takes longer than that is killed mid-stream no matter how fast data is flowing; zot deletes the partial upload, Docker retries the layer, and hits the same wall. The registry log shows the deadline verbatim:
+
+```bash
+docker logs k3d-registry.localhost 2>&1 | grep '"level":"error"'
+# PATCH /v2/<repo>/blobs/uploads/<id>  statusCode: 500  latency: "1m0s"
+# "unexpected error, removing .uploads/ files"  error: "read tcp ...: i/o timeout"
+```
+
+Small layers push fine, so this only ever bites the multi-GB `node_modules` layers — those need ~80s on a typical dev box. `zot-config.json` therefore sets `readTimeout` and `writeTimeout` to `30m`. If you see this after editing that file, confirm the running registry actually picked the values up (they need a restart, not a config hot-reload):
+
+```bash
+docker logs k3d-registry.localhost 2>&1 | grep -o '"ReadTimeout":[0-9]*' | tail -1
+# "ReadTimeout":1800000000000   <- nanoseconds; 60000000000 means the default is still in effect
+docker restart k3d-registry.localhost
+```
+
 ### `kubectl exec` fails with a 502 (wedged kubelet streaming)
 
 `kubectl exec` / `attach` / `logs -f` into a pod may fail like this, even though `kubectl get` / `describe` / `logs` still work and the node shows `Ready`:
