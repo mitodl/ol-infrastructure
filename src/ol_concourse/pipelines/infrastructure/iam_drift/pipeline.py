@@ -14,11 +14,12 @@ Prerequisites, both of which have to exist before this pipeline can do anything:
 - ``iam_drift_analysis`` attached to the analyzed role, granting the Access
   Analyzer calls the check makes. Wired to the Production ``infra`` pool in
   ``src/ol_infrastructure/applications/concourse/Pulumi.Production.yaml``.
-- ``((github.drift_pr_access_token))`` in the ``infrastructure`` team's Vault
-  namespace: a token with ``public_repo`` scope on ``mitodl/ol-infrastructure``
-  (push a branch, open and update a pull request). The existing tokens in
-  ``infrastructure/github`` back read-oriented resources, so this deliberately
-  asks for its own rather than assuming one of them can write.
+- ``((github.drift_pr_app_id))``, ``((github.drift_pr_app_installation_id))``,
+  and ``((github.drift_pr_app_pem))`` in the ``infrastructure`` team's Vault
+  namespace: a GitHub App installation with ``contents:write`` and
+  ``pull_requests:write`` on ``mitodl/ol-infrastructure``. Push/PR pipelines
+  authenticate as a short-lived App installation token rather than a
+  standing personal access token -- see ``bin/open-drift-pr``.
 """
 
 import sys
@@ -43,7 +44,9 @@ from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
 
 AWS_REGION = "us-east-1"
 GITHUB_REPOSITORY = "mitodl/ol-infrastructure"
-GITHUB_TOKEN_VAULT_PATH = "((github.drift_pr_access_token))"  # noqa: S105
+GITHUB_APP_ID_VAULT_PATH = "((github.drift_pr_app_id))"
+GITHUB_APP_INSTALLATION_ID_VAULT_PATH = "((github.drift_pr_app_installation_id))"
+GITHUB_APP_PRIVATE_KEY_VAULT_PATH = "((github.drift_pr_app_pem))"
 IAM_POLICIES_PACKAGE = "ol_infrastructure.applications.concourse.iam_policies"
 
 
@@ -138,7 +141,11 @@ def drift_job(target: DriftTarget) -> Job:
                         # it edits and pushes.
                         "PYTHONPATH": f"{ol_infrastructure.name}/src",
                         "AWS_DEFAULT_REGION": AWS_REGION,
-                        "GITHUB_TOKEN": GITHUB_TOKEN_VAULT_PATH,
+                        "GITHUB_APP_ID": GITHUB_APP_ID_VAULT_PATH,
+                        "GITHUB_APP_INSTALLATION_ID": (
+                            GITHUB_APP_INSTALLATION_ID_VAULT_PATH
+                        ),
+                        "GITHUB_APP_PRIVATE_KEY": GITHUB_APP_PRIVATE_KEY_VAULT_PATH,
                     },
                     run=Command(
                         user="root",
