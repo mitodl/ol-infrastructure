@@ -272,27 +272,50 @@ ok "Prerequisites satisfied (Docker ${DOCKER_MEM_GB} GB RAM)"
 # registry to the cluster via `registries.use`.
 REGISTRY_NAME="k3d-registry.localhost"
 REGISTRY_IMAGE="ghcr.io/project-zot/zot:v2.1.18"
+REGISTRY_VOLUME="k3d-registry-zot-data"
 ZOT_CONFIG="${REPO_ROOT}/local-dev/cluster/zot-config.json"
+
+# `k3d registry create` prefixes the name with 'k3d-'. Image storage is a
+# NAMED volume, not `-v /var/lib/zot`: k3d writes a destination-only volume
+# spec into the container with no volume name attached (Docker's own CLI
+# fills one in; k3d does not). That mount resolves fine for the daemon's
+# lifetime, so the registry works until dockerd restarts — after a reboot the
+# daemon reloads the container, cannot look the volume up by its empty name,
+# and every `docker start` fails with exit 128 "get: no such volume". A named
+# volume survives the reload, and still works with prune-docker.sh's
+# `--volumes-from` wipe (which, as a bonus, can no longer take an anonymous
+# volume with it when its `--rm` helper exits).
+create_registry() {
+    k3d registry create "${REGISTRY_NAME#k3d-}" --port 5001 \
+        --image "${REGISTRY_IMAGE}" \
+        -v "${ZOT_CONFIG}:/etc/zot/config.json" \
+        -v "${REGISTRY_VOLUME}:/var/lib/zot"
+}
 
 log "Setting up local image registry '${REGISTRY_NAME}'..."
 if docker ps -a --format '{{.Names}}' | grep -qx "${REGISTRY_NAME}"; then
     if docker inspect "${REGISTRY_NAME}" --format '{{.Config.Image}}' | grep -q zot; then
-        docker start "${REGISTRY_NAME}" >/dev/null 2>&1 || true
-        ok "Registry '${REGISTRY_NAME}' already exists — skipping creation."
+        if docker start "${REGISTRY_NAME}" >/dev/null 2>&1; then
+            ok "Registry '${REGISTRY_NAME}' already exists — skipping creation."
+        else
+            # Unstartable registry — an anonymous-volume container left over
+            # from before the named-volume switch cannot be repaired, only
+            # replaced. Contents are disposable: Tilt re-pushes on next build.
+            warn "Registry '${REGISTRY_NAME}' exists but will not start:"
+            warn "  $(docker inspect "${REGISTRY_NAME}" --format '{{.State.Error}}')"
+            warn "Recreating it (cached images are disposable — Tilt re-pushes)."
+            k3d registry delete "${REGISTRY_NAME}" >/dev/null 2>&1 || \
+                docker rm -f "${REGISTRY_NAME}" >/dev/null 2>&1 || true
+            create_registry
+            ok "Registry '${REGISTRY_NAME}' recreated (zot, named volume)."
+        fi
     else
         warn "Registry '${REGISTRY_NAME}' exists but is not zot (pre-2026-07 registry:2)."
         warn "To migrate:  k3d registry delete ${REGISTRY_NAME}  then re-run setup.sh"
         warn "(Tilt re-pushes all images on the next build; see local-dev/README.md)"
     fi
 else
-    # `k3d registry create` prefixes the name with 'k3d-'. The bare
-    # /var/lib/zot mount makes image storage an anonymous volume (zot's image
-    # declares none), so prune-docker.sh can wipe it with the registry
-    # stopped via --volumes-from.
-    k3d registry create "${REGISTRY_NAME#k3d-}" --port 5001 \
-        --image "${REGISTRY_IMAGE}" \
-        -v "${ZOT_CONFIG}:/etc/zot/config.json" \
-        -v /var/lib/zot
+    create_registry
     ok "Registry '${REGISTRY_NAME}' created (zot, retention enabled)."
 fi
 
