@@ -95,9 +95,17 @@ src/ol_infrastructure/applications/<app>/
 
 ## Stack Naming Convention
 
-Following the existing pattern:
+Existing application project names (the `name:` field in each app's `Pulumi.yaml`) are
+**not** uniform — e.g. `ol-infrastructure-airbyte-server`,
+`ol-infrastructure-bootcamps-ecommerce-application`,
+`ol-infrastructure-odl-video-service-env`. Data stack project names therefore define a
+**new, standardized** convention rather than deriving from the app project's name:
 
 - Data stack project name: `ol-infrastructure-<app>-data`
+- Here, `<app>` / `app_slug` is the application directory slug (for example,
+  `mit_learn`), which is already used in stack names and file paths.
+- This name is standardized for data stacks and is **not** derived from the
+  application stack project's `Pulumi.yaml` `name:` value, which varies across apps.
 - Stack names: `applications.<app>.data.CI`, `applications.<app>.data.QA`,
   `applications.<app>.data.Production`
 - Reference in code: `StackReference(f"applications.{app_slug}.data.{stack_info.name}")`
@@ -118,9 +126,16 @@ pulumi.export("<app_slug>_data", {
     "db_identifier": db.db_instance.identifier,
     # Cache (if applicable)
     "cache_address": cache.address,
-    "cache_auth_token": cache.cache_cluster.auth_token,
+    "cache_auth_token": pulumi.Output.secret(cache.cache_cluster.auth_token),
 })
 ```
+
+`cache_auth_token` (and any other credential value in this dict) must be wrapped in
+`pulumi.Output.secret(...)` before export — an un-secreted value in a stack output is
+visible in plain text via `pulumi stack output`, the CLI, and CI logs. The existing
+per-app exports (e.g. `mit_learn`'s `redis_token`) predate this requirement and should
+be corrected to use `pulumi.Output.secret(...)` as part of migrating that app to a data
+stack.
 
 ## Updated Application Stack Pattern
 
@@ -160,15 +175,22 @@ pulumi stack init applications.<app>.data.Production
 
 ### Step 3: State move (zero-downtime)
 
-From the original application stack directory, retrieve URNs then move each component:
+From the original application stack directory, retrieve URNs then move each component.
+
+The `--source` project name is **not** `ol-infrastructure-<app>-application` for every
+app — read the actual `name:` value from that app's `src/ol_infrastructure/applications/<app>/Pulumi.yaml`
+(see [Stack Naming Convention](#stack-naming-convention) above for examples of how much
+this varies). The `--dest` project name is the new, standardized
+`ol-infrastructure-<app>-data`, which is fixed by this plan.
 
 ```bash
 # Show URNs of all resources in the app stack
 pulumi stack --show-urns
 
 # Move RDS component (all children — parameter group, CW alarms, IAM role — follow automatically)
+# Replace <app-project-name> with the "name:" value from that app's Pulumi.yaml
 pulumi state move \
-  --source <org>/ol-infrastructure-<app>-application/applications.<app>.Production \
+  --source <org>/<app-project-name>/applications.<app>.Production \
   --dest <org>/ol-infrastructure-<app>-data/applications.<app>.data.Production \
   'urn:pulumi:...::ol:infrastructure:aws:database:OLAmazonDB::<instance-name>'
 
