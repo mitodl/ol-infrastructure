@@ -502,8 +502,13 @@ class OLApisixHTTPRoute(ComponentResource):
             paths = route_config.paths if route_config.paths else ["/"]
             for path in paths:
                 # Convert APISIX path pattern to Gateway API path match
-                # APISIX uses /path/* format, Gateway API uses prefix matching
-                path_value = path.rstrip("*").rstrip("/")
+                # APISIX uses /path/* format, Gateway API uses prefix matching.
+                # The trailing "/" is only stripped for PathPrefix: for Exact,
+                # "/api/" and "/api" are different paths, and stripping it would
+                # silently match the wrong one.
+                path_value = path.rstrip("*")
+                if route_config.path_match_type == "PathPrefix":
+                    path_value = path_value.rstrip("/")
                 if not path_value:
                     path_value = "/"
 
