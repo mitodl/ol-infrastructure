@@ -222,11 +222,53 @@ CLEANUP_OLDER_THAN = (
 # move again when that cost is attacked upstream. Retuning admission control
 # during an incident must not mean editing this repo, cutting a release and
 # rolling an image.
-PER_ACTOR_INFLIGHT_MAX = (
-    omnigraph_config.get_int("per_actor_inflight_max") or DEFAULT_PER_ACTOR_INFLIGHT_MAX
+#
+# ★ VALIDATED, and NOT with `or`. Two distinct traps, both silent:
+#
+#   `or` cannot tell 0 from unset. Zero is a MEANINGFUL setting here — it is how
+#   an operator says "admit nothing", a real incident answer — and `or` would
+#   quietly hand back the default, re-enabling the writes somebody was trying to
+#   stop. `is None` is the only test that distinguishes them.
+#
+#   The server parses these into Rust `u32`/`u64`. A negative or oversized value
+#   is not rejected loudly; omnigraph falls back to its own upstream defaults
+#   (16 in flight, 4 GiB), which are far LOOSER than ours — so a typo does not
+#   tighten the cap or crash the pod, it silently removes both safeguards. That
+#   is the worst of the three outcomes and the one nothing downstream reports,
+#   so it is refused here, at the point where the value is still readable.
+_U32_MAX = 2**32 - 1
+_U64_MAX = 2**64 - 1
+
+
+def _bounded_cap(name: str, value: int | None, default: int, ceiling: int) -> int:
+    """Return a stack-config admission cap, or the default.
+
+    Refuses what omnigraph would silently discard — see the note above on the
+    u32/u64 fallback.
+    """
+    if value is None:
+        return default
+    if not 0 <= value <= ceiling:
+        msg = (
+            f"omnigraph:{name}={value} is outside the range the server accepts "
+            f"(0..{ceiling}). Out of range, omnigraph ignores it and reverts to "
+            f"its own default, which is looser than the cap being set here."
+        )
+        raise ValueError(msg)
+    return value
+
+
+PER_ACTOR_INFLIGHT_MAX = _bounded_cap(
+    "per_actor_inflight_max",
+    omnigraph_config.get_int("per_actor_inflight_max"),
+    DEFAULT_PER_ACTOR_INFLIGHT_MAX,
+    _U32_MAX,
 )
-PER_ACTOR_BYTES_MAX = (
-    omnigraph_config.get_int("per_actor_bytes_max") or DEFAULT_PER_ACTOR_BYTES_MAX
+PER_ACTOR_BYTES_MAX = _bounded_cap(
+    "per_actor_bytes_max",
+    omnigraph_config.get_int("per_actor_bytes_max"),
+    DEFAULT_PER_ACTOR_BYTES_MAX,
+    _U64_MAX,
 )
 
 cluster_stack = make_stack_reference(projects.EKS, f"operations.{stack_info.name}")

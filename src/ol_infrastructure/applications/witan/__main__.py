@@ -319,10 +319,39 @@ WITAN_CI_INDEX_SCHEDULE = (
 # Empty here means "use the code default" (4 writes, 10s queue wait). Set per
 # stack when an environment's measured knee differs — Production's larger graphs
 # make each write slower, and the write cost itself is expected to change
-# upstream. Both are read per call inside witan, so `kubectl set env` moves them
-# on a live pod ahead of committing the config.
+# upstream.
+#
+# ★ CHANGING EITHER REPLACES THE POD. Kubernetes cannot edit env vars inside a
+# running container: `kubectl set env` rewrites the workload template and rolls
+# it, and for this workload that means the single witan replica is recreated and
+# in-flight calls are dropped. witan reads both per call, so the NEW pod picks a
+# value up on its very next write with no rebuild or release — that is the
+# property worth having, not a disruption-free edit, and the earlier wording
+# here claimed the latter. Treat an incident retune as a (brief) restart.
+#
+# And persist it: the MCPServer is operator-owned, so a hand-edit is reverted by
+# the next reconcile or `pulumi up`. `kubectl set env` buys the minutes before
+# the config change lands, not a durable setting.
 WITAN_REMOTE_WRITE_MAX_INFLIGHT = witan_config.get("remote_write_max_inflight") or ""
 WITAN_REMOTE_WRITE_QUEUE_SECONDS = witan_config.get("remote_write_queue_seconds") or ""
+
+# How long a witan tool call has before something upstream stops waiting for it.
+# ★ THIS NUMBER IS A PROPERTY OF THIS DEPLOYMENT, WHICH IS WHY IT IS SET HERE
+# AND NOT IN witan-core. The same client library also runs from an interactive
+# CLI with no deadline at all and from the migration Job, which is happy to wait
+# minutes; a library that assumed 30s would be wrong for both.
+#
+# 30s is ToolHive's, and it is not adjustable: three separate hardcoded
+# constants in v0.42.0 (the vMCP backend client twice, and WriteTimeout on the
+# vMCP's own listener) each cut a `tools/call` at 30s, and the CRD field that
+# looks like the knob — `spec.config.operational.timeouts` — is read by nothing
+# at runtime (tk-toolhive-s-vmcp-operational-timeouts-crd-field-i-c44c7a).
+# Telling witan the number lets it refuse a write it cannot finish, instead of
+# being torn down mid-call and returning a 502 whose outcome nobody can
+# determine.
+WITAN_REMOTE_CALL_BUDGET_SECONDS = (
+    witan_config.get("remote_call_budget_seconds") or "30"
+)
 
 # The GitHub App the CI indexer clones as, when one is configured. All three
 # values come from one SOPS file rather than splitting the ids into plain
@@ -766,6 +795,7 @@ mcp_servers = create_mcp_servers(
     service_version=witan_service_version,
     remote_write_max_inflight=WITAN_REMOTE_WRITE_MAX_INFLIGHT,
     remote_write_queue_seconds=WITAN_REMOTE_WRITE_QUEUE_SECONDS,
+    remote_call_budget_seconds=WITAN_REMOTE_CALL_BUDGET_SECONDS,
 )
 
 #########################################

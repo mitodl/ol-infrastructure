@@ -224,6 +224,7 @@ def create_mcp_servers(  # noqa: PLR0913
     service_version: str,
     remote_write_max_inflight: str = "",
     remote_write_queue_seconds: str = "",
+    remote_call_budget_seconds: str = "",
 ) -> WitanMCPServers:
     """Provision the witan-tools MCPGroup and the witan MCPServer backend.
 
@@ -232,6 +233,12 @@ def create_mcp_servers(  # noqa: PLR0913
     defaults in force — the env var is omitted entirely rather than set to an
     empty string, so "unset" and "set to nothing" cannot diverge between what
     Pulumi declares and what witan reads.
+
+    ``remote_call_budget_seconds`` tells witan how long a tool call has here
+    before ToolHive stops waiting for it, so it can refuse a write it cannot
+    finish rather than be cut off mid-call. witan-core assumes no deadline of
+    its own — the same library runs from a CLI and from a batch Job — so this
+    is the deployment declaring one. See the note at its call site.
     """
     witan_mcpgroup = kubernetes.apiextensions.CustomResource(
         f"witan-mcpgroup-{stack_info.env_suffix}",
@@ -347,6 +354,20 @@ def create_mcp_servers(  # noqa: PLR0913
                         }
                     ]
                     if remote_write_queue_seconds
+                    else []
+                ),
+                # The deadline THIS deployment imposes, told to witan so it can
+                # refuse a write it has no time left to finish. Set here rather
+                # than defaulted in witan-core because it is a fact about
+                # ToolHive, not about the client library — see the call site.
+                *(
+                    [
+                        {
+                            "name": "WITAN_REMOTE_CALL_BUDGET_SECONDS",
+                            "value": str(remote_call_budget_seconds),
+                        }
+                    ]
+                    if remote_call_budget_seconds
                     else []
                 ),
                 # Structured logging + OTel. Appended from a shared helper
