@@ -6,6 +6,7 @@
 #   2. Creates the k3d cluster (local-dev) with local image registry
 #   3. Generates mkcert TLS certificates for all local .dev hostnames
 #   4. Adds /etc/hosts entries for all local hostnames
+#      (--skip-hosts prints the entries instead of writing them)
 #
 # What this script does NOT do:
 #   - Install in-cluster resources (Pulumi owns all of those; run `tilt up`)
@@ -46,6 +47,14 @@ HOSTS=(
     # Mailpit (captured outbound email)
     "mail.${ROOT_DOMAIN}"
 )
+
+# k3d load balancer always listens on 127.0.0.1 for the exposed ports
+INGRESS_IP="127.0.0.1"
+
+# Markers delimiting the managed block inside /etc/hosts (and, on WSL, the
+# Windows hosts file) so it can be rewritten idempotently.
+HOSTS_BLOCK_START="# BEGIN local-dev local-dev"
+HOSTS_BLOCK_END="# END local-dev local-dev"
 
 # mkcert wildcard SANs — one wildcard per subdomain level needed.
 MKCERT_DOMAINS=(
@@ -207,6 +216,16 @@ with open('${win_hosts}', 'w') as f:
     fi
 }
 
+# Emits the /etc/hosts block for all local hostnames on stdout.
+build_hosts_block() {
+    local block="${HOSTS_BLOCK_START}"$'\n'
+    local host
+    for host in "${HOSTS[@]}"; do
+        block+="${INGRESS_IP}  ${host}"$'\n'
+    done
+    printf '%s%s\n' "$block" "${HOSTS_BLOCK_END}"
+}
+
 # ---------------------------------------------------------------------------
 # 1. Validate prerequisites
 # ---------------------------------------------------------------------------
@@ -358,21 +377,21 @@ fi
 # ---------------------------------------------------------------------------
 if $SKIP_HOSTS; then
     warn "Skipping /etc/hosts update (--skip-hosts)."
+    warn "You must make these ${#HOSTS[@]} hostnames resolve to ${INGRESS_IP} yourself,"
+    warn "either through DNS or by adding the block below to /etc/hosts."
+    warn "'tilt up' fails immediately if sso.ol.${ROOT_DOMAIN} does not resolve."
+    echo ""
+    build_hosts_block | sed 's/^/    /'
+    echo ""
+    if is_wsl; then
+        warn "WSL detected: Windows browsers need the same entries in"
+        warn "C:\\Windows\\System32\\drivers\\etc\\hosts, and /etc/wsl.conf needs"
+        warn "[network] generateHosts = false so WSL does not overwrite /etc/hosts."
+    fi
 else
     log "Updating /etc/hosts..."
 
-    # k3d load balancer always listens on 127.0.0.1 for the exposed ports
-    INGRESS_IP="127.0.0.1"
-
-    HOSTS_BLOCK_START="# BEGIN local-dev local-dev"
-    HOSTS_BLOCK_END="# END local-dev local-dev"
-
-    # Build the new hosts block
-    HOSTS_BLOCK="${HOSTS_BLOCK_START}"$'\n'
-    for host in "${HOSTS[@]}"; do
-        HOSTS_BLOCK+="${INGRESS_IP}  ${host}"$'\n'
-    done
-    HOSTS_BLOCK+="${HOSTS_BLOCK_END}"
+    HOSTS_BLOCK="$(build_hosts_block)"
 
     if grep -q "${HOSTS_BLOCK_START}" /etc/hosts; then
         # Remove existing block and replace
