@@ -68,42 +68,59 @@ stage.match {
 """
 
 
-def _keycloak_olapps_idp_login_metrics_alloy_config() -> str:
+def _keycloak_olapps_idp_login_redact_alloy_config() -> str:
     """
-    Alloy River stages that turn olapps-realm brokered-login events into
-    per-IdP Prometheus counters, without shipping login records (or the PII
-    they carry) to Loki.
+    Alloy River stages that redact PII from olapps-realm brokered-login
+    events and let the rest of the line through to Loki, so
+    dashboards/keycloak_olapps_idp_logins.py can count logins per IdP
+    directly from LogQL (count_over_time) instead of from a derived
+    Prometheus counter.
+
+    An earlier version of this pipeline extracted a Prometheus counter via
+    stage.metrics instead of keeping any log record. That turned out to have
+    three compounding problems, all found via live QA testing: (1)
+    metric.counter's `source` is required, not optional, to actually
+    increment (unset, it looks for a field that never exists and silently
+    never fires); (2) `source` alone doesn't attach a label, so a separate
+    stage.labels promotion was needed for a per-IdP breakdown; (3)
+    max_idle_duration drops and recreates the counter after any gap between
+    logins, and because Prometheus's increase() only detects a reset via a
+    *decrease* (not a gap), a reset landing on the same value as before it
+    silently reports zero increase -- and metric.counter's own first-ever
+    appearance (no prior sample to diff against) hits the identical blind
+    spot on every single login until a second one confirms a real delta.
+    Every fix for one of these surfaced the next. Redacting and keeping the
+    actual log line sidesteps all three: count_over_time reads directly from
+    Loki's stored lines at query time, so there's no persistent counter
+    state to evict, reset, or have a cold start.
 
     Keycloak's jboss-logging event listener is configured (see
     applications/keycloak/__main__.py) with success-level=info so that
     successful LOGIN/IDENTITY_PROVIDER_LOGIN events reach our logs; that
     setting is all-or-nothing per Keycloak, logging every successful event
     type (CODE_TO_TOKEN, REFRESH_TOKEN, LOGOUT, REGISTER, ...) across every
-    realm on the shared instance, not just logins on olapps. Those events
-    also carry username and identity_provider_identity (the federated
-    email) -- fields the dashboard doesn't need, since it only wants a
-    per-IdP count.
-
-    So rather than filter down to the wanted events and ship them to Loki,
-    this pipeline extracts what's needed as metrics and ships no
-    olapps-brokered-login records to Loki at all:
+    realm on the shared instance, not just logins on olapps.
 
     1. Match INFO-level LOGIN/IDENTITY_PROVIDER_LOGIN events on olapps that
        carry an identity_provider detail (i.e. were actually brokered
        through an external IdP, not a direct username/password login), and
-       increment keycloak_olapps_idp_login_total{identity_provider=...}.
-    2. Unconditionally drop every remaining INFO-level org.keycloak.events
-       line -- covering both the events just counted (no login record, only
-       the counter, reaches Loki) and the rest of the noisy INFO volume
-       (CODE_TO_TOKEN, REFRESH_TOKEN, etc.) that success-level=info produces.
+       redact username and identity_provider_identity (the federated email)
+       -- the only PII these events carry -- in place. identity_provider
+       itself is just an IdP alias (e.g. "touchstone-idp"), not PII, and is
+       left untouched so the dashboard can query and group by it. The
+       (redacted) line is kept, not dropped.
+    2. Drop every other INFO-level org.keycloak.events line: both direct
+       (non-brokered) olapps logins, which this dashboard doesn't cover, and
+       the rest of the noisy INFO volume (CODE_TO_TOKEN, REFRESH_TOKEN, etc.)
+       that success-level=info produces across every realm. The selector
+       excludes lines carrying identity_provider=", since those are exactly
+       the ones stage 1 already redacted and wants kept.
     3. Match WARN-level LOGIN_ERROR/IDENTITY_PROVIDER_LOGIN_ERROR events on
-       olapps that carry an identity_provider detail, and increment
-       keycloak_olapps_idp_login_failure_total{identity_provider=...}. This
-       stage has no drop action: WARN/ERROR events are the pre-existing
-       failure logs already relied on for debugging (e.g. diagnosing a
-       broken IdP integration) and carry materially less PII than the
-       success events, so they keep flowing to Loki unchanged -- this stage
-       only adds a metric as a side effect.
+       olapps that carry an identity_provider detail, and redact username the
+       same way. These were never dropped -- WARN/ERROR events are the
+       pre-existing failure logs already relied on for debugging (e.g.
+       diagnosing a broken IdP integration) -- so this only adds the same
+       redaction, not a change in what reaches Loki.
 
     Each stage's selector independently re-checks the INFO/WARN level
     marker and the olapps realm, rather than relying on another stage
@@ -113,43 +130,43 @@ def _keycloak_olapps_idp_login_metrics_alloy_config() -> str:
     return r"""
 stage.match {
   selector = "{namespace=\"keycloak\", container=\"keycloak\"} |= \"INFO  [org.keycloak.events]\" |= \"realmId=\\\"olapps\\\"\" |~ \"type=\\\"(LOGIN|IDENTITY_PROVIDER_LOGIN)\\\"\" |= \"identity_provider=\\\"\""
-  pipeline_name = "keycloak_olapps_login_success_metric"
+  pipeline_name = "keycloak_olapps_login_success_redact"
 
-  stage.regex {
-    expression = `identity_provider="(?P<identity_provider>[^"]+)"`
+  // expression's capture group is what gets replaced -- the surrounding
+  // username="..." / identity_provider_identity="..." text outside the
+  // parens is left as-is and doesn't need to be repeated in `replace`.
+  stage.replace {
+    expression = `username="([^"]+)"`
+    replace    = `[REDACTED]`
   }
 
-  stage.metrics {
-    metric.counter {
-      name        = "keycloak_olapps_idp_login_total"
-      description = "Successful olapps realm logins brokered through an external identity provider, by IdP alias"
-      source      = "identity_provider"
-      action      = "inc"
-    }
+  stage.replace {
+    expression = `identity_provider_identity="([^"]+)"`
+    replace    = `[REDACTED]`
   }
 }
 
 stage.match {
-  selector = "{namespace=\"keycloak\", container=\"keycloak\"} |= \"INFO  [org.keycloak.events]\""
+  selector = "{namespace=\"keycloak\", container=\"keycloak\"} |= \"INFO  [org.keycloak.events]\" != \"identity_provider=\\\"\""
   action = "drop"
   drop_counter_reason = "keycloak_info_event"
 }
 
 stage.match {
   selector = "{namespace=\"keycloak\", container=\"keycloak\"} |= \"WARN  [org.keycloak.events]\" |= \"realmId=\\\"olapps\\\"\" |~ \"type=\\\"(LOGIN_ERROR|IDENTITY_PROVIDER_LOGIN_ERROR)\\\"\" |= \"identity_provider=\\\"\""
-  pipeline_name = "keycloak_olapps_login_failure_metric"
+  pipeline_name = "keycloak_olapps_login_failure_redact"
 
-  stage.regex {
-    expression = `identity_provider="(?P<identity_provider>[^"]+)"`
+  // expression's capture group is what gets replaced -- the surrounding
+  // username="..." / identity_provider_identity="..." text outside the
+  // parens is left as-is and doesn't need to be repeated in `replace`.
+  stage.replace {
+    expression = `username="([^"]+)"`
+    replace    = `[REDACTED]`
   }
 
-  stage.metrics {
-    metric.counter {
-      name        = "keycloak_olapps_idp_login_failure_total"
-      description = "Failed olapps realm logins brokered through an external identity provider, by IdP alias"
-      source      = "identity_provider"
-      action      = "inc"
-    }
+  stage.replace {
+    expression = `identity_provider_identity="([^"]+)"`
+    replace    = `[REDACTED]`
   }
 }
 """
@@ -385,7 +402,7 @@ def setup_grafana(
                     "enabled": True,
                     "collector": "alloy-logs",
                     "extraLogProcessingStages": _apisix_cookie_metrics_alloy_config()
-                    + _keycloak_olapps_idp_login_metrics_alloy_config(),
+                    + _keycloak_olapps_idp_login_redact_alloy_config(),
                 },
                 "applicationObservability": {
                     "enabled": True,
