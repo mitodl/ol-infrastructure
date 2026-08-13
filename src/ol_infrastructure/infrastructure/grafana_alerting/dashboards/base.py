@@ -9,6 +9,10 @@ Sub-modules
 -----------
   keycloak_olapps_idp_logins — Per-identity-provider login counts for the
     olapps realm.
+  keycloak_overview — General service-health overview (logins, JVM, HTTP,
+    DB pool) across all realms.
+  keycloak_activity — Trace-backed request rates not covered by
+    keycloak_overview's Micrometer-derived panels.
 """
 
 import json
@@ -19,9 +23,12 @@ from pulumiverse_grafana.oss.dashboard import Dashboard
 from pulumiverse_grafana.oss.folder import Folder
 
 from ol_infrastructure.infrastructure.grafana_alerting.dashboards import (
+    keycloak_activity,
     keycloak_olapps_idp_logins,
+    keycloak_overview,
 )
 from ol_infrastructure.infrastructure.grafana_alerting.dashboards.datasources import (
+    LOKI_DATASOURCE_REF,
     MIMIR_DATASOURCE_REF,
 )
 
@@ -29,12 +36,27 @@ from ol_infrastructure.infrastructure.grafana_alerting.dashboards.datasources im
 def _timeseries_panel(
     *,
     title: str,
-    expr: str,
+    expr: str = "",
     grid_pos: dict[str, Any],
     datasource_ref: dict[str, str] = MIMIR_DATASOURCE_REF,
     legend_format: str = "{{identity_provider}}",
+    queries: list[dict[str, str]] | None = None,
+    unit: str = "short",
+    query_key: str = "expr",
 ) -> dict[str, Any]:
-    """Build a time-series panel model querying a shared datasource."""
+    """Build a time-series panel model querying a shared datasource.
+
+    Pass `queries` (a list of `{"expr": ..., "legend_format": ...}` dicts)
+    instead of `expr`/`legend_format` when a panel needs more than one
+    query series (e.g. p50/p95/p99 latency, or GC time+count by cause) --
+    each becomes its own target, lettered A, B, C...
+
+    `query_key` names the JSON key the datasource expects the query string
+    under -- Prometheus/Loki use `expr`, but Tempo's TraceQL targets use
+    `query` instead; pass `query_key="query"` for a Tempo-backed panel.
+    """
+    if queries is None:
+        queries = [{"expr": expr, "legend_format": legend_format}]
     return {
         "title": title,
         "type": "timeseries",
@@ -49,7 +71,7 @@ def _timeseries_panel(
                     "fillOpacity": 10,
                     "pointSize": 5,
                 },
-                "unit": "short",
+                "unit": unit,
                 "min": 0,
             },
             "overrides": [],
@@ -65,10 +87,11 @@ def _timeseries_panel(
         "targets": [
             {
                 "datasource": datasource_ref,
-                "expr": expr,
-                "legendFormat": legend_format,
-                "refId": "A",
+                query_key: query["expr"],
+                "legendFormat": query.get("legend_format", "{{legend}}"),
+                "refId": chr(65 + i),
             }
+            for i, query in enumerate(queries)
         ],
     }
 
@@ -80,6 +103,7 @@ def _bar_gauge_panel(
     grid_pos: dict[str, Any],
     datasource_ref: dict[str, str] = MIMIR_DATASOURCE_REF,
     legend_format: str = "{{identity_provider}}",
+    unit: str = "short",
 ) -> dict[str, Any]:
     """Build a bar-gauge panel model querying a shared datasource."""
     return {
@@ -90,7 +114,7 @@ def _bar_gauge_panel(
         "fieldConfig": {
             "defaults": {
                 "color": {"mode": "palette-classic"},
-                "unit": "short",
+                "unit": unit,
                 "min": 0,
             },
             "overrides": [],
@@ -109,6 +133,144 @@ def _bar_gauge_panel(
                 "instant": True,
             }
         ],
+    }
+
+
+def _stat_panel(
+    *,
+    title: str,
+    expr: str,
+    grid_pos: dict[str, Any],
+    datasource_ref: dict[str, str] = MIMIR_DATASOURCE_REF,
+    unit: str = "short",
+    legend_format: str = "",
+) -> dict[str, Any]:
+    """Build a single-value stat panel querying a shared datasource."""
+    return {
+        "title": title,
+        "type": "stat",
+        "datasource": datasource_ref,
+        "gridPos": grid_pos,
+        "fieldConfig": {
+            "defaults": {
+                "color": {"mode": "thresholds"},
+                "unit": unit,
+                "thresholds": {
+                    "mode": "absolute",
+                    "steps": [{"color": "green", "value": None}],
+                },
+            },
+            "overrides": [],
+        },
+        "options": {
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
+            "orientation": "auto",
+            "textMode": "auto",
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+        },
+        "targets": [
+            {
+                "datasource": datasource_ref,
+                "expr": expr,
+                "legendFormat": legend_format,
+                "refId": "A",
+                "instant": True,
+            }
+        ],
+    }
+
+
+def _gauge_panel(
+    *,
+    title: str,
+    expr: str,
+    grid_pos: dict[str, Any],
+    datasource_ref: dict[str, str] = MIMIR_DATASOURCE_REF,
+    unit: str = "percentunit",
+    min_value: float = 0,
+    max_value: float = 1,
+) -> dict[str, Any]:
+    """Build a radial gauge panel querying a shared datasource."""
+    return {
+        "title": title,
+        "type": "gauge",
+        "datasource": datasource_ref,
+        "gridPos": grid_pos,
+        "fieldConfig": {
+            "defaults": {
+                "color": {"mode": "thresholds"},
+                "unit": unit,
+                "min": min_value,
+                "max": max_value,
+                "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                        {"color": "red", "value": None},
+                        {"color": "yellow", "value": 0.95},
+                        {"color": "green", "value": 0.99},
+                    ],
+                },
+            },
+            "overrides": [],
+        },
+        "options": {
+            "showThresholdLabels": False,
+            "showThresholdMarkers": True,
+        },
+        "targets": [
+            {
+                "datasource": datasource_ref,
+                "expr": expr,
+                "refId": "A",
+                "instant": True,
+            }
+        ],
+    }
+
+
+def _logs_panel(
+    *,
+    title: str,
+    expr: str,
+    grid_pos: dict[str, Any],
+    datasource_ref: dict[str, str] = LOKI_DATASOURCE_REF,
+) -> dict[str, Any]:
+    """Build a raw log-line panel querying the Loki datasource."""
+    return {
+        "title": title,
+        "type": "logs",
+        "datasource": datasource_ref,
+        "gridPos": grid_pos,
+        "options": {
+            "showTime": True,
+            "showLabels": False,
+            "showCommonLabels": False,
+            "wrapLogMessage": True,
+            "prettifyLogMessage": False,
+            "enableLogDetails": True,
+            "dedupStrategy": "none",
+            "sortOrder": "Descending",
+        },
+        "targets": [
+            {
+                "datasource": datasource_ref,
+                "expr": expr,
+                "refId": "A",
+            }
+        ],
+    }
+
+
+def _row_panel(*, title: str, y: int) -> dict[str, Any]:
+    """Build a row divider panel to visually group the panels beneath it."""
+    return {
+        "title": title,
+        "type": "row",
+        "collapsed": False,
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": y},
+        "panels": [],
     }
 
 
@@ -140,6 +302,26 @@ def create(resource_opts: ResourceOptions) -> None:
         dashboards_folder.uid,
         _timeseries_panel,
         _bar_gauge_panel,
+        _create_dashboard,
+        resource_opts,
+    )
+
+    keycloak_overview.create(
+        dashboards_folder.uid,
+        _timeseries_panel,
+        _stat_panel,
+        _gauge_panel,
+        _logs_panel,
+        _row_panel,
+        _create_dashboard,
+        resource_opts,
+    )
+
+    keycloak_activity.create(
+        dashboards_folder.uid,
+        _timeseries_panel,
+        _bar_gauge_panel,
+        _row_panel,
         _create_dashboard,
         resource_opts,
     )

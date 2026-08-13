@@ -90,8 +90,10 @@ Rootly). That path is independent of Grafana and is managed in
 | `log_rules/vault.py` | Vault secret-absent and auth-failure alert rules. |
 | `dashboards/` | Package. Grafana dashboards. |
 | `dashboards/base.py` | Shared panel-builder helpers, folder creation, delegates to sub-modules. |
-| `dashboards/datasources.py` | Mimir/Loki datasource ref constants, importable directly by sub-modules without a circular import through `base.py`. |
+| `dashboards/datasources.py` | Mimir/Loki/Tempo datasource ref constants, importable directly by sub-modules without a circular import through `base.py`. |
 | `dashboards/keycloak_olapps_idp_logins.py` | Per-identity-provider login counts (success + failure) for the olapps realm, from Loki via LogQL. |
+| `dashboards/keycloak_overview.py` | General service-health overview across all realms: logins, JVM, HTTP, DB pool, GC, JDBC cache, plus raw error/warning log tails. |
+| `dashboards/keycloak_activity.py` | Tempo-derived request rates and broad event/error breakdowns not covered by `keycloak_overview.py`'s itemized panels. |
 | `pingdom_checks.py` | Pingdom uptime checks via Pulumi dynamic provider. Runs in the production stack only. |
 | `CLAUDE.md` | This file. |
 
@@ -119,12 +121,14 @@ UID and a pre-bound `rd(expr)` helper from its package `base.py`:
 create(folder_uid: Input[str], rd: Callable[[str], list[RuleGroupRuleDataArgs]], resource_opts: ResourceOptions)
 ```
 
-Within `dashboards/`, each sub-module receives the folder UID, the shared
-panel-builder helpers, and a `create_dashboard` helper from `base.py`:
+Within `dashboards/`, each sub-module receives the folder UID, whichever
+panel-builder helpers it actually uses, and a `create_dashboard` helper from
+`base.py` -- not every sub-module takes every helper; `base.py` passes only
+the ones each `create(...)` signature declares:
 
 ```python
-# sub-module signature (dashboards/*)
-create(folder_uid, timeseries_panel: Callable[..., dict], bar_gauge_panel: Callable[..., dict], create_dashboard: Callable[..., None], resource_opts: ResourceOptions)
+# sub-module signature (dashboards/*) -- example using every available helper
+create(folder_uid, timeseries_panel: Callable[..., dict], bar_gauge_panel: Callable[..., dict], stat_panel: Callable[..., dict], gauge_panel: Callable[..., dict], logs_panel: Callable[..., dict], row_panel: Callable[..., dict], create_dashboard: Callable[..., None], resource_opts: ResourceOptions)
 ```
 
 ---
@@ -184,27 +188,76 @@ one. A second Keycloak dashboard about something unrelated (say, session
 counts) would be `keycloak_session_counts.py`, not a new function inside
 `keycloak_olapps_idp_logins.py`.
 
+### Panel-builder helpers (base.py)
+
+| Helper | Panel type | Use for |
+|---|---|---|
+| `_timeseries_panel` | `timeseries` | Rate/count-over-time graphs. Pass `expr`/`legend_format` for a single query series, or `queries=[{"expr": ..., "legend_format": ...}, ...]` for more than one series in the same panel (e.g. p50/p95/p99 latency, or GC pause time + count by cause) -- each becomes its own lettered target. Never split a single measure with two different *units* across `queries` on one panel (e.g. seconds + a raw count) -- that reproduces the dual-axis anti-pattern in a single-axis panel; use two panels instead. |
+| `_bar_gauge_panel` | `bargauge` | A ranked or windowed-total breakdown by label (e.g. `topk(5, ...)`, or a `$__range`-windowed total). |
+| `_stat_panel` | `stat` | A single current/windowed number (pod count, error %, average GC pause time). |
+| `_gauge_panel` | `gauge` | A bounded ratio with thresholds, e.g. an availability SLO (`min`/`max` default to 0/1, `unit` defaults to `percentunit`). |
+| `_logs_panel` | `logs` | Raw log-line display (e.g. an error/warning tail). Defaults to the Loki datasource since a Mimir target makes no sense for this panel type. |
+| `_row_panel` | `row` | A visual section divider between groups of panels. Pass the `y` gridPos it sits at; give it `title=""` for an unlabeled top row. |
+
+All of the above except `_logs_panel`/`_row_panel` take a `unit` param
+(defaults to `"short"`) -- set it explicitly for anything that isn't a plain
+count: `"percentunit"` for ratios, `"s"` for durations, `"bytes"` for memory.
+
+**Tempo (TraceQL) panels need two non-obvious overrides on `_timeseries_panel`:**
+1. `query_key="query"` -- Prometheus/Loki targets hold the query string under
+   `expr`, but Tempo's target schema uses `query` instead. Passing plain
+   `expr` (the default) silently renders an empty panel with no error, even
+   though the same TraceQL string returns data from `grafana_tempo_*` tools
+   directly -- there's no validation error to catch this, only "No data".
+2. Match routes on `span.http.route` (the path template alone, e.g.
+   `/realms/{realm}/protocol/{protocol}/auth`), not the span `name` (which
+   also carries the HTTP method, e.g. `GET /realms/{realm}/protocol/...`).
+   Whichever attribute you match on, TraceQL's `=~` requires a **full**
+   match (unlike Prometheus/Loki's unanchored regex) -- prefix the pattern
+   with `.*` to skip over the realm segment, e.g. `.*/protocol/.*/auth`.
+   Verify a new route pattern with `grafana_tempo_traceql-search` before
+   wiring it into a panel; both mistakes above produce an empty panel with
+   no error, not a query failure.
+
+### Template variables
+
+A dashboard that needs to filter by realm or restrict Loki/Tempo queries to
+one cluster declares its own `templating.list` entries directly in
+`_dashboard_json(...)` -- there's no shared helper for this, since the
+variable's datasource and query differ per dashboard. Follow the pattern in
+`keycloak_overview.py`: `type: "query"`, `multi: True`, `includeAll: True`,
+`current: {"text": "All", "value": "$__all"}`, so the default view shows
+everything and a viewer can narrow it. A `$realm` variable queries Mimir
+(`label_values(keycloak_user_events_total{namespace="keycloak"},realm)`); a
+`$cluster` variable queries Loki (`label_values({namespace="keycloak"},cluster)`)
+since that's confirmed to carry the label -- don't add `cluster=~"$cluster"`
+to a Micrometer/Prometheus query without first confirming that metric family
+actually carries a `cluster` label, since a missing label on a non-default
+variable value silently returns no data rather than erroring.
+
 ### Adding a new dashboard
 
 1. Add `dashboards/<system>_<what_it_shows>.py` with a `_dashboard_json(...)`
-   builder and a `create(folder_uid, timeseries_panel, bar_gauge_panel,
-   create_dashboard, resource_opts)` function, matching the signature in
-   [Submodule API](#submodule-api) above.
-2. Use the `timeseries_panel`/`bar_gauge_panel` helpers passed in from
-   `base.py` rather than building panel dicts by hand, so styling stays
-   consistent across dashboards. They default to the shared Mimir datasource;
-   for a Loki-backed panel (LogQL, e.g. `count_over_time`), pass
-   `datasource_ref=LOKI_DATASOURCE_REF` (import it from `datasources.py`,
-   not `base.py`, to avoid a circular import). Prefer counting straight from
-   Loki over deriving a Prometheus counter via an Alloy `stage.metrics`
-   block: a `metric.counter` only exists once incremented, so a low-volume
-   counter's first-ever appearance is invisible to PromQL's increase() (no
-   prior sample to diff against), and it gets evicted and reset after any
-   gap longer than `max_idle_duration` -- both silently undercount. LogQL's
-   `count_over_time` reads directly from Loki's stored lines at query time:
-   no persistent counter state, so neither failure mode applies.
+   builder and a `create(folder_uid, ...helpers..., create_dashboard,
+   resource_opts)` function, matching the signature in
+   [Submodule API](#submodule-api) above. Take only the panel-builder helpers
+   this dashboard actually calls -- an unused parameter fails lint (`ARG001`).
+2. Use the helpers above rather than building panel dicts by hand, so
+   styling stays consistent across dashboards. They default to the shared
+   Mimir datasource; for a Loki- or Tempo-backed panel, pass
+   `datasource_ref=LOKI_DATASOURCE_REF`/`TEMPO_DATASOURCE_REF` (import from
+   `datasources.py`, not `base.py`, to avoid a circular import). Prefer
+   counting straight from Loki over deriving a Prometheus counter via an
+   Alloy `stage.metrics` block: a `metric.counter` only exists once
+   incremented, so a low-volume counter's first-ever appearance is invisible
+   to PromQL's increase() (no prior sample to diff against), and it gets
+   evicted and reset after any gap longer than `max_idle_duration` -- both
+   silently undercount. LogQL's `count_over_time` reads directly from
+   Loki's stored lines at query time: no persistent counter state, so
+   neither failure mode applies.
 3. Import the new sub-module in `base.py` and call its `create(...)` from
-   `base.create(...)`, passing the shared folder UID and helpers.
+   `base.create(...)`, passing the shared folder UID and whichever helpers
+   its signature declares.
 4. All dashboards in this package currently share one folder (`"Keycloak"`,
    uid `keycloak-dashboards`). If a new dashboard belongs to an unrelated
    system, create a second folder in `base.py` rather than dropping it into

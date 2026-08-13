@@ -252,6 +252,10 @@ inline-quotes = "double"
 "src/ol_infrastructure/infrastructure/grafana_alerting/alertmanager.py" = ["E501"]
 "src/ol_infrastructure/infrastructure/grafana_alerting/metric_rules/*.py" = ["E501", "ERA001"]
 "src/ol_infrastructure/infrastructure/grafana_alerting/log_rules/*.py" = ["E501"]
+# Panel-builder helpers and dashboard queries: many keyword-only params to
+# assemble varied Grafana panel JSON, and inherently long PromQL/LogQL/TraceQL
+# expression strings, same rationale as metric_rules/log_rules above.
+"src/ol_infrastructure/infrastructure/grafana_alerting/dashboards/*.py" = ["E501", "PLR0913"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

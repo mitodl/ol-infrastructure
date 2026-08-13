@@ -12,3 +12,4 @@ import back through base.py (which imports every sub-module).
 
 MIMIR_DATASOURCE_REF = {"type": "prometheus", "uid": "grafanacloud-prom"}
 LOKI_DATASOURCE_REF = {"type": "loki", "uid": "grafanacloud-logs"}
+TEMPO_DATASOURCE_REF = {"type": "tempo", "uid": "grafanacloud-traces"}
