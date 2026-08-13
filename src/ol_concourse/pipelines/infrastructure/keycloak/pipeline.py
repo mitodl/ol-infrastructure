@@ -34,6 +34,10 @@ from ol_concourse.pipelines.constants import (
 )
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
+from ol_concourse.pipelines.versions_map import (
+    project_version_paths,
+    version_pin_paths,
+)
 
 
 def build_keycloak_substructure_pipeline() -> PipelineFragment:
@@ -84,7 +88,11 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
         paths=[
             *PULUMI_WATCHED_PATHS,
             str(PULUMI_CODE_PATH.joinpath("applications/keycloak/")),
-            "src/bridge/lib/versions.py",
+            # KEYCLOAK_VERSION is what tag_filters the SPI releases and the
+            # upstream image below, so the deploy has to follow it even though
+            # nothing under applications/keycloak/ imports it.
+            *version_pin_paths("KEYCLOAK_VERSION"),
+            *project_version_paths("applications/keycloak/"),
             *project_secrets_paths("applications/keycloak/"),
         ],
     )

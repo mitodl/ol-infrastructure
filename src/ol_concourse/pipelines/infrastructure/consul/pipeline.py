@@ -12,6 +12,10 @@ from ol_concourse.pipelines.constants import (
 )
 from ol_concourse.pipelines.jobs import packer_jobs, pulumi_jobs_chain
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
+from ol_concourse.pipelines.versions_map import (
+    image_version_paths,
+    project_version_paths,
+)
 
 consul_release = hashicorp_release(Identifier("consul-release"), "consul")
 consul_image_code = git_repo(
@@ -21,6 +25,7 @@ consul_image_code = git_repo(
         "src/bilder/components/",
         "src/bilder/images/consul/",
         "src/bilder/components/hashicorp/",
+        *image_version_paths("consul"),
         *PACKER_WATCHED_PATHS,
     ],
 )
@@ -30,6 +35,7 @@ consul_pulumi_infrastructure_code = git_repo(
     paths=[
         *PULUMI_WATCHED_PATHS,
         "src/ol_infrastructure/infrastructure/consul/",
+        *project_version_paths("infrastructure/consul/"),
         *project_secrets_paths("infrastructure/consul/"),
     ],
 )
@@ -40,6 +46,7 @@ consul_pulumi_substructure_code = git_repo(
     paths=[
         *PULUMI_WATCHED_PATHS,
         "src/ol_infrastructure/substructure/consul/",
+        *project_version_paths("substructure/consul/"),
         *project_secrets_paths("substructure/consul/"),
     ],
 )

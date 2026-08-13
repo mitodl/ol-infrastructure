@@ -17,6 +17,11 @@ from ol_concourse.pipelines.secrets_map import (
     combined_secrets_paths,
     project_secrets_paths,
 )
+from ol_concourse.pipelines.versions_map import (
+    combined_version_paths,
+    image_version_paths,
+    project_version_paths,
+)
 
 # Every substructure/vault/* Pulumi project deployed by this pipeline, sharing a
 # single git resource -- so its watched secrets are the union across all of them.
@@ -37,6 +42,7 @@ vault_image_code = git_repo(
         "src/bilder/components/",
         "src/bilder/images/vault/",
         "src/bilder/components/hashicorp/",
+        *image_version_paths("vault"),
         *PACKER_WATCHED_PATHS,
     ],
 )
@@ -46,6 +52,7 @@ vault_pulumi_code = git_repo(
     paths=[
         *PULUMI_WATCHED_PATHS,
         "src/ol_infrastructure/infrastructure/vault/",
+        *project_version_paths("infrastructure/vault/"),
         *project_secrets_paths("infrastructure/vault/"),
     ],
 )
@@ -56,7 +63,10 @@ vault_pulumi_substructure_code = git_repo(
         *PULUMI_WATCHED_PATHS,
         "src/ol_infrastructure/substructure/vault/",
         # One checkout drives every substructure/vault/* project, so watch the
-        # union of the secrets those projects read.
+        # union of the secrets and version pins those projects read.
+        *combined_version_paths(
+            *(f"substructure/vault/{p}/" for p in VAULT_SUBSTRUCTURE_PROJECTS)
+        ),
         *combined_secrets_paths(
             *(f"substructure/vault/{p}/" for p in VAULT_SUBSTRUCTURE_PROJECTS)
         ),

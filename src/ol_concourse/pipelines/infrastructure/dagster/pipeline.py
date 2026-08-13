@@ -26,6 +26,7 @@ from ol_concourse.pipelines.constants import (
 )
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
+from ol_concourse.pipelines.versions_map import project_version_paths
 
 
 def build_dagster_docker_pipeline() -> Pipeline:
@@ -107,7 +108,7 @@ def build_dagster_docker_pipeline() -> Pipeline:
         paths=[
             *PULUMI_WATCHED_PATHS,
             "src/ol_infrastructure/applications/dagster/",
-            "src/bridge/lib/versions.py",
+            *project_version_paths("applications/dagster/"),
             *project_secrets_paths("applications/dagster/"),
         ],
         branch=pulumi_code_branch,
