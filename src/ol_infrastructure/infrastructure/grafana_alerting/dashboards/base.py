@@ -14,7 +14,7 @@ Sub-modules
 import json
 from typing import Any
 
-from pulumi import ResourceOptions
+from pulumi import Input, ResourceOptions
 from pulumiverse_grafana.oss.dashboard import Dashboard
 from pulumiverse_grafana.oss.folder import Folder
 
@@ -114,7 +114,7 @@ def _bar_gauge_panel(
 
 def _create_dashboard(
     resource_name: str,
-    folder_uid,
+    folder_uid: Input[str],
     dashboard_json: dict[str, Any],
     resource_opts: ResourceOptions,
 ) -> None:

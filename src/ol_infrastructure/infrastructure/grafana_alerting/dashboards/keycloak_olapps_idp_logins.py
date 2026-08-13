@@ -18,7 +18,7 @@ so no cold-start gap and no eviction/reload resets to work around.
 from collections.abc import Callable
 from typing import Any
 
-from pulumi import ResourceOptions
+from pulumi import Input, ResourceOptions
 
 from ol_infrastructure.infrastructure.grafana_alerting.dashboards.datasources import (
     LOKI_DATASOURCE_REF,
@@ -104,10 +104,12 @@ def _dashboard_json(
 
 
 def create(
-    folder_uid,
+    folder_uid: Input[str],
     timeseries_panel: Callable[..., dict[str, Any]],
     bar_gauge_panel: Callable[..., dict[str, Any]],
-    create_dashboard: Callable[[str, object, dict[str, Any], ResourceOptions], None],
+    create_dashboard: Callable[
+        [str, Input[str], dict[str, Any], ResourceOptions], None
+    ],
     resource_opts: ResourceOptions,
 ) -> None:
     """Create the olapps per-IdP login dashboard."""
