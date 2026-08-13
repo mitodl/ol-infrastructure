@@ -305,6 +305,7 @@ policy_definition = {
                 "mediaconvert:GetQueue",
                 "mediaconvert:ListTagsForResource",
                 "mediaconvert:UpdateQueue",
+                "rds:CreateBlueGreenDeployment",
                 "rds:CreateDBParameterGroup",
                 "rds:DeleteBlueGreenDeployment",
                 "rds:DeleteDBParameterGroup",
