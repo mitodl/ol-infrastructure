@@ -1186,6 +1186,34 @@ for location in code_locations:
 
     deployments.append(deployment)
 
+# Referenced by run_launcher.config.run_k8s_config.pod_spec_config in
+# dagster_instance.yaml -- see the rationale there. A pod naming a
+# nonexistent PriorityClass is rejected outright, so this has to exist before
+# the instance ConfigMap that points at it (hence the Helm release's
+# depends_on below).
+#
+# The value is negative deliberately: run workers rank below every priority-0
+# pod in the cluster, not just the ones in this namespace. That is broader
+# than the incident strictly requires, but these pods have already starved
+# StarRocks FE out of the core nodegroup for 5 days (#5183), so ranking batch
+# work below anything long-lived is the designation we want. preemption_policy
+# Never keeps the relationship one-directional -- run workers queue for
+# capacity, they never evict anything themselves.
+dagster_run_priority_class = kubernetes.scheduling.v1.PriorityClass(
+    f"dagster-run-priority-class-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-run",
+        labels=k8s_global_labels.model_dump(),
+    ),
+    value=-100,
+    preemption_policy="Never",
+    global_default=False,
+    description=(
+        "Dagster run workers: preemptible batch work that ranks below all "
+        "control-plane pods."
+    ),
+)
+
 # Custom Dagster instance ConfigMap with dynamic credentials support
 # Note: We create this before the Helm release so it gets proper ownership
 dagster_instance_yaml = (
@@ -1452,6 +1480,7 @@ dagster_helm_release = kubernetes.helm.v3.Release(
             dagster_static_secrets,
             dagster_dbt_secrets,
             dagster_auth_binding,
+            dagster_run_priority_class,
         ]
     ),
 )
