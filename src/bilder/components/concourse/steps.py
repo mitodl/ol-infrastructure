@@ -220,13 +220,15 @@ def configure_concourse(
             user=concourse_config.user,
             recursive=True,
         )
-        # Concourse 8.3.0 (concourse/concourse#9637) migrated baggageclaim's
-        # filesystem operations onto Go's os.Root API. It reliably creates the
-        # top-level overlays dir on first startup but not the nested "work"
-        # subdirectory inside it (confirmed live: overlays/ exists and is
-        # empty on an affected worker, while volumes/{dead,init,live} -- also
-        # runtime-created -- are all present). Pre-create the nested dir at
-        # image-build time so baggageclaim doesn't depend on that behavior.
+        # On Concourse 8.3.0, baggageclaim's runtime directory creation on
+        # worker boot reliably creates the top-level overlays dir but not the
+        # nested "work" subdirectory inside it -- confirmed live on an
+        # affected production worker: overlays/ existed and was empty, while
+        # volumes/{dead,init,live} (also runtime-created) were all present.
+        # Not yet root-caused against a specific upstream commit -- #9601 and
+        # #9637 were both checked and are about archive-extraction paths, not
+        # this. Pre-create the nested dir at image-build time so baggageclaim
+        # doesn't depend on that runtime behavior.
         files.directory(
             name="Create Concourse baggageclaim overlays work directory",
             path=str(concourse_config.work_dir.joinpath("overlays", "work")),
