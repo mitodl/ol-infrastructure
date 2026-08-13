@@ -88,6 +88,12 @@ class OLApisixHTTPRouteConfig(BaseModel):
     an ``Exact`` route should not carry one."""
     backend_service_name: str | None = None
     backend_service_port: str | NonNegativeInt | None = None
+    # Set explicitly (to False) when the backend app has no nginx sidecar, so
+    # the validator below can catch the "http" named-port trap: that name
+    # always resolves to DEFAULT_NGINX_PORT (8071) in _resolve_backend_port,
+    # which silently 502s once an app drops its sidecar. Left unset for
+    # backends that still run one.
+    backend_import_nginx_config: bool | None = None
     backend_resolve_granularity: Literal["endpoint", "service"] = (
         "service"  # NOT used in Gateway API HTTPRoute
     )
@@ -149,6 +155,30 @@ class OLApisixHTTPRouteConfig(BaseModel):
             and not self.websocket_backend_selector
         ):
             msg = "When 'websocket' is True with a service backend, 'websocket_backend_selector' must be provided."
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def check_named_port_matches_sidecar(self) -> "OLApisixHTTPRouteConfig":
+        """Reject the "http" named port for a backend with no nginx sidecar.
+
+        ``_resolve_backend_port`` maps the port name "http" to the nginx
+        sidecar's conventional port (8071). An app that has dropped its
+        sidecar no longer has anything listening there, so routing to it
+        502s on every request with nothing in the Pulumi diff to hint at it.
+        Pass the resolved numeric port (e.g.
+        ``OLApplicationK8s.application_lb_service_port``) instead.
+        """
+        if (
+            self.backend_service_port == "http"
+            and self.backend_import_nginx_config is False
+        ):
+            msg = (
+                "backend_service_port='http' resolves to the nginx sidecar's "
+                "port (8071), but backend_import_nginx_config=False says this "
+                "backend has no sidecar. Pass the numeric port instead (e.g. "
+                "OLApplicationK8s.application_lb_service_port)."
+            )
             raise ValueError(msg)
         return self
 

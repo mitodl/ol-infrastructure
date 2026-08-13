@@ -729,6 +729,7 @@ ocw_studio_apisix_httproute = OLApisixHTTPRoute(
             paths=["/static/hash.txt"],
             backend_service_name=ocw_studio_k8s_app.application_lb_service_name,
             backend_service_port=ocw_studio_k8s_app.application_lb_service_port,
+            backend_import_nginx_config=False,
             plugins=[
                 OLApisixPluginConfig(
                     name="response-rewrite",
@@ -748,6 +749,7 @@ ocw_studio_apisix_httproute = OLApisixHTTPRoute(
             paths=["/static/*"],
             backend_service_name=ocw_studio_k8s_app.application_lb_service_name,
             backend_service_port=ocw_studio_k8s_app.application_lb_service_port,
+            backend_import_nginx_config=False,
             plugins=[
                 OLApisixPluginConfig(
                     name="response-rewrite",
@@ -778,6 +780,7 @@ ocw_studio_apisix_httproute = OLApisixHTTPRoute(
             path_match_type="Exact",
             backend_service_name=ocw_studio_k8s_app.application_lb_service_name,
             backend_service_port=ocw_studio_k8s_app.application_lb_service_port,
+            backend_import_nginx_config=False,
             plugins=[
                 OLApisixPluginConfig(
                     name="mocking",
@@ -797,6 +800,7 @@ ocw_studio_apisix_httproute = OLApisixHTTPRoute(
             paths=["/*"],
             backend_service_name=ocw_studio_k8s_app.application_lb_service_name,
             backend_service_port=ocw_studio_k8s_app.application_lb_service_port,
+            backend_import_nginx_config=False,
             plugins=[],
         ),
     ],
