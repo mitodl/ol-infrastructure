@@ -1,3 +1,4 @@
+import re
 import sys
 
 from ol_concourse.lib.models.fragment import PipelineFragment
@@ -27,12 +28,21 @@ from ol_concourse.pipelines.versions_map import (
 # worker (see PR #5401). Bumping the pin is now what triggers a rebuild, via
 # concourse_image_code watching its version pin (image_version_paths("concourse")
 # below) rather than the raw versions.py file -- see PR #5407.
+#
+# concourse/concourse tags releases with a "v" prefix (e.g. "v8.2.5"), and
+# github-release's tag_filter is an unanchored Go regexp -- an unescaped,
+# unanchored CONCOURSE_VERSION would incidentally match today's tag but would
+# also match unintended ones (e.g. "8.2.5" matches inside "v8.2.50"). Anchor
+# it, escape the literal version, and keep a capture group around just the
+# unprefixed digits so the resource's "version" file -- read by
+# env_vars_from_files below -- contains "8.2.5", not "v8.2.5", matching what
+# deploy.py expects.
 concourse_release = github_release(
     Identifier("concourse-release"),
     "concourse",
     "concourse",
     github_token="",
-    tag_filter=CONCOURSE_VERSION,
+    tag_filter=rf"^v({re.escape(CONCOURSE_VERSION)})$",
 )
 concourse_image_code = git_repo(
     Identifier("ol-infrastructure-packer"),
