@@ -135,6 +135,15 @@ prune_build_cache() {
 #
 # Deleting is safe by construction: with no manifest there is nothing
 # pullable in the directory, and a subsequent push just re-uploads the layers.
+#
+# The age check and the `rm -rf` are not atomic against zot, so a push that
+# starts in the microseconds between them loses its in-flight upload. That is
+# accepted deliberately: the loser is a push that Docker retries, into a repo
+# that had been untouched for an hour, and it lands right back in the state
+# this sweep already handles — no manifest is ever broken, because a repo with
+# a manifest is never a candidate. Closing the window means excluding registry
+# writes (stopping zot, or a registry-side delete API), which would interrupt
+# pushes and pulls far more often than the race it prevents.
 # --volumes-from reads the storage path from the registry container, so it
 # needs no knowledge of the volume name setup.sh chose.
 # ---------------------------------------------------------------------------

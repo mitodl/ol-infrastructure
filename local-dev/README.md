@@ -389,6 +389,16 @@ One registry case zot cannot reclaim on its own is a repo left with no manifest 
 
 > **Note:** The teardown script calls `pulumi destroy` automatically to clean up Pulumi-managed resources before deleting the cluster, so no orphaned resources are left behind.
 
+Pulumi state must never outlive the cluster: everything these stacks manage
+lives inside the cluster, but the state lives in this checkout, so state that
+survives makes the next `pulumi up` skip resources that no longer exist (that
+is the `404 Realm not found` failure). Teardown therefore discards a stack's
+state if its `destroy` fails, discards leftover state when the cluster is
+already gone (deleted by hand, or by an interrupted teardown), and **stops
+before `k3d cluster delete`** if it can neither destroy nor discard — the
+checked-in `Pulumi.<stack>.yaml` config is preserved either way. If it stops,
+it prints the exact `pulumi stack rm` to run; do that and re-run teardown.
+
 ---
 
 ## Customization & Advanced Setup
