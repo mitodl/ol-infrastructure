@@ -65,6 +65,10 @@ config:
     - cloud_custodian
     - pulumi_state
     - pulumi_infra
+    # Production only: the scheduled iam-policy-drift pipeline is set on this
+    # deployment's infrastructure team and analyzes this pool's Production
+    # role, so CI/QA workers have no reason to hold Access Analyzer access.
+    - iam_drift_analysis
     instance_type: m7a.4xlarge
     name: infra
     spot_options:
