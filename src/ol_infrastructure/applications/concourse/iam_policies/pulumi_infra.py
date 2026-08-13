@@ -314,6 +314,7 @@ policy_definition = {
                 "rds:DescribeDBParameters",
                 "rds:DescribeDBSubnetGroups",
                 "rds:ListTagsForResource",
+                "rds:ModifyDBInstance",
                 "rds:ModifyDBSubnetGroup",
                 "rds:ResetDBParameterGroup",
                 "route53:CreateHostedZone",
