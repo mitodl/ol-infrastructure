@@ -1,0 +1,28 @@
+---
+_custom_properties:
+  tier: unmanaged
+_direct_collaborators:
+  rhysyngsun: admin
+_has_branch_protection: true
+_pushed_at: '2024-04-11T10:34:56Z'
+_ruleset_count: 0
+_visibility: public
+allow_merge_commit: false
+allow_rebase_merge: false
+allow_squash_merge: true
+archetype: archived
+default_branch: main
+description: Monorepo for Open Learning Engineering's node libraries
+has_discussions: false
+has_issues: true
+has_projects: true
+has_wiki: false
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: ol-npm-libraries
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+topics:
+- typescript
+- typescript-library
+web_commit_signoff_required: false

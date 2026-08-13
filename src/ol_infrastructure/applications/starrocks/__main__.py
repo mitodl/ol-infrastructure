@@ -116,6 +116,76 @@ io_optimized_node_affinity = {
     }
 }
 
+# Pin FE to the static, non-Karpenter-managed core nodegroup. FE's BDBJE
+# metadata group only tolerates losing 1 of 3 replicas before quorum is at
+# risk (see the FE PDB below), so it needs the most churn-resistant nodes
+# available rather than the Karpenter spot/on-demand fleet that BE/CN use.
+core_node_selector = {"ol.mit.edu/core_node": "true"}
+
+# Incident 2026-07-30 (QA + prod): core nodes have no taint, so ordinary
+# Deployments (Airbyte, Dagster, JupyterHub, etc.) land there freely and can
+# fill a core node before an FE pod needs to reschedule onto it, leaving FE
+# Pending indefinitely with no automatic recovery.
+#
+# A PriorityClass was tried here (#5183) and silently did nothing: the
+# starrocksclusters.starrocks.com/v1 CRD's starRocksFeSpec has no
+# priorityClassName field, so the API server pruned it and FE kept running at
+# priority 0 with no ability to preempt anything. Incident 2026-08-05 (prod)
+# was the result — fe-2 sat Pending for 5 days behind ~21 Dagster run pods on
+# the only core node its anti-affinity rule allowed.
+#
+# The scheduling room now comes from capacity instead: the core nodegroup runs
+# one more node than there are FE replicas, and FE's cpu_request is sized to
+# observed usage rather than the docs' sizing recommendation, so FE fits in the
+# gaps left by other workloads. The CRD does support `tolerations`, so if
+# capacity headroom proves insufficient the next step is a NoSchedule taint on
+# the core nodegroup plus a matching toleration here.
+
+
+def _starrocks_pod_anti_affinity(component: str, *, required: bool) -> dict[str, Any]:
+    """Spread replicas of one StarRocks pod type across distinct nodes.
+
+    Incident 2026-07-30 (data-QA): a single spot node reclaim took out 2 of 3
+    FE replicas at once because nothing prevented the scheduler from
+    co-locating them after eviction, dropping FE below BDBJE quorum. `component`
+    must match the chart's `app.kubernetes.io/component` pod label (fe/be/cn).
+    `required` is hard (blocks scheduling) for FE/BE, whose small fixed replica
+    counts make co-location a quorum/redundancy risk; CN uses soft/preferred
+    since it's HPA-autoscaled and a hard constraint would force one Karpenter
+    node per CN replica even at max (10-20) replicas.
+    """
+    pod_affinity_term = {
+        "labelSelector": {
+            "matchExpressions": [
+                {
+                    "key": "app.kubernetes.io/component",
+                    "operator": "In",
+                    "values": [component],
+                },
+                {
+                    "key": "app.starrocks.ownerreference/name",
+                    "operator": "In",
+                    "values": [f"{stack_info.env_prefix}-starrocks-{component}"],
+                },
+            ]
+        },
+        "topologyKey": "kubernetes.io/hostname",
+    }
+    if required:
+        return {
+            "podAntiAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": [pod_affinity_term]
+            }
+        }
+    return {
+        "podAntiAffinity": {
+            "preferredDuringSchedulingIgnoredDuringExecution": [
+                {"weight": 100, "podAffinityTerm": pod_affinity_term}
+            ]
+        }
+    }
+
+
 starrocks_root_password_secret_name = f"{stack_info.env_prefix}-starrocks-root-password"
 starrocks_root_password_secret = kubernetes.core.v1.Secret(
     f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-root-password-secret",
@@ -362,6 +432,8 @@ starrocks_values: dict[str, Any] = {
         "image": {"tag": STARROCKS_VERSION},
         "serviceAccount": "starrocks",
         "runAsNonRoot": True,
+        "nodeSelector": core_node_selector,
+        "affinity": _starrocks_pod_anti_affinity("fe", required=True),
         "service": {
             "type": "ClusterIP",
         },
@@ -376,15 +448,18 @@ starrocks_values: dict[str, Any] = {
         ),
         "resources": {
             "requests": {
-                # StarRocks recommends 8 CPU cores and 16 GB RAM per FE node.
+                # StarRocks recommends 8 CPU cores and 16 GB RAM per FE node,
+                # but that is a sizing recommendation, not a reservation: FE's
+                # observed 7-day peak is ~150m. Requesting the full 8 cores
+                # reserved ~50x actual usage and made FE nearly unplaceable on
+                # the shared core nodegroup (incident 2026-08-05). Request to
+                # observed usage, burst to the recommendation via the limit.
                 # Ref: https://docs.starrocks.io/docs/deployment/plan_cluster/
-                "cpu": fe_config.get("cpu_request", "8000m"),
+                "cpu": fe_config.get("cpu_request", "1000m"),
                 "memory": fe_config.get("memory_request", "16Gi"),
             },
             "limits": {
-                "cpu": fe_config.get(
-                    "cpu_limit", fe_config.get("cpu_request", "8000m")
-                ),
+                "cpu": fe_config.get("cpu_limit", "8000m"),
                 "memory": fe_config.get("memory_limit", "16Gi"),
             },
         },
@@ -409,18 +484,16 @@ starrocks_values: dict[str, Any] = {
     },
 }
 
-if stack_info.name == "Production":
-    # Incident 2026-07-22: Karpenter voluntarily consolidated the spot node
-    # under an FE pod three times in ~13 minutes (cost-driven, not a crash),
-    # and each EBS volume detach/reattach cycle took long enough that the
-    # StatefulSet spent over 10 minutes below full replica count, tripping
-    # StatefulSetReplicasMissingCritical. FE only tolerates losing 1 of 3
-    # replicas before quorum is at risk, so CI/QA (fine to disrupt anytime)
-    # are left alone and only prod opts out of voluntary node consolidation
-    # for FE pods specifically.
-    starrocks_values["starrocksFESpec"]["annotations"] = {
-        "karpenter.sh/do-not-disrupt": "true",
-    }
+# Incidents 2026-07-22 (prod) and 2026-07-30 (QA): Karpenter voluntarily
+# consolidating or losing the spot node under an FE pod repeatedly dropped the
+# StatefulSet below full replica count for 10+ minutes (EBS detach/reattach is
+# slow) and, in the QA case, co-located 2 of 3 FE replicas on the single
+# replacement node. FE only tolerates losing 1 of 3 replicas before BDBJE
+# quorum is at risk. `core_node_selector` above moves FE off the Karpenter
+# fleet entirely (all environments, not just prod), which supersedes the
+# prod-only `karpenter.sh/do-not-disrupt` annotation previously used here —
+# that annotation only affects Karpenter-owned nodes, and FE no longer runs on
+# any.
 
 # Placeholder ConfigMap for the file-based group provider managed by the substructure
 # stack (substructure/starrocks keycloak_group_sync.py).  Created here so the FE pods
@@ -453,6 +526,7 @@ if starrocks_config.get_bool("use_be"):
         "image": {"tag": STARROCKS_VERSION},
         "serviceAccount": "starrocks",
         "runAsNonRoot": True,
+        "affinity": _starrocks_pod_anti_affinity("be", required=True),
         "resources": {
             "requests": {
                 # StarRocks recommends 16 CPU cores and 64 GB RAM per BE node.
@@ -484,7 +558,12 @@ if starrocks_config.get_bool("use_be"):
         starrocks_be_spec = cast(dict[str, Any], starrocks_values["starrocksBeSpec"])
         starrocks_be_spec["nodeSelector"] = io_optimized_node_selector
         starrocks_be_spec["tolerations"] = io_optimized_tolerations
-        starrocks_be_spec["affinity"] = io_optimized_node_affinity
+        # Merge, not overwrite: podAntiAffinity (spread replicas across hosts)
+        # and nodeAffinity (require io-optimized hosts) are independent keys.
+        starrocks_be_spec["affinity"] = {
+            **starrocks_be_spec["affinity"],
+            **io_optimized_node_affinity,
+        }
 
 if starrocks_config.get_bool("use_cn"):
     # shared storage configuration
@@ -494,6 +573,7 @@ if starrocks_config.get_bool("use_cn"):
         "image": {"tag": STARROCKS_VERSION},
         "serviceAccount": "starrocks",
         "runAsNonRoot": True,
+        "affinity": _starrocks_pod_anti_affinity("cn", required=False),
         "resources": {
             "requests": {
                 # StarRocks recommends 16 CPU cores and 64 GB RAM per CN node.
@@ -551,6 +631,9 @@ if starrocks_config.get_bool("use_cn"):
 # Ref: starrocks/values.yaml starrocksFESpec.config in the operator Helm chart.
 # Reviewed for 1.11.6: the only diff from 1.11.5 is an unrelated
 # externalTrafficPolicy service field; the fe.conf config block is unchanged.
+# Reviewed for 1.11.7: the only diff from 1.11.6 is unrelated csiVolumes
+# support (CSI ephemeral inline volumes); the fe.conf config block is
+# byte-identical.
 #
 # NOTE: The SSL keystore password appears in fe.conf (→ K8s ConfigMap). This is
 # an inherent limitation of StarRocks' SSL design; the password protects the
@@ -559,10 +642,11 @@ if (
     ssl_enabled
     or starrocks_config.get_bool("use_cn")
     or starrocks_config.get_bool("use_be")
-) and (STARROCKS_CHART_VERSION != "1.11.6"):
+) and (STARROCKS_CHART_VERSION not in ("1.11.6", "1.11.7")):
     msg = (
-        f"_FE_CONFIG_BASE was sourced from chart 1.11.6; review defaults for"
-        f" {STARROCKS_CHART_VERSION} before deploying with SSL or CN enabled"
+        f"_FE_CONFIG_BASE was sourced from chart 1.11.6/1.11.7; review defaults"
+        f" for {STARROCKS_CHART_VERSION} before deploying with SSL, CN, or BE"
+        f" enabled"
     )
     raise ValueError(msg)
 # Set JVM heap to 87.5 % of the container memory limit to leave headroom for
@@ -831,7 +915,10 @@ starrocks_release = kubernetes.helm.v3.Release(
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
-        depends_on=[starrocks_root_password_secret, starrocks_auth_binding],
+        depends_on=[
+            starrocks_root_password_secret,
+            starrocks_auth_binding,
+        ],
     ),
 )
 

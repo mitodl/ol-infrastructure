@@ -24,6 +24,10 @@ from pulumi import (
 )
 from pulumi_aws import ec2, iam, route53, s3
 
+from bridge.lib.constants import (
+    apisix_oidc_session_cookie_name,
+    mit_learn_session_cookie_name,
+)
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
@@ -46,6 +50,7 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    stale_session_cookie_cleanup_plugin,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -78,6 +83,10 @@ from ol_infrastructure.lib.aws.route53_helper import (
     lookup_zone_id_from_domain,
 )
 from ol_infrastructure.lib.fastly import get_fastly_provider
+from ol_infrastructure.lib.k8s_keda import (
+    build_webapp_keda_config,
+    create_webapp_prometheus_trigger_auth,
+)
 from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
     Application,
@@ -116,6 +125,7 @@ network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
+sentry_stack = make_stack_reference(projects.SENTRY, "default")
 operations_vpc = network_stack.require_output("operations_vpc")
 mitxonline_environment = f"mitxonline-{stack_info.env_suffix}"
 
@@ -408,6 +418,16 @@ mitxonline_vault_collected_static_secrets = vault.generic.Secret(
     data_json=json.dumps(mitxonline_collected_secrets),
     opts=ResourceOptions(depends_on=[mitxonline_vault_mount]),
 )
+# Dedicated single-purpose path also read by the mitxonline edxapp deployment's
+# k8s secrets (see applications/mitxonline/k8s_secrets.py); previously a
+# hard-coded secret, now sourced from the ol-infrastructure-sentry stack output.
+mitxonline_operations_sentry_dsn = vault.generic.Secret(
+    f"mitxonline-operations-sentry-dsn-{stack_info.env_suffix}",
+    path="secret-operations/global/mitxonline/sentry-dsn",
+    data_json=sentry_stack.require_output("mitxonline_sentry_dsn").apply(
+        lambda dsn: json.dumps({"value": dsn})
+    ),
+)
 
 mitxonline_vault_policy = vault.Policy(
     f"mitxonline-vault-policy-{stack_info.env_suffix}",
@@ -542,6 +562,34 @@ mitxonline_granian_workers_max_rss = (
     - GRANIAN_MASTER_OVERHEAD_MIB
 ) // MITXONLINE_GRANIAN_WORKERS
 
+# Horizontal scaling is KEDA-driven on APISIX request rate and p95 latency, with a
+# CPU trigger as a backstop, matching edxapp and mit-learn. CPU alone is a poor
+# saturation signal here: a request blocked on Postgres, edX or HubSpot keeps CPU low
+# while the queue grows, so a CPU-only scaler stays flat through exactly the overload
+# it should react to.
+#
+# The route matcher aggregates every webapp route (direct + prefixed, passauth /
+# reqauth / cart) so total traffic drives scaling rather than a single route. Verified
+# against live metrics -- `count by (route) (apisix_http_status)` returns
+# mitxonline_mitxonline-apisix-route-{direct,prefixed}-production_{passauth,reqauth,cart}.
+webapp_trigger_auth, webapp_trigger_auth_name = create_webapp_prometheus_trigger_auth(
+    application_name="mitxonline",
+    env_name=env_name,
+    namespace=mitxonline_namespace,
+    k8s_global_labels=k8s_app_labels,
+    stack_info=stack_info,
+    vault_k8s_resources=vault_k8s_resources,
+)
+
+mitxonline_webapp_keda_config = build_webapp_keda_config(
+    trigger_auth_name=webapp_trigger_auth_name,
+    route_matcher=(f"mitxonline_mitxonline-apisix-route-.*-{stack_info.env_suffix}_.*"),
+    container_name=f"{Services.mitxonline}-app",
+    requests_threshold=mitxonline_config.get("autoscaling_requests_threshold") or "20",
+    latency_threshold=mitxonline_config.get("autoscaling_latency_threshold") or "2000",
+    cpu_threshold=mitxonline_config.get("autoscaling_cpu_threshold") or "60",
+)
+
 mitxonline_k8s_app = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
         project_root=Path(__file__).parent,
@@ -612,15 +660,22 @@ mitxonline_k8s_app = OLApplicationK8s(
         ),
         resource_requests={"cpu": "250m", "memory": mitxonline_web_memory_limit},
         resource_limits={"memory": mitxonline_web_memory_limit},
-        # hpa_scaling_metrics is left at the component default (CPU only). Memory is
-        # managed vertically by the component's webapp VPA; the ceiling below is what
-        # `mitxonline_granian_workers_max_rss` is derived from, so keep the two in
-        # sync if either changes.
+        # Memory is managed vertically by the component's webapp VPA; the ceiling
+        # below is what `mitxonline_granian_workers_max_rss` is derived from, so keep
+        # the two in sync if either changes. Horizontal scaling is KEDA-driven (see
+        # above), so hpa_scaling_metrics is unused -- the component builds a
+        # ScaledObject instead of a native HPA when webapp_keda_config is set.
         webapp_vpa_max_allowed_memory=mitxonline_web_memory_ceiling,
+        webapp_keda_config=mitxonline_webapp_keda_config,
     ),
     opts=ResourceOptions(
-        # Ensure secrets are created before the application deployment
-        depends_on=[mitxonline_app_security_group, *secret_resources]
+        # Ensure secrets and the KEDA trigger authentication are created before the
+        # application deployment; the ScaledObject references the auth by name.
+        depends_on=[
+            mitxonline_app_security_group,
+            webapp_trigger_auth,
+            *secret_resources,
+        ]
     ),
 )
 
@@ -653,6 +708,17 @@ mitxonline_direct_oidc = OLApisixOIDCResources(
         oidc_post_logout_redirect_uri=f"https://{api_domain}/logout/",
         oidc_session_absolute_timeout=60 * 20160,
         oidc_session_cookie_domain=api_domain.removeprefix("api"),
+        # This is MITx Online's own login session, on its own parent domain --
+        # distinct from the MIT Learn session the prefixed resources below read,
+        # so it gets its own name rather than the shared one.  It needs an
+        # explicit name for the same reason mit-learn does: the cookie domain
+        # above means the Production cookie is also sent to
+        # rc./ci.mitxonline.mit.edu, where a same-named cookie belonging to
+        # another environment cannot be decrypted.
+        oidc_session_cookie_name=apisix_oidc_session_cookie_name(
+            "mitxonline",
+            stack_info.env_suffix,
+        ),
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
         oidc_use_session_secret=True,
@@ -671,6 +737,24 @@ mitxonline_prefixed_oidc_resources = OLApisixOIDCResources(
         oidc_logout_path=f"/{api_path_prefix}/logout/oidc",
         oidc_post_logout_redirect_uri=f"https://{api_domain}/{api_path_prefix}/logout/",
         oidc_session_absolute_timeout=60 * 20160,
+        # These routes are served from MIT Learn's own host
+        # (api.<env>.learn.mit.edu, see learn_api_domain below) and are what the
+        # MIT Learn frontend calls as NEXT_PUBLIC_MITX_ONLINE_BASE_URL.  Their
+        # unauth_action="pass" plugins recognize the session mit-learn's login
+        # flow set, which only works while both name the cookie identically --
+        # so this must track mit_learn/__main__.py's oidc_session_cookie_name,
+        # not the mitxonline name used above.
+        oidc_session_cookie_name=mit_learn_session_cookie_name(
+            stack_info.env_suffix,
+        ),
+        # Matching mit_learn/__main__.py's cookie domain matters as much as
+        # matching its name.  The "reqauth" route below performs a real login
+        # (unauth_action="auth" on /mitxonline/login/), and without a domain the
+        # plugin would write a *host-only* cookie on api.<env>.learn.mit.edu
+        # under the shared name -- a second, separate entry in the browser's jar
+        # shadowing mit-learn's .learn.mit.edu cookie on that host.  With the
+        # domain set, all of them read and write the one shared cookie.
+        oidc_session_cookie_domain=learn_backend_domain.removeprefix("api"),
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
         oidc_use_session_secret=True,
@@ -711,6 +795,21 @@ response_rewrite_plugin_config = OLApisixPluginConfig(
         }
     },
 )
+
+# Both OIDC resources above moved off lua-resty-session's default "session"
+# cookie name, so every current user has a dead one in their browser.  The two
+# route groups need different deletions because a cookie's identity includes its
+# domain: the direct routes' cookie was scoped to the mitxonline parent domain,
+# while the prefixed routes' was host-only on MIT Learn's API host.  These are
+# attached per route group rather than to mitxonline_shared_plugins because that
+# config is referenced from both groups, and a Domain=.mitxonline.mit.edu
+# deletion emitted from api.<env>.learn.mit.edu is simply rejected by the
+# browser.  Safe to delete once the old cookies have aged out of circulation.
+direct_stale_session_cleanup = stale_session_cookie_cleanup_plugin(
+    cookie_domains=[api_domain.removeprefix("api")],
+)
+prefixed_stale_session_cleanup = stale_session_cookie_cleanup_plugin()
+
 mitxonline_apisix_route_direct = OLApisixRoute(
     name=f"mitxonline-apisix-route-direct-{stack_info.env_suffix}",
     k8s_namespace=mitxonline_namespace,
@@ -727,6 +826,7 @@ mitxonline_apisix_route_direct = OLApisixRoute(
                     unauth_action="pass"
                 ),
                 response_rewrite_plugin_config,
+                direct_stale_session_cleanup,
             ],
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
             backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
@@ -739,6 +839,7 @@ mitxonline_apisix_route_direct = OLApisixRoute(
             plugins=[
                 OLApisixPluginConfig(name="redirect", config={"uri": "/logout/oidc"}),
                 response_rewrite_plugin_config,
+                direct_stale_session_cleanup,
             ],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
@@ -754,6 +855,7 @@ mitxonline_apisix_route_direct = OLApisixRoute(
                     unauth_action="auth"
                 ),
                 response_rewrite_plugin_config,
+                direct_stale_session_cleanup,
             ],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
@@ -773,6 +875,7 @@ mitxonline_apisix_route_direct = OLApisixRoute(
                     unauth_action="auth"
                 ),
                 response_rewrite_plugin_config,
+                direct_stale_session_cleanup,
             ],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
@@ -803,6 +906,7 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
                     unauth_action="pass"
                 ),
                 response_rewrite_plugin_config,
+                prefixed_stale_session_cleanup,
             ],
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
             backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
@@ -815,6 +919,7 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
             plugins=[
                 OLApisixPluginConfig(name="redirect", config={"uri": "/logout/oidc"}),
                 response_rewrite_plugin_config,
+                prefixed_stale_session_cleanup,
             ],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
@@ -836,6 +941,7 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
                     unauth_action="auth"
                 ),
                 response_rewrite_plugin_config,
+                prefixed_stale_session_cleanup,
             ],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,

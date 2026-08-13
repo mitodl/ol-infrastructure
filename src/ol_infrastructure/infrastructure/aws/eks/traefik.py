@@ -90,7 +90,9 @@ def setup_traefik(
             skip_crds=False,
             cleanup_on_fail=True,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-                repo="https://helm.traefik.io/traefik",
+                # helm.traefik.io was retired and now 404s on index.yaml, which
+                # fails the release at resolve time rather than degrading.
+                repo="https://traefik.github.io/charts",
             ),
             values={
                 "image": {
@@ -206,7 +208,11 @@ def setup_traefik(
                 },
                 "resources": {
                     "requests": {
-                        "cpu": "100m",
+                        # The HPA above scales on CPU utilization as a percentage of
+                        # this request. Keep it near observed per-pod burst usage or
+                        # every minor traffic burst pins the deployment at
+                        # maxReplicas.
+                        "cpu": eks_config.get("traefik_cpu_request") or "500m",
                         "memory": "150Mi",
                     },
                     "limits": {

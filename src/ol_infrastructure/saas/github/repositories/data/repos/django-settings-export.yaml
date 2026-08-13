@@ -1,0 +1,26 @@
+---
+_custom_properties:
+  tier: unmanaged
+_has_branch_protection: false
+_pushed_at: '2015-08-13T21:34:13Z'
+_ruleset_count: 0
+_visibility: public
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: master
+description: Export Django settings to templates
+has_discussions: false
+has_issues: false
+has_projects: true
+has_wiki: true
+homepage: https://pypi.python.org/pypi/django-settings-export
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: django-settings-export
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+teams:
+  odl-engineering-owners: admin
+web_commit_signoff_required: false

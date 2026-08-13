@@ -114,6 +114,30 @@ def build_base_general_config() -> ConfigDict:
             "ssl_cert_reqs": "optional",
         },
         "CELERY_BROKER_VHOST": "1",
+        # edx-platform's celery.py does `config_from_object("django.conf:settings")`
+        # with no namespace, so it's on Celery's old-style uppercase names read via
+        # ENV_TOKENS -- there is no generic CELERY_TASK_* / env-var passthrough.
+        # ACKS_LATE + REJECT_ON_WORKER_LOST make a task's message go back to the
+        # Redis queue (rather than staying acked-and-lost) when the worker holding it
+        # dies -- e.g. KEDA scaling a celery Deployment down mid-task, or a pod
+        # getting SIGKILLed after its grace period expires. This applies to every
+        # edxapp task on this broker connection, so a task must tolerate being run
+        # twice if a worker is lost partway through it.
+        "CELERY_ACKS_LATE": True,
+        "CELERY_REJECT_ON_WORKER_LOST": True,
+        # Backstop for the case ACKS_LATE/REJECT_ON_WORKER_LOST can't cover: the
+        # whole pod (not just the task) is killed before the broker connection can
+        # signal the reject, so the message just sits unacked. Redis's kombu
+        # transport makes an unacked message visible for redelivery again after this
+        # many seconds -- default is 3600s (1hr), which is what left a stuck OLX
+        # import task sitting in "started" for about an hour with no worker ever
+        # picking it back up. This is one connection-level setting shared by
+        # lms-celery, lms-high-mem-celery, and
+        # cms-celery (see build_base_general_config()'s single call site), so it has
+        # to be safe for the high_mem queue's up-to-4-hour reports too -- hence it
+        # matches HIGH_MEM_CELERY_TERMINATION_GRACE_PERIOD_SECONDS in
+        # k8s_resources.py rather than being tuned tighter for the default queues.
+        "CELERY_BROKER_TRANSPORT_OPTIONS": {"visibility_timeout": 4 * 60 * 60},
         "CELERY_EVENT_QUEUE_TTL": None,
         "CELERY_TIMEZONE": "UTC",
         "CELERY_TASK_TRACK_STARTED": True,
@@ -197,11 +221,6 @@ def build_base_general_config() -> ConfigDict:
         "MEDIA_ROOT": "media/",
         "MEDIA_URL": "/media/",
         "MICROSITE_CONFIGURATION": {},
-        "MKTG_URL_LINK_MAP": {
-            "TOS": "tos",
-            "ABOUT": "about",
-            "ACCESSIBILITY": "accessibility",
-        },
         "MOBILE_STORE_URLS": {},
         "NOTIFICATION_TYPE_ICONS": {},
         "DEFAULT_NOTIFICATION_ICON_URL": "",
@@ -448,6 +467,11 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
         # Module-level settings overrides for residential
         "DISABLE_START_DATES": False,
         "ENABLE_MKTG_SITE": False,  # Extracted to module-level
+        "MKTG_URL_LINK_MAP": {
+            "TOS": "tos",
+            "ABOUT": "about",
+            "ACCESSIBILITY": "accessibility",
+        },
         # FEATURES overrides for residential (only non-module-level flags)
         "FEATURES": {
             "ALLOW_PUBLIC_ACCOUNT_CREATION": True,
@@ -492,6 +516,11 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
             "EMAIL_HOST": "smtp.mailgun.org",
             "EMAIL_PORT": 587,
             "EMAIL_USE_TLS": True,
+            "MKTG_URL_LINK_MAP": {
+                "TOS": "tos",
+                "ABOUT": "about",
+                "ACCESSIBILITY": "accessibility",
+            },
             "COURSE_MODE_DEFAULTS": {
                 "name": "Professional",
                 "android_sku": None,
@@ -550,6 +579,7 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
                 "^/courses/.*/courseware-navigation-sidebar/toggles/?$",
                 "^/courses/.*/courseware-search/enabled/?$",
             ],
+            "MKTG_URL_LINK_MAP": {},
             "SYSADMIN_DEFAULT_BRANCH": "live",
             "EMAIL_BACKEND": "django_ses.SESBackend",
             "MIT_BASE_URL": "https://web.mit.edu",

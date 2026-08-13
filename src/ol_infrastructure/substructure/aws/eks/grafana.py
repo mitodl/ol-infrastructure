@@ -68,6 +68,110 @@ stage.match {
 """
 
 
+def _keycloak_olapps_idp_login_redact_alloy_config() -> str:
+    """
+    Alloy River stages that redact PII from olapps-realm brokered-login
+    events and let the rest of the line through to Loki, so
+    dashboards/keycloak_olapps_idp_logins.py can count logins per IdP
+    directly from LogQL (count_over_time) instead of from a derived
+    Prometheus counter.
+
+    An earlier version of this pipeline extracted a Prometheus counter via
+    stage.metrics instead of keeping any log record. That turned out to have
+    three compounding problems, all found via live QA testing: (1)
+    metric.counter's `source` is required, not optional, to actually
+    increment (unset, it looks for a field that never exists and silently
+    never fires); (2) `source` alone doesn't attach a label, so a separate
+    stage.labels promotion was needed for a per-IdP breakdown; (3)
+    max_idle_duration drops and recreates the counter after any gap between
+    logins, and because Prometheus's increase() only detects a reset via a
+    *decrease* (not a gap), a reset landing on the same value as before it
+    silently reports zero increase -- and metric.counter's own first-ever
+    appearance (no prior sample to diff against) hits the identical blind
+    spot on every single login until a second one confirms a real delta.
+    Every fix for one of these surfaced the next. Redacting and keeping the
+    actual log line sidesteps all three: count_over_time reads directly from
+    Loki's stored lines at query time, so there's no persistent counter
+    state to evict, reset, or have a cold start.
+
+    Keycloak's jboss-logging event listener is configured (see
+    applications/keycloak/__main__.py) with success-level=info so that
+    successful LOGIN/IDENTITY_PROVIDER_LOGIN events reach our logs; that
+    setting is all-or-nothing per Keycloak, logging every successful event
+    type (CODE_TO_TOKEN, REFRESH_TOKEN, LOGOUT, REGISTER, ...) across every
+    realm on the shared instance, not just logins on olapps.
+
+    1. Match INFO-level LOGIN/IDENTITY_PROVIDER_LOGIN events on olapps that
+       carry an identity_provider detail (i.e. were actually brokered
+       through an external IdP, not a direct username/password login), and
+       redact username and identity_provider_identity (the federated email)
+       -- the only PII these events carry -- in place. identity_provider
+       itself is just an IdP alias (e.g. "touchstone-idp"), not PII, and is
+       left untouched so the dashboard can query and group by it. The
+       (redacted) line is kept, not dropped.
+    2. Drop every other INFO-level org.keycloak.events line: both direct
+       (non-brokered) olapps logins, which this dashboard doesn't cover, and
+       the rest of the noisy INFO volume (CODE_TO_TOKEN, REFRESH_TOKEN, etc.)
+       that success-level=info produces across every realm. The selector
+       excludes lines carrying identity_provider=", since those are exactly
+       the ones stage 1 already redacted and wants kept.
+    3. Match WARN-level LOGIN_ERROR/IDENTITY_PROVIDER_LOGIN_ERROR events on
+       olapps that carry an identity_provider detail, and redact username the
+       same way. These were never dropped -- WARN/ERROR events are the
+       pre-existing failure logs already relied on for debugging (e.g.
+       diagnosing a broken IdP integration) -- so this only adds the same
+       redaction, not a change in what reaches Loki.
+
+    Each stage's selector independently re-checks the INFO/WARN level
+    marker and the olapps realm, rather than relying on another stage
+    having already scoped the pipeline, so this is correct regardless of
+    stage ordering.
+    """
+    return r"""
+stage.match {
+  selector = "{namespace=\"keycloak\", container=\"keycloak\"} |= \"INFO  [org.keycloak.events]\" |= \"realmId=\\\"olapps\\\"\" |~ \"type=\\\"(LOGIN|IDENTITY_PROVIDER_LOGIN)\\\"\" |= \"identity_provider=\\\"\""
+  pipeline_name = "keycloak_olapps_login_success_redact"
+
+  // expression's capture group is what gets replaced -- the surrounding
+  // username="..." / identity_provider_identity="..." text outside the
+  // parens is left as-is and doesn't need to be repeated in `replace`.
+  stage.replace {
+    expression = `username="([^"]+)"`
+    replace    = `[REDACTED]`
+  }
+
+  stage.replace {
+    expression = `identity_provider_identity="([^"]+)"`
+    replace    = `[REDACTED]`
+  }
+}
+
+stage.match {
+  selector = "{namespace=\"keycloak\", container=\"keycloak\"} |= \"INFO  [org.keycloak.events]\" != \"identity_provider=\\\"\""
+  action = "drop"
+  drop_counter_reason = "keycloak_info_event"
+}
+
+stage.match {
+  selector = "{namespace=\"keycloak\", container=\"keycloak\"} |= \"WARN  [org.keycloak.events]\" |= \"realmId=\\\"olapps\\\"\" |~ \"type=\\\"(LOGIN_ERROR|IDENTITY_PROVIDER_LOGIN_ERROR)\\\"\" |= \"identity_provider=\\\"\""
+  pipeline_name = "keycloak_olapps_login_failure_redact"
+
+  // expression's capture group is what gets replaced -- the surrounding
+  // username="..." / identity_provider_identity="..." text outside the
+  // parens is left as-is and doesn't need to be repeated in `replace`.
+  stage.replace {
+    expression = `username="([^"]+)"`
+    replace    = `[REDACTED]`
+  }
+
+  stage.replace {
+    expression = `identity_provider_identity="([^"]+)"`
+    replace    = `[REDACTED]`
+  }
+}
+"""
+
+
 def setup_grafana(
     cluster_name: str,
     stack_info: StackInfo,
@@ -187,18 +291,49 @@ def setup_grafana(
                         "processors": {
                             "tailSampling": {
                                 "enabled": True,
-                                "decisionWait": "5s",
-                                "numTraces": 100,
-                                "expectedNewTracesPerSec": 10,
+                                # The sampler holds every in-flight trace in memory
+                                # until decisionWait elapses, then decides.  These
+                                # numbers must be sized against real trace volume:
+                                # APISIX alone fronts ~280 req/s, and each of those
+                                # is a distinct trace.  The previous values (100 /
+                                # 10) buffered ~0.4s of traffic, so traces were
+                                # evicted before their decision was ever made and
+                                # ~98% of them -- including nearly every APISIX root
+                                # span -- never reached Tempo.
+                                #
+                                # decisionWait also has to outlast the slowest
+                                # exporter feeding a trace.  APISIX batches spans on
+                                # a 2s timeout and the Django BatchSpanProcessor on
+                                # 5s, so a 5s window routinely closed before the
+                                # gateway's root span arrived, orphaning the trace.
+                                "decisionWait": "15s",
+                                "numTraces": 50000,
+                                "expectedNewTracesPerSec": 1000,
+                                # Keep decisions for trace IDs far longer than the
+                                # span data itself, so spans that arrive after a
+                                # trace has been released from memory inherit the
+                                # original decision instead of being re-judged.
+                                #
+                                # Do NOT raise either of these to 1_000_000 or
+                                # above: the chart renders them through Go's %v on a
+                                # float64, which switches to scientific notation at
+                                # 1e6 and emits `non_sampled_cache_size = 1e+06`
+                                # into the Alloy config.  Verified against chart
+                                # 4.3.2 with `helm template`; 999_999 renders as an
+                                # integer, 1_000_000 does not.
                                 "decisionCache": {
-                                    "sampledCacheSize": 1000,
-                                    "nonSampledCacheSize": 10000,
+                                    "sampledCacheSize": 500000,
+                                    "nonSampledCacheSize": 900000,
                                 },
                                 "policies": [
                                     {
+                                        # UNSET is the status of virtually every
+                                        # successful span, so including it here made
+                                        # this policy match all traffic and silently
+                                        # neutered the probabilistic policy below.
                                         "name": "keep-errors",
                                         "type": "status_code",
-                                        "status_codes": ["ERROR", "UNSET"],
+                                        "status_codes": ["ERROR"],
                                     },
                                     {
                                         "name": "sample-slow-traces",
@@ -220,6 +355,22 @@ def setup_grafana(
                                 # explicitly on the sampler collector to avoid this.
                                 "collector": {
                                     "remoteConfig": {"enabled": False},
+                                    # The chart ships the sampler with no requests
+                                    # or limits, which left it BestEffort -- first
+                                    # in line for eviction under node pressure.
+                                    # That is untenable now that numTraces buffers
+                                    # ~50k traces (order 1GiB) instead of 100.  No
+                                    # CPU limit: throttling the sampler stalls the
+                                    # trace pipeline for the whole cluster.
+                                    "alloy": {
+                                        "resources": {
+                                            "requests": {
+                                                "cpu": "500m",
+                                                "memory": "1Gi",
+                                            },
+                                            "limits": {"memory": "2Gi"},
+                                        },
+                                    },
                                 },
                             },
                         },
@@ -250,7 +401,8 @@ def setup_grafana(
                 "podLogsViaLoki": {
                     "enabled": True,
                     "collector": "alloy-logs",
-                    "extraLogProcessingStages": _apisix_cookie_metrics_alloy_config(),
+                    "extraLogProcessingStages": _apisix_cookie_metrics_alloy_config()
+                    + _keycloak_olapps_idp_login_redact_alloy_config(),
                 },
                 "applicationObservability": {
                     "enabled": True,
@@ -273,6 +425,17 @@ def setup_grafana(
                     },
                 },
                 "integrations": {
+                    # Without this, collectors.getCollectorForFeature falls
+                    # back to "use the only enabled collector" -- which is
+                    # ambiguous here (4 named collectors), so it resolves to
+                    # an empty collector name and the *entire* integrations
+                    # feature (this alloy integration AND the pre-existing
+                    # dcgm-exporter one) is silently dropped from every
+                    # collector's rendered config. Confirmed live: neither
+                    # integration appeared in any of the 4 collector
+                    # ConfigMaps in applications-production despite the Helm
+                    # release values matching desired state.
+                    "collector": "alloy-metrics",
                     "dcgm-exporter": {
                         "instances": [
                             {
@@ -281,6 +444,54 @@ def setup_grafana(
                                     "app.kubernetes.io/name": "dcgm-exporter",
                                 },
                             }
+                        ],
+                    },
+                    # Chart-native self-monitoring for the Alloy collectors
+                    # themselves (feature-integrations' integrations.alloy).
+                    # Discovers every collector Deployment/StatefulSet the
+                    # chart creates (alloy-logs, alloy-metrics,
+                    # alloy-receiver, alloy-singleton, and the tail-sampling
+                    # collector, which the alloy-operator names plain
+                    # "alloy") on their shared http-metrics/12345 port --
+                    # verified against the live applications-production
+                    # Service objects and this chart version's default
+                    # port_name (also http-metrics).
+                    #
+                    # useDefaultAllowList (on by default) keeps this to the
+                    # chart's curated ~90-series set instead of scraping
+                    # every alloy_component_* and go runtime metric
+                    # unfiltered. includeMetrics extends that allowlist with
+                    # the tail-sampling processor's own counters, which
+                    # aren't in the default set: these are what would have
+                    # surfaced the tail-sampler sizing bug (traces evicted
+                    # before a decision was made, buffer occupancy far past
+                    # the old 100-trace cap) instead of it going unnoticed.
+                    "alloy": {
+                        "instances": [
+                            {
+                                "name": "alloy-collectors",
+                                "labelSelectors": {
+                                    "app.kubernetes.io/name": [
+                                        "alloy",
+                                        "alloy-logs",
+                                        "alloy-metrics",
+                                        "alloy-receiver",
+                                        "alloy-singleton",
+                                    ],
+                                },
+                                "namespaces": ["grafana"],
+                                "metrics": {
+                                    "tuning": {
+                                        "includeMetrics": [
+                                            "otelcol_processor_tail_sampling_count_traces_sampled",
+                                            "otelcol_processor_tail_sampling_sampling_trace_dropped_too_early",
+                                            "otelcol_processor_tail_sampling_new_trace_id_received",
+                                            "otelcol_processor_tail_sampling_sampling_traces_on_memory",
+                                            "otelcol_processor_tail_sampling_sampling_policy_evaluation_error",
+                                        ],
+                                    },
+                                },
+                            },
                         ],
                     },
                 },

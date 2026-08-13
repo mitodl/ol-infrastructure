@@ -65,6 +65,11 @@ ONE_GIGAHERTZ = 1024
 ONE_MEGABYTE_BYTE = 1048576
 ONE_MONTH_SECONDS = 60 * 60 * HOURS_IN_MONTH
 SECONDS_IN_ONE_DAY = 86400
+# What nginx's `expires max` resolves to (10 years). The Django apps served their
+# content-hashed static assets with that directive behind the nginx sidecar, so
+# apps moving static onto Granian pass this as --static-path-expires rather than
+# silently dropping to Granian's own 1-day default.
+STATIC_ASSET_MAX_AGE_SECONDS = 315360000
 VAULT_CLUSTER_PORT = 8201
 VAULT_HTTP_PORT = 8200
 XQUEUE_SERVICE_PORT = 8040

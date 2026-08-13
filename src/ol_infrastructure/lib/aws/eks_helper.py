@@ -1,4 +1,5 @@
 import json
+import re
 from functools import lru_cache, partial
 from typing import Any
 
@@ -74,8 +75,69 @@ def get_cluster_version(*, use_default: bool = True) -> str:
     return versions_list[0]
 
 
+EKS_ADDON_VERSION_RE = re.compile(
+    r"^v?(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)(?:-eksbuild\.(?P<build>\d+))?$"
+)
+
+
+def eks_addon_version_sort_key(addon_version: str) -> tuple[int, int, int, int]:
+    """Order EKS addon versions numerically rather than lexicographically.
+
+    Addon versions look like ``v1.63.0-eksbuild.1``. Sorting those as plain
+    strings is wrong at every digit boundary -- ``v1.9.0-eksbuild.1`` sorts
+    *above* ``v1.63.0-eksbuild.1`` because "9" > "6" -- so a lexicographic
+    "newest" pick silently selects a years-old addon.
+
+    Args:
+        addon_version: An addon version string, e.g. ``v1.63.0-eksbuild.1``.
+
+    Returns:
+        A tuple ordering versions numerically. Unparseable versions sort below
+        every well-formed one instead of raising, so an unexpected format from
+        AWS degrades the ordering rather than breaking the deploy.
+    """
+    match = EKS_ADDON_VERSION_RE.match(addon_version)
+    if match is None:
+        return (-1, -1, -1, -1)
+    return (
+        int(match["major"]),
+        int(match["minor"]),
+        int(match["patch"]),
+        int(match["build"] or 0),
+    )
+
+
 @lru_cache
-def get_eks_addon_version(addon_name: str, cluster_version: str | None = None) -> str:
+def get_eks_addon_version(
+    addon_name: str,
+    cluster_version: str | None = None,
+    pinned_version: str | None = None,
+) -> str:
+    """Resolve the addon version to install, honouring an explicit pin.
+
+    Without ``pinned_version`` this returns the newest version AWS offers for
+    ``cluster_version``, which means the addon silently tracks latest and can take
+    a major-version jump with no PR, no review, and no staged rollout. Pass
+    ``pinned_version`` (from ``bridge.lib.versions``, where Renovate manages it) so
+    addon upgrades go through code review like every other dependency.
+
+    Args:
+        addon_name: EKS addon name, e.g. ``aws-efs-csi-driver``.
+        cluster_version: Kubernetes version to resolve addon versions against.
+            Defaults to ``get_cluster_version()``, which is the newest
+            standard-support EKS Kubernetes version -- not the version of any
+            particular cluster. Pass an explicit value to resolve against a
+            cluster that is not on the newest release.
+        pinned_version: Exact addon version to install. Must be offered by AWS for
+            ``cluster_version``.
+
+    Returns:
+        The addon version to install.
+
+    Raises:
+        ValueError: If ``pinned_version`` is not available for this cluster
+            version, rather than silently falling back to latest.
+    """
     if cluster_version is None:
         cluster_version = get_cluster_version()
     version_info = eks_client.describe_addon_versions(
@@ -83,7 +145,17 @@ def get_eks_addon_version(addon_name: str, cluster_version: str | None = None) -
         addonName=addon_name,
     )["addons"][0]
     versions = [version["addonVersion"] for version in version_info["addonVersions"]]
-    return sorted(versions, reverse=True)[0]
+    if pinned_version is not None:
+        if pinned_version not in versions:
+            available = sorted(versions, key=eks_addon_version_sort_key, reverse=True)
+            msg = (
+                f"Pinned version {pinned_version} of EKS addon {addon_name} is not "
+                f"available for Kubernetes {cluster_version}. Available versions: "
+                f"{', '.join(available)}"
+            )
+            raise ValueError(msg)
+        return pinned_version
+    return max(versions, key=eks_addon_version_sort_key)
 
 
 @lru_cache

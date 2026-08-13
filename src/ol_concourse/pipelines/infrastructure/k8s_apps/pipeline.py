@@ -50,6 +50,7 @@ from ol_concourse.pipelines.constants import (
     dockerhub_ecr_image_uri,
 )
 from ol_concourse.pipelines.jobs import pulumi_job, pulumi_jobs_chain
+from ol_concourse.pipelines.secrets_map import project_secrets_paths
 
 
 class SentrySourcemapsConfig(BaseModel):
@@ -381,6 +382,7 @@ def _define_git_resources_legacy(
         paths=[
             f"src/ol_infrastructure/applications/{app_name.replace('-', '_')}",
             *PULUMI_WATCHED_PATHS,
+            *project_secrets_paths(f"applications/{app_name.replace('-', '_')}/"),
         ],
     )
     return (
@@ -842,6 +844,7 @@ def _define_git_resources(
         paths=[
             f"src/ol_infrastructure/applications/{app_name.replace('-', '_')}",
             *PULUMI_WATCHED_PATHS,
+            *project_secrets_paths(f"applications/{app_name.replace('-', '_')}/"),
         ],
     )
     return main_repo, ol_infra_repo
@@ -853,11 +856,28 @@ def _define_release_resources(
     repo_main_branch: str,
 ) -> tuple[Resource, Resource, Resource, Resource, Resource]:
     """Define the release-flow resources: release resource, gates, issues, and GitHub Deployments."""
+    # Shared GitHub App installation ol-concourse-lib no longer defaults --
+    # every consumer of this library supplies its own credential reference.
+    # Backed by the "shared/github_app" entry in
+    # bridge/secrets/concourse/operations.production.yaml (Vault path
+    # secret-concourse/shared/github_app), the same secret the release bot
+    # reads. Deliberately not named "github" -- every Concourse team already
+    # has its own team-scoped "github" secret (e.g. secret-concourse/
+    # infrastructure/github), and Concourse's Vault credential manager tries
+    # team-scoped paths before the shared fallback, so a credential named
+    # plain "github" here would silently resolve against the wrong
+    # (team-scoped, fieldless) secret instead of ever reaching this one.
+    github_app_id = "((github_app.release_bot_app_id))"
+    github_app_installation_id = "((github_app.release_bot_app_installation_id))"
+    github_app_private_key = "((github_app.release_bot_app_pem))"
     release_res = release_resource(
         name=Identifier(f"{app_name}-release"),
         uri=f"https://github.com/{github_repo}",
         branch=repo_main_branch,
-        access_token="((github.release_resource_access_token))",  # noqa: S106
+        auth_method="app",
+        app_id=github_app_id,
+        app_installation_id=github_app_installation_id,
+        private_ssh_key=github_app_private_key,
         repository=github_repo,
         semver_tag_fallback=True,
     )
@@ -869,7 +889,10 @@ def _define_release_resources(
         issue_title_template=f"Release {app_name}",
         issue_state="closed",
         skip_if_labeled=["abandoned"],
-        access_token="((github.release_resource_access_token))",  # noqa: S106
+        auth_method="app",
+        app_id=github_app_id,
+        app_installation_id=github_app_installation_id,
+        private_ssh_key=github_app_private_key,
         gh_host=None,
     )
     # Open release issues are created after each QA deployment.
@@ -880,7 +903,10 @@ def _define_release_resources(
         issue_title_template=f"Release {app_name}",
         issue_state="open",
         labels=["release"],
-        access_token="((github.release_resource_access_token))",  # noqa: S106
+        auth_method="app",
+        app_id=github_app_id,
+        app_installation_id=github_app_installation_id,
+        private_ssh_key=github_app_private_key,
         gh_host=None,
         # A retriggered QA deploy with no new app commit re-runs this put
         # with the same checklist; editing in place (instead of the default
@@ -892,13 +918,19 @@ def _define_release_resources(
         name=Identifier(f"{app_name}-deployment-rc"),
         repository=github_repo,
         environment="RC",
-        access_token="((github.release_resource_access_token))",  # noqa: S106
+        auth_method="app",
+        app_id=github_app_id,
+        app_installation_id=github_app_installation_id,
+        private_ssh_key=github_app_private_key,
     )
     deployment_prod = github_deployment(
         name=Identifier(f"{app_name}-deployment-production"),
         repository=github_repo,
         environment="Production",
-        access_token="((github.release_resource_access_token))",  # noqa: S106
+        auth_method="app",
+        app_id=github_app_id,
+        app_installation_id=github_app_installation_id,
+        private_ssh_key=github_app_private_key,
     )
     return release_res, release_gate, release_issue, deployment_rc, deployment_prod
 
@@ -1141,6 +1173,7 @@ def _build_abandon_release_job(
                     "repo_dir": str(main_repo.name),
                     "version_file": f"{release_res.name}/version",
                 },
+                no_get=True,
             ),
         ],
     )
@@ -1289,24 +1322,28 @@ def _build_release_resource_app_pipeline(
             },
         ),
         # Merge the release branch back into the main branch and delete it so
-        # subsequent check calls no longer see a release as in-flight. Wrapped
-        # in a try since this job can be retriggered by an infra-only merge
-        # (QA re-runs on any change under the watched Pulumi paths, and its
-        # release_issue put edits the already-closed release_gate issue,
-        # which Concourse's version="every" get treats as a new trigger for
-        # this job) with no new app release -- the finish action then tries
-        # to fetch a release branch that a prior successful finish already
-        # deleted, and fails every time. That failure is safe to swallow:
-        # the release was already finished, there's nothing left to do.
-        TryStep(
-            try_=PutStep(
-                put=release_res.name,
-                params={
-                    "action": "finish",
-                    "repo_dir": str(main_repo.name),
-                    "version_file": f"{release_res.name}/version",
-                },
-            )
+        # subsequent check calls no longer see a release as in-flight.
+        #
+        # Deliberately NOT wrapped in a `try`. It used to be, because this job
+        # can be retriggered by an infra-only merge (QA re-runs on any change
+        # under the watched Pulumi paths, and its release_issue put edits the
+        # already-closed release_gate issue, which Concourse's version="every"
+        # get treats as a new trigger here) with no new app release -- and
+        # finish then failed trying to fetch a release branch that a prior
+        # finish had already deleted. The release resource now no-ops in that
+        # case instead of failing, so the `try` buys nothing and costs
+        # everything: it equally swallowed *genuine* finish failures. That is
+        # how ol-analytics-api sat with an unmerged releases/2026.8.3.1 branch
+        # -- and therefore a frozen release version -- from 2026-08-03 onward,
+        # with no red build to show for it. A failure here now means a real
+        # release that never finished, and should stop the job.
+        PutStep(
+            put=release_res.name,
+            params={
+                "action": "finish",
+                "repo_dir": str(main_repo.name),
+                "version_file": f"{release_res.name}/version",
+            },
         ),
     ]
     additional_post_steps: dict[int, list[GetStep | PutStep | TaskStep | TryStep]] = {

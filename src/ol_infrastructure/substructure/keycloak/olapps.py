@@ -41,7 +41,20 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     captcha_domain = "www.recaptcha.net"
     ol_apps_realm = keycloak.Realm(
         "olapps",
-        access_code_lifespan="30m",
+        # Labeled "Client Login Timeout" in the admin console's Tokens tab
+        # (Keycloak renamed accessCodeLifespan in the UI, the underlying API
+        # field is unchanged). This is the TTL for the intermediate OAuth
+        # `code` between issuance and its machine-to-machine redemption for
+        # a token at a token endpoint -- a server-to-server exchange with no
+        # user interaction, normally completing in well under a second. Per
+        # AbstractOAuth2IdentityProvider.generateToken(), Keycloak also
+        # reuses this same value as the `exp` claim on the private_key_jwt
+        # client assertions it sends to external OIDC IdPs when brokering
+        # login. Raising it re-widens that assertion's validity window and
+        # can cause some IdPs, which enforce a stricter freshness check on
+        # that claim, to reject the assertion with `invalid_client: Client
+        # assertion verification failed`.
+        access_code_lifespan="5m",
         access_code_lifespan_user_action="15m",
         attributes={
             "business_unit": f"operations-{env_name}",
@@ -930,6 +943,37 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 resource_options=resource_options,
             ),
         )
+        onboard_saml_org(
+            SamlIdpConfig(
+                idp_alias="IBSU",
+                idp_display_name="International Black Sea University",
+                org_saml_metadata_url="https://emis.ibsu.edu.ge/saml/metadata",
+                principal_type="ATTRIBUTE",
+                principal_attribute="urn:oid:0.9.2342.19200300.100.1.3",
+                name_id_format=NameIdFormat.email,
+                single_sign_on_service_url="https://emis.ibsu.edu.ge/saml/sso/mit",
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                attribute_map={
+                    "email": "urn:oid:0.9.2342.19200300.100.1.3",
+                    "firstName": "firstName",
+                    "lastName": "lastName",
+                    "fullName": "displayName",
+                },
+                want_assertions_encrypted=False,
+                want_assertions_signed=True,
+            ),
+            org=OrgConfig(
+                org_domains=["ibsu.edu.ge"],
+                org_name="International Black Sea University",
+                org_alias="IBSU",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
         istanbul_aydin_org = create_org_for_learn(
             OrgConfig(
                 org_domains=[
@@ -1352,6 +1396,35 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 resource_options=resource_options,
             ),
         )
+
+        # MASAI SCHOOL [START]
+        # Masai School authenticates us via private_key_jwt (no client secret
+        # issued); they validate our assertions against our realm's live
+        # JWKS, so omitting client_secret here is required, not optional, to
+        # get onboard_oidc_org to configure private_key_jwt auth.
+        onboard_oidc_org(
+            OIDCIdpConfig(
+                idp_alias="MASAI",
+                idp_display_name="Masai School",
+                org_oidc_metadata_url="https://admissions-api.masaischool.com/oidc/.well-known/openid-configuration",
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                client_id="mit-learn",
+            ),
+            org=OrgConfig(
+                # Same as upGrad: Masai School users log in via a direct
+                # kc_idp_hint link, not domain-based home-realm discovery,
+                # so no domain is needed to gate access.
+                org_domains=[],
+                org_name="Masai School",
+                org_alias="MASAI",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
+        # MASAI SCHOOL [END]
 
     # B2B Organizations [END]
 

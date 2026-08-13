@@ -1,0 +1,13 @@
+---
+config:
+  gwarek:domain: gwarek.ol.mit.edu
+  environment:business_unit: operations
+  environment:target_vpc: operations_vpc
+  gwarek:db_password:
+    secure: v1:SZHEdJhuPLXfdSzV:qE2qFJ52c3ihPcd8i5xy0P7cXVD25s8U54O72udxyncxHAJ2PPI2N3p1zEkNB/fiX6KDkwghdYtjjQo=
+  redis:password:
+    secure: v1:o6jpj8V0XkT+MSSf:V2t7GWzsCVDN6tumzcth9bC+224jIgK1CDSDOdMq+3Pn8zjlqEH8sErwrZ0yF44vcaoqp19rXEWcTPw=
+  gwarek:secret_key:
+    secure: v1:B1Ub6Eb5mlu9ubyj:amj7wGu1njxfwh4mwnDDvH2yLFkMm6a7+c+LcvQuRh+IpLzjiXMnOnVvzwh+JfCaWDY4LppK4iISUsTv
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwFF5xyQvDNs9FJpdVFOktRPAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMx4tF6+6L5AuVFvF8AgEQgDsc1ZGFyRyPmHBdmaUZRG9UD2LglsL6V8hyqLRNKz12lVOGZ4st3hAsPdZUJ4VabufE+zOQiQWJ58JHHw==

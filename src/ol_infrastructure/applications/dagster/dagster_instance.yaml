@@ -39,6 +39,40 @@ run_launcher:
       pod_template_spec_metadata:
         annotations:
           karpenter.sh/do-not-disrupt: "true"
+      pod_spec_config:
+        # Rank run workers below every priority-0 pod in the cluster. The
+        # daemon is the highest-blast-radius pod in the namespace -- while it
+        # is down nothing schedules, no sensors, no run monitoring, no run
+        # timeouts -- yet at a shared priority of 0 it had the weakest claim
+        # on capacity: incident 2026-08-10 left it Pending for 25 minutes
+        # behind 178 run workers holding 90 CPU of requests, with the
+        # scheduler reporting "No preemption victims found" because it could
+        # not evict any of them.
+        #
+        # The chart pins at DAGSTER_CHART_VERSION renders no priorityClassName
+        # for the daemon (grep the templates -- only schedulerName exists), so
+        # raising the control plane is not expressible; lowering the batch
+        # workload is. Preemption is safe here because run_monitoring's
+        # max_resume_run_attempts and run_retries below already recover an
+        # interrupted run, and karpenter.sh/do-not-disrupt above only stops
+        # Karpenter consolidation, not kube-scheduler preemption.
+        priority_class_name: dagster-run
+      job_spec_config:
+        # Overrides dagster_k8s' DEFAULT_K8S_JOB_TTL_SECONDS_AFTER_FINISHED of
+        # 24h. Retained run pods are pure API objects, but every cluster-wide
+        # informer caches them, so cluster memory footprint is (retention x
+        # completion rate) -- not a function of live workload. At the rate
+        # data-production sustains post-backlog-clear that ceiling was ~7-12k
+        # pod objects, which OOMKilled the jupyterhub user-scheduler and the
+        # vantage agent and left external-dns and all three VPA components
+        # sized around the garbage.
+        #
+        # A finished run pod is only worth keeping for infrastructure-level
+        # failures that produce no Dagster events (OOMKill, image pull error,
+        # scheduling failure); run history and the event log are in Postgres
+        # and compute logs are in S3, so an hour is enough to catch a page and
+        # still `kubectl describe` the pod.
+        ttl_seconds_after_finished: 3600
     load_incluster_config: true
     job_namespace: dagster
     image_pull_policy: IfNotPresent
@@ -50,7 +84,9 @@ run_launcher:
     - dagster-static-secrets
     - dagster-dbt-secrets
     - dagster-postgresql-secret
-
+      # Ops execute in run worker pods, not in the code location pods, so the
+      # Sentry DSN has to reach them here as well.
+    - dagster-sentry-secrets
 
 run_storage:
   module: dagster_postgres.run_storage
@@ -103,8 +139,7 @@ run_coordinator:
   module: dagster.core.run_coordinator
   class: QueuedRunCoordinator
   config:
-    max_concurrent_runs: 30
-
+    max_concurrent_runs: 100
 
 # Configures how long Dagster waits for code locations
 # to load before timing out.

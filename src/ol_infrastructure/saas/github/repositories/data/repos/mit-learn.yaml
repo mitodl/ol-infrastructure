@@ -1,0 +1,33 @@
+---
+_actions_secret_names:
+- HEROKU_API_KEY
+- HEROKU_EMAIL
+- MITOL_LEARN_DOCKERHUB_PASSWORD
+- MITOL_LEARN_DOCKERHUB_USER
+- MITX_ONLINE_BASE_URL_PROD
+- MITX_ONLINE_BASE_URL_RC
+_custom_properties:
+  tier: tier-1
+_excluded_environments: 44
+_has_branch_protection: true
+_pushed_at: '2026-08-07T20:41:25Z'
+_ruleset_count: 1
+_visibility: public
+allow_auto_merge: false
+allow_merge_commit: false
+allow_rebase_merge: false
+allow_squash_merge: true
+archetype: application
+dependabot_security_updates: false
+has_discussions: true
+has_projects: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: mit-learn
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+teams:
+  arbisoft-contractors: triage
+  odl-engineering: push
+  odl-engineering-owners: admin
+web_commit_signoff_required: false

@@ -1,0 +1,37 @@
+---
+_actions_secret_names:
+- HEROKU_API_KEY
+- HEROKU_EMAIL
+_custom_properties:
+  tier: tier-1
+_direct_collaborators:
+  rhysyngsun: admin
+_excluded_environments: 5
+_has_branch_protection: true
+_pushed_at: '2026-08-07T14:24:43Z'
+_ruleset_count: 0
+_visibility: public
+allow_auto_merge: false
+allow_merge_commit: false
+allow_rebase_merge: false
+allow_squash_merge: true
+archetype: application
+default_branch: master
+dependabot_security_updates: false
+description: Open Source Courseware authoring tool
+has_discussions: true
+has_projects: true
+has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: ocw-studio
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+teams:
+  arbisoft-contractors: push
+  odl-engineering: push
+  odl-engineering-owners: admin
+topics:
+- ocw
+- opencourseware
+web_commit_signoff_required: false

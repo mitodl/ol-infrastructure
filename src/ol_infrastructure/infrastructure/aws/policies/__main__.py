@@ -1,4 +1,4 @@
-from pulumi import ResourceOptions, export
+from pulumi import Output, ResourceOptions, export
 from pulumi.resource import Alias
 from pulumi_aws import iam
 
@@ -37,8 +37,10 @@ default_instance_policy_document = {
                 "ecr:BatchGetImage",
                 "ecr:GetLifecyclePolicy",
                 "ecr:GetLifecyclePolicyPreview",
+                "ecr:PutLifecyclePolicy",
                 "ecr:ListTagsForResource",
                 "ecr:DescribeImageScanFindings",
+                "ecr:PutImageScanningConfiguration",
             ],
             "Resource": ["arn:aws:ecr:*:*:repository/*"],
         },
@@ -88,6 +90,25 @@ for zone in app_route53_zones:
         ),
     )
     app_route53_policies[f"route53_{zone}_zone_records"] = policy.arn
+
+all_zone_ids = Output.all(
+    *[dns_stack.require_output(zone)["id"] for zone in app_route53_zones]
+)
+route53_all_zones_records_policy = iam.Policy(
+    "all-zones-route53-records-policy",
+    name="route53-all-zones-records-policy",
+    path="/ol-infrastructure/route53-all-zones-records-policy/",
+    policy=all_zone_ids.apply(
+        lambda zone_ids: lint_iam_policy(
+            route53_policy_template(zone_ids), stringify=True
+        )
+    ),
+    description=(
+        "Grant permissions to manage (create, update, delete) Route53 records "
+        f"across all managed zones ({', '.join(app_route53_zones)})"
+    ),
+)
+app_route53_policies["route53_all_zones_records"] = route53_all_zones_records_policy.arn
 
 
 cloudwatch_logs_policy = {

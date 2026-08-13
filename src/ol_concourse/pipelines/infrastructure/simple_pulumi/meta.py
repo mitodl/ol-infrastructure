@@ -110,6 +110,7 @@ def meta_pipeline(
             "pyproject.toml",
             "src/ol_concourse/pipelines/constants.py",
             "src/ol_concourse/pipelines/jobs.py",
+            "src/ol_concourse/pipelines/secrets_map.py",
         ],
     )
 
@@ -197,6 +198,7 @@ if __name__ == "__main__":
         "data_warehouse",
         "digital-credentials",
         "fastly-redirector",
+        "grafana-alerting",
         "jupyterhub-data",
         "mailgun",
         "marimo-data",
@@ -207,6 +209,7 @@ if __name__ == "__main__":
         "open-metadata",
         "open-metadata-substructure",
         "opensearch",
+        "opik",
         "qdrant-cloud",
         "release-bot",
         "rootly",

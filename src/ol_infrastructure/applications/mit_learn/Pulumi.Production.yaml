@@ -27,6 +27,7 @@ config:
     csrf_domains:
     - "https://api.learn.mit.edu"
     - "https://learn.mit.edu"
+    - "https://courses.learn.mit.edu"   # MITxOnline courseware MFE (content feedback submit)
     - "https://api.mitopen.odl.mit.edu"   # legacy
     - "https://mitopen.odl.mit.edu"   # legacy
     - "https://draft.ocw.mit.edu"
@@ -47,14 +48,32 @@ config:
   mitlearn:posthog_proxy: "ph.ol.mit.edu"
   mitlearn:support_url: "support.learn.mit.edu"
   mitlearn:use_granian: true
-  # Peak webapp container RSS measured 2774Mi over the 14 days to 2026-07-28. The
-  # 256Mi default floor let the VPA shrink the limit to ~2062-2295Mi, below that
-  # peak, and the kernel OOM-killed the container: 24-44 restarts/day whenever the
-  # limit sat at or under ~2553Mi, against 1-3/day whenever it sat at or above
-  # ~2990Mi. 3Gi clears the measured peak by ~11% while staying under the 3200Mi
-  # declared limit, so the VPA can still size these pods down, just not into the
-  # range that kills them.
-  mitlearn:webapp_vpa_min_allowed_memory: 3Gi
+  # Raised again 2026-08-07, 3Gi -> 3.5Gi. The 3Gi floor (peak RSS 2774Mi + ~11%,
+  # see git history for that calibration) got eaten within ~10 days: PR #5303
+  # (2026-08-06) raised the webapp CPU request 500m->1200m because the two
+  # Prometheus triggers were inert, leaving CPU to peg the HPA at max_replicas=30.
+  # its own terms, but it also means the same real CPU usage reads as lower
+  # utilization, so the HPA now legitimately runs fewer replicas (observed
+  # kube_horizontalpodautoscaler_status_current_replicas dropped from oscillating
+  # 12-30 to oscillating 5-17). The same total traffic lands on ~half as many
+  # pods, raising per-pod concurrency and per-pod RSS -- container working set
+  # was observed hitting 3045-3069Mi against the 3072Mi (3Gi) floor within a day
+  # of that deploy, restarts/OOMKills resumed. 3.5Gi clears the newly-observed
+  # peak (~3069Mi) by ~14% -- more margin than the previous fix, since this
+  # margin has now been eaten twice. See
+  # les-root-cause-found-mit-learn-s-aug-6-cpu-request-b-cfebf0 (witan) for the
+  # full investigation. Still well under the 4Gi max_allowed ceiling, so the VPA
+  # retains downward room.
+  mitlearn:webapp_vpa_min_allowed_memory: 3.5Gi
+  # Raised from the 500m default (memory stays 3200Mi via the merge in
+  # __main__.py). granian runs 2 workers x 2 threads with no CPU limit, so 500m
+  # read as 95-116% utilization under normal load and pegged the HPA at
+  # max_replicas. Calibrated, not padded: at 0.035 cores/rps a pod doing the
+  # intended 20 rps draws ~700m, and 700m/0.60 is ~1170m. Don't raise it further
+  # without fixing the inert Prometheus triggers in lib/k8s_keda.py first -- the
+  # cpu trigger is currently the only working scale-up signal.
+  mitlearn:webapp_resource_requests:
+    cpu: 1200m
   mitlearn:vars:
     AI_MIT_SYLLABUS_URL: "https://api.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.learn.mit.edu/api/v0/vector_content_files_search/"

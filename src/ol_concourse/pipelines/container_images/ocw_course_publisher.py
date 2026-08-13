@@ -13,6 +13,7 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import git_repo, registry_image
 
 from ol_concourse.pipelines.constants import ECR_REGION
+from ol_concourse.pipelines.ecr import configure_ecr_repository_task
 
 ocw_studio_repo = git_repo(
     name=Identifier("ocw-studio-repository"),
@@ -65,6 +66,7 @@ docker_pipeline = Pipeline(
                 GetStep(get=ocw_studio_repo.name, trigger=True),
                 build_task,
                 ensure_ecr_task("mitodl/ocw-course-publisher"),
+                configure_ecr_repository_task("mitodl/ocw-course-publisher"),
                 PutStep(
                     put=ocw_course_publisher_image.name,
                     params={

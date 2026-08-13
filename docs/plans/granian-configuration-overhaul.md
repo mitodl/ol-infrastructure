@@ -1,6 +1,7 @@
 # Granian configuration overhaul
 
-**Status:** stage 0 merged 2026-07-23 (#5083); stage 1 in review 2026-07-27; stages 2–4 pending
+**Status:** stage 0 merged 2026-07-23 (#5083); stage 1 merged 2026-07-27 (#5135), validated
+in production 2026-08-07; stage 2 in review; stages 3–4 pending
 **Project:** `wp-granian-configuration-overhaul-expose-blocking-t-3debc2`
 **Component:** `src/ol_infrastructure/components/services/k8s.py` — `GranianConfig`
 **Evidence:** witan lessons `les-granianconfig-never-exposes-blocking-threads-bac-874462`,
@@ -226,6 +227,16 @@ Component change lands once; per-app behavior changes as each app's stack is dep
   921MiB, so the cap still fires ahead of the cgroup OOM killer.
 - **Stage 2 — mid traffic.** `micromasters`, `xpro`. Same edit. Health-probe split task
   becomes eligible here.
+
+  Replica pre-raise was evaluated against production and **not** applied. Over the 7 days
+  to 2026-08-10 both webapps sat pinned at `min_replicas=2` — with no scale-down possible
+  from an already-minimum replica count, the scale-down risk the pre-raise guards against
+  doesn't apply regardless of CPU headroom. p95 CPU ≈ 10m/pod for `micromasters` (≈ 4% of
+  its 250m request) and ≈ 62m/pod for `xpro` (≈ 25% of its 250m request); zero container
+  restarts for either app over the same window. Peak working set — ≈ 928MiB of a 2000Mi
+  limit (`micromasters`) and ≈ 1236MiB of a 2Gi limit (`xpro`) — stays under the new
+  single-worker RSS caps of 1800MiB and 1843MiB, so the cap still fires ahead of the
+  cgroup OOM killer.
 - **Stage 3 — high traffic.** `mitxonline` (plus removal of the ceiling-based
   `workers_max_rss` override), then `edxapp` LMS and CMS separately — CMS first, it takes
   far less traffic than LMS.

@@ -104,11 +104,27 @@ def create_meilisearch_resources(
             "tag": MEILISEARCH_VERSION,
             "pullPolicy": "IfNotPresent",
         },
-        "custom_labels": k8s_global_labels,
+        "customLabels": k8s_global_labels,
         "environment": {
             "MEILI_NO_ANALYTICS": True,
             "MEILI_ENV": "production",
             "MEILI_MASTER_KEY": secrets["meilisearch_master_key"],
+            # Without this, Meilisearch refuses to start whenever the on-disk
+            # database was written by a different engine version, which is what
+            # forced the v1.33.0 image pin in March 2026. It migrates the
+            # database in place on startup and is a no-op once the versions
+            # match, so it is safe to leave enabled permanently. Note that this
+            # is one-way: Meilisearch has no downgrade path, so rolling the
+            # image tag back requires restoring the volume from a snapshot.
+            "MEILI_UPGRADE_DB": True,
+        },
+        # The chart's default startup budget is 60s (60 x 1s). A version
+        # upgrade migrates the task queue synchronously before the HTTP server
+        # binds, so that default can kill the pod mid-migration and leave the
+        # database partially converted. Give it 15 minutes instead.
+        "startupProbe": {
+            "periodSeconds": 5,
+            "failureThreshold": 180,
         },
         "persistence": {
             "enabled": True,

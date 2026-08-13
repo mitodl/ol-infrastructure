@@ -10,6 +10,12 @@ config:
     CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
     CYBERSOURCE_WSDL_URL: "https://ics2wstest.ic3.com/commerce/1.x/transactionProcessor/CyberSourceTransaction_1.154.wsdl"
     DIGITAL_CREDENTIALS_SUPPORTED_RUNS: "course-v1:xPRO+TestCourse1+R2,course-v1:xPRO+TestCourse2+R2,program-v1:xPRO+TestProgram"
+    # RC's request sheets and assignment-sheet output folder live in the "Open
+    # Learning Engineering" shared drive. Without this, pygsheets omits
+    # supportsTeamDrives on the Drive calls and assignment-sheet creation fails
+    # with "404 File not found" on DRIVE_OUTPUT_FOLDER_ID.
+    # NOTE: production's sheets are in My Drive, so it must stay unset there.
+    DRIVE_SHARED_ID: "0ADY3FaGtq2jvUk9PVA"
     GA_TRACKING_ID: "UA-5145472-40"
     GTM_TRACKING_ID: "GTM-KJHRV6K"
     HUBSPOT_ENTERPRISE_PAGE_FORM_ID: "c50388d7-794e-4103-bdb9-8cbb71da0cd4"

@@ -35,6 +35,7 @@ from ol_infrastructure.lib.pulumi_helper import (
 stack_info = parse_stack()
 
 cluster_stack = make_stack_reference(projects.EKS, f"applications.{stack_info.name}")
+sentry_stack = make_stack_reference(projects.SENTRY, "default")
 MIT_LEARN_NEXTJS_DOCKER_TAG = get_docker_image_tag("MIT_LEARN_NEXTJS")
 
 app_image = ecr_image_uri(
@@ -76,12 +77,38 @@ nextjs_config = Config("nextjs")
 # means raising nextjs_memory_limit later hands all of the added memory straight to
 # the heap (the actual thing that needs more room); a percentage would keep skimming
 # an ever-larger, unneeded slice off the top as the limit grows.
-nextjs_memory_limit = "1Gi"
+# The heap budget the container is provisioned around: V8's old-space ceiling is
+# derived from this, and it is also the memory request (what the scheduler reserves).
+#
+# Raised from 1Gi: at an 800MiB old-space ceiling, production pods rode with working
+# set pinned at ~900MiB for 20+ hours at a stretch, i.e. the heap sat permanently at
+# its cap. V8 answers that by running near-continuous mark-compact, and a major GC on
+# a full ~800MiB heap stops the world for seconds -- long enough that the synthetic
+# probe against the origin hit its 15s ceiling on ~3% of checks (11% in the worst
+# hour) and kubelet's own probes timed out. This buys the heap real room so GC is
+# occasional rather than constant.
+#
+# This is mitigation, not a fix: working set climbs monotonically from ~250MiB to
+# 900MiB+ over a few hours and never plateaus, so something is retaining memory
+# (the fetch/ISR data cache over high-cardinality search/topic query strings is the
+# leading suspect). More headroom buys hours between GC storms instead of minutes; it
+# does not stop the climb, and a larger heap makes each individual major GC longer.
+# Fixing the leak is the actual fix.
+nextjs_memory_request = "1536Mi"
 NEXTJS_NON_HEAP_OVERHEAD_MIB = 224
 nextjs_max_old_space_size_mib = (
-    int(parse_quantity(nextjs_memory_limit)) // (1024 * 1024)
+    int(parse_quantity(nextjs_memory_request)) // (1024 * 1024)
     - NEXTJS_NON_HEAP_OVERHEAD_MIB
 )
+# The limit sits above the request rather than matching it. With request == limit ==
+# 1Gi, the heap ceiling (800MiB) plus the 224MiB non-heap reserve exactly consumed the
+# whole limit, so there was no margin at all: production pods rode at ~1002Mi against
+# the 1024Mi cap and were OOMKilled whenever non-heap use drifted past its reserve
+# while the heap was near full. The extra headroom here is deliberately NOT given to
+# V8 -- max_old_space_size stays pinned to the request-derived budget above -- so it
+# stays available to absorb non-heap spikes instead of being absorbed into the heap.
+# Kept at request + 512Mi as the request grew, preserving that absorption margin.
+nextjs_memory_limit = "2Gi"
 
 stay_updated_hubspot_form_ids = {
     "ci": "f201f3af-c2c0-4b7d-b297-ddbb75912cc1",
@@ -106,6 +133,12 @@ raw_env_vars = {
     "GTM_COOKIES_WIN": nextjs_config.get("gtm_cookies_win") or "",
     "NEXT_CACHE_S_MAXAGE_SECONDS": nextjs_config.get("cache_s_maxage_seconds") or "",
     # Env vars available on client and server
+    # Optional: ol-analytics-api has no CI deployment (see
+    # applications/ol_analytics_api/__main__.py), so this is left unset there.
+    # The app's own yup schema treats it as optional and reports the B2B
+    # analytics dashboard as unavailable rather than erroring when unset.
+    "NEXT_PUBLIC_ANALYTICS_API_BASE_URL": nextjs_config.get("analytics_api_base_url")
+    or "",
     "NEXT_PUBLIC_APPZI_URL": nextjs_config.require("appzi_url"),
     "NEXT_PUBLIC_CSRF_COOKIE_NAME": nextjs_config.require("csrf_cookie_name"),
     "NEXT_PUBLIC_EMBEDLY_KEY": nextjs_config.require("embedly_key"),
@@ -134,7 +167,7 @@ raw_env_vars = {
     "NEXT_PUBLIC_POSTHOG_API_KEY": nextjs_config.require("posthog_api_key"),
     "NEXT_PUBLIC_POSTHOG_PROJECT_ID": nextjs_config.require("posthog_project_id"),
     "NEXT_PUBLIC_POSTHOG_UI_HOST": "https://us.posthog.com",
-    "NEXT_PUBLIC_SENTRY_DSN": nextjs_config.require("sentry_dsn"),
+    "NEXT_PUBLIC_SENTRY_DSN": sentry_stack.require_output("mit_learn_sentry_dsn"),
     "NEXT_PUBLIC_SENTRY_ENV": nextjs_config.require("sentry_env"),
     "NEXT_PUBLIC_SENTRY_PROFILES_SAMPLE_RATE": "0.25",
     "NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE": "0.001",
@@ -246,17 +279,48 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
                         ],
                         image_pull_policy="Always",
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                            requests={"cpu": "100m", "memory": nextjs_memory_limit},
+                            # 100m was well under what these pods actually use: 100-270m
+                            # steady state and ~900m through startup. Because cpu.shares
+                            # is proportional to the request, that under-ask left this
+                            # pod with ~5% scheduling weight on 2-vCPU nodes already at
+                            # 90%+ CPU-requested and shared with edxapp/mitxonline,
+                            # so it lost every contention fight. Starving a
+                            # single-threaded Node server of CPU stretches its GC pauses
+                            # and blocks the event loop.
+                            #
+                            # Deliberately no CPU limit: SSR latency here is far more
+                            # sensitive to CFS throttling than the cluster is to this
+                            # pod bursting.
+                            requests={"cpu": "500m", "memory": nextjs_memory_request},
                             limits={"memory": nextjs_memory_limit},
                         ),
                         env=env_vars,
+                        # Both probes previously left timeout_seconds unset, silently
+                        # inheriting the 1s default. One second is not a meaningful
+                        # health signal for a single-threaded Node server: any GC pause
+                        # or burst of event-loop work trips it even though the process
+                        # is fine and will answer moments later. In production that
+                        # turned GC pauses into pod kills -- 14 container restarts in
+                        # 24h across 5 replicas, all exit 137 / "Error" (SIGKILL)
+                        # rather than OOMKilled, with memory sitting at only ~400-600MiB
+                        # of a 1536Mi limit at the time. Each kill also flapped the pod
+                        # out of the service endpoints, concentrating traffic onto the
+                        # remaining pods and accelerating their own heap growth.
+                        #
+                        # A tcp_socket liveness check is the worst fit for this failure
+                        # mode -- a blocked event loop cannot accept(), so a
+                        # healthy-but-pausing process fails it. Kept, since a genuinely
+                        # wedged process should still be replaced, but widened to ~3
+                        # minutes of continuous unresponsiveness before a kill -- far
+                        # longer than any GC pause.
                         liveness_probe=kubernetes.core.v1.ProbeArgs(
                             tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
                                 port=DEFAULT_NEXTJS_PORT,
                             ),
                             initial_delay_seconds=30,
                             period_seconds=30,
-                            failure_threshold=3,
+                            failure_threshold=6,
+                            timeout_seconds=10,
                         ),
                         readiness_probe=kubernetes.core.v1.ProbeArgs(
                             http_get=kubernetes.core.v1.HTTPGetActionArgs(
@@ -266,6 +330,7 @@ mit_learn_nextjs_deployment = kubernetes.apps.v1.Deployment(
                             initial_delay_seconds=15,
                             period_seconds=15,
                             failure_threshold=3,
+                            timeout_seconds=5,
                         ),
                         startup_probe=kubernetes.core.v1.ProbeArgs(
                             http_get=kubernetes.core.v1.HTTPGetActionArgs(

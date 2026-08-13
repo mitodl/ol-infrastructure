@@ -1,0 +1,27 @@
+---
+_custom_properties:
+  tier: unmanaged
+_direct_collaborators:
+  jkachel: admin
+_has_branch_protection: false
+_pushed_at: '2025-12-09T05:04:21Z'
+_ruleset_count: 0
+_visibility: public
+allow_merge_commit: false
+allow_rebase_merge: false
+allow_squash_merge: true
+archetype: archived
+default_branch: main
+description: JavaScript API client for the Unified Ecommerce application
+has_discussions: false
+has_issues: true
+has_projects: false
+has_wiki: false
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: unified-ecommerce-api-clients
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+teams:
+  odl-engineering: admin
+web_commit_signoff_required: false

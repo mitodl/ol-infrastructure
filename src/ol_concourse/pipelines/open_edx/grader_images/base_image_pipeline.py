@@ -46,6 +46,8 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resources import git_repo, registry_image
 
+from ol_concourse.pipelines.ecr import configure_ecr_repository_task
+
 _AWS_REGION = "us-east-1"
 _BASE_IMAGE_REPO = "mitodl/xqueue-watcher-grader-base"
 _PYTHON_VERSIONS = ("3.12", "3.13", "3.14")
@@ -154,6 +156,7 @@ def grader_base_image_pipeline() -> Pipeline:
                 },
             ),
             ensure_ecr_task(_BASE_IMAGE_REPO),
+            configure_ecr_repository_task(_BASE_IMAGE_REPO),
             _version_tag_task(str(xqwatcher_repo.name), python_version),
             # Push to DockerHub first — fail fast if credentials are wrong
             # before consuming the ECR push quota.

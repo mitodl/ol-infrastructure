@@ -597,6 +597,21 @@ _LOGO_FILENAME = "ol-data-platform-logo.svg"
 _LOGO_CONFIGMAP_NAME = "superset-logo"
 _LOGO_MOUNT_PATH = f"/app/superset/static/assets/images/{_LOGO_FILENAME}"
 
+# "mcp" is the container port name the chart assigns to supersetMcp.service.port.
+# `httpGet: None` is load-bearing: Helm deep-merges these over the chart's
+# defaults rather than replacing them, so without an explicit null the chart's
+# default httpGet block survives alongside tcpSocket and the API server rejects
+# the pod for declaring two probe handlers.
+_MCP_TCP_PROBE = {
+    "httpGet": None,
+    "tcpSocket": {"port": "mcp"},
+    "initialDelaySeconds": 15,
+    "timeoutSeconds": 3,
+    "periodSeconds": 15,
+    "failureThreshold": 3,
+    "successThreshold": 1,
+}
+
 logo_configmap = kubernetes.core.v1.ConfigMap(
     "superset-logo-configmap",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -632,6 +647,8 @@ superset_chart = kubernetes.helm.v3.Release(
             "secretEnv": {"create": False},
             "extraEnv": {
                 "REDIS_PROTO": "rediss",
+                # Public URL for MCP-generated links (chart previews, etc.)
+                "SUPERSET_MCP_PUBLIC_URL": f"https://{superset_domain}",
             },
             "configOverrides": {
                 "config": Path(__file__)
@@ -707,6 +724,33 @@ superset_chart = kubernetes.helm.v3.Release(
             "supersetCeleryBeat": {
                 "enabled": True,
                 "podLabels": k8s_global_labels,
+            },
+            # MCP server for AI clients (Claude Desktop, Claude Code, etc.) to
+            # interact with dashboards, datasets, and SQL Lab. Shares the same
+            # image, config (via configOverrides), envFromSecret(s), and
+            # service account/IRSA as the rest of the chart. Exposed at /mcp
+            # via the custom Gateway API HTTPRoute below.
+            "supersetMcp": {
+                "enabled": True,
+                "replicaCount": 2,
+                "podLabels": k8s_global_labels | {"ol.mit.edu/process": "mcp"},
+                "resources": {
+                    "limits": {"cpu": "500m", "memory": "512Mi"},
+                    "requests": {"cpu": "100m", "memory": "256Mi"},
+                },
+                # The chart defaults every MCP probe to `httpGet /health`, but
+                # Superset 6.1.0 exposes health_check as an MCP *tool*, not an
+                # HTTP route -- the FastMCP app only serves the streamable-HTTP
+                # endpoint, so /health returns 404 and the pods never pass their
+                # startup probe. Probe the socket instead; a plain GET to the
+                # MCP endpoint is not a valid probe either, since it expects
+                # JSON-RPC with an SSE Accept header.
+                # Startup budget of 15s + 30*5s = 165s, comfortably inside the
+                # 300s Helm wait that this Release is subject to.
+                "startupProbe": _MCP_TCP_PROBE
+                | {"periodSeconds": 5, "failureThreshold": 30},
+                "readinessProbe": _MCP_TCP_PROBE,
+                "livenessProbe": _MCP_TCP_PROBE,
             },
             "serviceAccount": {
                 "create": True,
@@ -802,6 +846,19 @@ gateway_config = OLEKSGatewayConfig(
         ),
     ],
     routes=[
+        # Each OLEKSGatewayRouteConfig becomes a separate HTTPRoute resource;
+        # list order does not affect matching.  Gateway API selects the most
+        # specific matching route by prefix length, so /mcp always wins over /.
+        OLEKSGatewayRouteConfig(
+            backend_service_name="superset-mcp",
+            backend_service_namespace=superset_namespace,
+            backend_service_port=5008,
+            name="superset-mcp-https",
+            listener_name="https-web",
+            hostnames=[superset_domain],
+            port=8443,
+            matches=[{"path": {"type": "PathPrefix", "value": "/mcp"}}],
+        ),
         OLEKSGatewayRouteConfig(
             backend_service_name="superset",
             backend_service_namespace=superset_namespace,

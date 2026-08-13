@@ -1,0 +1,27 @@
+---
+_custom_properties:
+  tier: unmanaged
+_excluded_environments: 1
+_has_branch_protection: false
+_pushed_at: '2016-12-05T15:47:50Z'
+_ruleset_count: 0
+_visibility: public
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: gh-pages
+description: mga
+has_discussions: false
+has_issues: false
+has_projects: false
+has_wiki: false
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: mga
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+teams:
+  arbisoft-contractors: pull
+  odl-engineering: admin
+web_commit_signoff_required: false

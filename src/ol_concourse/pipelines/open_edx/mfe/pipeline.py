@@ -55,6 +55,7 @@ from bridge.settings.openedx.types import (
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_concourse.pipelines.constants import (
     GH_ISSUES_DEFAULT_REPOSITORY,
+    GH_ISSUES_ENTERPRISE_POLL_FREQUENCY,
 )
 
 LEHRER_URI = "https://github.com/mitodl/lehrer"
@@ -374,6 +375,7 @@ def mfe_job(
             f"for {open_edx_deployment.deployment_name}"
         ),
         issue_state="open",
+        poll_frequency=GH_ISSUES_ENTERPRISE_POLL_FREQUENCY,
     )
 
     default_github_issue_labels = [
@@ -463,6 +465,7 @@ def mfe_pipeline(
                     issue_title_template=issue_title,
                     issue_prefix=issue_title,
                     issue_state="closed",
+                    poll_frequency=GH_ISSUES_ENTERPRISE_POLL_FREQUENCY,
                 )
                 mfe_fragment.resources.append(gh_issues_trigger)
                 last_gh_issue_resource_name_per_mfe[mfe_app_name] = (

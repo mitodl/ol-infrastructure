@@ -30,6 +30,40 @@ MARIMO_OPERATOR_MANIFEST_URL = (
 )
 MARIMO_OPERATOR_NAMESPACE = "marimo-operator-system"
 
+# The upstream v0.3.0 manifest ships the controller at requests 10m/64Mi and
+# limits 500m/128Mi. That cap is too tight once the operator is reconciling real
+# notebooks: on data-qa it reached 117.5Mi and entered an OOMKill/CrashLoopBackOff
+# loop that also took the Deployment unavailable, which is why this was first
+# raised to 384Mi.
+#
+# 384Mi then failed the same way on data-production. The driver is not notebook
+# count: the controller-runtime cache is cluster-wide, so the operator's memory
+# tracks total pods in the cluster, and data-production retains ~4k completed
+# dagster Job pods. Only the limit is patched -- the upstream request is left
+# alone so this does not reserve capacity the operator never uses at rest.
+MARIMO_OPERATOR_MEMORY_LIMIT = "512Mi"
+
+
+def _patch_controller_memory_limit(doc: dict[str, Any]) -> dict[str, Any]:
+    """Raise the operator controller's memory limit above the upstream default.
+
+    Args:
+        doc: A single Kubernetes resource dict from the install manifest.
+
+    Returns:
+        The same dict, with the controller container's memory limit raised.
+    """
+    if doc.get("kind") != "Deployment":
+        return doc
+    containers = (
+        doc.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [])
+    )
+    for container in containers:
+        if container.get("name") == "manager":
+            limits = container.setdefault("resources", {}).setdefault("limits", {})
+            limits["memory"] = MARIMO_OPERATOR_MEMORY_LIMIT
+    return doc
+
 
 def _fetch_operator_manifests() -> list[dict[str, Any]]:
     """Fetch and parse the marimo operator install YAML.
@@ -39,7 +73,11 @@ def _fetch_operator_manifests() -> list[dict[str, Any]]:
     """
     with urllib.request.urlopen(MARIMO_OPERATOR_MANIFEST_URL) as response:  # noqa: S310
         content = response.read().decode("utf-8")
-    return [doc for doc in pyyaml.safe_load_all(content) if doc is not None]
+    return [
+        _patch_controller_memory_limit(doc)
+        for doc in pyyaml.safe_load_all(content)
+        if doc is not None
+    ]
 
 
 def setup_marimo_operator(

@@ -8,21 +8,23 @@ import textwrap
 from pathlib import Path
 
 import pulumi_fastly as fastly
-import pulumi_github as github
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import (
     ROOT_STACK_RESOURCE,
     Alias,
     Config,
-    InvokeOptions,
     Output,
     ResourceOptions,
     export,
 )
 from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
 
-from bridge.lib.constants import FASTLY_A_TLS_1_3
+from bridge.lib.constants import (
+    FASTLY_A_TLS_1_3,
+    apisix_oidc_session_cookie_name,
+    mit_learn_session_cookie_name,
+)
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_REDIS_PORT,
@@ -42,6 +44,7 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    stale_session_cookie_cleanup_plugin,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -68,10 +71,14 @@ from ol_infrastructure.lib.aws.eks_helper import (
     get_default_psg_ingress_args,
     setup_k8s_provider,
 )
-from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
+)
+from ol_infrastructure.lib.k8s_keda import (
+    build_webapp_keda_config,
+    create_webapp_prometheus_trigger_auth,
 )
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
@@ -103,6 +110,7 @@ monitoring_stack = make_stack_reference(projects.MONITORING, "default")
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 opik_stack = make_stack_reference(projects.OPIK, stack_info.name)
 policy_stack = make_stack_reference(projects.POLICIES, "default")
+sentry_stack = make_stack_reference(projects.SENTRY, "default")
 vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
@@ -126,26 +134,11 @@ apisix_ingress_class = learn_ai_config.get("apisix_ingress_class") or "apisix"
 
 setup_vault_provider(stack_info)
 fastly_provider = get_fastly_provider()
-github_provider = github.Provider(
-    "github_provider",
-    owner=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["owner"],
-    token=read_yaml_secrets(Path("pulumi/github_provider.yaml"))["token"],
-)
 
 k8s_global_labels = K8sGlobalLabels(
     ou=BusinessUnit.mit_learn, service=Services.mit_learn, stack=stack_info
 ).model_dump()
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
-
-match stack_info.env_suffix:
-    case "production":
-        env_var_suffix = "PROD"
-    case "qa":
-        env_var_suffix = "RC"
-    case "ci":
-        env_var_suffix = "CI"
-    case _:
-        env_var_suffix = "INVALID"
 
 learn_ai_namespace = "learn-ai"
 cluster_stack.require_output("namespaces").apply(
@@ -291,63 +284,6 @@ learn_ai_service_account = kubernetes.core.v1.ServiceAccount(
     automount_service_account_token=False,
 )
 
-
-gh_workflow_s3_bucket_permissions_doc = {
-    "Version": IAM_POLICY_VERSION,
-    "Statement": [
-        {
-            "Action": [
-                "s3:ListBucket*",
-            ],
-            "Effect": "Allow",
-            "Resource": [f"arn:aws:s3:::{learn_ai_app_storage_bucket_name}"],
-        },
-        {
-            "Action": [
-                "s3:GetObject*",
-                "s3:PutObject",
-                "s3:PutObjectAcl",
-                "s3:DeleteObject",
-            ],
-            "Effect": "Allow",
-            "Resource": [f"arn:aws:s3:::{learn_ai_app_storage_bucket_name}/frontend/*"],
-        },
-    ],
-}
-
-gh_workflow_iam_policy = iam.Policy(
-    f"learn-ai-gh-workflow-iam-policy-{stack_info.env_suffix}",
-    name=f"learn-ai-gh-workflow-iam-policy-{stack_info.env_suffix}",
-    policy=lint_iam_policy(
-        gh_workflow_s3_bucket_permissions_doc,
-        stringify=True,
-        parliament_config=parliament_config,
-    ),
-)
-
-################################################
-# Github frontend workflow IAM configuration
-# Just create a static user for now. Some day refactor to use
-# https://github.com/hashicorp/vault-action
-gh_workflow_user = iam.User(
-    f"learn-ai-gh-workflow-user-{stack_info.env_suffix}",
-    name=f"learn-ai-gh-workflow-{stack_info.env_suffix}",
-    tags=aws_config.tags,
-)
-iam.PolicyAttachment(
-    f"learn-ai-gh-workflow-iam-policy-attachment-{stack_info.env_suffix}",
-    policy_arn=gh_workflow_iam_policy.arn,
-    users=[gh_workflow_user.name],
-)
-gh_workflow_accesskey = iam.AccessKey(
-    f"learn-ai-gh-workflow-access-key-{stack_info.env_suffix}",
-    user=gh_workflow_user.name,
-    status="Active",
-)
-gh_repo = github.get_repository(
-    full_name="mitodl/learn-ai",
-    opts=InvokeOptions(provider=github_provider),
-)
 
 ################################################
 # Fastly configuration
@@ -521,7 +457,9 @@ learn_ai_vault_mount = vault.Mount(
 learn_ai_static_vault_secrets = vault.generic.Secret(
     f"learn-ai-secrets-{stack_info.env_suffix}",
     path=learn_ai_vault_mount.path.apply("{}/secrets".format),
-    data_json=json.dumps(learn_ai_vault_secrets),
+    data_json=sentry_stack.require_output("learn_ai_sentry_dsn").apply(
+        lambda dsn: json.dumps({**learn_ai_vault_secrets, "SENTRY_DSN": dsn})
+    ),
 )
 
 ################################################
@@ -794,6 +732,35 @@ env_vars.update(
 # signals carry organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(env_vars, k8s_global_labels)
 
+# Horizontal scaling is KEDA-driven on APISIX request rate and p95 latency, with a
+# CPU trigger as a backstop, matching edxapp, mit-learn and mitxonline. CPU is an
+# especially poor saturation signal for this app: it spends most of a request waiting
+# on upstream LLM and embedding calls, so a saturated pod can sit near-idle on CPU
+# while requests queue behind it.
+#
+# The route matcher covers both the direct and the mit-learn-fronted routes. Verified
+# against live metrics -- `count by (route) (apisix_http_status)` returns
+# learn-ai_learn-ai-production-https-olapisixroute_passauth and
+# learn-ai_mit-learn-learn-ai-production-https-olapisixroute_{passauth,reqauth}, so the
+# leading `.*` is load-bearing.
+webapp_trigger_auth, webapp_trigger_auth_name = create_webapp_prometheus_trigger_auth(
+    application_name="learn-ai",
+    env_name=env_name,
+    namespace=learn_ai_namespace,
+    k8s_global_labels=k8s_global_labels,
+    stack_info=stack_info,
+    vault_k8s_resources=vault_k8s_resources,
+)
+
+learn_ai_webapp_keda_config = build_webapp_keda_config(
+    trigger_auth_name=webapp_trigger_auth_name,
+    route_matcher=f"learn-ai_.*learn-ai-{stack_info.env_suffix}-https-olapisixroute_.*",
+    container_name="learn-ai-app",
+    requests_threshold=learn_ai_config.get("autoscaling_requests_threshold") or "20",
+    latency_threshold=learn_ai_config.get("autoscaling_latency_threshold") or "2000",
+    cpu_threshold=learn_ai_config.get("autoscaling_cpu_threshold") or "60",
+)
+
 # Instantiate the OLApplicationK8s component
 learn_ai_app_k8s = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
@@ -877,23 +844,11 @@ learn_ai_app_k8s = OLApplicationK8s(
             resource_requests={"cpu": "10m", "memory": "384Mi"},
             resource_limits={"memory": "384Mi"},
         ),
-        # Memory removed from the HPA: it duplicated the component default and is now
-        # handled vertically by the component's webapp memory VPA. An HPA memory
-        # metric is a fleet average and cannot prevent an individual pod from being
-        # OOMKilled. This block now matches the component default and could be dropped
-        # entirely; it is kept explicit because the CPU target is intentional.
-        hpa_scaling_metrics=[
-            kubernetes.autoscaling.v2.MetricSpecArgs(
-                type="Resource",
-                resource=kubernetes.autoscaling.v2.ResourceMetricSourceArgs(
-                    name="cpu",
-                    target=kubernetes.autoscaling.v2.MetricTargetArgs(
-                        type="Utilization",
-                        average_utilization=60,  # Target CPU utilization (60%)
-                    ),
-                ),
-            ),
-        ],
+        # hpa_scaling_metrics is left at the component default. It is unused here:
+        # the component builds a KEDA ScaledObject instead of a native HPA when
+        # webapp_keda_config is set, and the CPU backstop lives in the KEDA triggers.
+        # Memory is managed vertically by the component's webapp memory VPA.
+        webapp_keda_config=learn_ai_webapp_keda_config,
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
@@ -905,6 +860,8 @@ learn_ai_app_k8s = OLApplicationK8s(
             opik_keycloak_secret,
             vault_k8s_resources,
             learn_ai_application_security_group,
+            # The ScaledObject references the trigger authentication by name.
+            webapp_trigger_auth,
         ],
     ),
 )
@@ -959,23 +916,57 @@ learn_ai_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=learn_ai_namespace,
         k8s_labels=k8s_global_labels,
         enable_defaults=True,
+        plugins=[
+            # Both of learn-ai's OIDC resources have now moved off
+            # lua-resty-session's default "session" name, so every current user
+            # has a dead one of those in their browser: on the legacy host from
+            # this file's own rename, and on api.<env>.learn.mit.edu from the
+            # rename in #5219.  Nothing else evicts them -- #5219 attached no
+            # cleanup to learn-ai, and mit-learn's cleanup only fires on
+            # responses from mit-learn's own routes, not from /ai/*.
+            #
+            # No cookie_domains: this config is referenced from both hosts, and a
+            # Domain=.learn.mit.edu deletion emitted from api-learn-ai.ol.mit.edu
+            # would just be rejected by the browser.  Host-only is also the only
+            # scope learn-ai ever wrote a "session" cookie at, on either host.
+            # Safe to delete once the old cookies have aged out of circulation.
+            stale_session_cookie_cleanup_plugin(),
+        ],
     ),
     opts=ResourceOptions(delete_before_replace=True),
 )
 
-# Instantiate OIDC resources component for mit-learn domain
+# Instantiate OIDC resources component for learn-ai's own legacy host.
+#
+# This one deliberately sets no cookie domain: the legacy host is not under
+# learn.mit.edu, so a Domain=.learn.mit.edu cookie would be rejected there
+# outright.  A host-only cookie is correct for it -- there is no mit-learn
+# session on that host to share.  The routes served from mit-learn's own host
+# use the separate resource below.
 learn_ai_oidc_resources = OLApisixOIDCResources(
     f"learn-ai-{stack_info.env_suffix}-oidc-resources",
     oidc_config=OLApisixOIDCConfig(
         application_name="learn-ai",
         k8s_labels=k8s_global_labels,
         k8s_namespace=learn_ai_namespace,
-        oidc_scope="openid profile email",  # Default scope from component
+        # Narrower than the component default, which adds organization:*.  Safe
+        # on this host: its session is not shared with mit-learn, and learn-ai's
+        # own APISIX_USERDATA_MAP reads no organization claim.
+        oidc_scope="openid profile email",
         oidc_introspection_endpoint_auth_method="client_secret_basic",  # Default
         oidc_logout_path="/logout",
         oidc_post_logout_redirect_uri="/",
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
+        # Its own name, not the shared MIT Learn one: this host is not under
+        # learn.mit.edu, so no mit-learn cookie is ever sent here and there is no
+        # session to share -- naming it after mit-learn would only mislead
+        # whoever next reads a Cookie header from this host.  The resource below
+        # is the one that actually participates in the shared MIT Learn session.
+        oidc_session_cookie_name=apisix_oidc_session_cookie_name(
+            "learn-ai",
+            stack_info.env_suffix,
+        ),
         oidc_use_session_secret=True,
         vault_mount="secret-operations",
         vault_mount_type="kv-v1",
@@ -987,6 +978,59 @@ learn_ai_oidc_resources = OLApisixOIDCResources(
 
 learn_ai_api_domain = learn_ai_config.require("backend_domain")  # Legacy domain
 learn_api_domain = learn_ai_config.require("learn_backend_domain")  # New domain
+
+# Instantiate a second OIDC resource for the /ai/* routes served from mit-learn's
+# own host (api.<env>.learn.mit.edu).
+#
+# Identical to the legacy-host resource above apart from the cookie domain,
+# which is why it has to be a separate resource rather than one shared config:
+# the domain lives on the plugin config, and a single config cannot be both
+# host-only on api-learn-ai.ol.mit.edu and domain-scoped on
+# api.<env>.learn.mit.edu.  ol_analytics_api/__main__.py splits its own
+# .ol.mit.edu and .learn.mit.edu hosts into "<app>" and "<app>-learn" resources
+# for the same reason.
+#
+# The domain is what matters here.  These routes' unauth_action="pass" plugins
+# recognize the session mit-learn's login flow set, which requires the cookie
+# name to match -- but the "reqauth" route below performs a real login
+# (unauth_action="auth" on /ai/http/login/, which the learn-ai frontend uses as
+# its log-in link).  Without a matching domain that login writes a *host-only*
+# cookie on api.<env>.learn.mit.edu under the shared name: a second, separate
+# entry in the browser's jar that shadows mit-learn's .learn.mit.edu cookie,
+# since a cookie's identity includes whether it is host-only.  Both are then
+# sent on every request and the gateway reads whichever comes first, so an OIDC
+# callback can be handed a session envelope with no state for the flow in
+# progress.  With the domain set, all of them read and write the one shared
+# cookie.
+learn_ai_mit_learn_oidc_resources = OLApisixOIDCResources(
+    f"learn-ai-mit-learn-{stack_info.env_suffix}-oidc-resources",
+    oidc_config=OLApisixOIDCConfig(
+        application_name="learn-ai-mit-learn",
+        k8s_labels=k8s_global_labels,
+        k8s_namespace=learn_ai_namespace,
+        # No oidc_scope override, unlike the legacy-host resource above: the
+        # "reqauth" route below writes the shared session, so it has to request
+        # the same claims mit-learn's own login does.  The component default
+        # adds organization:*, which mit-learn maps to users.User.organizations
+        # via APISIX_USERDATA_MAP and reads to decide whether to skip onboarding.
+        oidc_introspection_endpoint_auth_method="client_secret_basic",  # Default
+        oidc_logout_path="/logout",
+        oidc_post_logout_redirect_uri="/",
+        oidc_session_idling_timeout=0,
+        oidc_session_rolling_timeout=0,
+        oidc_session_cookie_domain=learn_api_domain.removeprefix("api"),
+        # Must track mit_learn/__main__.py's oidc_session_cookie_name exactly.
+        oidc_session_cookie_name=mit_learn_session_cookie_name(
+            stack_info.env_suffix,
+        ),
+        oidc_use_session_secret=True,
+        vault_mount="secret-operations",
+        vault_mount_type="kv-v1",
+        vault_path="sso/mitlearn",  # Use mitlearn SSO config
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(delete_before_replace=True, parent=vault_k8s_resources),
+)
 
 # ApisixUpstream resources don't seem to work but we don't really need them?
 # Ref: https://github.com/apache/apisix-ingress-controller/issues/1655
@@ -1040,7 +1084,9 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
                 proxy_rewrite_plugin,
                 # Use helper from OIDC component instance
                 OLApisixPluginConfig(
-                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("pass")
+                    **learn_ai_mit_learn_oidc_resources.get_full_oidc_plugin_config(
+                        "pass"
+                    )
                 ),
             ],
             hosts=[learn_api_domain],
@@ -1076,7 +1122,9 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
             plugins=[
                 proxy_rewrite_plugin,
                 OLApisixPluginConfig(
-                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("auth")
+                    **learn_ai_mit_learn_oidc_resources.get_full_oidc_plugin_config(
+                        "auth"
+                    )
                 ),
             ],
             hosts=[learn_api_domain],
@@ -1100,7 +1148,9 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
             plugins=[
                 proxy_rewrite_plugin,
                 OLApisixPluginConfig(
-                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("pass")
+                    **learn_ai_mit_learn_oidc_resources.get_full_oidc_plugin_config(
+                        "pass"
+                    )
                 ),
             ],
             hosts=[learn_api_domain],
@@ -1114,7 +1164,7 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
     ],
     opts=ResourceOptions(
         delete_before_replace=True,
-        depends_on=[learn_ai_app_k8s, learn_ai_oidc_resources],
+        depends_on=[learn_ai_app_k8s, learn_ai_mit_learn_oidc_resources],
     ),
 )
 
@@ -1265,47 +1315,6 @@ learn_ai_https_apisix_consumer = kubernetes.apiextensions.CustomResource(
         },
     },
 )
-
-# Finally, put the aws access key into the github actions configuration
-
-gh_workflow_access_key_id_env_secret = github.ActionsSecret(
-    f"learn-ai-gh-workflow-access-key-id-env-secret-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"AWS_ACCESS_KEY_ID_{env_var_suffix}",  # pragma: allowlist secret
-    plaintext_value=gh_workflow_accesskey.id,
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-gh_workflow_secretaccesskey_env_secret = github.ActionsSecret(
-    f"learn-ai-gh-workflow-secretaccesskey-env-secret-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    secret_name=f"AWS_SECRET_ACCESS_KEY_{env_var_suffix}",  # pragma: allowlist secret
-    plaintext_value=gh_workflow_accesskey.secret,
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-
-gh_workflow_s3_bucket_name_env_secret = github.ActionsVariable(
-    f"learn-ai-gh-workflow-s3-bucket-name-env-variable-{stack_info.env_suffix}",
-    repository=gh_repo.name,
-    variable_name=f"AWS_S3_BUCKET_NAME_{env_var_suffix}",  # pragma: allowlist secret
-    value=learn_ai_app_storage_bucket_name,
-    opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-)
-
-if stack_info.env_suffix != "ci":
-    gh_workflow_posthog_project_api_key_env_secret = github.ActionsSecret(
-        f"learn-ai-gh-workflow-posthog-project-api_key-{stack_info.env_suffix}",
-        repository=gh_repo.name,
-        secret_name=f"POSTHOG_PROJECT_API_KEY_{env_var_suffix}",
-        plaintext_value=mitlearn_posthog_secrets["project_api_key"],
-        opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-    )
-    gh_workflow_posthog_personal_api_key_env_secret = github.ActionsSecret(
-        f"learn-ai-gh-workflow-posthog-personal-api-key-{stack_info.env_suffix}",
-        repository=gh_repo.name,
-        secret_name=f"POSTHOG_PERSONAL_API_KEY_{env_var_suffix}",
-        plaintext_value=mitlearn_posthog_secrets["personal_api_key"],
-        opts=ResourceOptions(provider=github_provider, delete_before_replace=True),
-    )
 
 export(
     "learn_ai",

@@ -10,6 +10,8 @@ This deployment uses:
 - APISix ingress with OpenID Connect for authentication
 """
 
+import hashlib
+import json
 import os
 from pathlib import Path
 
@@ -89,6 +91,18 @@ vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
 cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
+# Owns the Sentry project and client key whose DSN this stack writes to Vault.
+# Single-stack (default) because there is one Sentry org, and one Dagster
+# project within it shared by every environment.
+sentry_stack = make_stack_reference(projects.SENTRY, "default")
+# Keycloak is deployed to CI/QA/Production only; the Dev Dagster stack has no
+# counterpart to reference, so its data_loading deployment simply goes without
+# the Keycloak host and that source stays unavailable there.
+keycloak_stack = (
+    make_stack_reference(projects.KEYCLOAK_APP, stack_info.name)
+    if stack_info.env_suffix in ("ci", "qa", "production")
+    else None
+)
 
 # VPC and network configuration
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
@@ -502,6 +516,47 @@ dagster_dbt_secrets = OLVaultK8SSecret(
         vaultauth=dagster_auth_binding.vault_k8s_resources.auth_name,
     ),
     opts=ResourceOptions(depends_on=[dagster_auth_binding]),
+)
+
+# The DSN is created by the ol-infrastructure-sentry stack, which owns the
+# Sentry project and its client key, so Pulumi manages the value end to end and
+# nobody has to hand-write it into Vault. secret-data is a pre-existing kv-v1
+# mount shared by the other Dagster secrets, so only the secret itself is
+# declared here, not the mount.
+dagster_sentry_vault_secret = vault.generic.Secret(
+    f"dagster-sentry-dsn-{stack_info.env_suffix}",
+    path="secret-data/dagster/sentry",
+    data_json=sentry_stack.require_output("dagster_sentry_dsn").apply(
+        lambda dsn: json.dumps({"dsn": dsn})
+    ),
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
+# Sentry DSN for the code locations and run workers. Kept as its own secret
+# rather than folded into dagster-static-secrets because an OLVaultK8SSecret
+# reads a single Vault path, and the DSN is owned by the sentry stack.
+dagster_sentry_secrets = OLVaultK8SSecret(
+    f"dagster-k8s-sentry-secrets-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        dest_secret_labels=k8s_global_labels.model_dump(),
+        dest_secret_name="dagster-sentry-secrets",  # pragma: allowlist secret  # noqa: E501, S106
+        exclude_raw=True,
+        excludes=[".*"],
+        labels=k8s_global_labels.model_dump(),
+        mount="secret-data",
+        mount_type="kv-v1",
+        name="dagster-sentry-secrets",
+        namespace=dagster_namespace,
+        path="dagster/sentry",
+        refresh_after="1m",
+        templates={
+            "SENTRY_DSN": '{{ get .Secrets "dsn" }}',
+        },
+        vaultauth=dagster_auth_binding.vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        depends_on=[dagster_auth_binding, dagster_sentry_vault_secret]
+    ),
 )
 
 # Create Vault dynamic secret for database credentials
@@ -992,13 +1047,28 @@ for location in code_locations:
             {"name": "DAGSTER_ENVIRONMENT", "value": stack_info.env_suffix},
             {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
             {"name": "DAGSTER_VAULT_ROLE", "value": "dagster"},
+            # Ties each Sentry issue to the image it came from. Same git
+            # short-ref the Concourse pipeline tagged the image with.
+            {"name": "SENTRY_RELEASE", "value": image_tag_or_digest},
         ],
         "envSecrets": [
             {"name": "dagster-static-secrets"},
             {"name": "dagster-dbt-secrets"},
             {"name": "dagster-postgresql-secret"},
+            {"name": "dagster-sentry-secrets"},
         ],
     }
+
+    # data_loading's dlt database sources connect by host and take their
+    # credentials from Vault at run time, so only the host is passed through
+    # here -- from the owning application's stack, not duplicated in config.
+    if name == "data_loading" and keycloak_stack is not None:
+        deployment["env"].append(
+            {
+                "name": "KEYCLOAK_DB_HOST",
+                "value": keycloak_stack.require_output("keycloak")["rds_host"],
+            }
+        )
 
     # Add higher resources for lakehouse deployment (runs dbt)
     if name == "lakehouse":
@@ -1116,11 +1186,54 @@ for location in code_locations:
 
     deployments.append(deployment)
 
+# Referenced by run_launcher.config.run_k8s_config.pod_spec_config in
+# dagster_instance.yaml -- see the rationale there. A pod naming a
+# nonexistent PriorityClass is rejected outright, so this has to exist before
+# the instance ConfigMap that points at it (hence the Helm release's
+# depends_on below).
+#
+# The value is negative deliberately: run workers rank below every priority-0
+# pod in the cluster, not just the ones in this namespace. That is broader
+# than the incident strictly requires, but these pods have already starved
+# StarRocks FE out of the core nodegroup for 5 days (#5183), so ranking batch
+# work below anything long-lived is the designation we want. preemption_policy
+# Never keeps the relationship one-directional -- run workers queue for
+# capacity, they never evict anything themselves.
+dagster_run_priority_class = kubernetes.scheduling.v1.PriorityClass(
+    f"dagster-run-priority-class-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-run",
+        labels=k8s_global_labels.model_dump(),
+    ),
+    value=-100,
+    preemption_policy="Never",
+    global_default=False,
+    description=(
+        "Dagster run workers: preemptible batch work that ranks below all "
+        "control-plane pods."
+    ),
+)
+
 # Custom Dagster instance ConfigMap with dynamic credentials support
 # Note: We create this before the Helm release so it gets proper ownership
 dagster_instance_yaml = (
     Path(__file__).parent.joinpath("dagster_instance.yaml").read_text()
 )
+# The daemon and webserver mount dagster.yaml from the dagster-instance
+# ConfigMap via subPath, which kubelet never live-refreshes, and the chart's
+# built-in checksum/dagster-instance rollout trigger hashes only its OWN
+# values-rendered instance template -- not the extraManifests override below
+# that actually carries this file. Without this annotation, edits to
+# dagster_instance.yaml deploy the ConfigMap but silently never reach the
+# running processes until someone manually restarts them (bit us on the run
+# Job TTL fix, #5373): injecting our own content hash into both pod templates
+# makes a config edit roll the pods the same way the chart's native checksum
+# does.
+dagster_instance_checksum_annotation = {
+    "checksum/ol-dagster-instance": hashlib.sha256(
+        dagster_instance_yaml.encode()
+    ).hexdigest(),
+}
 
 # Get dagster-k8s image tag from environment variable (set by Concourse)
 dagster_k8s_image_tag = os.environ.get("DAGSTER_K8S_IMAGE_TAG")
@@ -1152,6 +1265,7 @@ dagster_helm_values = {
     },
     # Dagster webserver (UI)
     "dagsterWebserver": {
+        "annotations": dagster_instance_checksum_annotation,
         "image": dagster_k8s_image_config,
         "workspace": {
             "enabled": True,
@@ -1236,6 +1350,7 @@ dagster_helm_values = {
     },
     # Dagster daemon (background job scheduler)
     "dagsterDaemon": {
+        "annotations": dagster_instance_checksum_annotation,
         "image": dagster_k8s_image_config,
         "env": [
             {
@@ -1365,6 +1480,7 @@ dagster_helm_release = kubernetes.helm.v3.Release(
             dagster_static_secrets,
             dagster_dbt_secrets,
             dagster_auth_binding,
+            dagster_run_priority_class,
         ]
     ),
 )

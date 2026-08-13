@@ -870,6 +870,21 @@ for worker_def in concourse_config.get_object("workers") or []:
         role=concourse_worker_instance_role.name,
     )
 
+    if worker_class_name == "infra":
+        # pulumi_infra only grants read-only route53 actions (see
+        # iam_policies/pulumi_infra.py), so pulumi_job() runs that manage
+        # records in any app-managed zone (e.g. the xpro Fastly CNAME) need
+        # the write policy too, same as the web nodes already get for the
+        # odl zone below. This pool runs deploys across all app stacks, so
+        # it gets the combined policy rather than one zone at a time.
+        iam.RolePolicyAttachment(
+            f"concourse-instance-policy-worker-{worker_class_name}-route53-all-zones-{stack_info.env_suffix}",
+            policy_arn=policy_stack.require_output("iam_policies")[
+                "route53_all_zones_records"
+            ],
+            role=concourse_worker_instance_role.name,
+        )
+
     concourse_worker_instance_profile = iam.InstanceProfile(
         f"concourse-instance-profile-worker-{worker_class_name}-{stack_info.env_suffix}",
         role=concourse_worker_instance_role.name,

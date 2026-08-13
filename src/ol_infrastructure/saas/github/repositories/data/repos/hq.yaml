@@ -1,0 +1,34 @@
+---
+_actions_secret_names:
+- STANDUP_CAT_ID
+- STANDUP_REPO_ID
+_custom_properties:
+  tier: tier-1
+_direct_collaborators:
+  rhysyngsun: admin
+_has_branch_protection: false
+_pushed_at: '2026-08-06T12:40:16Z'
+_ruleset_count: 0
+_visibility: private
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: library
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: OL Engineering & Products - headquarters
+has_discussions: true
+has_projects: true
+has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: hq
+secret_scanning: disabled
+secret_scanning_push_protection: disabled
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+teams:
+  arbisoft-contractors: maintain
+  odl-engineering: push
+web_commit_signoff_required: false

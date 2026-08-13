@@ -1,7 +1,7 @@
 # ClickHouse LLMOps Runbook
 
 This runbook covers operational procedures for the multi-tenant ClickHouse cluster
-deployed on the data EKS cluster for LLMOps tooling (TensorZero, OpenLit, Opik).
+deployed on the data EKS cluster for LLMOps tooling (TensorZero, Opik).
 
 **Architecture summary:** See [ADR-0007](adr/0007-clickhouse-llmops-multi-tenant.md)
 
@@ -42,8 +42,6 @@ ADMIN_PASSWORD=$(vault kv get -field=admin secret-clickhouse/credentials)
 # Create per-tool databases
 curl -s "http://localhost:8123/?user=admin&password=$ADMIN_PASSWORD" \
   --data "CREATE DATABASE IF NOT EXISTS tensorzero_db"
-curl -s "http://localhost:8123/?user=admin&password=$ADMIN_PASSWORD" \
-  --data "CREATE DATABASE IF NOT EXISTS openlit_db"
 curl -s "http://localhost:8123/?user=admin&password=$ADMIN_PASSWORD" \
   --data "CREATE DATABASE IF NOT EXISTS opik_db"
 

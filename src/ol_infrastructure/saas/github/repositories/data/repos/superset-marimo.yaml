@@ -1,0 +1,30 @@
+---
+_custom_properties:
+  tier: tier-1
+_has_branch_protection: true
+_pushed_at: '2026-05-22T19:14:05Z'
+_ruleset_count: 0
+_visibility: public
+allow_auto_merge: false
+allow_merge_commit: false
+allow_rebase_merge: false
+allow_squash_merge: true
+archetype: library
+dependabot_security_updates: false
+description: Marimo notebook integration for Apache Superset — connects reactive Python
+  notebooks to Superset-configured data sources
+has_discussions: false
+has_projects: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: superset-marimo
+required_status_checks:
+- Backend lint & type-check
+- Backend tests
+- Frontend type-check & build
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+teams:
+  odl-engineering: push
+  odl-engineering-owners: admin
+web_commit_signoff_required: false

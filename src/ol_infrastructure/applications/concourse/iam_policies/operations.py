@@ -26,6 +26,12 @@ policy_definition = {
                 "arn:aws:s3:::*-edxapp-mfe/*",
                 "arn:aws:s3:::ol-eng-artifacts",
                 "arn:aws:s3:::ol-eng-artifacts/*",
+                # learn-ai static frontend. The learn_ai Pulumi stack creates
+                # ol-mit-learn-ai-{ci,qa,production}; the Fastly service in front
+                # of them rewrites every request under the /frontend/ prefix, so
+                # object writes are scoped to that prefix.
+                "arn:aws:s3:::ol-mit-learn-ai-*",
+                "arn:aws:s3:::ol-mit-learn-ai-*/frontend/*",
             ],
         },
         {

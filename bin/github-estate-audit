@@ -1,0 +1,340 @@
+#!/usr/bin/env python3
+"""Audit the mitodl GitHub estate from the committed fleet data.
+
+Phase 4 of docs/plans/github-org-pulumi-import.md. The rules live in
+`ol_infrastructure.saas.github.audit` as pure functions; this is the CLI around them.
+
+    github-estate-audit run                    # all axes, text
+    github-estate-audit run --axis security    # one axis
+    github-estate-audit run --json             # machine-readable, for CI
+    github-estate-audit drift                  # live GitHub vs. the committed data
+
+`run` needs NO credentials and hits NO API -- it reads data/repos/, which is why it
+finishes in milliseconds and works anywhere. `drift` is the exception: comparing
+declared against live is the one job that requires both.
+"""
+
+import json
+import sys
+from collections import Counter
+from pathlib import Path
+from typing import Annotated, Any
+
+import cyclopts
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from ol_infrastructure.saas.github import audit
+from ol_infrastructure.saas.github.repositories import archetypes
+
+app = cyclopts.App(help="Audit the mitodl GitHub estate.")
+
+SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
+
+
+@app.command
+def run(
+    *,
+    # Literal, not str: cyclopts then rejects a typo and lists the valid choices.
+    # `--axis securty` under a bare `str` would filter to zero findings and print a
+    # clean report -- an unmeasured axis and a clean one look identical, and only one
+    # of them is good news. That is the same trap audit.py's scope handling exists to
+    # avoid, so the CLI should not reintroduce it at the edge.
+    axis: Annotated[
+        audit.Axis | None, cyclopts.Parameter(help="Restrict to one axis.")
+    ] = None,
+    as_json: Annotated[
+        bool, cyclopts.Parameter(name=["--json"], help="Emit JSON instead of text.")
+    ] = False,
+    # Literal for the same reason, plus a concrete one: the body indexes
+    # SEVERITY_ORDER[fail_on] directly, so an unvalidated typo raised KeyError.
+    fail_on: Annotated[
+        audit.Severity | None,
+        cyclopts.Parameter(
+            help="Exit non-zero if any finding is at or above this severity."
+        ),
+    ] = None,
+) -> int:
+    """Report every rule that fires across the fleet."""
+    fleet = archetypes.load_fleet()
+    findings = audit.evaluate(fleet)
+    if axis:
+        findings = [f for f in findings if f.axis == axis]
+
+    by_rule = Counter(f.rule_id for f in findings)
+
+    if as_json:
+        print(
+            json.dumps(
+                {
+                    "repos": len(fleet),
+                    "findings": len(findings),
+                    "by_rule": dict(by_rule),
+                    "detail": [f.__dict__ for f in findings],
+                },
+                indent=2,
+            )
+        )
+    else:
+        print(
+            f"# mitodl estate audit -- {len(fleet)} repos, {len(findings)} findings\n"
+        )
+        # EVERY rule is listed, including the ones at zero, and `--axis` filters which
+        # rules are listed rather than only which findings are counted. A rule that
+        # fires nowhere would otherwise be indistinguishable from a rule that is not
+        # registered, or one whose input the crawl never recorded -- the same
+        # "empty and unmeasured look identical" failure audit.py exists to avoid, just
+        # moved to the reporter. CON-11 read as clean from the day it was written; the
+        # only thing separating that from a broken rule is seeing it on the report.
+        listed = [r for r in audit.RULES if axis is None or r.axis == axis]
+        ordered = sorted(
+            listed,
+            key=lambda r: (SEVERITY_ORDER[r.severity], -by_rule[r.rule_id]),
+        )
+        for rule in ordered:
+            count = by_rule[rule.rule_id]
+            total = audit.population(fleet, rule.scope)
+            share = f"{count / total:.0%}" if total else "-"
+            print(
+                f"  {rule.severity:6} {rule.rule_id:8} {count:4} "
+                f"({share:>4} of {total} {rule.scope})  {rule.summary}"
+            )
+        print("\nWorst offenders, by number of findings:")
+        for repo, count in Counter(f.repo for f in findings).most_common(8):
+            print(f"     {count:4}  {repo}")
+
+    if fail_on:
+        threshold = SEVERITY_ORDER[fail_on]
+        blocking = [f for f in findings if SEVERITY_ORDER[f.severity] <= threshold]
+        if blocking:
+            print(
+                f"\n{len(blocking)} finding(s) at or above {fail_on}", file=sys.stderr
+            )
+            return 1
+    return 0
+
+
+@app.command
+def drift(
+    *,
+    cache: Annotated[
+        Path, cyclopts.Parameter(help="Crawl cache to compare against.")
+    ] = Path(".github-org-inventory-cache.json"),
+) -> int:
+    """Compare the committed fleet data against a fresh crawl.
+
+    This is what keeps the estate managed after the import: an out-of-band console
+    change shows up here. Refresh the cache first --
+
+        uv run bin/github-org-inventory report --refresh
+
+    -- because this command deliberately does not crawl on its own. Keeping the fetch
+    and the comparison separate means a drift report can be re-run against the same
+    snapshot while investigating, instead of shifting under you.
+
+    NOTE for when the phase-3.5 rulesets land: while they sit at `enforcement:
+    evaluate` they are invisible to the per-repo read endpoints, so `_ruleset_count`
+    will not see them. Any ruleset-aware drift check must enumerate
+    `/orgs/{org}/rulesets` directly -- see probe controls C6a/C6b.
+    """
+    if not cache.exists():
+        print(f"no crawl cache at {cache}; run `github-org-inventory report --refresh`")
+        return 1
+    live = {r["name"]: r for r in json.loads(cache.read_text())["repos"]}
+    declared = {r["name"]: r for r in archetypes.load_fleet()}
+
+    only_live = sorted(set(live) - set(declared))
+    only_declared = sorted(set(declared) - set(live))
+    changed: list[str] = []
+    # Compare only the fields the fleet data actually declares. Anything else is
+    # inventory that moves on its own (pushed_at, environment counts) and would make
+    # every run look like drift.
+    tracked = (
+        "description",
+        "default_branch",
+        "archived",
+        "allow_squash_merge",
+        "allow_merge_commit",
+        "allow_rebase_merge",
+        "allow_auto_merge",
+        "delete_branch_on_merge",
+        "has_issues",
+        "has_wiki",
+        "secret_scanning",
+        "secret_scanning_push_protection",
+        "teams",
+    )
+    for name in sorted(set(live) & set(declared)):
+        for field in tracked:
+            want = declared[name].get(field)
+            got = live[name].get(field)
+            # `want is None` means the fleet declares nothing for this field, so there
+            # is nothing to have drifted from -- that is a real exemption for the
+            # tracked fields above, all of which archetypes may legitimately stay
+            # silent on. It is NOT true of `tier`, which is compared separately below
+            # precisely so it cannot inherit this skip.
+            if want is not None and want != got:
+                changed.append(f"{name}.{field}: declared {want!r}, live {got!r}")
+        # `tier` is not in `tracked` because it does not live at the top level of the
+        # crawl: GitHub reports it among the repo's custom-property values. It gets its
+        # own comparison rather than a flattening step so that BOTH sides are asserted
+        # present -- an unset custom property reads back as the schema's default value,
+        # never as an absence, so `got is None` means the crawl failed to measure it
+        # rather than that the repo has no tier. Reporting that as "no drift" is how a
+        # 140-repo divergence went unseen (PR #5317); reporting it as drift is noisy
+        # exactly once, when the cache predates this field.
+        want_tier = declared[name].get("tier")
+        got_tier = (live[name].get("custom_properties") or {}).get("tier")
+        if want_tier != got_tier:
+            changed.append(
+                f"{name}.tier: declared {want_tier!r}, "
+                f"live {got_tier!r}"
+                f"{' (not in the crawl)' if got_tier is None else ''}"
+            )
+
+    for name in only_live:
+        print(f"  UNMANAGED   {name} exists on GitHub but has no fleet entry")
+    for name in only_declared:
+        print(f"  MISSING     {name} is declared but not on GitHub")
+    for line in changed:
+        print(f"  DRIFT       {line}")
+
+    total = len(only_live) + len(only_declared) + len(changed)
+    print(f"\n{total} difference(s) between the committed fleet and {cache}")
+    return 1 if total else 0
+
+
+def _fetch_rosters() -> tuple[
+    dict[str, set[str]], set[str], dict[str, str | None], set[str]
+]:
+    """Team rosters, org members and team nesting, read live from the API.
+
+    NOT read from committed data, and not cached to disk, because there is nowhere
+    safe to put it: `vault-developer-access` and `vault-devops-access` are declared
+    `privacy: secret` in organization/teams.py so their membership is not advertised
+    even inside the org, and ol-infrastructure is a PUBLIC repository. Committing
+    rosters here would publish exactly what that setting exists to withhold.
+    """
+    import httpx  # noqa: PLC0415 -- only `access` needs the API; `run` must stay clean
+
+    from ol_infrastructure.lib.github_helper import (  # noqa: PLC0415
+        API_HEADERS,
+        GITHUB_API,
+        get_installation_token,
+    )
+
+    org = "mitodl"
+    token = get_installation_token()
+
+    def paginate(client: httpx.Client, path: str) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        url: str | None = f"{path}{'&' if '?' in path else '?'}per_page=100"
+        while url:
+            response = client.get(url)
+            response.raise_for_status()
+            out.extend(response.json())
+            url = response.links.get("next", {}).get("url")
+        return out
+
+    with httpx.Client(
+        base_url=GITHUB_API,
+        headers={**API_HEADERS, "Authorization": f"Bearer {token}"},
+        timeout=60,
+        follow_redirects=True,
+    ) as client:
+        members = {m["login"] for m in paginate(client, f"/orgs/{org}/members")}
+        # Org OWNERS hold implicit admin on every repo -- a third access path beside
+        # teams and direct grants, and the only one the others cannot revoke. The
+        # plain members list does not distinguish them, so this is a separate call.
+        owners = {
+            m["login"] for m in paginate(client, f"/orgs/{org}/members?role=admin")
+        }
+        teams = paginate(client, f"/orgs/{org}/teams")
+        rosters = {
+            t["slug"]: {
+                m["login"]
+                for m in paginate(client, f"/orgs/{org}/teams/{t['slug']}/members")
+            }
+            for t in teams
+        }
+    parents = {t["slug"]: (t.get("parent") or {}).get("slug") for t in teams}
+    return rosters, members, parents, owners
+
+
+@app.command
+def access(
+    *,
+    as_json: Annotated[
+        bool, cyclopts.Parameter(name=["--json"], help="Emit JSON instead of text.")
+    ] = False,
+) -> int:
+    """Report team-grant uniformity and explain every direct collaborator grant.
+
+    NEEDS CREDENTIALS, unlike `run`. Classifying a direct grant means knowing who is
+    in which team, and rosters are deliberately not committed -- see `_fetch_rosters`.
+
+    Read the two halves together. The shape count says how far the fleet is from a
+    model; the direct-grant split says how much of the cleanup is free (`redundant`
+    and `level-only`) versus how much needs a team grant added first (`no-access`).
+    """
+    fleet = archetypes.load_fleet()
+    active = [r for r in fleet if not r.get("archived")]
+    rosters, members, parents, owners = _fetch_rosters()
+    rows = audit.classify_direct_grants(fleet, rosters, members, parents, owners)
+    shapes = audit.grant_shapes(active)
+    kinds = Counter(r["kind"] for r in rows)
+
+    if as_json:
+        print(
+            json.dumps(
+                {
+                    "active_repos": len(active),
+                    "distinct_shapes": len(shapes),
+                    "shapes": [
+                        {"teams": dict(shape), "repos": n}
+                        for shape, n in shapes.most_common()
+                    ],
+                    "direct_grants": rows,
+                    "by_kind": dict(kinds),
+                },
+                indent=2,
+            )
+        )
+        return 0
+
+    print(
+        f"# team grant shapes -- {len(shapes)} distinct across {len(active)} active repos\n"
+    )
+    for shape, count in shapes.most_common():
+        label = ", ".join(f"{t}:{p}" for t, p in shape) or "(NO TEAM GRANTS)"
+        print(f"  {count:4}  {label}")
+
+    print(
+        f"\n# direct collaborator grants -- {len(rows)} across "
+        f"{len({r['repo'] for r in rows})} repos, {len({r['login'] for r in rows})} people\n"
+    )
+    # Ordered by how much work removal takes, cheapest first, because that is the
+    # order the cleanup should run in.
+    for kind, note in (
+        ("redundant", "team access already >= the grant; delete freely"),
+        ("level-only", "repo reach kept, elevated rights dropped to team level"),
+        ("owner-implicit", "org owner; implicit admin survives the deletion"),
+        ("no-access", "ONLY path in -- needs a team grant BEFORE removal"),
+        ("outside", "not an org member; invite to a team, or remove"),
+    ):
+        print(f"  {kind:14} {kinds[kind]:4}   {note}")
+    removable = sum(kinds[k] for k in audit.REMOVABLE_KINDS)
+    print(f"  {'':14} ---")
+    print(f"  {'':14} {removable:4}   removable with no new team work")
+
+    blocked = [r for r in rows if r["kind"] == "no-access"]
+    if blocked:
+        print("\nGrants that gate the cleanup:")
+        for row in sorted(blocked, key=lambda r: (r["repo"], r["login"])):
+            tag = " [archived]" if row["archived"] else ""
+            print(f"  {row['repo']:38}{tag:11} {row['login']}:{row['role']}")
+    return 0
+
+
+if __name__ == "__main__":
+    app()

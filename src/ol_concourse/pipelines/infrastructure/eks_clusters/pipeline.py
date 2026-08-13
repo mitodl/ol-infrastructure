@@ -4,6 +4,7 @@ from ol_concourse.lib.resources import git_repo
 
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.secrets_map import project_secrets_paths
 
 eks_infrastructure_code = git_repo(
     Identifier("ol-infrastructure"),
@@ -12,6 +13,7 @@ eks_infrastructure_code = git_repo(
         "src/ol_infrastructure/infrastructure/aws/eks",
         *PULUMI_WATCHED_PATHS,
         "src/bridge/lib/versions.py",
+        *project_secrets_paths("infrastructure/aws/eks/"),
     ],
 )
 
@@ -22,6 +24,7 @@ eks_substructure_code = git_repo(
         "src/ol_infrastructure/substructure/aws/eks",
         *PULUMI_WATCHED_PATHS,
         "src/bridge/lib/versions.py",
+        *project_secrets_paths("substructure/aws/eks/"),
     ],
 )
 
@@ -33,6 +36,13 @@ for cluster in ["data", "operations", "applications", "residential"]:
     infra_chain = pulumi_jobs_chain(
         eks_infrastructure_code,
         refresh_stack=True,
+        # Gate each stage on a preview OF ITSELF: the preview opens the gate
+        # issue with that stage's own diff, and closing it runs the deploy.
+        # Cluster stages drift from each other more than most stacks -- they get
+        # hand-touched during incidents -- and that drift is invisible in the
+        # diff of the stage that was just deployed.
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
         project_name="ol-infrastructure-eks",
         project_source_path=PULUMI_CODE_PATH.joinpath("infrastructure/aws/eks"),
         stack_names=[f"{cluster}.{stage}" for stage in stages],
@@ -42,6 +52,8 @@ for cluster in ["data", "operations", "applications", "residential"]:
     substructure_chain = pulumi_jobs_chain(
         eks_substructure_code,
         refresh_stack=True,
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
         project_name="ol-substructure-eks",
         project_source_path=PULUMI_CODE_PATH.joinpath("substructure/aws/eks"),
         stack_names=[f"{cluster}.{stage}" for stage in stages],

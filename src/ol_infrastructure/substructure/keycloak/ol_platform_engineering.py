@@ -4,7 +4,7 @@ import json
 
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
-from pulumi import Alias, Config, Output, ResourceOptions
+from pulumi import Alias, Config, InvokeOptions, Output, ResourceOptions
 
 
 def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
@@ -284,53 +284,163 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
     )
     # TOOLHIVE [END] # noqa: ERA001
 
-    # OPENLIT [START] # noqa: ERA001
-    # OpenLIT (LLM/GenAI observability) has no native auth in its open-source
-    # edition, so authentication is enforced by APISIX in front of it. This
-    # CONFIDENTIAL client backs both the interactive UI login (standard flow)
-    # and the service-account / client-credentials flow that instrumented
-    # applications use to mint bearer tokens for the OTLP ingestion path
-    # (``/v1/traces|metrics|logs`` — see the openlit application stack).
-    # Credentials are published to Vault for the APISIX openid-connect plugin
-    # to consume via the Vault Secrets Operator.
-    ol_platform_engineering_openlit_client = keycloak.openid.Client(
-        "ol-platform-engineering-openlit-client",
-        name="ol-platform-engineering-openlit-client",
+    # WITAN [START] # noqa: ERA001
+    # Membership of THIS REALM is the authoritative answer to "who may use
+    # witan". The omnigraph stack's token-sync CronJob enumerates it hourly and
+    # maintains one omnigraph bearer token per enabled human user, keyed by the
+    # actor id derived from their `sub` (agent-kit ADR-0004 D3). Adding someone
+    # to the realm is the entire onboarding step; removing or disabling them
+    # retires their token on the next run.
+    #
+    # DELIBERATELY NO `witan-users` GROUP, despite ADR-0004 D3 naming one. That
+    # name is a *Cedar* group in agent-kit's policy bundles
+    # (mcp/servers/witan/policy/server.policy.yaml), populated with the
+    # act-<sub> ids the sync job writes — the collision with a hypothetical
+    # Keycloak group of the same name is what made one look mandatory. This
+    # realm has registration_allowed=False, no identity-provider brokering and
+    # no federation, so it is already limited to exactly the intended audience;
+    # a group inside it would be a second gate on an already-gated population,
+    # whose failure mode is somebody being added to the realm, nobody adding
+    # them to the group, and a 401 that reads like a provisioning lag. The
+    # trade accepted: no way to revoke witan while leaving this realm's other
+    # applications (jupyterhub, superset, opik) intact.
+    #
+    # The identity the token-sync job enumerates the realm as. CONFIDENTIAL
+    # with only the service-account (client-credentials) flow enabled: no human
+    # ever logs in as this, there is no redirect URI to get wrong, and the
+    # standard/implicit/direct-access flows are all off so a leaked secret buys
+    # exactly the two read-only Admin API calls below and nothing else.
+    #
+    # This is NOT the `witan-cli` public client that ADR-0005 path (a)'s
+    # `witan login` device-code flow authenticates against — that one is
+    # declared separately below. Interactive user login and this machine
+    # credential have no reason to share a client.
+    ol_platform_engineering_witan_token_sync_client = keycloak.openid.Client(
+        "ol-platform-engineering-witan-token-sync-client",
+        name="ol-platform-engineering-witan-token-sync-client",
         realm_id="ol-platform-engineering",
-        client_id="ol-openlit-client",
+        client_id="witan-token-sync",
         client_secret=keycloak_realm_config.get(
-            "ol-platform-engineering-openlit-client-secret"
+            "ol-platform-engineering-witan-token-sync-client-secret"
         ),
         enabled=True,
         access_type="CONFIDENTIAL",
-        standard_flow_enabled=True,
-        implicit_flow_enabled=False,
         service_accounts_enabled=True,
-        valid_redirect_uris=keycloak_realm_config.get_object(
-            "ol-platform-engineering-openlit-redirect-uris"
-        ),
+        standard_flow_enabled=False,
+        implicit_flow_enabled=False,
+        direct_access_grants_enabled=False,
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
+
+    # Exactly one realm-management role, and it is read-only: `view-users` is
+    # all that listing the realm's users requires. Deliberately not
+    # `realm-admin` or `manage-users` — this credential lives in a Kubernetes
+    # Secret, and nothing about its job requires the ability to change a single
+    # thing in the realm. (An earlier revision also granted `query-groups`, for
+    # resolving a `witan-users` group that no longer exists.)
+    witan_realm_mgmt_client = keycloak.openid.get_client(
+        realm_id="ol-platform-engineering",
+        client_id="realm-management",
+        opts=InvokeOptions(provider=keycloak_provider),
+    )
+    keycloak.openid.ClientServiceAccountRole(
+        "ol-platform-engineering-witan-token-sync-view-users",
+        realm_id=ol_platform_engineering_realm.id,
+        service_account_user_id=(
+            ol_platform_engineering_witan_token_sync_client.service_account_user_id
+        ),
+        client_id=witan_realm_mgmt_client.id,
+        role="view-users",
+        opts=resource_options,
+    )
+
+    # Filed under `witan/` rather than `sso/` with this realm's application
+    # clients: the consumer is witan's own provisioning plumbing, and the
+    # omnigraph stack's VSO reads it alongside witan/actor-tokens and
+    # witan/ci-token. Only the two fields the job actually uses — it talks to
+    # the Admin API, not to a login endpoint, so there is no realm public key
+    # or session secret to publish.
     vault.generic.Secret(
-        "ol-platform-engineering-openlit-client-vault-oidc-credentials",
-        path="secret-operations/sso/openlit",
+        "ol-platform-engineering-witan-token-sync-vault-oidc-credentials",
+        path="secret-operations/witan/token-sync-oidc",
         data_json=Output.all(
-            url=ol_platform_engineering_openlit_client.realm_id.apply(
-                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
-            ),
-            client_id=ol_platform_engineering_openlit_client.client_id,
-            client_secret=ol_platform_engineering_openlit_client.client_secret,
-            # Independent random value required by the APISIX openid-connect
-            # plugin for session signing; not part of the OAuth credentials.
-            secret=session_secret,
-            realm_id=ol_platform_engineering_openlit_client.realm_id,
-            realm_name="ol-platform-engineering",
-            realm_public_key=ol_platform_engineering_openlit_client.realm_id.apply(
-                fetch_realm_public_key_partial
+            client_id=ol_platform_engineering_witan_token_sync_client.client_id,
+            client_secret=(
+                ol_platform_engineering_witan_token_sync_client.client_secret
             ),
         ).apply(json.dumps),
     )
-    # OPENLIT [END] # noqa: ERA001
+
+    # The client a human's `witan` CLI authenticates as (agent-kit ADR-0005 path
+    # a: `witan login`/`whoami`/`logout`, witan_core.remote.oidc). PUBLIC with
+    # ONLY the device authorization grant enabled — every property here is
+    # load-bearing:
+    #
+    #   - PUBLIC because a CLI on a laptop cannot keep a secret. `witan-cli` is
+    #     also the client_id agent-kit defaults to
+    #     (witan_core.remote.config.DEFAULT_CLIENT_ID), so a user needs no
+    #     client configuration at all — only WITAN_REMOTE_URL and
+    #     WITAN_OIDC_ISSUER.
+    #   - Device grant (RFC 8628) because the CLI has no loopback listener and
+    #     no browser of its own: it prints a code and a URL, the human completes
+    #     the login in whatever browser they already have, and the CLI polls the
+    #     token endpoint. That is the one flow that works over SSH into a
+    #     jumphost, which is where operators actually run this.
+    #   - standard/implicit/direct-access all OFF. Standard flow would need a
+    #     redirect URI (there is no web app here); direct access grants would let
+    #     the CLI collect a password, which is exactly what the device flow
+    #     exists to avoid.
+    #   - No `client_secret` argument: passing one to a PUBLIC client is silently
+    #     ignored by Keycloak and would only mislead a future reader into
+    #     thinking one is required.
+    #
+    # No Vault write accompanies this client, unlike every other client in this
+    # file: a public client has no secret to distribute, and issuer/client_id/
+    # audience are plain configuration a user sets from the runbook.
+    ol_platform_engineering_witan_cli_client = keycloak.openid.Client(
+        "ol-platform-engineering-witan-cli-client",
+        name="ol-platform-engineering-witan-cli-client",
+        realm_id="ol-platform-engineering",
+        client_id="witan-cli",
+        enabled=True,
+        access_type="PUBLIC",
+        oauth2_device_authorization_grant_enabled=True,
+        standard_flow_enabled=False,
+        implicit_flow_enabled=False,
+        direct_access_grants_enabled=False,
+        service_accounts_enabled=False,
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+
+    # Stamps `aud: witan` onto the access token this client mints, which is what
+    # makes the token usable: both the witan vMCP's incomingAuth
+    # (applications/witan/__main__.py, `audience: WITAN_OIDC_AUDIENCE`) and
+    # witan's own JWTVerifier (WITAN_OIDC_AUDIENCE, agent-kit ADR-0004 D1)
+    # reject a token whose audience does not match, and Keycloak puts no such
+    # audience in by default.
+    #
+    # `included_custom_audience` rather than `included_client_audience`: the
+    # audience is the *witan service*, which is not a Keycloak client at all
+    # (the deployment validates a literal string, it does not resolve a client),
+    # so there is no client id to point at. The value is deliberately the
+    # hard-coded default rather than realm config — `witan:oidc_audience` in the
+    # witan stack defaults to the same literal, and a mismatch between the two
+    # is an unauthenticated-CLI bug that only shows up at login time. If that
+    # stack's audience is ever overridden per environment, this must move to
+    # realm config in the same change.
+    keycloak.openid.AudienceProtocolMapper(
+        "ol-platform-engineering-witan-cli-audience-mapper",
+        realm_id=ol_platform_engineering_realm.id,
+        client_id=ol_platform_engineering_witan_cli_client.id,
+        name="witan-audience",
+        included_custom_audience="witan",
+        add_to_access_token=True,
+        # The witan service reads the ACCESS token; nothing consumes the id
+        # token, so it stays out of it.
+        add_to_id_token=False,
+        opts=resource_options,
+    )
+    # WITAN [END] # noqa: ERA001
 
     # JUPYTERHUB [START] # noqa: ERA001
     ol_platform_engineering_jupyterhub_client = keycloak.openid.Client(
@@ -509,6 +619,102 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         ).apply(json.dumps),
     )
     # LEEK [END] # noqa: ERA001
+
+    # GWAREK [START] # noqa: ERA001
+    # Guarded like OL ANALYTICS API and MIT LEARN in olapps.py: gwarek is a
+    # Production-only application (applications/gwarek has only a
+    # Pulumi.Production.yaml), so Pulumi.CI.yaml and Pulumi.QA.yaml define
+    # neither ol-platform-engineering-gwarek-client-secret nor
+    # -redirect-uris. Without this guard the CI and QA keycloak stacks try to
+    # create a CONFIDENTIAL client with a null secret and null
+    # valid_redirect_uris, which the provider rejects outright ("standard
+    # (authorization code) and implicit flows require at least one valid
+    # redirect uri") -- failing the whole substructure update, not just this
+    # resource.
+    if keycloak_realm_config.get("ol-platform-engineering-gwarek-client-secret"):
+        ol_platform_engineering_gwarek_client = keycloak.openid.Client(
+            "ol-platform-engineering-gwarek-client",
+            name="ol-platform-engineering-gwarek-client",
+            realm_id="ol-platform-engineering",
+            client_id="ol-gwarek-client",
+            client_secret=keycloak_realm_config.get(
+                "ol-platform-engineering-gwarek-client-secret"
+            ),
+            enabled=True,
+            access_type="CONFIDENTIAL",
+            standard_flow_enabled=True,
+            implicit_flow_enabled=False,
+            service_accounts_enabled=False,
+            valid_redirect_uris=keycloak_realm_config.get_object(
+                "ol-platform-engineering-gwarek-redirect-uris"
+            ),
+            opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+        )
+
+        # Realm-wide roles for gwarek's admin/viewer split. Kept distinct from
+        # the generic admin/developer roles above since those are shared across
+        # unrelated tools (Airbyte, Vault, Concourse) and granting them
+        # shouldn't imply gwarek access or vice versa. Realm roles land in
+        # every access/ID token's realm_access.roles claim automatically via
+        # Keycloak's default "roles" client scope -- but that default mapper's
+        # "Add to userinfo" is off, and APISIX's openid-connect plugin builds
+        # the X-Userinfo header gwarek's backend trusts from the /userinfo
+        # response, not the raw token. Confirmed in production: gwarek-admin
+        # assigned to a user still 403'd on every request ("No gwarek role
+        # assigned") because realm_access was simply absent from userinfo.
+        # The explicit UserRealmRoleProtocolMapper below (userinfo-only, so it
+        # doesn't duplicate what the default scope already puts in the
+        # access/ID token) closes that gap -- same shape as the Concourse
+        # groups-mapper above, just writing to realm_access.roles instead of
+        # a custom "groups" claim.
+        keycloak.Role(
+            "ol-platform-engineering-gwarek-admin-role",
+            realm_id=ol_platform_engineering_realm.id,
+            name="gwarek-admin",
+            description="Gwarek admin — manage integrations and trigger analysis",
+            opts=resource_options,
+        )
+        keycloak.Role(
+            "ol-platform-engineering-gwarek-viewer-role",
+            realm_id=ol_platform_engineering_realm.id,
+            name="gwarek-viewer",
+            description="Gwarek viewer — read-only access to findings/reports",
+            opts=resource_options,
+        )
+        keycloak.openid.UserRealmRoleProtocolMapper(
+            "ol-platform-engineering-gwarek-realm-role-userinfo-mapper",
+            realm_id=ol_platform_engineering_realm.id,
+            client_id=ol_platform_engineering_gwarek_client.id,
+            name="Realm Roles Userinfo Mapper",
+            claim_name="realm_access.roles",
+            multivalued=True,
+            add_to_id_token=False,
+            add_to_access_token=False,
+            add_to_userinfo=True,
+            opts=resource_options,
+        )
+
+        vault.generic.Secret(
+            "ol-platform-engineering-gwarek-client-vault-oidc-credentials",
+            path="secret-operations/sso/gwarek",
+            data_json=Output.all(
+                url=ol_platform_engineering_gwarek_client.realm_id.apply(
+                    lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+                ),
+                client_id=ol_platform_engineering_gwarek_client.client_id,
+                client_secret=ol_platform_engineering_gwarek_client.client_secret,
+                # This is included for the case where we are using
+                # traefik-forward-auth. It requires a random secret value to be
+                # present which is independent of the OAuth credentials.
+                secret=session_secret,
+                realm_id=ol_platform_engineering_gwarek_client.realm_id,
+                realm_name="ol-platform-engineering",
+                realm_public_key=ol_platform_engineering_gwarek_client.realm_id.apply(
+                    fetch_realm_public_key_partial
+                ),
+            ).apply(json.dumps),
+        )
+    # GWAREK [END] # noqa: ERA001
 
     # VAULT [START] # noqa: ERA001
     ol_platform_engineering_vault_client = keycloak.openid.Client(

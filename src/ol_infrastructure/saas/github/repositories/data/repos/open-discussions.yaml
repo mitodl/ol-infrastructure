@@ -1,0 +1,36 @@
+---
+_actions_secret_names:
+- HEROKU_API_KEY
+- HEROKU_EMAIL
+_custom_properties:
+  tier: tier-1
+_excluded_environments: 1723
+_has_branch_protection: true
+_pushed_at: '2026-07-23T18:59:37Z'
+_ruleset_count: 0
+_visibility: public
+allow_auto_merge: false
+allow_merge_commit: false
+allow_rebase_merge: false
+allow_squash_merge: true
+archetype: application
+default_branch: master
+dependabot_security_updates: false
+has_discussions: true
+has_projects: true
+has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: open-discussions
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+teams:
+  arbisoft-contractors: push
+  odl-engineering: push
+  odl-engineering-owners: admin
+  owners-mit-open: push
+topics:
+- community
+- mit
+- mm
+web_commit_signoff_required: false

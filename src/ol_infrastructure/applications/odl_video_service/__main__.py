@@ -25,9 +25,9 @@ from pulumi_aws.s3 import BucketCorsConfigurationCorsRuleArgs
 
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
-    DEFAULT_NGINX_PORT,
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
+    DEFAULT_WSGI_PORT,
 )
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.odl_video_service.k8s_secrets import (
@@ -41,6 +41,7 @@ from ol_infrastructure.components.aws.mediaconvert import (
 )
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.apisix import (
+    OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
 )
@@ -538,18 +539,29 @@ ovs_database_security_group = ec2.SecurityGroup(
         ec2.SecurityGroupIngressArgs(
             security_groups=[
                 vault_stack.require_output("vault_server")["security_group"],
-                data_vpc["security_groups"]["integrator"],
             ],
-            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"].apply(
-                lambda pod_cidrs: [*pod_cidrs, target_vpc["cidr"]]
-            ),
+            cidr_blocks=[target_vpc["cidr"]],
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
             description=(
-                "Access to Postgres from odl-video-service nodes on"
-                f" {DEFAULT_POSTGRES_PORT}"
+                f"Access to Postgres on {DEFAULT_POSTGRES_PORT} from the Vault server"
+                f" security group and the whole {target_vpc_name} CIDR"
+                " (odl-video-service nodes)"
             ),
+        ),
+        ec2.SecurityGroupIngressArgs(
+            security_groups=[
+                data_vpc["security_groups"]["integrator"],
+            ],
+            # Airbyte isn't using pod security groups in Kubernetes. This is a
+            # workaround to allow for data integration from the data Kubernetes
+            # cluster. (TMM 2025-05-16)
+            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"],
+            protocol="tcp",
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
+            description="Allow access from data VPC pod subnets.",
         ),
     ],
     vpc_id=target_vpc_id,
@@ -808,7 +820,7 @@ app_env_vars.update(k8s_extra_vars)
 # signals carry organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(app_env_vars, k8s_app_labels)
 
-default_domain = ovs_config.get("default_domain")
+default_domain = ovs_config.require("default_domain")
 tls_secret_name = "ovs-tls-pair"  # noqa: S105  # pragma: allowlist secret
 
 cert_manager_certificate = OLCertManagerCert(
@@ -848,9 +860,25 @@ ovs_k8s_app = OLApplicationK8s(
             blocking_threads_idle_timeout=120,
             enable_metrics=True,
             log_level=(ovs_config.get("log_level") or "info").lower(),
+            # Serve /static/* from the collectstatic emptyDir in Granian's Rust
+            # layer rather than through dj_static.Cling, which handles every
+            # asset request as a full WSGI call on the blocking thread pool.
+            # STATIC_ROOT is /src/staticfiles (BASE_DIR=/src in the image), the
+            # same directory the collectstatic init container populates, and
+            # Granian's default static route is /static -- which is what
+            # STATIC_URL is set to, since STATIC_CLOUDFRONT_DIST is unset for
+            # this app.
+            static_path_mounts=["/src/staticfiles"],
         ),
-        import_nginx_config=True,
-        import_nginx_config_path="files/web.conf_granian",
+        # The nginx sidecar was a pure reverse proxy for this app: unlike the
+        # other Django deployments it had no /static block (dj_static.Cling
+        # already served static from inside the WSGI app), so removing it costs
+        # nothing but the extra hop. Its only other content -- a /nginx-health
+        # endpoint duplicating Django's /health/*, an X-Forwarded-Proto
+        # re-forward of the header APISix already sets, and five YouTube
+        # redirects -- is covered by the Django health endpoints and the
+        # redirect routes on the APISix route below.
+        import_nginx_config=False,
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         init_migrations=True,
         init_collectstatic=True,
@@ -860,7 +888,7 @@ ovs_k8s_app = OLApplicationK8s(
             "liveness_probe": kubernetes.core.v1.ProbeArgs(
                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
                     path="/health/liveness/",
-                    port=DEFAULT_NGINX_PORT,
+                    port=DEFAULT_WSGI_PORT,
                 ),
                 initial_delay_seconds=30,
                 period_seconds=30,
@@ -870,7 +898,7 @@ ovs_k8s_app = OLApplicationK8s(
             "readiness_probe": kubernetes.core.v1.ProbeArgs(
                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
                     path="/health/readiness/",
-                    port=DEFAULT_NGINX_PORT,
+                    port=DEFAULT_WSGI_PORT,
                 ),
                 initial_delay_seconds=15,
                 period_seconds=15,
@@ -880,7 +908,7 @@ ovs_k8s_app = OLApplicationK8s(
             "startup_probe": kubernetes.core.v1.ProbeArgs(
                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
                     path="/health/startup/",
-                    port=DEFAULT_NGINX_PORT,
+                    port=DEFAULT_WSGI_PORT,
                 ),
                 initial_delay_seconds=10,
                 period_seconds=10,
@@ -930,15 +958,96 @@ ovs_k8s_app = OLApplicationK8s(
     ),
 )
 
+# Legacy vanity URLs for collections that have since moved to YouTube. These
+# lived as `return 301` blocks in the nginx sidecar; they move here verbatim
+# when the sidecar goes away. nginx matched them by longest-prefix, so the three
+# individual videos have to outrank the collection-wide redirect, which in turn
+# has to outrank the `/*` passthrough -- hence the explicit priorities.
+#
+# Every entry carries both the bare path and a `*` variant because an nginx
+# `location /foo` is a prefix match: `/foo/`, and anything below it, hit the same
+# redirect. Without the wildcard a trailing slash on one of the video URLs would
+# fall through to the priority-10 collection route and land on the channel page
+# instead of the specific video.
+_YOUTUBE_COLLECTION_REDIRECTS: list[tuple[str, list[str], str, int]] = [
+    (
+        "letterlocking-iron-gall-ink",
+        [
+            "/collections/letterlocking/videos/30213-iron-gall-ink-a-quick-and-easy-method",
+            "/collections/letterlocking/videos/30213-iron-gall-ink-a-quick-and-easy-method*",
+        ],
+        "https://www.youtube.com/playlist?list=PL2uZTM-xaHP4tFQT7eTTK3sWRoJMcDWwB",
+        20,
+    ),
+    (
+        "letterlocking-elizabeth-stuart",
+        [
+            "/collections/letterlocking/videos/30215-elizabeth-stuart-s-deciphering-"
+            "sir-thomas-roe-s-letter-cryptography-1626",
+            "/collections/letterlocking/videos/30215-elizabeth-stuart-s-deciphering-"
+            "sir-thomas-roe-s-letter-cryptography-1626*",
+        ],
+        "https://www.youtube.com/watch?v=6X_ZXrLs8I8&list=PL2uZTM-xaHP4tFQT7eTTK3sWRoJMcDWwB&index=3&t=0s",
+        20,
+    ),
+    (
+        "letterlocking-tiny-spy-letter",
+        [
+            "/collections/letterlocking/videos/30209-a-tiny-spy-letter-constantijn-"
+            "huygens-to-amalia-von-solms-1635",
+            "/collections/letterlocking/videos/30209-a-tiny-spy-letter-constantijn-"
+            "huygens-to-amalia-von-solms-1635*",
+        ],
+        "https://www.youtube.com/watch?v=PePWd-h679c&list=PL2uZTM-xaHP4tFQT7eTTK3sWRoJMcDWwB&index=7&t=0s",
+        20,
+    ),
+    (
+        "letterlocking-collection",
+        ["/collections/letterlocking", "/collections/letterlocking*"],
+        "https://www.youtube.com/c/Letterlocking/videos",
+        10,
+    ),
+    (
+        "mit-energy-initiative-collection",
+        [
+            "/collections/c8c5179c7596408fa0f09f6b76082331",
+            "/collections/c8c5179c7596408fa0f09f6b76082331*",
+        ],
+        "https://www.youtube.com/c/MITEnergyInitiative",
+        10,
+    ),
+]
+
 ovs_apisix_httproute = OLApisixRoute(
     f"ovs-apisix-httproute-{stack_info.env_suffix}",
     route_configs=[
+        *(
+            OLApisixRouteConfig(
+                route_name=route_name,
+                priority=priority,
+                hosts=[default_domain],
+                paths=paths,
+                # The redirect plugin short-circuits in the rewrite phase, so
+                # this backend is never dialed. It is here because an
+                # ApisixRoute rule has to name either a backend or an upstream.
+                backend_service_name="ovs-webapp",
+                backend_service_port=DEFAULT_WSGI_PORT,
+                plugins=[
+                    OLApisixPluginConfig(
+                        name="redirect",
+                        secretRef=None,
+                        config={"uri": target, "ret_code": 301},
+                    ),
+                ],
+            )
+            for route_name, paths, target, priority in _YOUTUBE_COLLECTION_REDIRECTS
+        ),
         OLApisixRouteConfig(
             route_name="passthrough",
             hosts=[default_domain],
             paths=["/*"],
             backend_service_name="ovs-webapp",
-            backend_service_port=DEFAULT_NGINX_PORT,
+            backend_service_port=DEFAULT_WSGI_PORT,
             plugins=[],
         ),
     ],

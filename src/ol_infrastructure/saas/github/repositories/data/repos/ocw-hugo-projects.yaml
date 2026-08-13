@@ -1,0 +1,31 @@
+---
+_custom_properties:
+  tier: tier-1
+_direct_collaborators:
+  gumaerc: admin
+_excluded_environments: 1
+_has_branch_protection: true
+_pushed_at: '2026-08-06T21:13:25Z'
+_ruleset_count: 0
+_visibility: public
+allow_auto_merge: false
+allow_merge_commit: false
+allow_rebase_merge: false
+allow_squash_merge: true
+archetype: library
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: A collection of Hugo project templates for different types of OCW websites
+has_discussions: false
+has_projects: true
+has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: ocw-hugo-projects
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+teams:
+  arbisoft-contractors: push
+  odl-engineering: push
+  odl-engineering-owners: admin
+web_commit_signoff_required: false

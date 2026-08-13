@@ -50,9 +50,20 @@ setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 bot_secrets = read_yaml_secrets(Path("release_bot/secrets.production.yaml"))
 concourse_ops_secrets = read_yaml_secrets(Path("concourse/operations.production.yaml"))
-github_token = concourse_ops_secrets["pipelines"]["infrastructure/github"][
-    "issues_resource_access_token"
-]
+# Same GitHub App installation Concourse's github-issues resource type can use
+# via auth_method="app" (ol_concourse.lib.resources.github_issues) -- sharing
+# one App instead of each consumer holding its own long-lived PAT. Backed by
+# the "shared/github_app" entry, the same Vault-synced secret k8s_apps/
+# pipeline.py references as ((github_app.release_bot_app_id)) etc. Named
+# "github_app" rather than "github" because every Concourse team already has
+# its own team-scoped "github" secret (e.g. secret-concourse/infrastructure/
+# github) -- Concourse's Vault credential manager tries team-scoped paths
+# before the shared fallback, so "github" alone would resolve to the wrong,
+# fieldless secret for any pipeline in a team that already has one.
+github_secrets = concourse_ops_secrets["pipelines"]["shared/github_app"]
+github_app_id = github_secrets["release_bot_app_id"]
+github_app_installation_id = github_secrets["release_bot_app_installation_id"]
+github_app_private_key = github_secrets["release_bot_app_pem"]
 
 bot_config = Config("release_bot")
 concourse_url = bot_config.get("concourse_url") or "https://cicd.odl.mit.edu"
@@ -114,7 +125,9 @@ bot_secret = kubernetes.core.v1.Secret(
         "slack-app-token": bot_secrets["slack-app-token"],
         "concourse-user": bot_secrets["concourse-username"],
         "concourse-password": bot_secrets["concourse-password"],
-        "github-token": github_token,
+        "github-app-id": str(github_app_id),
+        "github-app-installation-id": str(github_app_installation_id),
+        "github-app-private-key": github_app_private_key,
     },
 )
 
@@ -171,7 +184,14 @@ bot_deployment = kubernetes.apps.v1.Deployment(
                             _secret_env("SLACK_APP_TOKEN", "slack-app-token"),
                             _secret_env("CONCOURSE_USER", "concourse-user"),
                             _secret_env("CONCOURSE_PASSWORD", "concourse-password"),
-                            _secret_env("GITHUB_TOKEN", "github-token"),
+                            _secret_env("GITHUB_APP_ID", "github-app-id"),
+                            _secret_env(
+                                "GITHUB_APP_INSTALLATION_ID",
+                                "github-app-installation-id",
+                            ),
+                            _secret_env(
+                                "GITHUB_APP_PRIVATE_KEY", "github-app-private-key"
+                            ),
                             kubernetes.core.v1.EnvVarArgs(
                                 name="CONCOURSE_URL",
                                 value=concourse_url,

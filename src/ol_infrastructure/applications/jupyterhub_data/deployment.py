@@ -432,9 +432,13 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     "podPriority": {"enabled": True},
                     "userScheduler": {
                         "enabled": True,
+                        # This scheduler's informer caches scale with the total
+                        # object count of the whole cluster, not with this
+                        # namespace. data-production routinely carries several
+                        # thousand pods, which OOMKilled the previous 64Mi cap.
                         "resources": {
-                            "requests": {"cpu": "100m", "memory": "64Mi"},
-                            "limits": {"memory": "64Mi"},
+                            "requests": {"cpu": "100m", "memory": "256Mi"},
+                            "limits": {"memory": "1Gi"},
                         },
                     },
                 },

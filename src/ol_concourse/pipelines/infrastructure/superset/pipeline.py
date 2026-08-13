@@ -25,6 +25,7 @@ from ol_concourse.pipelines.constants import (
     dockerhub_ecr_image_uri,
 )
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.secrets_map import project_secrets_paths
 
 
 def build_superset_docker_pipeline() -> Pipeline:
@@ -36,6 +37,7 @@ def build_superset_docker_pipeline() -> Pipeline:
         repository="superset",
         tag_filter="^6",
         order_by="time",
+        github_token="",
     )
 
     docker_code_repo = git_repo(
@@ -52,7 +54,7 @@ def build_superset_docker_pipeline() -> Pipeline:
         paths=[
             *PULUMI_WATCHED_PATHS,
             "src/ol_infrastructure/applications/superset/",
-            "src/bridge/secrets/superset",
+            *project_secrets_paths("applications/superset/"),
         ],
     )
 

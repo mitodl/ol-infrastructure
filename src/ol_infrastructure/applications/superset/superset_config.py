@@ -1,4 +1,10 @@
 # ruff: noqa: ERA001
+#
+# This file is injected into the Superset Helm chart via `configOverrides`, and
+# the chart pipes that value through Helm's `tpl` function. Anything that looks
+# like a Go template action -- `{`+`{ ... }`+`}`, even inside a comment or a
+# string -- is evaluated at render time and fails the whole release. Never write
+# doubled curly braces here.
 import logging
 import os
 import re
@@ -679,6 +685,98 @@ def _interpolate_env_vars(value: str | None) -> str | None:
     return _ENV_VAR_PATTERN.sub(_replace, value)
 
 
+# ---------------------------------------------------
+# MCP Server Configuration
+# ---------------------------------------------------
+# The MCP server runs as a separate Kubernetes Deployment (superset-mcp)
+# alongside the main Superset web pods.  It exposes the Superset MCP API at
+# /mcp, routed through the existing Gateway listener at https://{domain}/mcp.
+#
+# Authentication re-uses the Keycloak RS256 JWT tokens already issued for
+# Superset UI access.  The MCP server validates incoming Bearer tokens against
+# the Keycloak JWKS endpoint and resolves the Superset user by
+# preferred_username, which mirrors the existing
+# CustomSsoSecurityManager.load_user_jwt path.
+#
+# Multi-pod session state is backed by Redis DB 3 (distinct from the Superset
+# metadata cache on DB 0, Celery broker on DB 1, and Celery results on DB 2)
+# so that all MCP replicas share session context.
+#
+# Requires: fastmcp package in the Superset image (pip install fastmcp).
+
+# The bind address and port are not configurable from here: `superset mcp run`
+# takes them as CLI flags, and the chart's supersetMcp.command already passes
+# --host 0.0.0.0 with the port from supersetMcp.service.port.
+#
+# Public-facing base URL for MCP-generated links (e.g. chart preview URLs).
+# Injected at runtime via SUPERSET_MCP_PUBLIC_URL env var set in Pulumi.
+MCP_SERVICE_URL = os.environ.get("SUPERSET_MCP_PUBLIC_URL")
+
+# JWT authentication via Keycloak RS256 JWKS endpoint.
+# OIDC_URL is the Keycloak realm base URL injected from the oidc k8s secret
+# (e.g. https://keycloak.example.com/realms/master).
+MCP_AUTH_ENABLED = True
+MCP_JWT_ALGORITHM = "RS256"
+# Keycloak publishes its realm signing keys at this well-known path.
+MCP_JWKS_URI = f"{OIDC_URL}/protocol/openid-connect/certs" if OIDC_URL else None
+# Keycloak sets the 'iss' claim to the realm URL.
+MCP_JWT_ISSUER = OIDC_URL
+
+
+def _mcp_user_resolver(app: object, access_token: object) -> str:  # noqa: ARG001
+    """Resolve a Superset username from a validated Keycloak JWT.
+
+    Tries ``preferred_username`` first (the canonical Keycloak claim), then
+    falls back to ``username``, ``email``, and the ``sub`` subject claim in
+    that order.  The primary ``preferred_username`` path aligns with
+    ``CustomSsoSecurityManager.load_user_jwt``; the additional fallbacks handle
+    machine/service-account tokens that may omit ``preferred_username``.
+    """
+    payload: dict[str, object] = getattr(access_token, "payload", {})
+    return (
+        str(payload.get("preferred_username") or "")
+        or str(payload.get("username") or "")
+        or str(payload.get("email") or "")
+        or str(getattr(access_token, "subject", "") or "")
+        or ""
+    )
+
+
+MCP_USER_RESOLVER = _mcp_user_resolver
+
+# Redis-backed session store so all MCP replicas share session state.
+# Uses Redis DB 3 — distinct from metadata cache (DB 0), Celery broker (DB 1),
+# and Celery results backend (DB 2).
+MCP_STORE_CONFIG = {
+    "enabled": True,
+    "CACHE_REDIS_URL": f"rediss://default:{REDIS_TOKEN}@{REDIS_HOST}:{REDIS_PORT}/3",
+    "event_store_max_events": 100,
+    "event_store_ttl": 3600,
+}
+
+# Response caching for read-heavy tool calls (dashboard/dataset listings).
+# Mutating and non-deterministic tools are always excluded.
+MCP_CACHE_CONFIG = {
+    "enabled": True,
+    "CACHE_KEY_PREFIX": "superset_mcp_cache",
+    "list_tools_ttl": 300,
+    "list_resources_ttl": 300,
+    "list_prompts_ttl": 300,
+    "read_resource_ttl": 3600,
+    "get_prompt_ttl": 3600,
+    "call_tool_ttl": 3600,
+    # No per-item size cap: upstream documents max_item_size but
+    # _build_caching_settings() never forwards it to FastMCP's
+    # ResponseCachingMiddleware, so setting it would be inert.
+    "excluded_tools": [
+        "execute_sql",
+        "generate_dashboard",
+        "generate_chart",
+        "update_chart",
+    ],
+}
+
+
 def DB_CONNECTION_MUTATOR(  # noqa: N802
     uri: URL,
     params: dict[str, object],
@@ -718,3 +816,52 @@ def DB_CONNECTION_MUTATOR(  # noqa: N802
         database=new_database,
     )
     return uri, params
+
+
+# ---------------------------------------------------
+# STARROCKS DIALECT / SQLALCHEMY 1.4 COMPATIBILITY
+# ---------------------------------------------------
+# Reflecting any StarRocks table with a PARTITION BY clause raises
+# `TypeError: unhashable type: 'ReflectedPartitionInfo'`, which surfaces as an
+# HTTP 500 on every endpoint that has to reflect a new dataset (dataset create,
+# /get_or_create/). In production this blocked three Iceberg-partitioned
+# datasets from ever being created -- organization_administration_report,
+# tfact_problem_events, tfact_studentmodule_problems -- failing the nightly
+# Dagster sync run for 11 runs straight.
+#
+# The collision is between two upstreams, neither of which is wrong alone:
+#
+#   * SQLAlchemy 1.4's @reflection.cache builds its cache key from *every*
+#     kwarg it is handed -- `tuple((k, v) for k, v in kw.items() if k !=
+#     "info_cache")` -- and Inspector.reflect_table merges the dialect's
+#     get_table_options() result into table.dialect_kwargs before splatting
+#     them into get_columns(). (SQLAlchemy 2.0 filters that key by type, so
+#     this only bites on 1.x, which is what Superset 6 pins.)
+#   * The starrocks dialect returns its reflected table options as plain
+#     non-frozen dataclasses, so `__hash__` is None and the key can't be
+#     hashed.
+#
+# Give those dataclasses a hash derived from __str__ -- the dialect's own
+# canonical DDL rendering of the fields, so objects that compare equal always
+# hash equal. Discovered by iteration rather than by name so a dialect upgrade
+# that adds another reflected option is covered too.
+#
+# Remove once the dialect ships hashable reflection objects (or Superset moves
+# to SQLAlchemy 2.0).
+try:
+    import dataclasses
+
+    from starrocks.engine import interfaces as _starrocks_interfaces
+except ImportError:  # dialect absent or restructured -- nothing to patch
+    logging.getLogger(__name__).debug(
+        "starrocks.engine.interfaces not importable; skipping reflection shim"
+    )
+else:
+    for _name in dir(_starrocks_interfaces):
+        _candidate = getattr(_starrocks_interfaces, _name)
+        if (
+            isinstance(_candidate, type)
+            and dataclasses.is_dataclass(_candidate)
+            and _candidate.__hash__ is None
+        ):
+            _candidate.__hash__ = lambda self: hash(str(self))

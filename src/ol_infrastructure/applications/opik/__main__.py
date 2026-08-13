@@ -152,7 +152,7 @@ opik_app = OLEKSAuthBinding(
 # VSO K8s Secret — ClickHouse credentials as env vars
 #
 # The Vault Secrets Operator renders the templates below into a K8s Secret. Raw
-# Vault keys (admin, tensorzero, openlit, ...) are excluded by default; only the
+# Vault keys (admin, tensorzero, ...) are excluded by default; only the
 # rendered env-var keys are written. Both keys map to the single ``opik`` user
 # password so the backend can use it for runtime queries and migrations alike.
 ############################################################
@@ -369,6 +369,20 @@ opik_apisix_route = OLApisixRoute(
     k8s_namespace=OPIK_NAMESPACE,
     k8s_labels=k8s_global_labels,
     route_configs=[
+        # /health -> unauthenticated. The chart's frontend nginx serves this
+        # path directly (see configmap-frontend-nginx.yaml's "Dedicated
+        # healthcheck endpoint" location) for load balancer / uptime checks,
+        # so it must bypass OIDC entirely rather than redirect to Keycloak.
+        # Highest priority so it wins over the catch-all UI rule below.
+        OLApisixRouteConfig(
+            route_name="opik-health",
+            priority=30,
+            hosts=[opik_domain],
+            paths=["/health"],
+            backend_service_name="opik-frontend",
+            backend_service_port=5173,
+            shared_plugin_config_name=opik_shared_plugins.resource_name,
+        ),
         # /api/* WITH an Authorization header -> bearer-token validation (SDK /
         # programmatic clients). Highest priority so it wins over the session
         # /api rule when a token is present.

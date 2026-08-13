@@ -44,6 +44,7 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import registry_image, ssh_git_repo
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+from ol_concourse.pipelines.ecr import configure_ecr_repository_task
 from ol_concourse.pipelines.open_edx.grader_images.base_image_pipeline import (
     DEFAULT_PYTHON_VERSION,
 )
@@ -180,6 +181,7 @@ def grader_image_pipeline(config: GraderPipelineConfig) -> Pipeline:
                 ),
             ),
             ensure_ecr_task(config.ecr_repo_name),
+            configure_ecr_repository_task(config.ecr_repo_name),
             PutStep(
                 put=grader_ecr_image.name,
                 params={

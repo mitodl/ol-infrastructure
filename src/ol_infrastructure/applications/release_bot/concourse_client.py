@@ -3,6 +3,7 @@
 import asyncio
 import os
 import time
+from typing import Any
 
 import aiohttp
 
@@ -72,13 +73,92 @@ async def trigger_job(pipeline: str, job: str) -> str:
     return f"{CONCOURSE_URL}/builds/{build['id']}"
 
 
-async def check_resource(pipeline: str, resource: str) -> None:
-    """Trigger an immediate check of a resource instead of waiting for its interval.
+_CHECK_POLL_SECONDS = 2
+_CHECK_TIMEOUT_SECONDS = 180
+_TERMINAL_BUILD_STATUSES = frozenset({"succeeded", "failed", "errored", "aborted"})
 
-    Used after closing a release issue so the production `-release-gate`
-    resource picks up the closed issue right away, rather than leaving the
-    production deploy stalled for up to its normal check_every interval.
+
+async def _get_build_status(build_id: int) -> str:
+    token = await _get_token()
+    url = f"{CONCOURSE_URL}/api/v1/builds/{build_id}"
+    async with (
+        aiohttp.ClientSession() as session,
+        session.get(url, headers={"Authorization": f"Bearer {token}"}) as resp,
+    ):
+        resp.raise_for_status()
+        build = await resp.json()
+    return build["status"]
+
+
+async def _get_resource(pipeline: str, resource: str) -> dict[str, Any]:
+    token = await _get_token()
+    url = (
+        f"{CONCOURSE_URL}/api/v1/teams/{CONCOURSE_TEAM}"
+        f"/pipelines/{pipeline}/resources/{resource}"
+    )
+    async with (
+        aiohttp.ClientSession() as session,
+        session.get(url, headers={"Authorization": f"Bearer {token}"}) as resp,
+    ):
+        resp.raise_for_status()
+        return await resp.json()
+
+
+async def _read_build(resp: aiohttp.ClientResponse) -> dict[str, Any] | None:
+    """Return the check build from a response, or None if there isn't one.
+
+    Concourse 8.2.5 *does* return the check build as JSON -- it is just
+    mislabeled. `CheckResource` commits the status line before writing the
+    body::
+
+        w.WriteHeader(http.StatusCreated)
+        err = json.NewEncoder(w).Encode(present.Build(build, nil, nil))
+
+    so the headers flush with Go's default `text/plain; charset=utf-8` and the
+    JSON follows. `content_type=None` disables aiohttp's MIME check and
+    decodes it. Calling plain `resp.json()` here is what raised
+    `ContentTypeError` in production -- the mimetype was wrong, not the body
+    missing.
+
+    Still tolerant of a genuinely absent or non-JSON body, since this is the
+    only place that assumption is made and other Concourse versions differ.
     """
+    try:
+        body = await resp.json(content_type=None)
+    except (aiohttp.ContentTypeError, ValueError):
+        return None
+    return body if isinstance(body, dict) else None
+
+
+async def check_resource(pipeline: str, resource: str) -> None:
+    """Run a resource check and wait for it to finish.
+
+    Used to make a resource pick up new versions immediately rather than
+    waiting for its `check_every` interval — after closing a release issue so
+    the production `-release-gate` sees it right away, and before triggering a
+    release so the build binds the current version.
+
+    **Waits for the check to finish.** The POST only starts it and returns
+    immediately (`fly check-resource` separately streams the check build's
+    events unless `--async` is passed). Returning as soon as the POST came
+    back would let a caller trigger a job before the new version was recorded,
+    which is exactly the stale-version binding this is meant to prevent.
+
+    The check build comes back in the POST body (see :func:`_read_build`) and
+    is polled by id until it reaches a terminal status, which must be
+    `succeeded`. If some other Concourse version returns no usable build, the
+    resource's own `build` summary is polled instead -- `atc.Resource` in
+    8.2.5 carries `last_checked` and `build`, and notably *no* `check_error`
+    field, so the summary's status is the only outcome signal available there.
+    A bare `last_checked` bump is not treated as success: a failed check
+    advances it too.
+
+    :raises RuntimeError: If the check does not succeed, or does not finish
+        within `_CHECK_TIMEOUT_SECONDS`.
+    """
+    before = await _get_resource(pipeline, resource)
+    last_checked = before.get("last_checked") or 0
+
     token = await _get_token()
     url = (
         f"{CONCOURSE_URL}/api/v1/teams/{CONCOURSE_TEAM}"
@@ -91,3 +171,33 @@ async def check_resource(pipeline: str, resource: str) -> None:
         ) as resp,
     ):
         resp.raise_for_status()
+        build = await _read_build(resp)
+
+    build_id = build.get("id") if build else None
+    deadline = time.monotonic() + _CHECK_TIMEOUT_SECONDS
+    while True:
+        if build_id is not None:
+            status = await _get_build_status(build_id)
+        else:
+            # No build to poll. The resource's own summary describes the
+            # latest check, but only once this check has actually landed --
+            # before then it still describes the *previous* one.
+            current = await _get_resource(pipeline, resource)
+            status = None
+            if (current.get("last_checked") or 0) > last_checked:
+                status = (current.get("build") or {}).get("status")
+
+        if status in _TERMINAL_BUILD_STATUSES:
+            if status != "succeeded":
+                where = f" {CONCOURSE_URL}/builds/{build_id}" if build_id else ""
+                msg = f"Check of {pipeline}/{resource} {status}.{where}"
+                raise RuntimeError(msg)
+            return
+
+        if time.monotonic() >= deadline:
+            msg = (
+                f"Check of {pipeline}/{resource} did not finish within "
+                f"{_CHECK_TIMEOUT_SECONDS}s (last status: {status!r})."
+            )
+            raise RuntimeError(msg)
+        await asyncio.sleep(_CHECK_POLL_SECONDS)

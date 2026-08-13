@@ -1,0 +1,27 @@
+---
+_custom_properties:
+  tier: unmanaged
+_has_branch_protection: false
+_pushed_at: '2022-12-14T18:31:57Z'
+_ruleset_count: 0
+_visibility: public
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: master
+description: MITOL Fork of ckeditor5 for our ocw-studio resource link plugin
+has_discussions: false
+has_issues: true
+has_projects: true
+has_wiki: true
+homepage: https://ckeditor.com/ckeditor-5
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: ckeditor5
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+teams:
+  devops: admin
+  odl-engineering: push
+web_commit_signoff_required: false

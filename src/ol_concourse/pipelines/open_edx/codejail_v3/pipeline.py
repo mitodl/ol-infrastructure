@@ -23,6 +23,7 @@ from bridge.settings.openedx.types import DeploymentEnvRelease, OpenEdxSupported
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.secrets_map import project_secrets_paths
 
 
 def build_codejail_pipeline(
@@ -58,6 +59,7 @@ def build_codejail_pipeline(
             *PULUMI_WATCHED_PATHS,
             PULUMI_CODE_PATH.joinpath("applications/codejail/"),
             "src/bridge/settings/openedx",
+            *project_secrets_paths("applications/codejail/"),
         ],
     )
 

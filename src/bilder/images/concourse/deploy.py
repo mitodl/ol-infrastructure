@@ -7,7 +7,7 @@ from pathlib import Path
 import yaml
 from pyinfra import host
 from pyinfra.api.util import get_template
-from pyinfra.operations import files, systemd
+from pyinfra.operations import files, server, systemd
 
 from bilder.components.alloy.models import AlloyConfig
 from bilder.components.alloy.steps import install_and_configure_alloy
@@ -524,6 +524,37 @@ if host.get_fact(HasSystemd):
                 enabled=True,
                 daemon_reload=worker_services_changed,
             )
+        # register_concourse_service above started concourse.service, which
+        # pulled in concourse-worker-preflight.service as a hard dependency
+        # (Requires=/After=) and ran it for real -- on *this* Packer builder
+        # instance. That run wrote /etc/default/concourse-name using the
+        # builder's own instance-id, and the write is intentionally
+        # idempotent (never overwritten once present). Left in place, every
+        # real worker booted from this AMI would inherit that same stale
+        # identity file, skip writing its own, and register with the TSA
+        # under the builder's identity -- colliding with every other worker
+        # from this image. Stop the service and remove the file so the AMI
+        # ships clean; a real instance's first boot starts concourse.service
+        # fresh (still enabled via WantedBy=multi-user.target) and preflight
+        # pins that instance's own identity.
+        #
+        # This must be a raw server.shell, not files.file(present=False) /
+        # systemd.service(running=False): pyinfra compiles this whole script
+        # into an ordered command queue by fact-checking each operation
+        # against the host's state *before any queued command has actually
+        # run* -- register_concourse_service's start was only queued, not
+        # yet applied, when these facts were checked. Both fact-gated ops
+        # therefore saw "file absent" / "service not running" and queued
+        # nothing. server.shell has no such precondition check, so it always
+        # queues its commands, which then run for real at this point in the
+        # execution order (after the start, once it has actually happened).
+        server.shell(
+            name="Stop concourse.service and remove build-time-baked worker identity",
+            commands=[
+                "systemctl stop concourse.service || true",
+                "rm -f /etc/default/concourse-name",
+            ],
+        )
     service_configuration_watches(
         service_name="concourse",
         watched_files=watched_concourse_files,

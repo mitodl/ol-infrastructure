@@ -38,6 +38,6 @@ path "sys/leases/revoke" {
   }
 }
 
-path "secret-global/learn_ai" {
+path "secret-global/data/grafana" {
   capabilities = ["read"]
 }

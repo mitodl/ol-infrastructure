@@ -95,7 +95,12 @@ spec:
             memory: 2Gi
         readinessProbe:
           httpGet:
-            path: /health/
+            # learn-ai runs with SECURE_SSL_REDIRECT=True, so a plain-HTTP
+            # request from kubelet to a non-exempt path 301s to https:// and
+            # the probe fails against the HTTP-only app port. The dedicated
+            # health endpoints are in SECURE_REDIRECT_EXEMPT; the trailing
+            # slash is required to match its `^health/readiness/$` pattern.
+            path: /health/readiness/
             port: 8001
           initialDelaySeconds: 15
           periodSeconds: 10

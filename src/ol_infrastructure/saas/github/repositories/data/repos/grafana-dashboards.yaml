@@ -1,0 +1,29 @@
+---
+_custom_properties:
+  tier: unmanaged
+_direct_collaborators:
+  Ardiea: admin
+  odlbot: admin
+_has_branch_protection: false
+_pushed_at: '2025-11-21T19:30:39Z'
+_ruleset_count: 0
+_visibility: public
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: main
+description: Automatically managed grafana dashboards used by mitodl
+has_discussions: false
+has_issues: true
+has_projects: true
+has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: grafana-dashboards
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+teams:
+  devops: admin
+  odl-engineering: admin
+web_commit_signoff_required: false

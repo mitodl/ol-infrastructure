@@ -1,0 +1,29 @@
+---
+_custom_properties:
+  tier: unmanaged
+_direct_collaborators:
+  Anas12091101: admin
+_has_branch_protection: false
+_pushed_at: '2025-11-14T16:22:25Z'
+_ruleset_count: 0
+_visibility: public
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: fork
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: A React-based micro frontend for the Open edX discussion forums.
+has_discussions: false
+has_projects: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: frontend-app-discussions
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+teams:
+  odl-engineering: push
+  odl-engineering-owners: admin
+web_commit_signoff_required: false

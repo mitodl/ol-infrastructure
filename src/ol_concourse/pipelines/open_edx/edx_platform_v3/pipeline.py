@@ -31,9 +31,10 @@ from bridge.settings.openedx.types import (
 )
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.secrets_map import project_secrets_paths
 
 
-def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
+def build_edx_pipeline(release_names: list[str]) -> Pipeline:
     # This resource will be shared by all releases/deployment combinations
     lehrer_git_resource = git_repo(
         name=Identifier("lehrer"),
@@ -46,7 +47,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
     pulumi_fragments = []
     group_configs = []
 
-    for release_name in releases:
+    for release_name in release_names:
         job_names = []
         for deployment in filter_deployments_by_release(release_name):
             deployment_name = deployment.deployment_name
@@ -95,6 +96,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                 repository="node",
                 tag_filter=rf"^v({node_version}\.\d+\.\d+)",
                 order_by="version",
+                github_token="",
             )
 
             # Pulumi code related resource setup
@@ -107,8 +109,8 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                 paths=[
                     *PULUMI_WATCHED_PATHS,
                     "src/ol_infrastructure/applications/edxapp/",
-                    "src/bridge/secrets/edxapp/",
                     "src/bridge/settings/openedx/",
+                    *project_secrets_paths("applications/edxapp/"),
                 ],
             )
 
@@ -217,6 +219,17 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:  # noqa: ARG001
                     # edxapp's Pulumi code provisions Fastly resources; refresh
                     # calls the Fastly API and fails while the token is rotated.
                     refresh_stack=False,
+                    # Gate each stage on a preview OF ITSELF. edxapp is the
+                    # largest blast radius in the estate and its environments
+                    # are the most likely to have drifted -- exactly what the
+                    # previously-deployed stack's diff cannot show.
+                    #
+                    # This also fixes coverage that preview_next_stack could not
+                    # reach: edxapp splits one deployment across Open edX
+                    # releases, so mitx CI and mitx QA are built by DIFFERENT
+                    # chain calls and a next-stack preview cannot span them.
+                    topology="preview-gated",
+                    auto_deploy_stages=["CI"],
                     stack_names=[
                         f"{deployment.deployment_name}.{stage}"
                         for stage in deployment.envs_by_release(release_name)

@@ -13,7 +13,7 @@ from pulumi_vault import (
     jwt,
 )
 
-from bridge.lib.magic_numbers import EIGHT_HOURS_SECONDS
+from bridge.lib.magic_numbers import EIGHT_HOURS_SECONDS, ONE_MONTH_SECONDS
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.ol_types import AWSBase, Environment
 from ol_infrastructure.lib.pulumi_helper import (
@@ -150,10 +150,16 @@ developer_role = jwt.AuthBackendRole(
 admin_role = jwt.AuthBackendRole(
     "admin-role",
     backend=vault_oidc_keycloak_auth.path,
-    # Pinned rather than inheriting Vault's system default, which is far longer
-    # than a working session needs.
-    token_ttl=EIGHT_HOURS_SECONDS,
-    token_max_ttl=EIGHT_HOURS_SECONDS,
+    # Longer than the eight hours a working session needs, because dynamic
+    # secrets are children of the token that created them: an eight-hour admin
+    # token means every credential minted through it dies in eight hours too.
+    # Airbyte stores connector credentials once and has no way to renew a lease,
+    # so its hand-issued source credentials were expiring the same day they were
+    # entered. Interim measure -- mitodl/hq#12319 moves Airbyte's source
+    # credentials to Vault static roles, at which point this drops back to
+    # EIGHT_HOURS_SECONDS.
+    token_ttl=ONE_MONTH_SECONDS,
+    token_max_ttl=ONE_MONTH_SECONDS,
     role_name="admin",
     token_policies=[admin_policy.name],
     allowed_redirect_uris=[

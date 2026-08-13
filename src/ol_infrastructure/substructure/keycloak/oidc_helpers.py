@@ -61,8 +61,13 @@ def oidc_identity_provider_args_from_discovery_url(
             scope for scope in required_scopes if scope not in supported_scopes
         ]
         if missing_scopes:
-            msg = f"OIDC provider at {discovery_url} does not support required scopes: {', '.join(missing_scopes)}"  # noqa: E501
-            raise RuntimeError(msg)
+            logger.warning(
+                "OIDC provider at %s does not support required scopes: %s. "
+                "Skipping this provider.",
+                discovery_url,
+                ", ".join(missing_scopes),
+            )
+            return None
         oidc_idp_args["default_scopes"] = " ".join(required_scopes)
     else:
         oidc_idp_args["default_scopes"] = " ".join(required_scopes)
@@ -72,8 +77,12 @@ def oidc_identity_provider_args_from_discovery_url(
             and "client_secret_basic"
             not in oidc_provider_metadata["token_endpoint_auth_methods_supported"]
         ):
-            msg = f"OIDC provider at {discovery_url} does not support client_secret_basic client auth method"  # noqa: E501
-            raise RuntimeError(msg)
+            logger.warning(
+                "OIDC provider at %s does not support client_secret_basic client "
+                "auth method. Skipping this provider.",
+                discovery_url,
+            )
+            return None
         oidc_idp_args["client_secret"] = client_secret
         oidc_idp_args["extra_config"] = {"clientAuthMethod": "client_secret_basic"}
     else:
@@ -82,8 +91,12 @@ def oidc_identity_provider_args_from_discovery_url(
             or "private_key_jwt"
             not in oidc_provider_metadata["token_endpoint_auth_methods_supported"]
         ):
-            msg = f"OIDC provider at {discovery_url} does not support private_key_jwt client auth method"  # noqa: E501
-            raise RuntimeError(msg)
+            logger.warning(
+                "OIDC provider at %s does not support private_key_jwt client auth "
+                "method. Skipping this provider.",
+                discovery_url,
+            )
+            return None
         # pulumi-keycloak >=6.12.0 marks client_secret/client_secret_wo as
         # required even when Keycloak is configured for private_key_jwt client
         # authentication. Provide an explicit empty value to satisfy provider

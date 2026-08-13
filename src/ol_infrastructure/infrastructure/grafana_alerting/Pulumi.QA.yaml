@@ -1,2 +1,3 @@
 ---
-encryptionsalt: v1:8lDpeSBr4Ms=:v1:uaU75ZN8tVKjJ6pB:e8zv/DgYNtRdtfJjpDcGzuc2dcnbpw==
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgE7QK2goKXvJtcjjzGVHSp1AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM+5+08abwC9U03HyOAgEQgDvTbZfeoi04uDc2rtJx7Bw5clU4beBT8C3d6GZgOxoi9ZM7QogmNKONrAQFAetFNGKyJDRXKNGAzpFf5g==

@@ -18,6 +18,14 @@ path "secret-operations/global/mitxonline/sentry-dsn" {
 path "secret-global/data/mailgun" {
   capabilities = ["read"]
 }
+# Grafana Cloud metrics credentials, read by the webapp's KEDA Prometheus
+# TriggerAuthentication. Without this the VaultStaticSecret sync 403s, KEDA
+# cannot resolve the trigger's basic auth, and it refuses to create the HPA at
+# all -- leaving the webapp entirely unautoscaled rather than falling back to
+# the CPU trigger.
+path "secret-global/data/grafana" {
+  capabilities = ["read"]
+}
 
 path "secret-mitxonline" {
   capabilities = ["read"]
@@ -42,13 +50,13 @@ path "secret-digital-credentials/data/signing-service" {
 path "sys/leases/renew" {
   capabilities = ["update"]
   allowed_parameters = {
-    lease_id = ["postgres-mitopen/creds/app/*"]
+    lease_id = ["postgres-mitxonline/creds/app/*"]
   }
 }
 path "sys/leases/revoke" {
   capabilities = ["update"]
   allowed_parameters = {
-    lease_id = ["postgres-mitopen/creds/app/*"]
+    lease_id = ["postgres-mitxonline/creds/app/*"]
   }
 }
 

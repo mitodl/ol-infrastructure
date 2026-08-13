@@ -1,0 +1,37 @@
+---
+_actions_secret_names:
+- AWS_BUCKET_NAME
+- ENV_ACCESS_KEY
+- ENV_DEFAULT_REGION
+- ENV_SECRET_ACCESS_KEY
+- NETLIFY_AUTH_TOKEN
+- NETLIFY_SITE_ID
+- SEARCH_API_URL
+- ZAP_PROD_TARGET
+- ZAP_RC_TARGET
+_custom_properties:
+  tier: unmanaged
+_excluded_environments: 2
+_has_branch_protection: false
+_pushed_at: '2022-02-21T19:44:11Z'
+_ruleset_count: 0
+_visibility: public
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: master
+description: hugo research
+has_discussions: false
+has_issues: true
+has_projects: true
+has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: hugo-course-publisher
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+teams:
+  odl-engineering: admin
+  odl-engineering-owners: admin
+web_commit_signoff_required: false

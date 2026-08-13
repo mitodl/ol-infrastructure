@@ -194,9 +194,17 @@ postgres_role_statements = {
                 """
             ),
             Template("""RESET ROLE;"""),
-            # Grant rds_iam so any user in this role can authenticate via AWS IAM
-            # on RDS instances that have IAM DB authentication enabled.
-            # The DO block is a no-op on non-RDS Postgres where the role doesn't exist.
+            # Self-healing cleanup: earlier versions of this role unconditionally
+            # granted rds_iam here, and that membership is persisted on
+            # "read_only_role" in the database itself, not in this statement list -
+            # removing the old GRANT from creation_statements does not retroactively
+            # revoke it. Since these statements run on every readonly credential
+            # issuance, this guarantees any stale grant is cleared out the next time
+            # anyone requests a readonly credential. REVOKE-ing a membership that
+            # doesn't exist is a no-op (NOTICE, not an error), so this is safe to run
+            # unconditionally. Opt-in consumers append
+            # RDS_IAM_READONLY_GRANT_STATEMENT after this in their own copy, so their
+            # GRANT still wins.
             Template(
                 """
                 DO
@@ -205,7 +213,7 @@ postgres_role_statements = {
                     IF EXISTS (
                         SELECT FROM pg_catalog.pg_roles WHERE rolname = 'rds_iam'
                     ) THEN
-                        GRANT rds_iam TO "read_only_role";
+                        REVOKE rds_iam FROM "read_only_role";
                     END IF;
                 END
                 $$do$$;
@@ -245,6 +253,53 @@ postgres_role_statements = {
         "rollback": [],
     },
 }
+
+# Opt-in addition for postgres_role_statements["readonly"]["create"] on
+# instances where a consumer specifically authenticates via AWS IAM tokens
+# (e.g. rds-db:connect) rather than a Vault-issued password. On RDS Postgres,
+# once a role is a member of rds_iam, RDS enforces IAM-token auth for that
+# role and rejects plain password auth with "FATAL: PAM authentication
+# failed" - so this must NOT be added to postgres_role_statements directly.
+# Use with_rds_iam_readonly_grant() below rather than appending it by hand:
+# postgres_role_statements.copy() is a shallow copy, so mutating
+# ["readonly"]["create"] in place (e.g. via .append()) would mutate the
+# shared defaults too.
+RDS_IAM_READONLY_GRANT_STATEMENT = Template(
+    """
+    DO
+    $$do$$
+    BEGIN
+        IF EXISTS (
+            SELECT FROM pg_catalog.pg_roles WHERE rolname = 'rds_iam'
+        ) THEN
+            GRANT rds_iam TO "read_only_role";
+        END IF;
+    END
+    $$do$$;
+    """
+)
+
+
+def with_rds_iam_readonly_grant(
+    role_statements: dict[str, dict[str, list[Template]]],
+) -> dict[str, dict[str, list[Template]]]:
+    """Return a copy of role_statements with readonly granted rds_iam.
+
+    Does not mutate the input. Only use this for a database whose readonly
+    consumers authenticate via AWS IAM tokens - see
+    RDS_IAM_READONLY_GRANT_STATEMENT above for why.
+    """
+    return {
+        **role_statements,
+        "readonly": {
+            **role_statements["readonly"],
+            "create": [
+                *role_statements["readonly"]["create"],
+                RDS_IAM_READONLY_GRANT_STATEMENT,
+            ],
+        },
+    }
+
 
 mysql_role_statements = {
     "admin": {

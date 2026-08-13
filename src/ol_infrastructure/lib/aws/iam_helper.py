@@ -216,18 +216,20 @@ def split_iam_policy_by_size(
     ]
 
 
-def route53_policy_template(zone_id: str) -> dict[str, Any]:
-    """Policy definition to allow Caddy to use Route 53 to resolve DNS challenges.
+def route53_policy_template(zone_id: str | list[str]) -> dict[str, Any]:
+    """Policy definition granting write access to one or more Route53 zones.
 
     This provides the permissions necessary to modify Route53 records, for example in a
     Caddy configuration that is using the DNS authorization method for Let's Encrypt.
 
-    :param zone_id: The ID of the DNS zone that the policy is being generated for.
-    :type zone_id: str
+    :param zone_id: The ID, or list of IDs, of the DNS zone(s) the policy is being
+        generated for.
+    :type zone_id: str | list[str]
 
     :returns: A dictionary object representing a policy document to allow access to
               modify records in a Route53 zone.
     """
+    zone_ids = [zone_id] if isinstance(zone_id, str) else zone_id
     return {
         "Version": "2012-10-17",
         "Statement": [
@@ -238,10 +240,8 @@ def route53_policy_template(zone_id: str) -> dict[str, Any]:
                     "route53:GetChange",
                     "route53:ChangeResourceRecordSets",
                 ],
-                "Resource": [
-                    f"arn:aws:route53:::hostedzone/{zone_id}",
-                    "arn:aws:route53:::change/*",
-                ],
+                "Resource": [f"arn:aws:route53:::hostedzone/{zid}" for zid in zone_ids]
+                + ["arn:aws:route53:::change/*"],
             },
             {
                 "Effect": "Allow",

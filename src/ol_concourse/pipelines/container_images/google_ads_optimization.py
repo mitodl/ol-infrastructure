@@ -13,6 +13,7 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import git_repo, registry_image
 
 from ol_concourse.pipelines.constants import ECR_REGION
+from ol_concourse.pipelines.ecr import configure_ecr_repository_task
 
 ad_opt_repository = git_repo(
     name=Identifier("ad-opt-resource"),
@@ -54,6 +55,7 @@ docker_pipeline = Pipeline(
                 GetStep(get=ad_opt_repository.name, trigger=True),
                 build_task,
                 ensure_ecr_task("mitodl/ad-opt"),
+                configure_ecr_repository_task("mitodl/ad-opt"),
                 PutStep(
                     put=ad_opt_release_image.name,
                     params={

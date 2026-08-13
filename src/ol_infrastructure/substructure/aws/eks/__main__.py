@@ -257,39 +257,59 @@ if cluster_stack.require_output("has_ebs_storage"):
                     "disableKubeTLSverify": True,
                     "nodeAddressTypes": "InternalIP",
                     "collectNamespaceLabels": "true",
+                    "extraEnv": [
+                        # Soft limit ~90% of limits.memory: the Go runtime GCs
+                        # more aggressively rather than letting the cgroup
+                        # OOMKiller win. Without this the runtime cannot see
+                        # the cgroup ceiling at all, which is why the sawtooth
+                        # peaks land on the limit instead of collecting below
+                        # it.
+                        {"name": "GOMEMLIMIT", "value": "1400MiB"},
+                    ],
                 },
                 "persist": {
                     "storageClassName": cluster_stack.require_output(
                         "ebs_storageclass"
                     ),
                 },
-                # This has bounced between 100Mi/200Mi/256Mi several times
-                # (see git history) chasing recurring OOM kills -- most
-                # recently 200Mi, which still OOMs: every restart reloads a
-                # full controller/pod/node cluster-state snapshot from
-                # backup before it can do anything else, so this is a
-                # consistent per-startup need, not an occasional burst above
-                # a fine idle baseline. Guaranteed QoS requires every
-                # resource (not just memory) to have request == limit, so
-                # cpu is set explicitly here too, matching the chart's own
-                # default limit (100m) that was already silently in effect
-                # -- our previous override only ever set requests.cpu=10m,
-                # never touched limits.cpu, so Helm merged in the chart
-                # default there. Making that explicit and matching request
-                # to it, rather than leaving the mismatch, so the pod
-                # actually gets Guaranteed QoS: a single pod per cluster, so
-                # the aggregate reservation cost is small, and Guaranteed
-                # protects it from being a preferred eviction target under
-                # node memory pressure while it's already struggling to
-                # survive its own startup.
+                # Memory scales with cluster-wide POD COUNT, not with the
+                # number of workloads or the cost data being reported: the
+                # agent holds cluster-wide pod/controller/node informers, so
+                # it caches every pod including completed dagster Job pods
+                # (ttlSecondsAfterFinished=24h). Measured peaks: ~46Mi at 124
+                # pods (operations-production), ~60Mi at 126 (residential),
+                # ~165Mi at 325 (applications), and data-production pinned at
+                # its ceiling with 3.9k pods. Extrapolating ~0.17Mi/pod over
+                # the 8k pods a full day of dagster churn has produced puts
+                # the real ceiling near 1.5Gi, so size for that rather than
+                # for today's instant -- this value has already been bumped
+                # 100Mi -> 200Mi -> 256Mi -> 512Mi (and hand-patched to 768Mi
+                # in data-production) chasing the same OOM because each bump
+                # was fitted to the pod count of the week.
+                #
+                # Deliberately no longer request == limit, reversing the
+                # earlier Guaranteed-QoS reasoning here to match how the other
+                # cluster-wide informer holders were sized in #5326:
+                # Guaranteed buys eviction protection but leaves zero burst
+                # headroom, and an OOMKill is a certain outage where
+                # node-pressure eviction is a rare and recoverable one. The
+                # modest request also keeps reserved capacity cheap on the 11
+                # clusters that genuinely use <200Mi, since this block is
+                # shared across all 12 EKS stacks.
+                #
+                # limits.cpu has to be stated explicitly: omitting it lets
+                # Helm merge in the chart's own 100m default, which was
+                # throttling the container 10-18% of every period. Starved GC
+                # is what lets the heap outrun the soft limit, so the ceiling
+                # is raised to give the collector room to actually keep up.
                 "resources": {
                     "requests": {
-                        "cpu": "100m",
-                        "memory": "512Mi",
+                        "cpu": "10m",
+                        "memory": "256Mi",
                     },
                     "limits": {
-                        "cpu": "100m",
-                        "memory": "512Mi",
+                        "cpu": "500m",
+                        "memory": "1536Mi",
                     },
                 },
             },

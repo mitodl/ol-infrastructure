@@ -100,6 +100,15 @@ kms_stack = make_stack_reference(projects.KMS, stack_info.name)
 vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
+sentry_stack = make_stack_reference(projects.SENTRY, "default")
+# Each edxapp deployment maps to its own Sentry project; mitx and
+# mitx-staging share the openedx-residential project.
+EDXAPP_SENTRY_DSN_OUTPUTS = {
+    "mitx": "openedx_residential_sentry_dsn",
+    "mitx-staging": "openedx_residential_sentry_dsn",
+    "mitxonline": "openedx_mitxonline_sentry_dsn",
+    "xpro": "openedx_mitxpro_sentry_dsn",
+}
 monitoring_stack = make_stack_reference(projects.MONITORING, "default")
 vector_log_proxy_stack = make_stack_reference(
     projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}"
@@ -498,15 +507,28 @@ edxapp_db_security_group = ec2.SecurityGroup(
             security_groups=[
                 data_vpc["security_groups"]["orchestrator"],
                 data_vpc["security_groups"]["integrator"],
-                vault_stack.require_output("vault_server")["security_group"],
             ],
-            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"].apply(
-                lambda pod_cidrs: [*pod_cidrs, edxapp_vpc["cidr"]]
-            ),
+            # Airbyte isn't using pod security groups in Kubernetes. This is a
+            # workaround to allow for data integration from the data Kubernetes
+            # cluster. (TMM 2025-05-16)
+            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"],
             protocol="tcp",
             from_port=DEFAULT_MYSQL_PORT,
             to_port=DEFAULT_MYSQL_PORT,
-            description="Access to MariaDB from Edxapp web nodes",
+            description="Access to MariaDB from data VPC pod subnets",
+        ),
+        ec2.SecurityGroupIngressArgs(
+            security_groups=[
+                vault_stack.require_output("vault_server")["security_group"],
+            ],
+            cidr_blocks=[edxapp_vpc["cidr"]],
+            protocol="tcp",
+            from_port=DEFAULT_MYSQL_PORT,
+            to_port=DEFAULT_MYSQL_PORT,
+            description=(
+                "Access to MariaDB from the Vault server security group and the"
+                " whole edxapp VPC CIDR (web and worker nodes)"
+            ),
         ),
         # This is needed because the security group pinning near the bottom does not work
         ec2.SecurityGroupIngressArgs(
@@ -533,13 +555,16 @@ edxapp_vault_mount = vault.Mount(
     ),
     type="kv",
 )
+edxapp_static_secrets = read_yaml_secrets(
+    Path(f"edxapp/{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
+)
 edxapp_secrets = vault.generic.Secret(
     "edxapp-static-secrets",
     path=edxapp_vault_mount.path.apply("{}/edxapp".format),
     data_json=Output.secret(
-        read_yaml_secrets(
-            Path(f"edxapp/{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
-        )
+        sentry_stack.require_output(
+            EDXAPP_SENTRY_DSN_OUTPUTS[stack_info.env_prefix]
+        ).apply(lambda dsn: {**edxapp_static_secrets, "sentry_dsn": dsn})
     ).apply(json.dumps),
 )
 forum_secrets = vault.generic.Secret(

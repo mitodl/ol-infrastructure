@@ -52,3 +52,8 @@ path "+/creds/" {
 path "+/creds/readonly" {
   capabilities = ["read", "list"]
 }
+
+# Allow generation of the starrocks app role to allow for dbt testing
+path "database-starrocks/creds/app" {
+  capabilities = ["read", "list"]
+}

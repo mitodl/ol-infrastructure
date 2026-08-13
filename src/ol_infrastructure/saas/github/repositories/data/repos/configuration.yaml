@@ -1,0 +1,31 @@
+---
+_custom_properties:
+  tier: unmanaged
+_has_branch_protection: false
+_pushed_at: '2024-04-10T16:48:36Z'
+_ruleset_count: 0
+_visibility: public
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: fork
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: a simple, but flexible, way for anyone to stand up an instance of the
+  edX platform that is fully configured and ready-to-go
+has_discussions: false
+has_issues: true
+has_projects: true
+has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: configuration
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+teams:
+  odl-engineering: push
+  odl-engineering-owners: admin
+vulnerability_alerts: false
+web_commit_signoff_required: false

@@ -1,0 +1,27 @@
+---
+_custom_properties:
+  tier: unmanaged
+_has_branch_protection: false
+_pushed_at: '2019-08-02T20:23:31Z'
+_ruleset_count: 0
+_visibility: public
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: master
+description: A django app plugin for edx-platform that adds HTTP API endpoints for
+  interacting with video object
+has_discussions: false
+has_issues: true
+has_projects: true
+has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: edx-video-api
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+teams:
+  arbisoft-contractors: admin
+  odl-engineering: admin
+web_commit_signoff_required: false

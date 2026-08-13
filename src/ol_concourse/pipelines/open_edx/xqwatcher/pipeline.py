@@ -15,6 +15,7 @@ from ol_concourse.lib.resources import git_repo, registry_image
 from bridge.settings.openedx.accessors import filter_deployments_by_application
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.secrets_map import project_secrets_paths
 
 
 def build_xqwatcher_pipeline(release_name: str):
@@ -40,6 +41,7 @@ def build_xqwatcher_pipeline(release_name: str):
             *PULUMI_WATCHED_PATHS,
             PULUMI_CODE_PATH.joinpath("applications/xqwatcher/"),
             "src/bridge/settings/openedx/",
+            *project_secrets_paths("applications/xqwatcher/"),
         ],
     )
 

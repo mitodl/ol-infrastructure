@@ -1,0 +1,1203 @@
+#!/usr/bin/env python3
+"""Crawl the mitodl GitHub org once and turn it into data the import can be built from.
+
+Phase 1 of docs/plans/github-org-pulumi-import.md. The design constraint that shapes this
+tool: a SINGLE crawl must produce both the YAML that describes the fleet and the payload
+that imports it, so code and Pulumi state agree by construction. The usual brownfield
+failure -- hand-authored code drifting from imported state, first preview a wall of diffs
+-- is then impossible rather than merely unlikely.
+
+Commands:
+  report            estate report, tied to the §7 audit rule IDs. Read-only, no Pulumi.
+  infer-archetypes  propose an archetype per repo, for human confirmation.
+  crawl             emit per-repo YAML (the half that becomes CODE).
+  imports           emit `pulumi import -f` payloads (the half that becomes STATE).
+
+All read through the `ol-infrastructure-as-code` App installation rather than a user PAT:
+the App holds org-wide read, whereas a PAT would need admin on each repo individually.
+Requires the sops key for src/bridge/secrets/pulumi/github_app.yaml.
+
+The crawl is cached to disk so the other commands do not re-hit the API. Pass --refresh to
+force a new crawl -- and note that `crawl` and `imports` MUST be generated from the same
+cache, since agreeing by construction is the entire point.
+
+    uv run bin/github-org-inventory report
+    uv run bin/github-org-inventory infer-archetypes --out src/.../data/archetypes-proposed.yaml
+    uv run bin/github-org-inventory crawl
+    uv run bin/github-org-inventory imports
+"""
+
+import json
+import sys
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Annotated, Any
+
+import cyclopts
+import httpx
+import yaml
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from ol_infrastructure.lib.github_helper import (
+    API_HEADERS,
+    GITHUB_API,
+    get_installation_token,
+)
+from ol_infrastructure.saas.github.tiers import TIER_PROPERTY_NAME
+
+app = cyclopts.App(help="Inventory the mitodl GitHub org for the Pulumi import.")
+
+ORG = "mitodl"
+DEFAULT_CACHE = Path(".github-org-inventory-cache.json")
+CRAWL_THREADS = 12
+DATA_DIR = Path("src/ol_infrastructure/saas/github/repositories/data")
+
+# A repo is an archive candidate (DX-07) after this long with no push.
+STALE_DAYS = 365
+# Environments beyond this on one repo means CI is leaking review apps (DX-08).
+ENVIRONMENT_SPRAWL_THRESHOLD = 10
+
+# Upstream forks follow upstream conventions, not ours. Name prefixes that mark a repo as
+# an Open edX fork even when GitHub's `fork` flag is false -- several were created by
+# import rather than by forking, so the flag alone under-detects.
+FORK_NAME_PREFIXES = (
+    "edx-",
+    "frontend-app-",
+    "frontend-build",
+    "frontend-component",
+    "frontend-platform",
+    "openedx-",
+    "xblock",
+    "tutor-",
+)
+FORK_NAME_EXACT = {
+    "edx-platform",
+    "XBlock",
+    "tutor",
+    "configuration",
+    "devstack",
+    "course-discovery",
+    "credentials",
+    "ecommerce",
+    "enterprise-catalog",
+    "taxonomy-connector",
+}
+INFRASTRUCTURE_NAME_HINTS = ("infrastructure", "concourse", "dagster", "salt", "packer")
+INFRASTRUCTURE_TOPIC_HINTS = ("infrastructure", "devops", "pulumi", "terraform")
+
+# GitHub Environments that do NOT mean "this repo is a deployed service".
+#
+# `copilot` is created automatically for the Copilot coding agent and appears on 15 of the
+# repos an earlier version of this heuristic called applications -- including `ol-django`,
+# which is a collection of Django libraries. `github-pages` is docs publishing and `pypi`
+# / `npm` are trusted-publishing targets: all three are things a LIBRARY does.
+#
+# Treating any environment as a deploy signal misclassified roughly half the application
+# bucket, which is the failure mode that matters most here -- see §4.5. An archetype is
+# only useful if the audit can trust it.
+NON_DEPLOY_ENVIRONMENTS = frozenset(
+    {"copilot", "github-pages", "pypi", "testpypi", "npm", "release"}
+)
+
+# Fields Pulumi will manage that an archetype may decline to pin. Where the archetype has
+# no opinion, the repo records its own current value, so the field is still managed and
+# still satisfies the empty-diff gate -- it is simply not being asked to change.
+#
+# Merge strategy: no archetype pins it (2026-08-05 decision -- squash-merge is preferred
+# but unenforced, since 158 of 178 active repos allow all three).
+# default_branch: pinned to `main` by `base`; `fork` opts out.
+UNPINNED_BUT_MANAGED_FIELDS = (
+    "allow_squash_merge",
+    "allow_merge_commit",
+    "allow_rebase_merge",
+    "default_branch",
+    # No archetype has an opinion on these, but the provider manages them all, so
+    # leaving them out makes the first preview want to reset them. Recorded
+    # verbatim for the same reason as the merge flags.
+    "has_discussions",
+    "has_projects",
+    "squash_merge_commit_title",
+    "squash_merge_commit_message",
+    "merge_commit_title",
+    "merge_commit_message",
+    # `base` DOES pin these, so base-derived repos inherit and record nothing. The
+    # `archived` archetype does not extend base and pins nothing, so its 140 repos
+    # record them verbatim -- without which Pulumi reads "undeclared" as "turn off"
+    # and plans an update against a repo GitHub will not let it write.
+    "has_issues",
+    "has_wiki",
+    "web_commit_signoff_required",
+)
+
+# Archetypes exempt from CON-03 (default branch must be `main`). Forks follow upstream's
+# branch naming; enforcing ours would fire on ~102 repos with no action anyone would take.
+DEFAULT_BRANCH_EXEMPT_ARCHETYPES = frozenset({"fork", "archived"})
+
+# Rules whose population is the archived fleet, not the active one. Reporting these as a
+# share of active repos overstates them badly (92 of 138 archived reads as "52% of active").
+ARCHIVED_SCOPED_RULES = frozenset({"CON-07 archived repo still grants team write"})
+
+# Rules whose population is the WHOLE fleet, active and archived alike. SEC-06 is here
+# because the no-direct-collaborators policy (2026-08-05) admits no exceptions: an admin
+# grant on an archived repo is inert only until someone unarchives it, and the fork fleet
+# was explicitly included when the policy was set.
+FLEET_SCOPED_RULES = frozenset(
+    {
+        "SEC-06 direct collaborator on repo (policy: repo access via teams only)",
+        "SEC-15 admin held by a team outside the sanctioned set",
+    }
+)
+
+# The teams sanctioned to hold `admin` on a repository (policy 2026-08-05).
+#
+#   odl-engineering-owners  the org's admin team
+#   devops                  admin on infrastructure it operates
+#
+# NOT sanctioned, and each excluded on purpose:
+#   odl-engineering         the broad engineering team -- push or maintain (116 repos)
+#   devops-contractors      contractor counterpart to devops (4 repos)
+#   arbisoft-contractors    contractor team currently at admin on 57 repos
+#
+# The contractor teams are the point of the rule. Staff/contractor is exactly the boundary
+# where a permission ceiling earns its keep, and `devops` being sanctioned while
+# `devops-contractors` is not is a deliberate distinction rather than an oversight.
+#
+# Deliberately an ALLOWLIST rather than a list of teams barred from admin. `admin` carries
+# repo deletion, settings changes and ruleset bypass, and with direct collaborator grants
+# going away (§4.7) team grants are the whole access control rather than one input to it.
+# Under a denylist a newly created team acquires admin silently and SEC-15 stays quiet;
+# under an allowlist it has to be named here first. Default-deny is the only version of
+# this rule that stays true as the org changes.
+ADMIN_TEAMS = frozenset({"odl-engineering-owners", "devops"})
+ADMIN_PERMISSIONS = frozenset({"admin"})
+
+# The value GitHub reports for an active security-and-analysis feature. Hoisted to a
+# constant because comparing the scanning-status fields against a literal trips both
+# ruff S105 and detect-secrets as a hardcoded-credential false positive.
+FEATURE_ENABLED = "enabled"
+
+
+def _client(token: str) -> httpx.Client:
+    return httpx.Client(
+        base_url=GITHUB_API,
+        headers={**API_HEADERS, "Authorization": f"Bearer {token}"},
+        timeout=60,
+        follow_redirects=True,
+    )
+
+
+def _paginate(client: httpx.Client, path: str) -> list[dict[str, Any]]:
+    """Follow RFC 5988 `Link: rel=next` until exhausted."""
+    out: list[dict[str, Any]] = []
+    url: str | None = f"{path}{'&' if '?' in path else '?'}per_page=100"
+    while url:
+        response = client.get(url)
+        response.raise_for_status()
+        payload = response.json()
+        out.extend(payload if isinstance(payload, list) else payload.get("items", []))
+        url = response.links.get("next", {}).get("url")
+    return out
+
+
+def _maybe(client: httpx.Client, path: str) -> Any:
+    """GET a path where 403/404 is a legitimate answer rather than an error.
+
+    Returns the decoded JSON, or None for 403/404. Archived repos reject several
+    endpoints, and a 404 on branch protection means "none configured" -- itself the
+    SEC-01 finding. Returning None keeps the crawl going and keeps the distinction
+    visible in the data.
+
+    Use `_flag()` for endpoints that answer 204-means-yes / 404-means-no. This function
+    deliberately does NOT return a bool: a `JSON | None | bool` union makes the common
+    `_maybe(...) or {}` idiom silently wrong (`True or {}` is `True`, not `{}`), and
+    every caller would have to defend against a case only one endpoint can produce.
+    """
+    response = client.get(path)
+    if response.status_code in (httpx.codes.NOT_FOUND, httpx.codes.FORBIDDEN):
+        return None
+    response.raise_for_status()
+    return response.json()
+
+
+def _flag(client: httpx.Client, path: str) -> bool:
+    """Read a boolean endpoint that signals with status alone: 204 yes, 404 no.
+
+    Only `/repos/{}/vulnerability-alerts` behaves this way. Note that
+    `/repos/{}/automated-security-fixes` does NOT -- it answers 200 with a JSON body in
+    both states, verified against live repos with the feature on and off.
+
+    Anything other than 204/404 raises rather than reading as False. A 500 quietly
+    becoming "alerts are off" would manufacture a SEC-05 finding out of a transient
+    server error, which is worse than crashing: a false finding gets acted on.
+    """
+    response = client.get(path)
+    if response.status_code == httpx.codes.NO_CONTENT:
+        return True
+    if response.status_code == httpx.codes.NOT_FOUND:
+        return False
+    response.raise_for_status()
+    message = f"{path}: unexpected {response.status_code} from a 204/404 endpoint"
+    raise RuntimeError(message)
+
+
+def _count(client: httpx.Client, path: str) -> int | None:
+    """Read a total_count without paging through the collection."""
+    payload = _maybe(client, f"{path}{'&' if '?' in path else '?'}per_page=1")
+    if payload is None:
+        return None
+    if isinstance(payload, dict):
+        return int(payload.get("total_count", 0))
+    return len(payload)
+
+
+def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
+    """Collect everything about one repo that the import or the audit needs."""
+    name = listed["name"]
+    with _client(token) as client:
+        # `/orgs/{org}/repos` does NOT carry allow_squash_merge, allow_merge_commit,
+        # allow_rebase_merge, allow_auto_merge or delete_branch_on_merge -- they exist
+        # only on the individual repo endpoint. Reading them off the list response
+        # yields None for every repo, which silently reads as "disabled" and manufactures
+        # three 100%-of-fleet findings (CON-01, CON-02, DX-01). Always merge in the full
+        # object. security_and_analysis and default_branch DO come back on the list.
+        repo = {**listed, **(_maybe(client, f"/repos/{ORG}/{name}") or {})}
+        default_branch = repo.get("default_branch") or "main"
+        security = repo.get("security_and_analysis") or {}
+        protection = _maybe(
+            client, f"/repos/{ORG}/{name}/branches/{default_branch}/protection"
+        )
+        rulesets = _maybe(client, f"/repos/{ORG}/{name}/rulesets") or []
+        secrets = _maybe(client, f"/repos/{ORG}/{name}/actions/secrets?per_page=100")
+        # One page. The endpoint reports total_count, so trip loudly rather than
+        # truncating in silence -- these names feed SEC-09 (secrets never rotated), and a
+        # security audit quietly missing entries is worse than one that fails.
+        #
+        # Deliberately NOT switched to _paginate(): that helper extracts `items` from a
+        # dict response, while this endpoint returns `secrets`, so it would yield zero
+        # secrets for every repo. It also raises on the 403/404s that _maybe absorbs.
+        # Highest observed is 22 (access-forge) against a page size of 100.
+        if secrets and len(secrets["secrets"]) < secrets["total_count"]:
+            message = (
+                f"{name}: {secrets['total_count']} Actions secrets exceeds one page. "
+                "Pagination is now required -- see the note above."
+            )
+            raise RuntimeError(message)
+        teams = _maybe(client, f"/repos/{ORG}/{name}/teams?per_page=100") or []
+        # IDs, not just counts: `imports` needs them to build the Pulumi import payload.
+        hooks = _maybe(client, f"/repos/{ORG}/{name}/hooks?per_page=100") or []
+        deploy_keys = _maybe(client, f"/repos/{ORG}/{name}/keys?per_page=100") or []
+        direct_collaborators = (
+            _maybe(
+                client,
+                f"/repos/{ORG}/{name}/collaborators?affiliation=direct&per_page=100",
+            )
+            or []
+        )
+        # A SAMPLE of environment names, not the full set -- mitxonline has 412 and the
+        # rest are ephemeral review apps. The count below stays authoritative; these
+        # names exist to tell a real deploy target from publishing plumbing.
+        environments = (
+            _maybe(client, f"/repos/{ORG}/{name}/environments?per_page=30") or {}
+        )
+
+        required_checks: list[str] = []
+        if protection:
+            required_checks = (protection.get("required_status_checks") or {}).get(
+                "contexts", []
+            )
+
+        return {
+            "name": name,
+            "visibility": repo.get("visibility"),
+            "archived": bool(repo.get("archived")),
+            "fork": bool(repo.get("fork")),
+            "default_branch": default_branch,
+            "description": repo.get("description"),
+            "homepage": repo.get("homepage"),
+            "topics": sorted(repo.get("topics") or []),
+            "language": repo.get("language"),
+            "pushed_at": repo.get("pushed_at"),
+            "allow_squash_merge": repo.get("allow_squash_merge"),
+            "allow_merge_commit": repo.get("allow_merge_commit"),
+            "allow_rebase_merge": repo.get("allow_rebase_merge"),
+            "allow_auto_merge": repo.get("allow_auto_merge"),
+            "delete_branch_on_merge": repo.get("delete_branch_on_merge"),
+            "has_issues": repo.get("has_issues"),
+            "has_wiki": repo.get("has_wiki"),
+            # Needed for the empty-diff gate: the provider manages both, so leaving
+            # them undeclared makes the first preview want to turn them off.
+            "has_discussions": repo.get("has_discussions"),
+            "has_projects": repo.get("has_projects"),
+            # Commit-message formats. mitxonline has non-default values, so leaving
+            # these undeclared would have Pulumi reset how its merges are titled.
+            "squash_merge_commit_title": repo.get("squash_merge_commit_title"),
+            "squash_merge_commit_message": repo.get("squash_merge_commit_message"),
+            "merge_commit_title": repo.get("merge_commit_title"),
+            "merge_commit_message": repo.get("merge_commit_message"),
+            "web_commit_signoff_required": repo.get("web_commit_signoff_required"),
+            "secret_scanning": (security.get("secret_scanning") or {}).get("status"),
+            "secret_scanning_push_protection": (
+                security.get("secret_scanning_push_protection") or {}
+            ).get("status"),
+            "has_branch_protection": protection is not None,
+            "required_status_checks": required_checks,
+            "ruleset_count": len(rulesets),
+            "rulesets": [
+                {
+                    "id": r["id"],
+                    "name": r.get("name"),
+                    "enforcement": r.get("enforcement"),
+                }
+                for r in rulesets
+            ],
+            "vulnerability_alerts": _flag(
+                client, f"/repos/{ORG}/{name}/vulnerability-alerts"
+            ),
+            "dependabot_security_updates": bool(
+                (
+                    _maybe(client, f"/repos/{ORG}/{name}/automated-security-fixes")
+                    or {}
+                ).get("enabled")
+            ),
+            # Names and timestamps only -- values are write-only and deliberately never
+            # imported (plan §4.1). The updated_at is what feeds SEC-09.
+            "actions_secrets": [
+                {"name": s["name"], "updated_at": s["updated_at"]}
+                for s in (secrets or {}).get("secrets", [])
+            ],
+            "environment_count": int(environments.get("total_count", 0)),
+            "environment_names": [
+                e["name"] for e in environments.get("environments", [])
+            ],
+            "webhook_count": len(hooks),
+            # config.url and secret-presence feed SEC-07; the id is what `imports` needs.
+            "webhooks": [
+                {
+                    "id": h["id"],
+                    "url": (h.get("config") or {}).get("url"),
+                    "has_secret": bool((h.get("config") or {}).get("secret")),
+                }
+                for h in hooks
+            ],
+            "deploy_key_count": len(deploy_keys),
+            "deploy_keys": [
+                {"id": k["id"], "read_only": k.get("read_only")} for k in deploy_keys
+            ],
+            "collaborator_count": len(direct_collaborators),
+            # WHO holds a direct grant and at what level, not just how many. Repo access
+            # is meant to come from team membership only (§4.7), so every entry here is a
+            # SEC-06 finding with a name attached and a specific team to migrate it to.
+            # A count alone cannot produce that remediation list.
+            "direct_collaborators": {
+                u["login"]: u.get("role_name") for u in direct_collaborators
+            },
+            # `custom_properties` is NOT built here -- see _crawl_org. One org-wide call
+            # covers all 316 repos, so asking per repo bought 315 extra requests and a
+            # second code path for the same fact.
+            "teams": {t["slug"]: t["permission"] for t in teams},
+        }
+
+
+def _crawl_org(cache: Path, *, refresh: bool) -> dict[str, Any]:
+    """Return the org crawl, from cache unless --refresh."""
+    if cache.exists() and not refresh:
+        return json.loads(cache.read_text())
+
+    token = get_installation_token()
+    with _client(token) as client:
+        print(f"listing repos in {ORG} ...", file=sys.stderr)
+        repos = _paginate(client, f"/orgs/{ORG}/repos?type=all")
+        # Not via _maybe(): a 404 here is not "none configured", it means the crawl
+        # cannot see the org at all. Swallowing it would drop OrganizationSettings from
+        # the import payload silently, and a resource that is never imported never shows
+        # up as a diff -- the empty-diff gate cannot catch an absence.
+        org_response = client.get(f"/orgs/{ORG}")
+        org_response.raise_for_status()
+        org_settings = org_response.json()
+        teams = _paginate(client, f"/orgs/{ORG}/teams")
+        members = _paginate(client, f"/orgs/{ORG}/members")
+        property_schema = _maybe(client, f"/orgs/{ORG}/properties/schema") or []
+        # Every repo's custom-property values in ~4 pages. `tier` is what the phase-3.5
+        # org rulesets target, so this is the single most consequential field in the
+        # crawl: a repo whose live tier is not its declared tier is matched by a
+        # different set of rulesets than the code says it is.
+        #
+        # AN UNSET PROPERTY IS A VALUE, NOT AN ABSENCE. `tier` is `required` with
+        # `default_value: standard`, so a repo nobody has written to reads back as
+        # `standard` -- and `standard` is targeted by `baseline-default-branch`. That
+        # is not a hypothetical: after the phase-3 apply all 140 archived repos were
+        # live at `standard` while the fleet declared `unmanaged`, and the ruleset
+        # matched 214 repos where 74 was intended (PR #5317). Values are therefore
+        # recorded VERBATIM, including falsy ones -- an earlier `if p.get("value")`
+        # filter here made "set to empty" and "never measured" identical, which is the
+        # exact shape of the bug that hid the divergence.
+        property_values = {
+            entry["repository_name"]: {
+                p["property_name"]: p["value"] for p in entry["properties"]
+            }
+            for entry in _paginate(client, f"/orgs/{ORG}/properties/values")
+        }
+        org_rulesets = _maybe(client, f"/orgs/{ORG}/rulesets") or []
+        org_hooks = _maybe(client, f"/orgs/{ORG}/hooks?per_page=100") or []
+        # TeamMembership imports as <team-id>:<username>, so the roster has to be per team.
+        team_members = {
+            t["slug"]: [
+                m["login"]
+                for m in _paginate(client, f"/orgs/{ORG}/teams/{t['slug']}/members")
+            ]
+            for t in teams
+        }
+
+    print(
+        f"crawling {len(repos)} repos on {CRAWL_THREADS} threads ...", file=sys.stderr
+    )
+    with ThreadPoolExecutor(max_workers=CRAWL_THREADS) as pool:
+        crawled = list(pool.map(lambda r: _crawl_repo(token, r), repos))
+
+    # A repo missing from the org-wide property response gets `{}`, and `{}` must not be
+    # read as "no properties set" -- with a required, defaulted `tier` that cannot happen,
+    # so it means the response did not cover the fleet. Trip rather than emit repo files
+    # whose tier the audit will then report as drifted for a reason that is not drift.
+    if uncovered := sorted({r["name"] for r in crawled} - set(property_values)):
+        message = (
+            f"{len(uncovered)} repo(s) absent from /orgs/{ORG}/properties/values: "
+            f"{uncovered[:10]}{' ...' if len(uncovered) > 10 else ''}\n"
+            "`tier` is required with a default, so every repo must appear. Suspect "
+            "pagination or a permissions change before believing the data."
+        )
+        raise SystemExit(message)
+    for repo in crawled:
+        repo["custom_properties"] = property_values[repo["name"]]
+
+    data = {
+        "crawled_at": datetime.now(UTC).isoformat(),
+        "org": {
+            "login": org_settings.get("login"),
+            # OrganizationSettings imports by the numeric org id, not the login.
+            "id": org_settings.get("id"),
+            "plan": org_settings.get("plan"),
+            "default_repository_permission": org_settings.get(
+                "default_repository_permission"
+            ),
+            "members_can_create_public_repositories": org_settings.get(
+                "members_can_create_public_repositories"
+            ),
+            "two_factor_requirement_enabled": org_settings.get(
+                "two_factor_requirement_enabled"
+            ),
+            "advanced_security_enabled_for_new_repositories": org_settings.get(
+                "advanced_security_enabled_for_new_repositories"
+            ),
+            "dependabot_alerts_enabled_for_new_repositories": org_settings.get(
+                "dependabot_alerts_enabled_for_new_repositories"
+            ),
+            "dependency_graph_enabled_for_new_repositories": org_settings.get(
+                "dependency_graph_enabled_for_new_repositories"
+            ),
+        },
+        "teams": [
+            {
+                "slug": t["slug"],
+                "id": t["id"],
+                "parent": (t.get("parent") or {}).get("slug"),
+                "members": sorted(team_members.get(t["slug"], [])),
+            }
+            for t in teams
+        ],
+        # slug -> numeric id. `TeamRepository` accepts a slug on create, but the
+        # imported state records the numeric id, so declaring the slug shows as a
+        # REPLACE -- which revokes and re-grants a team's access to a repo.
+        "team_ids": {t["slug"]: t["id"] for t in teams},
+        "members": sorted(m["login"] for m in members),
+        "property_schema": [p["property_name"] for p in property_schema],
+        "org_rulesets": [
+            {"id": r["id"], "name": r["name"], "enforcement": r.get("enforcement")}
+            for r in org_rulesets
+        ],
+        "org_webhooks": [
+            {"id": h["id"], "url": (h.get("config") or {}).get("url")}
+            for h in org_hooks
+        ],
+        "repos": sorted(crawled, key=lambda r: r["name"]),
+    }
+    cache.write_text(json.dumps(data, indent=2))
+    print(f"cached to {cache}", file=sys.stderr)
+    return data
+
+
+def _is_stale(repo: dict[str, Any]) -> bool:
+    pushed = repo.get("pushed_at")
+    if not pushed:
+        return False
+    age = datetime.now(UTC) - datetime.fromisoformat(pushed.replace("Z", "+00:00"))
+    return age.days > STALE_DAYS
+
+
+def propose_archetype(repo: dict[str, Any]) -> str:
+    """Best-guess archetype. A human confirms -- this only has to be mostly right.
+
+    Order matters: archived wins over everything (GitHub rejects most writes to archived
+    repos regardless of what the repo used to be), then fork, because misfiling a fork as
+    an application is what generates ~60 false audit findings.
+    """
+    if repo["archived"]:
+        return "archived"
+    name = repo["name"]
+    if (
+        repo["fork"]
+        or name in FORK_NAME_EXACT
+        or name.lower().startswith(FORK_NAME_PREFIXES)
+    ):
+        return "fork"
+    topics = set(repo["topics"])
+    if any(h in name.lower() for h in INFRASTRUCTURE_NAME_HINTS) or (
+        topics & set(INFRASTRUCTURE_TOPIC_HINTS)
+    ):
+        return "infrastructure"
+    # A deployed service has somewhere to deploy TO. Two signals were tried and dropped:
+    #
+    #   - webhook presence: 91 active repos have a webhook and no environment, nearly all
+    #     libraries and forks carrying an org-wide integration (Renovate, Codecov).
+    #   - any environment at all: half the resulting application bucket was repos whose
+    #     only environment is `copilot`, `github-pages` or `pypi`. See
+    #     NON_DEPLOY_ENVIRONMENTS.
+    #
+    # What survives is "has an environment that is not publishing plumbing". Note this
+    # reads the environment-name SAMPLE, so a repo with many ephemeral review-app
+    # environments is still an application by virtue of those names.
+    if any(
+        name.lower() not in NON_DEPLOY_ENVIRONMENTS
+        for name in repo.get("environment_names", [])
+    ):
+        return "application"
+    return "library"
+
+
+def _archetype_teams(archetypes_file: Path) -> dict[str, dict[str, str]] | None:
+    """Resolve each archetype's target team grants, or None if the file is absent.
+
+    `report` is documented as usable before any Pulumi exists, so a missing archetypes
+    file is a legitimate state rather than an error -- it just means the two conformance
+    rules cannot be evaluated, which the caller reports rather than scoring as zero.
+    """
+    if not archetypes_file.exists():
+        return None
+    archetypes = yaml.safe_load(archetypes_file.read_text())["archetypes"]
+    return {
+        name: _resolve_archetype(archetypes, name).get("teams") or {}
+        for name in archetypes
+    }
+
+
+def _findings(
+    repos: list[dict[str, Any]],
+    archetype_teams: dict[str, dict[str, str]] | None = None,
+) -> dict[str, list[str]]:
+    """Map §7 rule id -> repo names that fire it.
+
+    Rules scope to active repos by default. Two exceptions, both declared as frozensets
+    above so the percentage rendering agrees with the population: CON-07 is about archived
+    repos by definition, and SEC-06 is fleet-wide because the policy behind it has no
+    exemptions.
+    """
+    live = [r for r in repos if not r["archived"]]
+    # CON-04/SEC-15 need each archetype's target team grants. Absent (no archetypes.yaml),
+    # both are skipped rather than reported as zero -- an empty finding and an unmeasured
+    # one look identical in a report, and only one of them is good news.
+    conformance: dict[str, list[str]] = {}
+    if archetype_teams is not None:
+        conformance = {
+            "CON-04 team grants deviate from archetype": [
+                r["name"]
+                for r in live
+                if (r.get("teams") or {})
+                != (archetype_teams.get(propose_archetype(r)) or {})
+            ],
+            "SEC-15 admin held by a team outside the sanctioned set": [
+                r["name"]
+                for r in repos
+                if any(
+                    perm in ADMIN_PERMISSIONS and team not in ADMIN_TEAMS
+                    for team, perm in (r.get("teams") or {}).items()
+                )
+            ],
+        }
+    return {
+        **conformance,
+        "SEC-01 no branch protection and no ruleset": [
+            r["name"]
+            for r in live
+            if not r["has_branch_protection"] and r["ruleset_count"] == 0
+        ],
+        "SEC-03 no required status checks": [
+            r["name"] for r in live if not r["required_status_checks"]
+        ],
+        "SEC-04 secret scanning or push protection off": [
+            r["name"]
+            for r in live
+            if r["secret_scanning"] != FEATURE_ENABLED
+            or r["secret_scanning_push_protection"] != FEATURE_ENABLED
+        ],
+        "SEC-05 dependabot security updates off": [
+            r["name"] for r in live if not r["dependabot_security_updates"]
+        ],
+        # Fleet-wide, deliberately: see FLEET_SCOPED_RULES.
+        "SEC-06 direct collaborator on repo (policy: repo access via teams only)": [
+            r["name"] for r in repos if r["collaborator_count"] > 0
+        ],
+        "CON-02 delete_branch_on_merge off": [
+            r["name"] for r in live if not r["delete_branch_on_merge"]
+        ],
+        "CON-03 default branch is not main (forks exempt)": [
+            r["name"]
+            for r in live
+            if r["default_branch"] != "main"
+            and propose_archetype(r) not in DEFAULT_BRANCH_EXEMPT_ARCHETYPES
+        ],
+        "CON-05 no topics": [r["name"] for r in live if not r["topics"]],
+        "CON-09 no custom properties set": [
+            r["name"] for r in live if not r["custom_properties"]
+        ],
+        "CON-10 no description": [r["name"] for r in live if not r["description"]],
+        "DX-01 allow_auto_merge off": [
+            r["name"] for r in live if not r["allow_auto_merge"]
+        ],
+        "DX-07 no push in 12+ months (archive candidate)": [
+            r["name"] for r in live if _is_stale(r)
+        ],
+        "DX-08 environment sprawl": [
+            r["name"]
+            for r in live
+            if r["environment_count"] > ENVIRONMENT_SPRAWL_THRESHOLD
+        ],
+        "CON-07 archived repo still grants team write": [
+            r["name"]
+            for r in repos
+            if r["archived"]
+            and any(p in ("push", "admin", "maintain") for p in r["teams"].values())
+        ],
+    }
+
+
+@app.command
+def report(
+    *,
+    cache: Annotated[
+        Path, cyclopts.Parameter(help="Crawl cache file.")
+    ] = DEFAULT_CACHE,
+    refresh: Annotated[bool, cyclopts.Parameter(help="Force a fresh crawl.")] = False,
+    as_json: Annotated[
+        bool, cyclopts.Parameter(name=["--json"], help="Emit JSON instead of text.")
+    ] = False,
+    archetypes_file: Annotated[
+        Path, cyclopts.Parameter(help="Archetype definitions, for CON-04 / SEC-15.")
+    ] = DATA_DIR / "archetypes.yaml",
+) -> None:
+    """Estate report for the whole org, before any Pulumi is involved."""
+    data = _crawl_org(cache, refresh=refresh)
+    repos = data["repos"]
+    live = [r for r in repos if not r["archived"]]
+    findings = _findings(repos, _archetype_teams(archetypes_file))
+
+    if as_json:
+        print(
+            json.dumps(
+                {
+                    "crawled_at": data["crawled_at"],
+                    "counts": {
+                        "repos": len(repos),
+                        "active": len(live),
+                        "archived": len(repos) - len(live),
+                    },
+                    "findings": {k: len(v) for k, v in findings.items()},
+                    "findings_detail": findings,
+                },
+                indent=2,
+            )
+        )
+        return
+
+    org = data["org"]
+    print(f"# mitodl estate report -- crawled {data['crawled_at']}\n")
+    print(f"repos                {len(repos)}")
+    print(f"  active             {len(live)}")
+    print(f"  archived           {len(repos) - len(live)}")
+    print(
+        f"  public             {sum(1 for r in repos if r['visibility'] == 'public')}"
+    )
+    print(
+        f"  private            {sum(1 for r in repos if r['visibility'] == 'private')}"
+    )
+    print(f"  forks (flag)       {sum(1 for r in repos if r['fork'])}")
+    print(f"teams                {len(data['teams'])}")
+    print(f"members              {len(data['members'])}")
+    print(f"org custom props     {len(data['property_schema'])}")
+    print(f"org rulesets         {len(data['org_rulesets'])}")
+    plan = org.get("plan") or {}
+    print(
+        f"plan                 {plan.get('name')} ({plan.get('filled_seats')}/{plan.get('seats')} seats)"
+    )
+
+    print("\n## Merge strategy spread (CON-01)")
+    combos = Counter(
+        (
+            f"squash={r['allow_squash_merge']} merge={r['allow_merge_commit']} "
+            f"rebase={r['allow_rebase_merge']}"
+        )
+        for r in live
+    )
+    for combo, count in combos.most_common():
+        print(f"  {count:4}  {combo}")
+
+    print("\n## Proposed archetypes")
+    for archetype, count in Counter(propose_archetype(r) for r in repos).most_common():
+        print(f"  {count:4}  {archetype}")
+
+    archived_count = len(repos) - len(live)
+    print("\n## Findings")
+    for rule, hits in sorted(findings.items(), key=lambda kv: -len(kv[1])):
+        if rule in FLEET_SCOPED_RULES:
+            denominator, label = len(repos), "all repos"
+        elif rule in ARCHIVED_SCOPED_RULES:
+            denominator, label = archived_count, "archived"
+        else:
+            denominator, label = len(live), "active"
+        share = f"{len(hits) / denominator:.0%}" if denominator else "-"
+        print(f"  {len(hits):4}  ({share:>4} of {label})  {rule}")
+
+    grants: Counter[str] = Counter()
+    by_team: Counter[str] = Counter()
+    for repo in repos:
+        for team, perm in (repo.get("teams") or {}).items():
+            grants[perm] += 1
+            if perm in ADMIN_PERMISSIONS:
+                by_team[team] += 1
+    if grants:
+        total = sum(grants.values())
+        admin = sum(c for p, c in grants.items() if p in ADMIN_PERMISSIONS)
+        print(f"\n## Team permission spread — {admin}/{total} grants are admin")
+        for perm, count in grants.most_common():
+            print(f"     {count:5}  {perm}")
+        print("  teams holding admin, by repo count:")
+        for team, count in by_team.most_common(8):
+            flag = "" if team in ADMIN_TEAMS else "  <-- SEC-15"
+            print(f"     {count:5}  {team}{flag}")
+
+    holders: Counter[str] = Counter()
+    levels: Counter[str] = Counter()
+    for repo in repos:
+        for login, role in repo.get("direct_collaborators", {}).items():
+            holders[login] += 1
+            levels[role or "unknown"] += 1
+    if holders:
+        print("\n## Direct collaborators (SEC-06) — every one of these moves to a team")
+        print(f"  {sum(levels.values())} grants across {len(holders)} people:")
+        for role, count in levels.most_common():
+            print(f"     {count:5}  {role}")
+        print("  most-granted:")
+        for login, count in holders.most_common(8):
+            print(f"     {count:5}  {login}")
+
+    print("\n## Environment sprawl detail (DX-08)")
+    for repo in sorted(live, key=lambda r: -r["environment_count"])[:10]:
+        if repo["environment_count"] > ENVIRONMENT_SPRAWL_THRESHOLD:
+            print(f"  {repo['environment_count']:5}  {repo['name']}")
+
+    print(
+        f"\nSecrets recorded (names only): {sum(len(r['actions_secrets']) for r in repos)}"
+    )
+
+
+def _resolve_archetype(archetypes: dict[str, Any], name: str) -> dict[str, Any]:
+    """Flatten an archetype's `extends` chain into the effective settings.
+
+    A key set to `null` in a child archetype means **explicitly not enforced**, and is
+    dropped rather than inherited. `fork` uses this to opt out of `default_branch`: 102
+    active repos still default to `master` and nearly all are upstream forks, where the
+    branch name is upstream's choice and not ours to assign.
+
+    Without the opt-out there would be no way to say "this archetype deliberately has no
+    opinion here" -- a child can only ever override a parent's value with another value,
+    which is exactly how a rule ends up firing on ~100 repos nobody intends to change.
+    """
+    spec = dict(archetypes[name])
+    parent = spec.pop("extends", None)
+    if not parent:
+        return {k: v for k, v in spec.items() if v is not None}
+    merged = _resolve_archetype(archetypes, parent)
+    # `teams` is replaced wholesale rather than merged: `infrastructure` grants devops
+    # instead of odl-engineering, and a deep merge would silently grant both.
+    merged.update(spec)
+    return {k: v for k, v in merged.items() if v is not None}
+
+
+def _deviations(repo: dict[str, Any], effective: dict[str, Any]) -> dict[str, Any]:
+    """Return what this repo declares that differs from its archetype.
+
+    Only compares keys the archetype actually defines -- a repo attribute the archetype is
+    silent about (description, topics, homepage) is always carried explicitly instead.
+    """
+    out: dict[str, Any] = {}
+    for key, expected in effective.items():
+        if key in ("tier", "visibility"):
+            continue
+        actual = repo.get(key)
+        if actual is not None and actual != expected:
+            out[key] = actual
+    return out
+
+
+@app.command
+def crawl(
+    *,
+    cache: Annotated[
+        Path, cyclopts.Parameter(help="Crawl cache file.")
+    ] = DEFAULT_CACHE,
+    refresh: Annotated[bool, cyclopts.Parameter(help="Force a fresh crawl.")] = False,
+    archetypes_file: Annotated[
+        Path, cyclopts.Parameter(help="Archetype definitions.")
+    ] = DATA_DIR / "archetypes.yaml",
+    assignments: Annotated[
+        Path, cyclopts.Parameter(help="Confirmed archetype-per-repo assignment.")
+    ] = DATA_DIR / "archetypes-proposed.yaml",
+    out: Annotated[
+        Path, cyclopts.Parameter(help="Directory for per-repo YAML.")
+    ] = DATA_DIR / "repos",
+) -> None:
+    """Emit one YAML file per repo, carrying only deviations from its archetype.
+
+    This is the half of the single crawl that becomes CODE. `imports` emits the half that
+    becomes STATE, from the same cache, which is what makes the two agree by construction.
+    """
+    data = _crawl_org(cache, refresh=refresh)
+    archetypes = yaml.safe_load(archetypes_file.read_text())["archetypes"]
+    # The assignment file is edited by hand -- that human confirmation step IS phase 1's
+    # gate -- so it gets validated rather than trusted. An emptied-out archetype parses
+    # as None, and a typo'd name would otherwise surface as a bare KeyError several
+    # hundred lines from its cause.
+    assignment_doc = yaml.safe_load(assignments.read_text()) or {}
+    if unknown := sorted(set(assignment_doc) - set(archetypes)):
+        message = (
+            f"{assignments}: unknown archetype(s) {unknown}. "
+            f"Valid archetypes are {sorted(archetypes)}."
+        )
+        raise SystemExit(message)
+    assigned = {
+        name: archetype
+        for archetype, names in assignment_doc.items()
+        for name in (names or [])
+    }
+    effective = {a: _resolve_archetype(archetypes, a) for a in archetypes}
+
+    # GitHub's archived flag is authoritative and moves without anyone editing this file.
+    # Two repos were archived mid-review on 2026-08-05 while still assigned `library`,
+    # which would have emitted a library-shaped config for a repo that rejects most
+    # writes. The assignment file is human-confirmed, not human-authoritative.
+    mismatched = [
+        f"{r['name']}: archived on GitHub, assigned `{assigned[r['name']]}`"
+        if r["archived"]
+        else f"{r['name']}: assigned `archived`, but live on GitHub"
+        for r in data["repos"]
+        if r["name"] in assigned
+        and r["archived"] != (assigned[r["name"]] == "archived")
+    ]
+    if mismatched:
+        message = (
+            f"{len(mismatched)} repo(s) disagree with GitHub's archived flag:\n  "
+            + "\n  ".join(mismatched)
+            + "\nRe-run `infer-archetypes` to pick up the change, then confirm."
+        )
+        raise SystemExit(message)
+
+    # A repo absent from the assignment file is a gap in the human review, not a library.
+    # Silently defaulting would hand it the `library` tier and, with it, whichever org
+    # rulesets target that tier -- a protection decision nobody actually made.
+    if unassigned := sorted(
+        r["name"] for r in data["repos"] if r["name"] not in assigned
+    ):
+        message = (
+            f"{len(unassigned)} repo(s) have no archetype in {assignments}: "
+            f"{unassigned[:10]}{' ...' if len(unassigned) > 10 else ''}\n"
+            "Re-run `infer-archetypes` to regenerate, then confirm the additions."
+        )
+        raise SystemExit(message)
+
+    out.mkdir(parents=True, exist_ok=True)
+    written = 0
+    for repo in data["repos"]:
+        archetype = assigned[repo["name"]]
+        doc: dict[str, Any] = {"name": repo["name"], "archetype": archetype}
+        if repo["description"]:
+            doc["description"] = repo["description"]
+        if repo["homepage"]:
+            doc["homepage"] = repo["homepage"]
+        if repo["topics"]:
+            doc["topics"] = repo["topics"]
+        # The one genuinely per-repo rule (§5.4) -- check names differ per repo.
+        if repo["required_status_checks"]:
+            doc["required_status_checks"] = repo["required_status_checks"]
+        if repo["teams"]:
+            doc["teams"] = repo["teams"]
+        # "Not enforced" must not become "not recorded". Where the archetype has no
+        # opinion on a field Pulumi will manage, the repo carries its own current value
+        # verbatim -- otherwise the field is unmanaged and the provider applies its own
+        # default on the first `up`, which breaks the empty-diff gate (§6).
+        #
+        # In practice: no archetype pins the merge flags, so every repo records them; only
+        # `fork` opts out of `default_branch`, so only forks record that.
+        for field in UNPINNED_BUT_MANAGED_FIELDS:
+            if field not in effective[archetype] and repo.get(field) is not None:
+                doc[field] = repo[field]
+        doc.update(_deviations(repo, effective[archetype]))
+        # `_`-prefixed keys are INVENTORY, not configuration: nothing generates a
+        # Pulumi resource from them. They exist so `bin/github-estate-audit` is a query
+        # over committed data rather than an API crawl -- which makes it fast, testable
+        # with fixtures, and diffable in git over time. See data/README.md.
+        if repo["environment_count"]:
+            # Environments are NEVER imported wholesale (§4.3). Recording the count
+            # keeps the exclusion visible rather than silent.
+            doc["_excluded_environments"] = repo["environment_count"]
+        if repo["actions_secrets"]:
+            doc["_actions_secret_names"] = [s["name"] for s in repo["actions_secrets"]]
+        # OBSERVED property values, under `_` because they are inventory: the DECLARED
+        # tier is `tier`, resolved from the archetype, and it is what Pulumi writes.
+        # Recording the live value beside it is what lets CON-11 compare the two without
+        # an API call. Emitted unconditionally -- an empty dict here is a real finding
+        # (the property exists org-wide with a default, so nothing should read back
+        # empty), and omitting the key on empty would hide it.
+        doc["_custom_properties"] = repo["custom_properties"]
+        doc["_visibility"] = repo["visibility"]
+        doc["_pushed_at"] = repo["pushed_at"]
+        doc["_has_branch_protection"] = repo["has_branch_protection"]
+        doc["_ruleset_count"] = repo["ruleset_count"]
+        if repo.get("direct_collaborators"):
+            doc["_direct_collaborators"] = repo["direct_collaborators"]
+
+        (out / f"{repo['name']}.yaml").write_text(
+            # The leading `---` matches what the repo's YAML formatter enforces. Without
+            # it, every regeneration shows all 316 files as modified, pre-commit adds the
+            # marker back, and the next regeneration strips it again -- permanent churn
+            # that would bury the real drift this directory exists to show.
+            "---\n"
+            + yaml.safe_dump(
+                doc, default_flow_style=False, sort_keys=True, allow_unicode=True
+            )
+        )
+        written += 1
+    # slug -> numeric team id, consumed by saas/github/repositories/repository.py.
+    # See the note on data["team_ids"] for why the numeric form is required.
+    (out.parent / "teams.yaml").write_text(
+        "---\n"
+        "# Team slug -> numeric id, generated by bin/github-org-inventory.\n"
+        "# TeamRepository must be declared with the NUMERIC id: the slug is accepted\n"
+        "# on create, but imported state records the id, so a slug shows as a replace\n"
+        "# -- which revokes and re-grants the team's access.\n"
+        + yaml.safe_dump(data["team_ids"], default_flow_style=False, sort_keys=True)
+    )
+    print(f"wrote {written} repo files to {out}", file=sys.stderr)
+
+
+@app.command
+def imports(
+    *,
+    cache: Annotated[
+        Path, cyclopts.Parameter(help="Crawl cache file.")
+    ] = DEFAULT_CACHE,
+    refresh: Annotated[bool, cyclopts.Parameter(help="Force a fresh crawl.")] = False,
+    out_dir: Annotated[
+        Path, cyclopts.Parameter(help="Where to write payloads.")
+    ] = Path(),
+) -> None:
+    """Emit `pulumi import -f` payloads, one per Pulumi project.
+
+    ID forms come from plan §5.2, which was verified against the shipped provider schema
+    rather than from docs -- several are counterintuitive (RepositoryCustomProperty embeds
+    the org name; webhooks and autolinks use `/` where everything else uses `:`).
+
+    Deliberately NOT emitted: ActionsSecret and DependabotSecret (importable, but the
+    value never comes back, so the next preview wants to write one and breaks the
+    empty-diff gate -- §4.1), RepositoryEnvironment (7,803 of them, allowlist only --
+    §4.3), and AppInstallationRepository (§4.2).
+    """
+    data = _crawl_org(cache, refresh=refresh)
+    org_resources: list[dict[str, str]] = []
+    repo_resources: list[dict[str, str]] = []
+
+    def add(bucket: list[dict[str, str]], type_: str, name: str, id_: str) -> None:
+        bucket.append({"type": f"github:index/{type_}", "name": name, "id": id_})
+
+    # LOGICAL NAMES MUST MATCH THE AUTHORED CODE, not just be unique. `pulumi import`
+    # writes state at a URN derived from the name, so a mismatch imports the resource
+    # where nothing declares it: preview then shows a create for the declared resource
+    # AND a delete for the imported one, and the empty-diff gate (section 6) becomes
+    # unreachable. These strings are the same ones used in
+    # src/ol_infrastructure/saas/github/organization/.
+    if data["org"].get("id"):
+        add(
+            org_resources,
+            "organizationSettings:OrganizationSettings",
+            "mitodl-organization-settings",
+            str(data["org"]["id"]),
+        )
+    # NO INDIVIDUAL PEOPLE IN THE ESTATE (decision 2026-08-05). Pulumi manages teams and
+    # what teams can do; it does not manage who is an org member or who is in a team.
+    #
+    # `Membership` (39) and `TeamMembership` (145) are deliberately not emitted, taking
+    # the organization payload from 199 resources to 15. Reasons, in order of weight:
+    #
+    #   1. Onboarding stops depending on infrastructure. Both resource types put every
+    #      hire, departure and team move behind a PR and this stack's manual-approval
+    #      apply. The org is also at 39/39 seats, so a Pulumi-managed Membership would
+    #      fail on the next hire -- loudly and harmlessly, but at the worst moment.
+    #   2. `Membership` deletion evicts a human from the org. Not modelling it removes
+    #      the highest-blast-radius resource in the estate rather than guarding it.
+    #   3. Repo access does not flow through either one. It flows through TeamRepository,
+    #      which the repositories payload still emits (169 of them) -- so "team
+    #      permissions" stay fully managed while people stay out.
+    #
+    # The crawl still RECORDS org members and team rosters; that is inventory feeding the
+    # audit, not Pulumi state. Drift in a roster stays visible without being enforced.
+    for team in data["teams"]:
+        add(
+            org_resources,
+            "team:Team",
+            f"mitodl-team-{team['slug']}",
+            str(team["id"]),
+        )
+    for hook in data.get("org_webhooks", []):
+        add(
+            org_resources,
+            "organizationWebhook:OrganizationWebhook",
+            f"org-hook-{hook['id']}",
+            str(hook["id"]),
+        )
+    for ruleset in data["org_rulesets"]:
+        add(
+            org_resources,
+            "organizationRuleset:OrganizationRuleset",
+            ruleset["name"],
+            str(ruleset["id"]),
+        )
+
+    # Logical names must match saas/github/repositories/repository.py exactly -- see
+    # the note above the organization section.
+    #
+    # Four resource types the crawl KNOWS EXIST are deliberately not emitted:
+    # RepositoryWebhook, BranchProtection, RepositoryRuleset and RepositoryDeployKey.
+    # The inventory records their ids and counts but not the fields Pulumi needs to
+    # declare them -- webhook events and content_type, the full protection object,
+    # ruleset rules and bypass actors, deploy-key material. Importing from partial data
+    # yields resources that diff on every preview, which is worse than leaving them
+    # unmanaged: an absent resource is visibly absent, a permanently-diffing one trains
+    # everyone to ignore the gate. They need a crawl extension first (§5.6).
+    for repo in data["repos"]:
+        name = repo["name"]
+        add(repo_resources, "repository:Repository", f"mitodl-repo-{name}", name)
+        if repo["archived"]:
+            # GitHub rejects writes to archived repos, so the Repository resource alone
+            # is the whole point of importing them (§4.4). Note this check comes BEFORE
+            # topics: an earlier version emitted RepositoryTopics for archived repos
+            # too, which the factory does not declare, so the import produced ten
+            # protected resources that preview then wanted to delete.
+            continue
+        if repo["topics"]:
+            add(
+                repo_resources,
+                "repositoryTopics:RepositoryTopics",
+                f"mitodl-repo-topics-{name}",
+                name,
+            )
+        add(
+            repo_resources,
+            "branchDefault:BranchDefault",
+            f"mitodl-repo-default-branch-{name}",
+            name,
+        )
+        add(
+            repo_resources,
+            "repositoryVulnerabilityAlerts:RepositoryVulnerabilityAlerts",
+            f"mitodl-repo-vulnerability-alerts-{name}",
+            name,
+        )
+        # `tier` only, not every property in the crawl. The resource name has to match
+        # what repository.py declares (`mitodl-repo-tier-<repo>`), and that function
+        # emits exactly one RepositoryCustomProperty per repo. Importing a second
+        # property under the tier's name would bind live state to the wrong resource.
+        # A new org property therefore needs a code change here AND in repository.py --
+        # which is the right amount of friction for something rulesets target.
+        if repo["custom_properties"].get(TIER_PROPERTY_NAME) is not None:
+            # Three parts, and the ORG name is part of the id.
+            add(
+                repo_resources,
+                "repositoryCustomProperty:RepositoryCustomProperty",
+                f"mitodl-repo-tier-{name}",
+                f"{ORG}:{name}:{TIER_PROPERTY_NAME}",
+            )
+        for team_slug in repo["teams"]:
+            add(
+                repo_resources,
+                "teamRepository:TeamRepository",
+                f"mitodl-team-repo-{team_slug}-{name}",
+                f"{team_slug}:{name}",
+            )
+
+    for filename, resources in (
+        ("import-organization.json", org_resources),
+        ("import-repositories.json", repo_resources),
+    ):
+        path = out_dir / filename
+        path.write_text(json.dumps({"resources": resources}, indent=2))
+        print(f"{len(resources):5} resources -> {path}", file=sys.stderr)
+
+
+@app.command
+def infer_archetypes(
+    *,
+    cache: Annotated[
+        Path, cyclopts.Parameter(help="Crawl cache file.")
+    ] = DEFAULT_CACHE,
+    refresh: Annotated[bool, cyclopts.Parameter(help="Force a fresh crawl.")] = False,
+    out: Annotated[
+        Path | None, cyclopts.Parameter(help="Write the proposal as YAML here.")
+    ] = None,
+) -> None:
+    """Propose an archetype per repo. Output is a PROPOSAL for a human to confirm.
+
+    Getting the `fork` bucket right is the whole game -- a fork misfiled as an application
+    produces a permanent stream of false "no branch protection" and "missing CODEOWNERS"
+    findings in phase 4, which is how an audit loses its audience.
+    """
+    data = _crawl_org(cache, refresh=refresh)
+    proposal: dict[str, list[str]] = {}
+    for repo in data["repos"]:
+        proposal.setdefault(propose_archetype(repo), []).append(repo["name"])
+
+    rendered = yaml.safe_dump(
+        {k: sorted(v) for k, v in sorted(proposal.items())},
+        default_flow_style=False,
+        sort_keys=True,
+        allow_unicode=True,
+    )
+    if out:
+        # Leading `---` for the same reason `crawl` writes one: without it the YAML
+        # formatter adds it back and every regeneration shows the file as modified.
+        out.write_text(
+            "---\n"
+            "# PROPOSED archetype assignment -- generated by bin/github-org-inventory.\n"
+            "# Every line needs a human decision before phase 2. The `fork` bucket\n"
+            "# matters most: see docs/plans/github-org-pulumi-import.md §4.5.\n"
+            + rendered
+        )
+        print(f"wrote {out}", file=sys.stderr)
+    else:
+        print(rendered, end="")
+
+    for archetype, names in sorted(proposal.items()):
+        print(f"{len(names):4}  {archetype}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    app()

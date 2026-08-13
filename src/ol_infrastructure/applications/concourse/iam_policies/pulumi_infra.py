@@ -20,17 +20,22 @@ _DEFAULT_PATH_MANAGED_GROUP_NAMES = ["Admins", "EKSAdmins", "EKSDevelopers"]
 # builds also run on this pool and are cadence-driven enough that they didn't
 # reliably show up in either usage-history source).
 #
-# IAM self-management actions are scoped to the /ol-applications/* and
-# /ol-infrastructure/* paths this repo provisions under, rather than
-# Resource: "*" -- closing the self-escalation path found via CloudTrail
-# (this role successfully called iam:AttachRolePolicy on itself under its
-# prior AdministratorAccess grant).
+# IAM self-management actions are scoped to the /ol-applications/*,
+# /ol-data/*, and /ol-infrastructure/* paths this repo provisions under,
+# rather than Resource: "*" -- closing the self-escalation path found via
+# CloudTrail (this role successfully called iam:AttachRolePolicy on itself
+# under its prior AdministratorAccess grant).
 policy_definition = {
     "Version": IAM_POLICY_VERSION,
     "Statement": [
         {
             "Effect": "Allow",
             "Action": [
+                "acm-pca:DescribeCertificateAuthority",
+                "acm-pca:GetCertificate",
+                "acm-pca:GetCertificateAuthorityCertificate",
+                "acm-pca:IssueCertificate",
+                "acm-pca:ListTags",
                 "acm:DeleteCertificate",
                 "acm:DescribeCertificate",
                 "acm:ExportCertificate",
@@ -87,6 +92,7 @@ policy_definition = {
                 "ec2:AssociateAddress",
                 "ec2:AssociateRouteTable",
                 "ec2:AttachVolume",
+                "ec2:AuthorizeSecurityGroupEgress",
                 "ec2:AuthorizeSecurityGroupIngress",
                 "ec2:CopyImage",
                 "ec2:CreateImage",
@@ -166,10 +172,14 @@ policy_definition = {
                 "ec2:ReleaseAddress",
                 "ec2:ReplaceRoute",
                 "ec2:ReplaceRouteTableAssociation",
+                "ec2:RevokeSecurityGroupEgress",
+                "ec2:RevokeSecurityGroupIngress",
                 "ec2:RunInstances",
                 "ec2:StartInstances",
                 "ec2:StopInstances",
                 "ec2:TerminateInstances",
+                "ec2:UpdateSecurityGroupRuleDescriptionsEgress",
+                "ec2:UpdateSecurityGroupRuleDescriptionsIngress",
                 "ecr:BatchCheckLayerAvailability",
                 "ecr:BatchGetImage",
                 "ecr:CompleteLayerUpload",
@@ -258,6 +268,10 @@ policy_definition = {
                 "glue:CreateDatabase",
                 "glue:DeleteDatabase",
                 "glue:GetDatabase",
+                # The AWS provider reads tags on every Glue database refresh,
+                # even though CatalogDatabase sets none -- without this, refresh
+                # fails closed and the data-warehouse stacks can't deploy.
+                "glue:GetTags",
                 "glue:UpdateDatabase",
                 "iam:GetGroup",
                 "iam:GetInstanceProfile",
@@ -291,6 +305,7 @@ policy_definition = {
                 "mediaconvert:GetQueue",
                 "mediaconvert:ListTagsForResource",
                 "mediaconvert:UpdateQueue",
+                "rds:CreateBlueGreenDeployment",
                 "rds:CreateDBParameterGroup",
                 "rds:DeleteBlueGreenDeployment",
                 "rds:DeleteDBParameterGroup",
@@ -300,6 +315,7 @@ policy_definition = {
                 "rds:DescribeDBParameters",
                 "rds:DescribeDBSubnetGroups",
                 "rds:ListTagsForResource",
+                "rds:ModifyDBInstance",
                 "rds:ModifyDBSubnetGroup",
                 "rds:ResetDBParameterGroup",
                 "route53:CreateHostedZone",
@@ -331,6 +347,15 @@ policy_definition = {
                 "s3:GetLifecycleConfiguration",
                 "s3:GetReplicationConfiguration",
                 "s3:ListAllMyBuckets",
+                # The provider reads every aws:s3:Bucket via HeadBucket, which
+                # authorizes as s3:ListBucket. A 403 there has an empty response
+                # body, so it is indistinguishable from a 404: the provider
+                # treats the bucket as gone and refresh silently DELETES it from
+                # state, with no AccessDenied anywhere in the log. The next run
+                # then tries to recreate a bucket that still exists. Only
+                # mitol-pulumi-state and a couple of operations buckets are
+                # covered by ListBucket* elsewhere, so it must be granted here.
+                "s3:ListBucket",
                 "s3:PutBucketCORS",
                 "s3:PutBucketLogging",
                 "s3:PutBucketOwnershipControls",
@@ -398,20 +423,28 @@ policy_definition = {
                 "iam:CreateInstanceProfile",
                 "iam:CreatePolicy",
                 "iam:CreatePolicyVersion",
+                "iam:CreateRole",
                 "iam:CreateUser",
+                "iam:DeleteAccessKey",
                 "iam:DeleteGroup",
                 "iam:DeletePolicy",
                 "iam:DeletePolicyVersion",
+                "iam:DeleteRole",
                 "iam:DeleteUser",
                 "iam:DetachRolePolicy",
                 "iam:DetachUserPolicy",
                 "iam:RemoveUserFromGroup",
+                "iam:TagRole",
+                "iam:UntagRole",
                 "iam:UpdateAssumeRolePolicy",
+                "iam:UpdateRoleDescription",
             ],
             "Resource": [
                 "arn:aws:iam::*:role/ol-applications/*",
+                "arn:aws:iam::*:role/ol-data/*",
                 "arn:aws:iam::*:role/ol-infrastructure/*",
                 "arn:aws:iam::*:policy/ol-applications/*",
+                "arn:aws:iam::*:policy/ol-data/*",
                 "arn:aws:iam::*:policy/ol-infrastructure/*",
                 "arn:aws:iam::*:instance-profile/ol-applications/*",
                 "arn:aws:iam::*:instance-profile/ol-infrastructure/*",
@@ -430,6 +463,14 @@ policy_definition = {
                 *[
                     f"arn:aws:iam::*:group/{group_name}"
                     for group_name in _DEFAULT_PATH_MANAGED_GROUP_NAMES
+                ],
+                # mit_learn/__main__.py's now-deleted gh_workflow_user (commit
+                # 512678eec removed it from code) was provisioned at the
+                # default "/" path. Enumerated here, same as above, so the
+                # worker can finish deleting it out of Pulumi state.
+                *[
+                    f"arn:aws:iam::*:user/mitopen-gh-workflow-{env}"
+                    for env in ("ci", "qa", "production")
                 ],
             ],
         },

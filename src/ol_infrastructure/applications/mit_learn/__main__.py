@@ -21,7 +21,11 @@ from pulumi import (
 from pulumi.output import Output
 from pulumi_aws import ec2, iam, route53, s3
 
-from bridge.lib.constants import FASTLY_A_TLS_1_3, FASTLY_CNAME_TLS_1_3
+from bridge.lib.constants import (
+    FASTLY_A_TLS_1_3,
+    FASTLY_CNAME_TLS_1_3,
+    mit_learn_session_cookie_name,
+)
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
@@ -50,6 +54,7 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    stale_session_cookie_cleanup_plugin,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -132,6 +137,7 @@ ocw_site_buckets = ocw_site_stack.require_output("ocw_site_buckets")
 qdrant_cloud_stack = make_stack_reference(
     projects.QDRANT_CLOUD, f"mitlearn.{stack_info.name}"
 )
+sentry_stack = make_stack_reference(projects.SENTRY, "default")
 
 qdrant_secrets = read_yaml_secrets(Path("qdrant_cloud/account.yaml"))
 qdrant_provider = qdrant_cloud.Provider(
@@ -403,11 +409,18 @@ mitlearn_vault_secrets = read_yaml_secrets(
 mitlearn_vault_static_secrets = vault.generic.Secret(
     f"ol-mitlearn-configuration-secrets-{stack_info.env_suffix}",
     path=mitlearn_vault_mount.path.apply("{}/secrets".format),
-    data_json=qdrant_api_key.key.apply(
-        lambda key: json.dumps(
+    data_json=Output.all(
+        qdrant_api_key=qdrant_api_key.key,
+        sentry_dsn=sentry_stack.require_output("mit_learn_sentry_dsn"),
+    ).apply(
+        lambda args: json.dumps(
             {
                 **mitlearn_vault_secrets,
-                "qdrant": {**mitlearn_vault_secrets["qdrant"], "api_key_v2": key},
+                "qdrant": {
+                    **mitlearn_vault_secrets["qdrant"],
+                    "api_key_v2": args["qdrant_api_key"],
+                },
+                "sentry_dsn": args["sentry_dsn"],
             }
         )
     ),
@@ -1148,6 +1161,7 @@ env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
 # Values that are generally unchanging across environments
 env_vars = {
     "ALLOWED_HOSTS": '["*"]',
+    "OVS_ALLOWED_MEDIA_HOSTS": '[".cloudfront.net"]',
     "AWS_STORAGE_BUCKET_NAME": f"ol-mitlearn-app-storage-{env_name}",
     "CANVAS_PDF_TRANSCRIPTION_MODEL": "gpt-4o",
     "CONTENT_FILE_EMBEDDING_CHUNK_OVERLAP": 51,
@@ -1201,6 +1215,7 @@ env_vars = {
     "QDRANT_ENABLE_INDEXING_PLUGIN_HOOKS": True,
     "QDRANT_ENCODER": "vector_search.encoders.litellm.LiteLLMEncoder",
     "QDRANT_SPARSE_ENCODER_V2": "vector_search.encoders.qdrant_cloud.QdrantCloudEncoder",
+    "OCR_PDF_MAX_PAGE_THRESHOLD": 20,
     "QDRANT_SPARSE_MODEL_V2": "qdrant/bm25",
     "QDRANT_HOST_V2": qdrant_cloud_stack.require_output("cluster_url"),
     "QDRANT_SPARSE_ENCODER": "vector_search.encoders.qdrant_cloud.QdrantCloudEncoder",
@@ -1309,6 +1324,23 @@ learn_external_service_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=learn_namespace,
         k8s_labels=application_labels,
         enable_defaults=True,
+        plugins=[
+            # Everyone currently logged in is holding a session cookie under
+            # lua-resty-session's old default name, which the renamed plugins
+            # below now ignore -- it would otherwise sit in their browser
+            # unread until they fully quit it.  Both variants have to go: the
+            # host-only one predates the move to a parent-domain cookie in
+            # #5182 (and is also what mitxonline's /mitxonline/* routes on this
+            # host used to set), and the domain-scoped one is what #5182
+            # replaced it with.  Every route on this host references this
+            # shared config, and clearing the .learn.mit.edu entry from here
+            # also clears it for analytics.<env>.learn.mit.edu, since a
+            # domain-scoped cookie is a single entry in the browser's jar.
+            # Safe to delete once the old cookies have aged out of circulation.
+            stale_session_cookie_cleanup_plugin(
+                cookie_domains=[mitlearn_api_domain.removeprefix("api")],
+            ),
+        ],
     ),
 )
 
@@ -1423,6 +1455,11 @@ def _resource_config(config_key: str, default: dict[str, str]) -> dict[str, str]
     return {**default, **(mitlearn_config.get_object(config_key) or {})}
 
 
+# The 500m CPU default suits CI/QA, which idle. Production overrides it to 1200m:
+# granian can consume several cores, and a request this far below real usage makes
+# the KEDA cpu trigger read 95-116% utilization under normal load and peg the HPA at
+# max_replicas. See the calibration note on webapp_resource_requests in
+# Pulumi.Production.yaml before changing either value.
 webapp_resource_requests = _resource_config(
     "webapp_resource_requests", {"cpu": "500m", "memory": "3200Mi"}
 )
@@ -1500,21 +1537,28 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
         granian_config=GranianConfig(
             workers=2,
-            # Sized against the VPA *floor* (3Gi in production), not the declared
+            # Sized against the VPA *floor* (3.5Gi in production), not the declared
             # 3200Mi limit, because the floor is the smallest limit a pod can be
             # running under and therefore the one the cap has to beat. The component's
             # own floor(limit/workers*0.9) would give 1440, leaving the worker pair at
-            # 2880Mi with almost nothing left for the master under a 3072Mi floor.
+            # 2880Mi with almost nothing left for the master under the floor.
             #
-            # 2*1350 = 2700Mi bounds the pair below the 2774Mi peak container RSS
-            # measured over 14 days, leaving ~370Mi for the master and transient
-            # overshoot. The previous value of 1080 sat *below* the ~1300Mi a worker
-            # legitimately reaches at peak, so it fired during normal operation --
-            # graceful respawns as steady-state behaviour rather than a runaway guard.
+            # Raised again 2026-08-07, 1350 -> 1500. The previous 1350 (pair 2700Mi,
+            # ~370Mi margin under a 3Gi floor) was sized against a 2774Mi peak that
+            # was itself measured while the fleet was over-scaled (the two inert Prometheus
+            # triggers left the undersized-request CPU trigger pegging the HPA near
+            # max_replicas and spreading traffic thin). PR #5303 raised the CPU request, so
+            # the HPA settled into a much smaller replica range,
+            # container RSS to 3045-3069Mi within a day -- eating the margin and
+            # reviving the OOMKills. 2*1500 = 3000Mi leaves ~580Mi under the new 3.5Gi
+            # floor for the master and transient overshoot, sized with more headroom
+            # than before since this margin has now been eaten twice. See
+            # les-root-cause-found-mit-learn-s-aug-6-cpu-request-b-cfebf0 (witan) for
+            # the full investigation.
             #
             # Coupled to `workers` and to the VPA floor: both must be revisited
             # together. Dropping to workers=1 without resizing this would cap the sole
-            # worker at 1350Mi of a 3Gi pod. See the stage 4 task in
+            # worker at 1500Mi of a 3.5Gi pod. See the stage 4 task in
             # docs/plans/granian-configuration-overhaul.md.
             #
             # This is one value across all stacks, while the VPA floor it is sized
@@ -1522,11 +1566,11 @@ mitlearn_k8s_app = OLApplicationK8s(
             # the protection gap it looks like: a cap only guards anything when
             # 2*cap + master fits under the running limit, and no cap derived from
             # the 3200Mi declared limit fits under a VPA floor of 256Mi. Below a
-            # ~2300Mi limit the cap is inert at 1080 and at 1350 alike, so CI/QA are
-            # no worse off than before. Making it genuinely track the limit the
+            # ~2300Mi limit the cap is inert at 1080, 1350 and 1500 alike, so CI/QA
+            # are no worse off than before. Making it genuinely track the limit the
             # kernel enforces needs a runtime cgroup read, not a synth-time constant
             # -- tracked as tk-evaluate-runtime-cgroup-derived-workers-max-rss.
-            workers_max_rss=1350,
+            workers_max_rss=1500,
             enable_metrics=True,
             interface="asginl",
             backlog=None,
@@ -1613,6 +1657,23 @@ mitlearn_k8s_app_oidc_resources_no_prefix = OLApisixOIDCResources(
         # browser cookie lifetime instead of expiring early (hq#8416).
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
+        # Broadened from the default host-only scope so a logged-in session
+        # cookie is also sent to ol-analytics-api's Learn-scoped host
+        # (analytics.learn.mit.edu et al.), letting its "pass" route recognize
+        # the same session instead of requiring a second login -- see
+        # ol_analytics_api/__main__.py's Learn-scoped OIDC resource, which
+        # shares this same "sso/mitlearn" Vault path/client and mirrors this
+        # cookie domain.
+        oidc_session_cookie_domain=mitlearn_api_domain.removeprefix("api"),
+        # Environment-scoped name instead of lua-resty-session's default
+        # "session". Required because of the broadened cookie domain above:
+        # a *.learn.mit.edu cookie is also sent to the RC and CI hosts, where
+        # a same-named cookie from another environment cannot be decrypted.
+        # Shared with learn-ai and ol-analytics-api -- see the helper's
+        # docstring.
+        oidc_session_cookie_name=mit_learn_session_cookie_name(
+            stack_info.env_suffix,
+        ),
         oidc_use_session_secret=True,
         vault_mount="secret-operations",
         vault_mount_type="kv-v1",
@@ -1629,9 +1690,14 @@ mitlearn_k8s_app_oidc_resources = OLApisixOIDCResources(
         oidc_logout_path="/learn/logout/oidc",
         oidc_post_logout_redirect_uri=f"https://{mitlearn_config.get('api_domain')}/learn/logout/",
         oidc_session_absolute_timeout=60 * 20160,
-        # See the mitlearn-k8s-no-prefix resources above for why these are 0.
+        # See the mitlearn-k8s-no-prefix resources above for why these are 0,
+        # and for the cookie domain and name below.
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
+        oidc_session_cookie_domain=mitlearn_api_domain.removeprefix("api"),
+        oidc_session_cookie_name=mit_learn_session_cookie_name(
+            stack_info.env_suffix,
+        ),
         oidc_use_session_secret=True,
         vault_mount="secret-operations",
         vault_mount_type="kv-v1",
@@ -1771,8 +1837,16 @@ learn_external_service_apisix_route = OLApisixRoute(
 # (a KEDA cpu trigger, in mit-learn's case) owns CPU and the VPA owns memory. Bounds
 # come from webapp_vpa_min/max_allowed_memory on the OLApplicationK8sConfig above.
 # Celery workers and beat are scaled via KEDA (Redis queue depth), so CPU+memory VPA is safe.
+# The 128Mi memory floor was too low to be safe. make_vpa() scales the limit
+# proportionally to the declared request:limit ratio, so the floor sets the limit
+# floor too -- at 128Mi the VPA was free to shrink the default worker's request to
+# ~662Mi, which dragged its limit down to 1324Mi. Steady-state use fits there, but
+# bursts hit 1307Mi and OOMKilled just under the cap, which is exactly the failure
+# the 2:1 ratio above was introduced to prevent: the ratio only helps if the request
+# it multiplies cannot collapse. A 1Gi floor keeps the effective limit at or above
+# 2Gi while still leaving the VPA room to trim over-provisioned workers.
 _worker_vpa_bounds = {
-    "min_allowed": {"cpu": "25m", "memory": "128Mi"},
+    "min_allowed": {"cpu": "25m", "memory": "1Gi"},
     "max_allowed": {"cpu": "1000m", "memory": "3Gi"},
 }
 # The embeddings worker runs ML inference (embedding generation), which is
@@ -1781,7 +1855,7 @@ _worker_vpa_bounds = {
 # 2026-07-28) already exceeds the shared 1000m ceiling above, so it gets its
 # own bounds instead of sharing _worker_vpa_bounds with the lighter queues.
 _embeddings_worker_vpa_bounds = {
-    "min_allowed": {"cpu": "25m", "memory": "128Mi"},
+    "min_allowed": {"cpu": "25m", "memory": "1Gi"},
     "max_allowed": {"cpu": "2000m", "memory": "3Gi"},
 }
 for _celery_name in mitlearn_k8s_app.celery_deployment_names:

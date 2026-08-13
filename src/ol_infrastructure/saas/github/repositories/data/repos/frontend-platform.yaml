@@ -1,0 +1,30 @@
+---
+_custom_properties:
+  tier: unmanaged
+_has_branch_protection: false
+_pushed_at: '2024-09-01T11:24:16Z'
+_ruleset_count: 0
+_visibility: public
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: fork
+default_branch: master
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: A framework for Open edX micro-frontend applications.
+has_discussions: false
+has_projects: true
+has_wiki: true
+homepage: http://openedx.github.io/frontend-platform
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: frontend-platform
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+teams:
+  odl-engineering: push
+  odl-engineering-owners: admin
+vulnerability_alerts: false
+web_commit_signoff_required: false

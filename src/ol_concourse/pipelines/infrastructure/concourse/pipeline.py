@@ -10,12 +10,13 @@ from ol_concourse.pipelines.constants import (
     PULUMI_WATCHED_PATHS,
 )
 from ol_concourse.pipelines.jobs import packer_jobs, pulumi_jobs_chain
+from ol_concourse.pipelines.secrets_map import project_secrets_paths
 
 #############
 # RESOURCES #
 #############
 concourse_release = github_release(
-    Identifier("concourse-release"), "concourse", "concourse"
+    Identifier("concourse-release"), "concourse", "concourse", github_token=""
 )
 concourse_image_code = git_repo(
     Identifier("ol-infrastructure-packer"),
@@ -33,7 +34,7 @@ concourse_pulumi_code = git_repo(
     paths=[
         *PULUMI_WATCHED_PATHS,
         "src/ol_infrastructure/applications/concourse",
-        "src/bridge/secrets/concourse",
+        *project_secrets_paths("applications/concourse/"),
     ],
 )
 

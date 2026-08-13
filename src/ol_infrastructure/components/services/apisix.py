@@ -7,6 +7,7 @@ import pulumi_kubernetes as kubernetes
 from pulumi import ComponentResource, Output, ResourceOptions
 from pydantic import BaseModel, Field, NonNegativeInt, field_validator, model_validator
 
+from bridge.lib.constants import DEFAULT_OIDC_SESSION_COOKIE_NAME
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
@@ -29,6 +30,77 @@ class OLApisixPluginConfig(BaseModel):
         alias="secretRef",
     )
     config: dict[str, Any] = {}
+
+
+def stale_session_cookie_cleanup_plugin(
+    cookie_domains: list[str] | None = None,
+    stale_cookie_name: str = DEFAULT_OIDC_SESSION_COOKIE_NAME,
+) -> OLApisixPluginConfig:
+    """Build a plugin that evicts a session cookie an application no longer uses.
+
+    Renaming an OIDC session cookie does not remove the old one: the browser
+    keeps sending the abandoned cookie to every route on the host, where the
+    plugin now ignores it.  lua-resty-session cookies are large -- large enough
+    that we watch their size on a dashboard -- and they are session-scoped, so
+    they only expire when the user fully quits the browser, which most people
+    never do.  This emits the matching ``Set-Cookie ... Max-Age=0`` so the
+    browser drops them on the next response instead.
+
+    The deletion is conditional: it only fires when a stale cookie is actually
+    present on the request, so it costs nothing on the overwhelming majority of
+    responses and stops firing for a given browser after the one response that
+    clears it.  Chunked cookies are handled too -- lua-resty-session splits an
+    oversized payload across ``<name>``, ``<name>_2``, ``<name>_3``... and each
+    chunk is its own cookie that has to be expired individually.
+
+    A cookie's identity is (name, domain, path), so the domain-scoped and
+    host-only variants are separate entries in the browser's jar and each needs
+    its own deletion.  ``cookie_domains`` must therefore list exactly the parent
+    domains the stale cookie was ever scoped to, and the caller has to be able
+    to name them: attaching this to routes on a host that is not under one of
+    the listed domains just gets the header rejected by the browser, and
+    deriving a domain from the request host risks clearing an unrelated
+    ``.mit.edu`` cookie belonging to someone else.  The host-only variant is
+    always cleared.
+
+    :param cookie_domains: Parent domains (leading dot, e.g. ``.learn.mit.edu``)
+        the stale cookie was scoped to, in addition to the host-only variant.
+    :param stale_cookie_name: Name of the abandoned cookie.  Defaults to
+        lua-resty-session's built-in name, which is what every application that
+        has adopted an explicit name was previously using.
+
+    :returns: A ``serverless-post-function`` plugin config to attach to routes.
+    :rtype: OLApisixPluginConfig
+    """
+    scopes = ["", *[f"; Domain={domain}" for domain in cookie_domains or []]]
+    expirations = "\n".join(
+        f'            core.response.add_header("Set-Cookie", name .. "=; '
+        f'Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax{scope}")'
+        for scope in scopes
+    )
+    cleanup_function = f"""return function(conf, ctx)
+    local cookie = ngx.var.http_cookie
+    if not cookie then
+        return
+    end
+    local core = require("apisix.core")
+    for pair in cookie:gmatch("[^;]+") do
+        local name = pair:match("^%s*([^=%s]+)=")
+        if name and (name == "{stale_cookie_name}"
+                     or name:match("^{stale_cookie_name}_%d+$")) then
+{expirations}
+        end
+    end
+end"""
+    return OLApisixPluginConfig(
+        name="serverless-post-function",
+        secretRef=None,
+        # header_filter rather than the plugin's default log phase: the response
+        # headers are still mutable there, and this needs to run after the
+        # openid-connect plugin has set the cookies it *does* own so that
+        # add_header appends to them rather than being overwritten.
+        config={"phase": "header_filter", "functions": [cleanup_function]},
+    )
 
 
 class OLApisixRouteConfig(BaseModel):
@@ -209,6 +281,11 @@ class OLApisixOIDCConfig(BaseModel):
         "user": True,
     }
     oidc_session_cookie_domain: str | None = None
+    # None leaves lua-resty-session's default cookie name ("session") in
+    # place. Applications that share a parent domain with other environments
+    # or other applications should set an explicit, environment-scoped name so
+    # their session cookies stay distinct in the browser's cookie jar.
+    oidc_session_cookie_name: str | None = None
     oidc_session_absolute_timeout: NonNegativeInt = 0
     # None leaves lua-resty-session's compiled-in defaults (900s idling /
     # 3600s rolling) untouched for callers that haven't opted in. 0
@@ -273,10 +350,22 @@ class OLApisixOIDCResources(ComponentResource):
         )
 
         session_config: dict[str, Any] = {}
+        # Flat session.cookie_domain, per the openid-connect plugin's
+        # lua-resty-session 4.x schema on the pinned APISIX 3.17.0 (chart
+        # 2.15.0). The nested session.cookie.domain form was the pre-3.17.0
+        # shape; on 3.17.0+ it is a silent no-op since lua-resty-session 4.x
+        # only reads the flat key.
         if oidc_config.oidc_session_cookie_domain:
-            session_config.setdefault("session", {}).setdefault("cookie", {})[
-                "domain"
-            ] = oidc_config.oidc_session_cookie_domain
+            session_config.setdefault("session", {})["cookie_domain"] = (
+                oidc_config.oidc_session_cookie_domain
+            )
+
+        # Flat session.cookie_name, same lua-resty-session 4.x schema as
+        # cookie_domain above. Defaults to "session" in the plugin when unset.
+        if oidc_config.oidc_session_cookie_name:
+            session_config.setdefault("session", {})["cookie_name"] = (
+                oidc_config.oidc_session_cookie_name
+            )
 
         if oidc_config.oidc_session_absolute_timeout:
             session_config.setdefault("session", {})["absolute_timeout"] = (
@@ -352,9 +441,19 @@ class OLApisixSharedPluginsConfig(BaseModel):
     # references a plugin APISIX has not loaded is rejected, so the route-level
     # attachment must be gated to match the cluster-level plugin enablement.
     enable_opentelemetry: bool = True
+    # Attach the gzip response-compression plugin.  ``None`` (the default)
+    # resolves from the stack: on everywhere except Production.  Compression is
+    # cheap to validate for correctness, but its real cost is CPU on a gateway
+    # whose HPA scales on CPU, and that only shows up under production traffic
+    # volume -- so Production stays off until the non-production soak says
+    # otherwise, at which point this default becomes the single line to flip.
+    # Pass True or False to override for one application ahead of that.
+    enable_gzip: bool | None = None
     k8s_labels: dict[str, str] = {}
     k8s_namespace: str
-    plugins: list[dict[str, Any]] = []
+    # Either raw CRD dicts or OLApisixPluginConfig objects; the component
+    # normalises the latter to dicts before rendering.
+    plugins: list[dict[str, Any] | OLApisixPluginConfig] = []
 
 
 class OLApisixSharedPlugins(ComponentResource):
@@ -422,6 +521,65 @@ class OLApisixSharedPlugins(ComponentResource):
             },
         ]
 
+        # Response compression.  APISIX loads the gzip plugin cluster-wide (see
+        # the enabled-plugins list in infrastructure/aws/eks/apisix_official.py)
+        # but until now it was attached to no route anywhere, so every response
+        # through every shared gateway went out uncompressed.  Measured on
+        # applications-production 2026-08-05: each JupyterHub
+        # notebook_core.<hash>.js fetch was exactly 7,167,719 bytes, byte for
+        # byte, on every single request -- ~4.85 GB/day of /static/ on
+        # nb.learn.mit.edu alone.  Compressing shrinks both the egress and the
+        # body NGINX has to buffer for a slow client, which is the mechanism
+        # behind the 2026-07-21 gateway OOM (see the proxy_buffering block in
+        # apisix_official.py).
+        #
+        # Kept out of __default_plugins because it is rolled out
+        # non-production-first -- see ``enable_gzip`` on the config class.
+        #
+        # ``types`` deliberately lists only text-shaped payloads.  Formats that
+        # are already compressed (images, video, woff/woff2, archives) would
+        # burn CPU for no gain, and ``text/event-stream`` is excluded so SSE
+        # responses are not held back by the compression buffers.
+        #
+        # ``comp_level`` stays at NGINX's own default of 1 rather than something
+        # higher: this attaches to every route on a gateway whose HPA scales on
+        # CPU, and level 1 already captures most of the reduction on JS/JSON.
+        # Raise it only with gateway CPU headroom in hand.  ``vary`` is on so
+        # downstream shared caches key on Accept-Encoding instead of serving a
+        # gzipped body to a client that did not ask for one.
+        __gzip_plugin: dict[str, Any] = {
+            "name": "gzip",
+            "enable": True,
+            "config": {
+                "types": [
+                    "application/javascript",
+                    "application/json",
+                    "application/manifest+json",
+                    "application/rss+xml",
+                    "application/wasm",
+                    "application/x-javascript",
+                    "application/xml",
+                    "image/svg+xml",
+                    "text/css",
+                    "text/html",
+                    "text/javascript",
+                    "text/plain",
+                    "text/xml",
+                ],
+                # Below roughly one MTU the framing overhead outweighs the
+                # saving, and APISIX's own default of 20 bytes would compress
+                # essentially every response.
+                "min_length": 1024,
+                "comp_level": 1,
+                # 16 x 4 KiB = 64 KiB of compression buffers per in-flight
+                # response, deliberately in the same range as the ~72 KiB
+                # proxy-buffer budget set in apisix_official.py so the
+                # per-request memory footprint stays predictable.
+                "buffers": {"number": 16, "size": 4096},
+                "vary": True,
+            },
+        }
+
         # opentelemetry emits an OTLP trace span per request.  ``always_on`` head
         # sampling exports every span to the Grafana Alloy receiver, which then
         # applies tail sampling (keep errors, keep slow traces, probabilistic
@@ -436,8 +594,20 @@ class OLApisixSharedPlugins(ComponentResource):
 
         resource_options = ResourceOptions(parent=self).merge(opts)
 
-        if plugin_config.enable_defaults:
-            plugin_config.plugins.extend(__default_plugins)
+        # Defaults first, then the caller's own plugins.  APISIX dispatches by
+        # each plugin's registered priority rather than by array position, so
+        # the order here is cosmetic -- but keeping the defaults at stable
+        # indices means adding a plugin renders as a one-line append in
+        # `pulumi preview` instead of shifting every entry down by one.
+        plugins: list[dict[str, Any]] = (
+            list(__default_plugins) if plugin_config.enable_defaults else []
+        )
+        plugins.extend(
+            plugin.model_dump(by_alias=True, exclude_none=True)
+            if isinstance(plugin, OLApisixPluginConfig)
+            else plugin
+            for plugin in plugin_config.plugins
+        )
 
         # Gate on CI to match the cluster-level plugin enablement: APISIX does not
         # load the opentelemetry plugin on CI, so attaching it to a route there
@@ -446,7 +616,17 @@ class OLApisixSharedPlugins(ComponentResource):
             plugin_config.enable_opentelemetry
             and parse_stack().env_suffix.lower() != "ci"
         ):
-            plugin_config.plugins.append(__opentelemetry_plugin)
+            plugins.append(__opentelemetry_plugin)
+
+        # Unset means "resolve from the stack": every non-Production environment
+        # soaks compression first.  Unlike the opentelemetry gate above this is
+        # not a correctness constraint -- APISIX loads gzip everywhere -- it is
+        # a deliberate rollout order, so a caller may override it either way.
+        enable_gzip = plugin_config.enable_gzip
+        if enable_gzip is None:
+            enable_gzip = parse_stack().env_suffix.lower() != "production"
+        if enable_gzip:
+            plugins.append(__gzip_plugin)
 
         self.resource_name = (
             f"{plugin_config.application_name}-{plugin_config.resource_suffix}"
@@ -464,7 +644,7 @@ class OLApisixSharedPlugins(ComponentResource):
                     namespace=plugin_config.k8s_namespace,
                 ),
                 spec={
-                    "plugins": plugin_config.plugins,
+                    "plugins": plugins,
                 },
                 opts=resource_options,
             )
@@ -481,7 +661,7 @@ class OLApisixSharedPlugins(ComponentResource):
         # path either.
         _v1alpha1_plugins = [
             {"name": p["name"], **({"config": p["config"]} if p.get("config") else {})}
-            for p in plugin_config.plugins
+            for p in plugins
             if p.get("enable", True)
         ]
         self.shared_plugin_pluginconfig_resource = (

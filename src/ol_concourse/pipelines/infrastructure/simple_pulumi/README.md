@@ -194,16 +194,24 @@ If you're migrating an existing pipeline to this pattern:
 
 ### Additional Watched Paths
 
-Some apps need to watch additional directories beyond standard Pulumi paths:
+Some apps need to watch additional directories beyond the standard Pulumi paths:
 
 ```python
-"ocw-studio": SimplePulumiParams(
-    app_name="ocw-studio",
-    pulumi_project_path="applications/ocw_studio/",
-    stack_prefix="applications.ocw_studio",
-    additional_watched_paths=["src/bridge/secrets/ocw_studio/"],
+"rootly": SimplePulumiParams(
+    app_name="rootly",
+    pulumi_project_path="saas/rootly/",
+    pulumi_project_name="ol-saas-rootly",
+    additional_watched_paths=["sdks/rootly/"],
+    stages=["Production"],
 ),
 ```
+
+Do **not** list `src/bridge/secrets/...` here. Secrets are scoped centrally in
+`src/ol_concourse/pipelines/secrets_map.py`, keyed by `pulumi_project_path`, and
+added to every pipeline automatically. Watching the whole secrets tree is what
+used to make one app's secret change re-trigger every Pulumi pipeline. If a
+project starts reading a new secret, add it to `PROJECT_SECRETS` there --
+`tests/ol_concourse/test_secrets_map.py` fails if you forget.
 
 ### Custom Stages Configuration
 

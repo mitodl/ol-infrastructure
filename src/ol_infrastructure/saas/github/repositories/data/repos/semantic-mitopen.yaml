@@ -1,0 +1,34 @@
+---
+_custom_properties:
+  tier: unmanaged
+_direct_collaborators:
+  mbertrand: admin
+_excluded_environments: 1
+_has_branch_protection: false
+_pushed_at: '2024-08-29T20:01:40Z'
+_ruleset_count: 0
+_visibility: public
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: fork
+default_branch: main
+delete_branch_on_merge: false
+dependabot_security_updates: false
+description: Codebase for semantic search of MIT Open Courseware (AI-powered Search
+  and Chat for MIT Open Courseware)
+has_discussions: false
+has_issues: true
+has_projects: true
+has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: semantic-mitopen
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+teams:
+  odl-engineering: push
+  odl-engineering-owners: admin
+vulnerability_alerts: false
+web_commit_signoff_required: false

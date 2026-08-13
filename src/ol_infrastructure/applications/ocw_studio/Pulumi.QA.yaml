@@ -22,11 +22,14 @@ config:
     GITHUB_RATE_LIMIT_CHECK: "False"
     GITHUB_WEBHOOK_BRANCH: 'release-candidate'
     GTM_ACCOUNT_ID: GTM-57BZ8PN
+    HUGO_CSRF_COOKIE_NAME: learn_rc_csrftoken
     MAILGUN_FROM_EMAIL: 'MIT OCW <no-reply@ocw-rc.mail.odl.mit.edu'
     MAILGUN_SENDER_DOMAIN: 'ocw-rc.mail.odl.mit.edu'
     MAILGUN_URL: https://api.mailgun.net/v3/ocw-rc.mail.odl.mit.edu
     MIT_LEARN_BASE_URL: https://rc.learn.mit.edu
     MIT_LEARN_API_BASE_URL: https://api.rc.learn.mit.edu
+    MITOL_MAIL_FROM_EMAIL: ocw-rc-support@mit.edu
+    MITOL_MAIL_REPLY_TO_ADDRESS: ocw-rc-support@mit.edu
     OCW_COURSE_STARTER_SLUG: ocw-course-v2
     OCW_EXTRA_COURSE_THEMES: ocw-course-v3
     OCW_EXTRA_THEMES_GTM_IDS: '{"ocw-course-v3": "GTM-NMJ2CT6T&gtm_auth=Rl-qxbJnD78rPEq1OFQLow&gtm_preview=env-3&gtm_cookies_win=x"}'

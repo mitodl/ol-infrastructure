@@ -13,6 +13,7 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import git_repo, registry_image
 
 from ol_concourse.pipelines.constants import ECR_REGION
+from ol_concourse.pipelines.ecr import configure_ecr_repository_task
 
 concourse_npm_resource_repository = git_repo(
     name=Identifier("mitodl-concourse-npm-resource"),
@@ -58,6 +59,7 @@ docker_pipeline = Pipeline(
                 GetStep(get=concourse_npm_resource_repository.name, trigger=True),
                 build_task,
                 ensure_ecr_task("mitodl/concourse-npm-resource"),
+                configure_ecr_repository_task("mitodl/concourse-npm-resource"),
                 PutStep(
                     put=concourse_npm_resource_image.name,
                     params={

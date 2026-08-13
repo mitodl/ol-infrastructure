@@ -133,6 +133,6 @@ config:
   typesense:course_search_enabled: "true"
   typesense:forum_search_enabled: "false"
   edxapp:site_project:
-    deployment: mitx
+    deployment: mitx-staging
     mfe_apps:
     - instructor-dashboard

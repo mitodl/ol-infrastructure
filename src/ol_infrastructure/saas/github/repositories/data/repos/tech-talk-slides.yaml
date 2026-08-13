@@ -1,0 +1,28 @@
+---
+_custom_properties:
+  tier: tier-1
+_excluded_environments: 1
+_has_branch_protection: false
+_pushed_at: '2026-08-06T12:46:04Z'
+_ruleset_count: 0
+_visibility: public
+allow_auto_merge: false
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: library
+dependabot_security_updates: false
+has_discussions: false
+has_issues: false
+has_projects: false
+homepage: https://mitodl.github.io/tech-talk-slides/
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: tech-talk-slides
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+teams:
+  arbisoft-contractors: push
+  odl-engineering: push
+  odl-engineering-owners: admin
+web_commit_signoff_required: false

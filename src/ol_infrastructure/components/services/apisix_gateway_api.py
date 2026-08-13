@@ -77,8 +77,23 @@ class OLApisixHTTPRouteConfig(BaseModel):
     plugins: list[OLApisixPluginConfig] = []
     hosts: list[str] = []
     paths: list[str] = []
+    path_match_type: Literal["PathPrefix", "Exact"] = "PathPrefix"
+    """How every path in ``paths`` is matched.
+
+    ``PathPrefix`` (the default, and what this component always did) matches the
+    path and everything below it, element-wise: ``/static`` matches ``/static``
+    and ``/static/app.js`` but not ``/staticfoo``. Use ``Exact`` to translate an
+    nginx ``location = /path`` block, where a descendant like ``/path/anything``
+    must NOT match. A trailing ``*`` is stripped from each path either way, so
+    an ``Exact`` route should not carry one."""
     backend_service_name: str | None = None
     backend_service_port: str | NonNegativeInt | None = None
+    # Set explicitly (to False) when the backend app has no nginx sidecar, so
+    # the validator below can catch the "http" named-port trap: that name
+    # always resolves to DEFAULT_NGINX_PORT (8071) in _resolve_backend_port,
+    # which silently 502s once an app drops its sidecar. Left unset for
+    # backends that still run one.
+    backend_import_nginx_config: bool | None = None
     backend_resolve_granularity: Literal["endpoint", "service"] = (
         "service"  # NOT used in Gateway API HTTPRoute
     )
@@ -140,6 +155,30 @@ class OLApisixHTTPRouteConfig(BaseModel):
             and not self.websocket_backend_selector
         ):
             msg = "When 'websocket' is True with a service backend, 'websocket_backend_selector' must be provided."
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def check_named_port_matches_sidecar(self) -> "OLApisixHTTPRouteConfig":
+        """Reject the "http" named port for a backend with no nginx sidecar.
+
+        ``_resolve_backend_port`` maps the port name "http" to the nginx
+        sidecar's conventional port (8071). An app that has dropped its
+        sidecar no longer has anything listening there, so routing to it
+        502s on every request with nothing in the Pulumi diff to hint at it.
+        Pass the resolved numeric port (e.g.
+        ``OLApplicationK8s.application_lb_service_port``) instead.
+        """
+        if (
+            self.backend_service_port == "http"
+            and self.backend_import_nginx_config is False
+        ):
+            msg = (
+                "backend_service_port='http' resolves to the nginx sidecar's "
+                "port (8071), but backend_import_nginx_config=False says this "
+                "backend has no sidecar. Pass the numeric port instead (e.g. "
+                "OLApplicationK8s.application_lb_service_port)."
+            )
             raise ValueError(msg)
         return self
 
@@ -363,6 +402,12 @@ class OLApisixHTTPRoute(ComponentResource):
         Gateway API backendRef ports must be numeric. Named ports are mapped to
         APISIX's conventional defaults, matching the logic used when building
         backendRefs.
+
+        The "http" mapping assumes the nginx sidecar's port and has no way to see
+        what the backing Service actually publishes, so an app that drops the
+        sidecar keeps routing to 8071 and 502s. Pass
+        ``OLApplicationK8s.application_lb_service_port`` (the resolved number)
+        rather than the port name for any app without a sidecar.
         """
         if isinstance(port, str):
             port_mapping = {
@@ -457,14 +502,19 @@ class OLApisixHTTPRoute(ComponentResource):
             paths = route_config.paths if route_config.paths else ["/"]
             for path in paths:
                 # Convert APISIX path pattern to Gateway API path match
-                # APISIX uses /path/* format, Gateway API uses prefix matching
-                path_value = path.rstrip("*").rstrip("/")
+                # APISIX uses /path/* format, Gateway API uses prefix matching.
+                # The trailing "/" is only stripped for PathPrefix: for Exact,
+                # "/api/" and "/api" are different paths, and stripping it would
+                # silently match the wrong one.
+                path_value = path.rstrip("*")
+                if route_config.path_match_type == "PathPrefix":
+                    path_value = path_value.rstrip("/")
                 if not path_value:
                     path_value = "/"
 
                 match = {
                     "path": {
-                        "type": "PathPrefix",
+                        "type": route_config.path_match_type,
                         "value": path_value,
                     }
                 }

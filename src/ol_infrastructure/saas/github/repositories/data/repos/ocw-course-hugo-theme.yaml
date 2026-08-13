@@ -1,0 +1,27 @@
+---
+_custom_properties:
+  tier: unmanaged
+_direct_collaborators:
+  gumaerc: admin
+_has_branch_protection: false
+_pushed_at: '2021-05-04T13:53:05Z'
+_ruleset_count: 0
+_visibility: public
+allow_merge_commit: true
+allow_rebase_merge: true
+allow_squash_merge: true
+archetype: archived
+default_branch: main
+description: A Hugo theme for authoring an OCW course
+has_discussions: false
+has_issues: true
+has_projects: true
+has_wiki: true
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: ocw-course-hugo-theme
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+teams:
+  odl-engineering: admin
+web_commit_signoff_required: false

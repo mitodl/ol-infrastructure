@@ -846,7 +846,9 @@ if eks_config.get_bool("ebs_csi_provisioner"):
         f"{cluster_name}-eks-addon-ebs-cni-driver-addon",
         cluster=cluster,
         addon_name="aws-ebs-csi-driver",
-        addon_version=get_eks_addon_version("aws-ebs-csi-driver"),
+        addon_version=get_eks_addon_version(
+            "aws-ebs-csi-driver", pinned_version=VERSIONS["EBS_CSI_DRIVER"]
+        ),
         service_account_role_arn=ebs_csi_driver_role.role.arn,
         opts=ResourceOptions(
             parent=cluster,
@@ -945,8 +947,38 @@ if eks_config.get_bool("efs_csi_provisioner"):
         f"{cluster_name}-eks-addon-efs-cni-driver-addon",
         cluster=cluster,
         addon_name="aws-efs-csi-driver",
-        addon_version=get_eks_addon_version("aws-efs-csi-driver"),
+        addon_version=get_eks_addon_version(
+            "aws-efs-csi-driver", pinned_version=VERSIONS["EFS_CSI_DRIVER"]
+        ),
         service_account_role_arn=efs_csi_driver_role.role.arn,
+        # Installed with no configuration_values, the node DaemonSet inherits the
+        # addon defaults: resources {} (so efs-plugin lands in BestEffort QoS, first
+        # in line to be starved) and a liveness probe of periodSeconds 2 /
+        # timeoutSeconds 3 / failureThreshold 5 -- roughly 10 seconds of
+        # unresponsiveness is enough for the kubelet to kill it. On
+        # applications-production that combination produced ~345 efs-plugin restarts
+        # per day across every node, with the liveness-probe sidecar logging
+        # "Health check failed" / "context deadline exceeded" against csi.sock while
+        # the driver itself logged no error and held flat at ~24Mi.
+        #
+        # Requests (not limits) move the container to Burstable so it has a
+        # guaranteed CPU share; the probe is widened to ~50s of grace, which still
+        # restarts a genuinely wedged driver but not one that is merely slow to
+        # answer under node contention.
+        configuration_values={
+            "node": {
+                "resources": {
+                    "requests": {"cpu": "25m", "memory": "64Mi"},
+                },
+                "livenessProbe": {
+                    "httpGet": {"path": "/healthz", "port": "healthz"},
+                    "initialDelaySeconds": 10,
+                    "periodSeconds": 10,
+                    "timeoutSeconds": 5,
+                    "failureThreshold": 5,
+                },
+            },
+        },
         opts=ResourceOptions(
             parent=cluster,
             # Addons won't install properly if there are not nodes to schedule them on
@@ -1094,6 +1126,14 @@ metrics_server_release = kubernetes.helm.v3.Release(
         values={
             "commonLabels": k8s_global_labels,
             "tolerations": operations_tolerations,
+            # Every HPA in the cluster depends on metrics-server for resource
+            # metrics. A single replica means any restart or node drain leaves
+            # all HPAs blind until it comes back.
+            "replicas": 2,
+            "podDisruptionBudget": {
+                "enabled": True,
+                "minAvailable": 1,
+            },
             "resources": {
                 "requests": {
                     "memory": "100Mi",

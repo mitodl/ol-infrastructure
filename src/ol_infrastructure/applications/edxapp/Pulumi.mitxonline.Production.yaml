@@ -53,7 +53,7 @@ config:
     "--authenticated"]
   - ["studio.enable_checklists_quality", "--create", "--superusers", "--everyone"]
   - ["teams.enable_teams_app", "--create", "--superusers", "--staff"]
-  - ["instructor.legacy_instructor_dashboard", "--create", "--everyone"]
+  - ["instructor.legacy_instructor_dashboard", "--deactivate"]
   edxapp:use_extracted_html_block: "false"
   edxapp:appzi_url: "https://w.appzi.io/w.js?token=Q2pSI"
   edxapp:business_unit: mitxonline
@@ -100,7 +100,6 @@ config:
   edxapp:backend_preview_domain: preview-backend.learn.mit.edu
   edxapp:enable_auto_language_selection: "true"
   edxapp:autoscaling_lms_requests_threshold: "20"
-  edxapp:autoscaling_lms_latency_threshold: "2000"
   edxapp:autoscaling_lms_cpu_threshold: "70"
   edxapp:autoscaling_cms_requests_threshold: "20"
   edxapp:autoscaling_cms_cpu_threshold: "70"
@@ -116,6 +115,12 @@ config:
       lms:
         max: 20
         min: 1
+      # Dedicated edx.lms.core.high_mem worker for long instructor-task reports.
+      # Keep one warm so a report starts immediately; cap low because each pod runs
+      # exactly one report at a time and they are infrequent.
+      lms_high_mem:
+        max: 3
+        min: 1
       cms:
         max: 20
         min: 1
@@ -126,7 +131,11 @@ config:
         memory_request: "2Gi"
         memory_limit: "3Gi"
       cms:
-        cpu_request: "250m"
+        # Studio operations (course publish/import, outline rebuilds) burst to
+        # ~0.65 cores per pod at only 1-9 req/s. The KEDA CPU trigger scales on
+        # utilization relative to this request, so an undersized request pins
+        # the webapp at max replicas during routine authoring activity.
+        cpu_request: "500m"
         memory_request: "2Gi"
         memory_limit: "4Gi"
     celery:
@@ -134,6 +143,17 @@ config:
         cpu_request: "250m"
         memory_request: "3Gi"
         memory_limit: "4Gi"
+      # The high_mem worker runs one report at a time, so it wants CPU (the compile
+      # loop is serial and DB-bound) more than it wants headroom. Measured peak for
+      # the shared LMS worker was ~2.1Gi across all task types; a 5k-learner problem
+      # grade report projects to a few hundred MB of that, so 4Gi stays generous.
+      # ephemeral-storage covers the TemporaryFile spill path in instructor_task.
+      lms_high_mem:
+        cpu_request: "1000m"
+        memory_request: "3Gi"
+        memory_limit: "6Gi"
+        ephemeral_storage_request: "2Gi"
+        ephemeral_storage_limit: "8Gi"
       cms:
         cpu_request: "250m"
         memory_request: "4Gi"

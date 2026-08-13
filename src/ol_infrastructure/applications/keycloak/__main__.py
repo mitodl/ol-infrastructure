@@ -261,16 +261,29 @@ keycloak_database_security_group = ec2.SecurityGroup(
             security_groups=[
                 keycloak_server_security_group.id,
                 vault_stack.require_output("vault_server")["security_group"],
-                data_vpc["security_groups"]["integrator"],
             ],
-            # TODO: @Ardiea 20250521 Why are we opening the entire VPC?  # noqa: FIX002, TD002, E501
-            cidr_blocks=[target_vpc["cidr"], data_vpc["cidr"]],
+            cidr_blocks=[target_vpc["cidr"]],
             protocol="tcp",
             from_port=DEFAULT_POSTGRES_PORT,
             to_port=DEFAULT_POSTGRES_PORT,
             description=(
-                f"Access to Postgres from keycloak nodes on {DEFAULT_POSTGRES_PORT}"
+                f"Access to Postgres on {DEFAULT_POSTGRES_PORT} from the keycloak"
+                f" server and Vault server security groups, and the whole"
+                f" {target_vpc_name} CIDR"
             ),
+        ),
+        ec2.SecurityGroupIngressArgs(
+            security_groups=[
+                data_vpc["security_groups"]["integrator"],
+            ],
+            # Airbyte isn't using pod security groups in Kubernetes. This is a
+            # workaround to allow for data integration from the data Kubernetes
+            # cluster. (TMM 2025-05-16)
+            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"],
+            protocol="tcp",
+            from_port=DEFAULT_POSTGRES_PORT,
+            to_port=DEFAULT_POSTGRES_PORT,
+            description="Allow access from data VPC pod subnets.",
         ),
     ],
     vpc_id=target_vpc_id,
@@ -307,6 +320,12 @@ keycloak_db_config = OLPostgresDBConfig(
     db_name="keycloak",
     tags=aws_config.tags,
     use_blue_green=keycloak_config.get_bool("db_use_blue_green") or False,
+    # Vault-issued readonly credentials (e.g. the keycloak_ingest dlt asset)
+    # authenticate with a plain password, never an IAM token. RDS enforces
+    # IAM-token auth for any role granted rds_iam, so IAM DB auth must stay
+    # off here or those connections fail with "FATAL: PAM authentication
+    # failed".
+    enable_iam_auth=False,
     **rds_defaults,
 )
 keycloak_db = OLAmazonDB(keycloak_db_config)
@@ -535,6 +554,20 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
                 "value": "scim",
             },
             {"name": "spi-login--provider", "value": "ol-freemarker"},
+            # The jboss-logging event listener defaults successful-event
+            # logging to DEBUG (only failures log at WARN), so successful
+            # logins never reach our INFO-level server logs / Loki even with
+            # realm events enabled. This raises just that listener's
+            # success-event level to INFO so successful LOGIN and
+            # IDENTITY_PROVIDER_LOGIN events become visible for dashboarding,
+            # without touching any other logging category. This is
+            # server-wide (applies to every realm on this Keycloak instance)
+            # and increases log volume noticeably, since it now logs every
+            # successful auth-related event, not just logins.
+            {
+                "name": "spi-events-listener--jboss-logging--success-level",
+                "value": "info",
+            },
         ],
         "tracing": tracing_config,
         "hostname": {

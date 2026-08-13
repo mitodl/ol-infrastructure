@@ -40,6 +40,115 @@ def truncate_k8s_metanames(name: str) -> str:
     return name[:MAXIMUM_K8S_NAME_LENGTH].rstrip("-_.")
 
 
+def webapp_deployment_name(application_name: str) -> str:
+    """Name of the webapp Deployment OLApplicationK8s creates."""
+    return truncate_k8s_metanames(f"{application_name}-app")
+
+
+def celery_worker_deployment_name(application_name: str, worker_name: str) -> str:
+    """Name of a celery worker Deployment OLApplicationK8s creates."""
+    return truncate_k8s_metanames(
+        f"{application_name}-{worker_name}-celery-worker".replace("_", "-")
+    )
+
+
+def celery_beat_deployment_name(application_name: str) -> str:
+    """Name of the celery beat Deployment OLApplicationK8s creates."""
+    return truncate_k8s_metanames(f"{application_name}-celery-beat".replace("_", "-"))
+
+
+def application_deployment_names(
+    application_name: str,
+    celery_worker_configs: "list[OLApplicationK8sCeleryWorkerConfig] | None" = None,
+    celery_beat_config: "OLApplicationK8sCeleryBeatConfig | None" = None,
+) -> list[str]:
+    """Deployment names OLApplicationK8s will create, without constructing it.
+
+    Same list as the ``all_deployment_names`` property, but computable *before*
+    the component exists, because the names depend only on the arguments here.
+
+    This exists to break an ordering cycle. Secrets consumed via
+    ``env_from_secret_names`` are mounted with ``envFrom``, so their values
+    become pod environment variables that are fixed at pod start -- updating the
+    Kubernetes Secret does not touch a running pod. The fix is
+    ``restart_targets`` on the ``OLVaultK8SSecret``, which needs the deployment
+    names; but those secrets must be created *before* the component, because the
+    component takes their names as input. Calling this first resolves it::
+
+        targets = [
+            OLVaultRestartTarget(kind="Deployment", name=name)
+            for name in application_deployment_names(
+                application_name=Services.xpro,
+                celery_worker_configs=worker_configs,
+                celery_beat_config=beat_config,
+            )
+        ]
+        secret_names, _ = create_secrets(..., restart_targets=targets)
+        app = OLApplicationK8s(OLApplicationK8sConfig(
+            env_from_secret_names=secret_names, ...
+        ))
+
+    Deliberately does NOT take the full ``OLApplicationK8sConfig``: that config
+    needs ``env_from_secret_names``, which is what the caller is still trying to
+    build. Pass only the three fields the names actually derive from.
+    """
+    names = [webapp_deployment_name(application_name)]
+    for worker_config in celery_worker_configs or []:
+        names.append(  # noqa: PERF401
+            celery_worker_deployment_name(
+                application_name, worker_config.worker_name or ""
+            )
+        )
+    if celery_beat_config is not None:
+        names.append(celery_beat_deployment_name(application_name))
+    return names
+
+
+def default_probe_configs(port: int) -> dict[str, kubernetes.core.v1.ProbeArgs]:
+    """Probes against the django-health-check endpoints on ``port``.
+
+    Built per-instance rather than held as a class default so the port tracks
+    whatever the application container actually listens on. Apps with the nginx
+    sidecar are probed at the sidecar; apps without it are probed at Granian.
+    """
+    return {
+        # Liveness probe to check if the application is still running
+        "liveness_probe": kubernetes.core.v1.ProbeArgs(
+            http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                path="/health/liveness/",
+                port=port,
+            ),
+            initial_delay_seconds=30,  # Wait 30 seconds before first probe
+            period_seconds=30,
+            failure_threshold=3,  # Consider failed after 3 attempts
+            timeout_seconds=3,
+        ),
+        # Readiness probe to check if the application is ready to serve traffic
+        "readiness_probe": kubernetes.core.v1.ProbeArgs(
+            http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                path="/health/readiness/",
+                port=port,
+            ),
+            initial_delay_seconds=15,  # Wait 15 seconds before first probe
+            period_seconds=15,
+            failure_threshold=3,  # Consider failed after 3 attempts
+            timeout_seconds=3,
+        ),
+        # Startup probe to ensure the application is fully initialized before other probes start
+        "startup_probe": kubernetes.core.v1.ProbeArgs(
+            http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                path="/health/startup/",
+                port=port,
+            ),
+            initial_delay_seconds=10,  # Wait 10 seconds before first probe
+            period_seconds=10,  # Probe every 10 seconds
+            failure_threshold=12,  # Allow up to 2 minutes (12 x 10s) for startup
+            success_threshold=1,
+            timeout_seconds=5,
+        ),
+    }
+
+
 class OLApplicationK8sCeleryWorkerConfig(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     application_name: str = "main.celery:app"
@@ -189,6 +298,19 @@ class GranianConfig(BaseModel):
             "static path mounts simultaneously."
         ),
     )
+    static_path_expires: NonNegativeInt | None = Field(
+        default=None,
+        description=(
+            "Seconds to advertise in the 'Cache-Control: max-age' header Granian "
+            "attaches to statically served files ('--static-path-expires'). Granian's "
+            "own default is 86400, an order of magnitude shorter than the 'expires "
+            "max' the nginx sidecars used, so apps migrating off the sidecar should "
+            "set this explicitly rather than inherit the regression. Zero is a "
+            "meaningful value upstream -- it disables the header entirely -- so this "
+            "is NonNegativeInt; use None to leave the flag off and take Granian's "
+            "default."
+        ),
+    )
 
     @field_validator("nginx_config_filename")
     @classmethod
@@ -275,6 +397,8 @@ class GranianConfig(BaseModel):
             ]
         for path in self.static_path_mounts:
             args += ["--static-path-mount", path]
+        if self.static_path_expires is not None:
+            args += ["--static-path-expires", str(self.static_path_expires)]
         args += ["--log-level", self.log_level, self.application_module]
         return args
 
@@ -480,42 +604,16 @@ class OLApplicationK8sConfig(BaseModel):
         default=None,
         description="A tuple of <job_name>, <job_command_array> for executing upon completion of the deployment updating",
     )
-    probe_configs: dict[str, kubernetes.core.v1.ProbeArgs] = {
-        # Liveness probe to check if the application is still running
-        "liveness_probe": kubernetes.core.v1.ProbeArgs(
-            http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                path="/health/liveness/",
-                port=DEFAULT_NGINX_PORT,
-            ),
-            initial_delay_seconds=30,  # Wait 30 seconds before first probe
-            period_seconds=30,
-            failure_threshold=3,  # Consider failed after 3 attempts
-            timeout_seconds=3,
+    probe_configs: dict[str, kubernetes.core.v1.ProbeArgs] | None = Field(
+        default=None,
+        description=(
+            "Probes for the application container. When omitted the component "
+            "generates django-health-check probes against the resolved application "
+            "port, so dropping the nginx sidecar moves them from the sidecar to "
+            "Granian without the caller restating them. Callers that supply this "
+            "own the port they name."
         ),
-        # Readiness probe to check if the application is ready to serve traffic
-        "readiness_probe": kubernetes.core.v1.ProbeArgs(
-            http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                path="/health/readiness/",
-                port=DEFAULT_NGINX_PORT,
-            ),
-            initial_delay_seconds=15,  # Wait 15 seconds before first probe
-            period_seconds=15,
-            failure_threshold=3,  # Consider failed after 3 attempts
-            timeout_seconds=3,
-        ),
-        # Startup probe to ensure the application is fully initialized before other probes start
-        "startup_probe": kubernetes.core.v1.ProbeArgs(
-            http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                path="/health/startup/",
-                port=DEFAULT_NGINX_PORT,
-            ),
-            initial_delay_seconds=10,  # Wait 10 seconds before first probe
-            period_seconds=10,  # Probe every 10 seconds
-            failure_threshold=12,  # Allow up to 2 minutes (12 x 10s) for startup
-            success_threshold=1,
-            timeout_seconds=5,
-        ),
-    }
+    )
     app_pdb_maximum_unavailable: NonNegativeInt | str = 1
     extra_container_ports: list[kubernetes.core.v1.ContainerPortArgs] = Field(
         default_factory=list,
@@ -875,6 +973,11 @@ class OLApplicationK8s(ComponentResource):
             application_port = DEFAULT_NGINX_PORT
         else:
             application_port = DEFAULT_WSGI_PORT
+        # Published so APISix route configs can name the numeric Service port
+        # instead of the port name. OLApisixHTTPRoute has to hand Gateway API a
+        # number and resolves the name "http" to DEFAULT_NGINX_PORT, which is
+        # wrong the moment an app drops its sidecar.
+        self.application_lb_service_port: int = application_port
 
         # Determine the full name of the container image
         if ol_app_k8s_config.application_image_digest:
@@ -1198,8 +1301,8 @@ class OLApplicationK8s(ComponentResource):
                 ).hexdigest()
             )
 
-        _application_deployment_name = truncate_k8s_metanames(
-            f"{ol_app_k8s_config.application_name}-app"
+        _application_deployment_name = webapp_deployment_name(
+            ol_app_k8s_config.application_name
         )
 
         # Expose deployment names as public attributes so callers can reference them
@@ -1344,7 +1447,15 @@ class OLApplicationK8s(ComponentResource):
                 env=application_deployment_env_vars,
                 env_from=application_deployment_envfrom,
                 volume_mounts=webapp_volume_mounts,
-                **ol_app_k8s_config.probe_configs,
+                # `is None` rather than a falsy check: an explicitly supplied
+                # empty mapping means "no probes at all", which the literal-dict
+                # default used to allow and `or` would silently override with
+                # the defaults.
+                **(
+                    default_probe_configs(application_port)
+                    if ol_app_k8s_config.probe_configs is None
+                    else ol_app_k8s_config.probe_configs
+                ),
             ),
         )
         # Append caller-supplied sidecar containers after the main app container
@@ -1820,6 +1931,7 @@ class OLApplicationK8s(ComponentResource):
                 )
             ),
         )
+        self.application_service: kubernetes.core.v1.Service = _application_service
 
         for celery_worker_config in ol_app_k8s_config.celery_worker_configs:
             celery_labels = ol_app_k8s_config.k8s_global_labels | {
@@ -1839,10 +1951,9 @@ class OLApplicationK8s(ComponentResource):
                     ol_app_k8s_config.slack_channel
                 )
 
-            _celery_deployment_name = truncate_k8s_metanames(
-                f"{ol_app_k8s_config.application_name}-{celery_worker_config.worker_name}-celery-worker".replace(
-                    "_", "-"
-                )
+            _celery_deployment_name = celery_worker_deployment_name(
+                ol_app_k8s_config.application_name,
+                celery_worker_config.worker_name or "",
             )
             self.celery_deployment_names.append(_celery_deployment_name)
             _celery_deployment = kubernetes.apps.v1.Deployment(
@@ -2023,8 +2134,8 @@ class OLApplicationK8s(ComponentResource):
                 beat_labels["ol.mit.edu/slack-channel"] = (
                     ol_app_k8s_config.slack_channel
                 )
-            _beat_deployment_name = truncate_k8s_metanames(
-                f"{ol_app_k8s_config.application_name}-celery-beat".replace("_", "-")
+            _beat_deployment_name = celery_beat_deployment_name(
+                ol_app_k8s_config.application_name
             )
             self.beat_deployment_name = _beat_deployment_name
             _beat_deployment = kubernetes.apps.v1.Deployment(

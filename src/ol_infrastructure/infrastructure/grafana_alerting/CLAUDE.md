@@ -80,6 +80,8 @@ Rootly). That path is independent of Grafana and is managed in
 | `metric_rules/base.py` | Mimir datasource UIDs, two-stage pipeline helper, folder creation, delegates to sub-modules. |
 | `metric_rules/eks_general.py` | EKS workload alert rules (replicas, node readiness, crash loops, OOM, jobs, HPA). |
 | `metric_rules/linux_host.py` | Linux host alert rules (CPU, memory, disk usage). |
+| `metric_rules/apisix_edge.py` | Per-host 5xx rate at the APISIX edge (`apisix_http_status`). Two windows (fast cliff / slow creep) with a minimum-traffic gate. Currently unlabelled → `oblivion` while calibrating. |
+| `metric_rules/synthetic_monitoring.py` | MIT Learn probe-failure rules (`probe_success`) for the Next.js origin, the API health endpoint, and the homepage. Imported from hand-made UI rules; lives in the Synthetic Monitoring **plugin's** folder, so it takes no `folder_uid`. |
 | `log_rules/` | Package. Grafana-managed alert rule groups for log queries. Migrated from `grafana-alerts/loki-rules/`. |
 | `log_rules/base.py` | Loki datasource UIDs, two-stage pipeline helper, folder creation, delegates to sub-modules. |
 | `log_rules/cert_manager.py` | cert-manager ACME issuer and DNS challenge alert rules. |
@@ -87,6 +89,10 @@ Rootly). That path is independent of Grafana and is managed in
 | `log_rules/heroku.py` | Heroku application log alert rules (invalid AWS keys, OCW Studio, Keycloak). |
 | `log_rules/mit_learn.py` | MIT Learn and MITx Online 5xx error rate alert rules. |
 | `log_rules/vault.py` | Vault secret-absent and auth-failure alert rules. |
+| `dashboards/` | Package. Grafana dashboards. |
+| `dashboards/base.py` | Shared panel-builder helpers, folder creation, delegates to sub-modules. |
+| `dashboards/datasources.py` | Mimir/Loki datasource ref constants, importable directly by sub-modules without a circular import through `base.py`. |
+| `dashboards/keycloak_olapps_idp_logins.py` | Per-identity-provider login counts (success + failure) for the olapps realm, from Loki via LogQL. |
 | `pingdom_checks.py` | Pingdom uptime checks via Pulumi dynamic provider. Runs in the production stack only. |
 | `CLAUDE.md` | This file. |
 
@@ -102,6 +108,7 @@ needed is passed as a parameter.
 alertmanager.create(grafana_secrets: dict, resource_opts: ResourceOptions)
 metric_rules.create(resource_opts: ResourceOptions)
 log_rules.create(resource_opts: ResourceOptions)
+dashboards.create(resource_opts: ResourceOptions)
 pingdom_checks.create(api_token: Input[str], integration_ids: list[int])
 ```
 
@@ -111,6 +118,21 @@ UID and a pre-bound `rd(expr)` helper from its package `base.py`:
 ```python
 # sub-module signature (metric_rules/* and log_rules/*)
 create(folder_uid: Input[str], rd: Callable[[str], list[RuleGroupRuleDataArgs]], resource_opts: ResourceOptions)
+```
+
+`metric_rules/synthetic_monitoring.py` is the one exception — it omits
+`folder_uid` because its rules must stay in the Synthetic Monitoring plugin's
+folder (`grafana-synthetic-monitoring-app`), which Pulumi references but does not
+create. The folder UID is half a rule group's import identity, so moving those
+rules into "Infrastructure Alerts" would destroy and recreate them, losing their
+alert-state history and any live silences.
+
+Within `dashboards/`, each sub-module receives the folder UID, the shared
+panel-builder helpers, and a `create_dashboard` helper from `base.py`:
+
+```python
+# sub-module signature (dashboards/*)
+create(folder_uid, timeseries_panel: Callable[..., dict], bar_gauge_panel: Callable[..., dict], create_dashboard: Callable[..., None], resource_opts: ResourceOptions)
 ```
 
 ---
@@ -142,12 +164,103 @@ a confusing NoData state.
 4. Set `for_`, `labels`, `annotations`, and `no_data_state` to match the
    original YAML.
 
+### Adopting a rule that was created in the UI
+
+Rule groups import with `{{ folderUID }}:{{ title }}`, where `title` is the rule
+*group* name, not the rule name.
+
+**Export the Grafana credentials first.** `pulumi import` resolves the resource
+against the CLI's *default* provider rather than the explicit `grafana.Provider`
+that `__main__.py` builds, and passing `--provider` does not change that. Without
+configuration it fails with:
+
+```
+the Grafana client is required for this resource.
+Set the auth and url provider attributes
+```
+
+Give the default provider the same credentials the program reads:
+
+```
+export GRAFANA_URL="$(sops -d src/bridge/secrets/grafana_cloud/api.production.yaml | yq -r '.grafana_url')"
+export GRAFANA_AUTH="$(sops -d src/bridge/secrets/grafana_cloud/api.production.yaml | yq -r '.grafana_api_token')"
+
+pulumi stack select Production
+pulumi import grafana:alerting/ruleGroup:RuleGroup \
+  <pulumi-resource-name> "<folder-uid>:<rule-group-name>"
+```
+
+Importing through the default provider does not strand the resource there: the
+next `pulumi preview` shows the group as an update under the program's own
+provider, not a replacement. Check that it does before applying.
+
+Import the group before the first `pulumi up` that declares it — an apply
+against an undeclared existing group fails as already-exists rather than
+adopting it.
+
+Two things to check first:
+
+1. **What else is in the group.** Import adopts the whole group, and any rule in
+   it that the code does not declare is deleted on the next apply. Check with
+   `GET /api/v1/provisioning/folder/{folderUid}/rule-groups/{group}`.
+2. **Pin each rule's `uid`** to the value it already has. Without it the
+   provider assigns a fresh one, which orphans the rule's alert-state history,
+   breaks live silences, and dead-links the Grafana URL embedded in every past
+   Rootly alert.
+
 ### Adding a new log alert rule
 
 Same pattern, but open the relevant file in `log_rules/` and use a LogQL
 expression. The expression must be metric-producing (use `count_over_time`,
 `rate`, `sum`, etc. with a threshold baked in). Bare log stream queries must
 be wrapped: `count_over_time({...} |= "pattern" [5m]) > 0`.
+
+---
+
+## Dashboards (dashboards/)
+
+Each Grafana dashboard is its own file, one dashboard per file -- not one
+file per product/platform. `metric_rules/` and `log_rules/` group several
+related *rules* into one file per category (`eks_general.py`, `heroku.py`);
+dashboards don't follow that grouping, because a single growing "keycloak.py"
+holding every current and future Keycloak dashboard just recreates the same
+"one file for everything in this topic" problem the `dashboards/` package
+(vs. a single `dashboards.py`) already exists to avoid.
+
+**Naming**: `<system>_<what-it-shows>.py`, e.g. `keycloak_olapps_idp_logins.py`.
+The `<system>` prefix (`keycloak`, in this case) is shared across every
+dashboard for that system so they sort and grep together, but each distinct
+dashboard -- a different concern, a different realm, whatever varies -- gets
+its own file under that same prefix rather than being added to an existing
+one. A second Keycloak dashboard about something unrelated (say, session
+counts) would be `keycloak_session_counts.py`, not a new function inside
+`keycloak_olapps_idp_logins.py`.
+
+### Adding a new dashboard
+
+1. Add `dashboards/<system>_<what_it_shows>.py` with a `_dashboard_json(...)`
+   builder and a `create(folder_uid, timeseries_panel, bar_gauge_panel,
+   create_dashboard, resource_opts)` function, matching the signature in
+   [Submodule API](#submodule-api) above.
+2. Use the `timeseries_panel`/`bar_gauge_panel` helpers passed in from
+   `base.py` rather than building panel dicts by hand, so styling stays
+   consistent across dashboards. They default to the shared Mimir datasource;
+   for a Loki-backed panel (LogQL, e.g. `count_over_time`), pass
+   `datasource_ref=LOKI_DATASOURCE_REF` (import it from `datasources.py`,
+   not `base.py`, to avoid a circular import). Prefer counting straight from
+   Loki over deriving a Prometheus counter via an Alloy `stage.metrics`
+   block: a `metric.counter` only exists once incremented, so a low-volume
+   counter's first-ever appearance is invisible to PromQL's increase() (no
+   prior sample to diff against), and it gets evicted and reset after any
+   gap longer than `max_idle_duration` -- both silently undercount. LogQL's
+   `count_over_time` reads directly from Loki's stored lines at query time:
+   no persistent counter state, so neither failure mode applies.
+3. Import the new sub-module in `base.py` and call its `create(...)` from
+   `base.create(...)`, passing the shared folder UID and helpers.
+4. All dashboards in this package currently share one folder (`"Keycloak"`,
+   uid `keycloak-dashboards`). If a new dashboard belongs to an unrelated
+   system, create a second folder in `base.py` rather than dropping it into
+   the Keycloak one.
 
 ---
 
@@ -209,6 +322,24 @@ The notification policy in `alertmanager.py` mirrors the original
 
 OpsGenie is no longer active. All actionable alerts route to Rootly.
 
+**Rule 5 is load-bearing, not just a fallback.** A rule carrying no `severity`
+label is still evaluated and still recorded in `grafanacloud-alert-state-history`
+— it is simply delivered nowhere. `metric_rules/apisix_edge.py` uses that
+deliberately, to calibrate new thresholds against real firing data at zero paging
+risk; promoting such a rule means adding a `severity` label and nothing else.
+
+That "nothing else" holds only if the rule's resource-identifying label is
+already in `NotificationPolicy.group_bies`. A rule aggregating `sum by (X)`
+carries `X` as its only such label, and if `X` is missing from that list every
+firing instance collapses into one notification group per rule — the bundling
+the list exists to prevent. `matched_host` was added there for
+`apisix_edge.py`; when adding a rule that groups by a new label, add it too.
+
+The same mechanism silently swallows rules that lost their label *by accident*:
+`HTTPRequestDurationTooHighAvg` fired 1,168 times in 30 days into `oblivion`
+before anyone noticed. When adding a rule, be explicit about which of the two
+you mean.
+
 ---
 
 ## Secrets reference
@@ -229,12 +360,16 @@ pingdom_integration_ids: [<integration-id>, ...]  # Pingdom integration IDs for 
 
 ---
 
-## Pending phases (as of 2026-07-02)
+## Phase status (as of 2026-08-05)
 
-- **Phase 5** — Remove cortextool sync jobs (both cortex and loki) from the
-  Grafana Cloud Concourse pipeline
-  (`src/ol_concourse/pipelines/infrastructure/grafana_cloud/pipeline.py`)
-  once Pulumi rules (Phases 3 and 4) are verified in production.
+- **Phase 5** — Done. The legacy Grafana Concourse pipelines have been deleted:
+  `src/ol_concourse/pipelines/infrastructure/grafana_cloud/` (grizzly dashboard
+  sync + cortextool cortex/loki rule sync) and the older hand-written YAML
+  pipelines `pipelines/infrastructure/{grizzly,cortextool}/`. Alert rules and
+  Alertmanager config are now managed solely by this Pulumi program, deployed
+  via the `grafana-alerting` simple_pulumi pipeline. Note that the hourly
+  CI → QA → Production sync of the `mitodl/grafana-dashboards` repo went away
+  with it and has no Pulumi replacement.
 - **Phase 6** — Rename SNS topics `OpsGenie_Critical_Notifications` /
   `OpsGenie_Warning_Notifications` to reflect Rootly (cosmetic, low priority).
   Note: renaming an SNS topic changes its ARN and requires updating all

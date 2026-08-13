@@ -2,6 +2,7 @@
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHjZAY5LtmRWGljev0oiDGn0jR5cRwD4IVXCn50TW5i0qQGFNzbK/uuewL52WbAl1Ff3AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMVGbH/3ut2WFD5RmlAgEQgDsGgjF7DPjcruIeBZ8PGZcxuGFXVOyCCQj+BrJqIWymrfv+iFxrVhhHr7ke+h9J1PrpRroB8E+2oNTtoA==
 config:
+  nextjs:analytics_api_base_url: "https://analytics.rc.learn.mit.edu"
   nextjs:appzi_url:
     secure: v1:BvKYm13EnJavPEmi:Ef5Gf3J3tU+noMVdRHTzhw==
   nextjs:cache_s_maxage_seconds: 900
@@ -26,8 +27,6 @@ config:
   nextjs:posthog_project_id:
     secure: v1:0RjYuffs0Kq5piyu:/Weziwdlwuk/A4W2YYEHx2g0Jczv
   nextjs:recommendation_endpoint: "https://api.rc.learn.mit.edu/ai/http/recommendation_agent/"
-  nextjs:sentry_dsn:
-    secure: v1:FVKlsmjuVBFWXhWG:dxpsTB02SGRWkUfDCpmanVKBOQA6EXh6KnnZ8R+nqHsCF/WOBY/SlZMqikOI6CYlYmhCt8T/BAFn2Ps3xzll68R8UXWBIEhQrfkky4ArOGLRC3xRO6MN7bMS5gjenAhzMIgg3g==
   nextjs:sentry_env: "rc"
   nextjs:syllabus_endpoint: "https://api.rc.learn.mit.edu/ai/http/syllabus_agent/"
   nextjs:optimize_images: "true"

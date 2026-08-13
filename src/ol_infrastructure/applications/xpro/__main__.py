@@ -47,12 +47,14 @@ from ol_infrastructure.components.services.k8s import (
     OLApplicationK8sCeleryBeatConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
+    application_deployment_names,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
     OLVaultPostgresDatabaseConfig,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -111,6 +113,7 @@ operations_vpc = network_stack.require_output("operations_vpc")
 vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
+sentry_stack = make_stack_reference(projects.SENTRY, "default")
 aws_config = AWSBase(
     tags={
         "OU": "mitxpro",
@@ -315,6 +318,8 @@ xpro_vault_secrets = read_yaml_secrets(
 )
 
 for key, data in xpro_vault_secrets.items():
+    if key == "sentry":
+        continue
     vault.kv.Secret(
         f"xpro-vault-secrets-{key}",
         # This mount is created already as part of the edxapp Pulumi project. See note
@@ -322,6 +327,16 @@ for key, data in xpro_vault_secrets.items():
         path=f"secret-xpro/{key}",
         data_json=json.dumps(data),
     )
+
+# Previously a hard-coded SOPS secret; now sourced from the
+# ol-infrastructure-sentry stack output.
+vault.kv.Secret(
+    "xpro-vault-secrets-sentry",
+    path="secret-xpro/sentry",
+    data_json=sentry_stack.require_output("xpro_sentry_dsn").apply(
+        lambda dsn: json.dumps({**xpro_vault_secrets["sentry"], "dsn": dsn})
+    ),
+)
 
 # env_name is 'ci' 'rc' or 'production'
 env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
@@ -496,6 +511,40 @@ if k8s_deploy:
         f":{DEFAULT_POSTGRES_PORT}"
     )
 
+    # Celery topology is declared up here, rather than inline in the
+    # OLApplicationK8s config below, because the static secrets need the
+    # resulting Deployment names before the component exists -- see below.
+    xpro_celery_worker_configs = [
+        OLApplicationK8sCeleryWorkerConfig(
+            application_name="mitxpro.celery:app",
+            worker_name="default",
+            redis_host=redis_cache.address,
+            redis_password=redis_config.require("password"),
+            resource_requests={"cpu": "100m", "memory": "1200Mi"},
+            resource_limits={"memory": "1200Mi"},
+        ),
+    ]
+    xpro_celery_beat_config = OLApplicationK8sCeleryBeatConfig(
+        application_name="mitxpro.celery:app",
+        resource_requests={"cpu": "10m", "memory": "384Mi"},
+        resource_limits={"memory": "384Mi"},
+    )
+
+    # Static secrets reach the app through env_from_secret_names, i.e. envFrom,
+    # so their values become pod environment variables that are fixed at pod
+    # start. Re-rendering the Kubernetes Secret does not touch a running pod --
+    # without these restart targets a credential change lands in the Secret and
+    # the pods keep serving the old value until something unrelated rolls them.
+    # That is exactly how the 2026-07-28 xPro Sheets outage went unnoticed.
+    xpro_secret_restart_targets = [
+        OLVaultRestartTarget(kind="Deployment", name=deployment_name)
+        for deployment_name in application_deployment_names(
+            application_name=Services.xpro,
+            celery_worker_configs=xpro_celery_worker_configs,
+            celery_beat_config=xpro_celery_beat_config,
+        )
+    ]
+
     # Create Kubernetes secrets
     secret_names, secret_resources = create_xpro_k8s_secrets(
         stack_info=stack_info,
@@ -506,6 +555,7 @@ if k8s_deploy:
         rds_endpoint=rds_endpoint,
         redis_password=redis_config.require("password"),
         redis_cache=redis_cache,
+        restart_targets=xpro_secret_restart_targets,
     )
 
     # Merge stack-level config vars into the app env vars
@@ -532,17 +582,9 @@ if k8s_deploy:
             **docker_image_config_kwargs("XPRO"),
             granian_config=GranianConfig(
                 application_module="mitxpro.wsgi:application",
-                # Holding pins: preserve the pre-overhaul effective concurrency
-                # until this app's stage of the rollout. Granian derived
-                # backpressure=64 (backlog=128 // workers=2) and
-                # blocking_threads=64 // 2 = 32. Delete all five to adopt the
-                # component defaults (1 worker, 8 blocking threads, 16
-                # backpressure). See docs/plans/granian-configuration-overhaul.md
-                workers=2,
-                runtime_mode="mt",
-                runtime_threads=2,
-                blocking_threads=32,
-                backpressure=64,
+                # Stage 2 of docs/plans/granian-configuration-overhaul.md: holding
+                # pins removed, so this app now runs on the component defaults (1
+                # worker, 8 blocking threads, 16 backpressure, runtime defaults).
                 blocking_threads_idle_timeout=120,
                 enable_metrics=True,
             ),
@@ -554,21 +596,8 @@ if k8s_deploy:
             pre_deploy_commands=[
                 ("migrate", ["python", "manage.py", "migrate", "--noinput"])
             ],
-            celery_worker_configs=[
-                OLApplicationK8sCeleryWorkerConfig(
-                    application_name="mitxpro.celery:app",
-                    worker_name="default",
-                    redis_host=redis_cache.address,
-                    redis_password=redis_config.require("password"),
-                    resource_requests={"cpu": "100m", "memory": "1200Mi"},
-                    resource_limits={"memory": "1200Mi"},
-                ),
-            ],
-            celery_beat_config=OLApplicationK8sCeleryBeatConfig(
-                application_name="mitxpro.celery:app",
-                resource_requests={"cpu": "10m", "memory": "384Mi"},
-                resource_limits={"memory": "384Mi"},
-            ),
+            celery_worker_configs=xpro_celery_worker_configs,
+            celery_beat_config=xpro_celery_beat_config,
             resource_requests={"cpu": "250m", "memory": "2Gi"},
             resource_limits={"memory": "2Gi"},
         ),
@@ -962,8 +991,8 @@ set bereq.http.x-forwarded-host = "{frontend_domain}";""",  # noqa: E501
 
 xpro_tls_configuration = fastly.get_tls_configuration(
     default=False,
-    name="TLS v1.3",
-    tls_protocols=["1.2", "1.3"],
+    name="TLS v1.3+0RTT",
+    tls_protocols=["1.2", "1.3+0RTT"],
     opts=InvokeOptions(provider=fastly_provider.provider),
 )
 
