@@ -50,6 +50,11 @@ data:
 
   # ── SSO / Keycloak ─────────────────────────────────────────────────────────
   SOCIAL_AUTH_OL_OIDC_KEY: "ol-mitlearn-client"
+  # Client for Keycloak account actions (update email / update password).
+  # Distinct from SOCIAL_AUTH_OL_OIDC_KEY above: its registered redirect URI is
+  # the /account/action/complete callback. Matches ol-mitlearn-account-client in
+  # local-dev/infra/modules/keycloak.py.
+  KEYCLOAK_CLIENT_ID: "ol-mitlearn-account-client"
   KEYCLOAK_REALM_NAME: "olapps"
   KEYCLOAK_BASE_URL: "https://sso.ol.mit.dev/"
   OIDC_ENDPOINT: "https://sso.ol.mit.dev/realms/olapps"
