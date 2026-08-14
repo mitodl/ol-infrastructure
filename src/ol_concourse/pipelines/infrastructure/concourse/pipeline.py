@@ -1,11 +1,9 @@
-import re
 import sys
 
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import GetStep, Identifier, Pipeline
-from ol_concourse.lib.resources import git_repo, github_release
+from ol_concourse.lib.resources import git_repo
 
-from bridge.lib.versions import CONCOURSE_VERSION
 from ol_concourse.pipelines.constants import (
     PACKER_WATCHED_PATHS,
     PULUMI_CODE_PATH,
@@ -21,29 +19,17 @@ from ol_concourse.pipelines.versions_map import (
 #############
 # RESOURCES #
 #############
-# Pinned to CONCOURSE_VERSION (src/bridge/lib/versions.py) rather than tracking
-# upstream's latest release. Previously this resource had no tag_filter, so any
-# new upstream release auto-triggered a build+deploy through CI->QA->Production
-# with no human gate -- that's how 8.3.0 reached production and broke every
-# worker (see PR #5401). Bumping the pin is now what triggers a rebuild, via
-# concourse_image_code watching its version pin (image_version_paths("concourse")
-# below) rather than the raw versions.py file -- see PR #5407.
-#
-# concourse/concourse tags releases with a "v" prefix (e.g. "v8.2.5"), and
-# github-release's tag_filter is an unanchored Go regexp -- an unescaped,
-# unanchored CONCOURSE_VERSION would incidentally match today's tag but would
-# also match unintended ones (e.g. "8.2.5" matches inside "v8.2.50"). Anchor
-# it, escape the literal version, and keep a capture group around just the
-# unprefixed digits so the resource's "version" file -- read by
-# env_vars_from_files below -- contains "8.2.5", not "v8.2.5", matching what
-# deploy.py expects.
-concourse_release = github_release(
-    Identifier("concourse-release"),
-    "concourse",
-    "concourse",
-    github_token="",
-    tag_filter=rf"^v({re.escape(CONCOURSE_VERSION)})$",
-)
+# No github_release resource here on purpose. install_concourse
+# (src/bilder/components/concourse/steps.py) downloads the release archive
+# directly from GitHub using just the version string -- it never reads
+# anything else out of a release fetch -- so CONCOURSE_VERSION is sourced
+# straight from the version pin file below instead of a separate tracked
+# resource. That pin is bumped by Renovate (via versions.py + the
+# sync-version-pins pre-commit hook, see PR #5407) and concourse_image_code's
+# watch on image_version_paths("concourse") is what triggers a rebuild --
+# never upstream cutting a new release. That auto-tracking (with no tag_filter
+# and no human gate) is how 8.3.0 reached production and broke every worker
+# (see PR #5401).
 concourse_image_code = git_repo(
     Identifier("ol-infrastructure-packer"),
     uri="https://github.com/mitodl/ol-infrastructure",
@@ -67,17 +53,16 @@ concourse_pulumi_code = git_repo(
 )
 
 concourse_ami_fragment = packer_jobs(
-    dependencies=[
-        GetStep(
-            get=concourse_release.name,
-            trigger=True,
-        )
-    ],
+    dependencies=[],
     image_code=concourse_image_code,
     packer_template_path="src/bilder/images/.",
     node_types=["web", "worker"],
     packer_vars={"app_name": "concourse"},
-    env_vars_from_files={"CONCOURSE_VERSION": f"{concourse_release.name}/version"},
+    env_vars_from_files={
+        "CONCOURSE_VERSION": (
+            f"{concourse_image_code.name}/src/bridge/lib/version_pins/CONCOURSE_VERSION"
+        )
+    },
     extra_packer_params={"only": ["amazon-ebs.third-party"]},
 )
 
@@ -110,7 +95,6 @@ def concourse_pipeline() -> Pipeline:
         resource_types=combined_fragment.resource_types,
         resources=[
             *combined_fragment.resources,
-            concourse_release,
             concourse_image_code,
             concourse_pulumi_code,
         ],
