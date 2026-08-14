@@ -13,6 +13,7 @@ config.define_string("openedx_mode", usage="qa (default) or local (Tutor)")
 config.define_string_list("prebuilt_tags", usage="Prebuilt image tag overrides per app, e.g. mit-learn=0.62.0 learn-ai=0.28.3")
 config.define_string("disk_keep_tags", usage="Newest tilt-built image tags kept per repo by the disk janitor (default: 3). Overrides LOCAL_DEV_DISK_KEEP_TAGS env var.")
 config.define_string("disk_buildcache_max_gb", usage="Docker build-cache size cap in GB (default: 10% of total disk; 0 disables). Overrides LOCAL_DEV_BUILDCACHE_MAX_GB env var.")
+config.define_string("log_retention_period", usage="How long Grafana/Loki keeps local-dev logs, as a whole number of days, e.g. 72h or 3d (default: 168h). Overrides LOCAL_DEV_LOG_RETENTION env var.")
 cfg = config.parse()
 
 enabled_apps = cfg.get("enabled_apps", ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"])
@@ -47,6 +48,12 @@ prebuilt_tags = {
     for kv in cfg.get("prebuilt_tags", [])
     if "=" in kv
 }
+
+# How long Loki keeps logs. Empty means the Pulumi program's own default (168h).
+# Set it per-developer in the gitignored tilt_config.json — it is deliberately
+# not pinned in Pulumi.local-dev.core.Dev.yaml, since Pulumi config would win
+# over the environment and silently override this.
+log_retention_period = cfg.get("log_retention_period") or os.environ.get("LOCAL_DEV_LOG_RETENTION", "")
 
 # Workspace root: directory that contains ol-infrastructure and sibling app repos.
 # Override with MITOL_WORKSPACE_ROOT environment variable.
@@ -230,7 +237,7 @@ APPS = [
 # Core stack (operators, foundational services, Keycloak instance)
 local_resource(
     "local-infra-core",
-    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'pulumi stack init local-dev.core.Dev 2>/dev/null; pulumi refresh --yes --skip-preview --stack local-dev.core.Dev && pulumi up --yes --skip-preview --logtostderr --stack local-dev.core.Dev'".format(rd=root_domain),
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} LOCAL_DEV_LOG_RETENTION={lr} PULUMI_CONFIG_PASSPHRASE='' bash -c 'pulumi stack init local-dev.core.Dev 2>/dev/null; pulumi refresh --yes --skip-preview --stack local-dev.core.Dev && pulumi up --yes --skip-preview --logtostderr --stack local-dev.core.Dev'".format(rd=root_domain, lr=log_retention_period),
     dir="./local-dev/infra/core",
     deps=["./local-dev/infra/modules", "./local-dev/infra/core/__main__.py"],
     labels=["infra"],

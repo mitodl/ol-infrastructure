@@ -39,6 +39,7 @@ This environment runs the MIT Learn application stack as Kubernetes workloads in
 | odl-video-service | `https://video.odl.mit.dev` | ODL Video Service (Django/uwsgi) |
 | Keycloak SSO | `https://sso.ol.mit.dev` | Identity provider (olapps realm) |
 | Mailpit | `https://mail.mit.dev` | Captured outbound email (web UI) |
+| Grafana | `https://grafana.mit.dev` | Logs from every service in the cluster (1-week retention) |
 
 All hostnames use a `.dev` TLD that mirrors production (`.edu` → `.dev`), so URLs, CSRF cookies, and OIDC redirect URIs behave identically to deployed environments.
 
@@ -204,6 +205,8 @@ With an app repo checked out next to `ol-infrastructure`, Tilt live-syncs your e
 
 ### Access logs
 
+For a single pod you already have in mind, `kubectl` is the shortest path:
+
 ```bash
 # Web pod
 kubectl logs -n mit-learn deploy/mitlearn-webapp -c app -f
@@ -214,6 +217,19 @@ kubectl logs -n mit-learn deploy/mitlearn-worker-default -f
 # APISIX ingress
 kubectl logs -n operations deploy/apisix -f
 ```
+
+To search across services — or to follow a request from the ingress into the app and on into the worker that picked up the task — use **Grafana at [https://grafana.mit.dev](https://grafana.mit.dev)**. It opens straight into the UI with no login. Every pod in the cluster is collected, including the ones Tilt does not manage (Postgres, Valkey, OpenSearch, Keycloak, APISIX, Mailpit).
+
+Start from the pre-provisioned **local-dev logs** dashboard, or go to **Explore → Loki** and write LogQL directly:
+
+```logql
+{namespace="mit-learn"}                      # everything in one app's namespace
+{app="mitlearn-webapp"} |= "ERROR"           # one workload, filtered
+{namespace="operations", app="apisix"}       # ingress access logs
+{container="celery"} |= "Traceback"          # across every app's workers
+```
+
+Available labels are `namespace`, `pod`, `container`, and `app`. Logs are kept for one week by default — see [Log retention](#log-retention) to change that, and `observability_enabled` in [Pulumi stack config](#pulumi-stack-config) to turn the whole stack off.
 
 ### Run management commands
 
@@ -301,6 +317,7 @@ tilt trigger seed-mit-learn-fixtures
 | `enabled_apps` | all four | Apps to deploy. Omit any to skip it entirely. |
 | `prebuilt_tags` | see example file | `["app=tag"]` list of image tags used when the app repo is not checked out locally. |
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
+| `log_retention_period` | `168h` | How long Grafana/Loki keeps logs — see [Log retention](#log-retention). |
 | `per_app_databases`, `openedx_mode` | — | Declared but not wired to anything yet; setting them has no effect. |
 
 The rule of thumb for which config surface a knob belongs to: settings that change **which/how Tilt runs things** (apps, image tags) go in `tilt_config.json`; anything that sets an **env var or secret value inside a workload** (API keys, feature flags, endpoints) goes in a gitignored `app-env.local.yaml` override ConfigMap — see [Local Configuration Overrides](#local-configuration-overrides).
@@ -312,6 +329,27 @@ Every service hostname derives from the `LOCAL_DEV_ROOT_DOMAIN` environment vari
 `tilt up` fails immediately if `sso.ol.<root_domain>` does not resolve, whether through DNS or `/etc/hosts`.
 
 After changing the value, re-run `./local-dev/scripts/setup.sh` to reissue the TLS certificate and rewrite the `/etc/hosts` block; pass `--skip-hosts` to reissue the certificate only, which is what you want when the hostnames already resolve through DNS. The certificate's SANs cover one root domain, so requests to hostnames outside it fail at the TLS layer.
+
+### Log retention
+
+Logs are kept for **one week** (`168h`). To change that for yourself, set `log_retention_period` in your gitignored `tilt_config.json`:
+
+```json
+{
+  "log_retention_period": "72h"
+}
+```
+
+Tilt forwards it to the core Pulumi stack as `LOCAL_DEV_LOG_RETENTION`, so the same value works for a hand-run `pulumi up`:
+
+```bash
+cd local-dev/infra/core
+LOCAL_DEV_LOG_RETENTION=72h pulumi up --stack local-dev.core.Dev
+```
+
+Loki only honours a retention window that is a **whole number of days**, so give it hours in multiples of 24 (`48h`, `168h`) or days (`3d`, `7d`). Anything else fails the deploy with an explanatory error rather than being silently ignored.
+
+This knob is deliberately *not* pinned in `Pulumi.local-dev.core.Dev.yaml` — Pulumi config takes precedence over the environment, so a value committed there would override every developer's `tilt_config.json`. Changing it replaces the Loki ConfigMap and restarts Loki; already-ingested logs are re-evaluated against the new window on the next compaction pass (within ~15 minutes).
 
 ### Pulumi stack config
 
@@ -326,6 +364,7 @@ The infrastructure is split across two Pulumi stacks:
 | `apisix_version` | `2.12.0` | APISIX Helm chart version |
 | `cnpg_version` | `0.23.0` | CloudNativePG operator Helm chart version |
 | `keycloak_operator_version` | `26.0.7` | Official Keycloak Operator version |
+| `observability_enabled` | `true` | Deploy Grafana + Loki + Alloy (~1.3GB). Set to `false` on a constrained Docker VM. |
 
 **`local-dev/infra/apps_infra/Pulumi.local-dev.apps-infra.Dev.yaml`** — Keycloak realm and OIDC clients:
 

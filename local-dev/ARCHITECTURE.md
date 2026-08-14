@@ -143,7 +143,7 @@ flowchart TB
 
 ## What runs in the cluster
 
-Inside the cluster, workloads are grouped into namespaces: one per app, plus `local-infra` for shared services and `operations` for ingress.
+Inside the cluster, workloads are grouped into namespaces: one per app, plus `local-infra` for shared services and `operations` for ingress and observability.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -153,7 +153,9 @@ Inside the cluster, workloads are grouped into namespaces: one per app, plus `lo
 │  │operations│  │           local-infra                    │  │
 │  │          │  │  PostgreSQL (CNPG)  Valkey  Qdrant       │  │
 │  │  APISIX  │  │  OpenSearch  Tika  Keycloak  LiteLLM     │  │
-│  │          │  │  Mailpit                                 │  │
+│  │  Grafana │  │  Mailpit                                 │  │
+│  │  Loki    │  │                                          │  │
+│  │  Alloy   │  │                                          │  │
 │  └────┬─────┘  └──────────────────────────────────────────┘  │
 │       │                                                       │
 │       │  routes traffic by hostname                          │
@@ -172,7 +174,28 @@ Inside the cluster, workloads are grouped into namespaces: one per app, plus `lo
     Developer browser / curl
 ```
 
-The shared services in `local-infra`, briefly: **PostgreSQL** (one CNPG-managed cluster, one database per app), **Valkey** (the open-source Redis fork — the apps' Redis cache and Celery broker), **OpenSearch** (search), **Qdrant** (vector database for AI features), **Tika** (document text extraction), **LiteLLM** (proxy in front of LLM APIs), **Keycloak** (SSO), and **Mailpit** (catches all outbound email). In `operations`: **APISIX** (ingress — hostname routing, TLS termination, OIDC).
+The shared services in `local-infra`, briefly: **PostgreSQL** (one CNPG-managed cluster, one database per app), **Valkey** (the open-source Redis fork — the apps' Redis cache and Celery broker), **OpenSearch** (search), **Qdrant** (vector database for AI features), **Tika** (document text extraction), **LiteLLM** (proxy in front of LLM APIs), **Keycloak** (SSO), and **Mailpit** (catches all outbound email). In `operations`: **APISIX** (ingress — hostname routing, TLS termination, OIDC), and the logging stack — **Alloy**, **Loki**, and **Grafana** (see below).
+
+### Observability
+
+Every pod's stdout is collected into one searchable place, reachable at `https://grafana.<root_domain>`:
+
+```
+every pod's stdout
+  → /var/log/pods/*/*/*.log       node filesystem, mounted read-only
+  → Alloy (DaemonSet, one per node)   discovery.kubernetes → local.file_match
+                                      → loki.source.file → stage.cri
+  → Loki (filesystem storage on a PVC, retention window enforced by the compactor)
+  → Grafana (anonymous Admin — no login on a local-only cluster)
+```
+
+This is the production shape, shrunk. Production runs the same collector, Grafana Alloy, via the `k8s-monitoring` Helm chart's `filesystem-log-reader` preset (`src/ol_infrastructure/substructure/aws/eks/grafana.py`). Two deliberate divergences: Loki and Grafana are self-hosted here instead of Grafana Cloud, and Alloy is configured by hand rather than through that chart, which would pull in four collectors plus kube-state-metrics, opencost and kepler for no local benefit.
+
+Collection reads log *files* off the node rather than streaming through the API server (`loki.source.kubernetes`). The streaming path rides the same kubelet `:10250` API that is documented to wedge after VM sleep, which would kill log collection exactly when the environment is already broken.
+
+Alloy also exposes an OTLP receiver on 4317/4318 forwarding to Loki's native OTLP endpoint (`http://alloy.operations.svc.cluster.local:4318`). **Nothing emits to it yet** — it exists so an app can opt into production-style OTLP export by setting the `OTEL_*` env vars used in the deployed environments, and so Keycloak's `OTEL_SDK_DISABLED=true` workaround in `identity_core.py` (added precisely because no receiver existed) can be lifted.
+
+The whole stack is roughly 1.3GB and can be switched off with `observability_enabled: "false"`; nothing else depends on it.
 
 ## Design decisions
 
