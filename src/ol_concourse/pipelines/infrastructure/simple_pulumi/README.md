@@ -13,16 +13,18 @@ The Simple Pulumi-Only pattern is for applications/services that:
 ## Managed Applications
 
 `production_app_names` in `meta.py` is the source of truth for what this meta
-pipeline manages on odl-prod. It currently holds 33 applications, each rendered
+pipeline manages on odl-prod. It currently holds 37 applications, each rendered
 as a `pulumi-{app_name}` pipeline on the `infrastructure` team:
 
 `airbyte`, `aws-ecr`, `aws-sftp`, `b2b-partners-storage`, `celery-monitoring`,
 `clickhouse`, `data_warehouse`, `digital-credentials`, `fastly-redirector`,
+`github-organization`, `github-repositories`, `grafana-alerting`,
 `jupyterhub-data`, `mailgun`, `marimo-data`, `mongodb-atlas`, `monitoring`,
 `ocw-site`, `open-discussions`, `open-metadata`, `open-metadata-substructure`,
-`opensearch`, `qdrant-cloud`, `release-bot`, `rootly`, `sentry`, `starrocks`,
-`starrocks-substructure`, `starburst`, `tika`, `toolhive-apps`, `toolhive-data`,
-`toolhive-operator`, `toolhive-swe`, `vector-log-proxy`, `xpro-partner-dns`
+`opensearch`, `opik`, `qdrant-cloud`, `release-bot`, `rootly`, `sentry`,
+`starrocks`, `starrocks-substructure`, `starburst`, `tika`, `toolhive-apps`,
+`toolhive-data`, `toolhive-operator`, `toolhive-swe`, `vector-log-proxy`,
+`xpro-partner-dns`
 
 `meta.py` also carries `qa_app_names` (`starrocks-substructure-qa`) and
 `ci_app_names` (`starrocks-substructure-ci`), selected via `--env qa` / `--env ci`
