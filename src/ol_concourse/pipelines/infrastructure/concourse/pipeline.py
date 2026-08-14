@@ -11,6 +11,10 @@ from ol_concourse.pipelines.constants import (
 )
 from ol_concourse.pipelines.jobs import packer_jobs, pulumi_jobs_chain
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
+from ol_concourse.pipelines.versions_map import (
+    image_version_paths,
+    project_version_paths,
+)
 
 #############
 # RESOURCES #
@@ -24,6 +28,7 @@ concourse_image_code = git_repo(
     paths=[
         "src/bilder/components/",
         "src/bilder/images/concourse",
+        *image_version_paths("concourse"),
         *PACKER_WATCHED_PATHS,
     ],
 )
@@ -34,6 +39,7 @@ concourse_pulumi_code = git_repo(
     paths=[
         *PULUMI_WATCHED_PATHS,
         "src/ol_infrastructure/applications/concourse",
+        *project_version_paths("applications/concourse/"),
         *project_secrets_paths("applications/concourse/"),
     ],
 )

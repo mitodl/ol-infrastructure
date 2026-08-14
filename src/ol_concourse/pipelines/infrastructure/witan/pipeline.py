@@ -55,6 +55,7 @@ from ol_concourse.pipelines.constants import (
 from ol_concourse.pipelines.ecr import configure_ecr_repository_task
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
+from ol_concourse.pipelines.versions_map import project_version_paths
 
 ENVIRONMENTS = ("CI", "QA", "Production")
 IMAGE_NAME = "witan"
@@ -89,6 +90,7 @@ def build_witan_pipeline() -> PipelineFragment:
         paths=[
             *PULUMI_WATCHED_PATHS,
             str(PULUMI_PROJECT_PATH),
+            *project_version_paths("applications/witan/"),
             *project_secrets_paths("applications/witan/"),
         ],
     )

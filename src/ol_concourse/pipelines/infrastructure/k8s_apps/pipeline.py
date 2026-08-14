@@ -51,6 +51,7 @@ from ol_concourse.pipelines.constants import (
 )
 from ol_concourse.pipelines.jobs import pulumi_job, pulumi_jobs_chain
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
+from ol_concourse.pipelines.versions_map import project_version_paths
 
 
 class SentrySourcemapsConfig(BaseModel):
@@ -382,6 +383,7 @@ def _define_git_resources_legacy(
         paths=[
             f"src/ol_infrastructure/applications/{app_name.replace('-', '_')}",
             *PULUMI_WATCHED_PATHS,
+            *project_version_paths(f"applications/{app_name.replace('-', '_')}/"),
             *project_secrets_paths(f"applications/{app_name.replace('-', '_')}/"),
         ],
     )
@@ -844,6 +846,7 @@ def _define_git_resources(
         paths=[
             f"src/ol_infrastructure/applications/{app_name.replace('-', '_')}",
             *PULUMI_WATCHED_PATHS,
+            *project_version_paths(f"applications/{app_name.replace('-', '_')}/"),
             *project_secrets_paths(f"applications/{app_name.replace('-', '_')}/"),
         ],
     )

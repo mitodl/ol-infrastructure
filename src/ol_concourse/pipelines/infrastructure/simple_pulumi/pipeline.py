@@ -39,6 +39,7 @@ from ol_concourse.pipelines.constants import (
 )
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
+from ol_concourse.pipelines.versions_map import project_version_paths
 
 
 class DockerImageConfig(BaseModel):
@@ -615,7 +616,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
         paths=[
             *PULUMI_WATCHED_PATHS,
             str(PULUMI_CODE_PATH.joinpath(params.pulumi_project_path)),
-            "src/bridge/lib/versions.py",
+            *project_version_paths(params.pulumi_project_path),
             *project_secrets_paths(params.pulumi_project_path),
             *params.additional_watched_paths,
         ],

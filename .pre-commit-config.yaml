@@ -11,6 +11,19 @@ exclude: |
     ^charts/
   )
 repos:
+- repo: local
+  hooks:
+    # src/bridge/lib/version_pins/ is a derived, per-constant projection of
+    # versions.py that Concourse git resources watch instead of the whole file.
+    # Regenerating it here means Renovate only ever has to edit versions.py --
+    # pre-commit.ci syncs the pins inside the Renovate PR, so both land in the
+    # same commit and the pipelines that pin that version retrigger correctly.
+  - id: sync-version-pins
+    name: Sync src/bridge/lib/version_pins/ with versions.py
+    entry: python src/bridge/lib/sync_version_pins.py
+    language: python
+    files: ^src/bridge/lib/(versions\.py|version_pins/)
+    pass_filenames: false
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v6.0.0
   hooks:

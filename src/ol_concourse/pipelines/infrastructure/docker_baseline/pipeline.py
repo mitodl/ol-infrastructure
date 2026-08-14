@@ -5,6 +5,7 @@ from ol_concourse.lib.resources import git_repo, github_release, hashicorp_relea
 
 from ol_concourse.pipelines.constants import PACKER_WATCHED_PATHS
 from ol_concourse.pipelines.jobs import packer_jobs
+from ol_concourse.pipelines.versions_map import image_version_paths
 
 hashicorp_release_resource = hashicorp_resource()
 vector_release = github_release(
@@ -26,7 +27,7 @@ docker_baseline_image_code = git_repo(
     paths=[
         "src/bilder/components/",
         "src/bilder/images/docker_baseline_ami/",
-        "src/bridge/lib/versions.py",
+        *image_version_paths("docker_baseline_ami"),
         *PACKER_WATCHED_PATHS,
     ],
 )

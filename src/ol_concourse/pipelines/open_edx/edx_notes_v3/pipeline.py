@@ -27,6 +27,7 @@ from ol_concourse.pipelines.constants import (
 )
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
+from ol_concourse.pipelines.versions_map import project_version_paths
 
 
 def build_notes_pipeline(
@@ -63,6 +64,7 @@ def build_notes_pipeline(
             *PULUMI_WATCHED_PATHS,
             PULUMI_CODE_PATH.joinpath("applications/edx_notes/"),
             "src/bridge/settings/openedx/",
+            *project_version_paths("applications/edx_notes/"),
             *project_secrets_paths("applications/edx_notes/"),
         ],
     )
