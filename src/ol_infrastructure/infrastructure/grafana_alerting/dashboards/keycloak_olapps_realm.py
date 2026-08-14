@@ -109,6 +109,7 @@ def _dashboard_json(
                     "[$__range]))"
                 ),
                 grid_pos={"h": 4, "w": 6, "x": 0, "y": 1},
+                decimals=0,
             ),
             stat_panel(
                 title="Login Error %",
@@ -131,6 +132,7 @@ def _dashboard_json(
                     "[$__range]))"
                 ),
                 grid_pos={"h": 4, "w": 6, "x": 12, "y": 1},
+                decimals=0,
             ),
             stat_panel(
                 title="Account Lockouts (selected range)",
@@ -140,6 +142,7 @@ def _dashboard_json(
                     "[$__range]))"
                 ),
                 grid_pos={"h": 4, "w": 6, "x": 18, "y": 1},
+                decimals=0,
             ),
             row_panel(title="Login & Auth Flow Trends", y=5),
             timeseries_panel(
@@ -163,37 +166,41 @@ def _dashboard_json(
                     },
                 ],
                 grid_pos={"h": 8, "w": 12, "x": 0, "y": 6},
+                decimals=0,
             ),
             timeseries_panel(
-                title="Login Errors by Type",
+                title="Login Errors by Type (per min)",
                 expr=(
                     "sum by (error) (rate(keycloak_user_events_total"
                     f'{{event="login", error!="", {_REALM_SELECTOR}}}'
-                    "[$__rate_interval]))"
+                    "[$__rate_interval])) * 60"
                 ),
                 grid_pos={"h": 8, "w": 12, "x": 12, "y": 6},
                 legend_format="{{error}}",
+                decimals=0,
             ),
             timeseries_panel(
-                title="Login & Logout Events",
+                title="Login & Logout Events (per min)",
                 expr=(
                     "sum by (event) (rate(keycloak_user_events_total"
                     f'{{event=~"login|logout", {_REALM_SELECTOR}}}'
-                    "[$__rate_interval]))"
+                    "[$__rate_interval])) * 60"
                 ),
                 grid_pos={"h": 8, "w": 12, "x": 0, "y": 14},
                 legend_format="{{event}}",
+                decimals=0,
             ),
             timeseries_panel(
-                title="Token Operations & Registrations",
+                title="Token Operations & Registrations (per min)",
                 expr=(
                     "sum by (event) (rate(keycloak_user_events_total"
                     '{event=~"refresh_token|code_to_token|register|token_exchange", '
                     f"{_REALM_SELECTOR}}}"
-                    "[$__rate_interval]))"
+                    "[$__rate_interval])) * 60"
                 ),
                 grid_pos={"h": 8, "w": 12, "x": 12, "y": 14},
                 legend_format="{{event}}",
+                decimals=0,
             ),
             row_panel(title="Logins by Identity Provider (Loki)", y=22),
             timeseries_panel(
@@ -201,24 +208,28 @@ def _dashboard_json(
                 expr=_idp_login_count_expr(**idp_success_kwargs, window="$__interval"),
                 grid_pos={"h": 8, "w": 12, "x": 0, "y": 23},
                 datasource_ref=LOKI_DATASOURCE_REF,
+                decimals=0,
             ),
             timeseries_panel(
                 title="Failed Logins by Identity Provider",
                 expr=_idp_login_count_expr(**idp_failure_kwargs, window="$__interval"),
                 grid_pos={"h": 8, "w": 12, "x": 12, "y": 23},
                 datasource_ref=LOKI_DATASOURCE_REF,
+                decimals=0,
             ),
             bar_gauge_panel(
                 title="Total Successful Logins by IdP (selected range)",
                 expr=_idp_login_count_expr(**idp_success_kwargs, window="$__range"),
                 grid_pos={"h": 8, "w": 12, "x": 0, "y": 31},
                 datasource_ref=LOKI_DATASOURCE_REF,
+                decimals=0,
             ),
             bar_gauge_panel(
                 title="Total Failed Logins by IdP (selected range)",
                 expr=_idp_login_count_expr(**idp_failure_kwargs, window="$__range"),
                 grid_pos={"h": 8, "w": 12, "x": 12, "y": 31},
                 datasource_ref=LOKI_DATASOURCE_REF,
+                decimals=0,
             ),
             row_panel(title="Recent Auth Failures (Logs)", y=39),
             logs_panel(

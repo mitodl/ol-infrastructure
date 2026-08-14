@@ -40,6 +40,7 @@ def _timeseries_panel(
     legend_format: str = "{{identity_provider}}",
     queries: list[dict[str, Any]] | None = None,
     unit: str = "short",
+    decimals: int | None = None,
     description: str = "",
 ) -> dict[str, Any]:
     """Build a time-series panel model querying a shared datasource.
@@ -48,6 +49,11 @@ def _timeseries_panel(
     instead of `expr`/`legend_format` when a panel needs more than one
     query series (e.g. p50/p95/p99 latency, or GC time+count by cause) --
     each becomes its own target, lettered A, B, C...
+
+    `decimals` forces the displayed precision (e.g. `0` to round a
+    per-minute rate to a whole number) instead of Grafana's auto-scaled
+    default, which otherwise shows several decimal places for a small
+    rate value.
 
     `description` shows as a hover tooltip (the small "i" icon in the panel
     header) -- use it to spell out what a value actually means when that
@@ -65,6 +71,19 @@ def _timeseries_panel(
         }
         for i, query in enumerate(queries)
     ]
+    defaults: dict[str, Any] = {
+        "color": {"mode": "palette-classic"},
+        "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "pointSize": 5,
+        },
+        "unit": unit,
+        "min": 0,
+    }
+    if decimals is not None:
+        defaults["decimals"] = decimals
     return {
         "title": title,
         "description": description,
@@ -72,17 +91,7 @@ def _timeseries_panel(
         "datasource": datasource_ref,
         "gridPos": grid_pos,
         "fieldConfig": {
-            "defaults": {
-                "color": {"mode": "palette-classic"},
-                "custom": {
-                    "drawStyle": "line",
-                    "lineWidth": 2,
-                    "fillOpacity": 10,
-                    "pointSize": 5,
-                },
-                "unit": unit,
-                "min": 0,
-            },
+            "defaults": defaults,
             "overrides": [],
         },
         "options": {
@@ -105,19 +114,23 @@ def _bar_gauge_panel(
     datasource_ref: dict[str, str] = MIMIR_DATASOURCE_REF,
     legend_format: str = "{{identity_provider}}",
     unit: str = "short",
+    decimals: int | None = None,
 ) -> dict[str, Any]:
     """Build a bar-gauge panel model querying a shared datasource."""
+    defaults: dict[str, Any] = {
+        "color": {"mode": "palette-classic"},
+        "unit": unit,
+        "min": 0,
+    }
+    if decimals is not None:
+        defaults["decimals"] = decimals
     return {
         "title": title,
         "type": "bargauge",
         "datasource": datasource_ref,
         "gridPos": grid_pos,
         "fieldConfig": {
-            "defaults": {
-                "color": {"mode": "palette-classic"},
-                "unit": unit,
-                "min": 0,
-            },
+            "defaults": defaults,
             "overrides": [],
         },
         "options": {
@@ -144,23 +157,27 @@ def _stat_panel(
     grid_pos: dict[str, Any],
     datasource_ref: dict[str, str] = MIMIR_DATASOURCE_REF,
     unit: str = "short",
+    decimals: int | None = None,
     legend_format: str = "",
 ) -> dict[str, Any]:
     """Build a single-value stat panel querying a shared datasource."""
+    defaults: dict[str, Any] = {
+        "color": {"mode": "thresholds"},
+        "unit": unit,
+        "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "green", "value": None}],
+        },
+    }
+    if decimals is not None:
+        defaults["decimals"] = decimals
     return {
         "title": title,
         "type": "stat",
         "datasource": datasource_ref,
         "gridPos": grid_pos,
         "fieldConfig": {
-            "defaults": {
-                "color": {"mode": "thresholds"},
-                "unit": unit,
-                "thresholds": {
-                    "mode": "absolute",
-                    "steps": [{"color": "green", "value": None}],
-                },
-            },
+            "defaults": defaults,
             "overrides": [],
         },
         "options": {
