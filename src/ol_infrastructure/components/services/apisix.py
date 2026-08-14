@@ -155,7 +155,15 @@ def oidc_error_callback_recovery_plugin(
     :returns: A ``serverless-pre-function`` plugin config to attach to routes.
     :rtype: OLApisixPluginConfig
     """
-    errors = recoverable_errors or ["temporarily_unavailable"]
+    # `is None`, not `or`: an explicit empty list means "recover nothing",
+    # which is how a caller turns the plugin into a no-op without detaching it
+    # from every route that references the shared config.  `or` would quietly
+    # turn that back into the default.
+    errors = (
+        ["temporarily_unavailable"]
+        if recoverable_errors is None
+        else recoverable_errors
+    )
     recoverable_table = ", ".join(f'["{error}"] = true' for error in errors)
     recovery_function = f"""return function(conf, ctx)
     local uri = ngx.var.uri
