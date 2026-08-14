@@ -245,8 +245,16 @@ def configure_concourse(
 def register_concourse_service(
     concourse_config: ConcourseWebConfig | ConcourseWorkerConfig,
     restart=False,  # noqa: FBT002
+    start_service_immediately=True,  # noqa: FBT002
 ):
-    # Create Systemd unit to manage Concourse service
+    # Image builds must pass start_service_immediately=False. Starting
+    # concourse.service on a Packer builder runs the node's real startup path
+    # against a throwaway instance -- for workers that means
+    # concourse-worker-preflight (a hard Requires= of concourse.service) pins
+    # /etc/default/concourse-name to the *builder's* instance id, which then
+    # ships in the AMI and is inherited by every worker launched from it. Only
+    # enabling the unit leaves it to start on the first boot of a real
+    # instance, via WantedBy=multi-user.target.
     systemd_unit = files.template(
         name="Create concourse Systemd unit definition",
         src=str(
@@ -256,9 +264,9 @@ def register_concourse_service(
         concourse_config=concourse_config,
     )
     systemd.service(
-        name="Ensure Concourse service is enabled and running.",
+        name="Ensure Concourse service is enabled.",
         service="concourse",
-        running=True,
+        running=start_service_immediately,
         enabled=True,
         restarted=restart,
         daemon_reload=systemd_unit.changed,

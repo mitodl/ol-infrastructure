@@ -280,8 +280,8 @@ install_baseline_packages(
     )
     + (["awscli", "jq"] if node_type == CONCOURSE_WEB_NODE_TYPE else [])
 )
-concourse_install_changed = install_concourse(concourse_base_config)
-concourse_config_changed = configure_concourse(concourse_config)
+install_concourse(concourse_base_config)
+configure_concourse(concourse_config)
 
 consul_configuration = {Path("00-default.json"): ConsulConfig()}
 
@@ -460,11 +460,12 @@ if node_type == CONCOURSE_WORKER_NODE_TYPE:
         )
         worker_services_changed = worker_services_changed or result.changed
 
-# Manage services
+# Manage services. This deploy only ever runs as a Packer provisioner against a
+# throwaway builder instance (see src/bilder/images/packer.pkr.hcl), so every
+# unit here is enabled but never started: the AMI must ship units, not the
+# runtime state that starting them produces.
 if host.get_fact(HasSystemd):
-    register_concourse_service(
-        concourse_config, restart=concourse_install_changed or concourse_config_changed
-    )
+    register_concourse_service(concourse_config, start_service_immediately=False)
     register_services(hashicorp_products, start_services_immediately=False)
     proxy_consul_dns()
     watched_concourse_files = [
@@ -510,9 +511,9 @@ if host.get_fact(HasSystemd):
         # Enable the timer (not the service directly); the timer triggers the
         # oneshot service on its schedule.
         systemd.service(
-            name="Enable and start concourse-worker-reaper timer",
+            name="Enable concourse-worker-reaper timer",
             service="concourse-worker-reaper.timer",
-            running=True,
+            running=False,
             enabled=True,
             daemon_reload=reaper_units_changed,
         )
@@ -525,50 +526,45 @@ if host.get_fact(HasSystemd):
         )
         # Scripts and service unit files were already uploaded before
         # register_concourse_service (see block above HasSystemd), so only
-        # the service enable/start calls remain here.
+        # the service enable calls remain here.
         for service_name in [
             "concourse-worker-spot-watch",
             "concourse-worker-lifecycle-hook",
         ]:
             systemd.service(
-                name=f"Enable and start {service_name}",
+                name=f"Enable {service_name}",
                 service=service_name,
-                running=True,
+                running=False,
                 enabled=True,
                 daemon_reload=worker_services_changed,
             )
-        # register_concourse_service above started concourse.service, which
-        # pulled in concourse-worker-preflight.service as a hard dependency
-        # (Requires=/After=) and ran it for real -- on *this* Packer builder
-        # instance. That run wrote /etc/default/concourse-name using the
-        # builder's own instance-id, and the write is intentionally
-        # idempotent (never overwritten once present). Left in place, every
-        # real worker booted from this AMI would inherit that same stale
-        # identity file, skip writing its own, and register with the TSA
-        # under the builder's identity -- colliding with every other worker
-        # from this image. Stop the service and remove the file so the AMI
-        # ships clean; a real instance's first boot starts concourse.service
-        # fresh (still enabled via WantedBy=multi-user.target) and preflight
-        # pins that instance's own identity.
-        #
-        # This must be a raw server.shell, not files.file(present=False) /
-        # systemd.service(running=False): pyinfra compiles this whole script
-        # into an ordered command queue by fact-checking each operation
-        # against the host's state *before any queued command has actually
-        # run* -- register_concourse_service's start was only queued, not
-        # yet applied, when these facts were checked. Both fact-gated ops
-        # therefore saw "file absent" / "service not running" and queued
-        # nothing. server.shell has no such precondition check, so it always
-        # queues its commands, which then run for real at this point in the
-        # execution order (after the start, once it has actually happened).
-        server.shell(
-            name="Stop concourse.service and remove build-time-baked worker identity",
-            commands=[
-                "systemctl stop concourse.service || true",
-                "rm -f /etc/default/concourse-name",
-            ],
-        )
+    # Enable but do not start the watcher: an active concourse.path on the
+    # builder would restart concourse.service the moment any later step in the
+    # build touches a watched file, re-running the worker preflight and
+    # re-creating exactly the builder-owned identity this image must not carry.
     service_configuration_watches(
         service_name="concourse",
         watched_files=watched_concourse_files,
+        start_now=False,
     )
+
+# Runtime state that a Packer builder can generate but that must never be baked
+# into the image, because a real instance would inherit it instead of deriving
+# its own. Keep this list as the tripwire for that whole class of bug: a leak
+# here is silent at build time and only surfaces as a fleet-wide failure after
+# the AMI rolls out.
+BUILDER_STATE_PATHS = (
+    # Pins CONCOURSE_NAME. concourse-worker-preflight writes it once and never
+    # overwrites, so an inherited copy makes every worker from this image
+    # register under the builder's instance id and collide.
+    "/etc/default/concourse-name",
+)
+server.shell(
+    name="Assert no builder-generated state is baked into the image",
+    commands=[
+        f"for state_path in {' '.join(BUILDER_STATE_PATHS)}; do "
+        'if [ -e "$state_path" ]; then '
+        'echo "Builder-generated state leaked into image: $state_path" >&2; '
+        "exit 1; fi; done"
+    ],
+)
