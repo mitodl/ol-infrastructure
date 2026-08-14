@@ -12,7 +12,6 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: application
 default_branch: master
-dependabot_security_updates: false
 description: building blocks for a basic video service for ODL
 has_discussions: false
 has_projects: true

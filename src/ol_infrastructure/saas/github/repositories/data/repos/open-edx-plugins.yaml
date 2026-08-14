@@ -11,7 +11,6 @@ allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true
 archetype: library
-dependabot_security_updates: false
 description: A repository of plugins for extending and customizing the behavior of
   Open edX projects
 has_discussions: false

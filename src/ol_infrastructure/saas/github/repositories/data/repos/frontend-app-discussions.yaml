@@ -14,7 +14,6 @@ allow_squash_merge: true
 archetype: fork
 default_branch: master
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: A React-based micro frontend for the Open edX discussion forums.
 has_discussions: false
 has_projects: true

@@ -12,7 +12,6 @@ allow_squash_merge: true
 archetype: fork
 default_branch: devel
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: Implementation of per object permissions for Django 1.2+
 has_discussions: false
 has_projects: true

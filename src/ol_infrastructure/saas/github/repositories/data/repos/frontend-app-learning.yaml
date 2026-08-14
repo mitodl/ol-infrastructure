@@ -14,7 +14,6 @@ allow_squash_merge: true
 archetype: fork
 default_branch: master
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: Front-end for the Open edX course experience, implemented using React
   and Paragon.
 has_discussions: false

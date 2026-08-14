@@ -14,7 +14,6 @@ allow_squash_merge: true
 archetype: fork
 default_branch: main
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: Open edX events from the Hooks Extensions Framework
 has_discussions: false
 has_projects: true

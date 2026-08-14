@@ -16,7 +16,6 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: infrastructure
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: A repository that will hold Github Issues with which to test the Concourse
   issue driven workflow
 has_discussions: false

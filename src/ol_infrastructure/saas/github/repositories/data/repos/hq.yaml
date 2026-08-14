@@ -16,7 +16,6 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: library
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: OL Engineering & Products - headquarters
 has_discussions: true
 has_projects: true

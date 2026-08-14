@@ -12,7 +12,6 @@ allow_rebase_merge: false
 allow_squash_merge: true
 archetype: library
 delete_branch_on_merge: false
-dependabot_security_updates: false
 has_discussions: false
 has_projects: true
 has_wiki: true

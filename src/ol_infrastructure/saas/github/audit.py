@@ -163,18 +163,17 @@ RULES: tuple[Rule, ...] = (
             else None
         ),
     ),
-    Rule(
-        "SEC-05",
-        "security",
-        "high",
-        "active",
-        "Dependabot security updates disabled",
-        lambda r: (
-            ("disabled", "enabled", "set dependabot_security_updates in the archetype")
-            if not r.get("dependabot_security_updates")
-            else None
-        ),
-    ),
+    # SEC-05 (Dependabot security updates disabled) is RETIRED, not merely quiet.
+    # Closed 2026-08-14 as won't-fix: the org's shared Renovate config
+    # (`mitodl/.github:renovate-config`) already sets
+    # `vulnerabilityAlerts.enabled: true` plus `osvVulnerabilityAlerts: true`, sourced
+    # from the same `vulnerability_alerts` data GitHub's own toggle would use,
+    # bypassing Renovate's normal schedule. Enabling
+    # GitHub's native auto-fix PRs on top of that would duplicate Renovate's PR on every
+    # repo extending the shared config -- see the `base` archetype's comment in
+    # data/archetypes.yaml. A rule left in place here would report that duplication risk
+    # as a "disabled" finding on 174 of 176 active repos, forever, which is the opposite
+    # of what actually happened: the archetype default is `false` on purpose now.
     Rule(
         "SEC-06",
         "security",

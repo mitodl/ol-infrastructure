@@ -10,7 +10,6 @@ allow_merge_commit: false
 allow_rebase_merge: false
 allow_squash_merge: true
 archetype: library
-dependabot_security_updates: false
 has_discussions: false
 has_projects: true
 merge_commit_message: PR_TITLE

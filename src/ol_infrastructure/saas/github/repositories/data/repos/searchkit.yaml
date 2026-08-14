@@ -12,7 +12,6 @@ allow_squash_merge: true
 archetype: fork
 default_branch: develop
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: React UI components / widgets. The easiest way to build a great search
   experience with Elasticsearch.
 has_discussions: false

@@ -17,7 +17,6 @@ allow_rebase_merge: false
 allow_squash_merge: true
 archetype: application
 default_branch: master
-dependabot_security_updates: false
 description: Open Source Courseware authoring tool
 has_discussions: true
 has_projects: true

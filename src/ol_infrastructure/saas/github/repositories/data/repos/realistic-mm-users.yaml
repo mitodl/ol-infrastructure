@@ -12,7 +12,6 @@ allow_squash_merge: true
 archetype: library
 default_branch: master
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: Queries randomuser.me and generates realistic user and program data for
   use in Micromasters
 has_discussions: false

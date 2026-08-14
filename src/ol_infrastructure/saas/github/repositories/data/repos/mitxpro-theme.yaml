@@ -15,7 +15,6 @@ allow_squash_merge: true
 archetype: library
 default_branch: master
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: 'an open edX theme for MIT xPRO '
 has_discussions: false
 has_projects: true
