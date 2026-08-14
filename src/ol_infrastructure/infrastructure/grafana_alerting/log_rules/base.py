@@ -37,6 +37,8 @@ Differences from the original YAML
 
 Sub-modules
 -----------
+  apisix_oidc  — OIDC callback failure rate at the gateway. Not a migration;
+                 written 2026-08-14 against the APISIX access log.
   cert_manager — Source: grafana-alerts/loki-rules/cert-manager.yaml
   edxapp       — Source: grafana-alerts/loki-rules/edxapp-logs.yaml
   heroku       — Source: grafana-alerts/loki-rules/heroku-logs.yaml
@@ -51,6 +53,7 @@ from pulumiverse_grafana import alerting
 from pulumiverse_grafana.oss.folder import Folder
 
 from ol_infrastructure.infrastructure.grafana_alerting.log_rules import (
+    apisix_oidc,
     cert_manager,
     edxapp,
     heroku,
@@ -156,6 +159,7 @@ def create(resource_opts: ResourceOptions) -> None:
     def rd(expr: str) -> list[alerting.RuleGroupRuleDataArgs]:
         return _rule_data(expr, loki_uid)
 
+    apisix_oidc.create(log_alerts_folder.uid, rd, resource_opts)
     cert_manager.create(log_alerts_folder.uid, rd, resource_opts)
     edxapp.create(log_alerts_folder.uid, rd, resource_opts)
     heroku.create(log_alerts_folder.uid, rd, resource_opts)
