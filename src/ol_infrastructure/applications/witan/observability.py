@@ -27,6 +27,34 @@ CI still gets the structured JSON logs, which are the half that does not depend
 on Alloy at all: they go to stderr and the k8s-monitoring chart ships pod logs
 to Loki. That is why ``witan_log_env`` is unconditional while the OTel block is
 not.
+
+── The ToolHive tier (``toolhive_*`` below) ──
+Everything above configures the *witan process*. The two ToolHive hops in front
+of it — the ``VirtualMCPServer`` aggregator and the ``MCPServer`` proxyrunner —
+are separate Go binaries with their own OTel pipeline, configured through an
+``MCPTelemetryConfig`` CR rather than environment variables. They were dark
+until 2026-08-14 and are why the question "where did the 20s go" had no answer.
+
+That gap is not academic. witan's own ``duration_ms`` starts INSIDE its
+middleware; ToolHive's ``toolhive_mcp_request_duration_seconds`` wraps
+``next.ServeHTTP`` (``pkg/telemetry/middleware.go``). On 2026-08-14 a
+concurrency probe run saw the store finish all 8 writes at a normal 12.8s
+median while the client was told 7 of them failed — time spent in an interval
+NEITHER tier measured.
+
+★ WHAT THE METRIC DELTA IS, AND IS NOT. ToolHive's timer starts just before it
+forwards and stops after the downstream response returns, so it spans
+``pre-forward + witan + post-response``. Subtracting witan's ``duration_ms``
+therefore yields the TOTAL TIME OUTSIDE witan's middleware — both outer
+intervals summed — not the pre-handler interval on its own. It also cannot be
+done per request: the ToolHive side is a histogram and the witan side is a log
+field, so they pair only in aggregate (percentile against percentile).
+
+The pre-handler interval specifically needs the SPANS, where ToolHive's and
+witan's are nested with real start timestamps and the two boundaries are
+separable per request. That is why tracing is enabled here and not just
+metrics, and why the probe runs in QA — the metric delta alone would say only
+that time went somewhere outside witan, which is already known.
 """
 
 import pulumi_kubernetes as kubernetes
@@ -191,3 +219,195 @@ def downward_api_env_args() -> list[kubernetes.core.v1.EnvVarArgs]:
         )
         for name, field_path in _DOWNWARD_API_FIELDS.items()
     ]
+
+
+#########################################
+#   The ToolHive tier                    #
+#########################################
+# One MCPTelemetryConfig per hop, NOT one shared between them. The two differ in
+# exactly one field — `prometheus.enabled` — and that difference is a security
+# boundary, not a preference. See `expose_prometheus` on
+# `toolhive_telemetry_spec`.
+TOOLHIVE_TELEMETRY_BACKEND_CONFIG_NAME = "witan-telemetry-backend"
+TOOLHIVE_TELEMETRY_VMCP_CONFIG_NAME = "witan-telemetry-vmcp"
+
+
+def toolhive_service_name(stack_info: StackInfo, component: str) -> str:
+    """Per-hop OTel service name, `<env>-witan-<component>`.
+
+    ToolHive's own CRD documentation requires this to be unique per server, and
+    it is the only thing that separates the aggregator's spans from the
+    proxy's. Same `<env>-<service>` convention `otel_env` uses, so all three
+    witan-related services sort together in Grafana.
+    """
+    return f"{stack_info.env_suffix}-witan-{component}"
+
+
+def toolhive_trace_sampling_rate(stack_info: StackInfo) -> str:
+    """Head sampling rate for the ToolHive hops.
+
+    ★ THIS IS THE ROOT SAMPLING DECISION FOR THE WHOLE REQUEST. ToolHive
+    receives the request first, so it starts the trace; witan_core runs
+    `parentbased_traceidratio` (TRACES_SAMPLER above), which honours an
+    incoming decision rather than re-rolling it. So this value — not
+    TRACES_SAMPLER_ARG — sets what fraction of end-to-end traces exist.
+
+    QA samples everything because QA is where the concurrency probe runs and a
+    sampled-away trace is a probe run that measured nothing. It is affordable
+    precisely because QA carries no organic traffic: the probe's own ~50
+    requests per run are essentially the entire span volume.
+
+    Production keeps the 0.25 the other services use. Raising it there would
+    change span cost against real traffic, which is a billing decision and not
+    this module's to make.
+    """
+    return "1.0" if stack_info.env_suffix.lower() == "qa" else TRACES_SAMPLER_ARG
+
+
+def toolhive_telemetry_spec(
+    stack_info: StackInfo,
+    component: str,
+    *,
+    expose_prometheus: bool,
+) -> dict[str, object] | None:
+    """Build an ``MCPTelemetryConfigSpec``, or ``None`` if there is nothing to enable.
+
+    Returns ``None`` rather than an all-disabled spec so CI does not carry a CR
+    that configures nothing — a referenced-but-inert config is the kind of thing
+    that reads as "telemetry is on" to the next person to look.
+
+    :param expose_prometheus: whether to serve the Prometheus ``/metrics`` path.
+
+        ★ FALSE FOR THE vMCP, AND THAT IS LOAD-BEARING. ToolHive serves
+        ``/metrics`` on the *main transport port* — there is no separate admin
+        listener (toolhive `pkg/telemetry/config.go`: "The metrics are served on
+        the main transport port at /metrics"). The vMCP's port 4483 is the one
+        APISIX publishes, and `ingress.py` routes `paths=["/*"]` at it, so
+        enabling the path there would put an unauthenticated
+        ``https://<vmcp-host>/metrics`` on the public internet, listing every
+        tool name and its call counts. The backend proxy's 8080 is ClusterIP
+        only and never routed, so it is safe there.
+
+        Revisit only alongside a path-level deny in the APISIX route — not by
+        flipping this flag.
+
+    The Prometheus path is enabled in EVERY environment including CI, unlike
+    OTLP. It costs one HTTP route on a port already listening and opens no
+    outbound connection, so `ships_telemetry`'s reasoning does not apply to it.
+    It is also the only read available in CI, where the probe currently runs:
+    port-forward, scrape before and after a run, and diff the cumulative
+    histograms. That yields a window bounded on BOTH sides by construction,
+    which `kubectl logs --since` (no `--until`) cannot do — an unbounded window
+    silently folds in everything up to the moment of asking, which produced
+    three wrong conclusions during the 2026-08-14 analysis.
+    """
+    otlp_enabled = ships_telemetry(stack_info)
+    if not (otlp_enabled or expose_prometheus):
+        return None
+
+    spec: dict[str, object] = {"prometheus": {"enabled": expose_prometheus}}
+    if otlp_enabled:
+        spec["openTelemetry"] = {
+            "enabled": True,
+            # Scheme-less by the time ToolHive uses it — `NormalizeTelemetryConfig`
+            # strips http(s):// because the OTLP client wants host:port — but
+            # passed whole so this and OTEL_EXPORTER_OTLP_ENDPOINT above are
+            # visibly the same endpoint. `insecure` is what actually selects
+            # plaintext, and must stay in step with OTLP_ENDPOINT's scheme.
+            "endpoint": OTLP_ENDPOINT,
+            "insecure": True,
+            "metrics": {"enabled": True},
+            "tracing": {
+                "enabled": True,
+                "samplingRate": toolhive_trace_sampling_rate(stack_info),
+            },
+            # service.name is NOT set here — it comes from the per-hop
+            # `telemetryConfigRef.serviceName` override, which is what lets one
+            # spec shape serve two differently-named hops.
+            "resourceAttributes": {
+                "deployment.environment": stack_info.env_suffix,
+                "service.namespace": "witan",
+                "toolhive.component": component,
+            },
+        }
+    return spec
+
+
+def toolhive_mcpserver_audit() -> dict[str, object]:
+    """``MCPServer.spec.audit`` — which accepts ONLY ``enabled``.
+
+    ★ THE TWO CRDs ARE NOT SYMMETRIC HERE. ``MCPServer.spec.audit`` has exactly
+    one property; the full option set (``includeRequestData``, ``eventTypes``,
+    ``logFile``, …) exists only on ``VirtualMCPServer.spec.config.audit``. The
+    MCPServer CRD is a structural schema with no
+    ``x-kubernetes-preserve-unknown-fields``, so any extra key here is PRUNED by
+    the API server. Verified against operations-qa on 2026-08-14: a merge patch
+    carrying ``includeRequestData`` returns ``Warning: unknown field
+    "spec.audit.includeRequestData"`` and stores ``{"enabled": true}``. The
+    apply still succeeds, so an ``includeRequestData: false`` written here for
+    safety would survive review as an assurance while being enforced by nothing.
+
+    So the body-exclusion guarantee on this hop rests on ToolHive's own default
+    (``IncludeRequestData`` defaults false, `pkg/audit/config.go`) rather than
+    on anything declared here. See `toolhive_vmcp_audit` for the hop where it
+    can be, and is, stated explicitly.
+
+    Both hops log one JSON event per request — method, outcome, duration — to
+    stdout, so it rides the existing pod-log path to Loki with no collector
+    involved. That is why audit is on in every environment while OTLP is not.
+
+    ── ``jsonrpc_error_message``: checked, and safe ONLY BY VERSION ──
+    ``auditor.go`` writes ``jsonrpc_error_code``/``jsonrpc_error_message`` (256
+    chars) into audit metadata whenever an outcome is ``ApplicationError``,
+    gated ONLY on ``detectApplicationErrors`` (default true) and NOT on
+    ``includeResponseData`` — its own comment says it reports them "without
+    enabling full response data capture". This CRD exposes no switch for it, so
+    if it fired here it could not be turned off.
+
+    It does not fire for anything content-bearing, because it requires a
+    TOP-LEVEL JSON-RPC ``error`` and ``pkg/mcp/response.go`` "intentionally
+    omit[s] `result`". FastMCP 4.0.0b2 routes every tool-level failure into an
+    ``isError`` result inside ``result``. Verified 2026-08-14 against a live
+    streamable-http server: an exception echoing the caller's payload, a
+    pydantic error carrying ``input_value=``, and an unknown tool ALL came back
+    as ``isError`` results; only ``no/such/method`` produced a top-level error,
+    message ``"Method not found"``. The detector also runs only on 2xx, so 401s
+    and 5xx never reach it. What this deployment has actually produced at
+    protocol level is ``-32603`` under load, message "Server returned an error
+    response" — operational, no user content.
+
+    ★ RE-CHECK THIS ON ANY FastMCP OR ToolHive UPGRADE. Nothing tests it, and
+    both halves are load-bearing: if FastMCP started surfacing tool failures as
+    protocol errors, or ToolHive started parsing ``result``, this would begin
+    copying PRE-REDACTION request content — witan redacts inside the tool, after
+    arguments arrive — into Loki, which is readable by anyone with Grafana
+    access rather than being Cedar actor-scoped like the graph.
+    ``mask_error_details`` is FastMCP's second line of defence here and it
+    defaults to False; witan does not set it.
+
+    Kept ON deliberately rather than tolerated: a JSON-RPC error inside an HTTP
+    200 is exactly the ``-32603``-under-load signature this project is chasing,
+    and disabling detection would record those as successes.
+    """
+    return {"enabled": True}
+
+
+def toolhive_vmcp_audit() -> dict[str, object]:
+    """``VirtualMCPServer.spec.config.audit`` — the full-schema counterpart.
+
+    ★ `includeRequestData`/`includeResponseData` STAY FALSE. They are already
+    the CRD's defaults; they are restated because witan's request bodies are
+    the memories and tasks themselves, and turning either on would copy
+    user-authored graph content into the log pipeline, where the redaction that
+    governs the write path does not apply.
+
+    ``detectApplicationErrors`` is deliberately left at its default (true) even
+    though this CRD — unlike ``MCPServer.spec.audit`` — could disable it. See
+    `toolhive_mcpserver_audit` for the evidence that it carries no user content
+    at these versions, and for why the signal is wanted.
+    """
+    return {
+        "enabled": True,
+        "includeRequestData": False,
+        "includeResponseData": False,
+    }
