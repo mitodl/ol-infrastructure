@@ -358,6 +358,17 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         alias="CONCOURSE_DEFAULT_TASK_MEMORY_LIMIT",
         description="Default maximum memory per task, 0 means unlimited",
     )
+    destroy_archived_pipelines_after: str | None = Field(
+        None,
+        alias="CONCOURSE_DESTROY_ARCHIVED_PIPELINES_AFTER",
+        description=(
+            "Duration after which the pipeline collector will destroy ANY archived"
+            " pipeline (manually archived via fly/UI, or auto-archived set_pipeline"
+            " orphans alike -- Concourse applies this globally with no distinction"
+            " by archive reason). 0 (default) disables destruction of archived"
+            " pipelines."
+        ),
+    )
     display_user_id_per_connector: str | None = Field(
         None,
         alias="CONCOURSE_DISPLAY_USER_ID_PER_CONNECTOR",
@@ -1369,6 +1380,15 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         Path("/etc/concourse/session_signing_key"),
         alias="CONCOURSE_SESSION_SIGNING_KEY",
         description="File containing an RSA private key, used to sign auth tokens.",
+    )
+    stalled_worker_timeout: str | None = Field(
+        None,
+        alias="CONCOURSE_STALLED_WORKER_TIMEOUT",
+        description=(
+            "Duration after which a stalled worker will be deleted, so that its"
+            " containers and volumes can be garbage collected. 0 (default) disables"
+            " automatic pruning of stalled workers."
+        ),
     )
     streaming_artifacts_compression: str | None = Field(
         None,
