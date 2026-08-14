@@ -12,6 +12,8 @@ Sub-modules
   keycloak_olapps_realm — Holistic authentication-activity view (logins,
     registrations, token flows, per-identity-provider breakdown) for just
     the olapps realm.
+  keycloak_incident_lookup — Ad-hoc single-incident investigation (event
+    timeline, error trends, realm/client/IdP scoping) across all realms.
 """
 
 import json
@@ -22,6 +24,7 @@ from pulumiverse_grafana.oss.dashboard import Dashboard
 from pulumiverse_grafana.oss.folder import Folder
 
 from ol_infrastructure.infrastructure.grafana_alerting.dashboards import (
+    keycloak_incident_lookup,
     keycloak_olapps_realm,
     keycloak_overview,
 )
@@ -41,6 +44,7 @@ def _timeseries_panel(
     queries: list[dict[str, Any]] | None = None,
     unit: str = "short",
     decimals: int | None = None,
+    legend_calc: str | None = None,
     description: str = "",
 ) -> dict[str, Any]:
     """Build a time-series panel model querying a shared datasource.
@@ -59,6 +63,28 @@ def _timeseries_panel(
     header) -- use it to spell out what a value actually means when that
     isn't obvious from the title alone, e.g. that a count is per graph
     interval rather than a total.
+
+    The legend's summary column defaults to a straight `sum` across the
+    graph window, which is only meaningful for a genuine non-overlapping
+    interval count -- e.g. a Loki `count_over_time(...[$__interval])`
+    panel, where each rendered point is a distinct bucket and the buckets'
+    sum equals the true total for the selected range. It is *not*
+    meaningful for a `rate()`/`irate()`-derived series: each rendered
+    point is a per-second rate sampled at the display resolution, so
+    summing them together is rate x sample-count rather than a real
+    total, and the result changes with Grafana's query
+    step/`$__rate_interval` even though nothing about the underlying data
+    changed -- these need an explicit reducer too. Nor is it meaningful
+    for a gauge/instantaneous reading rather than an accumulating count
+    -- e.g. summing a ratio produces "3282%", and summing a heap-usage
+    sample across a day's worth of data points produces a "total" bytes
+    figure with no physical meaning (real max heap was 2.5 GiB, not the
+    1.73 TiB the naive sum reported). Ratio units (`percentunit`/
+    `percent`) and durations (`s`) default to `mean` automatically since
+    both are near-universally gauge- or rate-like. Pass `legend_calc`
+    explicitly for any other gauge-like or rate-derived series (e.g.
+    `"max"` for a memory panel to show peak usage over the window,
+    `"mean"` for a sampled rate where an average is the useful summary).
     """
     if queries is None:
         queries = [{"expr": expr, "legend_format": legend_format}]
@@ -84,6 +110,8 @@ def _timeseries_panel(
     }
     if decimals is not None:
         defaults["decimals"] = decimals
+    if legend_calc is None:
+        legend_calc = "mean" if unit in ("percentunit", "percent", "s") else "sum"
     return {
         "title": title,
         "description": description,
@@ -98,7 +126,7 @@ def _timeseries_panel(
             "legend": {
                 "displayMode": "list",
                 "placement": "bottom",
-                "calcs": ["sum"],
+                "calcs": [legend_calc],
             },
             "tooltip": {"mode": "multi"},
         },
@@ -115,8 +143,16 @@ def _bar_gauge_panel(
     legend_format: str = "{{identity_provider}}",
     unit: str = "short",
     decimals: int | None = None,
+    description: str = "",
 ) -> dict[str, Any]:
-    """Build a bar-gauge panel model querying a shared datasource."""
+    """Build a bar-gauge panel model querying a shared datasource.
+
+    `reduceOptions.values=True` is required so Grafana renders one bar per
+    returned series (e.g. one per IP/identity-provider label) -- without
+    it, Grafana's own default (`values=False`, `calcs=["lastNotNull"]`)
+    collapses every series into a single reduced bar, silently defeating
+    the point of a per-label breakdown panel like `topk(10, ...)`.
+    """
     defaults: dict[str, Any] = {
         "color": {"mode": "palette-classic"},
         "unit": unit,
@@ -126,6 +162,7 @@ def _bar_gauge_panel(
         defaults["decimals"] = decimals
     return {
         "title": title,
+        "description": description,
         "type": "bargauge",
         "datasource": datasource_ref,
         "gridPos": grid_pos,
@@ -137,6 +174,7 @@ def _bar_gauge_panel(
             "displayMode": "gradient",
             "orientation": "horizontal",
             "showUnfilled": True,
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": True},
         },
         "targets": [
             {
@@ -331,6 +369,16 @@ def create(resource_opts: ResourceOptions) -> None:
         dashboards_folder.uid,
         _timeseries_panel,
         _stat_panel,
+        _bar_gauge_panel,
+        _logs_panel,
+        _row_panel,
+        _create_dashboard,
+        resource_opts,
+    )
+
+    keycloak_incident_lookup.create(
+        dashboards_folder.uid,
+        _timeseries_panel,
         _bar_gauge_panel,
         _logs_panel,
         _row_panel,
