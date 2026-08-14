@@ -6,6 +6,13 @@ import boto3
 import pulumi
 
 rds_client = boto3.client("rds")
+ec2_client = boto3.client("ec2")
+
+# The RDS default parameter groups for PostgreSQL set
+# ``max_connections = LEAST({DBInstanceClassMemory/9531392}, 5000)``. These two
+# constants are that formula.
+POSTGRES_BYTES_PER_CONNECTION = 9531392
+POSTGRES_MAX_CONNECTIONS_CAP = 5000
 
 
 @unique
@@ -35,6 +42,33 @@ def db_engines() -> dict[str, list[str]]:
         for engine in engines_page["DBEngineVersions"]:
             engines_versions[engine["Engine"]].append(engine["EngineVersion"])
     return dict(engines_versions)
+
+
+@lru_cache
+def postgres_max_connections(db_instance_type: str) -> int:
+    """Resolve the effective ``max_connections`` for a PostgreSQL RDS instance class.
+
+    RDS's default parameter group computes this as
+    ``LEAST({DBInstanceClassMemory/9531392}, 5000)``, so it varies with the instance
+    class. Anything sizing a connection pool against the database needs the real
+    number rather than the 5000 cap, which only the larger classes actually reach --
+    a ``db.m7g.large`` tops out around 900.
+
+    :param db_instance_type: An RDS instance class, e.g. ``db.r7g.2xlarge``
+
+    :returns: The number of connections the instance will accept
+
+    :rtype: int
+    """
+    # RDS instance classes are the EC2 class with a ``db.`` prefix, and the
+    # DescribeDBInstance APIs don't report instance memory, so resolve it from EC2.
+    instance_types = ec2_client.describe_instance_types(
+        InstanceTypes=[db_instance_type.removeprefix("db.")]
+    )["InstanceTypes"]
+    memory_bytes = instance_types[0]["MemoryInfo"]["SizeInMiB"] * 1024 * 1024
+    return min(
+        memory_bytes // POSTGRES_BYTES_PER_CONNECTION, POSTGRES_MAX_CONNECTIONS_CAP
+    )
 
 
 def engine_major_version(engine_version: str) -> str:
