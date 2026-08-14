@@ -236,6 +236,15 @@ for iam_policy in iam_policy_names or []:
         },
         "RESOURCE_STAR": {},
     }
+    if iam_policy == "iam_drift_analysis":
+        # Parliament's bundled action database predates Access Analyzer's V2
+        # finding APIs, so it reports access-analyzer:ListFindingsV2 and
+        # GetFindingV2 as UNKNOWN_ACTION. Both are real, documented actions
+        # (and are what boto3's list_findings_v2/get_finding_v2 call), so the
+        # finding is a stale-database artifact rather than a typo. Suppressed
+        # for this module only, where the whole action list is four
+        # read-only Access Analyzer calls plus a resource-scoped PassRole.
+        parliament_config["UNKNOWN_ACTION"] = {}
     if iam_policy == "pulumi_infra":
         # These actions are real, observed Pulumi usage (CloudTrail-derived) and
         # are already scoped to Resource ARNs under /ol-applications/* and

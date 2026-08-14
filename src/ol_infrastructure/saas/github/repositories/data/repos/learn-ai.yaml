@@ -24,4 +24,5 @@ squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   odl-engineering: maintain
   odl-engineering-owners: admin
+  owners-mit-learn: push
 web_commit_signoff_required: false

@@ -37,6 +37,10 @@ Sub-modules
   eks_general  — Source: grafana-alerts/cortex-rules/eks_general.yaml
   linux_host   — Source: grafana-alerts/cortex-rules/linux-host.yaml
   apisix_edge  — New in 2026-08. Per-host 5xx rate at the APISIX edge.
+  synthetic_monitoring
+               — Imported 2026-08 from three hand-made UI rules. Unlike the
+                 others it takes no folder_uid: its rules live in the Synthetic
+                 Monitoring plugin's folder, not the one created here.
 """
 
 import json
@@ -49,6 +53,7 @@ from ol_infrastructure.infrastructure.grafana_alerting.metric_rules import (
     apisix_edge,
     eks_general,
     linux_host,
+    synthetic_monitoring,
 )
 
 # Every Grafana Cloud stack provisions its own Mimir datasource with this same
@@ -149,3 +154,6 @@ def create(resource_opts: ResourceOptions) -> None:
     eks_general.create(alerts_folder.uid, rd, resource_opts)
     linux_host.create(alerts_folder.uid, rd, resource_opts)
     apisix_edge.create(alerts_folder.uid, rd, resource_opts)
+    # No folder_uid: these rules live in the Synthetic Monitoring plugin's own
+    # folder rather than the one created above. See the module docstring.
+    synthetic_monitoring.create(rd, resource_opts)

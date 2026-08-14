@@ -198,6 +198,8 @@ if __name__ == "__main__":
         "data_warehouse",
         "digital-credentials",
         "fastly-redirector",
+        "github-organization",
+        "github-repositories",
         "grafana-alerting",
         "jupyterhub-data",
         "mailgun",

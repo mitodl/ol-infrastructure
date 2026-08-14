@@ -24,6 +24,7 @@ from pulumi_aws import ec2, get_caller_identity, iam
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
+    STATIC_ASSET_MAX_AGE_SECONDS,
 )
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.ocw_studio.k8s_secrets import (
@@ -36,6 +37,7 @@ from ol_infrastructure.components.aws.mediaconvert import (
     OLMediaConvert,
 )
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.components.services.apisix import OLApisixPluginConfig
 from ol_infrastructure.components.services.apisix_gateway_api import (
     OLApisixHTTPRoute,
     OLApisixHTTPRouteConfig,
@@ -622,10 +624,26 @@ ocw_studio_k8s_app = OLApplicationK8s(
             # blocking threads, 16 backpressure, runtime defaults).
             blocking_threads_idle_timeout=120,
             enable_metrics=True,
+            # Serve /static/* from Granian's Rust layer instead of the sidecar.
+            # STATIC_ROOT is the relative path "staticfiles" against the image's
+            # WORKDIR of /src, i.e. the emptyDir the collectstatic init container
+            # populates, and STATIC_URL is "/static/" -- which is Granian's
+            # default static route, so no route override is needed.
+            static_path_mounts=["/src/staticfiles"],
+            # The sidecar served this directory with `expires max`; Granian would
+            # otherwise fall back to its own 1-day default.
+            static_path_expires=STATIC_ASSET_MAX_AGE_SECONDS,
         ),
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
         registry="dockerhub",
-        import_nginx_config=True,
+        # The sidecar's only real job here was serving /static/*, which Granian
+        # now does directly. What is left of it -- a /nginx-health endpoint
+        # nothing probes (the probes use django-health-check), an
+        # X-Forwarded-Proto re-forward of the header APISix already sets, and a
+        # 25M body cap APISix does not enforce anyway -- is either redundant or
+        # translated to the APISix routes below. See
+        # docs/plans/remove-nginx-sidecar.md.
+        import_nginx_config=False,
         init_migrations=True,
         init_collectstatic=True,
         pre_deploy_commands=[
@@ -685,15 +703,104 @@ cert_manager_certificate = OLCertManagerCert(
     ),
 )
 
+# The `location` blocks that used to live in the nginx sidecar. HTTPRoute has no
+# priority field -- APISix resolves overlapping rules by longest matching path
+# prefix -- so /static/hash.txt outranks /static, which outranks /*, which is the
+# same ordering nginx applied.
+#
+# Every rule names the numeric Service port rather than the "http" port name:
+# OLApisixHTTPRoute has to give Gateway API a number and maps that name to the
+# nginx sidecar's 8071, which this app no longer listens on.
 ocw_studio_apisix_httproute = OLApisixHTTPRoute(
     f"ocw-studio-apisix-httproute-{stack_info.env_suffix}",
     route_configs=[
+        # hash.txt carries the deployed git ref and is polled by
+        # useAppVersionCheck to force a reload after a deploy, so it is the one
+        # file under /static that must not inherit the 10-year max-age Granian
+        # now stamps on that directory. nginx did this with `expires -1` plus an
+        # `add_header Cache-Control private`.
+        #
+        # Left as a prefix match, unlike dnt-policy below: nginx matched this one
+        # with a `location ~*` regex, which caught descendants too, so a prefix
+        # is the closer translation.
+        OLApisixHTTPRouteConfig(
+            route_name="static-hash",
+            hosts=[app_domain],
+            paths=["/static/hash.txt"],
+            backend_service_name=ocw_studio_k8s_app.application_lb_service_name,
+            backend_service_port=ocw_studio_k8s_app.application_lb_service_port,
+            backend_import_nginx_config=False,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="response-rewrite",
+                    secretRef=None,
+                    config={"headers": {"set": {"Cache-Control": "private, no-cache"}}},
+                ),
+            ],
+        ),
+        # Granian serves static without a CORS header; the sidecar added a
+        # blanket one. Preserved rather than dropped because this app has no
+        # shared plugin config supplying `cors`, so removing the sidecar would
+        # otherwise silently take the header away from cross-origin font and
+        # asset loads.
+        OLApisixHTTPRouteConfig(
+            route_name="static",
+            hosts=[app_domain],
+            paths=["/static/*"],
+            backend_service_name=ocw_studio_k8s_app.application_lb_service_name,
+            backend_service_port=ocw_studio_k8s_app.application_lb_service_port,
+            backend_import_nginx_config=False,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="response-rewrite",
+                    secretRef=None,
+                    config={
+                        "headers": {"set": {"Access-Control-Allow-Origin": "*"}},
+                    },
+                ),
+            ],
+        ),
+        # A 204 here is the EFF Do Not Track convention for "no policy
+        # published". Kept as a mock so the crawlers that request it are
+        # answered at the gateway rather than burning a Granian blocking thread
+        # on a Django 404.
+        #
+        # Exact, not prefix: this replaces an nginx `location = ` block, so
+        # /.well-known/dnt-policy.txt/anything must fall through to Django
+        # rather than collect a mocked 204.
+        #
+        # The empty response_example is not decoration -- the APISix mocking
+        # plugin schema is `anyOf: [required: response_example, required:
+        # response_schema]`, so a config with neither fails validation and the
+        # route never serves anything.
+        OLApisixHTTPRouteConfig(
+            route_name="dnt-policy",
+            hosts=[app_domain],
+            paths=["/.well-known/dnt-policy.txt"],
+            path_match_type="Exact",
+            backend_service_name=ocw_studio_k8s_app.application_lb_service_name,
+            backend_service_port=ocw_studio_k8s_app.application_lb_service_port,
+            backend_import_nginx_config=False,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="mocking",
+                    secretRef=None,
+                    config={
+                        "response_status": 204,
+                        "response_example": "",
+                        "content_type": "text/plain",
+                        "with_mock_header": False,
+                    },
+                ),
+            ],
+        ),
         OLApisixHTTPRouteConfig(
             route_name="passthrough",
             hosts=[app_domain],
             paths=["/*"],
             backend_service_name=ocw_studio_k8s_app.application_lb_service_name,
-            backend_service_port=ocw_studio_k8s_app.application_lb_service_port_name,
+            backend_service_port=ocw_studio_k8s_app.application_lb_service_port,
+            backend_import_nginx_config=False,
             plugins=[],
         ),
     ],

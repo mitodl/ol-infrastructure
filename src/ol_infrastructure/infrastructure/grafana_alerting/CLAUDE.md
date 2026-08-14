@@ -81,6 +81,7 @@ Rootly). That path is independent of Grafana and is managed in
 | `metric_rules/eks_general.py` | EKS workload alert rules (replicas, node readiness, crash loops, OOM, jobs, HPA). |
 | `metric_rules/linux_host.py` | Linux host alert rules (CPU, memory, disk usage). |
 | `metric_rules/apisix_edge.py` | Per-host 5xx rate at the APISIX edge (`apisix_http_status`). Two windows (fast cliff / slow creep) with a minimum-traffic gate. Currently unlabelled → `oblivion` while calibrating. |
+| `metric_rules/synthetic_monitoring.py` | MIT Learn probe-failure rules (`probe_success`) for the Next.js origin, the API health endpoint, and the homepage. Imported from hand-made UI rules; lives in the Synthetic Monitoring **plugin's** folder, so it takes no `folder_uid`. |
 | `log_rules/` | Package. Grafana-managed alert rule groups for log queries. Migrated from `grafana-alerts/loki-rules/`. |
 | `log_rules/base.py` | Loki datasource UIDs, two-stage pipeline helper, folder creation, delegates to sub-modules. |
 | `log_rules/cert_manager.py` | cert-manager ACME issuer and DNS challenge alert rules. |
@@ -121,6 +122,13 @@ UID and a pre-bound `rd(expr)` helper from its package `base.py`:
 create(folder_uid: Input[str], rd: Callable[[str], list[RuleGroupRuleDataArgs]], resource_opts: ResourceOptions)
 ```
 
+`metric_rules/synthetic_monitoring.py` is the one exception — it omits
+`folder_uid` because its rules must stay in the Synthetic Monitoring plugin's
+folder (`grafana-synthetic-monitoring-app`), which Pulumi references but does not
+create. The folder UID is half a rule group's import identity, so moving those
+rules into "Infrastructure Alerts" would destroy and recreate them, losing their
+alert-state history and any live silences.
+
 Within `dashboards/`, each sub-module receives the folder UID, whichever
 panel-builder helpers it actually uses, and a `create_dashboard` helper from
 `base.py` -- not every sub-module takes every helper; `base.py` passes only
@@ -159,6 +167,50 @@ a confusing NoData state.
 3. Use `rd(expr)` to build the two-stage data pipeline from a PromQL expression.
 4. Set `for_`, `labels`, `annotations`, and `no_data_state` to match the
    original YAML.
+
+### Adopting a rule that was created in the UI
+
+Rule groups import with `{{ folderUID }}:{{ title }}`, where `title` is the rule
+*group* name, not the rule name.
+
+**Export the Grafana credentials first.** `pulumi import` resolves the resource
+against the CLI's *default* provider rather than the explicit `grafana.Provider`
+that `__main__.py` builds, and passing `--provider` does not change that. Without
+configuration it fails with:
+
+```
+the Grafana client is required for this resource.
+Set the auth and url provider attributes
+```
+
+Give the default provider the same credentials the program reads:
+
+```
+export GRAFANA_URL="$(sops -d src/bridge/secrets/grafana_cloud/api.production.yaml | yq -r '.grafana_url')"
+export GRAFANA_AUTH="$(sops -d src/bridge/secrets/grafana_cloud/api.production.yaml | yq -r '.grafana_api_token')"
+
+pulumi stack select Production
+pulumi import grafana:alerting/ruleGroup:RuleGroup \
+  <pulumi-resource-name> "<folder-uid>:<rule-group-name>"
+```
+
+Importing through the default provider does not strand the resource there: the
+next `pulumi preview` shows the group as an update under the program's own
+provider, not a replacement. Check that it does before applying.
+
+Import the group before the first `pulumi up` that declares it — an apply
+against an undeclared existing group fails as already-exists rather than
+adopting it.
+
+Two things to check first:
+
+1. **What else is in the group.** Import adopts the whole group, and any rule in
+   it that the code does not declare is deleted on the next apply. Check with
+   `GET /api/v1/provisioning/folder/{folderUid}/rule-groups/{group}`.
+2. **Pin each rule's `uid`** to the value it already has. Without it the
+   provider assigns a fresh one, which orphans the rule's alert-state history,
+   breaks live silences, and dead-links the Grafana URL embedded in every past
+   Rootly alert.
 
 ### Adding a new log alert rule
 
