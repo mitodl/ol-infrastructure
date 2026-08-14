@@ -5,7 +5,7 @@ _direct_collaborators:
   mbertrand: admin
 _has_branch_protection: false
 _pushed_at: '2026-07-23T20:01:50Z'
-_ruleset_count: 0
+_ruleset_count: 2
 _visibility: public
 allow_auto_merge: false
 allow_merge_commit: true

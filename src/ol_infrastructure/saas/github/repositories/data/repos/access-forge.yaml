@@ -25,8 +25,8 @@ _actions_secret_names:
 _custom_properties:
   tier: tier-1
 _has_branch_protection: false
-_pushed_at: '2026-08-07T05:00:32Z'
-_ruleset_count: 0
+_pushed_at: '2026-08-14T05:00:38Z'
+_ruleset_count: 2
 _visibility: private
 allow_auto_merge: false
 allow_merge_commit: true

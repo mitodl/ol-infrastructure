@@ -4,8 +4,8 @@ _custom_properties:
 _direct_collaborators:
   jkachel: admin
 _has_branch_protection: false
-_pushed_at: '2026-08-05T16:57:02Z'
-_ruleset_count: 0
+_pushed_at: '2026-08-08T14:36:03Z'
+_ruleset_count: 2
 _visibility: private
 allow_auto_merge: false
 allow_merge_commit: true

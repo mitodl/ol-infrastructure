@@ -3,7 +3,7 @@ _custom_properties:
   tier: tier-1
 _has_branch_protection: false
 _pushed_at: '2026-06-30T18:10:28Z'
-_ruleset_count: 0
+_ruleset_count: 2
 _visibility: private
 allow_auto_merge: false
 allow_merge_commit: true

@@ -5,8 +5,8 @@ _custom_properties:
   tier: tier-1
 _excluded_environments: 2
 _has_branch_protection: true
-_pushed_at: '2026-08-07T20:09:59Z'
-_ruleset_count: 1
+_pushed_at: '2026-08-14T19:33:00Z'
+_ruleset_count: 3
 _visibility: public
 allow_auto_merge: false
 allow_merge_commit: true
@@ -25,7 +25,7 @@ squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   arbisoft-contractors: push
   devops: admin
-  devops-contractors: push
+  devops-contractors: admin
   odl-engineering: maintain
   odl-engineering-owners: admin
 topics:

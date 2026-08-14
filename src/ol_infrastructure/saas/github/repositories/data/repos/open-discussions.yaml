@@ -6,8 +6,8 @@ _custom_properties:
   tier: tier-1
 _excluded_environments: 1723
 _has_branch_protection: true
-_pushed_at: '2026-07-23T18:59:37Z'
-_ruleset_count: 0
+_pushed_at: '2026-08-12T15:50:43Z'
+_ruleset_count: 2
 _visibility: public
 allow_auto_merge: false
 allow_merge_commit: false
