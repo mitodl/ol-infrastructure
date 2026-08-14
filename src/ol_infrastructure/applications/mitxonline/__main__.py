@@ -51,6 +51,7 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    oidc_error_callback_recovery_plugin,
     stale_session_cookie_cleanup_plugin,
 )
 from ol_infrastructure.components.services.cert_manager import (
@@ -807,6 +808,16 @@ mitxonline_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=mitxonline_namespace,
         k8s_labels=k8s_app_labels,
         enable_defaults=True,
+        plugins=[
+            # 285 callbacks a day on mitxonline.mit.edu come back from Keycloak
+            # with error=temporarily_unavailable instead of a code, and the
+            # openid-connect plugin serves each one a 500.  Unlike the cookie
+            # cleanup below, this is safe to attach here rather than per route
+            # group: it derives its redirect target from the request URI and
+            # its guard cookie is host-only, so neither depends on which parent
+            # domain a group's session cookie was scoped to.
+            oidc_error_callback_recovery_plugin(),
+        ],
     ),
 )
 

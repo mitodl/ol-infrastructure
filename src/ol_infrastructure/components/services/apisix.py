@@ -103,6 +103,103 @@ end"""
     )
 
 
+def oidc_error_callback_recovery_plugin(
+    recoverable_errors: list[str] | None = None,
+    guard_cookie_name: str = "apisix_oidc_recovery",
+    guard_max_age: int = 60,
+) -> OLApisixPluginConfig:
+    """Restart the login flow when the IdP redirects back with a recoverable error.
+
+    An authorization request whose Keycloak authentication session has expired
+    -- the user left the login tab open, or followed a stale bookmark -- comes
+    back to the callback with ``error=temporarily_unavailable`` and no ``code``.
+    Keycloak's intent there is that the client start over; it even marks the
+    event ``restart_after_timeout="true"``.  ``lua-resty-openidc`` instead
+    treats any ``error`` parameter as fatal and hands the openid-connect plugin
+    a failure, which APISIX serves as a 21KB HTTP 500.  The user sees a
+    stack-trace page where they expected a login form, and nothing retries.
+
+    This is measured, not hypothetical: 614 such callbacks a day across
+    api.learn.mit.edu, mitxonline.mit.edu and nb.learn.mit.edu, from 530
+    distinct client addresses, 181 of which never reached a successful callback
+    in the same 24 hours.  It is the only one of the three causes of callback
+    500s that actually blocks anybody -- see ``log_rules/apisix_oidc.py``.
+
+    Running before openid-connect, this turns that dead end back into a login
+    page.  The redirect target is derived from the callback URI rather than
+    configured: APISIX's callback always sits at ``<login prefix>/.apisix/
+    redirect``, and the route serving it is by construction the one with
+    ``unauth_action="auth"``, so redirecting to the parent path re-enters the
+    authorization flow that just failed and lands the user wherever that route
+    normally sends them.  That keeps this attachable to a host's shared plugin
+    config with no per-application wiring.
+
+    Only errors the IdP considers transient are recovered.  ``access_denied``
+    (the user pressed "Cancel") or ``invalid_request`` (a real
+    misconfiguration) must keep failing loudly -- bouncing those back into
+    ``/login`` would spin the browser between the gateway and Keycloak.
+
+    Recovery is attempted at most once per ``guard_max_age`` seconds per
+    browser, tracked by a short-lived guard cookie.  If the retry hits the same
+    error, the second callback falls through to the plugin's 500 instead of
+    looping: a persistently broken IdP should surface as an error, not as an
+    infinite redirect.
+
+    :param recoverable_errors: OAuth 2.0 ``error`` codes to restart the flow
+        for.  Defaults to ``temporarily_unavailable``, which is 100% of what
+        production emits today.
+    :param guard_cookie_name: Name of the loop-breaker cookie.
+    :param guard_max_age: Seconds the guard cookie lives, bounding how often one
+        browser can be sent back through login.
+
+    :returns: A ``serverless-pre-function`` plugin config to attach to routes.
+    :rtype: OLApisixPluginConfig
+    """
+    errors = recoverable_errors or ["temporarily_unavailable"]
+    recoverable_table = ", ".join(f'["{error}"] = true' for error in errors)
+    recovery_function = f"""return function(conf, ctx)
+    local uri = ngx.var.uri
+    if not uri or not uri:match("%.apisix/redirect$") then
+        return
+    end
+    local core = require("apisix.core")
+    local args = core.request.get_uri_args(ctx)
+    if not args then
+        return
+    end
+    local err = args["error"]
+    if type(err) == "table" then
+        err = err[1]
+    end
+    local recoverable = {{{recoverable_table}}}
+    if not err or not recoverable[err] then
+        return
+    end
+    local cookie = ngx.var.http_cookie
+    if cookie then
+        for pair in cookie:gmatch("[^;]+") do
+            if pair:match("^%s*([^=%s]+)=") == "{guard_cookie_name}" then
+                return
+            end
+        end
+    end
+    core.log.warn("oidc callback error=", err, " uri=", uri, " restarting auth")
+    ngx.header["Set-Cookie"] = "{guard_cookie_name}=1; Path=/; Max-Age="
+        .. "{guard_max_age}" .. "; Secure; HttpOnly; SameSite=Lax"
+    return ngx.redirect((uri:gsub("%.apisix/redirect$", "")), 302)
+end"""
+    return OLApisixPluginConfig(
+        name="serverless-pre-function",
+        secretRef=None,
+        # rewrite rather than the plugin's default access phase: openid-connect
+        # also runs in rewrite, and serverless-pre-function's priority (10000)
+        # outranks it (2599), so this gets to inspect the callback and bail out
+        # before the plugin turns the error parameter into a 500.  In the access
+        # phase it would run after openid-connect had already failed.
+        config={"phase": "rewrite", "functions": [recovery_function]},
+    )
+
+
 class OLApisixRouteConfig(BaseModel):
     """Configuration for a single ApisixRoute rule (legacy CRD path)."""
 

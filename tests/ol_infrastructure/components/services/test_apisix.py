@@ -52,6 +52,7 @@ from ol_infrastructure.components.services.apisix import (  # noqa: E402
     OLApisixSharedPluginsConfig,
     OLApisixUpstream,
     OLApisixUpstreamConfig,
+    oidc_error_callback_recovery_plugin,
     stale_session_cookie_cleanup_plugin,
 )
 
@@ -347,6 +348,61 @@ def test_cleanup_plugin_honours_a_custom_stale_name():
     assert 'name == "mitlearn_apisix_session"' in lua
 
 
+# ─── OIDC error callback recovery ──────────────────────────────────────────────
+
+
+def test_recovery_plugin_runs_in_rewrite_before_openid_connect():
+    """openid-connect runs in rewrite; the access phase would be too late."""
+    plugin = oidc_error_callback_recovery_plugin()
+
+    assert plugin.name == "serverless-pre-function"
+    assert plugin.config["phase"] == "rewrite"
+
+
+def test_recovery_plugin_only_recovers_transient_errors_by_default():
+    """access_denied means the user pressed Cancel -- restarting the flow there
+    would bounce the browser between the gateway and Keycloak.
+    """
+    (lua,) = oidc_error_callback_recovery_plugin().config["functions"]
+
+    assert '["temporarily_unavailable"] = true' in lua
+    assert "access_denied" not in lua
+
+
+def test_recovery_plugin_honours_a_custom_error_list():
+    (lua,) = oidc_error_callback_recovery_plugin(
+        recoverable_errors=["temporarily_unavailable", "server_error"],
+    ).config["functions"]
+
+    assert '["temporarily_unavailable"] = true' in lua
+    assert '["server_error"] = true' in lua
+
+
+def test_recovery_plugin_ignores_non_callback_requests():
+    """Attached to a host's shared plugin config, this sees every route."""
+    (lua,) = oidc_error_callback_recovery_plugin().config["functions"]
+
+    assert 'uri:match("%.apisix/redirect$")' in lua
+
+
+def test_recovery_plugin_redirects_to_the_callback_s_parent_path():
+    """The parent of <login prefix>/.apisix/redirect is the auth-required route
+    that started the flow, so it re-enters authorization.
+    """
+    (lua,) = oidc_error_callback_recovery_plugin().config["functions"]
+
+    assert 'ngx.redirect((uri:gsub("%.apisix/redirect$", "")), 302)' in lua
+
+
+def test_recovery_plugin_breaks_redirect_loops_with_a_guard_cookie():
+    """A second callback with the same error must 500 rather than loop."""
+    (lua,) = oidc_error_callback_recovery_plugin(guard_max_age=90).config["functions"]
+
+    assert '== "apisix_oidc_recovery"' in lua
+    assert '"90"' in lua
+    assert "Max-Age=" in lua
+
+
 # ─── Shared plugin defaults ────────────────────────────────────────────────────
 
 
@@ -487,6 +543,43 @@ def test_gzip_reaches_the_gateway_api_plugin_config():
         assert gzip is not None
         # v1alpha1 accepts only name and config -- ``enable`` is v2-only.
         assert set(gzip) == {"name", "config"}
+
+    return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_recovery_plugin_renders_into_the_v2_plugin_config():
+    """The applications attach this to a host's shared plugin config rather
+    than per route, so it has to survive that normalisation.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-oidc-recovery-v2",
+        plugins=[oidc_error_callback_recovery_plugin()],
+    )
+
+    def check(spec):
+        recovery = plugin_named(spec["plugins"], "serverless-pre-function")
+        assert recovery is not None
+        assert recovery["config"]["phase"] == "rewrite"
+        assert "temporarily_unavailable" in recovery["config"]["functions"][0]
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_recovery_plugin_reaches_the_gateway_api_plugin_config():
+    """v1alpha1 drops secretRef, which this plugin sets to None -- a shape the
+    other shared plugins do not exercise.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-oidc-recovery-gateway-api",
+        plugins=[oidc_error_callback_recovery_plugin()],
+    )
+
+    def check(spec):
+        recovery = plugin_named(spec["plugins"], "serverless-pre-function")
+        assert recovery is not None
+        assert set(recovery) == {"name", "config"}
 
     return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
 

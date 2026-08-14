@@ -23,6 +23,7 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    oidc_error_callback_recovery_plugin,
     stale_session_cookie_cleanup_plugin,
 )
 from ol_infrastructure.components.services.cert_manager import (
@@ -186,6 +187,11 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                 # host belongs to mit-learn, which clears it from its own
                 # routes.  Safe to delete once the old cookies have aged out.
                 stale_session_cookie_cleanup_plugin(),
+                # Same expired-authentication-session callbacks that api.learn
+                # and mitxonline see, at this host's much smaller volume (2/day
+                # on nb.learn.mit.edu).  Attached for consistency of behaviour
+                # across the OIDC-protected hosts rather than for the volume.
+                oidc_error_callback_recovery_plugin(),
             ],
         ),
     )
