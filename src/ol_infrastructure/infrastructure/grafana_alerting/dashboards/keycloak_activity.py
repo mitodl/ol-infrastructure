@@ -7,18 +7,26 @@ visualizations of what keycloak_overview.py already shows from Keycloak's
 own Micrometer events, so they're dropped here. What's kept is content
 Overview has no equivalent for:
 
-- Combined Tempo-request-rate + Loki-error-rate panels for the two
+- Combined Tempo-request-count + Loki-error-count panels for the two
   browser-facing login/registration form endpoints. Overview only sees
   Keycloak's own `login`/`register` *events*; it has no visibility into
   raw HTTP hits on `/login-actions/authenticate` and
   `/login-actions/registration` themselves (e.g. a client that never
   completes the form flow far enough to emit a Keycloak event still shows
   up here).
-- Tempo trace-derived request rates for endpoints Keycloak doesn't emit a
+- Tempo trace-derived request counts for endpoints Keycloak doesn't emit a
   `keycloak_user_events_total` event for at all (token exchange,
   authorization, account-management requests).
 - Two broad, un-itemized event/error breakdowns from Loki (Overview only
   itemizes the event types and error codes we specifically care about).
+
+Every panel here reports a plain count per graph interval rather than a
+per-second `rate()` -- at Keycloak's human-scale traffic (logins per minute,
+not per second), a rate reads as an unreadable tiny decimal (e.g.
+`0.0000347`) where a count reads as "3". The tradeoff is that the bucket
+width isn't a fixed unit -- it auto-scales with the selected time range and
+panel width, same as any Grafana time series -- so each panel's description
+(hover the "i" icon) spells out what's being counted.
 
 The original dashboard hardcoded `service.name="keycloak-production"` and
 `cluster="operations-production"`, so it only ever worked in the Production
@@ -38,9 +46,19 @@ from ol_infrastructure.infrastructure.grafana_alerting.dashboards.datasources im
 
 _LOKI_SELECTOR = 'namespace="keycloak", container="keycloak", cluster=~"$cluster"'
 
+# All panels below report counts per graph interval (the bucket width Grafana
+# picks for the current time range and panel width), not a per-second rate --
+# a raw count like "3" reads far more clearly than "0.0002/s" for traffic this
+# low-volume, at the cost of the bucket width being implicit rather than a
+# fixed unit. Panel descriptions spell this out for anyone hovering the "i" icon.
+_COUNT_DESCRIPTION_SUFFIX = (
+    " Counted per graph interval (bucket width auto-scales with the "
+    "selected time range), not a per-second rate."
+)
 
-def _trace_rate_expr(*, route_pattern: str) -> str:
-    """TraceQL rate() for a Keycloak HTTP route, across QA and Production.
+
+def _trace_count_expr(*, route_pattern: str) -> str:
+    """TraceQL count_over_time() for a Keycloak HTTP route, QA and Production.
 
     Matches on the `span.http.route` semantic-convention attribute (the
     path template alone, e.g. "/realms/{realm}/protocol/{protocol}/auth")
@@ -49,15 +67,15 @@ def _trace_rate_expr(*, route_pattern: str) -> str:
     """
     return (
         f'{{resource.service.name=~"keycloak.*" '
-        f'&& span.http.route =~ "{route_pattern}"}} | rate()'
+        f'&& span.http.route =~ "{route_pattern}"}} | count_over_time()'
     )
 
 
-def _loki_error_rate_expr(*, event_type: str) -> str:
-    """LogQL rate() of a single raw Keycloak log event type, by logfmt."""
+def _loki_error_count_expr(*, event_type: str) -> str:
+    """LogQL count_over_time() of a single raw Keycloak log event type."""
     return (
-        "sum(rate("
-        f'{{{_LOKI_SELECTOR}}} | logfmt | type =~ "{event_type}" [$__rate_interval]'
+        "sum(count_over_time("
+        f'{{{_LOKI_SELECTOR}}} | logfmt | type =~ "{event_type}" [$__interval]'
         "))"
     )
 
@@ -70,19 +88,24 @@ def _attempts_vs_errors_panel(
     error_event_type: str,
     grid_pos: dict[str, Any],
 ) -> dict[str, Any]:
-    """Build a combined Tempo request-rate + Loki error-rate panel."""
+    """Build a combined Tempo request-count + Loki error-count panel."""
     return timeseries_panel(
         title=title,
+        description=(
+            "'attempts' is a count of matching HTTP requests seen in traces "
+            "(Tempo); 'errors' is a count of matching log lines (Loki)."
+            + _COUNT_DESCRIPTION_SUFFIX
+        ),
         queries=[
             {
-                "expr": _trace_rate_expr(route_pattern=route_pattern),
-                "legend_format": "attempts/s",
+                "expr": _trace_count_expr(route_pattern=route_pattern),
+                "legend_format": "attempts",
                 "datasource_ref": TEMPO_DATASOURCE_REF,
                 "query_key": "query",
             },
             {
-                "expr": _loki_error_rate_expr(event_type=error_event_type),
-                "legend_format": "errors/s",
+                "expr": _loki_error_count_expr(event_type=error_event_type),
+                "legend_format": "errors",
                 "datasource_ref": LOKI_DATASOURCE_REF,
             },
         ],
@@ -99,8 +122,10 @@ def _dashboard_json(
         "uid": "keycloak-activity",
         "title": "Keycloak - Activity",
         "description": (
-            "Trace-derived request rates and broad event/error breakdowns "
-            "for Keycloak, not already covered by Keycloak - Overview."
+            "Trace-derived request counts and broad event/error breakdowns "
+            "for Keycloak, not already covered by Keycloak - Overview. Values "
+            "are counts per graph interval, not per-second rates -- hover a "
+            'panel\'s "i" icon for what it counts.'
         ),
         "tags": ["keycloak"],
         "timezone": "browser",
@@ -139,37 +164,45 @@ def _dashboard_json(
                 error_event_type="REGISTER_ERROR",
                 grid_pos={"h": 8, "w": 12, "x": 12, "y": 1},
             ),
-            row_panel(title="Request Rates (Tempo)", y=9),
+            row_panel(title="Request Counts (Tempo)", y=9),
             timeseries_panel(
-                title="Token Request Rate",
-                expr=_trace_rate_expr(route_pattern=".*/protocol/.*/token"),
+                title="Token Requests",
+                description="Count of token-endpoint requests."
+                + _COUNT_DESCRIPTION_SUFFIX,
+                expr=_trace_count_expr(route_pattern=".*/protocol/.*/token"),
                 grid_pos={"h": 8, "w": 12, "x": 0, "y": 10},
                 datasource_ref=TEMPO_DATASOURCE_REF,
-                legend_format="token requests/s",
+                legend_format="token requests",
                 query_key="query",
             ),
             timeseries_panel(
-                title="Authorization Request Rate",
-                expr=_trace_rate_expr(route_pattern=".*/protocol/.*/auth"),
+                title="Authorization Requests",
+                description="Count of authorization-endpoint requests."
+                + _COUNT_DESCRIPTION_SUFFIX,
+                expr=_trace_count_expr(route_pattern=".*/protocol/.*/auth"),
                 grid_pos={"h": 8, "w": 12, "x": 12, "y": 10},
                 datasource_ref=TEMPO_DATASOURCE_REF,
-                legend_format="authorization requests/s",
+                legend_format="authorization requests",
                 query_key="query",
             ),
             timeseries_panel(
-                title="Account Management Request Rate",
-                expr=_trace_rate_expr(route_pattern=".*/account/.*"),
+                title="Account Management Requests",
+                description="Count of account-management requests."
+                + _COUNT_DESCRIPTION_SUFFIX,
+                expr=_trace_count_expr(route_pattern=".*/account/.*"),
                 grid_pos={"h": 8, "w": 12, "x": 0, "y": 18},
                 datasource_ref=TEMPO_DATASOURCE_REF,
-                legend_format="account requests/s",
+                legend_format="account requests",
                 query_key="query",
             ),
             row_panel(title="Broad Event/Error Breakdown (Loki)", y=26),
             timeseries_panel(
-                title="All Event Types Rate",
+                title="All Event Types",
+                description="Count of log lines per Keycloak event type."
+                + _COUNT_DESCRIPTION_SUFFIX,
                 expr=(
-                    "sum by (type) (rate("
-                    f'{{{_LOKI_SELECTOR}}} | logfmt | type != "" [$__rate_interval]'
+                    "sum by (type) (count_over_time("
+                    f'{{{_LOKI_SELECTOR}}} | logfmt | type != "" [$__interval]'
                     "))"
                 ),
                 grid_pos={"h": 8, "w": 12, "x": 0, "y": 27},
@@ -177,7 +210,7 @@ def _dashboard_json(
                 legend_format="{{type}}",
             ),
             bar_gauge_panel(
-                title="Top Error Types (selected range)",
+                title="Top Error Types (total, selected range)",
                 expr=(
                     "topk(5, sum by (error) (count_over_time("
                     f'{{{_LOKI_SELECTOR}}} | logfmt | error != "" [$__range]'

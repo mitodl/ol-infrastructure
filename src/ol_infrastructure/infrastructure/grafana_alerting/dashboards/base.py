@@ -16,6 +16,7 @@ Sub-modules
 """
 
 import json
+import re
 from typing import Any
 
 from pulumi import Input, ResourceOptions
@@ -34,6 +35,18 @@ from ol_infrastructure.infrastructure.grafana_alerting.dashboards.datasources im
 
 _MIXED_DATASOURCE_REF = {"type": "datasource", "uid": "-- Mixed --"}
 
+# Tempo's TraceQL metrics queries always end with the metric function that
+# produces the series (e.g. "... | count_over_time()"), and that function
+# name -- not `legendFormat` -- is what Tempo names an ungrouped series
+# after. Extracted so a field override can force the intended display name.
+_TEMPO_METRIC_FUNC_RE = re.compile(r"\|\s*([a-zA-Z_]+)\(")
+
+
+def _tempo_metric_name(expr: str) -> str | None:
+    """Return the last TraceQL metrics function name used in `expr`, if any."""
+    matches = _TEMPO_METRIC_FUNC_RE.findall(expr)
+    return matches[-1] if matches else None
+
 
 def _timeseries_panel(
     *,
@@ -45,6 +58,7 @@ def _timeseries_panel(
     queries: list[dict[str, Any]] | None = None,
     unit: str = "short",
     query_key: str = "expr",
+    description: str = "",
 ) -> dict[str, Any]:
     """Build a time-series panel model querying a shared datasource.
 
@@ -61,6 +75,11 @@ def _timeseries_panel(
     datasources -- e.g. a Tempo request rate next to a Loki error rate for
     the same endpoint. The panel's own `datasource` is set to Grafana's
     mixed-datasource sentinel whenever the targets don't all share one.
+
+    `description` shows as a hover tooltip (the small "i" icon in the panel
+    header) -- use it to spell out what a value actually means when that
+    isn't obvious from the title alone, e.g. that a count is per graph
+    interval rather than a total.
     """
     if queries is None:
         queries = [{"expr": expr, "legend_format": legend_format}]
@@ -80,8 +99,32 @@ def _timeseries_panel(
     panel_datasource = (
         resolved_datasources[0] if len(unique_uids) == 1 else _MIXED_DATASOURCE_REF
     )
+    # Tempo's TraceQL metrics queries ignore `legendFormat` for a query with
+    # no `by()` grouping -- the series is named after the metric function
+    # instead (e.g. "count_over_time"), and a `byFrameRefID` override does
+    # not override that name either. Matching the field by that generated
+    # name and overriding its display name does work, so a static
+    # legend_format ends up honored the same way it already is for
+    # Prometheus/Loki targets.
+    overrides = []
+    for query, resolved_ds in zip(queries, resolved_datasources):
+        if resolved_ds["type"] != "tempo":
+            continue
+        query_legend_format = query.get("legend_format", "{{legend}}")
+        if "{{" in query_legend_format:
+            continue
+        metric_name = _tempo_metric_name(query["expr"])
+        if metric_name is None:
+            continue
+        overrides.append(
+            {
+                "matcher": {"id": "byName", "options": metric_name},
+                "properties": [{"id": "displayName", "value": query_legend_format}],
+            }
+        )
     return {
         "title": title,
+        "description": description,
         "type": "timeseries",
         "datasource": panel_datasource,
         "gridPos": grid_pos,
@@ -97,7 +140,7 @@ def _timeseries_panel(
                 "unit": unit,
                 "min": 0,
             },
-            "overrides": [],
+            "overrides": overrides,
         },
         "options": {
             "legend": {
