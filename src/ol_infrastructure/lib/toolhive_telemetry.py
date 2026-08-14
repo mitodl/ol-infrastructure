@@ -220,8 +220,8 @@ def toolhive_mcpserver_audit() -> dict[str, object]:
 
     Capture requires a TOP-LEVEL JSON-RPC ``error``; ``pkg/mcp/response.go``
     "intentionally omit[s] `result`". Whether a tool failure lands in one or the
-    other is decided by the backend's MCP SDK, and THE THREE WE RUN DISAGREE
-    (all verified 2026-08-14):
+    other is decided by the BACKEND'S MCP SDK, not by ToolHive — so it has to be
+    established per backend, not once. All six we run, verified 2026-08-14:
 
     * **FastMCP 4.0.0b2** (witan) — every tool-level failure becomes an
       ``isError`` result. Confirmed against a live server: an exception echoing
@@ -229,19 +229,39 @@ def toolhive_mcpserver_audit() -> dict[str, object]:
       unknown tool ALL stayed in ``result``; only ``no/such/method`` produced a
       top-level error, message ``"Method not found"``. Nothing content-bearing
       is captured.
-    * **modelcontextprotocol/go-sdk** (fetch) — same outcome by a different
+    * **FastMCP** (toolhive_swe ``aws``) — mcp-proxy-for-aws 1.6.4 is FastMCP
+      too, and its ``ToolErrorMiddleware.on_call_tool`` catches EVERY exception
+      and re-raises ``ToolError``, which is the same path. This matters more
+      than the others because the managed AWS endpoint behind it exposes a
+      ``run_script`` tool, so its requests carry user-authored scripts.
+    * **modelcontextprotocol/go-sdk** (``fetch``) — same outcome by a different
       route: ``mcp/server.go`` returns a structured ``*jsonrpc.Error`` directly
       but wraps a *plain* error in ``CallToolResult{IsError: true}``, and
       gofetch returns ``fmt.Errorf``. So its URL-bearing messages
       ("access to %s is disallowed by robots.txt") are NOT captured.
-    * **mark3labs/mcp-go v0.55.0** (grafana) — DIFFERENT. A non-nil handler
-      error becomes ``requestError{code: INTERNAL_ERROR}``, i.e. a top-level
-      JSON-RPC error, so its messages ARE captured. Reviewed: mcp-grafana
-      v1.0.0 interpolates queries, resource ids and upstream API status into
-      those, but no credential — the service-account token travels as a header
-      and appears in no error format string.
+    * **@modelcontextprotocol/sdk** (``sentry``) — sentry-mcp returns
+      ``{content, isError: true}`` from a handler-level catch, carrying a
+      deliberate comment: "DO NOT change this to throw error - it breaks error
+      handling!". Not captured.
+    * **@modelcontextprotocol/sdk** (``context7``) — tool handlers return
+      content results rather than throwing. Its one JSON-RPC error is a
+      transport-level ``-32603`` emitted with **HTTP 500**, and the detector
+      runs only on 2xx, so it is unreachable twice over; the message is the
+      fixed string "Internal server error" regardless.
+    * **mark3labs/mcp-go v0.55.0** (``grafana``) — ★ THE ONE THAT DIFFERS. A
+      non-nil handler error becomes ``requestError{code: INTERNAL_ERROR}``,
+      i.e. a top-level JSON-RPC error, so its messages ARE captured. Reviewed:
+      mcp-grafana v1.0.0 interpolates queries, resource ids and upstream API
+      status into those, but no credential — the service-account token travels
+      as a header and appears in no error format string. Judged acceptable:
+      operational text, 256-char cap, and it lands in the same Grafana Cloud
+      the queries already target.
 
     The detector also runs only on 2xx, so 401s and 5xx never reach it.
+
+    ★ A NEW BACKEND IS NOT COVERED BY THIS ANALYSIS. Adding one means checking
+    its SDK's handler-error path before enabling audit on it — or leaving
+    ``audit`` off for that backend until someone has.
 
     ★ RE-CHECK ON ANY SDK OR ToolHive UPGRADE. Nothing tests this, and it is
     the only thing standing between an audit log and payload-derived content.
