@@ -378,6 +378,18 @@ def test_recovery_plugin_honours_a_custom_error_list():
     assert '["server_error"] = true' in lua
 
 
+def test_recovery_plugin_honours_an_explicit_empty_error_list():
+    """An empty list means "recover nothing" -- the way to make the plugin a
+    no-op without detaching it from every route on a shared config.
+    """
+    (lua,) = oidc_error_callback_recovery_plugin(
+        recoverable_errors=[],
+    ).config["functions"]
+
+    assert "local recoverable = {}" in lua
+    assert "temporarily_unavailable" not in lua
+
+
 def test_recovery_plugin_ignores_non_callback_requests():
     """Attached to a host's shared plugin config, this sees every route."""
     (lua,) = oidc_error_callback_recovery_plugin().config["functions"]
