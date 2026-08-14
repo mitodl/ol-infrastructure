@@ -18,7 +18,6 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: application
 default_branch: master
-dependabot_security_updates: false
 has_discussions: false
 has_projects: true
 merge_commit_message: PR_TITLE

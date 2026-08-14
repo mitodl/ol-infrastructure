@@ -12,6 +12,7 @@ allow_squash_merge: true
 archetype: fork
 default_branch: master
 delete_branch_on_merge: false
+dependabot_security_updates: true
 description: The classic editor build of CKEditor 5.
 has_discussions: false
 has_issues: true

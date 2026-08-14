@@ -33,6 +33,7 @@ allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true
 archetype: library
+dependabot_security_updates: true
 description: Automated user management system for Keycloak using GitHub Actions
 has_discussions: false
 has_projects: true
@@ -40,8 +41,6 @@ has_wiki: true
 merge_commit_message: PR_TITLE
 merge_commit_title: MERGE_MESSAGE
 name: access-forge
-secret_scanning: disabled
-secret_scanning_push_protection: disabled
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:

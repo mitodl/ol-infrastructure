@@ -12,7 +12,6 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: application
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: Multi-tenant read-only FastAPI analytics gateway over StarRocks (B2B
   site-license analytics for MIT Learn)
 has_discussions: false

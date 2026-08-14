@@ -15,7 +15,6 @@ allow_squash_merge: true
 archetype: fork
 default_branch: master
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: The Open edX platform, the software that powers edX!
 has_discussions: false
 has_issues: true

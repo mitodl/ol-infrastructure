@@ -28,7 +28,6 @@ def repo(**overrides: Any) -> dict[str, Any]:
         "default_branch": "main",
         "allow_auto_merge": True,
         "delete_branch_on_merge": True,
-        "dependabot_security_updates": True,
         "secret_scanning": "enabled",  # pragma: allowlist secret
         "secret_scanning_push_protection": "enabled",  # pragma: allowlist secret
         "teams": {"odl-engineering-owners": "admin", "odl-engineering": "push"},
@@ -53,7 +52,6 @@ def test_clean_repo_fires_nothing() -> None:
     [
         ("SEC-01", {"_has_branch_protection": False, "_ruleset_count": 0}),
         ("SEC-04", {"secret_scanning": "disabled"}),  # pragma: allowlist secret
-        ("SEC-05", {"dependabot_security_updates": False}),
         ("SEC-06", {"_direct_collaborators": {"someone": "admin"}}),
         ("SEC-15", {"teams": {"arbisoft-contractors": "admin"}}),
         ("CON-02", {"delete_branch_on_merge": False}),
@@ -133,7 +131,9 @@ def test_rule_ids_are_unique() -> None:
 
 def test_findings_carry_remediation() -> None:
     """A finding without a next action is a complaint, not a backlog item."""
-    findings = audit.evaluate([repo(dependabot_security_updates=False)])
+    findings = audit.evaluate(
+        [repo(secret_scanning="disabled")]  # pragma: allowlist secret
+    )
     assert findings
     for finding in findings:
         assert finding.remediation

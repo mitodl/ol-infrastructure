@@ -17,7 +17,6 @@ allow_squash_merge: true
 archetype: application
 default_branch: master
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: 'Portal for learners and course teams to access MITx Micromasters® programs '
 has_discussions: false
 has_projects: true

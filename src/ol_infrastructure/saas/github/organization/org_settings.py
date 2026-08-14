@@ -39,8 +39,21 @@ ORGANIZATION_SETTINGS = github.OrganizationSettings(
     secret_scanning_enabled_for_new_repositories=True,
     secret_scanning_push_protection_enabled_for_new_repositories=True,
     # --- What members may create ----------------------------------------------------
-    # SEC-10: any of 39 members can create a public repo. Tightening it is a policy
-    # decision with real workflow cost, so it is a phase-5 diff rather than an import.
+    # SEC-10: any of 39 members can create a public repo, AND flip an existing private
+    # repo public with no review step. The second half is closed 2026-08-14, but not
+    # here: `members_can_change_repo_visibility` does not exist anywhere in
+    # `pulumi_github.OrganizationSettings`'s 6.14.1 argument list -- verified against
+    # the installed provider's own generated bindings, not docs. The GitHub REST API
+    # has this field (`PATCH /orgs/{org}`); the Terraform/Pulumi provider never wired
+    # it up. Same shape as the `Membership` exclusion in plan §4.7: not modelling a
+    # setting is not the same as leaving it unmanaged by choice, so it is toggled off
+    # by an org owner directly in Settings -> Member privileges, and this comment is
+    # the only place that decision is recorded. Re-check on any provider bump.
+    #
+    # `members_can_create_public_repositories` stays true on purpose (decision
+    # 2026-08-14): restricting repo/public-repo *creation* is the bigger workflow
+    # change (every new OSS repo would need an owner in the loop) and was not the
+    # part of SEC-10 that was actionable now.
     members_can_create_public_repositories=True,
     members_can_create_private_repositories=True,
     members_can_create_internal_repositories=False,

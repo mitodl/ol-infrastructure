@@ -210,6 +210,13 @@ def build(repo: dict[str, Any]) -> None:
         opts=ResourceOptions(depends_on=[repository]),
     )
 
+    github.RepositoryDependabotSecurityUpdates(
+        f"mitodl-repo-dependabot-security-updates-{name}",
+        repository=name,
+        enabled=bool(repo.get("dependabot_security_updates")),
+        opts=ResourceOptions(depends_on=[repository]),
+    )
+
     _tier_property(name, repo["tier"], repository)
 
     for team_slug, permission in (repo.get("teams") or {}).items():

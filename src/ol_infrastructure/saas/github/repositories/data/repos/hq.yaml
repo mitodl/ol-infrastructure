@@ -16,7 +16,6 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: library
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: OL Engineering & Products - headquarters
 has_discussions: true
 has_projects: true
@@ -24,8 +23,6 @@ has_wiki: true
 merge_commit_message: PR_TITLE
 merge_commit_title: MERGE_MESSAGE
 name: hq
-secret_scanning: disabled
-secret_scanning_push_protection: disabled
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:

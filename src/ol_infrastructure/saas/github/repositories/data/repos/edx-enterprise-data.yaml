@@ -12,7 +12,6 @@ allow_squash_merge: true
 archetype: fork
 default_branch: master
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: The edX Enterprise Data repo is the home to tools and products related
   to providing access to Enterprise related data.
 has_discussions: false

@@ -13,7 +13,6 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: library
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: Plug and play apisix/keycloak setup for local dev
 has_discussions: false
 has_projects: true
@@ -21,8 +20,6 @@ has_wiki: true
 merge_commit_message: PR_TITLE
 merge_commit_title: MERGE_MESSAGE
 name: common-access
-secret_scanning: disabled
-secret_scanning_push_protection: disabled
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:

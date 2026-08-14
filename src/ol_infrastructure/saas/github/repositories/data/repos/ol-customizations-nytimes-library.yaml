@@ -11,7 +11,6 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: library
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: Customizations for the NYTimes Library application to fit the needs of
   MIT Open Learning
 has_discussions: false

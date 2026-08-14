@@ -16,7 +16,6 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: infrastructure
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: A repository that will hold Github Issues with which to test the Concourse
   issue driven workflow
 has_discussions: false
@@ -24,8 +23,6 @@ has_projects: false
 merge_commit_message: PR_TITLE
 merge_commit_title: MERGE_MESSAGE
 name: concourse-workflow
-secret_scanning: disabled
-secret_scanning_push_protection: disabled
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:

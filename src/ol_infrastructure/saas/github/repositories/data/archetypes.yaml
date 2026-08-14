@@ -36,7 +36,16 @@ archetypes:
     has_wiki: false
     web_commit_signoff_required: true
     vulnerability_alerts: true
-    dependabot_security_updates: true
+    # GITHUB'S NATIVE AUTO-FIX PRS ARE DELIBERATELY NOT ENABLED (decision 2026-08-14,
+    # closing SEC-05 as won't-fix). The org's shared Renovate config
+    # (`mitodl/.github:renovate-config`) already sets `vulnerabilityAlerts.enabled: true`
+    # plus `osvVulnerabilityAlerts: true` -- Renovate opens its own fix PRs sourced from
+    # the same `vulnerability_alerts` data (the toggle above) plus OSV as a second source,
+    # bypassing its normal schedule. Turning this on too would duplicate that PR on every
+    # repo extending the shared config. `access-forge` and `ckeditor-custom-build` are
+    # explicit true overrides below/in their repo files -- they were already live-enabled
+    # before this decision and are left as-is rather than turned off.
+    dependabot_security_updates: false
     secret_scanning: enabled  # pragma: allowlist secret
     secret_scanning_push_protection: enabled  # pragma: allowlist secret
     default_branch: main
