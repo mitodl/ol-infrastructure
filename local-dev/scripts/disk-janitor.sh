@@ -131,7 +131,10 @@ prune_build_cache() {
 # manifest PUT): only repos whose index.json lists no manifests at all, and
 # only those with no filesystem activity anywhere in the tree for
 # ORPHAN_REPO_MIN_AGE_MINS. Anything unparseable is left alone — a format
-# change upstream must fail towards keeping data, not deleting it.
+# change upstream must fail towards keeping data, not deleting it. A third
+# guard covers namespaced pushes (localhost:5001/<ns>/<repo>, which the
+# openedx integration can produce): the <ns> dir has no index.json of its
+# own, so it must not be judged manifest-less while a real repo sits below it.
 #
 # Deleting is safe by construction: with no manifest there is nothing
 # pullable in the directory, and a subsequent push just re-uploads the layers.
@@ -169,6 +172,10 @@ prune_orphan_repos() {
                 # ("null" for a nil slice, "[]" for an empty one).
                 [ -f "$idx" ] && ! grep -qE "\"manifests\":(null|\[\])" "$idx" && continue
                 [ -n "$(find "$d" -mmin -'"$ORPHAN_REPO_MIN_AGE_MINS"' 2>/dev/null | head -n1)" ] && continue
+                # A namespaced repo (<ns>/<repo>) leaves its parent dir with no
+                # index.json of its own; never delete a tree that still has a
+                # manifest somewhere below it.
+                [ -n "$(find "$d" -mindepth 2 -name index.json 2>/dev/null | head -n1)" ] && continue
                 name="${d#/var/lib/zot/}"
                 rm -rf "$d" && echo "${name%/}"
             done

@@ -295,8 +295,11 @@ create_registry() {
 log "Setting up local image registry '${REGISTRY_NAME}'..."
 if docker ps -a --format '{{.Names}}' | grep -qx "${REGISTRY_NAME}"; then
     if docker inspect "${REGISTRY_NAME}" --format '{{.Config.Image}}' | grep -q zot; then
-        if docker start "${REGISTRY_NAME}" >/dev/null 2>&1; then
-            ok "Registry '${REGISTRY_NAME}' already exists — skipping creation."
+        # `restart`, not `start`: on an already-running registry `start` is a
+        # no-op, so zot never re-reads the bind-mounted zot-config.json and
+        # config changes (timeouts, retention) silently never take effect.
+        if docker restart "${REGISTRY_NAME}" >/dev/null 2>&1; then
+            ok "Registry '${REGISTRY_NAME}' already exists — restarted to pick up zot-config.json."
         else
             # Unstartable registry — an anonymous-volume container left over
             # from before the named-volume switch cannot be repaired, only
