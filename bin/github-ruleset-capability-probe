@@ -1,0 +1,923 @@
+#!/usr/bin/env python3
+"""Probe whether the mitodl org can drive rulesets from repository custom properties.
+
+Settles open decision #1 in docs/plans/github-org-pulumi-import.md. If an
+organization ruleset can target repositories by a custom property, one org-level
+resource enforces the branch-protection baseline across the fleet instead of ~179
+per-repo RepositoryRuleset resources -- a materially simpler phase 3.
+
+Two things are already known and are NOT re-tested here:
+  * pulumi_github 6.x models the condition
+    (OrganizationRulesetConditionsRepositoryPropertyArgs, includes/excludes).
+  * Custom properties are enabled for the org -- GET /orgs/mitodl/properties/schema
+    returns 200 with an empty schema.
+
+What is unknown is whether the GitHub *plan* (mitodl is on Team) permits org-level
+rulesets at all, whether property targeting actually evaluates rather than merely
+being accepted and stored, and whether `evaluate` (dry-run) enforcement is allowed.
+That last one matters more than it looks: without it there is no way to trial a
+ruleset across 179 repos before turning it on.
+
+Safety properties of this probe:
+  * Every ruleset it creates uses `enforcement: disabled` -- present but inert. The
+    single exception is check C7, which flips to `evaluate` (log-only, still never
+    blocking) purely to observe whether the API accepts it, then flips back.
+  * Everything created is namespaced with a `pulumi-import-capability-probe` /
+    `pulumi_import_probe` prefix and is torn down in a `finally`, so a crash or a
+    Ctrl-C still cleans up. Re-running after a hard kill is safe: `cleanup` is
+    idempotent and matches on the prefix.
+  * The only lasting-looking mutation is a custom property value written to one
+    real repo (--labeled-repo). It is unset during teardown.
+
+Requires `admin:org`, which the default `gh` login does not carry:
+
+    gh auth refresh -h github.com -s admin:org
+
+Usage:
+    bin/github-ruleset-capability-probe                  # confirm, probe, tear down
+    bin/github-ruleset-capability-probe --yes            # no confirmation prompt
+    bin/github-ruleset-capability-probe --keep           # leave artifacts to inspect
+    bin/github-ruleset-capability-probe --json
+    bin/github-ruleset-capability-probe cleanup          # teardown after --keep/crash
+"""
+
+import json
+import subprocess
+import sys
+from dataclasses import dataclass, field
+from typing import Annotated, Any, cast
+
+import cyclopts
+
+app = cyclopts.App(
+    help="Probe GitHub org ruleset + custom property targeting capability."
+)
+
+PROPERTY_NAME = "pulumi_import_probe"
+RULESET_PREFIX = "pulumi-import-capability-probe"
+INCLUDE_VALUE = "probe-include"
+EXCLUDE_VALUE = "probe-exclude"
+
+
+@dataclass
+class Check:
+    """One capability question and its observed answer."""
+
+    ident: str
+    title: str
+    status: str  # PASS | FAIL | SKIP
+    detail: str = ""
+
+
+@dataclass
+class Probe:
+    """Run state: what was created (for teardown) and what was observed."""
+
+    org: str
+    labeled_repo: str
+    control_repo: str
+    checks: list[Check] = field(default_factory=list)
+    org_ruleset_id: int | None = None
+    system_ruleset_id: int | None = None
+    repo_ruleset_id: int | None = None
+    allrepos_ruleset_id: int | None = None
+    visibility_endpoint: str | None = None
+    property_created: bool = False
+    value_assigned: bool = False
+
+    def record(self, ident: str, title: str, status: str, detail: str = "") -> Check:
+        """Record a check result and stream it to stderr as it happens."""
+        check = Check(ident, title, status, detail)
+        self.checks.append(check)
+        print(f"  [{check.status}] {ident} {title}", file=sys.stderr)
+        if detail and status != "PASS":
+            print(f"         {detail}", file=sys.stderr)
+        return check
+
+    def passed(self, ident: str) -> bool:
+        """Whether the named check recorded a PASS."""
+        return any(c.ident == ident and c.status == "PASS" for c in self.checks)
+
+
+def _gh(args: list[str], body: dict[str, Any] | None = None) -> tuple[int, str, str]:
+    """Run a gh command, returning (returncode, stdout, stderr) without raising."""
+    stdin = json.dumps(body) if body is not None else None
+    if body is not None:
+        args = [*args, "--input", "-"]
+    result = subprocess.run(  # noqa: S603
+        ["gh", *args],  # noqa: S607
+        input=stdin,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.returncode, result.stdout, result.stderr
+
+
+def _error_detail(out: str, err: str) -> str:
+    """Pull GitHub's validation detail out of a failed response.
+
+    `gh` only prints "Validation Failed (HTTP 422)" to stderr; the body naming the
+    offending field lands on stdout. For a capability probe the body is the whole
+    point -- it is what tells us *which* field GitHub rejected.
+    """
+    detail = err.strip()
+    try:
+        payload = json.loads(out)
+    except (json.JSONDecodeError, TypeError):
+        return detail
+    if not isinstance(payload, dict):
+        return detail
+    parts = [payload.get("message", "")]
+    for item in payload.get("errors", []) or []:
+        if isinstance(item, dict):
+            parts.append(
+                " ".join(
+                    str(item.get(k))
+                    for k in ("resource", "field", "code", "message")
+                    if item.get(k)
+                )
+            )
+        else:
+            parts.append(str(item))
+    body = "; ".join(p for p in parts if p)
+    return f"{detail} -- {body}" if body else detail
+
+
+def _gh_json(
+    args: list[str], body: dict[str, Any] | None = None
+) -> tuple[bool, Any, str]:
+    code, out, err = _gh(args, body)
+    if code != 0:
+        return False, None, _error_detail(out, err)
+    try:
+        return True, json.loads(out) if out.strip() else None, ""
+    except json.JSONDecodeError:
+        return True, None, ""
+
+
+def _token_scopes() -> list[str]:
+    """Scopes on the github.com token specifically -- github.mit.edu also has one.
+
+    Scans both streams: gh has moved `auth status` between stdout and stderr
+    across versions.
+    """
+    _, out, err = _gh(["auth", "status", "--hostname", "github.com"])
+    for line in f"{out}\n{err}".splitlines():
+        if "Token scopes:" in line:
+            raw = line.split("Token scopes:", 1)[1]
+            return [s.strip().strip("'\"") for s in raw.split(",") if s.strip()]
+    return []
+
+
+def _preflight(probe: Probe) -> bool:
+    print("Preflight", file=sys.stderr)
+    scopes = _token_scopes()
+    if "admin:org" not in scopes:
+        probe.record(
+            "P1",
+            "gh token carries admin:org",
+            "FAIL",
+            f"found {scopes or ['<none>']}; run: "
+            f"gh auth refresh -h github.com -s admin:org",
+        )
+        return False
+    probe.record("P1", "gh token carries admin:org", "PASS")
+
+    ok, org, err = _gh_json(["api", f"/orgs/{probe.org}"])
+    if not ok:
+        probe.record("P2", "org is readable", "FAIL", err)
+        return False
+    plan = (org or {}).get("plan", {}).get("name", "unknown")
+    probe.record("P2", "org is readable", "PASS", f"plan={plan}")
+
+    ok, _, err = _gh_json(["api", f"/orgs/{probe.org}/properties/schema"])
+    if not ok:
+        probe.record("P3", "custom properties available", "FAIL", err)
+        return False
+    probe.record("P3", "custom properties available", "PASS")
+    return True
+
+
+def _check_org_ruleset_read(probe: Probe) -> None:
+    ok, data, err = _gh_json(["api", f"/orgs/{probe.org}/rulesets"])
+    if not ok:
+        probe.record(
+            "C1",
+            "org rulesets readable (plan permits org rulesets)",
+            "FAIL",
+            f"{err} -- if this 404s with admin:org present, org-level rulesets "
+            f"are not available on this plan",
+        )
+        return
+    probe.record(
+        "C1",
+        "org rulesets readable (plan permits org rulesets)",
+        "PASS",
+        f"{len(data or [])} existing org ruleset(s)",
+    )
+
+
+def _check_property_create(probe: Probe) -> None:
+    body = {
+        "value_type": "single_select",
+        "required": False,
+        "description": "Temporary probe property; safe to delete.",
+        "allowed_values": [INCLUDE_VALUE, EXCLUDE_VALUE],
+    }
+    ok, _, err = _gh_json(
+        ["api", "-X", "PUT", f"/orgs/{probe.org}/properties/schema/{PROPERTY_NAME}"],
+        body,
+    )
+    if not ok:
+        probe.record("C2", "custom property can be created", "FAIL", err)
+        return
+    probe.property_created = True
+    probe.record("C2", "custom property can be created", "PASS")
+
+
+def _check_property_assign(probe: Probe) -> None:
+    if not probe.property_created:
+        probe.record("C3", "property value can be assigned to a repo", "SKIP")
+        return
+    body = {
+        "repository_names": [probe.labeled_repo],
+        "properties": [{"property_name": PROPERTY_NAME, "value": INCLUDE_VALUE}],
+    }
+    ok, _, err = _gh_json(
+        ["api", "-X", "PATCH", f"/orgs/{probe.org}/properties/values"], body
+    )
+    if not ok:
+        probe.record("C3", "property value can be assigned to a repo", "FAIL", err)
+        return
+    probe.value_assigned = True
+    probe.record(
+        "C3",
+        "property value can be assigned to a repo",
+        "PASS",
+        f"{probe.labeled_repo} = {INCLUDE_VALUE}",
+    )
+
+
+def _ruleset_body(name: str, include: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "name": name,
+        "target": "branch",
+        "enforcement": "disabled",
+        "conditions": {
+            "ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []},
+            "repository_property": {"include": [include], "exclude": []},
+        },
+        "rules": [{"type": "deletion"}],
+    }
+
+
+def _check_ruleset_create(probe: Probe) -> None:
+    if not probe.value_assigned:
+        probe.record("C4", "org ruleset accepts repository_property targeting", "SKIP")
+        return
+    body = _ruleset_body(
+        f"{RULESET_PREFIX}-custom",
+        {
+            "name": PROPERTY_NAME,
+            "property_values": [INCLUDE_VALUE],
+            "source": "custom",
+        },
+    )
+    ok, data, err = _gh_json(["api", "-X", "POST", f"/orgs/{probe.org}/rulesets"], body)
+    if not ok:
+        probe.record(
+            "C4", "org ruleset accepts repository_property targeting", "FAIL", err
+        )
+        return
+    probe.org_ruleset_id = (data or {}).get("id")
+    probe.record(
+        "C4",
+        "org ruleset accepts repository_property targeting",
+        "PASS",
+        f"ruleset id={probe.org_ruleset_id}, enforcement=disabled",
+    )
+
+
+def _check_condition_roundtrip(probe: Probe) -> None:
+    if probe.org_ruleset_id is None:
+        probe.record("C5", "property condition survives round-trip", "SKIP")
+        return
+    ok, data, err = _gh_json(
+        ["api", f"/orgs/{probe.org}/rulesets/{probe.org_ruleset_id}"]
+    )
+    if not ok:
+        probe.record("C5", "property condition survives round-trip", "FAIL", err)
+        return
+    includes = (
+        (data or {}).get("conditions", {}).get("repository_property", {}).get("include")
+    )
+    if not includes:
+        probe.record(
+            "C5",
+            "property condition survives round-trip",
+            "FAIL",
+            "condition was accepted but not persisted -- silently dropped",
+        )
+        return
+    probe.record(
+        "C5",
+        "property condition survives round-trip",
+        "PASS",
+        json.dumps(includes),
+    )
+
+
+def _default_branch(org: str, repo: str) -> str:
+    ok, data, _ = _gh_json(["api", f"/repos/{org}/{repo}"])
+    return (data or {}).get("default_branch", "main") if ok else "main"
+
+
+def _ruleset_visibility(org: str, repo: str, ruleset_id: int) -> dict[str, bool]:
+    """Report whether `ruleset_id` applies to `repo`, per each available endpoint.
+
+    Two endpoints report this and they do not agree. `/rulesets?includes_parents=true`
+    lists only ACTIVE rulesets (proved by control C6b), so it cannot answer a targeting
+    question at any non-blocking enforcement. `/rules/branches/{branch}` reports the
+    effective rules for a branch and may include evaluate-mode ones. C6b decides which
+    of the two to believe before C6 relies on it.
+    """
+    result = {}
+
+    ok, data, _ = _gh_json(
+        ["api", f"/repos/{org}/{repo}/rulesets?includes_parents=true"]
+    )
+    result["rulesets"] = ok and ruleset_id in [r.get("id") for r in (data or [])]
+
+    branch = _default_branch(org, repo)
+    ok, data, _ = _gh_json(["api", f"/repos/{org}/{repo}/rules/branches/{branch}"])
+    result["rules_branch"] = ok and ruleset_id in [
+        r.get("ruleset_id") for r in (data or [])
+    ]
+    return result
+
+
+def _repo_sees_ruleset(
+    org: str, repo: str, ruleset_id: int
+) -> tuple[bool, list[Any], str]:
+    ok, data, err = _gh_json(
+        ["api", f"/repos/{org}/{repo}/rulesets?includes_parents=true"]
+    )
+    if not ok:
+        return False, [], err
+    names = [r.get("id") for r in (data or [])]
+    return ruleset_id in names, data or [], ""
+
+
+def _set_enforcement(probe: Probe, enforcement: str) -> bool:
+    ok, _, _ = _gh_json(
+        ["api", "-X", "PUT", f"/orgs/{probe.org}/rulesets/{probe.org_ruleset_id}"],
+        {"enforcement": enforcement},
+    )
+    return ok
+
+
+def _check_disabled_visibility(probe: Probe) -> None:
+    """Control: are `disabled` rulesets even listed as applying to a repo?
+
+    Answering this first is what stops a `disabled` ruleset's invisibility from being
+    misread as "property targeting is broken" -- the two look identical from C6 alone.
+    """
+    if probe.org_ruleset_id is None:
+        probe.record("C6a", "disabled rulesets appear in effective list", "SKIP")
+        return
+    seen, _, err = _repo_sees_ruleset(
+        probe.org, probe.labeled_repo, probe.org_ruleset_id
+    )
+    if err:
+        probe.record("C6a", "disabled rulesets appear in effective list", "FAIL", err)
+        return
+    probe.record(
+        "C6a",
+        "disabled rulesets appear in effective list",
+        "PASS" if seen else "FAIL",
+        ""
+        if seen
+        else "a known-present disabled ruleset is absent from "
+        "?includes_parents=true, so that endpoint only lists ENFORCING rulesets; "
+        "C6 must therefore run in evaluate mode",
+    )
+
+
+def _check_evaluate_visibility(probe: Probe) -> None:
+    """Control: is an `evaluate` ruleset that targets EVERY repo visible as applying?
+
+    Without this, C6's False/False is ambiguous between "property targeting does not
+    match" and "the endpoint only ever lists `active` rulesets". This control has no
+    property condition at all, so if it is also invisible the endpoint is the problem
+    and C6 cannot be settled at any non-active enforcement.
+    """
+    if not probe.passed("C7"):
+        probe.record("C6b", "evaluate ruleset targeting ~ALL is visible", "SKIP")
+        return
+    body = {
+        "name": f"{RULESET_PREFIX}-allrepos",
+        "target": "branch",
+        "enforcement": "evaluate",
+        "conditions": {
+            "ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []},
+            "repository_name": {"include": ["~ALL"], "exclude": []},
+        },
+        "rules": [{"type": "deletion"}],
+    }
+    ok, data, err = _gh_json(["api", "-X", "POST", f"/orgs/{probe.org}/rulesets"], body)
+    if not ok:
+        probe.record("C6b", "evaluate ruleset targeting ~ALL is visible", "FAIL", err)
+        return
+    probe.allrepos_ruleset_id = (data or {}).get("id")
+    # A successful POST /orgs/{org}/rulesets always returns the created object's id.
+    ruleset_id = cast("int", probe.allrepos_ruleset_id)
+    seen = _ruleset_visibility(probe.org, probe.labeled_repo, ruleset_id)
+    usable = [name for name, hit in seen.items() if hit]
+    probe.visibility_endpoint = usable[0] if usable else None
+    probe.record(
+        "C6b",
+        "evaluate ruleset targeting ~ALL is visible",
+        "PASS" if usable else "FAIL",
+        f"trustworthy endpoint(s): {', '.join(usable)}"
+        if usable
+        else "invisible to BOTH /rulesets?includes_parents=true and "
+        "/rules/branches/{branch}, so no endpoint reports evaluate-mode matching -- "
+        "C6 cannot be settled without briefly going active on a scratch repo",
+    )
+
+
+def _check_targeting_evaluates(probe: Probe) -> None:
+    """Confirm the label changes what actually applies to a repo (the real test).
+
+    Runs with the ruleset in `evaluate` (log-only) enforcement, never `active`: an
+    `evaluate` ruleset is honoured for matching purposes but cannot block a push.
+    """
+    if probe.org_ruleset_id is None:
+        probe.record("C6", "property targeting actually evaluates", "SKIP")
+        return
+    if not probe.passed("C7"):
+        probe.record(
+            "C6",
+            "property targeting actually evaluates",
+            "SKIP",
+            "evaluate mode unavailable; cannot test matching without enforcing",
+        )
+        return
+    if probe.visibility_endpoint is None:
+        probe.record(
+            "C6",
+            "property targeting actually evaluates",
+            "SKIP",
+            "C6b found no endpoint that reports evaluate-mode matching, so a "
+            "negative result here would be meaningless",
+        )
+        return
+    if not _set_enforcement(probe, "evaluate"):
+        probe.record(
+            "C6",
+            "property targeting actually evaluates",
+            "SKIP",
+            "could not set evaluate enforcement",
+        )
+        return
+
+    endpoint = probe.visibility_endpoint
+    hit = _ruleset_visibility(probe.org, probe.labeled_repo, probe.org_ruleset_id)[
+        endpoint
+    ]
+    miss = _ruleset_visibility(probe.org, probe.control_repo, probe.org_ruleset_id)[
+        endpoint
+    ]
+    _set_enforcement(probe, "disabled")
+
+    if hit and not miss:
+        probe.record(
+            "C6",
+            "property targeting actually evaluates",
+            "PASS",
+            f"applies to {probe.labeled_repo}, not to {probe.control_repo}",
+        )
+        return
+    if hit and miss:
+        probe.record(
+            "C6",
+            "property targeting actually evaluates",
+            "FAIL",
+            "ruleset applies to BOTH repos -- the property condition is stored but "
+            "ignored, so it would match the whole fleet",
+        )
+        return
+    probe.record(
+        "C6",
+        "property targeting actually evaluates",
+        "FAIL",
+        f"labeled={probe.labeled_repo}:{hit} control={probe.control_repo}:{miss} "
+        f"-- matched nothing even in evaluate mode",
+    )
+
+
+def _check_evaluate_mode(probe: Probe) -> None:
+    """Dry-run enforcement. Believed Enterprise-gated; that would shape the rollout."""
+    if probe.org_ruleset_id is None:
+        probe.record("C7", "evaluate (dry-run) enforcement permitted", "SKIP")
+        return
+    path = f"/orgs/{probe.org}/rulesets/{probe.org_ruleset_id}"
+    ok, _, err = _gh_json(["api", "-X", "PUT", path], {"enforcement": "evaluate"})
+    if not ok:
+        probe.record(
+            "C7",
+            "evaluate (dry-run) enforcement permitted",
+            "FAIL",
+            f"{err} -- no way to trial a ruleset fleet-wide before activating it",
+        )
+        return
+    probe.record("C7", "evaluate (dry-run) enforcement permitted", "PASS")
+    _gh_json(["api", "-X", "PUT", path], {"enforcement": "disabled"})
+
+
+SYSTEM_PROPERTY_CANDIDATES = [
+    ("repository_visibility", "public"),
+    ("visibility", "public"),
+    ("is_public", "true"),
+    ("is_fork", "false"),
+    ("fork", "false"),
+    ("language", "Python"),
+    ("topic", "devops"),
+]
+
+
+def _check_system_property_targeting(probe: Probe) -> None:
+    """System properties would let us target forks/visibility with no custom schema.
+
+    GitHub does not publish a stable list of targetable system property names, so
+    rather than guess once and report a bare 422, try a candidate list and surface
+    each rejection body -- the failures are what identify the real vocabulary.
+    """
+    if not probe.passed("C1"):
+        probe.record("C8", "system property targeting works", "SKIP")
+        return
+    rejections = []
+    for name, value in SYSTEM_PROPERTY_CANDIDATES:
+        body = _ruleset_body(
+            f"{RULESET_PREFIX}-system",
+            {"name": name, "property_values": [value], "source": "system"},
+        )
+        ok, data, err = _gh_json(
+            ["api", "-X", "POST", f"/orgs/{probe.org}/rulesets"], body
+        )
+        if ok:
+            probe.system_ruleset_id = (data or {}).get("id")
+            probe.record(
+                "C8",
+                "system property targeting works",
+                "PASS",
+                f"'{name}' accepted -- targetable with no custom schema",
+            )
+            return
+        rejections.append(f"{name}: {err}")
+    probe.record(
+        "C8",
+        "system property targeting works",
+        "FAIL",
+        " | ".join(rejections),
+    )
+
+
+def _check_active_targeting(probe: Probe) -> None:
+    """Settle C6 by briefly setting the property-targeted ruleset to `active`.
+
+    Opt-in via --allow-active, because this is the one step that is genuinely
+    enforcing rather than inert. The blast radius is deliberately minimal:
+
+      * The only rule is `deletion` on `~DEFAULT_BRANCH` -- it blocks deleting a
+        repository's default branch, an operation nobody performs in normal work.
+      * If targeting WORKS, it applies solely to --labeled-repo.
+      * If targeting is BROKEN in the over-matching direction, the worst case is that
+        for the couple of seconds this check runs, default-branch deletion is blocked
+        org-wide. No push, merge, or PR is affected.
+
+    Enforcement is restored to `disabled` in a `finally`, so an exception mid-check
+    cannot leave an active ruleset behind.
+    """
+    if probe.org_ruleset_id is None:
+        probe.record("C6c", "property targeting evaluates (active mode)", "SKIP")
+        return
+    if not _set_enforcement(probe, "active"):
+        probe.record(
+            "C6c",
+            "property targeting evaluates (active mode)",
+            "FAIL",
+            "could not set active enforcement",
+        )
+        return
+    try:
+        hit = _ruleset_visibility(probe.org, probe.labeled_repo, probe.org_ruleset_id)
+        miss = _ruleset_visibility(probe.org, probe.control_repo, probe.org_ruleset_id)
+    finally:
+        _set_enforcement(probe, "disabled")
+
+    endpoints = sorted(set(hit) | set(miss))
+    summary = ", ".join(
+        f"{e}: {probe.labeled_repo}={hit.get(e)} {probe.control_repo}={miss.get(e)}"
+        for e in endpoints
+    )
+    matched = [e for e in endpoints if hit.get(e) and not miss.get(e)]
+    over = [e for e in endpoints if hit.get(e) and miss.get(e)]
+    if matched:
+        probe.record(
+            "C6c",
+            "property targeting evaluates (active mode)",
+            "PASS",
+            f"targets only the labeled repo ({', '.join(matched)}) -- {summary}",
+        )
+    elif over:
+        probe.record(
+            "C6c",
+            "property targeting evaluates (active mode)",
+            "FAIL",
+            f"OVER-MATCHES: applies to the unlabeled control too -- {summary}",
+        )
+    else:
+        probe.record(
+            "C6c",
+            "property targeting evaluates (active mode)",
+            "FAIL",
+            f"matched nothing even when active -- {summary}",
+        )
+
+
+def _check_repo_ruleset_fallback(probe: Probe) -> None:
+    """If org rulesets are unavailable, per-repo rulesets are the fallback plan."""
+    body = {
+        "name": f"{RULESET_PREFIX}-repo",
+        "target": "branch",
+        "enforcement": "disabled",
+        "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
+        "rules": [{"type": "deletion"}],
+    }
+    ok, data, err = _gh_json(
+        ["api", "-X", "POST", f"/repos/{probe.org}/{probe.labeled_repo}/rulesets"],
+        body,
+    )
+    if not ok:
+        probe.record("C9", "per-repo ruleset fallback works", "FAIL", err)
+        return
+    probe.repo_ruleset_id = (data or {}).get("id")
+    probe.record("C9", "per-repo ruleset fallback works", "PASS")
+
+
+def _teardown(probe: Probe) -> None:
+    print("\nTeardown", file=sys.stderr)
+    for ident, path in (
+        ("org ruleset", f"/orgs/{probe.org}/rulesets/{probe.org_ruleset_id}"),
+        ("system ruleset", f"/orgs/{probe.org}/rulesets/{probe.system_ruleset_id}"),
+        (
+            "all-repos ruleset",
+            f"/orgs/{probe.org}/rulesets/{probe.allrepos_ruleset_id}",
+        ),
+        (
+            "repo ruleset",
+            f"/repos/{probe.org}/{probe.labeled_repo}/rulesets/{probe.repo_ruleset_id}",
+        ),
+    ):
+        if path.rsplit("/", 1)[-1] == "None":
+            continue
+        ok, _, err = _gh_json(["api", "-X", "DELETE", path])
+        print(f"  {'ok  ' if ok else 'FAIL'} delete {ident}", file=sys.stderr)
+        if not ok:
+            print(f"       {err}", file=sys.stderr)
+
+    if probe.value_assigned:
+        body = {
+            "repository_names": [probe.labeled_repo],
+            "properties": [{"property_name": PROPERTY_NAME, "value": None}],
+        }
+        ok, _, err = _gh_json(
+            ["api", "-X", "PATCH", f"/orgs/{probe.org}/properties/values"], body
+        )
+        print(f"  {'ok  ' if ok else 'FAIL'} unset property value", file=sys.stderr)
+
+    if probe.property_created:
+        ok, _, err = _gh_json(
+            [
+                "api",
+                "-X",
+                "DELETE",
+                f"/orgs/{probe.org}/properties/schema/{PROPERTY_NAME}",
+            ]
+        )
+        print(f"  {'ok  ' if ok else 'FAIL'} delete property schema", file=sys.stderr)
+        if not ok:
+            print(f"       {err}", file=sys.stderr)
+
+
+def _verdict(probe: Probe) -> str:
+    if not probe.passed("C1"):
+        return (
+            "Org-level rulesets are NOT usable. Fall back to ~179 per-repo "
+            "RepositoryRuleset resources driven by the archetype model (plan "
+            "section 3.2). Custom properties are still worth populating for the "
+            "audit in section 7 (CON-09), just not as a ruleset target."
+        )
+    if probe.passed("C6") or probe.passed("C6c"):
+        base = (
+            "Property-targeted org rulesets WORK. Collapse the ~179 per-repo "
+            "rulesets into a handful of org rulesets targeting a `tier` property. "
+            "Consequence for phase 2: populating custom property values moves out "
+            "of fast-follow and becomes a prerequisite, and it creates a "
+            "cross-project ordering edge -- organization (schema + ruleset) then "
+            "repositories (per-repo values) then the ruleset begins matching. "
+            "Safe failure mode: an unlabeled fleet matches nothing, not everything."
+        )
+    elif not probe.passed("C6b"):
+        base = (
+            "INCONCLUSIVE -- and this is a limit of the probe, not a GitHub finding. "
+            "Org rulesets work (C1), the property condition is accepted and persisted "
+            "(C4/C5), and evaluate mode is available (C7). But controls C6a and C6b "
+            "show that NO read endpoint reports a non-enforcing ruleset as applying to "
+            "a repo: a ruleset targeting ~ALL in evaluate mode is invisible to both "
+            "/rulesets?includes_parents=true and /rules/branches/{branch}. So C6's "
+            "result carries no information either way -- do not read it as evidence "
+            "that property targeting is broken.\n\n"
+            "To settle it, re-run with --allow-active. That briefly sets the "
+            "property-targeted ruleset to `active`, whose only rule blocks deletion of "
+            "a default branch -- an operation nobody performs -- and reverts it in a "
+            "`finally`. Worst case, if targeting over-matches, default-branch deletion "
+            "is blocked org-wide for the couple of seconds the check runs. No push, "
+            "merge, or PR is affected."
+        )
+    else:
+        base = (
+            "Org rulesets exist but property targeting did not evaluate as "
+            "expected. Target by repository_name/repository_ids instead, or keep "
+            "per-repo rulesets. Re-read the C4/C5/C6 details before deciding."
+        )
+    if not probe.passed("C7"):
+        base += (
+            "\n\nNOTE: `evaluate` (dry-run) enforcement was rejected. There is no "
+            "way to trial a ruleset across the fleet before activating it, so "
+            "phase 5 must roll out in small reviewed waves, starting with a few "
+            "low-traffic repos, rather than one org-wide switch."
+        )
+    if probe.passed("C8"):
+        base += (
+            "\n\nBONUS: system-property targeting works, so visibility/fork/language "
+            "can be targeted with no custom schema at all -- useful for the ~60 "
+            "upstream Open edX forks."
+        )
+    return base
+
+
+def _report(probe: Probe, *, output_json: bool) -> None:
+    if output_json:
+        print(
+            json.dumps(
+                {
+                    "org": probe.org,
+                    "checks": [vars(c) for c in probe.checks],
+                    "verdict": _verdict(probe),
+                },
+                indent=2,
+            )
+        )
+        return
+    print("\n" + "=" * 72)
+    print(f"RESULTS  org={probe.org}")
+    print("=" * 72)
+    for check in probe.checks:
+        print(f"  {check.status:<5} {check.ident:<4} {check.title}")
+        if check.detail:
+            print(f"              {check.detail}")
+    print("\n" + "-" * 72)
+    print("VERDICT")
+    print("-" * 72)
+    print(_verdict(probe))
+
+
+@app.default
+def probe_capability(
+    org: str = "mitodl",
+    *,
+    labeled_repo: Annotated[
+        str,
+        cyclopts.Parameter(help="Repo that receives the probe property value."),
+    ] = "ol-infrastructure",
+    control_repo: Annotated[
+        str,
+        cyclopts.Parameter(help="Repo left unlabeled, to prove targeting excludes it."),
+    ] = "ol-django",
+    keep: Annotated[
+        bool,
+        cyclopts.Parameter(help="Leave probe artifacts in place for inspection."),
+    ] = False,
+    allow_active: Annotated[
+        bool,
+        cyclopts.Parameter(
+            help="Run C6c: briefly set the ruleset to `active` to settle targeting. "
+            "Only rule is block-default-branch-deletion; reverted immediately."
+        ),
+    ] = False,
+    yes: Annotated[
+        bool, cyclopts.Parameter(help="Skip the confirmation prompt.")
+    ] = False,
+    output_json: Annotated[
+        bool, cyclopts.Parameter(name="--json", help="Emit JSON instead of text.")
+    ] = False,
+) -> None:
+    """Probe org ruleset + custom property targeting, then tear everything down."""
+    probe = Probe(org=org, labeled_repo=labeled_repo, control_repo=control_repo)
+
+    if not yes:
+        print(f"This will temporarily create, in the {org} org:", file=sys.stderr)
+        print(f"  - custom property '{PROPERTY_NAME}'", file=sys.stderr)
+        print(f"  - that property's value on {org}/{labeled_repo}", file=sys.stderr)
+        print(
+            f"  - rulesets named '{RULESET_PREFIX}-*' (enforcement: disabled)",
+            file=sys.stderr,
+        )
+        print("All of it is inert and removed at the end.", file=sys.stderr)
+        if input("Proceed? [y/N] ").strip().lower() not in {"y", "yes"}:
+            print("aborted", file=sys.stderr)
+            raise SystemExit(1)
+
+    if not _preflight(probe):
+        _report(probe, output_json=output_json)
+        raise SystemExit(1)
+
+    try:
+        print("\nProbing", file=sys.stderr)
+        _check_org_ruleset_read(probe)
+        _check_property_create(probe)
+        _check_property_assign(probe)
+        _check_ruleset_create(probe)
+        _check_condition_roundtrip(probe)
+        _check_disabled_visibility(probe)
+        _check_evaluate_mode(probe)
+        _check_evaluate_visibility(probe)
+        _check_targeting_evaluates(probe)
+        if allow_active:
+            _check_active_targeting(probe)
+        _check_system_property_targeting(probe)
+        _check_repo_ruleset_fallback(probe)
+    finally:
+        if keep:
+            print(
+                "\n--keep set; artifacts left in place. Remove them with: "
+                "bin/github-ruleset-capability-probe cleanup",
+                file=sys.stderr,
+            )
+        else:
+            _teardown(probe)
+
+    _report(probe, output_json=output_json)
+
+
+@app.command
+def cleanup(
+    org: str = "mitodl",
+    *,
+    labeled_repo: str = "ol-infrastructure",
+) -> None:
+    """Remove any probe artifacts left behind by --keep or a crashed run."""
+    probe = Probe(org=org, labeled_repo=labeled_repo, control_repo="")
+
+    ok, rulesets, err = _gh_json(["api", f"/orgs/{org}/rulesets"])
+    if ok:
+        for ruleset in rulesets or []:
+            if str(ruleset.get("name", "")).startswith(RULESET_PREFIX):
+                _gh_json(
+                    ["api", "-X", "DELETE", f"/orgs/{org}/rulesets/{ruleset['id']}"]
+                )
+                print(f"  ok   deleted org ruleset {ruleset['name']}", file=sys.stderr)
+    else:
+        print(f"  skip org rulesets unreadable: {err}", file=sys.stderr)
+
+    ok, rulesets, _ = _gh_json(["api", f"/repos/{org}/{labeled_repo}/rulesets"])
+    if ok:
+        for ruleset in rulesets or []:
+            if str(ruleset.get("name", "")).startswith(RULESET_PREFIX):
+                _gh_json(
+                    [
+                        "api",
+                        "-X",
+                        "DELETE",
+                        f"/repos/{org}/{labeled_repo}/rulesets/{ruleset['id']}",
+                    ]
+                )
+                print(f"  ok   deleted repo ruleset {ruleset['name']}", file=sys.stderr)
+
+    ok, schema, _ = _gh_json(["api", f"/orgs/{org}/properties/schema"])
+    if ok and any(p.get("property_name") == PROPERTY_NAME for p in schema or []):
+        probe.value_assigned = True
+        probe.property_created = True
+        probe.org_ruleset_id = None
+        probe.system_ruleset_id = None
+        probe.repo_ruleset_id = None
+        _teardown(probe)
+    else:
+        print("  ok   no probe property present", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    app()

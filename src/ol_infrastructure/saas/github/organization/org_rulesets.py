@@ -32,6 +32,15 @@ failing anyone's push.
   before; promoting straight to `active` is the first real signal on those, not a
   confirmation of already-observed safety.
 
+  ONE KNOWN REGRESSION, ACCEPTED RATHER THAN FIXED. PR #5412 found that
+  `ChristopherChudzicki` holds a personal PR-review bypass on `smoot-design` (a
+  `tier-1` repo) with no equivalent under `_ADMIN_BYPASS` -- they are in
+  `odl-engineering`, not `odl-engineering-owners`. `OrganizationRulesetBypassActorArgs`
+  has no per-user actor type, so covering them would mean adding them to a
+  bypass-eligible team. Tobias's decision (2026-08-14): let that personal exemption
+  lapse rather than widen team membership to preserve it. This is a real, intentional
+  behaviour change on that one repo, not an oversight.
+
 ORDERING. These must not be applied before `ol-saas-github-repositories` has set
 per-repo tiers. Until then every repo carries the property default `standard`, which
 `baseline-default-branch` targets -- so applying early would sweep in all 102 forks

@@ -855,9 +855,19 @@ it. Everything else is org-level. This is also why DX-02/DX-03 stay per-repo aud
    finding to fix later; populating the `tier` property is part of the import.
 2. **A cross-project ordering edge appears.** The schema and rulesets live in `organization`;
    the per-repo values live in `repositories`. Deploy order is organization → repositories,
-   after which the rulesets begin matching. The failure mode is safe by construction — an
-   unlabeled fleet matches *nothing* rather than everything — but the pipeline must encode
-   the order rather than discover it.
+   after which the rulesets begin matching.
+
+   **Corrected 2026-08-14 — this was never safe by construction, and the plan already knew
+   it.** An earlier draft of this paragraph claimed an unlabeled fleet matches *nothing*
+   rather than everything. It is the opposite: `tier` is `required` with `default_value:
+   standard`, and `baseline-default-branch` targets `standard` deliberately (§3.5, so a
+   brand-new repo is protected from creation). §7 already documents the concrete failure
+   this produced — all 140 archived repos briefly matched at `tier=standard` post-phase-3,
+   fixed by PR #5317 — so the correct three-step order is **schema creation, then `tier`
+   population on every repo, then ruleset activation**, not "organization, then
+   repositories" as a two-step story. With both rulesets now `active` (this PR), getting
+   this order wrong on any future change is a real enforcement gap, not evaluate-mode log
+   noise — the pipeline must encode the three steps rather than discover them.
 
 This does not require a `StackReference`: the ruleset names a property by string, and the
 repositories stack sets that property's value by string. The coupling is a shared vocabulary,
@@ -1001,8 +1011,12 @@ reading clean is distinguishable from CON-11 not running.
 | **5** | Remediate by tightening archetypes, not per-repo edits. Land in reviewed waves. | Each wave previews clean and is approved |
 | **6** | Nightly `drift` job in Concourse; org custom-properties schema populated; consider Vault-sourced Actions secrets. | Drift job green |
 
-Phases 0–3 change nothing on GitHub. Phase 5 is where behaviour changes, and it is entirely
-downstream of a reviewed backlog — which is the point of doing the import first.
+Phases 0–3 change nothing on GitHub. **Updated 2026-08-14:** phase 5 is no longer where
+behaviour first changes — phase 3.5 landed at `active` on 2026-08-14 with no dry-run
+(evaluate mode turned out to be Enterprise-only), so its two org rulesets already enforce
+fleet-wide branch protection. Phase 5 remains downstream of a reviewed backlog for
+everything *else* — the SEC-/CON-/DX- findings phase 4's audit surfaces — but treat
+phase 3.5 as a real, live behaviour change, not a neutral prerequisite.
 
 ---
 
