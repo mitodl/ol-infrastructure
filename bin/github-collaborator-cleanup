@@ -40,7 +40,7 @@ from ol_infrastructure.saas.github.repositories import archetypes
 app = cyclopts.App(help="Delete SEC-06 direct-collaborator grants that cost nothing.")
 
 Kind = Annotated[
-    audit.GrantKind | None,
+    audit.RemovableKind | None,
     cyclopts.Parameter(help="Restrict to one removable kind. Default: all three."),
 ]
 
@@ -50,6 +50,17 @@ def _classify_removable(kind: str | None) -> list[dict[str, Any]]:
     rosters, members, parents, owners = audit.fetch_rosters()
     rows = audit.classify_direct_grants(fleet, rosters, members, parents, owners)
     removable = audit.REMOVABLE_KINDS if kind is None else {kind}
+    # Defense in depth, not redundant with the `Kind` annotation above: that only
+    # gates the CLI's own argument parser. Anything calling `_classify_removable`
+    # programmatically -- a test, a future script -- bypasses cyclopts entirely, and
+    # `no-access`/`outside` sailing through here is exactly the failure mode this
+    # tool exists to prevent (deleting a grant that is someone's only path in).
+    if not removable <= audit.REMOVABLE_KINDS:
+        message = (
+            f"kind={kind!r} is not a removable kind "
+            f"({sorted(audit.REMOVABLE_KINDS)}); refusing to classify against it"
+        )
+        raise ValueError(message)
     return sorted(
         (r for r in rows if r["kind"] in removable),
         key=lambda r: (r["repo"], r["login"]),

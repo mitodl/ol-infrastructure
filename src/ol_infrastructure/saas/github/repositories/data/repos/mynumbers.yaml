@@ -24,7 +24,7 @@ squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   arbisoft-contractors: triage
-  code-owners: admin
+  code-owners: push
   odl-engineering: push
   odl-engineering-owners: admin
 web_commit_signoff_required: false

@@ -474,6 +474,14 @@ def fetch_rosters() -> tuple[
 
 
 GrantKind = Literal["redundant", "level-only", "owner-implicit", "no-access", "outside"]
+#: The subset of `GrantKind` a caller may safely act on with a delete. Kept as its own
+#: `Literal` (not just a runtime check against `REMOVABLE_KINDS`) so a CLI built on top
+#: -- `bin/github-collaborator-cleanup`'s `--kind` -- gets this enforced at argument
+#: parsing, before any classification or API call runs. `RemovableKind` and
+#: `REMOVABLE_KINDS` must be kept in sync; there is no single source of truth to
+#: generate one from the other because a `Literal`'s members are not introspectable
+#: from a frozenset at the type-checker level.
+RemovableKind = Literal["redundant", "level-only", "owner-implicit"]
 #: The kinds whose removal costs the person nothing. `no-access` and `outside` are
 #: deliberately absent: one revokes access, the other is a membership decision.
 REMOVABLE_KINDS: frozenset[str] = frozenset(
