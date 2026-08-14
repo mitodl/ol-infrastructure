@@ -36,12 +36,25 @@ are separate Go binaries with their own OTel pipeline, configured through an
 until 2026-08-14 and are why the question "where did the 20s go" had no answer.
 
 That gap is not academic. witan's own ``duration_ms`` starts INSIDE its
-middleware; ToolHive's ``toolhive_mcp_request_duration_seconds`` starts before
-it forwards (``pkg/telemetry/middleware.go``, timer around ``next.ServeHTTP``).
-On 2026-08-14 a concurrency probe run saw the store finish all 8 writes at a
-normal 12.8s median while the client was told 7 of them failed — time spent in
-an interval NEITHER tier measured. The difference between the two durations is
-that interval.
+middleware; ToolHive's ``toolhive_mcp_request_duration_seconds`` wraps
+``next.ServeHTTP`` (``pkg/telemetry/middleware.go``). On 2026-08-14 a
+concurrency probe run saw the store finish all 8 writes at a normal 12.8s
+median while the client was told 7 of them failed — time spent in an interval
+NEITHER tier measured.
+
+★ WHAT THE METRIC DELTA IS, AND IS NOT. ToolHive's timer starts just before it
+forwards and stops after the downstream response returns, so it spans
+``pre-forward + witan + post-response``. Subtracting witan's ``duration_ms``
+therefore yields the TOTAL TIME OUTSIDE witan's middleware — both outer
+intervals summed — not the pre-handler interval on its own. It also cannot be
+done per request: the ToolHive side is a histogram and the witan side is a log
+field, so they pair only in aggregate (percentile against percentile).
+
+The pre-handler interval specifically needs the SPANS, where ToolHive's and
+witan's are nested with real start timestamps and the two boundaries are
+separable per request. That is why tracing is enabled here and not just
+metrics, and why the probe runs in QA — the metric delta alone would say only
+that time went somewhere outside witan, which is already known.
 """
 
 import pulumi_kubernetes as kubernetes
@@ -342,6 +355,39 @@ def toolhive_mcpserver_audit() -> dict[str, object]:
     Both hops log one JSON event per request — method, outcome, duration — to
     stdout, so it rides the existing pod-log path to Loki with no collector
     involved. That is why audit is on in every environment while OTLP is not.
+
+    ── ``jsonrpc_error_message``: checked, and safe ONLY BY VERSION ──
+    ``auditor.go`` writes ``jsonrpc_error_code``/``jsonrpc_error_message`` (256
+    chars) into audit metadata whenever an outcome is ``ApplicationError``,
+    gated ONLY on ``detectApplicationErrors`` (default true) and NOT on
+    ``includeResponseData`` — its own comment says it reports them "without
+    enabling full response data capture". This CRD exposes no switch for it, so
+    if it fired here it could not be turned off.
+
+    It does not fire for anything content-bearing, because it requires a
+    TOP-LEVEL JSON-RPC ``error`` and ``pkg/mcp/response.go`` "intentionally
+    omit[s] `result`". FastMCP 4.0.0b2 routes every tool-level failure into an
+    ``isError`` result inside ``result``. Verified 2026-08-14 against a live
+    streamable-http server: an exception echoing the caller's payload, a
+    pydantic error carrying ``input_value=``, and an unknown tool ALL came back
+    as ``isError`` results; only ``no/such/method`` produced a top-level error,
+    message ``"Method not found"``. The detector also runs only on 2xx, so 401s
+    and 5xx never reach it. What this deployment has actually produced at
+    protocol level is ``-32603`` under load, message "Server returned an error
+    response" — operational, no user content.
+
+    ★ RE-CHECK THIS ON ANY FastMCP OR ToolHive UPGRADE. Nothing tests it, and
+    both halves are load-bearing: if FastMCP started surfacing tool failures as
+    protocol errors, or ToolHive started parsing ``result``, this would begin
+    copying PRE-REDACTION request content — witan redacts inside the tool, after
+    arguments arrive — into Loki, which is readable by anyone with Grafana
+    access rather than being Cedar actor-scoped like the graph.
+    ``mask_error_details`` is FastMCP's second line of defence here and it
+    defaults to False; witan does not set it.
+
+    Kept ON deliberately rather than tolerated: a JSON-RPC error inside an HTTP
+    200 is exactly the ``-32603``-under-load signature this project is chasing,
+    and disabling detection would record those as successes.
     """
     return {"enabled": True}
 
@@ -354,6 +400,11 @@ def toolhive_vmcp_audit() -> dict[str, object]:
     the memories and tasks themselves, and turning either on would copy
     user-authored graph content into the log pipeline, where the redaction that
     governs the write path does not apply.
+
+    ``detectApplicationErrors`` is deliberately left at its default (true) even
+    though this CRD — unlike ``MCPServer.spec.audit`` — could disable it. See
+    `toolhive_mcpserver_audit` for the evidence that it carries no user content
+    at these versions, and for why the signal is wanted.
     """
     return {
         "enabled": True,

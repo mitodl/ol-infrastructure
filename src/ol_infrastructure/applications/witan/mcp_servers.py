@@ -450,10 +450,11 @@ def create_mcp_servers(  # noqa: PLR0913
                 "proxyDeployment": {"env": WITAN_PROXY_HEALTH_ENV},
             },
             # The proxy's own OTel pipeline — spans and metrics for the hop in
-            # FRONT of witan, which was dark until 2026-08-14. Its request
-            # duration starts before it forwards, so subtracting witan's own
-            # `duration_ms` from it yields the pre-handler interval that neither
-            # tier measured. See observability.py's "ToolHive tier" section.
+            # FRONT of witan, which was dark until 2026-08-14. The SPANS are the
+            # point: only nested span timestamps separate the pre-handler
+            # interval from the post-response one per request. The metric delta
+            # against witan's `duration_ms` bounds the two together and only in
+            # aggregate. See observability.py's "ToolHive tier" section.
             #
             # Deliberately NO `k8s.grafana.com/scrape` annotations to go with the
             # Prometheus path this enables: in QA and Production the same metrics
