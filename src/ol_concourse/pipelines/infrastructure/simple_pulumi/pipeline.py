@@ -342,6 +342,18 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_name="ol-application-fastly-redirector",
         refresh_stack=False,
     ),
+    "github-organization": SimplePulumiParams(
+        app_name="github-organization",
+        pulumi_project_path="saas/github/organization/",
+        pulumi_project_name="ol-saas-github-organization",
+        stages=["default"],
+    ),
+    "github-repositories": SimplePulumiParams(
+        app_name="github-repositories",
+        pulumi_project_path="saas/github/repositories/",
+        pulumi_project_name="ol-saas-github-repositories",
+        stages=["default"],
+    ),
     "grafana-alerting": SimplePulumiParams(
         app_name="grafana-alerting",
         pulumi_project_path="infrastructure/grafana_alerting/",
