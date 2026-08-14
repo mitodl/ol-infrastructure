@@ -7,16 +7,14 @@ no per-environment branching needed.
 
 Sub-modules
 -----------
-  keycloak_olapps_idp_logins — Per-identity-provider login counts for the
-    olapps realm.
   keycloak_overview — General service-health overview (logins, JVM, HTTP,
     DB pool) across all realms.
-  keycloak_activity — Trace-backed request rates not covered by
-    keycloak_overview's Micrometer-derived panels.
+  keycloak_olapps_realm — Holistic authentication-activity view (logins,
+    registrations, token flows, per-identity-provider breakdown) for just
+    the olapps realm.
 """
 
 import json
-import re
 from typing import Any
 
 from pulumi import Input, ResourceOptions
@@ -24,28 +22,13 @@ from pulumiverse_grafana.oss.dashboard import Dashboard
 from pulumiverse_grafana.oss.folder import Folder
 
 from ol_infrastructure.infrastructure.grafana_alerting.dashboards import (
-    keycloak_activity,
-    keycloak_olapps_idp_logins,
+    keycloak_olapps_realm,
     keycloak_overview,
 )
 from ol_infrastructure.infrastructure.grafana_alerting.dashboards.datasources import (
     LOKI_DATASOURCE_REF,
     MIMIR_DATASOURCE_REF,
 )
-
-_MIXED_DATASOURCE_REF = {"type": "datasource", "uid": "-- Mixed --"}
-
-# Tempo's TraceQL metrics queries always end with the metric function that
-# produces the series (e.g. "... | count_over_time()"), and that function
-# name -- not `legendFormat` -- is what Tempo names an ungrouped series
-# after. Extracted so a field override can force the intended display name.
-_TEMPO_METRIC_FUNC_RE = re.compile(r"\|\s*([a-zA-Z_]+)\(")
-
-
-def _tempo_metric_name(expr: str) -> str | None:
-    """Return the last TraceQL metrics function name used in `expr`, if any."""
-    matches = _TEMPO_METRIC_FUNC_RE.findall(expr)
-    return matches[-1] if matches else None
 
 
 def _timeseries_panel(
@@ -57,7 +40,6 @@ def _timeseries_panel(
     legend_format: str = "{{identity_provider}}",
     queries: list[dict[str, Any]] | None = None,
     unit: str = "short",
-    query_key: str = "expr",
     description: str = "",
 ) -> dict[str, Any]:
     """Build a time-series panel model querying a shared datasource.
@@ -67,15 +49,6 @@ def _timeseries_panel(
     query series (e.g. p50/p95/p99 latency, or GC time+count by cause) --
     each becomes its own target, lettered A, B, C...
 
-    `query_key` names the JSON key the datasource expects the query string
-    under -- Prometheus/Loki use `expr`, but Tempo's TraceQL targets use
-    `query` instead; pass `query_key="query"` for a Tempo-backed panel.
-    Either can be overridden per-query (via a `"query_key"`/`"datasource_ref"`
-    key in that query's dict) for a panel comparing series from two
-    datasources -- e.g. a Tempo request rate next to a Loki error rate for
-    the same endpoint. The panel's own `datasource` is set to Grafana's
-    mixed-datasource sentinel whenever the targets don't all share one.
-
     `description` shows as a hover tooltip (the small "i" icon in the panel
     header) -- use it to spell out what a value actually means when that
     isn't obvious from the title alone, e.g. that a count is per graph
@@ -83,50 +56,20 @@ def _timeseries_panel(
     """
     if queries is None:
         queries = [{"expr": expr, "legend_format": legend_format}]
-    resolved_datasources = [
-        query.get("datasource_ref", datasource_ref) for query in queries
-    ]
     targets = [
         {
-            "datasource": resolved_ds,
-            query.get("query_key", query_key): query["expr"],
+            "datasource": datasource_ref,
+            "expr": query["expr"],
             "legendFormat": query.get("legend_format", "{{legend}}"),
             "refId": chr(65 + i),
         }
-        for i, (query, resolved_ds) in enumerate(zip(queries, resolved_datasources))
+        for i, query in enumerate(queries)
     ]
-    unique_uids = {ds["uid"] for ds in resolved_datasources}
-    panel_datasource = (
-        resolved_datasources[0] if len(unique_uids) == 1 else _MIXED_DATASOURCE_REF
-    )
-    # Tempo's TraceQL metrics queries ignore `legendFormat` for a query with
-    # no `by()` grouping -- the series is named after the metric function
-    # instead (e.g. "count_over_time"), and a `byFrameRefID` override does
-    # not override that name either. Matching the field by that generated
-    # name and overriding its display name does work, so a static
-    # legend_format ends up honored the same way it already is for
-    # Prometheus/Loki targets.
-    overrides = []
-    for query, resolved_ds in zip(queries, resolved_datasources):
-        if resolved_ds["type"] != "tempo":
-            continue
-        query_legend_format = query.get("legend_format", "{{legend}}")
-        if "{{" in query_legend_format:
-            continue
-        metric_name = _tempo_metric_name(query["expr"])
-        if metric_name is None:
-            continue
-        overrides.append(
-            {
-                "matcher": {"id": "byName", "options": metric_name},
-                "properties": [{"id": "displayName", "value": query_legend_format}],
-            }
-        )
     return {
         "title": title,
         "description": description,
         "type": "timeseries",
-        "datasource": panel_datasource,
+        "datasource": datasource_ref,
         "gridPos": grid_pos,
         "fieldConfig": {
             "defaults": {
@@ -140,7 +83,7 @@ def _timeseries_panel(
                 "unit": unit,
                 "min": 0,
             },
-            "overrides": overrides,
+            "overrides": [],
         },
         "options": {
             "legend": {
@@ -356,14 +299,6 @@ def create(resource_opts: ResourceOptions) -> None:
         opts=resource_opts,
     )
 
-    keycloak_olapps_idp_logins.create(
-        dashboards_folder.uid,
-        _timeseries_panel,
-        _bar_gauge_panel,
-        _create_dashboard,
-        resource_opts,
-    )
-
     keycloak_overview.create(
         dashboards_folder.uid,
         _timeseries_panel,
@@ -375,10 +310,12 @@ def create(resource_opts: ResourceOptions) -> None:
         resource_opts,
     )
 
-    keycloak_activity.create(
+    keycloak_olapps_realm.create(
         dashboards_folder.uid,
         _timeseries_panel,
+        _stat_panel,
         _bar_gauge_panel,
+        _logs_panel,
         _row_panel,
         _create_dashboard,
         resource_opts,

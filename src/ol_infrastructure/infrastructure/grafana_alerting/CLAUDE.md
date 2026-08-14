@@ -91,10 +91,9 @@ Rootly). That path is independent of Grafana and is managed in
 | `log_rules/vault.py` | Vault secret-absent and auth-failure alert rules. |
 | `dashboards/` | Package. Grafana dashboards. |
 | `dashboards/base.py` | Shared panel-builder helpers, folder creation, delegates to sub-modules. |
-| `dashboards/datasources.py` | Mimir/Loki/Tempo datasource ref constants, importable directly by sub-modules without a circular import through `base.py`. |
-| `dashboards/keycloak_olapps_idp_logins.py` | Per-identity-provider login counts (success + failure) for the olapps realm, from Loki via LogQL. |
+| `dashboards/datasources.py` | Mimir/Loki datasource ref constants, importable directly by sub-modules without a circular import through `base.py`. |
 | `dashboards/keycloak_overview.py` | General service-health overview across all realms: logins, JVM, HTTP, DB pool, GC, JDBC cache, plus raw error/warning log tails. |
-| `dashboards/keycloak_activity.py` | Tempo-derived request rates and broad event/error breakdowns not covered by `keycloak_overview.py`'s itemized panels. |
+| `dashboards/keycloak_olapps_realm.py` | Holistic authentication-activity view for just the olapps realm -- logins, registrations, token flows, and a per-identity-provider breakdown (success + failure) from Loki. For devs/management, not hardware/JVM. |
 | `pingdom_checks.py` | Pingdom uptime checks via Pulumi dynamic provider. Runs in the production stack only. |
 | `CLAUDE.md` | This file. |
 
@@ -231,14 +230,14 @@ holding every current and future Keycloak dashboard just recreates the same
 "one file for everything in this topic" problem the `dashboards/` package
 (vs. a single `dashboards.py`) already exists to avoid.
 
-**Naming**: `<system>_<what-it-shows>.py`, e.g. `keycloak_olapps_idp_logins.py`.
+**Naming**: `<system>_<what-it-shows>.py`, e.g. `keycloak_olapps_realm.py`.
 The `<system>` prefix (`keycloak`, in this case) is shared across every
 dashboard for that system so they sort and grep together, but each distinct
 dashboard -- a different concern, a different realm, whatever varies -- gets
 its own file under that same prefix rather than being added to an existing
 one. A second Keycloak dashboard about something unrelated (say, session
 counts) would be `keycloak_session_counts.py`, not a new function inside
-`keycloak_olapps_idp_logins.py`.
+`keycloak_olapps_realm.py`.
 
 ### Panel-builder helpers (base.py)
 
@@ -256,25 +255,19 @@ All of the above except `_logs_panel`/`_row_panel` take a `unit` param --
 rest default to `"short"`. Set it explicitly for anything that isn't a plain
 count: `"percentunit"` for ratios, `"s"` for durations, `"bytes"` for memory.
 
-**Tempo (TraceQL) panels need two non-obvious overrides on `_timeseries_panel`:**
-1. `query_key="query"` -- Prometheus/Loki targets hold the query string under
-   `expr`, but Tempo's target schema uses `query` instead. Passing plain
-   `expr` (the default) silently renders an empty panel with no error, even
-   though the same TraceQL string returns data from `grafana_tempo_*` tools
-   directly -- there's no validation error to catch this, only "No data".
-2. Match routes on `span.http.route` (the path template alone, e.g.
-   `/realms/{realm}/protocol/{protocol}/auth`), not the span `name` (which
-   also carries the HTTP method, e.g. `GET /realms/{realm}/protocol/...`).
-   Whichever attribute you match on, TraceQL's `=~` requires a **full**
-   match (unlike Prometheus/Loki's unanchored regex) -- prefix the pattern
-   with `.*` to skip over the realm segment, e.g. `.*/protocol/.*/auth`.
-   Verify a new route pattern with `grafana_tempo_traceql-search` before
-   wiring it into a panel; both mistakes above produce an empty panel with
-   no error, not a query failure.
+No dashboard in this package queries Tempo -- an earlier version of
+`keycloak_activity.py` did, pairing a sampled TraceQL request count against
+an exhaustive Loki event count in one panel ("attempts vs errors"). That
+comparison was structurally misleading (Tempo only sees a sampled subset of
+requests; Loki sees every one) and was scrapped rather than fixed. Prefer
+Prometheus/Loki -- both are exhaustive -- over Tempo for any new
+request-volume panel; if a genuine trace-derived panel is needed later,
+re-derive the `query_key`/mixed-datasource support this package used to have
+from git history rather than assuming it's still there.
 
 ### Template variables
 
-A dashboard that needs to filter by realm or restrict Loki/Tempo queries to
+A dashboard that needs to filter by realm or restrict Loki queries to
 one cluster declares its own `templating.list` entries directly in
 `_dashboard_json(...)` -- there's no shared helper for this, since the
 variable's datasource and query differ per dashboard. Follow the pattern in
@@ -284,9 +277,10 @@ everything and a viewer can narrow it. A `$realm` variable queries Mimir
 (`label_values(keycloak_user_events_total{namespace="keycloak"},realm)`); a
 `$cluster` variable queries Loki (`label_values({namespace="keycloak"},cluster)`)
 since that's confirmed to carry the label -- don't add `cluster=~"$cluster"`
-to a Micrometer/Prometheus query without first confirming that metric family
-actually carries a `cluster` label, since a missing label on a non-default
-variable value silently returns no data rather than erroring.
+to a Micrometer/Prometheus query without first confirming that metric
+family actually carries a `cluster` label (`keycloak_user_events_total`
+doesn't), since a missing label on a non-default variable value silently
+returns no data rather than erroring.
 
 ### Adding a new dashboard
 
@@ -297,9 +291,9 @@ variable value silently returns no data rather than erroring.
    this dashboard actually calls -- an unused parameter fails lint (`ARG001`).
 2. Use the helpers above rather than building panel dicts by hand, so
    styling stays consistent across dashboards. They default to the shared
-   Mimir datasource; for a Loki- or Tempo-backed panel, pass
-   `datasource_ref=LOKI_DATASOURCE_REF`/`TEMPO_DATASOURCE_REF` (import from
-   `datasources.py`, not `base.py`, to avoid a circular import). Prefer
+   Mimir datasource; for a Loki-backed panel, pass
+   `datasource_ref=LOKI_DATASOURCE_REF` (import from `datasources.py`, not
+   `base.py`, to avoid a circular import). Prefer
    counting straight from Loki over deriving a Prometheus counter via an
    Alloy `stage.metrics` block: a `metric.counter` only exists once
    incremented, so a low-volume counter's first-ever appearance is invisible
