@@ -306,8 +306,13 @@ class PulumiProgram:
         import_id: str,
         args: dict[str, Any],
         opts_name: str = "sentry_opts",
-    ) -> None:
-        """Append a Pulumi resource declaration and its matching import entry."""
+        depends_on: list[str] | None = None,
+    ) -> str:
+        """Append a Pulumi resource declaration and its matching import entry.
+
+        Returns the resource's generated variable name so callers can chain
+        later resources onto it via ``depends_on``.
+        """
         name = unique_name(base_name, self.seen_names)
         formatted_items = []
         for key, value in args.items():
@@ -321,11 +326,22 @@ class PulumiProgram:
             formatted_items.append(f"    {key}={value_expr},")
         formatted_args = "\n".join(formatted_items)
         name_comment = "  # pragma: allowlist secret" if kind == "key" else ""
+        if depends_on:
+            deps_expr = "[" + ", ".join(depends_on) + "]"
+            opts_expr = (
+                f"ResourceOptions(\n"
+                f"        provider=sentry_provider,\n"
+                f"        protect=True,\n"
+                f"        depends_on={deps_expr},\n"
+                f"    )"
+            )
+        else:
+            opts_expr = opts_name
         block = (
             f"{name} = sentry.{class_name}(\n"
             f"    {name!r},{name_comment}\n"
             f"{formatted_args}\n"
-            f"    opts={opts_name},\n"
+            f"    opts={opts_expr},\n"
             f")\n"
         )
         self.blocks.append(block)
@@ -333,6 +349,7 @@ class PulumiProgram:
             {"type": RESOURCE_TOKENS[kind], "name": name, "id": import_id}
         )
         self.counts[kind] += 1
+        return name
 
     def render(self) -> str:
         """Render the full generated __main__.py source as a single string."""
@@ -522,29 +539,54 @@ def build_program(inventory: dict[str, Any], organization: str) -> PulumiProgram
             ),
         )
 
-    for mapping in sorted(inventory["code_mappings"], key=lambda item: item["id"]):
-        program.add_resource(
-            "code_mapping",
-            "SentryOrganizationCodeMapping",
-            safe_name(
+    # Sentry's code-mappings endpoint caps concurrency at 25 in-flight requests
+    # and 40 requests/second org-wide (see 429s in build 14 of the
+    # pulumi-sentry pipeline: "attempting to go above the allowed concurrency
+    # ... Concurrency limit is 25" / "Limit is 40 requests in 1 seconds").
+    # There are ~100 SentryOrganizationCodeMapping resources, and Pulumi
+    # refreshes/updates independent resources with unbounded parallelism, so a
+    # single stack update previously fired every code-mapping read at once and
+    # tripped both limits, failing the whole update. Chaining each batch's
+    # resources onto the previous batch via depends_on forces the engine to
+    # gate one batch's requests behind the last, keeping in-flight requests to
+    # this endpoint well under Sentry's limits without serializing the whole
+    # stack.
+    code_mapping_batch_size = 10
+    sorted_code_mappings = sorted(
+        inventory["code_mappings"], key=lambda item: item["id"]
+    )
+    previous_batch_names: list[str] = []
+    for batch_start in range(0, len(sorted_code_mappings), code_mapping_batch_size):
+        batch = sorted_code_mappings[
+            batch_start : batch_start + code_mapping_batch_size
+        ]
+        current_batch_names: list[str] = []
+        for mapping in batch:
+            name = program.add_resource(
                 "code_mapping",
-                mapping.get("projectSlug"),
-                mapping.get("repoName"),
-                mapping.get("id"),
-            ),
-            f"{organization}/{mapping['id']}",
-            compact(
-                {
-                    "organization": ORGANIZATION_REF,
-                    "project_id": str(mapping.get("projectId")),
-                    "repository_id": str(mapping.get("repoId")),
-                    "integration_id": str(mapping.get("integrationId")),
-                    "default_branch": mapping.get("defaultBranch"),
-                    "stack_root": mapping.get("stackRoot"),
-                    "source_root": mapping.get("sourceRoot"),
-                }
-            ),
-        )
+                "SentryOrganizationCodeMapping",
+                safe_name(
+                    "code_mapping",
+                    mapping.get("projectSlug"),
+                    mapping.get("repoName"),
+                    mapping.get("id"),
+                ),
+                f"{organization}/{mapping['id']}",
+                compact(
+                    {
+                        "organization": ORGANIZATION_REF,
+                        "project_id": str(mapping.get("projectId")),
+                        "repository_id": str(mapping.get("repoId")),
+                        "integration_id": str(mapping.get("integrationId")),
+                        "default_branch": mapping.get("defaultBranch"),
+                        "stack_root": mapping.get("stackRoot"),
+                        "source_root": mapping.get("sourceRoot"),
+                    }
+                ),
+                depends_on=previous_batch_names or None,
+            )
+            current_batch_names.append(name)
+        previous_batch_names = current_batch_names
 
     supported_dashboard_widget_types = {"discover", "issue", "metrics"}
     for dashboard in sorted(inventory["dashboards"], key=lambda item: item["id"]):

@@ -1979,7 +1979,22 @@ code_mapping_openedx_mitxonline_mitodl_edx_platform_110056 = (
         default_branch="master",
         stack_root="waffle/",
         source_root="openedx/core/djangoapps/waffle_utils/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_release_script_mitodl_testinfra_1044760,
+                code_mapping_ocw_next_mitodl_learn_zendesk_theme_1052841,
+                code_mapping_micromasters_mitodl_edx_platform_106058,
+                code_mapping_open_next_mitodl_mit_learn_1081209,
+                code_mapping_xpro_mitodl_mitxonline_1082964,
+                code_mapping_mitxonline_mitodl_mitxonline_1085838,
+                code_mapping_learn_ai_mitodl_learn_ai_1089875,
+                code_mapping_open_mitodl_mit_open_bk_1090440,
+                code_mapping_open_mitodl_mit_open_bk_1092976,
+                code_mapping_open_mitodl_mit_learn_1099628,
+            ],
+        ),
     )
 )
 
@@ -1993,7 +2008,22 @@ code_mapping_micromasters_mitodl_mit_learn_1100755 = (
         default_branch="main",
         stack_root="",
         source_root="",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_release_script_mitodl_testinfra_1044760,
+                code_mapping_ocw_next_mitodl_learn_zendesk_theme_1052841,
+                code_mapping_micromasters_mitodl_edx_platform_106058,
+                code_mapping_open_next_mitodl_mit_learn_1081209,
+                code_mapping_xpro_mitodl_mitxonline_1082964,
+                code_mapping_mitxonline_mitodl_mitxonline_1085838,
+                code_mapping_learn_ai_mitodl_learn_ai_1089875,
+                code_mapping_open_mitodl_mit_open_bk_1090440,
+                code_mapping_open_mitodl_mit_open_bk_1092976,
+                code_mapping_open_mitodl_mit_learn_1099628,
+            ],
+        ),
     )
 )
 
@@ -2006,7 +2036,22 @@ code_mapping_open_mitodl_testinfra_1102209 = sentry.SentryOrganizationCodeMappin
     default_branch="master",
     stack_root="",
     source_root="testinfra/modules/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_release_script_mitodl_testinfra_1044760,
+            code_mapping_ocw_next_mitodl_learn_zendesk_theme_1052841,
+            code_mapping_micromasters_mitodl_edx_platform_106058,
+            code_mapping_open_next_mitodl_mit_learn_1081209,
+            code_mapping_xpro_mitodl_mitxonline_1082964,
+            code_mapping_mitxonline_mitodl_mitxonline_1085838,
+            code_mapping_learn_ai_mitodl_learn_ai_1089875,
+            code_mapping_open_mitodl_mit_open_bk_1090440,
+            code_mapping_open_mitodl_mit_open_bk_1092976,
+            code_mapping_open_mitodl_mit_learn_1099628,
+        ],
+    ),
 )
 
 code_mapping_open_next_mitodl_learn_ai_1102230 = sentry.SentryOrganizationCodeMapping(
@@ -2018,7 +2063,22 @@ code_mapping_open_next_mitodl_learn_ai_1102230 = sentry.SentryOrganizationCodeMa
     default_branch="main",
     stack_root="",
     source_root="",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_release_script_mitodl_testinfra_1044760,
+            code_mapping_ocw_next_mitodl_learn_zendesk_theme_1052841,
+            code_mapping_micromasters_mitodl_edx_platform_106058,
+            code_mapping_open_next_mitodl_mit_learn_1081209,
+            code_mapping_xpro_mitodl_mitxonline_1082964,
+            code_mapping_mitxonline_mitodl_mitxonline_1085838,
+            code_mapping_learn_ai_mitodl_learn_ai_1089875,
+            code_mapping_open_mitodl_mit_open_bk_1090440,
+            code_mapping_open_mitodl_mit_open_bk_1092976,
+            code_mapping_open_mitodl_mit_learn_1099628,
+        ],
+    ),
 )
 
 code_mapping_micromasters_mitodl_mit_open_bk_1109367 = (
@@ -2031,7 +2091,22 @@ code_mapping_micromasters_mitodl_mit_open_bk_1109367 = (
         default_branch="master",
         stack_root="",
         source_root="",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_release_script_mitodl_testinfra_1044760,
+                code_mapping_ocw_next_mitodl_learn_zendesk_theme_1052841,
+                code_mapping_micromasters_mitodl_edx_platform_106058,
+                code_mapping_open_next_mitodl_mit_learn_1081209,
+                code_mapping_xpro_mitodl_mitxonline_1082964,
+                code_mapping_mitxonline_mitodl_mitxonline_1085838,
+                code_mapping_learn_ai_mitodl_learn_ai_1089875,
+                code_mapping_open_mitodl_mit_open_bk_1090440,
+                code_mapping_open_mitodl_mit_open_bk_1092976,
+                code_mapping_open_mitodl_mit_learn_1099628,
+            ],
+        ),
     )
 )
 
@@ -2044,7 +2119,22 @@ code_mapping_xpro_mitodl_mit_open_bk_1113122 = sentry.SentryOrganizationCodeMapp
     default_branch="master",
     stack_root="",
     source_root="",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_release_script_mitodl_testinfra_1044760,
+            code_mapping_ocw_next_mitodl_learn_zendesk_theme_1052841,
+            code_mapping_micromasters_mitodl_edx_platform_106058,
+            code_mapping_open_next_mitodl_mit_learn_1081209,
+            code_mapping_xpro_mitodl_mitxonline_1082964,
+            code_mapping_mitxonline_mitodl_mitxonline_1085838,
+            code_mapping_learn_ai_mitodl_learn_ai_1089875,
+            code_mapping_open_mitodl_mit_open_bk_1090440,
+            code_mapping_open_mitodl_mit_open_bk_1092976,
+            code_mapping_open_mitodl_mit_learn_1099628,
+        ],
+    ),
 )
 
 code_mapping_mitxonline_mitodl_open_discussions_114735 = (
@@ -2057,7 +2147,22 @@ code_mapping_mitxonline_mitodl_open_discussions_114735 = (
         default_branch="master",
         stack_root="./",
         source_root="frontends/open-discussions/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_release_script_mitodl_testinfra_1044760,
+                code_mapping_ocw_next_mitodl_learn_zendesk_theme_1052841,
+                code_mapping_micromasters_mitodl_edx_platform_106058,
+                code_mapping_open_next_mitodl_mit_learn_1081209,
+                code_mapping_xpro_mitodl_mitxonline_1082964,
+                code_mapping_mitxonline_mitodl_mitxonline_1085838,
+                code_mapping_learn_ai_mitodl_learn_ai_1089875,
+                code_mapping_open_mitodl_mit_open_bk_1090440,
+                code_mapping_open_mitodl_mit_open_bk_1092976,
+                code_mapping_open_mitodl_mit_learn_1099628,
+            ],
+        ),
     )
 )
 
@@ -2071,7 +2176,22 @@ code_mapping_micromasters_mitodl_odl_video_service_1163593 = (
         default_branch="master",
         stack_root="",
         source_root="",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_release_script_mitodl_testinfra_1044760,
+                code_mapping_ocw_next_mitodl_learn_zendesk_theme_1052841,
+                code_mapping_micromasters_mitodl_edx_platform_106058,
+                code_mapping_open_next_mitodl_mit_learn_1081209,
+                code_mapping_xpro_mitodl_mitxonline_1082964,
+                code_mapping_mitxonline_mitodl_mitxonline_1085838,
+                code_mapping_learn_ai_mitodl_learn_ai_1089875,
+                code_mapping_open_mitodl_mit_open_bk_1090440,
+                code_mapping_open_mitodl_mit_open_bk_1092976,
+                code_mapping_open_mitodl_mit_learn_1099628,
+            ],
+        ),
     )
 )
 
@@ -2084,7 +2204,22 @@ code_mapping_open_mitodl_open_discussions_117330 = sentry.SentryOrganizationCode
     default_branch="master",
     stack_root="moira_lists/",
     source_root="moira_lists/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_release_script_mitodl_testinfra_1044760,
+            code_mapping_ocw_next_mitodl_learn_zendesk_theme_1052841,
+            code_mapping_micromasters_mitodl_edx_platform_106058,
+            code_mapping_open_next_mitodl_mit_learn_1081209,
+            code_mapping_xpro_mitodl_mitxonline_1082964,
+            code_mapping_mitxonline_mitodl_mitxonline_1085838,
+            code_mapping_learn_ai_mitodl_learn_ai_1089875,
+            code_mapping_open_mitodl_mit_open_bk_1090440,
+            code_mapping_open_mitodl_mit_open_bk_1092976,
+            code_mapping_open_mitodl_mit_learn_1099628,
+        ],
+    ),
 )
 
 code_mapping_odl_video_service_mitodl_mitxpro_1175393 = (
@@ -2097,7 +2232,22 @@ code_mapping_odl_video_service_mitodl_mitxpro_1175393 = (
         default_branch="master",
         stack_root="./",
         source_root="",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_release_script_mitodl_testinfra_1044760,
+                code_mapping_ocw_next_mitodl_learn_zendesk_theme_1052841,
+                code_mapping_micromasters_mitodl_edx_platform_106058,
+                code_mapping_open_next_mitodl_mit_learn_1081209,
+                code_mapping_xpro_mitodl_mitxonline_1082964,
+                code_mapping_mitxonline_mitodl_mitxonline_1085838,
+                code_mapping_learn_ai_mitodl_learn_ai_1089875,
+                code_mapping_open_mitodl_mit_open_bk_1090440,
+                code_mapping_open_mitodl_mit_open_bk_1092976,
+                code_mapping_open_mitodl_mit_learn_1099628,
+            ],
+        ),
     )
 )
 
@@ -2110,7 +2260,22 @@ code_mapping_open_next_mitodl_ecommerce_1178604 = sentry.SentryOrganizationCodeM
     default_branch="master",
     stack_root="app:///",
     source_root="ecommerce/static/js/pages/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_110056,
+            code_mapping_micromasters_mitodl_mit_learn_1100755,
+            code_mapping_open_mitodl_testinfra_1102209,
+            code_mapping_open_next_mitodl_learn_ai_1102230,
+            code_mapping_micromasters_mitodl_mit_open_bk_1109367,
+            code_mapping_xpro_mitodl_mit_open_bk_1113122,
+            code_mapping_mitxonline_mitodl_open_discussions_114735,
+            code_mapping_micromasters_mitodl_odl_video_service_1163593,
+            code_mapping_open_mitodl_open_discussions_117330,
+            code_mapping_odl_video_service_mitodl_mitxpro_1175393,
+        ],
+    ),
 )
 
 code_mapping_openedx_mitxonline_mitodl_edx_platform_129009 = (
@@ -2123,7 +2288,22 @@ code_mapping_openedx_mitxonline_mitodl_edx_platform_129009 = (
         default_branch="master",
         stack_root="cms/",
         source_root="cms/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_110056,
+                code_mapping_micromasters_mitodl_mit_learn_1100755,
+                code_mapping_open_mitodl_testinfra_1102209,
+                code_mapping_open_next_mitodl_learn_ai_1102230,
+                code_mapping_micromasters_mitodl_mit_open_bk_1109367,
+                code_mapping_xpro_mitodl_mit_open_bk_1113122,
+                code_mapping_mitxonline_mitodl_open_discussions_114735,
+                code_mapping_micromasters_mitodl_odl_video_service_1163593,
+                code_mapping_open_mitodl_open_discussions_117330,
+                code_mapping_odl_video_service_mitodl_mitxpro_1175393,
+            ],
+        ),
     )
 )
 
@@ -2137,7 +2317,22 @@ code_mapping_micromasters_mitodl_micromasters_140179 = (
         default_branch="master",
         stack_root="exams/",
         source_root="exams/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_110056,
+                code_mapping_micromasters_mitodl_mit_learn_1100755,
+                code_mapping_open_mitodl_testinfra_1102209,
+                code_mapping_open_next_mitodl_learn_ai_1102230,
+                code_mapping_micromasters_mitodl_mit_open_bk_1109367,
+                code_mapping_xpro_mitodl_mit_open_bk_1113122,
+                code_mapping_mitxonline_mitodl_open_discussions_114735,
+                code_mapping_micromasters_mitodl_odl_video_service_1163593,
+                code_mapping_open_mitodl_open_discussions_117330,
+                code_mapping_odl_video_service_mitodl_mitxpro_1175393,
+            ],
+        ),
     )
 )
 
@@ -2151,7 +2346,22 @@ code_mapping_micromasters_mitodl_micromasters_152082 = (
         default_branch="master",
         stack_root="micromasters/",
         source_root="micromasters/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_110056,
+                code_mapping_micromasters_mitodl_mit_learn_1100755,
+                code_mapping_open_mitodl_testinfra_1102209,
+                code_mapping_open_next_mitodl_learn_ai_1102230,
+                code_mapping_micromasters_mitodl_mit_open_bk_1109367,
+                code_mapping_xpro_mitodl_mit_open_bk_1113122,
+                code_mapping_mitxonline_mitodl_open_discussions_114735,
+                code_mapping_micromasters_mitodl_odl_video_service_1163593,
+                code_mapping_open_mitodl_open_discussions_117330,
+                code_mapping_odl_video_service_mitodl_mitxpro_1175393,
+            ],
+        ),
     )
 )
 
@@ -2164,7 +2374,22 @@ code_mapping_ocw_studio_mitodl_ocw_studio_155387 = sentry.SentryOrganizationCode
     default_branch="master",
     stack_root="ocw_import/",
     source_root="ocw_import/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_110056,
+            code_mapping_micromasters_mitodl_mit_learn_1100755,
+            code_mapping_open_mitodl_testinfra_1102209,
+            code_mapping_open_next_mitodl_learn_ai_1102230,
+            code_mapping_micromasters_mitodl_mit_open_bk_1109367,
+            code_mapping_xpro_mitodl_mit_open_bk_1113122,
+            code_mapping_mitxonline_mitodl_open_discussions_114735,
+            code_mapping_micromasters_mitodl_odl_video_service_1163593,
+            code_mapping_open_mitodl_open_discussions_117330,
+            code_mapping_odl_video_service_mitodl_mitxpro_1175393,
+        ],
+    ),
 )
 
 code_mapping_ocw_studio_mitodl_edx_platform_156610 = (
@@ -2177,7 +2402,22 @@ code_mapping_ocw_studio_mitodl_edx_platform_156610 = (
         default_branch="master",
         stack_root="django/",
         source_root="common/djangoapps/edxmako/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_110056,
+                code_mapping_micromasters_mitodl_mit_learn_1100755,
+                code_mapping_open_mitodl_testinfra_1102209,
+                code_mapping_open_next_mitodl_learn_ai_1102230,
+                code_mapping_micromasters_mitodl_mit_open_bk_1109367,
+                code_mapping_xpro_mitodl_mit_open_bk_1113122,
+                code_mapping_mitxonline_mitodl_open_discussions_114735,
+                code_mapping_micromasters_mitodl_odl_video_service_1163593,
+                code_mapping_open_mitodl_open_discussions_117330,
+                code_mapping_odl_video_service_mitodl_mitxpro_1175393,
+            ],
+        ),
     )
 )
 
@@ -2190,7 +2430,22 @@ code_mapping_open_mitodl_open_discussions_170909 = sentry.SentryOrganizationCode
     default_branch="master",
     stack_root="embedly/",
     source_root="embedly/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_110056,
+            code_mapping_micromasters_mitodl_mit_learn_1100755,
+            code_mapping_open_mitodl_testinfra_1102209,
+            code_mapping_open_next_mitodl_learn_ai_1102230,
+            code_mapping_micromasters_mitodl_mit_open_bk_1109367,
+            code_mapping_xpro_mitodl_mit_open_bk_1113122,
+            code_mapping_mitxonline_mitodl_open_discussions_114735,
+            code_mapping_micromasters_mitodl_odl_video_service_1163593,
+            code_mapping_open_mitodl_open_discussions_117330,
+            code_mapping_odl_video_service_mitodl_mitxpro_1175393,
+        ],
+    ),
 )
 
 code_mapping_odl_video_service_mitodl_odl_video_service_177296 = (
@@ -2203,7 +2458,22 @@ code_mapping_odl_video_service_mitodl_odl_video_service_177296 = (
         default_branch="master",
         stack_root="odl_video/",
         source_root="odl_video/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_110056,
+                code_mapping_micromasters_mitodl_mit_learn_1100755,
+                code_mapping_open_mitodl_testinfra_1102209,
+                code_mapping_open_next_mitodl_learn_ai_1102230,
+                code_mapping_micromasters_mitodl_mit_open_bk_1109367,
+                code_mapping_xpro_mitodl_mit_open_bk_1113122,
+                code_mapping_mitxonline_mitodl_open_discussions_114735,
+                code_mapping_micromasters_mitodl_odl_video_service_1163593,
+                code_mapping_open_mitodl_open_discussions_117330,
+                code_mapping_odl_video_service_mitodl_mitxpro_1175393,
+            ],
+        ),
     )
 )
 
@@ -2216,7 +2486,22 @@ code_mapping_ocw_studio_mitodl_ocw_studio_182930 = sentry.SentryOrganizationCode
     default_branch="master",
     stack_root="news/",
     source_root="news/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_110056,
+            code_mapping_micromasters_mitodl_mit_learn_1100755,
+            code_mapping_open_mitodl_testinfra_1102209,
+            code_mapping_open_next_mitodl_learn_ai_1102230,
+            code_mapping_micromasters_mitodl_mit_open_bk_1109367,
+            code_mapping_xpro_mitodl_mit_open_bk_1113122,
+            code_mapping_mitxonline_mitodl_open_discussions_114735,
+            code_mapping_micromasters_mitodl_odl_video_service_1163593,
+            code_mapping_open_mitodl_open_discussions_117330,
+            code_mapping_odl_video_service_mitodl_mitxpro_1175393,
+        ],
+    ),
 )
 
 code_mapping_xpro_mitodl_mitxpro_223904 = sentry.SentryOrganizationCodeMapping(
@@ -2228,7 +2513,22 @@ code_mapping_xpro_mitodl_mitxpro_223904 = sentry.SentryOrganizationCodeMapping(
     default_branch="master",
     stack_root="affiliate/",
     source_root="affiliate/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_110056,
+            code_mapping_micromasters_mitodl_mit_learn_1100755,
+            code_mapping_open_mitodl_testinfra_1102209,
+            code_mapping_open_next_mitodl_learn_ai_1102230,
+            code_mapping_micromasters_mitodl_mit_open_bk_1109367,
+            code_mapping_xpro_mitodl_mit_open_bk_1113122,
+            code_mapping_mitxonline_mitodl_open_discussions_114735,
+            code_mapping_micromasters_mitodl_odl_video_service_1163593,
+            code_mapping_open_mitodl_open_discussions_117330,
+            code_mapping_odl_video_service_mitodl_mitxpro_1175393,
+        ],
+    ),
 )
 
 code_mapping_micromasters_mitodl_micromasters_225321 = (
@@ -2241,7 +2541,22 @@ code_mapping_micromasters_mitodl_micromasters_225321 = (
         default_branch="master",
         stack_root="selenium_tests/",
         source_root="selenium_tests/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_next_mitodl_ecommerce_1178604,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_129009,
+                code_mapping_micromasters_mitodl_micromasters_140179,
+                code_mapping_micromasters_mitodl_micromasters_152082,
+                code_mapping_ocw_studio_mitodl_ocw_studio_155387,
+                code_mapping_ocw_studio_mitodl_edx_platform_156610,
+                code_mapping_open_mitodl_open_discussions_170909,
+                code_mapping_odl_video_service_mitodl_odl_video_service_177296,
+                code_mapping_ocw_studio_mitodl_ocw_studio_182930,
+                code_mapping_xpro_mitodl_mitxpro_223904,
+            ],
+        ),
     )
 )
 
@@ -2255,7 +2570,22 @@ code_mapping_micromasters_mitodl_micromasters_236554 = (
         default_branch="master",
         stack_root="grades/",
         source_root="grades/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_next_mitodl_ecommerce_1178604,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_129009,
+                code_mapping_micromasters_mitodl_micromasters_140179,
+                code_mapping_micromasters_mitodl_micromasters_152082,
+                code_mapping_ocw_studio_mitodl_ocw_studio_155387,
+                code_mapping_ocw_studio_mitodl_edx_platform_156610,
+                code_mapping_open_mitodl_open_discussions_170909,
+                code_mapping_odl_video_service_mitodl_odl_video_service_177296,
+                code_mapping_ocw_studio_mitodl_ocw_studio_182930,
+                code_mapping_xpro_mitodl_mitxpro_223904,
+            ],
+        ),
     )
 )
 
@@ -2269,7 +2599,22 @@ code_mapping_micromasters_mitodl_ocw_studio_262423 = (
         default_branch="master",
         stack_root="backends/",
         source_root="content_sync/backends/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_next_mitodl_ecommerce_1178604,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_129009,
+                code_mapping_micromasters_mitodl_micromasters_140179,
+                code_mapping_micromasters_mitodl_micromasters_152082,
+                code_mapping_ocw_studio_mitodl_ocw_studio_155387,
+                code_mapping_ocw_studio_mitodl_edx_platform_156610,
+                code_mapping_open_mitodl_open_discussions_170909,
+                code_mapping_odl_video_service_mitodl_odl_video_service_177296,
+                code_mapping_ocw_studio_mitodl_ocw_studio_182930,
+                code_mapping_xpro_mitodl_mitxpro_223904,
+            ],
+        ),
     )
 )
 
@@ -2283,7 +2628,22 @@ code_mapping_open_next_mitodl_open_discussions_267578 = (
         default_branch="master",
         stack_root="learning_resources/",
         source_root="course_catalog/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_next_mitodl_ecommerce_1178604,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_129009,
+                code_mapping_micromasters_mitodl_micromasters_140179,
+                code_mapping_micromasters_mitodl_micromasters_152082,
+                code_mapping_ocw_studio_mitodl_ocw_studio_155387,
+                code_mapping_ocw_studio_mitodl_edx_platform_156610,
+                code_mapping_open_mitodl_open_discussions_170909,
+                code_mapping_odl_video_service_mitodl_odl_video_service_177296,
+                code_mapping_ocw_studio_mitodl_ocw_studio_182930,
+                code_mapping_xpro_mitodl_mitxpro_223904,
+            ],
+        ),
     )
 )
 
@@ -2297,7 +2657,22 @@ code_mapping_xpro_mitodl_odl_video_service_269996 = (
         default_branch="master",
         stack_root="authentication/",
         source_root="ui/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_next_mitodl_ecommerce_1178604,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_129009,
+                code_mapping_micromasters_mitodl_micromasters_140179,
+                code_mapping_micromasters_mitodl_micromasters_152082,
+                code_mapping_ocw_studio_mitodl_ocw_studio_155387,
+                code_mapping_ocw_studio_mitodl_edx_platform_156610,
+                code_mapping_open_mitodl_open_discussions_170909,
+                code_mapping_odl_video_service_mitodl_odl_video_service_177296,
+                code_mapping_ocw_studio_mitodl_ocw_studio_182930,
+                code_mapping_xpro_mitodl_mitxpro_223904,
+            ],
+        ),
     )
 )
 
@@ -2310,7 +2685,22 @@ code_mapping_ocw_next_mitodl_ocw_studio_274572 = sentry.SentryOrganizationCodeMa
     default_branch="master",
     stack_root="./www/assets/",
     source_root="static/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_open_next_mitodl_ecommerce_1178604,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_129009,
+            code_mapping_micromasters_mitodl_micromasters_140179,
+            code_mapping_micromasters_mitodl_micromasters_152082,
+            code_mapping_ocw_studio_mitodl_ocw_studio_155387,
+            code_mapping_ocw_studio_mitodl_edx_platform_156610,
+            code_mapping_open_mitodl_open_discussions_170909,
+            code_mapping_odl_video_service_mitodl_odl_video_service_177296,
+            code_mapping_ocw_studio_mitodl_ocw_studio_182930,
+            code_mapping_xpro_mitodl_mitxpro_223904,
+        ],
+    ),
 )
 
 code_mapping_mitxonline_mitodl_odl_video_service_288198 = (
@@ -2323,7 +2713,22 @@ code_mapping_mitxonline_mitodl_odl_video_service_288198 = (
         default_branch="master",
         stack_root="authentication/",
         source_root="ui/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_next_mitodl_ecommerce_1178604,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_129009,
+                code_mapping_micromasters_mitodl_micromasters_140179,
+                code_mapping_micromasters_mitodl_micromasters_152082,
+                code_mapping_ocw_studio_mitodl_ocw_studio_155387,
+                code_mapping_ocw_studio_mitodl_edx_platform_156610,
+                code_mapping_open_mitodl_open_discussions_170909,
+                code_mapping_odl_video_service_mitodl_odl_video_service_177296,
+                code_mapping_ocw_studio_mitodl_ocw_studio_182930,
+                code_mapping_xpro_mitodl_mitxpro_223904,
+            ],
+        ),
     )
 )
 
@@ -2337,7 +2742,22 @@ code_mapping_open_next_mitodl_open_discussions_294319 = (
         default_branch="master",
         stack_root="news_events/",
         source_root="course_catalog/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_next_mitodl_ecommerce_1178604,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_129009,
+                code_mapping_micromasters_mitodl_micromasters_140179,
+                code_mapping_micromasters_mitodl_micromasters_152082,
+                code_mapping_ocw_studio_mitodl_ocw_studio_155387,
+                code_mapping_ocw_studio_mitodl_edx_platform_156610,
+                code_mapping_open_mitodl_open_discussions_170909,
+                code_mapping_odl_video_service_mitodl_odl_video_service_177296,
+                code_mapping_ocw_studio_mitodl_ocw_studio_182930,
+                code_mapping_xpro_mitodl_mitxpro_223904,
+            ],
+        ),
     )
 )
 
@@ -2350,7 +2770,22 @@ code_mapping_open_mitodl_edx_platform_299172 = sentry.SentryOrganizationCodeMapp
     default_branch="master",
     stack_root="mail/",
     source_root="lms/djangoapps/bulk_email/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_open_next_mitodl_ecommerce_1178604,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_129009,
+            code_mapping_micromasters_mitodl_micromasters_140179,
+            code_mapping_micromasters_mitodl_micromasters_152082,
+            code_mapping_ocw_studio_mitodl_ocw_studio_155387,
+            code_mapping_ocw_studio_mitodl_edx_platform_156610,
+            code_mapping_open_mitodl_open_discussions_170909,
+            code_mapping_odl_video_service_mitodl_odl_video_service_177296,
+            code_mapping_ocw_studio_mitodl_ocw_studio_182930,
+            code_mapping_xpro_mitodl_mitxpro_223904,
+        ],
+    ),
 )
 
 code_mapping_mitxonline_mitodl_ocw_studio_355382 = sentry.SentryOrganizationCodeMapping(
@@ -2362,7 +2797,22 @@ code_mapping_mitxonline_mitodl_ocw_studio_355382 = sentry.SentryOrganizationCode
     default_branch="master",
     stack_root="ecommerce/views/v0/",
     source_root="",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_open_next_mitodl_ecommerce_1178604,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_129009,
+            code_mapping_micromasters_mitodl_micromasters_140179,
+            code_mapping_micromasters_mitodl_micromasters_152082,
+            code_mapping_ocw_studio_mitodl_ocw_studio_155387,
+            code_mapping_ocw_studio_mitodl_edx_platform_156610,
+            code_mapping_open_mitodl_open_discussions_170909,
+            code_mapping_odl_video_service_mitodl_odl_video_service_177296,
+            code_mapping_ocw_studio_mitodl_ocw_studio_182930,
+            code_mapping_xpro_mitodl_mitxpro_223904,
+        ],
+    ),
 )
 
 code_mapping_open_next_mitodl_open_discussions_357160 = (
@@ -2375,7 +2825,22 @@ code_mapping_open_next_mitodl_open_discussions_357160 = (
         default_branch="master",
         stack_root="",
         source_root="",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_micromasters_mitodl_micromasters_225321,
+                code_mapping_micromasters_mitodl_micromasters_236554,
+                code_mapping_micromasters_mitodl_ocw_studio_262423,
+                code_mapping_open_next_mitodl_open_discussions_267578,
+                code_mapping_xpro_mitodl_odl_video_service_269996,
+                code_mapping_ocw_next_mitodl_ocw_studio_274572,
+                code_mapping_mitxonline_mitodl_odl_video_service_288198,
+                code_mapping_open_next_mitodl_open_discussions_294319,
+                code_mapping_open_mitodl_edx_platform_299172,
+                code_mapping_mitxonline_mitodl_ocw_studio_355382,
+            ],
+        ),
     )
 )
 
@@ -2389,7 +2854,22 @@ code_mapping_openedx_mitxpro_mitodl_edx_platform_36648 = (
         default_branch="master",
         stack_root="openedx/",
         source_root="openedx/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_micromasters_mitodl_micromasters_225321,
+                code_mapping_micromasters_mitodl_micromasters_236554,
+                code_mapping_micromasters_mitodl_ocw_studio_262423,
+                code_mapping_open_next_mitodl_open_discussions_267578,
+                code_mapping_xpro_mitodl_odl_video_service_269996,
+                code_mapping_ocw_next_mitodl_ocw_studio_274572,
+                code_mapping_mitxonline_mitodl_odl_video_service_288198,
+                code_mapping_open_next_mitodl_open_discussions_294319,
+                code_mapping_open_mitodl_edx_platform_299172,
+                code_mapping_mitxonline_mitodl_ocw_studio_355382,
+            ],
+        ),
     )
 )
 
@@ -2403,7 +2883,22 @@ code_mapping_openedx_residential_mitodl_edx_platform_36739 = (
         default_branch="master",
         stack_root="openedx/",
         source_root="openedx/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_micromasters_mitodl_micromasters_225321,
+                code_mapping_micromasters_mitodl_micromasters_236554,
+                code_mapping_micromasters_mitodl_ocw_studio_262423,
+                code_mapping_open_next_mitodl_open_discussions_267578,
+                code_mapping_xpro_mitodl_odl_video_service_269996,
+                code_mapping_ocw_next_mitodl_ocw_studio_274572,
+                code_mapping_mitxonline_mitodl_odl_video_service_288198,
+                code_mapping_open_next_mitodl_open_discussions_294319,
+                code_mapping_open_mitodl_edx_platform_299172,
+                code_mapping_mitxonline_mitodl_ocw_studio_355382,
+            ],
+        ),
     )
 )
 
@@ -2417,7 +2912,22 @@ code_mapping_openedx_residential_mitodl_edx_platform_36740 = (
         default_branch="master",
         stack_root="lms/",
         source_root="lms/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_micromasters_mitodl_micromasters_225321,
+                code_mapping_micromasters_mitodl_micromasters_236554,
+                code_mapping_micromasters_mitodl_ocw_studio_262423,
+                code_mapping_open_next_mitodl_open_discussions_267578,
+                code_mapping_xpro_mitodl_odl_video_service_269996,
+                code_mapping_ocw_next_mitodl_ocw_studio_274572,
+                code_mapping_mitxonline_mitodl_odl_video_service_288198,
+                code_mapping_open_next_mitodl_open_discussions_294319,
+                code_mapping_open_mitodl_edx_platform_299172,
+                code_mapping_mitxonline_mitodl_ocw_studio_355382,
+            ],
+        ),
     )
 )
 
@@ -2430,7 +2940,22 @@ code_mapping_open_mitodl_open_discussions_36786 = sentry.SentryOrganizationCodeM
     default_branch="master",
     stack_root="notifications/",
     source_root="notifications/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_micromasters_mitodl_micromasters_225321,
+            code_mapping_micromasters_mitodl_micromasters_236554,
+            code_mapping_micromasters_mitodl_ocw_studio_262423,
+            code_mapping_open_next_mitodl_open_discussions_267578,
+            code_mapping_xpro_mitodl_odl_video_service_269996,
+            code_mapping_ocw_next_mitodl_ocw_studio_274572,
+            code_mapping_mitxonline_mitodl_odl_video_service_288198,
+            code_mapping_open_next_mitodl_open_discussions_294319,
+            code_mapping_open_mitodl_edx_platform_299172,
+            code_mapping_mitxonline_mitodl_ocw_studio_355382,
+        ],
+    ),
 )
 
 code_mapping_openedx_mitxonline_mitodl_edx_platform_36886 = (
@@ -2443,7 +2968,22 @@ code_mapping_openedx_mitxonline_mitodl_edx_platform_36886 = (
         default_branch="master",
         stack_root="common/",
         source_root="common/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_micromasters_mitodl_micromasters_225321,
+                code_mapping_micromasters_mitodl_micromasters_236554,
+                code_mapping_micromasters_mitodl_ocw_studio_262423,
+                code_mapping_open_next_mitodl_open_discussions_267578,
+                code_mapping_xpro_mitodl_odl_video_service_269996,
+                code_mapping_ocw_next_mitodl_ocw_studio_274572,
+                code_mapping_mitxonline_mitodl_odl_video_service_288198,
+                code_mapping_open_next_mitodl_open_discussions_294319,
+                code_mapping_open_mitodl_edx_platform_299172,
+                code_mapping_mitxonline_mitodl_ocw_studio_355382,
+            ],
+        ),
     )
 )
 
@@ -2456,7 +2996,22 @@ code_mapping_open_mitodl_open_discussions_37751 = sentry.SentryOrganizationCodeM
     default_branch="master",
     stack_root="course_catalog/",
     source_root="course_catalog/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_micromasters_mitodl_micromasters_225321,
+            code_mapping_micromasters_mitodl_micromasters_236554,
+            code_mapping_micromasters_mitodl_ocw_studio_262423,
+            code_mapping_open_next_mitodl_open_discussions_267578,
+            code_mapping_xpro_mitodl_odl_video_service_269996,
+            code_mapping_ocw_next_mitodl_ocw_studio_274572,
+            code_mapping_mitxonline_mitodl_odl_video_service_288198,
+            code_mapping_open_next_mitodl_open_discussions_294319,
+            code_mapping_open_mitodl_edx_platform_299172,
+            code_mapping_mitxonline_mitodl_ocw_studio_355382,
+        ],
+    ),
 )
 
 code_mapping_openedx_mitxpro_mitodl_edx_platform_37836 = (
@@ -2469,7 +3024,22 @@ code_mapping_openedx_mitxpro_mitodl_edx_platform_37836 = (
         default_branch="master",
         stack_root="xmodule/",
         source_root="xmodule/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_micromasters_mitodl_micromasters_225321,
+                code_mapping_micromasters_mitodl_micromasters_236554,
+                code_mapping_micromasters_mitodl_ocw_studio_262423,
+                code_mapping_open_next_mitodl_open_discussions_267578,
+                code_mapping_xpro_mitodl_odl_video_service_269996,
+                code_mapping_ocw_next_mitodl_ocw_studio_274572,
+                code_mapping_mitxonline_mitodl_odl_video_service_288198,
+                code_mapping_open_next_mitodl_open_discussions_294319,
+                code_mapping_open_mitodl_edx_platform_299172,
+                code_mapping_mitxonline_mitodl_ocw_studio_355382,
+            ],
+        ),
     )
 )
 
@@ -2483,7 +3053,22 @@ code_mapping_openedx_mitxpro_mitodl_edx_platform_37837 = (
         default_branch="master",
         stack_root="cms/",
         source_root="cms/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_micromasters_mitodl_micromasters_225321,
+                code_mapping_micromasters_mitodl_micromasters_236554,
+                code_mapping_micromasters_mitodl_ocw_studio_262423,
+                code_mapping_open_next_mitodl_open_discussions_267578,
+                code_mapping_xpro_mitodl_odl_video_service_269996,
+                code_mapping_ocw_next_mitodl_ocw_studio_274572,
+                code_mapping_mitxonline_mitodl_odl_video_service_288198,
+                code_mapping_open_next_mitodl_open_discussions_294319,
+                code_mapping_open_mitodl_edx_platform_299172,
+                code_mapping_mitxonline_mitodl_ocw_studio_355382,
+            ],
+        ),
     )
 )
 
@@ -2497,7 +3082,22 @@ code_mapping_openedx_residential_mitodl_edx_platform_37867 = (
         default_branch="master",
         stack_root="common/",
         source_root="common/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_micromasters_mitodl_micromasters_225321,
+                code_mapping_micromasters_mitodl_micromasters_236554,
+                code_mapping_micromasters_mitodl_ocw_studio_262423,
+                code_mapping_open_next_mitodl_open_discussions_267578,
+                code_mapping_xpro_mitodl_odl_video_service_269996,
+                code_mapping_ocw_next_mitodl_ocw_studio_274572,
+                code_mapping_mitxonline_mitodl_odl_video_service_288198,
+                code_mapping_open_next_mitodl_open_discussions_294319,
+                code_mapping_open_mitodl_edx_platform_299172,
+                code_mapping_mitxonline_mitodl_ocw_studio_355382,
+            ],
+        ),
     )
 )
 
@@ -2510,7 +3110,22 @@ code_mapping_open_mitodl_open_discussions_38303 = sentry.SentryOrganizationCodeM
     default_branch="master",
     stack_root="channels/",
     source_root="channels/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_open_next_mitodl_open_discussions_357160,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_36648,
+            code_mapping_openedx_residential_mitodl_edx_platform_36739,
+            code_mapping_openedx_residential_mitodl_edx_platform_36740,
+            code_mapping_open_mitodl_open_discussions_36786,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_36886,
+            code_mapping_open_mitodl_open_discussions_37751,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_37836,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_37837,
+            code_mapping_openedx_residential_mitodl_edx_platform_37867,
+        ],
+    ),
 )
 
 code_mapping_openedx_mitxpro_mitodl_edx_platform_38327 = (
@@ -2523,7 +3138,22 @@ code_mapping_openedx_mitxpro_mitodl_edx_platform_38327 = (
         default_branch="master",
         stack_root="common/",
         source_root="common/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_next_mitodl_open_discussions_357160,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_36648,
+                code_mapping_openedx_residential_mitodl_edx_platform_36739,
+                code_mapping_openedx_residential_mitodl_edx_platform_36740,
+                code_mapping_open_mitodl_open_discussions_36786,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_36886,
+                code_mapping_open_mitodl_open_discussions_37751,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_37836,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_37837,
+                code_mapping_openedx_residential_mitodl_edx_platform_37867,
+            ],
+        ),
     )
 )
 
@@ -2537,7 +3167,22 @@ code_mapping_micromasters_mitodl_micromasters_38540 = (
         default_branch="master",
         stack_root="dashboard/",
         source_root="dashboard/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_next_mitodl_open_discussions_357160,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_36648,
+                code_mapping_openedx_residential_mitodl_edx_platform_36739,
+                code_mapping_openedx_residential_mitodl_edx_platform_36740,
+                code_mapping_open_mitodl_open_discussions_36786,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_36886,
+                code_mapping_open_mitodl_open_discussions_37751,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_37836,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_37837,
+                code_mapping_openedx_residential_mitodl_edx_platform_37867,
+            ],
+        ),
     )
 )
 
@@ -2551,7 +3196,22 @@ code_mapping_openedx_residential_mitodl_edx_platform_38681 = (
         default_branch="master",
         stack_root="xmodule/",
         source_root="xmodule/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_next_mitodl_open_discussions_357160,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_36648,
+                code_mapping_openedx_residential_mitodl_edx_platform_36739,
+                code_mapping_openedx_residential_mitodl_edx_platform_36740,
+                code_mapping_open_mitodl_open_discussions_36786,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_36886,
+                code_mapping_open_mitodl_open_discussions_37751,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_37836,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_37837,
+                code_mapping_openedx_residential_mitodl_edx_platform_37867,
+            ],
+        ),
     )
 )
 
@@ -2565,7 +3225,22 @@ code_mapping_openedx_mitxonline_mitodl_edx_platform_38745 = (
         default_branch="master",
         stack_root="openedx/",
         source_root="openedx/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_next_mitodl_open_discussions_357160,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_36648,
+                code_mapping_openedx_residential_mitodl_edx_platform_36739,
+                code_mapping_openedx_residential_mitodl_edx_platform_36740,
+                code_mapping_open_mitodl_open_discussions_36786,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_36886,
+                code_mapping_open_mitodl_open_discussions_37751,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_37836,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_37837,
+                code_mapping_openedx_residential_mitodl_edx_platform_37867,
+            ],
+        ),
     )
 )
 
@@ -2579,7 +3254,22 @@ code_mapping_odl_video_service_mitodl_odl_video_service_38842 = (
         default_branch="master",
         stack_root="cloudsync/",
         source_root="cloudsync/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_next_mitodl_open_discussions_357160,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_36648,
+                code_mapping_openedx_residential_mitodl_edx_platform_36739,
+                code_mapping_openedx_residential_mitodl_edx_platform_36740,
+                code_mapping_open_mitodl_open_discussions_36786,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_36886,
+                code_mapping_open_mitodl_open_discussions_37751,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_37836,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_37837,
+                code_mapping_openedx_residential_mitodl_edx_platform_37867,
+            ],
+        ),
     )
 )
 
@@ -2593,7 +3283,22 @@ code_mapping_openedx_mitxpro_mitodl_edx_platform_38884 = (
         default_branch="master",
         stack_root="lms/",
         source_root="lms/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_next_mitodl_open_discussions_357160,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_36648,
+                code_mapping_openedx_residential_mitodl_edx_platform_36739,
+                code_mapping_openedx_residential_mitodl_edx_platform_36740,
+                code_mapping_open_mitodl_open_discussions_36786,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_36886,
+                code_mapping_open_mitodl_open_discussions_37751,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_37836,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_37837,
+                code_mapping_openedx_residential_mitodl_edx_platform_37867,
+            ],
+        ),
     )
 )
 
@@ -2607,7 +3312,22 @@ code_mapping_openedx_residential_mitodl_edx_platform_40480 = (
         default_branch="master",
         stack_root="capa/",
         source_root="xmodule/capa/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_next_mitodl_open_discussions_357160,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_36648,
+                code_mapping_openedx_residential_mitodl_edx_platform_36739,
+                code_mapping_openedx_residential_mitodl_edx_platform_36740,
+                code_mapping_open_mitodl_open_discussions_36786,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_36886,
+                code_mapping_open_mitodl_open_discussions_37751,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_37836,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_37837,
+                code_mapping_openedx_residential_mitodl_edx_platform_37867,
+            ],
+        ),
     )
 )
 
@@ -2620,7 +3340,22 @@ code_mapping_open_mitodl_open_discussions_41175 = sentry.SentryOrganizationCodeM
     default_branch="master",
     stack_root="search/",
     source_root="search/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_open_next_mitodl_open_discussions_357160,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_36648,
+            code_mapping_openedx_residential_mitodl_edx_platform_36739,
+            code_mapping_openedx_residential_mitodl_edx_platform_36740,
+            code_mapping_open_mitodl_open_discussions_36786,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_36886,
+            code_mapping_open_mitodl_open_discussions_37751,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_37836,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_37837,
+            code_mapping_openedx_residential_mitodl_edx_platform_37867,
+        ],
+    ),
 )
 
 code_mapping_openedx_mitxonline_mitodl_edx_platform_41654 = (
@@ -2633,7 +3368,22 @@ code_mapping_openedx_mitxonline_mitodl_edx_platform_41654 = (
         default_branch="master",
         stack_root="xmodule/",
         source_root="xmodule/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_next_mitodl_open_discussions_357160,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_36648,
+                code_mapping_openedx_residential_mitodl_edx_platform_36739,
+                code_mapping_openedx_residential_mitodl_edx_platform_36740,
+                code_mapping_open_mitodl_open_discussions_36786,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_36886,
+                code_mapping_open_mitodl_open_discussions_37751,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_37836,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_37837,
+                code_mapping_openedx_residential_mitodl_edx_platform_37867,
+            ],
+        ),
     )
 )
 
@@ -2646,7 +3396,22 @@ code_mapping_open_mitodl_open_discussions_41943 = sentry.SentryOrganizationCodeM
     default_branch="master",
     stack_root="authentication/",
     source_root="authentication/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_open_mitodl_open_discussions_38303,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_38327,
+            code_mapping_micromasters_mitodl_micromasters_38540,
+            code_mapping_openedx_residential_mitodl_edx_platform_38681,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_38745,
+            code_mapping_odl_video_service_mitodl_odl_video_service_38842,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_38884,
+            code_mapping_openedx_residential_mitodl_edx_platform_40480,
+            code_mapping_open_mitodl_open_discussions_41175,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_41654,
+        ],
+    ),
 )
 
 code_mapping_ocw_studio_mitodl_ocw_studio_43279 = sentry.SentryOrganizationCodeMapping(
@@ -2658,7 +3423,22 @@ code_mapping_ocw_studio_mitodl_ocw_studio_43279 = sentry.SentryOrganizationCodeM
     default_branch="master",
     stack_root="websites/",
     source_root="websites/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_open_mitodl_open_discussions_38303,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_38327,
+            code_mapping_micromasters_mitodl_micromasters_38540,
+            code_mapping_openedx_residential_mitodl_edx_platform_38681,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_38745,
+            code_mapping_odl_video_service_mitodl_odl_video_service_38842,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_38884,
+            code_mapping_openedx_residential_mitodl_edx_platform_40480,
+            code_mapping_open_mitodl_open_discussions_41175,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_41654,
+        ],
+    ),
 )
 
 code_mapping_openedx_residential_mitodl_edx_platform_43609 = (
@@ -2671,7 +3451,22 @@ code_mapping_openedx_residential_mitodl_edx_platform_43609 = (
         default_branch="master",
         stack_root="cms/",
         source_root="cms/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_mitodl_open_discussions_38303,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_38327,
+                code_mapping_micromasters_mitodl_micromasters_38540,
+                code_mapping_openedx_residential_mitodl_edx_platform_38681,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_38745,
+                code_mapping_odl_video_service_mitodl_odl_video_service_38842,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_38884,
+                code_mapping_openedx_residential_mitodl_edx_platform_40480,
+                code_mapping_open_mitodl_open_discussions_41175,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_41654,
+            ],
+        ),
     )
 )
 
@@ -2684,7 +3479,22 @@ code_mapping_open_mitodl_open_discussions_43688 = sentry.SentryOrganizationCodeM
     default_branch="master",
     stack_root="open_discussions/",
     source_root="open_discussions/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_open_mitodl_open_discussions_38303,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_38327,
+            code_mapping_micromasters_mitodl_micromasters_38540,
+            code_mapping_openedx_residential_mitodl_edx_platform_38681,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_38745,
+            code_mapping_odl_video_service_mitodl_odl_video_service_38842,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_38884,
+            code_mapping_openedx_residential_mitodl_edx_platform_40480,
+            code_mapping_open_mitodl_open_discussions_41175,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_41654,
+        ],
+    ),
 )
 
 code_mapping_ocw_studio_mitodl_ocw_studio_43984 = sentry.SentryOrganizationCodeMapping(
@@ -2696,7 +3506,22 @@ code_mapping_ocw_studio_mitodl_ocw_studio_43984 = sentry.SentryOrganizationCodeM
     default_branch="master",
     stack_root="gdrive_sync/",
     source_root="gdrive_sync/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_open_mitodl_open_discussions_38303,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_38327,
+            code_mapping_micromasters_mitodl_micromasters_38540,
+            code_mapping_openedx_residential_mitodl_edx_platform_38681,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_38745,
+            code_mapping_odl_video_service_mitodl_odl_video_service_38842,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_38884,
+            code_mapping_openedx_residential_mitodl_edx_platform_40480,
+            code_mapping_open_mitodl_open_discussions_41175,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_41654,
+        ],
+    ),
 )
 
 code_mapping_openedx_mitxpro_mitodl_edx_platform_44052 = (
@@ -2709,7 +3534,22 @@ code_mapping_openedx_mitxpro_mitodl_edx_platform_44052 = (
         default_branch="master",
         stack_root="capa/",
         source_root="xmodule/capa/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_mitodl_open_discussions_38303,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_38327,
+                code_mapping_micromasters_mitodl_micromasters_38540,
+                code_mapping_openedx_residential_mitodl_edx_platform_38681,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_38745,
+                code_mapping_odl_video_service_mitodl_odl_video_service_38842,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_38884,
+                code_mapping_openedx_residential_mitodl_edx_platform_40480,
+                code_mapping_open_mitodl_open_discussions_41175,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_41654,
+            ],
+        ),
     )
 )
 
@@ -2723,7 +3563,22 @@ code_mapping_openedx_mitxonline_mitodl_edx_platform_45453 = (
         default_branch="master",
         stack_root="lms/",
         source_root="lms/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_mitodl_open_discussions_38303,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_38327,
+                code_mapping_micromasters_mitodl_micromasters_38540,
+                code_mapping_openedx_residential_mitodl_edx_platform_38681,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_38745,
+                code_mapping_odl_video_service_mitodl_odl_video_service_38842,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_38884,
+                code_mapping_openedx_residential_mitodl_edx_platform_40480,
+                code_mapping_open_mitodl_open_discussions_41175,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_41654,
+            ],
+        ),
     )
 )
 
@@ -2737,7 +3592,22 @@ code_mapping_micromasters_mitodl_micromasters_46135 = (
         default_branch="master",
         stack_root="financialaid/",
         source_root="financialaid/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_mitodl_open_discussions_38303,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_38327,
+                code_mapping_micromasters_mitodl_micromasters_38540,
+                code_mapping_openedx_residential_mitodl_edx_platform_38681,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_38745,
+                code_mapping_odl_video_service_mitodl_odl_video_service_38842,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_38884,
+                code_mapping_openedx_residential_mitodl_edx_platform_40480,
+                code_mapping_open_mitodl_open_discussions_41175,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_41654,
+            ],
+        ),
     )
 )
 
@@ -2751,7 +3621,22 @@ code_mapping_micromasters_mitodl_micromasters_46279 = (
         default_branch="master",
         stack_root="discussions/",
         source_root="discussions/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_mitodl_open_discussions_38303,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_38327,
+                code_mapping_micromasters_mitodl_micromasters_38540,
+                code_mapping_openedx_residential_mitodl_edx_platform_38681,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_38745,
+                code_mapping_odl_video_service_mitodl_odl_video_service_38842,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_38884,
+                code_mapping_openedx_residential_mitodl_edx_platform_40480,
+                code_mapping_open_mitodl_open_discussions_41175,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_41654,
+            ],
+        ),
     )
 )
 
@@ -2764,7 +3649,22 @@ code_mapping_ocw_studio_mitodl_ocw_studio_47038 = sentry.SentryOrganizationCodeM
     default_branch="master",
     stack_root="content_sync/",
     source_root="content_sync/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_open_mitodl_open_discussions_38303,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_38327,
+            code_mapping_micromasters_mitodl_micromasters_38540,
+            code_mapping_openedx_residential_mitodl_edx_platform_38681,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_38745,
+            code_mapping_odl_video_service_mitodl_odl_video_service_38842,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_38884,
+            code_mapping_openedx_residential_mitodl_edx_platform_40480,
+            code_mapping_open_mitodl_open_discussions_41175,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_41654,
+        ],
+    ),
 )
 
 code_mapping_odl_video_service_mitodl_odl_video_service_47472 = (
@@ -2777,7 +3677,22 @@ code_mapping_odl_video_service_mitodl_odl_video_service_47472 = (
         default_branch="master",
         stack_root="mail/",
         source_root="mail/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_mitodl_open_discussions_41943,
+                code_mapping_ocw_studio_mitodl_ocw_studio_43279,
+                code_mapping_openedx_residential_mitodl_edx_platform_43609,
+                code_mapping_open_mitodl_open_discussions_43688,
+                code_mapping_ocw_studio_mitodl_ocw_studio_43984,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_44052,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_45453,
+                code_mapping_micromasters_mitodl_micromasters_46135,
+                code_mapping_micromasters_mitodl_micromasters_46279,
+                code_mapping_ocw_studio_mitodl_ocw_studio_47038,
+            ],
+        ),
     )
 )
 
@@ -2790,7 +3705,22 @@ code_mapping_ocw_studio_mitodl_ocw_studio_48161 = sentry.SentryOrganizationCodeM
     default_branch="master",
     stack_root="videos/",
     source_root="videos/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_open_mitodl_open_discussions_41943,
+            code_mapping_ocw_studio_mitodl_ocw_studio_43279,
+            code_mapping_openedx_residential_mitodl_edx_platform_43609,
+            code_mapping_open_mitodl_open_discussions_43688,
+            code_mapping_ocw_studio_mitodl_ocw_studio_43984,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_44052,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_45453,
+            code_mapping_micromasters_mitodl_micromasters_46135,
+            code_mapping_micromasters_mitodl_micromasters_46279,
+            code_mapping_ocw_studio_mitodl_ocw_studio_47038,
+        ],
+    ),
 )
 
 code_mapping_open_mitodl_open_discussions_49482 = sentry.SentryOrganizationCodeMapping(
@@ -2802,7 +3732,22 @@ code_mapping_open_mitodl_open_discussions_49482 = sentry.SentryOrganizationCodeM
     default_branch="master",
     stack_root="./src/",
     source_root="frontends/open-discussions/src/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_open_mitodl_open_discussions_41943,
+            code_mapping_ocw_studio_mitodl_ocw_studio_43279,
+            code_mapping_openedx_residential_mitodl_edx_platform_43609,
+            code_mapping_open_mitodl_open_discussions_43688,
+            code_mapping_ocw_studio_mitodl_ocw_studio_43984,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_44052,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_45453,
+            code_mapping_micromasters_mitodl_micromasters_46135,
+            code_mapping_micromasters_mitodl_micromasters_46279,
+            code_mapping_ocw_studio_mitodl_ocw_studio_47038,
+        ],
+    ),
 )
 
 code_mapping_odl_video_service_mitodl_odl_video_service_50838 = (
@@ -2815,7 +3760,22 @@ code_mapping_odl_video_service_mitodl_odl_video_service_50838 = (
         default_branch="master",
         stack_root="ui/",
         source_root="ui/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_mitodl_open_discussions_41943,
+                code_mapping_ocw_studio_mitodl_ocw_studio_43279,
+                code_mapping_openedx_residential_mitodl_edx_platform_43609,
+                code_mapping_open_mitodl_open_discussions_43688,
+                code_mapping_ocw_studio_mitodl_ocw_studio_43984,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_44052,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_45453,
+                code_mapping_micromasters_mitodl_micromasters_46135,
+                code_mapping_micromasters_mitodl_micromasters_46279,
+                code_mapping_ocw_studio_mitodl_ocw_studio_47038,
+            ],
+        ),
     )
 )
 
@@ -2829,7 +3789,22 @@ code_mapping_odl_video_service_mitodl_odl_video_service_51053 = (
         default_branch="master",
         stack_root="./static/",
         source_root="static/",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_open_mitodl_open_discussions_41943,
+                code_mapping_ocw_studio_mitodl_ocw_studio_43279,
+                code_mapping_openedx_residential_mitodl_edx_platform_43609,
+                code_mapping_open_mitodl_open_discussions_43688,
+                code_mapping_ocw_studio_mitodl_ocw_studio_43984,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_44052,
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_45453,
+                code_mapping_micromasters_mitodl_micromasters_46135,
+                code_mapping_micromasters_mitodl_micromasters_46279,
+                code_mapping_ocw_studio_mitodl_ocw_studio_47038,
+            ],
+        ),
     )
 )
 
@@ -2842,7 +3817,22 @@ code_mapping_mitxonline_mitodl_ocw_studio_653359 = sentry.SentryOrganizationCode
     default_branch="master",
     stack_root="courses/views/v2/",
     source_root="",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_open_mitodl_open_discussions_41943,
+            code_mapping_ocw_studio_mitodl_ocw_studio_43279,
+            code_mapping_openedx_residential_mitodl_edx_platform_43609,
+            code_mapping_open_mitodl_open_discussions_43688,
+            code_mapping_ocw_studio_mitodl_ocw_studio_43984,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_44052,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_45453,
+            code_mapping_micromasters_mitodl_micromasters_46135,
+            code_mapping_micromasters_mitodl_micromasters_46279,
+            code_mapping_ocw_studio_mitodl_ocw_studio_47038,
+        ],
+    ),
 )
 
 code_mapping_mitxonline_mitodl_mitxpro_667947 = sentry.SentryOrganizationCodeMapping(
@@ -2854,7 +3844,22 @@ code_mapping_mitxonline_mitodl_mitxpro_667947 = sentry.SentryOrganizationCodeMap
     default_branch="master",
     stack_root="",
     source_root="",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_open_mitodl_open_discussions_41943,
+            code_mapping_ocw_studio_mitodl_ocw_studio_43279,
+            code_mapping_openedx_residential_mitodl_edx_platform_43609,
+            code_mapping_open_mitodl_open_discussions_43688,
+            code_mapping_ocw_studio_mitodl_ocw_studio_43984,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_44052,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_45453,
+            code_mapping_micromasters_mitodl_micromasters_46135,
+            code_mapping_micromasters_mitodl_micromasters_46279,
+            code_mapping_ocw_studio_mitodl_ocw_studio_47038,
+        ],
+    ),
 )
 
 code_mapping_xpro_mitodl_mitxpro_668041 = sentry.SentryOrganizationCodeMapping(
@@ -2866,7 +3871,22 @@ code_mapping_xpro_mitodl_mitxpro_668041 = sentry.SentryOrganizationCodeMapping(
     default_branch="master",
     stack_root="./",
     source_root="",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_open_mitodl_open_discussions_41943,
+            code_mapping_ocw_studio_mitodl_ocw_studio_43279,
+            code_mapping_openedx_residential_mitodl_edx_platform_43609,
+            code_mapping_open_mitodl_open_discussions_43688,
+            code_mapping_ocw_studio_mitodl_ocw_studio_43984,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_44052,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_45453,
+            code_mapping_micromasters_mitodl_micromasters_46135,
+            code_mapping_micromasters_mitodl_micromasters_46279,
+            code_mapping_ocw_studio_mitodl_ocw_studio_47038,
+        ],
+    ),
 )
 
 code_mapping_xpro_mitodl_mitxpro_668557 = sentry.SentryOrganizationCodeMapping(
@@ -2878,7 +3898,22 @@ code_mapping_xpro_mitodl_mitxpro_668557 = sentry.SentryOrganizationCodeMapping(
     default_branch="master",
     stack_root="",
     source_root="",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_open_mitodl_open_discussions_41943,
+            code_mapping_ocw_studio_mitodl_ocw_studio_43279,
+            code_mapping_openedx_residential_mitodl_edx_platform_43609,
+            code_mapping_open_mitodl_open_discussions_43688,
+            code_mapping_ocw_studio_mitodl_ocw_studio_43984,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_44052,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_45453,
+            code_mapping_micromasters_mitodl_micromasters_46135,
+            code_mapping_micromasters_mitodl_micromasters_46279,
+            code_mapping_ocw_studio_mitodl_ocw_studio_47038,
+        ],
+    ),
 )
 
 code_mapping_mitxonline_mitodl_ocw_studio_695082 = sentry.SentryOrganizationCodeMapping(
@@ -2890,7 +3925,22 @@ code_mapping_mitxonline_mitodl_ocw_studio_695082 = sentry.SentryOrganizationCode
     default_branch="master",
     stack_root="b2b/views/v0/",
     source_root="",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_open_mitodl_open_discussions_41943,
+            code_mapping_ocw_studio_mitodl_ocw_studio_43279,
+            code_mapping_openedx_residential_mitodl_edx_platform_43609,
+            code_mapping_open_mitodl_open_discussions_43688,
+            code_mapping_ocw_studio_mitodl_ocw_studio_43984,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_44052,
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_45453,
+            code_mapping_micromasters_mitodl_micromasters_46135,
+            code_mapping_micromasters_mitodl_micromasters_46279,
+            code_mapping_ocw_studio_mitodl_ocw_studio_47038,
+        ],
+    ),
 )
 
 code_mapping_openedx_mitxonline_mitodl_edx_platform_70188 = (
@@ -2903,7 +3953,22 @@ code_mapping_openedx_mitxonline_mitodl_edx_platform_70188 = (
         default_branch="master",
         stack_root="",
         source_root="",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_odl_video_service_mitodl_odl_video_service_47472,
+                code_mapping_ocw_studio_mitodl_ocw_studio_48161,
+                code_mapping_open_mitodl_open_discussions_49482,
+                code_mapping_odl_video_service_mitodl_odl_video_service_50838,
+                code_mapping_odl_video_service_mitodl_odl_video_service_51053,
+                code_mapping_mitxonline_mitodl_ocw_studio_653359,
+                code_mapping_mitxonline_mitodl_mitxpro_667947,
+                code_mapping_xpro_mitodl_mitxpro_668041,
+                code_mapping_xpro_mitodl_mitxpro_668557,
+                code_mapping_mitxonline_mitodl_ocw_studio_695082,
+            ],
+        ),
     )
 )
 
@@ -2917,7 +3982,22 @@ code_mapping_openedx_residential_mitodl_edx_platform_70474 = (
         default_branch="master",
         stack_root="",
         source_root="",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_odl_video_service_mitodl_odl_video_service_47472,
+                code_mapping_ocw_studio_mitodl_ocw_studio_48161,
+                code_mapping_open_mitodl_open_discussions_49482,
+                code_mapping_odl_video_service_mitodl_odl_video_service_50838,
+                code_mapping_odl_video_service_mitodl_odl_video_service_51053,
+                code_mapping_mitxonline_mitodl_ocw_studio_653359,
+                code_mapping_mitxonline_mitodl_mitxpro_667947,
+                code_mapping_xpro_mitodl_mitxpro_668041,
+                code_mapping_xpro_mitodl_mitxpro_668557,
+                code_mapping_mitxonline_mitodl_ocw_studio_695082,
+            ],
+        ),
     )
 )
 
@@ -2931,7 +4011,22 @@ code_mapping_openedx_mitxpro_mitodl_edx_platform_70703 = (
         default_branch="master",
         stack_root="",
         source_root="",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_odl_video_service_mitodl_odl_video_service_47472,
+                code_mapping_ocw_studio_mitodl_ocw_studio_48161,
+                code_mapping_open_mitodl_open_discussions_49482,
+                code_mapping_odl_video_service_mitodl_odl_video_service_50838,
+                code_mapping_odl_video_service_mitodl_odl_video_service_51053,
+                code_mapping_mitxonline_mitodl_ocw_studio_653359,
+                code_mapping_mitxonline_mitodl_mitxpro_667947,
+                code_mapping_xpro_mitodl_mitxpro_668041,
+                code_mapping_xpro_mitodl_mitxpro_668557,
+                code_mapping_mitxonline_mitodl_ocw_studio_695082,
+            ],
+        ),
     )
 )
 
@@ -2945,7 +4040,22 @@ code_mapping_ocw_next_mitodl_ocw_hugo_themes_722324 = (
         default_branch="main",
         stack_root="./",
         source_root="",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_odl_video_service_mitodl_odl_video_service_47472,
+                code_mapping_ocw_studio_mitodl_ocw_studio_48161,
+                code_mapping_open_mitodl_open_discussions_49482,
+                code_mapping_odl_video_service_mitodl_odl_video_service_50838,
+                code_mapping_odl_video_service_mitodl_odl_video_service_51053,
+                code_mapping_mitxonline_mitodl_ocw_studio_653359,
+                code_mapping_mitxonline_mitodl_mitxpro_667947,
+                code_mapping_xpro_mitodl_mitxpro_668041,
+                code_mapping_xpro_mitodl_mitxpro_668557,
+                code_mapping_mitxonline_mitodl_ocw_studio_695082,
+            ],
+        ),
     )
 )
 
@@ -2958,7 +4068,22 @@ code_mapping_open_mitodl_open_discussions_73048 = sentry.SentryOrganizationCodeM
     default_branch="master",
     stack_root="",
     source_root="",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_odl_video_service_mitodl_odl_video_service_47472,
+            code_mapping_ocw_studio_mitodl_ocw_studio_48161,
+            code_mapping_open_mitodl_open_discussions_49482,
+            code_mapping_odl_video_service_mitodl_odl_video_service_50838,
+            code_mapping_odl_video_service_mitodl_odl_video_service_51053,
+            code_mapping_mitxonline_mitodl_ocw_studio_653359,
+            code_mapping_mitxonline_mitodl_mitxpro_667947,
+            code_mapping_xpro_mitodl_mitxpro_668041,
+            code_mapping_xpro_mitodl_mitxpro_668557,
+            code_mapping_mitxonline_mitodl_ocw_studio_695082,
+        ],
+    ),
 )
 
 code_mapping_micromasters_mitodl_micromasters_74163 = (
@@ -2971,7 +4096,22 @@ code_mapping_micromasters_mitodl_micromasters_74163 = (
         default_branch="master",
         stack_root="",
         source_root="",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_odl_video_service_mitodl_odl_video_service_47472,
+                code_mapping_ocw_studio_mitodl_ocw_studio_48161,
+                code_mapping_open_mitodl_open_discussions_49482,
+                code_mapping_odl_video_service_mitodl_odl_video_service_50838,
+                code_mapping_odl_video_service_mitodl_odl_video_service_51053,
+                code_mapping_mitxonline_mitodl_ocw_studio_653359,
+                code_mapping_mitxonline_mitodl_mitxpro_667947,
+                code_mapping_xpro_mitodl_mitxpro_668041,
+                code_mapping_xpro_mitodl_mitxpro_668557,
+                code_mapping_mitxonline_mitodl_ocw_studio_695082,
+            ],
+        ),
     )
 )
 
@@ -2984,7 +4124,22 @@ code_mapping_open_mitodl_open_discussions_76531 = sentry.SentryOrganizationCodeM
     default_branch="master",
     stack_root="./",
     source_root="frontends/open-discussions/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_odl_video_service_mitodl_odl_video_service_47472,
+            code_mapping_ocw_studio_mitodl_ocw_studio_48161,
+            code_mapping_open_mitodl_open_discussions_49482,
+            code_mapping_odl_video_service_mitodl_odl_video_service_50838,
+            code_mapping_odl_video_service_mitodl_odl_video_service_51053,
+            code_mapping_mitxonline_mitodl_ocw_studio_653359,
+            code_mapping_mitxonline_mitodl_mitxpro_667947,
+            code_mapping_xpro_mitodl_mitxpro_668041,
+            code_mapping_xpro_mitodl_mitxpro_668557,
+            code_mapping_mitxonline_mitodl_ocw_studio_695082,
+        ],
+    ),
 )
 
 code_mapping_micromasters_mitodl_micromasters_77540 = (
@@ -2997,7 +4152,22 @@ code_mapping_micromasters_mitodl_micromasters_77540 = (
         default_branch="master",
         stack_root="./",
         source_root="",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_odl_video_service_mitodl_odl_video_service_47472,
+                code_mapping_ocw_studio_mitodl_ocw_studio_48161,
+                code_mapping_open_mitodl_open_discussions_49482,
+                code_mapping_odl_video_service_mitodl_odl_video_service_50838,
+                code_mapping_odl_video_service_mitodl_odl_video_service_51053,
+                code_mapping_mitxonline_mitodl_ocw_studio_653359,
+                code_mapping_mitxonline_mitodl_mitxpro_667947,
+                code_mapping_xpro_mitodl_mitxpro_668041,
+                code_mapping_xpro_mitodl_mitxpro_668557,
+                code_mapping_mitxonline_mitodl_ocw_studio_695082,
+            ],
+        ),
     )
 )
 
@@ -3011,7 +4181,22 @@ code_mapping_odl_video_service_mitodl_odl_video_service_79298 = (
         default_branch="master",
         stack_root="",
         source_root="",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_odl_video_service_mitodl_odl_video_service_47472,
+                code_mapping_ocw_studio_mitodl_ocw_studio_48161,
+                code_mapping_open_mitodl_open_discussions_49482,
+                code_mapping_odl_video_service_mitodl_odl_video_service_50838,
+                code_mapping_odl_video_service_mitodl_odl_video_service_51053,
+                code_mapping_mitxonline_mitodl_ocw_studio_653359,
+                code_mapping_mitxonline_mitodl_mitxpro_667947,
+                code_mapping_xpro_mitodl_mitxpro_668041,
+                code_mapping_xpro_mitodl_mitxpro_668557,
+                code_mapping_mitxonline_mitodl_ocw_studio_695082,
+            ],
+        ),
     )
 )
 
@@ -3024,7 +4209,22 @@ code_mapping_ocw_studio_mitodl_ocw_studio_79304 = sentry.SentryOrganizationCodeM
     default_branch="master",
     stack_root="",
     source_root="",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_odl_video_service_mitodl_odl_video_service_47472,
+            code_mapping_ocw_studio_mitodl_ocw_studio_48161,
+            code_mapping_open_mitodl_open_discussions_49482,
+            code_mapping_odl_video_service_mitodl_odl_video_service_50838,
+            code_mapping_odl_video_service_mitodl_odl_video_service_51053,
+            code_mapping_mitxonline_mitodl_ocw_studio_653359,
+            code_mapping_mitxonline_mitodl_mitxpro_667947,
+            code_mapping_xpro_mitodl_mitxpro_668041,
+            code_mapping_xpro_mitodl_mitxpro_668557,
+            code_mapping_mitxonline_mitodl_ocw_studio_695082,
+        ],
+    ),
 )
 
 code_mapping_ocw_studio_mitodl_ocw_studio_83316 = sentry.SentryOrganizationCodeMapping(
@@ -3036,7 +4236,22 @@ code_mapping_ocw_studio_mitodl_ocw_studio_83316 = sentry.SentryOrganizationCodeM
     default_branch="master",
     stack_root="./",
     source_root="",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_70188,
+            code_mapping_openedx_residential_mitodl_edx_platform_70474,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_70703,
+            code_mapping_ocw_next_mitodl_ocw_hugo_themes_722324,
+            code_mapping_open_mitodl_open_discussions_73048,
+            code_mapping_micromasters_mitodl_micromasters_74163,
+            code_mapping_open_mitodl_open_discussions_76531,
+            code_mapping_micromasters_mitodl_micromasters_77540,
+            code_mapping_odl_video_service_mitodl_odl_video_service_79298,
+            code_mapping_ocw_studio_mitodl_ocw_studio_79304,
+        ],
+    ),
 )
 
 code_mapping_release_script_mitodl_release_script_836861 = (
@@ -3049,7 +4264,22 @@ code_mapping_release_script_mitodl_release_script_836861 = (
         default_branch="master",
         stack_root="",
         source_root="",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_70188,
+                code_mapping_openedx_residential_mitodl_edx_platform_70474,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_70703,
+                code_mapping_ocw_next_mitodl_ocw_hugo_themes_722324,
+                code_mapping_open_mitodl_open_discussions_73048,
+                code_mapping_micromasters_mitodl_micromasters_74163,
+                code_mapping_open_mitodl_open_discussions_76531,
+                code_mapping_micromasters_mitodl_micromasters_77540,
+                code_mapping_odl_video_service_mitodl_odl_video_service_79298,
+                code_mapping_ocw_studio_mitodl_ocw_studio_79304,
+            ],
+        ),
     )
 )
 
@@ -3062,7 +4292,22 @@ code_mapping_mitxonline_mitodl_ocw_studio_849054 = sentry.SentryOrganizationCode
     default_branch="master",
     stack_root="ecommerce/views/legacy/",
     source_root="",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_70188,
+            code_mapping_openedx_residential_mitodl_edx_platform_70474,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_70703,
+            code_mapping_ocw_next_mitodl_ocw_hugo_themes_722324,
+            code_mapping_open_mitodl_open_discussions_73048,
+            code_mapping_micromasters_mitodl_micromasters_74163,
+            code_mapping_open_mitodl_open_discussions_76531,
+            code_mapping_micromasters_mitodl_micromasters_77540,
+            code_mapping_odl_video_service_mitodl_odl_video_service_79298,
+            code_mapping_ocw_studio_mitodl_ocw_studio_79304,
+        ],
+    ),
 )
 
 code_mapping_open_next_mitodl_edx_sga_865652 = sentry.SentryOrganizationCodeMapping(
@@ -3074,7 +4319,22 @@ code_mapping_open_next_mitodl_edx_sga_865652 = sentry.SentryOrganizationCodeMapp
     default_branch="master",
     stack_root="app:///",
     source_root="edx_sga/static/js/bower/jquery/src/ajax/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_70188,
+            code_mapping_openedx_residential_mitodl_edx_platform_70474,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_70703,
+            code_mapping_ocw_next_mitodl_ocw_hugo_themes_722324,
+            code_mapping_open_mitodl_open_discussions_73048,
+            code_mapping_micromasters_mitodl_micromasters_74163,
+            code_mapping_open_mitodl_open_discussions_76531,
+            code_mapping_micromasters_mitodl_micromasters_77540,
+            code_mapping_odl_video_service_mitodl_odl_video_service_79298,
+            code_mapping_ocw_studio_mitodl_ocw_studio_79304,
+        ],
+    ),
 )
 
 code_mapping_odl_video_service_mitodl_odl_video_service_88503 = (
@@ -3087,7 +4347,22 @@ code_mapping_odl_video_service_mitodl_odl_video_service_88503 = (
         default_branch="master",
         stack_root="./",
         source_root="",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_70188,
+                code_mapping_openedx_residential_mitodl_edx_platform_70474,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_70703,
+                code_mapping_ocw_next_mitodl_ocw_hugo_themes_722324,
+                code_mapping_open_mitodl_open_discussions_73048,
+                code_mapping_micromasters_mitodl_micromasters_74163,
+                code_mapping_open_mitodl_open_discussions_76531,
+                code_mapping_micromasters_mitodl_micromasters_77540,
+                code_mapping_odl_video_service_mitodl_odl_video_service_79298,
+                code_mapping_ocw_studio_mitodl_ocw_studio_79304,
+            ],
+        ),
     )
 )
 
@@ -3100,7 +4375,22 @@ code_mapping_mitxonline_mitodl_mitxonline_961376 = sentry.SentryOrganizationCode
     default_branch="main",
     stack_root="./",
     source_root="frontend/public/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_70188,
+            code_mapping_openedx_residential_mitodl_edx_platform_70474,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_70703,
+            code_mapping_ocw_next_mitodl_ocw_hugo_themes_722324,
+            code_mapping_open_mitodl_open_discussions_73048,
+            code_mapping_micromasters_mitodl_micromasters_74163,
+            code_mapping_open_mitodl_open_discussions_76531,
+            code_mapping_micromasters_mitodl_micromasters_77540,
+            code_mapping_odl_video_service_mitodl_odl_video_service_79298,
+            code_mapping_ocw_studio_mitodl_ocw_studio_79304,
+        ],
+    ),
 )
 
 code_mapping_open_mitodl_testinfra_968060 = sentry.SentryOrganizationCodeMapping(
@@ -3112,7 +4402,22 @@ code_mapping_open_mitodl_testinfra_968060 = sentry.SentryOrganizationCodeMapping
     default_branch="master",
     stack_root="",
     source_root="testinfra/modules/",
-    opts=sentry_opts,
+    opts=ResourceOptions(
+        provider=sentry_provider,
+        protect=True,
+        depends_on=[
+            code_mapping_openedx_mitxonline_mitodl_edx_platform_70188,
+            code_mapping_openedx_residential_mitodl_edx_platform_70474,
+            code_mapping_openedx_mitxpro_mitodl_edx_platform_70703,
+            code_mapping_ocw_next_mitodl_ocw_hugo_themes_722324,
+            code_mapping_open_mitodl_open_discussions_73048,
+            code_mapping_micromasters_mitodl_micromasters_74163,
+            code_mapping_open_mitodl_open_discussions_76531,
+            code_mapping_micromasters_mitodl_micromasters_77540,
+            code_mapping_odl_video_service_mitodl_odl_video_service_79298,
+            code_mapping_ocw_studio_mitodl_ocw_studio_79304,
+        ],
+    ),
 )
 
 code_mapping_micromasters_mitodl_response_map_989015 = (
@@ -3125,7 +4430,22 @@ code_mapping_micromasters_mitodl_response_map_989015 = (
         default_branch="master",
         stack_root="/a2/",
         source_root="",
-        opts=sentry_opts,
+        opts=ResourceOptions(
+            provider=sentry_provider,
+            protect=True,
+            depends_on=[
+                code_mapping_openedx_mitxonline_mitodl_edx_platform_70188,
+                code_mapping_openedx_residential_mitodl_edx_platform_70474,
+                code_mapping_openedx_mitxpro_mitodl_edx_platform_70703,
+                code_mapping_ocw_next_mitodl_ocw_hugo_themes_722324,
+                code_mapping_open_mitodl_open_discussions_73048,
+                code_mapping_micromasters_mitodl_micromasters_74163,
+                code_mapping_open_mitodl_open_discussions_76531,
+                code_mapping_micromasters_mitodl_micromasters_77540,
+                code_mapping_odl_video_service_mitodl_odl_video_service_79298,
+                code_mapping_ocw_studio_mitodl_ocw_studio_79304,
+            ],
+        ),
     )
 )
 
