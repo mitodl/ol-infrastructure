@@ -1,8 +1,6 @@
 ---
 _custom_properties:
   tier: unmanaged
-_direct_collaborators:
-  mbertrand: write
 _excluded_environments: 1
 _has_branch_protection: false
 _pushed_at: '2024-08-29T20:01:40Z'

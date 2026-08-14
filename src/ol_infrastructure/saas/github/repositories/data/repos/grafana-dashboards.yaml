@@ -1,8 +1,6 @@
 ---
 _custom_properties:
   tier: unmanaged
-_direct_collaborators:
-  odlbot: admin
 _has_branch_protection: false
 _pushed_at: '2025-11-21T19:30:39Z'
 _ruleset_count: 0

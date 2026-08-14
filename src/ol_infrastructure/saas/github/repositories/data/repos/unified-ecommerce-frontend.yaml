@@ -1,8 +1,6 @@
 ---
 _custom_properties:
   tier: unmanaged
-_direct_collaborators:
-  ChristopherChudzicki: admin
 _excluded_environments: 1
 _has_branch_protection: true
 _pushed_at: '2025-12-03T22:25:52Z'

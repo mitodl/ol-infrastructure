@@ -1,8 +1,6 @@
 ---
 _custom_properties:
   tier: unmanaged
-_direct_collaborators:
-  mbertrand: admin
 _has_branch_protection: false
 _pushed_at: '2023-06-16T11:55:30Z'
 _ruleset_count: 0
