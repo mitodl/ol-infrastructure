@@ -625,8 +625,13 @@ pgbouncer_replica_count = dagster_config.get_int("pgbouncer_replica_count") or 2
 # max_connections tracks instance memory -- QA's db.m7g.large allows ~900, so a
 # hardcoded production number would leave QA overcommitted by the same 1.8x.
 # The headroom leaves room for superuser_reserved_connections, reserved_connections,
-# RDS's own rdsadmin sessions, Vault credential rotation logins, ad-hoc psql, and any
-# future direct-to-RDS consumer such as a metrics exporter.
+# RDS's own rdsadmin sessions, Vault credential rotation logins, ad-hoc psql, any
+# future direct-to-RDS consumer such as a metrics exporter, and -- on instance classes
+# below the 5000 cap -- the difference between total instance memory and the smaller
+# DBInstanceClassMemory that RDS actually divides (see postgres_max_connections).
+#
+# Dividing by pgbouncer_replica_count makes the aggregate ceiling depend on the running
+# pod count, which is why the Deployment below pins max_surge to 0.
 DB_CONNECTION_HEADROOM_FACTOR = 0.85
 pgbouncer_max_db_connections = int(
     postgres_max_connections(rds_defaults["instance_size"])
@@ -738,6 +743,19 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
         replicas=pgbouncer_replica_count,
+        # max_db_connections above is sized as budget / pgbouncer_replica_count, so the
+        # aggregate ceiling only holds while the running pod count stays at or below the
+        # desired replica count. Kubernetes' default 25% maxSurge would allow 8 pods in
+        # production and 3 in QA during a rollout -- 5664 and 1146 backends, both past
+        # the database limit the cap exists to respect, and reached precisely while
+        # rolling out a change to this Deployment. Surge to zero and replace in place.
+        strategy=kubernetes.apps.v1.DeploymentStrategyArgs(
+            type="RollingUpdate",
+            rolling_update=kubernetes.apps.v1.RollingUpdateDeploymentArgs(
+                max_surge=0,
+                max_unavailable=1,
+            ),
+        ),
         selector=kubernetes.meta.v1.LabelSelectorArgs(
             match_labels={
                 "component": "pgbouncer",

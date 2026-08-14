@@ -107,7 +107,10 @@ settled before anyone flips it.
 
 `DagsterInstance` builds **three** storages (run, event log, schedule), and the pooled
 classes give **each one its own engine** with defaults `pool_size=10, max_overflow=20`.
-That is up to **90 connections per process**, with a **30-connection persistent floor**.
+That is up to **90 connections per process**. `QueuePool` opens connections lazily, so
+`pool_size` is a retention limit rather than a set of pre-opened connections — but once
+demand has created them, each process can *hold* 30 idle connections indefinitely, which
+for sizing purposes is the number that matters.
 
 Process count on `data-production` today:
 
@@ -121,9 +124,10 @@ Process count on `data-production` today:
 | **total** | **up to 117** |
 
 Run workers mount the same `dagster-instance` ConfigMap, so they get the same pool config.
-At the defaults that is a **510-connection persistent floor and a 10,530 peak** — twice as
-bad as the failure we are fixing, and it would sit *below* the PgBouncer cap, so
-`max_db_connections` would convert it into permanent queueing rather than an outage.
+At the defaults that is a **10,530 peak**, with the 17 long-lived processes able to sit on
+510 idle connections between bursts — twice as bad as the failure we are fixing, and it
+would sit *below* the PgBouncer cap, so `max_db_connections` would convert it into
+permanent queueing rather than an outage.
 
 Sized against the new 4200-connection aggregate budget, the constraint is:
 
@@ -132,7 +136,8 @@ Sized against the new 4200-connection aggregate budget, the constraint is:
   =>  pool_size + max_overflow <= ~11
 ```
 
-So something like `pool_size=3, max_overflow=8` (33/process peak, 9 floor). For reference
+So something like `pool_size=3, max_overflow=8` (33/process peak, up to 9 retained idle).
+For reference
 the daemon currently holds **21 concurrent connections** at steady state, so a 33-connection
 ceiling is comfortable for it. The right numbers should be set from the exporter's
 `pgbouncer_pools_server_active_connections` once it is collecting, not from this estimate.

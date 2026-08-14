@@ -54,9 +54,19 @@ def postgres_max_connections(db_instance_type: str) -> int:
     number rather than the 5000 cap, which only the larger classes actually reach --
     a ``db.m7g.large`` tops out around 900.
 
+    **This is an upper bound, not an exact figure.** ``DBInstanceClassMemory`` is the
+    memory RDS leaves to the database after its own OS and management reservations,
+    which is somewhat less than the instance class's total physical memory used here,
+    and AWS does not publish the reservation. On classes large enough to hit the 5000
+    cap the difference is irrelevant and the result is exact -- verified against
+    ``ol-etl-db-production`` (``db.r7g.2xlarge``), where ``SHOW max_connections``
+    returns 5000. Below the cap the result may overstate by the size of that
+    reservation, so callers must leave headroom rather than budgeting to this number.
+
     :param db_instance_type: An RDS instance class, e.g. ``db.r7g.2xlarge``
 
-    :returns: The number of connections the instance will accept
+    :returns: An upper bound on the connections the instance will accept; exact for
+        classes that reach the 5000 cap
 
     :rtype: int
     """
@@ -65,6 +75,12 @@ def postgres_max_connections(db_instance_type: str) -> int:
     instance_types = ec2_client.describe_instance_types(
         InstanceTypes=[db_instance_type.removeprefix("db.")]
     )["InstanceTypes"]
+    if not instance_types:
+        # The instance class comes from Pulumi config, so a typo lands here rather than
+        # in an internal invariant. Say which value failed -- the bare IndexError this
+        # would otherwise raise gives no hint during a stack preview.
+        msg = f"No EC2 instance type matching RDS instance class {db_instance_type}"
+        raise ValueError(msg)
     memory_bytes = instance_types[0]["MemoryInfo"]["SizeInMiB"] * 1024 * 1024
     return min(
         memory_bytes // POSTGRES_BYTES_PER_CONNECTION, POSTGRES_MAX_CONNECTIONS_CAP

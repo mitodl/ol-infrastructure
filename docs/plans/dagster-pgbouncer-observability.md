@@ -103,10 +103,11 @@ daily rollup) makes the shape unambiguous:
 `superuser_reserved_connections = 3` and `reserved_connections = 2`, leaving 4995 for
 normal roles, and the remaining 6 are RDS's own `rdsadmin` sessions. A metric that is
 bit-identical across 88 consecutive samples is a value being clamped, not measured — so
-for that hour and a half every new Dagster connection was being refused with
-`FATAL: sorry, too many clients already`. This is the same window as the incident
-documented in `dagster_instance.yaml` (daemon Pending for 25 minutes behind 178 run
-workers); the daemon was Pending because it could not get a connection.
+for that hour and a half the database was continuously saturated. New connections were
+not uniformly refused: as short-lived sessions closed, some clients won the released
+slots and others got `FATAL: sorry, too many clients already`. Connecting had become a
+race rather than a given, which is enough to explain the incident documented in
+`dagster_instance.yaml` (daemon Pending for 25 minutes behind 178 run workers).
 
 There is currently no metric, no dashboard, and no alert on this.
 
@@ -130,10 +131,15 @@ connection for its whole session, so the binding constraint is
 aggregate, 1.8× the database's hard limit**. The pool is configured such that it can
 exhaust the database it exists to protect, and on 08-10 it did.
 
-This also settles one of the questions listed further down as needing the exporter to
-answer: *is `reserve_pool_size = 2000` ever entered?* Yes. The plateau is far above
-`default_pool_size × 6 = 4800`, so the reserve pool was not merely entered, it was
-entered across every replica simultaneously and stayed there.
+This also bears on one of the questions listed further down as needing the exporter to
+answer: *is `reserve_pool_size = 2000` ever entered?* Almost certainly yes. The plateau
+sits above `default_pool_size × 6 = 4800`, and while that count includes non-PgBouncer
+sessions (`rdsadmin`, ad-hoc `psql`), the excess is far larger than those account for.
+Note what it does and does not establish: an aggregate above 4800 means *at least one*
+replica went past its `default_pool_size` into reserve — it cannot show that all six did,
+because the per-pod breakdown was never recorded. That distribution is exactly what
+`pgbouncer_pools_server_used_connections` per pod would have told us, and is a good
+example of why the aggregate CloudWatch metric cannot answer pool-tuning questions.
 
 **Setting `max_db_connections` is a config-level fix that requires no new telemetry.**
 At 6 replicas, a per-pod cap of ~700 puts the aggregate ceiling at 4200 — comfortably
