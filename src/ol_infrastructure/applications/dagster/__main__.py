@@ -630,6 +630,13 @@ pgbouncer_replica_count = dagster_config.get_int("pgbouncer_replica_count") or 2
 # below the 5000 cap -- the difference between total instance memory and the smaller
 # DBInstanceClassMemory that RDS actually divides (see postgres_max_connections).
 #
+# That last term is the reason 0.85 is not as generous as it looks on the QA stack.
+# postgres_max_connections computes 901 there but the instance really allows 832, so
+# the resulting 764 aggregate leaves 68 connections rather than the ~135 the factor
+# implies -- still comfortably clear of the ~11 reserved and administrative
+# connections, but worth knowing before anyone raises this factor. Production is
+# unaffected: the 5000 cap binds, so its figure is exact.
+#
 # Dividing by pgbouncer_replica_count makes the aggregate ceiling depend on the running
 # pod count, which is why the Deployment below pins max_surge to 0.
 DB_CONNECTION_HEADROOM_FACTOR = 0.85

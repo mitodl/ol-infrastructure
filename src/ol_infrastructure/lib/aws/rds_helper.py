@@ -57,12 +57,20 @@ def postgres_max_connections(db_instance_type: str) -> int:
 
     **This is an upper bound, not an exact figure.** ``DBInstanceClassMemory`` is the
     memory RDS leaves to the database after its own OS and management reservations,
-    which is somewhat less than the instance class's total physical memory used here,
-    and AWS does not publish the reservation. On classes large enough to hit the 5000
-    cap the difference is irrelevant and the result is exact -- verified against
-    ``ol-etl-db-production`` (``db.r7g.2xlarge``), where ``SHOW max_connections``
-    returns 5000. Below the cap the result may overstate by the size of that
-    reservation, so callers must leave headroom rather than budgeting to this number.
+    which is less than the instance class's total physical memory used here, and AWS
+    does not publish the reservation.
+
+    Measured on both sides of the cap:
+
+    - ``db.r7g.2xlarge`` (``ol-etl-db-production``) -- computes 7210, clamped to 5000,
+      and ``SHOW max_connections`` returns 5000. **Exact**, because the cap binds.
+    - ``db.m7g.large`` (``ol-etl-db-qa``) -- computes 901, but ``SHOW max_connections``
+      returns **832**. RDS withholds ~629 MiB of the 8 GiB, so this **overstates by
+      ~8%**.
+
+    Below the cap, then, callers must leave at least ~10% headroom on top of whatever
+    margin they want for reserved and administrative connections -- budgeting straight
+    to this number would overcommit.
 
     :param db_instance_type: An RDS instance class, e.g. ``db.r7g.2xlarge``
 
