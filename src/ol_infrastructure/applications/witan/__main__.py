@@ -153,6 +153,13 @@ from ol_infrastructure.applications.witan.mcp_servers import (
     create_mcp_servers,
 )
 from ol_infrastructure.applications.witan.migrations import create_migration_job
+from ol_infrastructure.applications.witan.observability import (
+    TOOLHIVE_TELEMETRY_BACKEND_CONFIG_NAME,
+    TOOLHIVE_TELEMETRY_VMCP_CONFIG_NAME,
+    toolhive_service_name,
+    toolhive_telemetry_spec,
+    toolhive_vmcp_audit,
+)
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
@@ -771,6 +778,60 @@ if witan_admin_token_secret is not None:
     )
 
 #########################################
+#   MCPTelemetryConfig (ToolHive tier)   #
+#########################################
+# The two ToolHive hops in front of witan — the proxyrunner and the vMCP — run
+# their own OTel pipeline, configured through these CRs rather than through the
+# OTEL_* environment `observability.otel_env` builds for the witan process. They
+# were dark until 2026-08-14; see observability.py for what that cost.
+#
+# ★ TWO CRs, NOT ONE SHARED. They differ only in `prometheus.enabled`, and that
+# difference is a security boundary: ToolHive serves /metrics on the MAIN
+# TRANSPORT PORT, and the vMCP's is the port APISIX publishes under a `/*`
+# catch-all route (ingress.py). One shared config would either expose an
+# unauthenticated metrics endpoint on the public vMCP host or deny the backend
+# the one read CI can perform. The `serviceName` override on each ref is what
+# keeps the two hops' spans distinguishable.
+witan_telemetry_backend = kubernetes.apiextensions.CustomResource(
+    f"witan-telemetry-backend-{stack_info.env_suffix}",
+    api_version="toolhive.stacklok.dev/v1beta1",
+    kind="MCPTelemetryConfig",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=TOOLHIVE_TELEMETRY_BACKEND_CONFIG_NAME,
+        namespace=NAMESPACE,
+        labels=k8s_global_labels,
+    ),
+    # Never None for this hop: Prometheus is enabled in every environment, so
+    # `toolhive_telemetry_spec` always returns a spec here.
+    spec=toolhive_telemetry_spec(stack_info, "mcp-proxy", expose_prometheus=True),
+    opts=ResourceOptions(depends_on=[cluster_stack]),
+)
+
+# The vMCP's, only where there is an OTLP receiver to export to. With Prometheus
+# off and OTLP unavailable there is nothing left to configure, so CI gets no CR
+# and no `telemetryConfigRef` at all — rather than an inert one that reads like
+# telemetry is on.
+witan_telemetry_vmcp_spec = toolhive_telemetry_spec(
+    stack_info, "vmcp", expose_prometheus=False
+)
+witan_telemetry_vmcp = (
+    kubernetes.apiextensions.CustomResource(
+        f"witan-telemetry-vmcp-{stack_info.env_suffix}",
+        api_version="toolhive.stacklok.dev/v1beta1",
+        kind="MCPTelemetryConfig",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=TOOLHIVE_TELEMETRY_VMCP_CONFIG_NAME,
+            namespace=NAMESPACE,
+            labels=k8s_global_labels,
+        ),
+        spec=witan_telemetry_vmcp_spec,
+        opts=ResourceOptions(depends_on=[cluster_stack]),
+    )
+    if witan_telemetry_vmcp_spec
+    else None
+)
+
+#########################################
 #   MCPGroup + witan MCPServer           #
 #########################################
 mcp_servers = create_mcp_servers(
@@ -793,6 +854,8 @@ mcp_servers = create_mcp_servers(
     witan_code_token_secret=witan_code_token_secret,
     migration_job=witan_migration_job,
     service_version=witan_service_version,
+    telemetry_config_name=TOOLHIVE_TELEMETRY_BACKEND_CONFIG_NAME,
+    telemetry_config=witan_telemetry_backend,
     remote_write_max_inflight=WITAN_REMOTE_WRITE_MAX_INFLIGHT,
     remote_write_queue_seconds=WITAN_REMOTE_WRITE_QUEUE_SECONDS,
     remote_call_budget_seconds=WITAN_REMOTE_CALL_BUDGET_SECONDS,
@@ -920,6 +983,24 @@ witan_virtualmcpserver = kubernetes.apiextensions.CustomResource(
             },
         },
         "serviceType": "ClusterIP",
+        # Spans and OTLP metrics for the OUTERMOST hop — the first thing a
+        # client's request touches, and so the root of the trace. Absent in CI,
+        # which has no receiver: see the CR above.
+        #
+        # Unpacked from a dict rather than written as a literal key because the
+        # ref must not appear at all when there is no CR to point at — an
+        # unresolvable `telemetryConfigRef` degrades the vMCP rather than being
+        # ignored.
+        **(
+            {
+                "telemetryConfigRef": {
+                    "name": TOOLHIVE_TELEMETRY_VMCP_CONFIG_NAME,
+                    "serviceName": toolhive_service_name(stack_info, "vmcp"),
+                }
+            }
+            if witan_telemetry_vmcp
+            else {}
+        ),
         # VirtualMCPServerSpec has no `resources` field of its own (unlike
         # MCPServer), so the aggregator's limits can only be set through the
         # documented PodTemplateSpec escape hatch, targeting the operator-managed
@@ -999,6 +1080,12 @@ witan_virtualmcpserver = kubernetes.apiextensions.CustomResource(
                 # here is a CrashLoop rather than a rejected apply.
                 "conflictResolutionConfig": {"priorityOrder": [WITAN_MCPSERVER_NAME]},
             },
+            # Per-request JSON to stdout -> pod logs -> Loki, so unlike the OTLP
+            # block above this needs no collector and is on in CI too. Unlike
+            # `MCPServer.spec.audit`, this CRD carries the full option set, so
+            # the body-exclusion is stated rather than merely defaulted — see
+            # `toolhive_vmcp_audit`.
+            "audit": toolhive_vmcp_audit(),
         },
     },
     opts=ResourceOptions(
@@ -1016,6 +1103,10 @@ witan_virtualmcpserver = kubernetes.apiextensions.CustomResource(
             witan_ci_token_secret,
             witan_code_token_secret,
             actor_tokens_secret,
+            # Absent in CI, where the vMCP references no telemetry config at
+            # all. Filtered rather than conditionally appended so the list above
+            # stays a plain enumeration.
+            *([witan_telemetry_vmcp] if witan_telemetry_vmcp else []),
         ]
     ),
 )

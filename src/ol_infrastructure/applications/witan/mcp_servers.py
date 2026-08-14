@@ -46,6 +46,8 @@ from pulumi import Output, Resource, ResourceOptions, StackReference
 from ol_infrastructure.applications.witan.observability import (
     downward_api_env_dicts,
     otel_env,
+    toolhive_mcpserver_audit,
+    toolhive_service_name,
     witan_log_env,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
@@ -222,11 +224,19 @@ def create_mcp_servers(  # noqa: PLR0913
     witan_code_token_secret: Resource,
     migration_job: Resource,
     service_version: str,
+    telemetry_config_name: str,
+    telemetry_config: Resource,
     remote_write_max_inflight: str = "",
     remote_write_queue_seconds: str = "",
     remote_call_budget_seconds: str = "",
 ) -> WitanMCPServers:
     """Provision the witan-tools MCPGroup and the witan MCPServer backend.
+
+    ``telemetry_config_name`` is the ``MCPTelemetryConfig`` this hop references.
+    Unlike the vMCP, this hop has one in EVERY environment: the Prometheus
+    ``/metrics`` path is safe on its ClusterIP-only proxy port, and in CI — which
+    has no OTLP receiver — it is the only instrumentation there is. See
+    ``observability.toolhive_telemetry_spec``.
 
     ``remote_write_max_inflight`` / ``remote_write_queue_seconds`` retune
     witan's client-side write admission. Empty (the default) leaves witan's own
@@ -439,6 +449,27 @@ def create_mcp_servers(  # noqa: PLR0913
             "resourceOverrides": {
                 "proxyDeployment": {"env": WITAN_PROXY_HEALTH_ENV},
             },
+            # The proxy's own OTel pipeline — spans and metrics for the hop in
+            # FRONT of witan, which was dark until 2026-08-14. Its request
+            # duration starts before it forwards, so subtracting witan's own
+            # `duration_ms` from it yields the pre-handler interval that neither
+            # tier measured. See observability.py's "ToolHive tier" section.
+            #
+            # Deliberately NO `k8s.grafana.com/scrape` annotations to go with the
+            # Prometheus path this enables: in QA and Production the same metrics
+            # already arrive over OTLP, and scraping them as well would ingest
+            # every series twice under one name. The path exists for a
+            # port-forward — in CI, where there is no receiver, that is the only
+            # way to read them at all.
+            "telemetryConfigRef": {
+                "name": telemetry_config_name,
+                "serviceName": toolhive_service_name(stack_info, "mcp-proxy"),
+            },
+            # Per-request JSON to stdout, so it rides the existing pod-log path
+            # to Loki with no collector involved — which is why this is on in CI
+            # too. This CRD accepts only `enabled`; see `toolhive_mcpserver_audit`
+            # for why nothing else may be written here.
+            "audit": toolhive_mcpserver_audit(),
             # `volumes`/`volumeMounts` aren't first-class MCPServerSpec fields
             # beyond hostPath, so the actor-tokens Secret is mounted via the
             # documented escape hatch: a PodTemplateSpec merge-patch targeting
@@ -500,6 +531,11 @@ def create_mcp_servers(  # noqa: PLR0913
         # pulumi-kubernetes awaits a Job's completion, so the operator is not
         # handed the new image until the backfills for it have succeeded, and a
         # failed migration blocks the rollout instead of half-applying it.
+        #
+        # `telemetry_config` for the same reason as the secrets: the operator
+        # resolves `telemetryConfigRef` by name at reconcile time, and a
+        # reference to a CR that does not exist yet is a degraded server rather
+        # than a retry.
         opts=ResourceOptions(
             depends_on=[
                 witan_mcpgroup,
@@ -507,6 +543,7 @@ def create_mcp_servers(  # noqa: PLR0913
                 witan_code_token_secret,
                 actor_tokens_secret,
                 migration_job,
+                telemetry_config,
             ]
         ),
     )
