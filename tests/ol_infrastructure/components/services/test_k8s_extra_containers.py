@@ -15,9 +15,10 @@ Note:
     instantiate OLApplicationK8s or assert on full Kubernetes pod specs (e.g.,
     sidecars, init containers, volumes, or pod_security_context), nor do they
     assert on autoscaling resources such as HPAs or KEDA ScaledObjects. The
-    exception is test_default_container_annotation_set_to_app_container, which
+    exceptions are test_default_container_annotation_set_to_app_container, which
     instantiates OLApplicationK8s under Pulumi mocks to verify the Deployment's
-    pod template annotations.
+    pod template annotations, and the container_security_context tests at the
+    end of the module, which assert on the rendered container specs.
 """
 
 from __future__ import annotations
@@ -841,3 +842,89 @@ def test_empty_probe_configs_disables_probes():
         assert not any(key in container for key in _PROBE_KEYS)
 
     return app.application_deployment.spec.template.spec.containers.apply(check)
+
+
+# ─── container_security_context ───────────────────────────────────────────────
+
+_HARDENED_CONTAINER_CONTEXT = kubernetes.core.v1.SecurityContextArgs(
+    allow_privilege_escalation=False,
+    read_only_root_filesystem=True,
+    capabilities=kubernetes.core.v1.CapabilitiesArgs(drop=["ALL"]),
+)
+
+
+@pulumi.runtime.test
+def test_container_security_context_absent_by_default():
+    """Unset means no securityContext key at all, not an empty block."""
+    app = OLApplicationK8s(_base_config(application_name="nocontext"))
+
+    def check(containers):
+        assert "security_context" not in _app_container(containers, "nocontext")
+
+    return app.application_deployment.spec.template.spec.containers.apply(check)
+
+
+@pulumi.runtime.test
+def test_container_security_context_applied_to_app_container():
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="hardened",
+            container_security_context=_HARDENED_CONTAINER_CONTEXT,
+        )
+    )
+
+    def check(containers):
+        context = _app_container(containers, "hardened")["security_context"]
+        assert context["read_only_root_filesystem"] is True
+        assert context["allow_privilege_escalation"] is False
+        assert context["capabilities"]["drop"] == ["ALL"]
+
+    return app.application_deployment.spec.template.spec.containers.apply(check)
+
+
+@pulumi.runtime.test
+def test_container_security_context_skips_nginx_sidecar():
+    """Nginx needs a writable /var/cache/nginx, so it keeps the image's own context."""
+    project_root = Path(tempfile.mkdtemp())
+    (project_root / "files").mkdir()
+    (project_root / "files" / "web.conf").write_text("server { listen 8071; }\n")
+
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="withnginx",
+            project_root=project_root,
+            import_nginx_config=True,
+            container_security_context=_HARDENED_CONTAINER_CONTEXT,
+        )
+    )
+
+    def check(containers):
+        nginx = next(c for c in containers if c["name"] == "nginx")
+        assert "security_context" not in nginx
+        assert "security_context" in _app_container(containers, "withnginx")
+
+    return app.application_deployment.spec.template.spec.containers.apply(check)
+
+
+@pulumi.runtime.test
+def test_container_security_context_applied_to_celery_worker():
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="hardenedcelery",
+            container_security_context=_HARDENED_CONTAINER_CONTEXT,
+            celery_worker_configs=[
+                OLApplicationK8sCeleryWorkerConfig(
+                    application_name="hardenedcelery",
+                    worker_name="default",
+                    redis_host=pulumi.Output.from_input("redis.example.com"),
+                    redis_password="hunter2",  # pragma: allowlist secret
+                )
+            ],
+        )
+    )
+
+    def check(containers):
+        worker = next(c for c in containers if c["name"] == "celery-worker")
+        assert worker["security_context"]["read_only_root_filesystem"] is True
+
+    return app.celery_deployments[0].spec.template.spec.containers.apply(check)

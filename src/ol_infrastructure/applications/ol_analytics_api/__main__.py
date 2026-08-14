@@ -45,7 +45,11 @@ Key wiring decisions (see also ``k8s/README.md`` in the app repo):
   ``import_nginx_config`` is off and the probes are re-pointed at 8000.  This is
   the first data-cluster use of ``OLApplicationK8s``; it creates a
   ``SecurityGroupPolicy`` binding the pods to a dedicated security group (see
-  ``ol_analytics_api_application_security_group`` below).
+  ``ol_analytics_api_application_security_group`` below).  It is also the first
+  caller of the component's ``container_security_context``: this service is a
+  single non-Django container off an image that already runs as an
+  unprivileged user, so it can take a read-only root filesystem and a dropped
+  capability set that the Django apps sharing the component cannot yet.
 
 * **APISIX + Keycloak OIDC, two separate clients.**  ``OLApisixRoute`` +
   ``OLApisixOIDCResources`` put the openid-connect plugin in front of the
@@ -500,6 +504,41 @@ ol_analytics_api_k8s = OLApplicationK8s(
         probe_configs=_probe_configs,
         resource_requests={"cpu": "100m", "memory": "256Mi"},
         resource_limits={"memory": "512Mi"},
+        # Pod/container hardening. The app image already declares
+        # `USER appuser` (uid/gid 1000) and PYTHONDONTWRITEBYTECODE=1, so
+        # nothing writes to the image filesystem at runtime and a read-only
+        # root is free -- with the exception of tempfile's default directory,
+        # which the emptyDir below keeps writable.
+        pod_security_context=kubernetes.core.v1.PodSecurityContextArgs(
+            run_as_non_root=True,
+            run_as_user=1000,
+            run_as_group=1000,
+            # An emptyDir is created root-owned; without an fsGroup the app
+            # user cannot write into the /tmp mount below.
+            fs_group=1000,
+            seccomp_profile=kubernetes.core.v1.SeccompProfileArgs(
+                type="RuntimeDefault"
+            ),
+        ),
+        container_security_context=kubernetes.core.v1.SecurityContextArgs(
+            allow_privilege_escalation=False,
+            read_only_root_filesystem=True,
+            capabilities=kubernetes.core.v1.CapabilitiesArgs(drop=["ALL"]),
+        ),
+        extra_volumes=[
+            kubernetes.core.v1.VolumeArgs(
+                name="tmp",
+                empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(
+                    size_limit="64Mi"
+                ),
+            )
+        ],
+        extra_volume_mounts=[
+            kubernetes.core.v1.VolumeMountArgs(
+                name="tmp",
+                mount_path="/tmp",  # noqa: S108
+            )
+        ],
     ),
     opts=ResourceOptions(
         delete_before_replace=True,

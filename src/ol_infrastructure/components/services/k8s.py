@@ -661,6 +661,20 @@ class OLApplicationK8sConfig(BaseModel):
             "securityContext is set on pods."
         ),
     )
+    container_security_context: kubernetes.core.v1.SecurityContextArgs | None = Field(
+        default=None,
+        description=(
+            "Container-level security context applied to every container this "
+            "component builds from the application image: the webapp container, the "
+            "migrate/collectstatic init containers, the celery worker and beat "
+            "containers, and the pre/post-deploy job containers. NOT applied to the "
+            "nginx sidecar (an upstream image that needs a writable /var/cache/nginx "
+            "and /var/run, so read_only_root_filesystem there would crash-loop it), "
+            "nor to extra_init_containers/extra_sidecar_containers, which the caller "
+            "constructs in full and can set this on directly. When None, no "
+            "securityContext is set on containers."
+        ),
+    )
     extra_volumes: list[kubernetes.core.v1.VolumeArgs] = Field(
         default_factory=list,
         description=(
@@ -1182,6 +1196,15 @@ class OLApplicationK8s(ComponentResource):
         ):
             image_pull_policy = "Always"
 
+        # Spread into every ContainerArgs built from the application image, so an
+        # unset context stays absent from the manifest rather than serializing as an
+        # empty securityContext block.
+        app_container_security_context: dict[str, Any] = {}
+        if ol_app_k8s_config.container_security_context is not None:
+            app_container_security_context["security_context"] = (
+                ol_app_k8s_config.container_security_context
+            )
+
         init_containers = []
         # extra_init_containers run first, before component-managed ones
         for extra_init in ol_app_k8s_config.extra_init_containers:
@@ -1215,6 +1238,7 @@ class OLApplicationK8s(ComponentResource):
                         *ol_app_k8s_config.extra_volume_mounts,
                         *ol_app_k8s_config.extra_init_volume_mounts,
                     ],
+                    **app_container_security_context,
                 )
             )
 
@@ -1235,6 +1259,7 @@ class OLApplicationK8s(ComponentResource):
                         *ol_app_k8s_config.extra_volume_mounts,
                         *ol_app_k8s_config.extra_init_volume_mounts,
                     ],
+                    **app_container_security_context,
                 )
             )
 
@@ -1309,6 +1334,7 @@ class OLApplicationK8s(ComponentResource):
         # when configuring OLVaultK8SDynamicSecretConfig restart_targets.
         self.webapp_deployment_name: str = _application_deployment_name
         self.celery_deployment_names: list[str] = []
+        self.celery_deployments: list[kubernetes.apps.v1.Deployment] = []
         self.beat_deployment_name: str | None = None
 
         if pre_deploy_commands := ol_app_k8s_config.pre_deploy_commands:
@@ -1377,6 +1403,7 @@ class OLApplicationK8s(ComponentResource):
                                     ),
                                     volume_mounts=ol_app_k8s_config.extra_volume_mounts
                                     or None,
+                                    **app_container_security_context,
                                 )
                                 for (command_name, command_array) in pre_deploy_commands
                             ],
@@ -1456,6 +1483,7 @@ class OLApplicationK8s(ComponentResource):
                     if ol_app_k8s_config.probe_configs is None
                     else ol_app_k8s_config.probe_configs
                 ),
+                **app_container_security_context,
             ),
         )
         # Append caller-supplied sidecar containers after the main app container
@@ -1598,6 +1626,7 @@ class OLApplicationK8s(ComponentResource):
                                     env_from=application_deployment_envfrom,
                                     volume_mounts=ol_app_k8s_config.extra_volume_mounts
                                     or None,
+                                    **app_container_security_context,
                                 )
                                 for (
                                     command_name,
@@ -2043,6 +2072,7 @@ class OLApplicationK8s(ComponentResource):
                                     ),
                                     volume_mounts=ol_app_k8s_config.extra_volume_mounts
                                     or None,
+                                    **app_container_security_context,
                                 ),
                                 *ol_app_k8s_config.extra_sidecar_containers,
                             ],
@@ -2052,6 +2082,7 @@ class OLApplicationK8s(ComponentResource):
                 ),
                 opts=resource_options,
             )
+            self.celery_deployments.append(_celery_deployment)
 
             _celery_scaled_object = kubernetes.apiextensions.CustomResource(
                 f"{ol_app_k8s_config.application_name}-celery-worker-{celery_worker_config.worker_name}-{stack_info.env_suffix}-scaledobject",
@@ -2199,6 +2230,7 @@ class OLApplicationK8s(ComponentResource):
                                     ),
                                     volume_mounts=ol_app_k8s_config.extra_volume_mounts
                                     or None,
+                                    **app_container_security_context,
                                 ),
                                 *ol_app_k8s_config.extra_sidecar_containers,
                             ],
