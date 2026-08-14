@@ -460,7 +460,11 @@ def create_k8s_configmaps(  # noqa: PLR0915
     general_config_name = "50-general-config-yaml"
 
     # Build general config from dictionary (replaces YAML file)
-    general_config_dict = build_general_config(stack_info.env_prefix)
+    general_config_dict = build_general_config(
+        stack_info.env_prefix,
+        enable_courseware_index=edxapp_config.get_bool("enable_courseware_index")
+        or False,
+    )
     general_config_yaml = render_yaml(general_config_dict)
 
     general_config_map = kubernetes.core.v1.ConfigMap(
