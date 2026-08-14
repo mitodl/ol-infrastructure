@@ -256,19 +256,29 @@ rest default to `"short"`. Set it explicitly for anything that isn't a plain
 count: `"percentunit"` for ratios, `"s"` for durations, `"bytes"` for memory.
 
 **`_timeseries_panel`'s legend defaults to summing every series across the
-graph window** ("Total: ..."), which only means something for a genuine
-count/rate (logins/min, error rate, GC events by cause). For a gauge --
-anything that's an instantaneous reading rather than an accumulating count
-(memory used, connection-pool size, CPU usage, a hit ratio) -- summing
-hundreds of samples produces a number with no physical meaning: a heap panel
-summed to "1.73 TiB" against a real 2.5 GiB max, `percentunit` CPU usage
-summed past 3000%. `percentunit`/`percent` already default to `mean`
-automatically. **For every other gauge-like panel, pass `legend_calc`
+graph window** ("Total: ..."), which is only meaningful for a genuine
+non-overlapping interval count -- e.g. a Loki `count_over_time(...
+[$__interval])` panel, where each rendered point is a distinct bucket and
+the buckets' sum equals the true total for the selected range. It is
+**not** meaningful for a `rate()`/`irate()`-derived series (`logins/min`,
+an error rate, GC pause time/count by cause): each rendered point is a
+per-second rate sampled at the display resolution, so summing them
+together is rate x sample-count rather than a real total, and the number
+changes with Grafana's query step/`$__rate_interval` even though nothing
+about the underlying data changed -- these need an explicit reducer too.
+Nor is it meaningful for a gauge -- anything that's an instantaneous
+reading rather than an accumulating count (memory used, connection-pool
+size, CPU usage, a hit ratio) -- summing hundreds of samples produces a
+number with no physical meaning: a heap panel summed to "1.73 TiB" against
+a real 2.5 GiB max, `percentunit` CPU usage summed past 3000%.
+`percentunit`/`percent` and duration (`s`) units already default to `mean`
+automatically since both are near-universally gauge- or rate-like. **For
+every other gauge-like or rate-derived panel, pass `legend_calc`
 explicitly** -- `"max"` for a memory/capacity panel (peak usage is the
 number that matters), `"mean"` or `"last"` for others. When adding a new
-`_timeseries_panel` call, ask whether the underlying metric is cumulative
-(rate/count -- `sum` is fine) or a gauge (pass `legend_calc`) before
-shipping it.
+`_timeseries_panel` call, ask whether the underlying metric is a
+non-overlapping interval count (`sum` is fine) or a rate/gauge (pass
+`legend_calc`) before shipping it.
 
 No dashboard in this package queries Tempo -- an earlier version of
 `keycloak_activity.py` did, pairing a sampled TraceQL request count against

@@ -291,6 +291,7 @@ def _dashboard_json(
                     },
                 ],
                 grid_pos={"h": 8, "w": 12, "x": 0, "y": 56},
+                legend_calc="mean",
             ),
             timeseries_panel(
                 title="GC Pause Time by Cause",
