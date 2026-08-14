@@ -193,6 +193,8 @@ This is the production shape, shrunk. Production runs the same collector, Grafan
 
 Collection reads log *files* off the node rather than streaming through the API server (`loki.source.kubernetes`). The streaming path rides the same kubelet `:10250` API that is documented to wedge after VM sleep, which would kill log collection exactly when the environment is already broken.
 
+Grafana's **Logs Drilldown** app (`Drilldown → Logs`) is the intended entry point — browsing services, fields and patterns beats writing LogQL for the "something is wrong, where?" case that brings anyone here in the first place. It carries two setup requirements that are easy to miss because neither fails loudly. Grafana preinstalls the app *asynchronously* by default, so on a fresh PVC the server starts serving before the download lands and the first page load renders a nav with no Logs entry; `GF_PLUGINS_PREINSTALL_ASYNC=false` moves the install ahead of the HTTP listener. And Loki's `pattern_ingester` is off by default, which leaves the Patterns tab permanently empty with `/loki/api/v1/patterns` returning 404 rather than an error the UI surfaces.
+
 Alloy also exposes an OTLP receiver on 4317/4318 forwarding to Loki's native OTLP endpoint (`http://alloy.operations.svc.cluster.local:4318`). **Nothing emits to it yet** — it exists so an app can opt into production-style OTLP export by setting the `OTEL_*` env vars used in the deployed environments, and so Keycloak's `OTEL_SDK_DISABLED=true` workaround in `identity_core.py` (added precisely because no receiver existed) can be lifted.
 
 The whole stack is roughly 1.3GB and can be switched off with `observability_enabled: "false"`; nothing else depends on it.

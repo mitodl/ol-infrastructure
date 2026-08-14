@@ -220,7 +220,9 @@ kubectl logs -n operations deploy/apisix -f
 
 To search across services — or to follow a request from the ingress into the app and on into the worker that picked up the task — use **Grafana at [https://grafana.mit.dev](https://grafana.mit.dev)**. It opens straight into the UI with no login. Every pod in the cluster is collected, including the ones Tilt does not manage (Postgres, Valkey, OpenSearch, Keycloak, APISIX, Mailpit).
 
-Start from the pre-provisioned **local-dev logs** dashboard, or go to **Explore → Loki** and write LogQL directly:
+The quickest way in is **Drilldown → Logs**, which needs no LogQL at all: pick a service, then narrow by detected label, field, or log level from the sidebar. Its **Patterns** tab groups repetitive lines into templates, which is how you spot one error buried in a wall of health checks.
+
+For anything the point-and-click path cannot express, start from the pre-provisioned **local-dev logs** dashboard, or go to **Explore → Loki** and write LogQL directly:
 
 ```logql
 {namespace="mit-learn"}                      # everything in one app's namespace
@@ -229,7 +231,7 @@ Start from the pre-provisioned **local-dev logs** dashboard, or go to **Explore 
 {container="celery"} |= "Traceback"          # across every app's workers
 ```
 
-Available labels are `namespace`, `pod`, `container`, and `app`. Logs are kept for one week by default — see [Log retention](#log-retention) to change that, and `observability_enabled` in [Pulumi stack config](#pulumi-stack-config) to turn the whole stack off.
+Available labels are `namespace`, `pod`, `container`, and `app`, plus `service_name`, which Loki derives on its own and which is what Drilldown's service list is keyed on. Logs are kept for one week by default — see [Log retention](#log-retention) to change that, and `observability_enabled` in [Pulumi stack config](#pulumi-stack-config) to turn the whole stack off.
 
 ### Run management commands
 

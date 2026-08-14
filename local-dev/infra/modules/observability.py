@@ -41,7 +41,27 @@ NAMESPACE = "operations"
 
 LOKI_IMAGE = "grafana/loki:3.3.2"
 ALLOY_IMAGE = "grafana/alloy:v1.7.5"
-GRAFANA_IMAGE = "grafana/grafana:11.6.0"
+# >= 11.6.11 is the floor Grafana documents for the Logs Drilldown app below.
+GRAFANA_IMAGE = "grafana/grafana:11.6.16"
+
+# Logs Drilldown -- the "Logs" entry under Drilldown in the nav. It browses
+# services, fields and patterns without anyone writing LogQL, which is the
+# whole point of having Loki here rather than `kubectl logs`.
+#
+# Grafana already preinstalls this by default, but asynchronously: the server
+# starts listening before the download finishes, so on a fresh PVC the first
+# page load builds a nav with no Logs entry, and it only appears after a
+# restart. Naming it here and forcing a synchronous install is what makes it
+# show up on a cold `tilt up` -- the install now completes before the HTTP
+# listener opens. The list adds to Grafana's defaults rather than replacing
+# them, so the Pyroscope app comes along too; harmless, if a dead "Profiles"
+# nav entry until something serves profiles.
+#
+# Unpinned on purpose: the plugin catalog resolves the newest build whose
+# grafanaDependency matches GRAFANA_IMAGE, so this cannot drift out of sync
+# with a Grafana bump. A failed download is logged and start-up continues, so
+# an offline laptop loses the app, not the cluster.
+GRAFANA_PLUGINS = "grafana-lokiexplore-app"
 
 LOKI_URL = f"http://loki.{NAMESPACE}.svc.cluster.local:3100"
 OTLP_HTTP_ENDPOINT = f"http://alloy.{NAMESPACE}.svc.cluster.local:4318"
@@ -232,11 +252,22 @@ def _loki_config(retention_period: str) -> str:
             },
             "limits_config": {
                 "retention_period": retention_period,
+                # allow_structured_metadata/volume_enabled/discover_log_levels
+                # are the three limits Logs Drilldown requires: they back its
+                # detected fields, its service list, and its level breakdown
+                # respectively. The last two default on in Loki 3.x; set
+                # explicitly so a future default flip is not a silent
+                # regression in a UI nobody is testing.
                 "allow_structured_metadata": True,
                 "volume_enabled": True,
+                "discover_log_levels": True,
                 # A laptop that has been asleep replays old timestamps on wake.
                 "reject_old_samples": False,
             },
+            # Off by default, and the only source for Logs Drilldown's Patterns
+            # tab -- without it that tab is permanently empty and /patterns
+            # 404s. In-memory ring, matching the single-binary topology above.
+            "pattern_ingester": {"enabled": True},
             "compactor": {
                 "working_directory": "/loki/compactor",
                 # Without this, retention_period above is inert.
@@ -663,12 +694,27 @@ def _create_grafana(
                                     "value": "false",
                                 },
                                 {"name": "GF_USERS_DEFAULT_THEME", "value": "dark"},
+                                {
+                                    "name": "GF_PLUGINS_PREINSTALL",
+                                    "value": GRAFANA_PLUGINS,
+                                },
+                                # See GRAFANA_PLUGINS: the default async
+                                # install is why Logs Drilldown was missing
+                                # from the nav on a first boot.
+                                {
+                                    "name": "GF_PLUGINS_PREINSTALL_ASYNC",
+                                    "value": "false",
+                                },
                             ],
                             "readinessProbe": {
                                 "httpGet": {"path": "/api/health", "port": 3000},
                                 "initialDelaySeconds": 15,
+                                # Grafana does not listen until the synchronous
+                                # plugin install finishes, so the first boot on
+                                # an empty PVC has a ~13MB download in front of
+                                # it. 5 minutes covers a slow connection.
                                 "periodSeconds": 10,
-                                "failureThreshold": 12,
+                                "failureThreshold": 30,
                             },
                             "resources": {"limits": {"memory": "256Mi"}},
                             "volumeMounts": [
