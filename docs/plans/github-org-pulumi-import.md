@@ -837,8 +837,13 @@ What this buys:
 - A new repo is protected the moment its `tier` property is set — no separate ruleset
   resource to remember, which removes the "someone created a repo and it had no protection"
   failure mode entirely (currently the state of `ol-django`).
-- Because C7 passed, each ruleset can be introduced at `enforcement: evaluate`, watched, then
-  promoted to `active`.
+- ~~Because C7 passed, each ruleset can be introduced at `enforcement: evaluate`, watched, then
+  promoted to `active`.~~ **Wrong, corrected 2026-08-14** — C7 only proved the API accepts
+  `PUT enforcement=evaluate`, not that GitHub runs dry-run logic on the Team plan. The
+  settings UI states evaluate mode is Enterprise-only. Both rulesets sat inert at
+  `evaluate` for a week (confirmed: zero rule-suite log entries attributable to either,
+  despite real tier-1 push activity) and were promoted straight to `active` on
+  2026-08-14 with no dry-run. See `organization/org_rulesets.py`'s module docstring.
 
 **`required_status_checks` stays per-repo.** Check names differ per repo (`javascript-tests`
 vs `python-tests`), so that one rule remains a small `RepositoryRuleset` on repos that declare
@@ -850,9 +855,19 @@ it. Everything else is org-level. This is also why DX-02/DX-03 stay per-repo aud
    finding to fix later; populating the `tier` property is part of the import.
 2. **A cross-project ordering edge appears.** The schema and rulesets live in `organization`;
    the per-repo values live in `repositories`. Deploy order is organization → repositories,
-   after which the rulesets begin matching. The failure mode is safe by construction — an
-   unlabeled fleet matches *nothing* rather than everything — but the pipeline must encode
-   the order rather than discover it.
+   after which the rulesets begin matching.
+
+   **Corrected 2026-08-14 — this was never safe by construction, and the plan already knew
+   it.** An earlier draft of this paragraph claimed an unlabeled fleet matches *nothing*
+   rather than everything. It is the opposite: `tier` is `required` with `default_value:
+   standard`, and `baseline-default-branch` targets `standard` deliberately (§3.5, so a
+   brand-new repo is protected from creation). §7 already documents the concrete failure
+   this produced — all 140 archived repos briefly matched at `tier=standard` post-phase-3,
+   fixed by PR #5317 — so the correct three-step order is **schema creation, then `tier`
+   population on every repo, then ruleset activation**, not "organization, then
+   repositories" as a two-step story. With both rulesets now `active` (this PR), getting
+   this order wrong on any future change is a real enforcement gap, not evaluate-mode log
+   noise — the pipeline must encode the three steps rather than discover them.
 
 This does not require a `StackReference`: the ruleset names a property by string, and the
 repositories stack sets that property's value by string. The coupling is a shared vocabulary,
@@ -991,13 +1006,17 @@ reading clean is distinguishable from CON-11 not running.
 | **1** | Build `bin/github-org-inventory`. Crawl. Human-confirm archetype per repo. Commit `data/`. | 317 repos classified; estate report reviewed |
 | **2** | Author `organization/`. Import org settings and the 14 teams — **not** members or team rosters (§4.7). Define the `tier` custom-property schema (§5.4) — a prerequisite, not a fast-follow. | **Empty diff** on `ol-saas-github-organization` |
 | **3** | Author `repositories/`. Import in ~25-repo batches, including each repo's `tier` value. | **Empty diff** after every batch, and on the whole stack |
-| **3.5** | Add the two property-targeted org rulesets at `enforcement: evaluate`. Watch, then promote to `active` by flipping `_ENFORCEMENT` in `organization/org_rulesets.py`. | Rule-suite logs show the expected repos matching and no surprises |
+| **3.5** | Add the two property-targeted org rulesets at `enforcement: evaluate`, planning to watch and then promote. **Evaluate mode turned out to be Enterprise-only (2026-08-14 correction) — no dry-run was possible on the Team plan.** Fixed a real bypass gap found by reading existing branch-protection config directly (PR #5412), then promoted both to `active` on 2026-08-14 with no dry-run. | Landed at `active` |
 | **4** | Build `bin/github-estate-audit`. Run all three axes. Emit witan tasks. | Backlog exists and is triaged |
 | **5** | Remediate by tightening archetypes, not per-repo edits. Land in reviewed waves. | Each wave previews clean and is approved |
 | **6** | Nightly `drift` job in Concourse; org custom-properties schema populated; consider Vault-sourced Actions secrets. | Drift job green |
 
-Phases 0–3 change nothing on GitHub. Phase 5 is where behaviour changes, and it is entirely
-downstream of a reviewed backlog — which is the point of doing the import first.
+Phases 0–3 change nothing on GitHub. **Updated 2026-08-14:** phase 5 is no longer where
+behaviour first changes — phase 3.5 landed at `active` on 2026-08-14 with no dry-run
+(evaluate mode turned out to be Enterprise-only), so its two org rulesets already enforce
+fleet-wide branch protection. Phase 5 remains downstream of a reviewed backlog for
+everything *else* — the SEC-/CON-/DX- findings phase 4's audit surfaces — but treat
+phase 3.5 as a real, live behaviour change, not a neutral prerequisite.
 
 ---
 
@@ -1034,7 +1053,7 @@ because the evidence is what makes a decision re-examinable when the estate chan
    | C2/C3 custom property create + assign | PASS |
    | C4 org ruleset accepts `repository_property` | PASS |
    | C5 condition persists round-trip | PASS |
-   | **C7 `evaluate` (dry-run) enforcement** | **PASS** — not Enterprise-gated |
+   | **C7 `evaluate` (dry-run) enforcement** | **PASS, but wrong — see 2026-08-14 correction below** |
    | C8 system-property targeting | **PASS** — the name is `visibility`, not `repository_visibility` |
    | C9 per-repo ruleset fallback | PASS |
    | **C6c property targeting actually matches** | **PASS** — `ol-infrastructure=True`, `ol-django=False`, agreeing across both endpoints |
@@ -1044,9 +1063,16 @@ because the evidence is what makes a decision re-examinable when the estate chan
    - **Property targeting matches correctly** (C6c): with the ruleset briefly `active`,
      the labeled repo saw it and the unlabeled control did not, and both read endpoints
      agreed. This is what §5.4 is built on.
-   - **`evaluate` mode is available.** The earlier worry that phase 5 would have to
+   - ~~**`evaluate` mode is available.** The earlier worry that phase 5 would have to
      roll out blind is gone — a ruleset can be trialled fleet-wide in log-only mode
-     before it blocks anything.
+     before it blocks anything.~~ **Wrong, corrected 2026-08-14.** C7 only proved the
+     API accepts `PUT enforcement=evaluate` without erroring; it never confirmed GitHub
+     actually runs dry-run logic afterward. The org settings UI states evaluate mode is
+     Enterprise-only, and both org rulesets sat completely inert at `evaluate` for a
+     week — zero rule-suite log entries attributable to either despite real tier-1 push
+     activity. Phase 5 (and this promotion) did roll out blind, on the Team plan, by
+     necessity — see `organization/org_rulesets.py`'s module docstring for what was
+     de-risked first by reading existing branch-protection config directly instead.
    - **System properties work**, so the ~60 upstream forks and any visibility-based
      rule can be targeted with no custom schema at all.
    - **A read-API gotcha that affects §7's `drift` mode.** Controls C6a and C6b proved

@@ -5,32 +5,56 @@ Two rulesets replace what would otherwise be ~176 near-identical per-repo
 one object rather than a fleet-wide rollout, and a new repo is protected the moment
 its `tier` is set -- which, because `tier` has a default, is at creation (§3.5).
 
-BOTH LAND AT `enforcement: evaluate`. Evaluate mode logs what *would* have been
-blocked without blocking it, so the baseline can be watched against real traffic
-before it starts failing anyone's push. Probe check C7 confirmed evaluate is
-available on the Team plan; without it this would have to roll out blind.
+BOTH LANDED AT `enforcement: evaluate` on 2026-08-07 and were PROMOTED TO `active` on
+2026-08-14. That gap was meant to be a dry-run: evaluate mode logs what *would* have
+been blocked without blocking it, watched against real traffic before anything starts
+failing anyone's push.
 
-  Promotion to `active` is a deliberate, separate change: flip `_ENFORCEMENT` to
-  "active" after reading the rule-suite logs at
-  https://github.com/organizations/mitodl/settings/rules. What starts blocking then is
-  exactly what is declared below: force-push and deletion of the default branch, and
-  merging without an approving review. CI stays advisory either way -- neither ruleset
-  carries `required_status_checks` (see the omissions at the foot of this file), so
-  SEC-03 is untouched by the flip and remains a per-repo audit finding.
+  CORRECTION 2026-08-14 -- evaluate mode does not exist on the Team plan. The org
+  settings UI states plainly: "Evaluate mode is only available to Enterprise
+  organizations." Probe check C7 (`bin/github-ruleset-capability-probe`) recorded PASS
+  because the API accepted `PUT enforcement=evaluate` without erroring -- it never
+  confirmed GitHub actually ran dry-run logic afterward, which is exactly the kind of
+  false positive the probe's own methodological note already warns about for a
+  different check. In reality both rulesets sat completely inert for the week they
+  spent at `evaluate`: not logging, not blocking, doing nothing. This also explains why
+  no rule-suite log, at any endpoint, ever showed either ruleset evaluating a real push
+  (see the read-API paragraph below -- it undersold the problem; the real issue wasn't
+  read-endpoint visibility, it was that there was nothing to see).
+
+  Consequently there was no safe way to dry-run this on the Team plan, and promotion to
+  `active` on 2026-08-14 happened without one -- a deliberate decision (Tobias), not a
+  gap that got missed. The two concrete risks the investigation *could* still find by
+  reading existing branch-protection config directly -- renovate[bot] and
+  admin/odlbot bypass -- were fixed first (see `_ADMIN_BYPASS` below and PR #5412).
+  `tier-1-hardening`'s two rules (`require_last_push_approval`,
+  `required_review_thread_resolution`) are brand-new requirements no repo enforced
+  before; promoting straight to `active` is the first real signal on those, not a
+  confirmation of already-observed safety.
+
+  ONE KNOWN REGRESSION, ACCEPTED RATHER THAN FIXED. PR #5412 found that
+  `ChristopherChudzicki` holds a personal PR-review bypass on `smoot-design` (a
+  `tier-1` repo) with no equivalent under `_ADMIN_BYPASS` -- they are in
+  `odl-engineering`, not `odl-engineering-owners`. `OrganizationRulesetBypassActorArgs`
+  has no per-user actor type, so covering them would mean adding them to a
+  bypass-eligible team. Tobias's decision (2026-08-14): let that personal exemption
+  lapse rather than widen team membership to preserve it. This is a real, intentional
+  behaviour change on that one repo, not an oversight.
 
 ORDERING. These must not be applied before `ol-saas-github-repositories` has set
 per-repo tiers. Until then every repo carries the property default `standard`, which
 `baseline-default-branch` targets -- so applying early would sweep in all 102 forks
-and 140 archived repos. Evaluate mode makes that survivable rather than harmless:
-nothing would be blocked, but the rule-suite logs would be full of noise from repos
-that are meant to be untargeted. See organization/custom_properties.py.
+and 140 archived repos. See organization/custom_properties.py.
 
 A READ-API GOTCHA THAT AFFECTS DRIFT DETECTION. Probe controls C6a/C6b established
-that no read endpoint reports a non-`active` ruleset as applying to a repo: a ruleset
-in evaluate mode is invisible to both `/repos/{repo}/rulesets?includes_parents=true`
-and `/repos/{repo}/rules/branches/{branch}`. While these sit at `evaluate`, the only
-way to see them is `/orgs/{org}/rulesets`. Any drift check that uses the
-effective-rules endpoints will report them as absent and be wrong.
+that no read endpoint reports a non-`active` ruleset as applying to a repo: a
+ruleset not at `active` enforcement is invisible to both
+`/repos/{repo}/rulesets?includes_parents=true` and
+`/repos/{repo}/rules/branches/{branch}`. Now that both rulesets are `active`, this
+no longer matters for them, but it stays true for any future ruleset introduced at
+a non-`active` enforcement -- which, per the correction above, cannot mean
+`evaluate` on this plan; the only non-`active` option worth using is `disabled`,
+and a disabled ruleset is invisible everywhere except `/orgs/{org}/rulesets`.
 """
 
 import pulumi_github as github
@@ -43,8 +67,8 @@ from ol_infrastructure.saas.github.tiers import (
     TIER_STANDARD,
 )
 
-#: Flip to "active" only after watching the rule-suite logs. See the module docstring.
-_ENFORCEMENT = "evaluate"
+#: Promoted 2026-08-14. See the module docstring for why there was no dry-run first.
+_ENFORCEMENT = "active"
 
 # Found 2026-08-14, ahead of promotion: neither ruleset carries a bypass, but
 # `enforce_admins: false` on every repo's classic branch protection today means repo
