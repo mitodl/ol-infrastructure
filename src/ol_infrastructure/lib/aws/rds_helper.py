@@ -4,6 +4,7 @@ from functools import lru_cache
 
 import boto3
 import pulumi
+from botocore.exceptions import ClientError
 
 rds_client = boto3.client("rds")
 ec2_client = boto3.client("ec2")
@@ -72,15 +73,16 @@ def postgres_max_connections(db_instance_type: str) -> int:
     """
     # RDS instance classes are the EC2 class with a ``db.`` prefix, and the
     # DescribeDBInstance APIs don't report instance memory, so resolve it from EC2.
-    instance_types = ec2_client.describe_instance_types(
-        InstanceTypes=[db_instance_type.removeprefix("db.")]
-    )["InstanceTypes"]
-    if not instance_types:
-        # The instance class comes from Pulumi config, so a typo lands here rather than
-        # in an internal invariant. Say which value failed -- the bare IndexError this
-        # would otherwise raise gives no hint during a stack preview.
+    try:
+        instance_types = ec2_client.describe_instance_types(
+            InstanceTypes=[db_instance_type.removeprefix("db.")]
+        )["InstanceTypes"]
+    except ClientError as exc:
+        # An unknown type raises InvalidInstanceType rather than returning an empty
+        # list. The instance class comes from Pulumi config, so a typo lands here, and
+        # AWS reports the stripped EC2 name -- report the value as configured instead.
         msg = f"No EC2 instance type matching RDS instance class {db_instance_type}"
-        raise ValueError(msg)
+        raise ValueError(msg) from exc
     memory_bytes = instance_types[0]["MemoryInfo"]["SizeInMiB"] * 1024 * 1024
     return min(
         memory_bytes // POSTGRES_BYTES_PER_CONNECTION, POSTGRES_MAX_CONNECTIONS_CAP

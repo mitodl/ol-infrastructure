@@ -9,6 +9,7 @@ so that failure blocks the environment from deploying at all.
 import re
 
 import pytest
+from botocore.exceptions import ClientError
 
 from ol_infrastructure.lib.aws import rds_helper
 
@@ -62,15 +63,12 @@ class TestPostgresMaxConnections:
     """
 
     @staticmethod
-    def _stub_ec2(monkeypatch, size_mib: int | None):
-        """Stand in for EC2 ``describe_instance_types``; ``None`` = unknown class."""
-        instance_types = (
-            [] if size_mib is None else [{"MemoryInfo": {"SizeInMiB": size_mib}}]
-        )
+    def _stub_ec2(monkeypatch, size_mib: int):
+        """Stand in for a successful EC2 ``describe_instance_types``."""
         monkeypatch.setattr(
             rds_helper.ec2_client,
             "describe_instance_types",
-            lambda **_: {"InstanceTypes": instance_types},
+            lambda **_: {"InstanceTypes": [{"MemoryInfo": {"SizeInMiB": size_mib}}]},
         )
         # The function is lru_cached, so each case needs a clean slate.
         rds_helper.postgres_max_connections.cache_clear()
@@ -99,6 +97,24 @@ class TestPostgresMaxConnections:
         assert queried["InstanceTypes"] == ["t4g.medium"]
 
     def test_unknown_instance_class_names_the_bad_value(self, monkeypatch):
-        self._stub_ec2(monkeypatch, None)
+        # EC2 raises InvalidInstanceType rather than returning an empty list, and it
+        # reports the stripped name -- verified against the live API. The ValueError
+        # exists to name the class as it appears in Pulumi config, prefix included.
+        def _raise(**_):
+            raise ClientError(
+                {
+                    "Error": {
+                        "Code": "InvalidInstanceType",
+                        "Message": (
+                            "The following supplied instance types do not exist: "
+                            "[nonexistent.xlarge]"
+                        ),
+                    }
+                },
+                "DescribeInstanceTypes",
+            )
+
+        monkeypatch.setattr(rds_helper.ec2_client, "describe_instance_types", _raise)
+        rds_helper.postgres_max_connections.cache_clear()
         with pytest.raises(ValueError, match=re.escape("db.nonexistent.xlarge")):
             rds_helper.postgres_max_connections("db.nonexistent.xlarge")
