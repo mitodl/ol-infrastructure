@@ -1,14 +1,24 @@
 """Trace- and broad-event-backed activity panels not covered by the overview.
 
 Trimmed port of the Grafana-Cloud-UI-authored "Keycloak Activity Dashboard".
-Most of that dashboard's panels (login/registration rate, error ratio,
-current error rates) are strict subsets of what keycloak_overview.py already
-shows from Keycloak's own Micrometer events, so they're dropped here. What's
-kept is content Overview has no equivalent for: Tempo trace-derived request
-rates for endpoints Keycloak doesn't emit a `keycloak_user_events_total`
-event for (token exchange, authorization, account-management requests), and
-two broad, un-itemized event/error breakdowns from Loki (Overview only
-itemizes the event types and error codes we specifically care about).
+A few of that dashboard's panels ("Overall error ratio", "Current error
+rates", "Event types breakdown") are strict subsets or alternate
+visualizations of what keycloak_overview.py already shows from Keycloak's
+own Micrometer events, so they're dropped here. What's kept is content
+Overview has no equivalent for:
+
+- Combined Tempo-request-rate + Loki-error-rate panels for the two
+  browser-facing login/registration form endpoints. Overview only sees
+  Keycloak's own `login`/`register` *events*; it has no visibility into
+  raw HTTP hits on `/login-actions/authenticate` and
+  `/login-actions/registration` themselves (e.g. a client that never
+  completes the form flow far enough to emit a Keycloak event still shows
+  up here).
+- Tempo trace-derived request rates for endpoints Keycloak doesn't emit a
+  `keycloak_user_events_total` event for at all (token exchange,
+  authorization, account-management requests).
+- Two broad, un-itemized event/error breakdowns from Loki (Overview only
+  itemizes the event types and error codes we specifically care about).
 
 The original dashboard hardcoded `service.name="keycloak-production"` and
 `cluster="operations-production"`, so it only ever worked in the Production
@@ -40,6 +50,43 @@ def _trace_rate_expr(*, route_pattern: str) -> str:
     return (
         f'{{resource.service.name=~"keycloak.*" '
         f'&& span.http.route =~ "{route_pattern}"}} | rate()'
+    )
+
+
+def _loki_error_rate_expr(*, event_type: str) -> str:
+    """LogQL rate() of a single raw Keycloak log event type, by logfmt."""
+    return (
+        "sum(rate("
+        f'{{{_LOKI_SELECTOR}}} | logfmt | type =~ "{event_type}" [$__rate_interval]'
+        "))"
+    )
+
+
+def _attempts_vs_errors_panel(
+    timeseries_panel: Callable[..., dict[str, Any]],
+    *,
+    title: str,
+    route_pattern: str,
+    error_event_type: str,
+    grid_pos: dict[str, Any],
+) -> dict[str, Any]:
+    """Build a combined Tempo request-rate + Loki error-rate panel."""
+    return timeseries_panel(
+        title=title,
+        queries=[
+            {
+                "expr": _trace_rate_expr(route_pattern=route_pattern),
+                "legend_format": "attempts/s",
+                "datasource_ref": TEMPO_DATASOURCE_REF,
+                "query_key": "query",
+            },
+            {
+                "expr": _loki_error_rate_expr(event_type=error_event_type),
+                "legend_format": "errors/s",
+                "datasource_ref": LOKI_DATASOURCE_REF,
+            },
+        ],
+        grid_pos=grid_pos,
     )
 
 
@@ -77,11 +124,26 @@ def _dashboard_json(
             ]
         },
         "panels": [
-            row_panel(title="Request Rates (Tempo)", y=0),
+            row_panel(title="Login & Registration (Tempo + Loki)", y=0),
+            _attempts_vs_errors_panel(
+                timeseries_panel,
+                title="Login Attempts vs Errors",
+                route_pattern=".*/login-actions/authenticate",
+                error_event_type="LOGIN_ERROR",
+                grid_pos={"h": 8, "w": 12, "x": 0, "y": 1},
+            ),
+            _attempts_vs_errors_panel(
+                timeseries_panel,
+                title="Registration Attempts vs Errors",
+                route_pattern=".*/login-actions/registration",
+                error_event_type="REGISTER_ERROR",
+                grid_pos={"h": 8, "w": 12, "x": 12, "y": 1},
+            ),
+            row_panel(title="Request Rates (Tempo)", y=9),
             timeseries_panel(
                 title="Token Request Rate",
                 expr=_trace_rate_expr(route_pattern=".*/protocol/.*/token"),
-                grid_pos={"h": 8, "w": 12, "x": 0, "y": 1},
+                grid_pos={"h": 8, "w": 12, "x": 0, "y": 10},
                 datasource_ref=TEMPO_DATASOURCE_REF,
                 legend_format="token requests/s",
                 query_key="query",
@@ -89,7 +151,7 @@ def _dashboard_json(
             timeseries_panel(
                 title="Authorization Request Rate",
                 expr=_trace_rate_expr(route_pattern=".*/protocol/.*/auth"),
-                grid_pos={"h": 8, "w": 12, "x": 12, "y": 1},
+                grid_pos={"h": 8, "w": 12, "x": 12, "y": 10},
                 datasource_ref=TEMPO_DATASOURCE_REF,
                 legend_format="authorization requests/s",
                 query_key="query",
@@ -97,12 +159,12 @@ def _dashboard_json(
             timeseries_panel(
                 title="Account Management Request Rate",
                 expr=_trace_rate_expr(route_pattern=".*/account/.*"),
-                grid_pos={"h": 8, "w": 12, "x": 0, "y": 9},
+                grid_pos={"h": 8, "w": 12, "x": 0, "y": 18},
                 datasource_ref=TEMPO_DATASOURCE_REF,
                 legend_format="account requests/s",
                 query_key="query",
             ),
-            row_panel(title="Broad Event/Error Breakdown (Loki)", y=17),
+            row_panel(title="Broad Event/Error Breakdown (Loki)", y=26),
             timeseries_panel(
                 title="All Event Types Rate",
                 expr=(
@@ -110,7 +172,7 @@ def _dashboard_json(
                     f'{{{_LOKI_SELECTOR}}} | logfmt | type != "" [$__rate_interval]'
                     "))"
                 ),
-                grid_pos={"h": 8, "w": 12, "x": 0, "y": 18},
+                grid_pos={"h": 8, "w": 12, "x": 0, "y": 27},
                 datasource_ref=LOKI_DATASOURCE_REF,
                 legend_format="{{type}}",
             ),
@@ -121,7 +183,7 @@ def _dashboard_json(
                     f'{{{_LOKI_SELECTOR}}} | logfmt | error != "" [$__range]'
                     ")))"
                 ),
-                grid_pos={"h": 8, "w": 12, "x": 12, "y": 18},
+                grid_pos={"h": 8, "w": 12, "x": 12, "y": 27},
                 datasource_ref=LOKI_DATASOURCE_REF,
                 legend_format="{{error}}",
             ),

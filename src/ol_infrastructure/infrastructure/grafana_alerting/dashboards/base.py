@@ -32,6 +32,8 @@ from ol_infrastructure.infrastructure.grafana_alerting.dashboards.datasources im
     MIMIR_DATASOURCE_REF,
 )
 
+_MIXED_DATASOURCE_REF = {"type": "datasource", "uid": "-- Mixed --"}
+
 
 def _timeseries_panel(
     *,
@@ -40,7 +42,7 @@ def _timeseries_panel(
     grid_pos: dict[str, Any],
     datasource_ref: dict[str, str] = MIMIR_DATASOURCE_REF,
     legend_format: str = "{{identity_provider}}",
-    queries: list[dict[str, str]] | None = None,
+    queries: list[dict[str, Any]] | None = None,
     unit: str = "short",
     query_key: str = "expr",
 ) -> dict[str, Any]:
@@ -54,13 +56,34 @@ def _timeseries_panel(
     `query_key` names the JSON key the datasource expects the query string
     under -- Prometheus/Loki use `expr`, but Tempo's TraceQL targets use
     `query` instead; pass `query_key="query"` for a Tempo-backed panel.
+    Either can be overridden per-query (via a `"query_key"`/`"datasource_ref"`
+    key in that query's dict) for a panel comparing series from two
+    datasources -- e.g. a Tempo request rate next to a Loki error rate for
+    the same endpoint. The panel's own `datasource` is set to Grafana's
+    mixed-datasource sentinel whenever the targets don't all share one.
     """
     if queries is None:
         queries = [{"expr": expr, "legend_format": legend_format}]
+    resolved_datasources = [
+        query.get("datasource_ref", datasource_ref) for query in queries
+    ]
+    targets = [
+        {
+            "datasource": resolved_ds,
+            query.get("query_key", query_key): query["expr"],
+            "legendFormat": query.get("legend_format", "{{legend}}"),
+            "refId": chr(65 + i),
+        }
+        for i, (query, resolved_ds) in enumerate(zip(queries, resolved_datasources))
+    ]
+    unique_uids = {ds["uid"] for ds in resolved_datasources}
+    panel_datasource = (
+        resolved_datasources[0] if len(unique_uids) == 1 else _MIXED_DATASOURCE_REF
+    )
     return {
         "title": title,
         "type": "timeseries",
-        "datasource": datasource_ref,
+        "datasource": panel_datasource,
         "gridPos": grid_pos,
         "fieldConfig": {
             "defaults": {
@@ -84,15 +107,7 @@ def _timeseries_panel(
             },
             "tooltip": {"mode": "multi"},
         },
-        "targets": [
-            {
-                "datasource": datasource_ref,
-                query_key: query["expr"],
-                "legendFormat": query.get("legend_format", "{{legend}}"),
-                "refId": chr(65 + i),
-            }
-            for i, query in enumerate(queries)
-        ],
+        "targets": targets,
     }
 
 
