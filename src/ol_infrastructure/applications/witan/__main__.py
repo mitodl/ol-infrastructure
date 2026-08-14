@@ -149,17 +149,11 @@ from ol_infrastructure.applications.witan.ci_indexer import (
 from ol_infrastructure.applications.witan.ingress import create_ingress_resources
 from ol_infrastructure.applications.witan.mcp_servers import (
     MCP_GROUP_NAME,
+    TOOLHIVE_SERVICE,
     WITAN_MCPSERVER_NAME,
     create_mcp_servers,
 )
 from ol_infrastructure.applications.witan.migrations import create_migration_job
-from ol_infrastructure.applications.witan.observability import (
-    TOOLHIVE_TELEMETRY_BACKEND_CONFIG_NAME,
-    TOOLHIVE_TELEMETRY_VMCP_CONFIG_NAME,
-    toolhive_service_name,
-    toolhive_telemetry_spec,
-    toolhive_vmcp_audit,
-)
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
@@ -187,6 +181,12 @@ from ol_infrastructure.lib.pulumi_helper import (
     optional_stack_output_value,
     parse_stack,
     require_stack_output_value,
+)
+from ol_infrastructure.lib.toolhive_telemetry import (
+    telemetry_config_name,
+    toolhive_service_name,
+    toolhive_telemetry_spec,
+    toolhive_vmcp_audit,
 )
 from ol_infrastructure.lib.vault import setup_vault_provider
 
@@ -797,13 +797,15 @@ witan_telemetry_backend = kubernetes.apiextensions.CustomResource(
     api_version="toolhive.stacklok.dev/v1beta1",
     kind="MCPTelemetryConfig",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=TOOLHIVE_TELEMETRY_BACKEND_CONFIG_NAME,
+        name=telemetry_config_name(TOOLHIVE_SERVICE, "backend"),
         namespace=NAMESPACE,
         labels=k8s_global_labels,
     ),
     # Never None for this hop: Prometheus is enabled in every environment, so
     # `toolhive_telemetry_spec` always returns a spec here.
-    spec=toolhive_telemetry_spec(stack_info, "mcp-proxy", expose_prometheus=True),
+    spec=toolhive_telemetry_spec(
+        stack_info, TOOLHIVE_SERVICE, "mcp-proxy", expose_prometheus=True
+    ),
     opts=ResourceOptions(depends_on=[cluster_stack]),
 )
 
@@ -812,7 +814,7 @@ witan_telemetry_backend = kubernetes.apiextensions.CustomResource(
 # and no `telemetryConfigRef` at all — rather than an inert one that reads like
 # telemetry is on.
 witan_telemetry_vmcp_spec = toolhive_telemetry_spec(
-    stack_info, "vmcp", expose_prometheus=False
+    stack_info, TOOLHIVE_SERVICE, "vmcp", expose_prometheus=False
 )
 witan_telemetry_vmcp = (
     kubernetes.apiextensions.CustomResource(
@@ -820,7 +822,7 @@ witan_telemetry_vmcp = (
         api_version="toolhive.stacklok.dev/v1beta1",
         kind="MCPTelemetryConfig",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=TOOLHIVE_TELEMETRY_VMCP_CONFIG_NAME,
+            name=telemetry_config_name(TOOLHIVE_SERVICE, "vmcp"),
             namespace=NAMESPACE,
             labels=k8s_global_labels,
         ),
@@ -854,7 +856,7 @@ mcp_servers = create_mcp_servers(
     witan_code_token_secret=witan_code_token_secret,
     migration_job=witan_migration_job,
     service_version=witan_service_version,
-    telemetry_config_name=TOOLHIVE_TELEMETRY_BACKEND_CONFIG_NAME,
+    telemetry_config_name=telemetry_config_name(TOOLHIVE_SERVICE, "backend"),
     telemetry_config=witan_telemetry_backend,
     remote_write_max_inflight=WITAN_REMOTE_WRITE_MAX_INFLIGHT,
     remote_write_queue_seconds=WITAN_REMOTE_WRITE_QUEUE_SECONDS,
@@ -994,8 +996,10 @@ witan_virtualmcpserver = kubernetes.apiextensions.CustomResource(
         **(
             {
                 "telemetryConfigRef": {
-                    "name": TOOLHIVE_TELEMETRY_VMCP_CONFIG_NAME,
-                    "serviceName": toolhive_service_name(stack_info, "vmcp"),
+                    "name": telemetry_config_name(TOOLHIVE_SERVICE, "vmcp"),
+                    "serviceName": toolhive_service_name(
+                        stack_info, TOOLHIVE_SERVICE, "vmcp"
+                    ),
                 }
             }
             if witan_telemetry_vmcp

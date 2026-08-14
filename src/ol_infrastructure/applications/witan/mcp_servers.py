@@ -46,14 +46,22 @@ from pulumi import Output, Resource, ResourceOptions, StackReference
 from ol_infrastructure.applications.witan.observability import (
     downward_api_env_dicts,
     otel_env,
-    toolhive_mcpserver_audit,
-    toolhive_service_name,
     witan_log_env,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
+from ol_infrastructure.lib.toolhive_telemetry import (
+    toolhive_mcpserver_audit,
+    toolhive_service_name,
+)
 
 # Name shared by the MCPGroup and the VirtualMCPServer that references it.
 MCP_GROUP_NAME = "witan-tools"
+
+# Prefix for this stack's ToolHive telemetry CR names and OTel service names.
+# Equal to the namespace today; kept as its own name because one is a
+# Kubernetes object and the other is a Grafana-facing identity, and renaming
+# either should not silently rename the other.
+TOOLHIVE_SERVICE = "witan"
 
 # The MCPServer resource name. ToolHive derives a workload's backend id from the
 # resource name, so this is also the key the vMCP's `outgoingAuth.backends`
@@ -236,7 +244,7 @@ def create_mcp_servers(  # noqa: PLR0913
     Unlike the vMCP, this hop has one in EVERY environment: the Prometheus
     ``/metrics`` path is safe on its ClusterIP-only proxy port, and in CI — which
     has no OTLP receiver — it is the only instrumentation there is. See
-    ``observability.toolhive_telemetry_spec``.
+    ``lib.toolhive_telemetry.toolhive_telemetry_spec``.
 
     ``remote_write_max_inflight`` / ``remote_write_queue_seconds`` retune
     witan's client-side write admission. Empty (the default) leaves witan's own
@@ -464,7 +472,9 @@ def create_mcp_servers(  # noqa: PLR0913
             # way to read them at all.
             "telemetryConfigRef": {
                 "name": telemetry_config_name,
-                "serviceName": toolhive_service_name(stack_info, "mcp-proxy"),
+                "serviceName": toolhive_service_name(
+                    stack_info, TOOLHIVE_SERVICE, "mcp-proxy"
+                ),
             },
             # Per-request JSON to stdout, so it rides the existing pod-log path
             # to Loki with no collector involved — which is why this is on in CI

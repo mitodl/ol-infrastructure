@@ -14,7 +14,7 @@ by :func:`create_mcp_servers` so the vMCP's ``depends_on`` wiring picks it up.
 from typing import NamedTuple
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, ResourceOptions, StackReference
+from pulumi import Config, Resource, ResourceOptions, StackReference
 
 from bridge.lib.versions import (
     MCP_CONTEXT7_VERSION,
@@ -23,9 +23,42 @@ from bridge.lib.versions import (
     MCP_SENTRY_VERSION,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
+from ol_infrastructure.lib.toolhive_telemetry import (
+    telemetry_config_name,
+    toolhive_mcpserver_audit,
+    toolhive_service_name,
+)
 
 # Name shared by the MCPGroup and every backend/virtual server that references it.
 MCP_GROUP_NAME = "swe-tools"
+
+# Prefix for this stack's ToolHive telemetry CR names and OTel service names.
+# Equal to the namespace today; kept as its own name because one is a Kubernetes
+# object and the other is a Grafana-facing identity, and renaming either should
+# not silently rename the other.
+TOOLHIVE_SERVICE = "toolhive-swe"
+
+
+def _observability(stack_info: StackInfo, backend: str) -> dict[str, object]:
+    """Telemetry + audit fields every backend ``MCPServer`` here carries.
+
+    All the backends share ONE ``MCPTelemetryConfig`` — they need identical
+    settings — and are told apart by the per-ref ``serviceName``, which
+    overrides the config's own. Without that they would all report as one
+    service and the spans would be unattributable.
+
+    ``__main__`` creates the CR this names and puts it in each server's
+    ``depends_on``; the operator resolves the ref at reconcile time, so a
+    dangling name is a degraded server rather than a retry.
+    """
+    return {
+        "telemetryConfigRef": {
+            "name": telemetry_config_name(TOOLHIVE_SERVICE, "backend"),
+            "serviceName": toolhive_service_name(stack_info, TOOLHIVE_SERVICE, backend),
+        },
+        "audit": toolhive_mcpserver_audit(),
+    }
+
 
 # ServiceAccount the aws backend runs under. The OLEKSAuthBinding in __main__.py
 # creates it annotated with the IRSA role ARN; the EKS pod-identity webhook turns
@@ -70,8 +103,16 @@ def create_mcp_servers(  # noqa: PLR0913
     cluster_stack: StackReference,
     toolhive_swe_config: Config,
     aws_mcp_service_accounts: list[kubernetes.core.v1.ServiceAccount],
+    telemetry_config: Resource,
 ) -> ToolhiveSWEMCPServers:
-    """Provision the MCPGroup and every backend MCPServer that joins it."""
+    """Provision the MCPGroup and every backend MCPServer that joins it.
+
+    ``telemetry_config`` is the shared backend ``MCPTelemetryConfig`` every
+    server here references. It is passed as a handle purely for ``depends_on``:
+    the operator resolves ``telemetryConfigRef`` by name at reconcile time, and
+    a reference to a CR that does not exist yet is a degraded server rather
+    than a retry. The name itself comes from ``_observability``.
+    """
     swe_mcpgroup = kubernetes.apiextensions.CustomResource(
         f"toolhive-swe-mcpgroup-{stack_info.env_suffix}",
         api_version="toolhive.stacklok.dev/v1beta1",
@@ -106,6 +147,7 @@ def create_mcp_servers(  # noqa: PLR0913
             "proxyPort": 8080,
             "mcpPort": 8080,
             "groupRef": {"name": MCP_GROUP_NAME},
+            **_observability(stack_info, "fetch"),
             # Fetch needs outbound network access to retrieve URLs. The "network"
             # builtin profile grants egress; tighten to an allow-list ConfigMap when
             # the set of reachable hosts is known.
@@ -118,7 +160,7 @@ def create_mcp_servers(  # noqa: PLR0913
                 "limits": {"cpu": "100m", "memory": "128Mi"},
             },
         },
-        opts=ResourceOptions(depends_on=[swe_mcpgroup]),
+        opts=ResourceOptions(depends_on=[swe_mcpgroup, telemetry_config]),
     )
 
     # Grafana OSS MCP server pointed at Grafana Cloud with a service account token
@@ -188,6 +230,7 @@ def create_mcp_servers(  # noqa: PLR0913
             "proxyPort": 8080,
             "mcpPort": 8000,
             "groupRef": {"name": MCP_GROUP_NAME},
+            **_observability(stack_info, "grafana"),
             "env": [{"name": "GRAFANA_URL", "value": grafana_url}],
             "secrets": [
                 {
@@ -208,7 +251,9 @@ def create_mcp_servers(  # noqa: PLR0913
                 "limits": {"cpu": "200m", "memory": "256Mi"},
             },
         },
-        opts=ResourceOptions(depends_on=[swe_mcpgroup, grafana_token_secret]),
+        opts=ResourceOptions(
+            depends_on=[swe_mcpgroup, grafana_token_secret, telemetry_config]
+        ),
     )
 
     servers = [fetch_mcpserver, grafana_mcpserver]
@@ -260,6 +305,7 @@ def create_mcp_servers(  # noqa: PLR0913
                 "transport": "stdio",
                 "proxyPort": 8080,
                 "groupRef": {"name": MCP_GROUP_NAME},
+                **_observability(stack_info, "context7"),
                 "secrets": [
                     {
                         "name": CONTEXT7_TOKEN_SECRET_NAME,
@@ -279,7 +325,13 @@ def create_mcp_servers(  # noqa: PLR0913
                     "limits": {"cpu": "200m", "memory": "256Mi"},
                 },
             },
-            opts=ResourceOptions(depends_on=[swe_mcpgroup, context7_token_secret]),
+            opts=ResourceOptions(
+                depends_on=[
+                    swe_mcpgroup,
+                    context7_token_secret,
+                    telemetry_config,
+                ]
+            ),
         )
         servers.append(context7_mcpserver)
 
@@ -338,6 +390,7 @@ def create_mcp_servers(  # noqa: PLR0913
                 "transport": "stdio",
                 "proxyPort": 8080,
                 "groupRef": {"name": MCP_GROUP_NAME},
+                **_observability(stack_info, "sentry"),
                 "env": sentry_env,
                 "secrets": [
                     {
@@ -358,7 +411,13 @@ def create_mcp_servers(  # noqa: PLR0913
                     "limits": {"cpu": "200m", "memory": "256Mi"},
                 },
             },
-            opts=ResourceOptions(depends_on=[swe_mcpgroup, sentry_token_secret]),
+            opts=ResourceOptions(
+                depends_on=[
+                    swe_mcpgroup,
+                    sentry_token_secret,
+                    telemetry_config,
+                ]
+            ),
         )
         servers.append(sentry_mcpserver)
 
@@ -419,6 +478,7 @@ def create_mcp_servers(  # noqa: PLR0913
                 "transport": "stdio",
                 "proxyPort": 8080,
                 "groupRef": {"name": MCP_GROUP_NAME},
+                **_observability(stack_info, "aws"),
                 # Appended to the image's `mcp-proxy-for-aws` ENTRYPOINT. The
                 # endpoint URL is POSITIONAL and must come first.
                 #
@@ -457,7 +517,13 @@ def create_mcp_servers(  # noqa: PLR0913
             # not schedule a pod naming an absent ServiceAccount, into one that
             # never starts at all. __main__.py creates it under the same gate as
             # this block, so the list below is populated exactly when we get here.
-            opts=ResourceOptions(depends_on=[swe_mcpgroup, *aws_mcp_service_accounts]),
+            opts=ResourceOptions(
+                depends_on=[
+                    swe_mcpgroup,
+                    *aws_mcp_service_accounts,
+                    telemetry_config,
+                ]
+            ),
         )
         servers.append(aws_mcpserver)
 
