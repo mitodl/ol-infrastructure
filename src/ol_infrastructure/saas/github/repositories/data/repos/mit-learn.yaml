@@ -30,4 +30,5 @@ teams:
   arbisoft-contractors: triage
   odl-engineering: push
   odl-engineering-owners: admin
+  owners-mit-learn: push
 web_commit_signoff_required: false
