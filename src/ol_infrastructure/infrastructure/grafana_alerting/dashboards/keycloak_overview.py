@@ -269,6 +269,7 @@ def _dashboard_json(
                 ],
                 grid_pos={"h": 8, "w": 12, "x": 0, "y": 48},
                 unit="bytes",
+                legend_calc="max",
             ),
             timeseries_panel(
                 title="CPU Usage per Pod",

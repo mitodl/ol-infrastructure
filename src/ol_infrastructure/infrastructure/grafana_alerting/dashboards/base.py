@@ -41,6 +41,7 @@ def _timeseries_panel(
     queries: list[dict[str, Any]] | None = None,
     unit: str = "short",
     decimals: int | None = None,
+    legend_calc: str | None = None,
     description: str = "",
 ) -> dict[str, Any]:
     """Build a time-series panel model querying a shared datasource.
@@ -59,6 +60,17 @@ def _timeseries_panel(
     header) -- use it to spell out what a value actually means when that
     isn't obvious from the title alone, e.g. that a count is per graph
     interval rather than a total.
+
+    The legend's summary column defaults to a straight `sum` across the
+    graph window, which is the right read for a count/rate series but
+    meaningless for anything that's a gauge/instantaneous reading rather
+    than an accumulating count -- e.g. summing a ratio produces "3282%",
+    and summing a heap-usage sample across a day's worth of data points
+    produces a "total" bytes figure with no physical meaning (real max
+    heap was 2.5 GiB, not the 1.73 TiB the naive sum reported). Ratio
+    units (`percentunit`/`percent`) default to `mean` automatically.
+    Pass `legend_calc` explicitly for any other gauge-like series (e.g.
+    `"max"` for a memory panel, to show peak usage over the window).
     """
     if queries is None:
         queries = [{"expr": expr, "legend_format": legend_format}]
@@ -84,6 +96,8 @@ def _timeseries_panel(
     }
     if decimals is not None:
         defaults["decimals"] = decimals
+    if legend_calc is None:
+        legend_calc = "mean" if unit in ("percentunit", "percent") else "sum"
     return {
         "title": title,
         "description": description,
@@ -98,7 +112,7 @@ def _timeseries_panel(
             "legend": {
                 "displayMode": "list",
                 "placement": "bottom",
-                "calcs": ["sum"],
+                "calcs": [legend_calc],
             },
             "tooltip": {"mode": "multi"},
         },

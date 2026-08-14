@@ -255,6 +255,21 @@ All of the above except `_logs_panel`/`_row_panel` take a `unit` param --
 rest default to `"short"`. Set it explicitly for anything that isn't a plain
 count: `"percentunit"` for ratios, `"s"` for durations, `"bytes"` for memory.
 
+**`_timeseries_panel`'s legend defaults to summing every series across the
+graph window** ("Total: ..."), which only means something for a genuine
+count/rate (logins/min, error rate, GC events by cause). For a gauge --
+anything that's an instantaneous reading rather than an accumulating count
+(memory used, connection-pool size, CPU usage, a hit ratio) -- summing
+hundreds of samples produces a number with no physical meaning: a heap panel
+summed to "1.73 TiB" against a real 2.5 GiB max, `percentunit` CPU usage
+summed past 3000%. `percentunit`/`percent` already default to `mean`
+automatically. **For every other gauge-like panel, pass `legend_calc`
+explicitly** -- `"max"` for a memory/capacity panel (peak usage is the
+number that matters), `"mean"` or `"last"` for others. When adding a new
+`_timeseries_panel` call, ask whether the underlying metric is cumulative
+(rate/count -- `sum` is fine) or a gauge (pass `legend_calc`) before
+shipping it.
+
 No dashboard in this package queries Tempo -- an earlier version of
 `keycloak_activity.py` did, pairing a sampled TraceQL request count against
 an exhaustive Loki event count in one panel ("attempts vs errors"). That
