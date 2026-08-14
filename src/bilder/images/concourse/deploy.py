@@ -175,6 +175,12 @@ concourse_config_map = {
         # this is set well above that to avoid racing it or wiping a worker
         # that's merely partitioned and about to reconnect.
         stalled_worker_timeout="4h",
+        # Applies globally to any archived pipeline, not only set_pipeline orphans
+        # -- Concourse's DestroyArchivedPipelines query has no way to distinguish
+        # a manually-archived pipeline from an auto-archived one. Accepted as
+        # intentional: 30 days is long enough that a manual archive kept for
+        # reference should be re-set (fly set-pipeline) before it expires if it
+        # needs to survive longer.
         destroy_archived_pipelines_after="720h",  # 30 days
         global_resource_check_timeout="30m",
         lidar_scanner_interval="15s",

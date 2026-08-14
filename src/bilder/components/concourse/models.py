@@ -362,8 +362,11 @@ class ConcourseWebConfig(ConcourseBaseConfig):
         None,
         alias="CONCOURSE_DESTROY_ARCHIVED_PIPELINES_AFTER",
         description=(
-            "Duration after which the pipeline collector will destroy archived"
-            " pipelines. 0 (default) disables destruction of archived pipelines."
+            "Duration after which the pipeline collector will destroy ANY archived"
+            " pipeline (manually archived via fly/UI, or auto-archived set_pipeline"
+            " orphans alike -- Concourse applies this globally with no distinction"
+            " by archive reason). 0 (default) disables destruction of archived"
+            " pipelines."
         ),
     )
     display_user_id_per_connector: str | None = Field(
