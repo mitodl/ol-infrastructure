@@ -1,10 +1,19 @@
 """APISIX OIDC callback failure-rate alert rules.
 
 Every OIDC-protected host behind the gateway finishes its login at
-`/<login-path>/.apisix/redirect`.  That request either 302s the user on to the
-application or 500s them into the branded gateway error page -- there is no
-third outcome -- so the 500:total ratio on that one path is a direct measure of
-"what fraction of login attempts are failing", which no existing rule watches.
+`/<login-path>/.apisix/redirect`.  That request either 302s on to the
+application or 500s into the branded gateway error page -- there is no third
+outcome -- so the 500:total ratio on that one path is a direct measure of how
+much of the gateway's login traffic is erroring, which no existing rule watches.
+
+Read that ratio as a rate over *callback requests*, not over users or login
+attempts.  The two are not the same here: cause 1 below means a single
+successful login can produce one 302 and several 500s, so the ratio moves with
+replay volume as well as with real breakage.  It is the right thing to alert on
+-- it is what the gateway is actually doing, and it responds to both failure
+modes -- but it does not license a statement about how many people could not
+log in.  Nothing in the access log identifies a user or ties a replay burst back
+to its original login, so this data cannot answer that question at all.
 
 Why not reuse metric_rules/apisix_edge.py: `apisix_http_status` carries
 `matched_host` and `code` but no path, so the callback route cannot be isolated
@@ -13,17 +22,23 @@ log_rules/ despite being the same edge concern.
 
 Measured baseline (production, 24h to 2026-08-14)
 -------------------------------------------------
-  host                     302     500    failure rate
-  mitxonline.mit.edu      2,470    932      27.4%
-  api.learn.mit.edu       2,973    502      14.4%
-  nb.learn.mit.edu           79      7       8.1%
+  host                     302     500    500 rate
+  mitxonline.mit.edu      2,470    932     27.4%
+  api.learn.mit.edu       2,973    502     14.4%
+  nb.learn.mit.edu           79      7      8.1%
 
-That is ~1,440 failed logins a day, each one served a 21KB HTTP 500 page.  The
-2026-07 SOA audit logged this as "~780/day state-mismatch errors, each a user
-bounced back through login"; both halves of that are wrong.  The error log
-emits two lines per failure (openidc.lua:1118 and openid-connect.lua:876), so
-the log-line count double-counts, and the failures split into two distinct
-causes that the raw string count conflates:
+That is ~1,441 callback requests a day answered with a 21KB HTTP 500 page.  How
+many *people* that represents is unknown and is certainly much smaller: per
+cause 1 below, most of these 500s trail a login that already succeeded.
+
+The 2026-07 SOA audit logged this as "~780/day state-mismatch errors, each a
+user bounced back through login".  Both halves are wrong, in opposite
+directions.  The count is too low because it reads the error log, where APISIX
+emits two lines per failure (openidc.lua:1118 and openid-connect.lua:876), so it
+double-counts a smaller number than the access log actually shows.  The
+*interpretation* is too high because these are not users bounced back through
+login.  The failures split into two distinct causes that the raw string count
+conflates:
 
 1. **Stale-code replay (~55%).**  The callback URL is fetched repeatedly with
    the same `state`.  The *first* fetch succeeds -- carrying the small pre-auth
@@ -53,12 +68,13 @@ Two windows, same shape as metric_rules/apisix_edge.py
 ------------------------------------------------------
   fast    -- a step change. 45% over 30m, confirmed 15m.  Deliberately set above
              the 27.4% worst-host baseline so it stays silent today and fires
-             only on a genuine regression (a broken Keycloak client, a bad
-             redirect_uri, an expired secret).
+             only on a clear departure from it.
   chronic -- the standing condition. 5% over 6h, confirmed 1h.  This one fires
-             for all three hosts *right now*, on purpose: it is the tracker for
+             *right now*, on purpose, for the two hosts that clear the gate --
+             api.learn.mit.edu and mitxonline.mit.edu.  It is the tracker for
              the two causes above, and it going quiet is the signal that they
-             were actually fixed rather than merely re-explained.
+             were actually fixed rather than merely re-explained.  (nb.learn is
+             below the gate and so is not covered by either rule; see below.)
 
 Minimum-traffic gate
 --------------------
@@ -152,8 +168,8 @@ def create(
                 # See the module docstring.
                 labels={},
                 annotations={
-                    "summary": "Over 45% of logins to {{ $labels.matched_host }} are failing at the OIDC callback",
-                    "description": "More than 45% of requests to {{ $labels.matched_host }}'s /.apisix/redirect callback returned a 500 over the last 30 minutes, against a measured baseline of 27% (mitxonline) and 14% (api.learn) on 2026-08-14. A jump to this level means the authorization code exchange itself is broken -- check the Keycloak client's secret and redirect_uri, and the openid-connect plugin's discovery endpoint -- rather than the chronic stale-code replay this host already sees.",
+                    "summary": "{{ $labels.matched_host }} OIDC callback 500 rate has jumped above 45%",
+                    "description": "More than 45% of requests to {{ $labels.matched_host }}'s /.apisix/redirect callback returned a 500 over the last 30 minutes, against a measured baseline of 27% (mitxonline) and 14% (api.learn) on 2026-08-14. This is a rate over callback requests, not over users: a rise can mean the authorization code exchange is genuinely broken (check the Keycloak client's secret and redirect_uri, and the openid-connect plugin's discovery endpoint), or that the volume of one of the two chronic causes has grown -- stale-code replay, or Keycloak authentication_expired error callbacks. Separate them before assuming an outage: replays carry a `code` and a ~3KB authenticated session cookie, error callbacks carry `error=` and no code, and a genuinely broken exchange fails on the *first* callback with a small pre-auth cookie. Query the access log by request_uri and cookie_sizes to tell which.",
                 },
                 datas=rd(_failure_ratio_expr("30m", "0.45")),
             ),
@@ -164,7 +180,7 @@ def create(
                 no_data_state="OK",
                 labels={},
                 annotations={
-                    "summary": "{{ $labels.matched_host }} has been failing over 5% of OIDC callbacks for hours",
+                    "summary": "{{ $labels.matched_host }} OIDC callback 500 rate has been over 5% for hours",
                     "description": "More than 5% of requests to {{ $labels.matched_host }}'s /.apisix/redirect callback returned a 500 over the last 6 hours. This rule is expected to be firing until the two known causes are fixed -- stale-code replay against an already-authenticated session, and Keycloak authentication_expired error callbacks being turned into 500s -- and its going quiet is the check that a fix actually worked. See the module docstring for the measurements behind both.",
                 },
                 datas=rd(_failure_ratio_expr("6h", "0.05")),
