@@ -36,6 +36,7 @@ effective-rules endpoints will report them as absent and be wrong.
 import pulumi_github as github
 from pulumi import ResourceOptions
 
+from ol_infrastructure.saas.github.organization.teams import github_teams
 from ol_infrastructure.saas.github.tiers import (
     TIER_ONE,
     TIER_PROPERTY_NAME,
@@ -44,6 +45,30 @@ from ol_infrastructure.saas.github.tiers import (
 
 #: Flip to "active" only after watching the rule-suite logs. See the module docstring.
 _ENFORCEMENT = "evaluate"
+
+# Found 2026-08-14, ahead of promotion: neither ruleset carries a bypass, but
+# `enforce_admins: false` on every repo's classic branch protection today means repo
+# admins can already override it. An org ruleset with no bypass_actors is *more*
+# restrictive than that status quo -- promoting without one would newly block
+# `odlbot`, which several tier-1 repos restriction-list or bypass-list directly for
+# default-branch pushes (open-edx-plugins, ocw-hugo-themes, mit-learn,
+# ocw-hugo-projects). odlbot is a member of `odl-engineering-owners` (the sanctioned
+# admin team, SEC-15), so bypassing at the team level restores admin parity without
+# a per-user actor type, which OrganizationRulesetBypassActorArgs does not support
+# (only RepositoryRole, Team, Integration, OrganizationAdmin).
+#
+# renovate[bot] deliberately gets NO bypass_actor entry here. It already satisfies
+# `required_approving_review_count` for real: the `renovate-approve` GitHub App is
+# installed org-wide and leaves a genuine APPROVED review on every renovate PR
+# (confirmed live on ol-infrastructure#5343) -- a bypass would be redundant with an
+# approval that already exists.
+_ADMIN_BYPASS = [
+    github.OrganizationRulesetBypassActorArgs(
+        actor_type="Team",
+        actor_id=github_teams["odl-engineering-owners"].id.apply(int),
+        bypass_mode="always",
+    ),
+]
 
 #: `~DEFAULT_BRANCH` is GitHub's alias for whatever each repo's default branch is,
 #: which is what makes one ruleset work across a fleet where 102 repos are on
@@ -86,6 +111,7 @@ baseline_default_branch = github.OrganizationRuleset(
     name="baseline-default-branch",
     target="branch",
     enforcement=_ENFORCEMENT,
+    bypass_actors=_ADMIN_BYPASS,
     conditions=_tier_condition(TIER_ONE, TIER_STANDARD),
     rules=github.OrganizationRulesetRulesArgs(
         # No force-pushing over the default branch, and no deleting it.
@@ -108,6 +134,7 @@ tier_one_hardening = github.OrganizationRuleset(
     name="tier-1-hardening",
     target="branch",
     enforcement=_ENFORCEMENT,
+    bypass_actors=_ADMIN_BYPASS,
     conditions=_tier_condition(TIER_ONE),
     rules=github.OrganizationRulesetRulesArgs(
         pull_request=github.OrganizationRulesetRulesPullRequestArgs(
