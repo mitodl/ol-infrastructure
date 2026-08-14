@@ -8,7 +8,7 @@ deployment across CI, QA, and Production stages without any build steps.
 
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from ol_concourse.lib.containers import container_build_task
 from ol_concourse.lib.models.fragment import PipelineFragment
@@ -128,6 +128,16 @@ class SimplePulumiParams(BaseModel):
                       provisions Fastly resources while the Fastly API token is
                       being rotated -- refresh calls the Fastly API with the old
                       token and fails the whole job.
+        topology: "deploy-chained" (default) auto-deploys each stage on code
+                 change, gated only by the previous stage's promotion issue.
+                 "preview-gated" instead gates every stage on a `pulumi preview`
+                 of itself: a gate issue opens with that stage's diff, and only
+                 closing it triggers the `pulumi up`. Use for apps whose changes
+                 are too high-blast-radius to auto-apply, e.g. org-wide GitHub
+                 management.
+        auto_deploy_stages: Only used with topology="preview-gated". Stages
+                           listed here keep today's auto-deploy-on-change
+                           behavior instead of being gated. Typically ["CI"].
     """
 
     app_name: str
@@ -143,6 +153,8 @@ class SimplePulumiParams(BaseModel):
     build: BuildConfig | None = None
     prior_stage_stack: str | None = None
     refresh_stack: bool = True
+    topology: Literal["deploy-chained", "preview-gated"] = "deploy-chained"
+    auto_deploy_stages: list[str] | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -347,12 +359,14 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_path="saas/github/organization/",
         pulumi_project_name="ol-saas-github-organization",
         stages=["default"],
+        topology="preview-gated",
     ),
     "github-repositories": SimplePulumiParams(
         app_name="github-repositories",
         pulumi_project_path="saas/github/repositories/",
         pulumi_project_name="ol-saas-github-repositories",
         stages=["default"],
+        topology="preview-gated",
     ),
     "grafana-alerting": SimplePulumiParams(
         app_name="grafana-alerting",
@@ -765,6 +779,8 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                     dependencies=docker_dependencies,
                     env_vars_from_files=docker_env_vars_from_files or None,
                     custom_dependencies=cross_env_custom_deps or None,
+                    topology=params.topology,
+                    auto_deploy_stages=params.auto_deploy_stages,
                 )
 
                 # Collect resources and jobs
@@ -797,6 +813,8 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                 dependencies=docker_dependencies,
                 env_vars_from_files=docker_env_vars_from_files or None,
                 custom_dependencies=cross_env_custom_deps or None,
+                topology=params.topology,
+                auto_deploy_stages=params.auto_deploy_stages,
             )
 
             all_pipeline_resources = [
@@ -832,6 +850,8 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             dependencies=docker_dependencies,
             env_vars_from_files=docker_env_vars_from_files or None,
             custom_dependencies=cross_env_custom_deps or None,
+            topology=params.topology,
+            auto_deploy_stages=params.auto_deploy_stages,
         )
 
         all_pipeline_resources = [
