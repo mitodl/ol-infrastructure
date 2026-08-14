@@ -28,7 +28,11 @@ from pulumi.config import get_config
 from pulumi_aws import ec2, get_caller_identity
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
-from bridge.lib.versions import DAGSTER_CHART_VERSION, PGBOUNCER_VERSION
+from bridge.lib.versions import (
+    DAGSTER_CHART_VERSION,
+    PGBOUNCER_EXPORTER_VERSION,
+    PGBOUNCER_VERSION,
+)
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
@@ -60,6 +64,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
+from ol_infrastructure.lib.aws.rds_helper import postgres_max_connections
 from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
@@ -600,6 +605,40 @@ dagster_db_secret = OLVaultK8SSecret(
 # real scram-sha-256 auth is enforced on the backend connection to RDS via the
 # user/password embedded in the [databases] DSN.
 
+# Replica count is needed here to size the per-pod connection cap below, so it is
+# resolved before the ConfigMap rather than next to the Deployment that consumes it.
+pgbouncer_replica_count = dagster_config.get_int("pgbouncer_replica_count") or 2
+
+# Cap the connections PgBouncer can open against RDS, in aggregate across every replica.
+#
+# Without this, nothing bounds the total. In session pool mode each client pins a server
+# connection for its whole session, so the per-pod bound is
+# min(max_client_conn, default_pool_size + reserve_pool_size) = 1500 -- which at 6
+# replicas is 9000 possible backends against a hard max_connections of 5000. On
+# 2026-08-10 the pool reached that limit and held it for 88 consecutive minutes
+# (DatabaseConnections pinned at 4989 = 5000 - 5 reserved - 6 rdsadmin sessions), during
+# which every new Dagster connection was refused and the daemon sat Pending behind 178
+# run workers. PgBouncer was configured such that it could exhaust the database it
+# exists to protect.
+#
+# Deriving from the instance class rather than hardcoding 5000 matters because
+# max_connections tracks instance memory -- QA's db.m7g.large allows ~900, so a
+# hardcoded production number would leave QA overcommitted by the same 1.8x.
+# The headroom leaves room for superuser_reserved_connections, reserved_connections,
+# RDS's own rdsadmin sessions, Vault credential rotation logins, ad-hoc psql, any
+# future direct-to-RDS consumer such as a metrics exporter, and -- on instance classes
+# below the 5000 cap -- the difference between total instance memory and the smaller
+# DBInstanceClassMemory that RDS actually divides (see postgres_max_connections).
+#
+# Dividing by pgbouncer_replica_count makes the aggregate ceiling depend on the running
+# pod count, which is why the Deployment below pins max_surge to 0.
+DB_CONNECTION_HEADROOM_FACTOR = 0.85
+pgbouncer_max_db_connections = int(
+    postgres_max_connections(rds_defaults["instance_size"])
+    * DB_CONNECTION_HEADROOM_FACTOR
+    // pgbouncer_replica_count
+)
+
 # ConfigMap containing the pgbouncer.ini template; ${PGUSER} and ${PGPASSWORD}
 # placeholders are substituted at pod start time by the init container.
 pgbouncer_config = kubernetes.core.v1.ConfigMap(
@@ -626,6 +665,12 @@ pgbouncer_config = kubernetes.core.v1.ConfigMap(
                     "default_pool_size = 800",
                     "min_pool_size = 150",
                     "reserve_pool_size = 2000",
+                    # The aggregate ceiling. See the derivation above; this is the
+                    # only setting here that bounds total backends across replicas,
+                    # and it converts "exhaust RDS" into "queue inside PgBouncer",
+                    # which is the failure mode query_wait_timeout = 0 below was
+                    # already chosen to tolerate.
+                    f"max_db_connections = {pgbouncer_max_db_connections}",
                     "max_prepared_statements = 0",
                     "server_connect_timeout = 15",
                     # Dagster uses NullPool with AUTOCOMMIT isolation - no session
@@ -659,19 +704,33 @@ pgbouncer_config = kubernetes.core.v1.ConfigMap(
                     # cycles idle connections and the pool self-recovers within 1-2
                     # minutes of I/O pressure dropping.
                     "query_wait_timeout = 0",
-                    "log_connections = 1",
-                    "log_disconnections = 1",
+                    # Dagster uses NullPool, so it opens a fresh connection per query
+                    # and every connection logs with age=0s. Measured on one production
+                    # pod: 27,738 lines in 3 minutes, ~154 lines/s per replica and
+                    # ~925/s across six, all of it shipped to Loki. The one line that
+                    # carries signal -- the per-minute `stats:` aggregate -- was 1 in
+                    # ~9,000. The pgbouncer_exporter sidecar now collects the same
+                    # connection counts as metrics, so these logs are pure cost.
+                    "log_connections = 0",
+                    "log_disconnections = 0",
+                    # Required by pgbouncer_exporter: its PostgreSQL driver sends
+                    # extra_float_digits on connect, and PgBouncer rejects unknown
+                    # startup parameters unless they are listed here.
+                    "ignore_startup_parameters = extra_float_digits",
                     "application_name_add_host = 1",
                     "",
                 ]
             )
         )
     },
-    opts=ResourceOptions(depends_on=[dagster_db_secret]),
+    # The provider replaces this ConfigMap on any data change, and its name is fixed,
+    # so the replacement can only be delete-then-create. Make that ordering explicit
+    # rather than letting the default create-before-delete attempt fail on
+    # "configmaps ... already exists" and recover on the retry.
+    opts=ResourceOptions(depends_on=[dagster_db_secret], delete_before_replace=True),
 )
 
-# PgBouncer Deployment with configurable replica count (default 2) for HA
-pgbouncer_replica_count = dagster_config.get_int("pgbouncer_replica_count") or 2
+# PgBouncer Deployment; replica count (default 2, for HA) is resolved above.
 pgbouncer_deployment = kubernetes.apps.v1.Deployment(
     f"dagster-pgbouncer-deployment-{stack_info.env_suffix}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -684,6 +743,19 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
         replicas=pgbouncer_replica_count,
+        # max_db_connections above is sized as budget / pgbouncer_replica_count, so the
+        # aggregate ceiling only holds while the running pod count stays at or below the
+        # desired replica count. Kubernetes' default 25% maxSurge would allow 8 pods in
+        # production and 3 in QA during a rollout -- 5664 and 1146 backends, both past
+        # the database limit the cap exists to respect, and reached precisely while
+        # rolling out a change to this Deployment. Surge to zero and replace in place.
+        strategy=kubernetes.apps.v1.DeploymentStrategyArgs(
+            type="RollingUpdate",
+            rolling_update=kubernetes.apps.v1.RollingUpdateDeploymentArgs(
+                max_surge=0,
+                max_unavailable=1,
+            ),
+        ),
         selector=kubernetes.meta.v1.LabelSelectorArgs(
             match_labels={
                 "component": "pgbouncer",
@@ -785,6 +857,61 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
                             period_seconds=5,
                         ),
                     ),
+                    # Sidecar exporting PgBouncer's admin console as Prometheus
+                    # metrics. It polls SHOW LISTS/STATS/POOLS/DATABASES over
+                    # localhost and serves /metrics on 9127.
+                    #
+                    # No password and no PgBouncer auth config are needed: under
+                    # auth_type = any the console database admits any user as admin.
+                    # Verified against a production pod -- this exact DSN returns
+                    # SHOW POOLS. Reaching the console still requires being inside
+                    # the pod's network namespace, and the Service is ClusterIP.
+                    kubernetes.core.v1.ContainerArgs(
+                        name="pgbouncer-exporter",
+                        image=(
+                            "quay.io/prometheuscommunity/pgbouncer-exporter:"
+                            f"{PGBOUNCER_EXPORTER_VERSION}"
+                        ),
+                        env=[
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="PGBOUNCER_EXPORTER_CONNECTION_STRING",
+                                value=(
+                                    "postgres://exporter@127.0.0.1:5432"
+                                    "/pgbouncer?sslmode=disable"
+                                ),
+                            ),
+                        ],
+                        ports=[
+                            kubernetes.core.v1.ContainerPortArgs(
+                                name="metrics",
+                                container_port=9127,
+                                protocol="TCP",
+                            ),
+                        ],
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            requests={
+                                "cpu": "10m",
+                                "memory": "32Mi",
+                            },
+                            limits={
+                                "memory": "64Mi",
+                            },
+                        ),
+                        # The exporter is not in the data path -- a failing scrape
+                        # must never take PgBouncer's endpoint out of the Service and
+                        # sever Dagster's connection to the database. So it gets a
+                        # liveness probe to restart itself if it wedges, and
+                        # deliberately no readiness probe.
+                        liveness_probe=kubernetes.core.v1.ProbeArgs(
+                            http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                                path="/metrics",
+                                port=9127,
+                            ),
+                            initial_delay_seconds=10,
+                            period_seconds=30,
+                            failure_threshold=3,
+                        ),
+                    ),
                 ],
                 volumes=[
                     kubernetes.core.v1.VolumeArgs(
@@ -810,7 +937,13 @@ pgbouncer_service = kubernetes.core.v1.Service(
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="dagster-pgbouncer",
         namespace=dagster_namespace,
-        labels=k8s_global_labels.model_dump(),
+        # component=pgbouncer is on the Service itself, not just the pod selector,
+        # so the ServiceMonitor below can select this Service without also matching
+        # the other Services in the namespace that share the global labels.
+        labels={
+            "component": "pgbouncer",
+            **k8s_global_labels.model_dump(),
+        },
     ),
     spec=kubernetes.core.v1.ServiceSpecArgs(
         type="ClusterIP",
@@ -825,9 +958,74 @@ pgbouncer_service = kubernetes.core.v1.Service(
                 target_port=5432,
                 protocol="TCP",
             ),
+            kubernetes.core.v1.ServicePortArgs(
+                name="metrics",
+                port=9127,
+                target_port=9127,
+                protocol="TCP",
+            ),
         ],
     ),
     opts=ResourceOptions(depends_on=[pgbouncer_deployment]),
+)
+
+# ServiceMonitor so Prometheus scrapes the exporter sidecar on every replica.
+#
+# The cluster's k8s-monitoring collector has prometheusOperatorObjects enabled and
+# remote-writes to Grafana Cloud, so no pipeline work is needed -- this CR is the
+# whole integration. Pattern (including the "release": "prometheus" discovery label)
+# follows applications/clickhouse/__main__.py.
+#
+# These are the metrics every open pool-sizing question turns on:
+#   pgbouncer_pools_server_active_connections   -- is default_pool_size = 800 right?
+#   pgbouncer_pools_server_idle_connections     -- what is min_pool_size parking?
+#   pgbouncer_pools_client_active_connections   -- is max_client_conn a real ceiling?
+#   pgbouncer_pools_client_waiting_connections  -- is max_db_connections too tight?
+#   pgbouncer_pools_client_maxwait_seconds      -- the number pool tuning turns on,
+#                                                  unobtainable from the stats log
+#   sum of the above vs. max_connections        -- the 2026-08-10 headroom alert
+pgbouncer_service_monitor = kubernetes.apiextensions.CustomResource(
+    f"dagster-pgbouncer-service-monitor-{stack_info.env_suffix}",
+    api_version="monitoring.coreos.com/v1",
+    kind="ServiceMonitor",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-pgbouncer",
+        namespace=dagster_namespace,
+        labels={
+            **k8s_global_labels.model_dump(),
+            # Label required for Prometheus Operator to discover this ServiceMonitor
+            "release": "prometheus",
+        },
+    ),
+    spec={
+        "selector": {
+            "matchLabels": {
+                "component": "pgbouncer",
+                **k8s_global_labels.model_dump(),
+            },
+        },
+        "namespaceSelector": {"matchNames": [dagster_namespace]},
+        "endpoints": [
+            {
+                "port": "metrics",
+                "path": "/metrics",
+                "scheme": "http",
+                "interval": "30s",
+                "scrapeTimeout": "10s",
+                "relabelings": [
+                    {
+                        "sourceLabels": ["__meta_kubernetes_pod_name"],
+                        "targetLabel": "pod",
+                    },
+                    {
+                        "sourceLabels": ["__meta_kubernetes_namespace"],
+                        "targetLabel": "namespace",
+                    },
+                ],
+            }
+        ],
+    },
+    opts=ResourceOptions(depends_on=[pgbouncer_service]),
 )
 
 # APISix OIDC configuration for authentication

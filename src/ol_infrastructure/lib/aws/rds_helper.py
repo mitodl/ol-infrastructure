@@ -4,8 +4,16 @@ from functools import lru_cache
 
 import boto3
 import pulumi
+from botocore.exceptions import ClientError
 
 rds_client = boto3.client("rds")
+ec2_client = boto3.client("ec2")
+
+# The RDS default parameter groups for PostgreSQL set
+# ``max_connections = LEAST({DBInstanceClassMemory/9531392}, 5000)``. These two
+# constants are that formula.
+POSTGRES_BYTES_PER_CONNECTION = 9531392
+POSTGRES_MAX_CONNECTIONS_CAP = 5000
 
 
 @unique
@@ -35,6 +43,50 @@ def db_engines() -> dict[str, list[str]]:
         for engine in engines_page["DBEngineVersions"]:
             engines_versions[engine["Engine"]].append(engine["EngineVersion"])
     return dict(engines_versions)
+
+
+@lru_cache
+def postgres_max_connections(db_instance_type: str) -> int:
+    """Resolve the effective ``max_connections`` for a PostgreSQL RDS instance class.
+
+    RDS's default parameter group computes this as
+    ``LEAST({DBInstanceClassMemory/9531392}, 5000)``, so it varies with the instance
+    class. Anything sizing a connection pool against the database needs the real
+    number rather than the 5000 cap, which only the larger classes actually reach --
+    a ``db.m7g.large`` tops out around 900.
+
+    **This is an upper bound, not an exact figure.** ``DBInstanceClassMemory`` is the
+    memory RDS leaves to the database after its own OS and management reservations,
+    which is somewhat less than the instance class's total physical memory used here,
+    and AWS does not publish the reservation. On classes large enough to hit the 5000
+    cap the difference is irrelevant and the result is exact -- verified against
+    ``ol-etl-db-production`` (``db.r7g.2xlarge``), where ``SHOW max_connections``
+    returns 5000. Below the cap the result may overstate by the size of that
+    reservation, so callers must leave headroom rather than budgeting to this number.
+
+    :param db_instance_type: An RDS instance class, e.g. ``db.r7g.2xlarge``
+
+    :returns: An upper bound on the connections the instance will accept; exact for
+        classes that reach the 5000 cap
+
+    :rtype: int
+    """
+    # RDS instance classes are the EC2 class with a ``db.`` prefix, and the
+    # DescribeDBInstance APIs don't report instance memory, so resolve it from EC2.
+    try:
+        instance_types = ec2_client.describe_instance_types(
+            InstanceTypes=[db_instance_type.removeprefix("db.")]
+        )["InstanceTypes"]
+    except ClientError as exc:
+        # An unknown type raises InvalidInstanceType rather than returning an empty
+        # list. The instance class comes from Pulumi config, so a typo lands here, and
+        # AWS reports the stripped EC2 name -- report the value as configured instead.
+        msg = f"No EC2 instance type matching RDS instance class {db_instance_type}"
+        raise ValueError(msg) from exc
+    memory_bytes = instance_types[0]["MemoryInfo"]["SizeInMiB"] * 1024 * 1024
+    return min(
+        memory_bytes // POSTGRES_BYTES_PER_CONNECTION, POSTGRES_MAX_CONNECTIONS_CAP
+    )
 
 
 def engine_major_version(engine_version: str) -> str:

@@ -6,7 +6,10 @@ Under the preview-gated Concourse topology the preview is what opens the promoti
 so that failure blocks the environment from deploying at all.
 """
 
+import re
+
 import pytest
+from botocore.exceptions import ClientError
 
 from ol_infrastructure.lib.aws import rds_helper
 
@@ -50,3 +53,68 @@ def test_update_disables_protection(recorded_calls, monkeypatch):
             "DeletionProtection": False,
         }
     ]
+
+
+class TestPostgresMaxConnections:
+    """PgBouncer's ``max_db_connections`` for Dagster is derived from this.
+
+    Overstating it silently overcommits the pool against the database -- the failure
+    mode that took Dagster down on 2026-08-10 -- so the arithmetic is worth pinning.
+    """
+
+    @staticmethod
+    def _stub_ec2(monkeypatch, size_mib: int):
+        """Stand in for a successful EC2 ``describe_instance_types``."""
+        monkeypatch.setattr(
+            rds_helper.ec2_client,
+            "describe_instance_types",
+            lambda **_: {"InstanceTypes": [{"MemoryInfo": {"SizeInMiB": size_mib}}]},
+        )
+        # The function is lru_cached, so each case needs a clean slate.
+        rds_helper.postgres_max_connections.cache_clear()
+
+    def test_below_the_cap_divides_instance_memory(self, monkeypatch):
+        # db.m7g.large, 8 GiB: 8589934592 / 9531392 = 901
+        self._stub_ec2(monkeypatch, 8192)
+        assert rds_helper.postgres_max_connections("db.m7g.large") == 901
+
+    def test_large_classes_are_held_at_the_cap(self, monkeypatch):
+        # db.r7g.2xlarge, 64 GiB, computes 7210 before the LEAST(). Verified against
+        # ol-etl-db-production, where SHOW max_connections returns 5000.
+        self._stub_ec2(monkeypatch, 65536)
+        assert rds_helper.postgres_max_connections("db.r7g.2xlarge") == 5000
+
+    def test_the_db_prefix_is_stripped_for_ec2(self, monkeypatch):
+        queried = {}
+
+        def _record(**kwargs):
+            queried.update(kwargs)
+            return {"InstanceTypes": [{"MemoryInfo": {"SizeInMiB": 4096}}]}
+
+        monkeypatch.setattr(rds_helper.ec2_client, "describe_instance_types", _record)
+        rds_helper.postgres_max_connections.cache_clear()
+        rds_helper.postgres_max_connections("db.t4g.medium")
+        assert queried["InstanceTypes"] == ["t4g.medium"]
+
+    def test_unknown_instance_class_names_the_bad_value(self, monkeypatch):
+        # EC2 raises InvalidInstanceType rather than returning an empty list, and it
+        # reports the stripped name -- verified against the live API. The ValueError
+        # exists to name the class as it appears in Pulumi config, prefix included.
+        def _raise(**_):
+            raise ClientError(
+                {
+                    "Error": {
+                        "Code": "InvalidInstanceType",
+                        "Message": (
+                            "The following supplied instance types do not exist: "
+                            "[nonexistent.xlarge]"
+                        ),
+                    }
+                },
+                "DescribeInstanceTypes",
+            )
+
+        monkeypatch.setattr(rds_helper.ec2_client, "describe_instance_types", _raise)
+        rds_helper.postgres_max_connections.cache_clear()
+        with pytest.raises(ValueError, match=re.escape("db.nonexistent.xlarge")):
+            rds_helper.postgres_max_connections("db.nonexistent.xlarge")
