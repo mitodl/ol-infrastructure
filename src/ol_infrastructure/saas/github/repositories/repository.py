@@ -203,18 +203,22 @@ def build(repo: dict[str, Any]) -> None:
         opts=ResourceOptions(depends_on=[repository]),
     )
 
-    github.RepositoryVulnerabilityAlerts(
+    vulnerability_alerts = github.RepositoryVulnerabilityAlerts(
         f"mitodl-repo-vulnerability-alerts-{name}",
         repository=name,
         enabled=bool(repo.get("vulnerability_alerts")),
         opts=ResourceOptions(depends_on=[repository]),
     )
 
+    # GitHub requires vulnerability alerts to be enabled before Dependabot security
+    # updates can be, so this must not run concurrently with the resource above --
+    # without depends_on, Pulumi is free to create both at once, and a repo that is
+    # new to Pulumi state (nothing yet imported) can fail this nondeterministically.
     github.RepositoryDependabotSecurityUpdates(
         f"mitodl-repo-dependabot-security-updates-{name}",
         repository=name,
         enabled=bool(repo.get("dependabot_security_updates")),
-        opts=ResourceOptions(depends_on=[repository]),
+        opts=ResourceOptions(depends_on=[repository, vulnerability_alerts]),
     )
 
     _tier_property(name, repo["tier"], repository)

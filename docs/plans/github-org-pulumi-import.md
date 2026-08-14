@@ -317,7 +317,7 @@ archetypes:
     has_wiki: false
     web_commit_signoff_required: true
     vulnerability_alerts: true
-    dependabot_security_updates: true
+    dependabot_security_updates: false     # closed 2026-08-14 as SEC-05 won't-fix, see §7
     secret_scanning: enabled
     secret_scanning_push_protection: enabled
     teams:
@@ -437,7 +437,7 @@ which is precisely how `ol-django` ended up with no branch protection at all.
 | Mechanism | What it covers |
 |---|---|
 | `tier` custom property with `required: true, defaultValue: standard` | The new repo carries `tier=standard` from birth, so the `baseline-default-branch` org ruleset (§5.4) matches it **immediately**. |
-| `OrganizationSettings` new-repo toggles | `advanced_security`, `dependabot_alerts`, `dependabot_security_updates`, `dependency_graph`, `secret_scanning`, `secret_scanning_push_protection` — six `*_enabled_for_new_repositories` flags, **all currently off** (SEC-05). Set once; every future repo inherits them. |
+| `OrganizationSettings` new-repo toggles | Six `*_enabled_for_new_repositories` flags. `secret_scanning` and `secret_scanning_push_protection` are **already on**. `advanced_security`, `dependabot_alerts`, `dependency_graph` are off, tracked as a future phase-5 diff. `dependabot_security_updates` is **deliberately off, not a pending flip** — closed 2026-08-14 as SEC-05 won't-fix (§7): the org's shared Renovate config already covers vulnerability remediation, so enabling GitHub's native auto-fix PRs org-wide (existing repos or new ones) would duplicate it. |
 | The `.github` repo | Org-wide default issue/PR templates and community health files. Already works; no Pulumi involvement. |
 | `default_repository_permission: none` | Already correct. |
 
@@ -924,7 +924,7 @@ fixtures and cheap to add — the rule set is meant to grow every time someone n
 | SEC-02 | Force-push to default branch not blocked | every sampled repo |
 | SEC-03 | No required status checks on default branch | every sampled repo |
 | SEC-04 | Secret scanning or push protection disabled | `hq` (private) |
-| SEC-05 | Dependabot alerts or security updates disabled | every sampled repo + org default |
+| SEC-05 | ~~Dependabot alerts or security updates disabled~~ | **RETIRED 2026-08-14**, won't-fix: the org's shared Renovate config already covers vulnerability remediation (`vulnerabilityAlerts` + `osvVulnerabilityAlerts`); enabling GitHub's native auto-fix PRs too would duplicate Renovate's PR on every repo extending it. The `base` archetype default is now `false`, and the audit rule is removed rather than left firing on the deliberate default. |
 | SEC-06 | **Any** direct collaborator on **any** repo — repo access must come from team membership (§4.7) | **fires on 72 repos**: 83 grants, 73 of them `admin`, across 20 people |
 | SEC-07 | Webhook without a secret, or a non-HTTPS URL | unknown |
 | SEC-08 | Write-enabled deploy key on an active repo | unknown |
