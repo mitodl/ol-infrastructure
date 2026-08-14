@@ -394,6 +394,26 @@ def create_k8s_resources(  # noqa: C901
             mount_path="/openedx/edx-platform/uwsgi.ini",
             sub_path="uwsgi.ini",
         ),
+        # Settings entrypoint that DJANGO_SETTINGS_MODULE points at instead of
+        # <service>.envs.production -- see the comment on the settings_override
+        # ConfigMap in k8s_configmaps.py. Mounted at both service paths because the
+        # module is identical for each (its `from ..production import *` is relative),
+        # and the extra file is inert in the service it does not belong to. subPath so
+        # it lands alongside the image's existing envs/mitol/{assets,i18n}.py rather
+        # than replacing that directory. Appended rather than inserted so the rendered
+        # volumeMounts list stays index-stable for existing entries.
+        kubernetes.core.v1.VolumeMountArgs(
+            name=configmaps.settings_override_config_name,
+            mount_path="/openedx/edx-platform/lms/envs/mitol/production.py",
+            sub_path="production.py",
+            read_only=True,
+        ),
+        kubernetes.core.v1.VolumeMountArgs(
+            name=configmaps.settings_override_config_name,
+            mount_path="/openedx/edx-platform/cms/envs/mitol/production.py",
+            sub_path="production.py",
+            read_only=True,
+        ),
     ]
 
     # The Vector log-shipping sidecar mounts differ per service (lms vs cms log paths).
@@ -579,6 +599,9 @@ def create_k8s_resources(  # noqa: C901
         configmaps.interpolated_config_name,
         configmaps.lms_general_config_name,
         configmaps.lms_interpolated_config_name,
+        # Volume only -- deliberately absent from lms_edxapp_config_sources, which the
+        # init container cats into lms.env.yml. This is a Python module, not config.
+        configmaps.settings_override_config_name,
     ]
 
     lms_edxapp_volumes = [
@@ -680,7 +703,7 @@ def create_k8s_resources(  # noqa: C901
             registry="dockerhub",
             application_config={
                 "SERVICE_VARIANT": "lms",
-                "DJANGO_SETTINGS_MODULE": "lms.envs.production",
+                "DJANGO_SETTINGS_MODULE": "lms.envs.mitol.production",
                 "UWSGI_WORKERS": "2",
             },
             application_lb_service_name=lms_webapp_deployment_name,
@@ -926,6 +949,8 @@ def create_k8s_resources(  # noqa: C901
         configmaps.interpolated_config_name,
         configmaps.cms_general_config_name,
         configmaps.cms_interpolated_config_name,
+        # Volume only -- see the note on lms_edxapp_configmap_names.
+        configmaps.settings_override_config_name,
     ]
 
     cms_edxapp_volumes = [
@@ -1023,7 +1048,7 @@ def create_k8s_resources(  # noqa: C901
             registry="dockerhub",
             application_config={
                 "SERVICE_VARIANT": "cms",
-                "DJANGO_SETTINGS_MODULE": "cms.envs.production",
+                "DJANGO_SETTINGS_MODULE": "cms.envs.mitol.production",
                 "UWSGI_WORKERS": "2",
             },
             application_lb_service_name=cms_webapp_deployment_name,
@@ -1294,7 +1319,7 @@ def create_k8s_resources(  # noqa: C901
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="DJANGO_SETTINGS_MODULE",
-                                    value="lms.envs.production",
+                                    value="lms.envs.mitol.production",
                                 ),
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
@@ -1471,7 +1496,7 @@ def create_k8s_resources(  # noqa: C901
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="DJANGO_SETTINGS_MODULE",
-                                    value="lms.envs.production",
+                                    value="lms.envs.mitol.production",
                                 ),
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
@@ -1600,7 +1625,7 @@ def create_k8s_resources(  # noqa: C901
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="DJANGO_SETTINGS_MODULE",
-                                    value="lms.envs.production",
+                                    value="lms.envs.mitol.production",
                                 ),
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
@@ -1710,7 +1735,7 @@ def create_k8s_resources(  # noqa: C901
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="DJANGO_SETTINGS_MODULE",
-                                    value="lms.envs.production",
+                                    value="lms.envs.mitol.production",
                                 ),
                             ],
                             volume_mounts=celery_volume_mounts,
@@ -1825,7 +1850,7 @@ def create_k8s_resources(  # noqa: C901
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="DJANGO_SETTINGS_MODULE",
-                                    value="cms.envs.production",
+                                    value="cms.envs.mitol.production",
                                 ),
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
