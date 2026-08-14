@@ -9,11 +9,10 @@ the `$realm` template variable defaults to all realms.
 
 This is the Pulumi port of the Grafana-Cloud-UI-authored "Keycloak --
 Production Overview" dashboard, generalized for QA as well as Production,
-with a handful of panels folded in from two now-retired CI-only dashboards
-("Keycloak capacity planning dashboard" and "Keycloak troubleshooting
-dashboard") that covered ground this one didn't: password-hashing validation
-rate, GC pause time/count, JDBC (Infinispan) cache hit ratio, and an
-availability SLO gauge.
+with a handful of panels folded in from a now-retired CI-only dashboard
+("Keycloak troubleshooting dashboard") that covered ground this one didn't:
+GC pause time/count, JDBC (Infinispan) cache hit ratio, and an availability
+SLO gauge.
 """
 
 from collections.abc import Callable
@@ -158,7 +157,8 @@ def _dashboard_json(
                 title="Successful Logins by Realm",
                 expr=(
                     "sum by (realm) (rate(keycloak_user_events_total"
-                    f'{{event="login", error="", {_NAMESPACE_SELECTOR}}}'
+                    f'{{event="login", error="", {_NAMESPACE_SELECTOR}, '
+                    'realm=~"$realm"}'
                     "[$__rate_interval]))"
                 ),
                 grid_pos={"h": 8, "w": 12, "x": 0, "y": 14},
@@ -261,10 +261,10 @@ def _dashboard_json(
                     },
                     {
                         "expr": (
-                            "sum(jvm_memory_max_bytes"
+                            "sum by (pod) (jvm_memory_max_bytes"
                             f'{{{_NAMESPACE_SELECTOR}, area="heap"}})'
                         ),
-                        "legend_format": "max",
+                        "legend_format": "max - {{pod}}",
                     },
                 ],
                 grid_pos={"h": 8, "w": 12, "x": 0, "y": 48},

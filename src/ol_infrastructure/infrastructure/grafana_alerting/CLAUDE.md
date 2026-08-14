@@ -251,8 +251,9 @@ counts) would be `keycloak_session_counts.py`, not a new function inside
 | `_logs_panel` | `logs` | Raw log-line display (e.g. an error/warning tail). Defaults to the Loki datasource since a Mimir target makes no sense for this panel type. |
 | `_row_panel` | `row` | A visual section divider between groups of panels. Pass the `y` gridPos it sits at; give it `title=""` for an unlabeled top row. |
 
-All of the above except `_logs_panel`/`_row_panel` take a `unit` param
-(defaults to `"short"`) -- set it explicitly for anything that isn't a plain
+All of the above except `_logs_panel`/`_row_panel` take a `unit` param --
+`_gauge_panel` defaults it to `"percentunit"` (it's built for ratios), the
+rest default to `"short"`. Set it explicitly for anything that isn't a plain
 count: `"percentunit"` for ratios, `"s"` for durations, `"bytes"` for memory.
 
 **Tempo (TraceQL) panels need two non-obvious overrides on `_timeseries_panel`:**
