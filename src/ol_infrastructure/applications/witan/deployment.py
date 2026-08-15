@@ -1,0 +1,707 @@
+"""witan's serving tier: a plain Deployment and Service, no ToolHive.
+
+This module replaces ``mcp_servers.py`` (the ``MCPGroup`` + ``MCPServer``) and
+the ``VirtualMCPServer`` that used to sit in ``__main__.py``. APISIX now routes
+straight to witan's own FastMCP process.
+
+── WHY TOOLHIVE IS GONE ──
+
+Not because ToolHive is bad — ``toolhive_swe`` keeps it, and should. Because
+what it provides is redundant *for witan specifically*, while what it costs is
+the defect that blocked this project:
+
+  * **Its OIDC was a second lock on the same door.** witan validates the
+    Keycloak JWT itself (``server.py``'s ``JWTVerifier``, agent-kit ADR-0004 D1)
+    and derives the per-request actor from ``sub``. The vMCP's ``incomingAuth``
+    validated the same token against the same issuer moments earlier, then had
+    to be told to forward it (``passthroughHeaders``) — plus a header-injection
+    ``MCPExternalAuthConfig`` that authenticated nothing and existed only to
+    stop a probe 401 being read as misconfiguration. Three moving parts to end
+    up where witan already was.
+  * **It aggregated a group of one.** ``priorityOrder: ["witan"]``, and the
+    code-graph tools are mounted IN-PROCESS by ``witan serve``, not run as a
+    second workload. ``authzConfig`` was null; ``authServerConfig`` absent.
+  * **Its telemetry measured hops that no longer exist.**
+
+Against that:
+
+  * **A hardcoded 30s deadline on ``tools/call``**, in three separate upstream
+    constants, with the CRD field that looks like the knob
+    (``spec.config.operational.timeouts``) read by nothing at runtime. This is
+    the one that mattered. Measured in QA on 2026-08-15 at 16 concurrent
+    writers: the store committed **16 of 16** writes, and 15 callers were told
+    their write failed. Per-hop trace ``003cfcd836f5f9963dd3cd6c7722421b`` —
+    proxy receive to witan handler start 2459.63ms, ToolHive cut at
+    29997.06ms, witan committed at 33601.53ms, 6064.10ms after nobody was
+    listening. Not a slow write: an **indeterminate** one.
+  * **~289ms per call of pure tier overhead when idle** (65.90 vMCP inbound +
+    102.19 hop + 111.58 pre-handler + 8.97 return), rising to ~2.46s
+    pre-handler at 16 writers — 8.2% of the very budget it was enforcing,
+    spent before witan saw the request.
+  * **A vMCP memory ceiling around 32 concurrent sessions** (~15Mi each), which
+    OOMKilled the aggregator and took the whole endpoint down with it.
+  * **An upgrade freeze.** ToolHive 0.43 rejects ``Authorization`` in
+    ``passthroughHeaders`` at startup (upstream #6235) — the exact setting
+    witan's per-actor auth depended on — so the stack was pinned at 0.42.1 and
+    0.43 offered nothing on the deadline in exchange.
+
+The deadline does not disappear; it becomes **ours**. See
+``WITAN_REQUEST_TIMEOUT`` below.
+
+── WHAT WAS LOST, AND WHAT REPLACED IT ──
+
+* Health probes lived on the operator's proxy container, so witan had none of
+  its own. It now serves ``GET /health`` (agent-kit witan-council 0.13.0),
+  deliberately shallow — see ``WITAN_HEALTH_PATH``.
+* The ``witan-sa`` ServiceAccount was operator-created and owner-referenced by
+  the ``MCPServer``, so it is deleted along with it. This stack creates its own
+  as ``witan-server`` — NOT ``witan-sa``, which cannot be reused during the
+  cutover; see ``WITAN_SERVICE_NAME``. It carries no IRSA annotations, as the
+  operator's did not either (verified against the live SA), because witan
+  reaches only omnigraph-server and Keycloak — and for the same reason its
+  token is not projected into the pod at all.
+* Per-request audit JSON came from the ToolHive tier. witan's own structured
+  logging (``witan_log_env``) already emits a line per tool call to the same
+  Loki pipeline, and its OTel spans are unaffected — those come from
+  ``witan_core.observability``, inside the process.
+* ``spec.resources`` being silently dropped by the operator (which ran the
+  backend BestEffort until it was restated through a ``podTemplateSpec``
+  patch) is simply gone as a failure mode: a Deployment applies the resources
+  it declares.
+"""
+
+from typing import NamedTuple
+
+import pulumi_kubernetes as kubernetes
+from pulumi import Output, Resource, ResourceOptions
+
+from ol_infrastructure.applications.witan.observability import (
+    downward_api_env_args,
+    otel_env,
+    witan_log_env,
+)
+from ol_infrastructure.lib.pulumi_helper import StackInfo
+
+# The Deployment, Service and ServiceAccount all share this name. The Service
+# is what APISIX routes to (see ``ingress.py``); the kubelet's probes reach the
+# pod's own IP directly and do not go through it.
+#
+# ★ `witan-server`, NOT `witan`, AND THE MIGRATION IS WHY. The ToolHive operator
+# already owns a proxy-runner Deployment named exactly `witan` in this namespace
+# (plus a `witan` StatefulSet — only the kind told them apart), and it owns the
+# `witan-sa` ServiceAccount by ownerReference. Pulumi performs deletions LAST,
+# so a new Deployment claiming either name is created before the resources
+# holding it are removed, and fails:
+#
+#     creation failed: deployments.apps "witan" already exists
+#     creation failed: serviceaccounts "witan-sa" already exists
+#
+# Caught by `pulumi preview` against the live CI stack rather than discovered
+# during the cutover. Both old objects are ownerReference'd by the MCPServer, so
+# they are garbage-collected when it goes — but not before these are created.
+#
+# `-server` also matches the house style of the tier this talks to
+# (`omnigraph-server`, applications/omnigraph/data_tier.py) and disambiguates
+# the workload from the namespace and Pulumi project, which are both `witan`.
+WITAN_SERVICE_NAME = "witan-server"
+WITAN_SERVICE_ACCOUNT_NAME = "witan-server"
+
+# witan's FastMCP listener. Same port the MCPServer's `mcpPort` named, so the
+# container's command line is unchanged; what goes away is the proxy that used
+# to sit in front of it on 8080.
+WITAN_PORT = 8000
+
+# The MCP endpoint path. Equal to witan's own default, and PASSED EXPLICITLY as
+# `--path` below rather than relied upon, because it is half of the
+# client-facing URL — `https://witan.<env>.ol.mit.edu/mcp` — and that URL is
+# unchanged by this migration only because witan serves the same path the vMCP
+# did.
+#
+# Declaring it is the point: left implicit, the public URL of this service would
+# be a default inside an agent-kit release, and a change to it there would break
+# every configured client at once with nothing in this repo to review. Pinned
+# here, such a change is inert until someone edits this line.
+WITAN_MCP_PATH = "/mcp"
+
+# Liveness/readiness. Shallow by design on witan's side: it answers from
+# process state and never touches the graph.
+#
+# ★ THAT SHALLOWNESS IS THE WHOLE POINT, and this stack has the incident to
+# prove it. ToolHive's proxy `/health` synchronously pinged its MCP backend
+# (upstream `pkg/healthcheck/healthcheck.go:CheckHealth`). On 2026-08-12 a
+# burst of 16 concurrent writes saturated that backend, the ping stopped
+# answering, and the kubelet's 5s liveness probe killed a container that was
+# working perfectly — which removed the only endpoint APISIX had and turned a
+# 30s write queue into ~60s of outage for readers too. A deep probe converts
+# backend SLOWNESS into frontend DEATH, and fires exactly when killing the pod
+# is most harmful.
+#
+# So: do not "improve" these probes by pointing them at something that talks to
+# omnigraph. A graph outage is real and belongs in alerting on the spans witan
+# already emits, where it degrades a dashboard instead of a pod.
+WITAN_HEALTH_PATH = "/health"
+
+# ── Startup budget ───────────────────────────────────────────────────────────
+# Measured in QA on 2026-08-15 from the running pod: container start 22:25:17,
+# `Uvicorn running on http://0.0.0.0:8000` at 22:25:21.9 — ~4.9s to serving.
+#
+# The startupProbe gates the other two: while it runs the kubelet suppresses
+# liveness and readiness entirely, and once it passes it never runs again. The
+# Nth failure lands at initial_delay + (N-1) x period, so the container is
+# killed at 5 + 19x3 = 62s, ~12x the measured boot.
+#
+# That much headroom is deliberate rather than lazy: fastmcp performs an
+# outbound version check against pypi.org during startup (visible in the pod
+# logs as `GET https://pypi.org/pypi/fastmcp/json`), so boot has an external
+# dependency whose slow path is not ours to control. A boot that blows 62s is
+# stuck, not slow, and killing it is correct.
+WITAN_STARTUP_INITIAL_DELAY_SECONDS = 5
+WITAN_STARTUP_PERIOD_SECONDS = 3
+WITAN_STARTUP_FAILURE_THRESHOLD = 20
+
+# ── The request deadline, which is now ours ──────────────────────────────────
+# ★ REMOVING TOOLHIVE DOES NOT REMOVE THE DEADLINE — it moves it here, and the
+# difference is that this number is chosen and tunable where ToolHive's 30s was
+# hardcoded in three places.
+#
+# Left unset, the deadline would silently become APISIX's upstream default,
+# which is inherited rather than declared and is not visible from this stack.
+# `BackendTrafficPolicy` (apisix.apache.org/v1alpha1, present on the cluster
+# and the supported lever for Gateway API routes) makes it explicit.
+#
+# 120s against a measured worst case of 33.6s at 16 concurrent writers, and
+# 3.45s solo. The point is NOT to make writes fast — it is that a write which
+# needs 34s now returns a result instead of a 502 whose outcome nobody can
+# determine. Slow-but-correct beats fast-and-ambiguous for a memory graph,
+# because an indeterminate write is the one failure a caller cannot safely
+# retry.
+#
+# Raising this further has a real cost: a wedged call holds a connection for
+# the full budget. Lowering it back toward 30s reintroduces exactly the defect
+# this change exists to remove.
+#
+# `connect` is generous for an in-cluster ClusterIP hop that should resolve
+# instantly; if connect is the thing timing out, the pod is gone and 10s of
+# patience changes nothing but the error text.
+WITAN_REQUEST_TIMEOUT_SECONDS = 120
+WITAN_REQUEST_TIMEOUT = f"{WITAN_REQUEST_TIMEOUT_SECONDS}s"
+WITAN_CONNECT_TIMEOUT = "10s"
+WITAN_SEND_TIMEOUT = "60s"
+
+# ── Shutdown budget, which MUST exceed the request budget ────────────────────
+# ★ A GRACE PERIOD SHORTER THAN THE REQUEST BUDGET RECREATES THE EXACT DEFECT
+# THIS PR REMOVES, just with a different executioner. Kubernetes defaults to 30s:
+# it sends SIGTERM, waits, then SIGKILLs. A write measured at 33.6s under load
+# would be killed mid-commit during a `Recreate` rollout, an eviction, or a node
+# drain — the caller gets a severed connection and cannot tell whether the write
+# landed, which is the definition of the indeterminate write. Trading ToolHive's
+# 30s cut for the kubelet's 30s cut would have been no trade at all.
+#
+# Derived from the request budget rather than written as its own literal,
+# because the invariant is `grace > budget` and two independent numbers drift.
+# Raising WITAN_REQUEST_TIMEOUT_SECONDS now moves this with it.
+#
+# The margin covers uvicorn noticing SIGTERM and finishing a call already at the
+# far end of the budget; it does not need to be large, only positive. The cost is
+# that a node drain can wait this long for witan — acceptable for a
+# single-replica workload whose deploys are already a brief outage by design.
+#
+# This works because uvicorn shuts down gracefully on SIGTERM: it stops
+# accepting connections and waits for in-flight requests rather than dropping
+# them. Without that, a longer grace period would only delay the same kill.
+WITAN_TERMINATION_GRACE_SECONDS = WITAN_REQUEST_TIMEOUT_SECONDS + 30
+
+# Mount path (inside the container) for the actor-tokens Secret volume.
+ACTOR_TOKENS_MOUNT_PATH = "/etc/witan/actor-tokens"  # pragma: allowlist secret
+ACTOR_TOKENS_FILENAME = "tokens.json"  # pragma: allowlist secret
+
+# Writable scratch space. The container runs `readOnlyRootFilesystem: true`
+# with no writable volume, so Python's tempfile found nothing in
+# ['/tmp', '/var/tmp', '/usr/tmp', '/src'] and every server-side tool that
+# needs a temp file failed outright — verified against CI on 2026-08-07, where
+# `witan migrate merge` through the MCP tier returned "No usable temporary
+# directory found" at every payload size, including --dry-run. Those tools hand
+# a file to the `omnigraph` binary, so there is no in-memory fallback.
+#
+# Disk-backed on purpose: `medium: Memory` would charge this to the pod's
+# memory limit and OOM the server on a large export.
+#
+# Writability depends on `fsGroup`: kubelet group-owns an emptyDir by it, and
+# the container runs as uid/gid 1000, so without it the mount is root-owned and
+# useless — the same trap ci_indexer.py documents on its scratch volume. Under
+# ToolHive this happened to work because the operator set `fsGroup: 1000` of its
+# own accord; it is declared explicitly below now that nothing else will.
+TMP_MOUNT_PATH = "/tmp"  # noqa: S108
+TMP_FS_GROUP = 1000
+
+# Sized for the server-side work, which is dominated by the graph export
+# `store_merge` takes of its OWN target to reconcile against — that grows with
+# the shared graph, not with the caller's upload (client batches are capped near
+# 2 MiB by witan_core.chunking.MCP_LOAD_MAX_BYTES). 2Gi is well clear of a
+# council graph's export today and far below the indexer's 8Gi.
+TMP_SIZE_LIMIT = "2Gi"
+
+# ★ THESE NOW ACTUALLY APPLY. Under ToolHive the identical values were declared
+# on `MCPServer.spec.resources`, which the operator accepted and never passed to
+# the container — the rendered StatefulSet showed `resources: {}` and the pod ran
+# **BestEffort**, first in line for eviction under node memory pressure. The
+# workaround was to restate them through a `podTemplateSpec` patch and keep the
+# two in step (tk-toolhive-operator-drops-mcpserver-spec-resources-8ea1ff).
+# A Deployment applies what it declares, so there is one declaration again.
+WITAN_RESOURCES = kubernetes.core.v1.ResourceRequirementsArgs(
+    requests={"cpu": "100m", "memory": "256Mi"},
+    limits={"cpu": "500m", "memory": "512Mi"},
+)
+
+# The uid/gid the image runs as, and the hardening the ToolHive operator used to
+# apply on witan's behalf. Reproduced verbatim from the live StatefulSet rather
+# than reinvented, so dropping the operator does not quietly relax the pod's
+# security posture — that would be a real regression hidden inside a migration.
+WITAN_RUN_AS = 1000
+
+
+class WitanServingTier(NamedTuple):
+    """Handles for depends_on wiring and for the VPA's target."""
+
+    deployment: kubernetes.apps.v1.Deployment
+    service: kubernetes.core.v1.Service
+
+
+def create_serving_tier(  # noqa: PLR0913
+    stack_info: StackInfo,
+    namespace: str,
+    k8s_global_labels: dict[str, str],
+    witan_image: str | Output[str],
+    omnigraph_server_addr: str | Output[str],
+    council_graph_id: str | Output[str],
+    oidc_issuer: str,
+    oidc_audience: str,
+    actor_tokens_secret_name: str,
+    actor_tokens_secret: Resource,
+    witan_ci_token_secret_name: str,
+    witan_ci_token_secret_key: str,
+    witan_ci_token_secret: Resource,
+    witan_code_token_secret_name: str,
+    witan_code_token_secret_key: str,
+    witan_code_token_secret: Resource,
+    migration_job: Resource,
+    service_version: str,
+    remote_write_max_inflight: str = "",
+    remote_write_queue_seconds: str = "",
+    remote_call_budget_seconds: str = "",
+) -> WitanServingTier:
+    """Provision witan's ServiceAccount, Deployment, Service and route policy.
+
+    ``remote_write_max_inflight`` / ``remote_write_queue_seconds`` retune
+    witan's client-side write admission. Empty (the default) leaves witan's own
+    defaults in force — the env var is omitted entirely rather than set to an
+    empty string, so "unset" and "set to nothing" cannot diverge between what
+    Pulumi declares and what witan reads.
+
+    ``remote_call_budget_seconds`` tells witan how long a tool call has before
+    something upstream stops waiting for it, so it can refuse a write it cannot
+    finish rather than be cut off mid-call. witan-core assumes no deadline of
+    its own — the same library runs from a CLI and from a batch Job — so this
+    is the deployment declaring one. It must be kept in step with
+    ``WITAN_REQUEST_TIMEOUT``; see the call site.
+    """
+    witan_service_account = kubernetes.core.v1.ServiceAccount(
+        f"witan-service-account-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=WITAN_SERVICE_ACCOUNT_NAME,
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+    )
+
+    pod_labels = k8s_global_labels | {"app.kubernetes.io/name": WITAN_SERVICE_NAME}
+
+    witan_deployment = kubernetes.apps.v1.Deployment(
+        f"witan-deployment-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=WITAN_SERVICE_NAME,
+            namespace=namespace,
+            labels=pod_labels,
+        ),
+        spec=kubernetes.apps.v1.DeploymentSpecArgs(
+            # ★ SINGLE REPLICA IS LOAD-BEARING, NOT A STARTING POINT.
+            # witan's client-side write gate (`witan_core.omnigraph._WriteGate`)
+            # is the GLOBAL bound on writes in flight against one graph, and it
+            # is per-process. Two replicas means two gates, each admitting its
+            # own quota while the data tier — which serialises writes on one
+            # graph regardless — sees the sum. The cap would read as 4 and
+            # behave as 8.
+            #
+            # Scaling this out is a real option, but it is a design change
+            # (moving admission to the data tier or a shared lease), not a
+            # replica-count edit. Do NOT add an HPA.
+            replicas=1,
+            # Recreate, NOT the default RollingUpdate, for the same reason: a
+            # rolling update briefly runs two pods, which is exactly the
+            # two-gates state above. The old pod is torn down first. With one
+            # replica this is what the StatefulSet effectively did anyway, so it
+            # costs nothing new — a deploy is a brief serving outage either way,
+            # and the migration Job already gates the rollout.
+            strategy=kubernetes.apps.v1.DeploymentStrategyArgs(type="Recreate"),
+            selector=kubernetes.meta.v1.LabelSelectorArgs(
+                match_labels={"app.kubernetes.io/name": WITAN_SERVICE_NAME}
+            ),
+            template=kubernetes.core.v1.PodTemplateSpecArgs(
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=pod_labels),
+                spec=kubernetes.core.v1.PodSpecArgs(
+                    service_account_name=WITAN_SERVICE_ACCOUNT_NAME,
+                    # witan reaches omnigraph-server and Keycloak, and never the
+                    # Kubernetes API — so the default projected token would be a
+                    # cluster credential sitting inside the one process in this
+                    # namespace that is reachable from the internet. Same
+                    # reasoning, and the same setting, as `ci_indexer.py`.
+                    automount_service_account_token=False,
+                    # Must outlast the request budget, or a rollout/drain kills
+                    # a write mid-commit and hands the caller exactly the
+                    # indeterminate outcome this stack exists to remove. See
+                    # WITAN_TERMINATION_GRACE_SECONDS.
+                    termination_grace_period_seconds=WITAN_TERMINATION_GRACE_SECONDS,
+                    # What makes the /tmp emptyDir writable by a non-root
+                    # container — see TMP_FS_GROUP. Under ToolHive this was the
+                    # operator's default and worked by luck; here it is ours.
+                    security_context=kubernetes.core.v1.PodSecurityContextArgs(
+                        fs_group=TMP_FS_GROUP,
+                        run_as_user=WITAN_RUN_AS,
+                        run_as_group=WITAN_RUN_AS,
+                        run_as_non_root=True,
+                        seccomp_profile=kubernetes.core.v1.SeccompProfileArgs(
+                            type="RuntimeDefault",
+                        ),
+                    ),
+                    containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            # Still `mcp`, which is what the ToolHive operator
+                            # called it. The WORKLOAD had to be renamed (see
+                            # WITAN_SERVICE_NAME); the container did not, so it
+                            # keeps the name the VPA's `container_name`, saved
+                            # Grafana/Loki queries, and `kubectl logs -c` all
+                            # already use.
+                            name="mcp",
+                            image=witan_image,
+                            args=[
+                                "serve",
+                                "--transport",
+                                "streamable-http",
+                                "--host",
+                                "0.0.0.0",  # noqa: S104
+                                "--port",
+                                str(WITAN_PORT),
+                                "--path",
+                                WITAN_MCP_PATH,
+                            ],
+                            ports=[
+                                kubernetes.core.v1.ContainerPortArgs(
+                                    name="http",
+                                    container_port=WITAN_PORT,
+                                )
+                            ],
+                            env=[
+                                # Pod identity for spans and log lines.
+                                # `witan_core.observability` reads these ONCE at
+                                # import, so they must be present at startup.
+                                *downward_api_env_args(),
+                                # Direct OIDC/JWT validation against Keycloak
+                                # (agent-kit ADR-0004 D1). witan is the identity
+                                # boundary — and with ToolHive gone it is the
+                                # ONLY one, which is what it always effectively
+                                # was.
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="WITAN_OIDC_ISSUER", value=oidc_issuer
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="WITAN_OIDC_AUDIENCE", value=oidc_audience
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="WITAN_ACTOR_TOKENS_FILE",
+                                    value=(
+                                        f"{ACTOR_TOKENS_MOUNT_PATH}/"
+                                        f"{ACTOR_TOKENS_FILENAME}"
+                                    ),
+                                ),
+                                # Module-level fallback OmnigraphClient's target
+                                # (ADR-0004 D4) — omnigraph-server's in-cluster
+                                # address.
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="WITAN_MEMORY_URI",
+                                    value=omnigraph_server_addr,
+                                ),
+                                # An http(s) store is addressed as
+                                # `--server <url> --graph <id>`, and the graph id
+                                # is not encoded in WITAN_MEMORY_URI (a bare
+                                # server URL), so it comes from here. Sourced
+                                # from the omnigraph stack's own output rather
+                                # than a literal: witan must ask for exactly the
+                                # graph that stack declared in cluster.yaml, or
+                                # it addresses a graph the cluster never created.
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="WITAN_MEMORY_GRAPH",
+                                    value=council_graph_id,
+                                ),
+                                # The code-graph data tier — the same
+                                # omnigraph-server, whose `code-<repo>` graphs
+                                # data_tier.py declares alongside `council`.
+                                # WITAN_CODE_INDEX_ROLE is deliberately left at
+                                # its default (`client`): that is what keeps a
+                                # write arriving through the MCP boundary from
+                                # claiming a graph's shared default-branch view.
+                                # Only the in-cluster CI indexer Job declares
+                                # itself `ci`.
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="WITAN_CODE_SERVER",
+                                    value=omnigraph_server_addr,
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="WITAN_MEMORY_TOKEN",
+                                    value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                        secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                            name=witan_ci_token_secret_name,
+                                            key=witan_ci_token_secret_key,
+                                        )
+                                    ),
+                                ),
+                                # The tier's own credential against the code
+                                # graphs, for the questions asked *about* the
+                                # server rather than of a graph: `omnigraph
+                                # graphs list`, which `ensure_store` runs to
+                                # check the cluster actually declares a graph
+                                # before a write starts, and which backs
+                                # `code_indexed_repos`. That listing is
+                                # server-scoped (Cedar `graph_list`) and belongs
+                                # to no actor, so it authenticates as the service
+                                # or not at all.
+                                #
+                                # It is NOT what a caller's records are written
+                                # under: `witan_code.ingest._client` resolves the
+                                # actor from the request's JWT and swaps in that
+                                # actor's token before any read or mutation,
+                                # refusing outright when the actor has none.
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="WITAN_CODE_TOKEN",
+                                    value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                        secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                            name=witan_code_token_secret_name,
+                                            key=witan_code_token_secret_key,
+                                        )
+                                    ),
+                                ),
+                                # Client-side write admission, per graph, inside
+                                # this pod. Only emitted when the stack sets a
+                                # value: witan's own defaults are the measured
+                                # ones, and an env var present-but-empty would
+                                # only invite a debate about which layer's
+                                # default is in force.
+                                *(
+                                    [
+                                        kubernetes.core.v1.EnvVarArgs(
+                                            name="WITAN_REMOTE_WRITE_MAX_INFLIGHT",
+                                            value=str(remote_write_max_inflight),
+                                        )
+                                    ]
+                                    if remote_write_max_inflight
+                                    else []
+                                ),
+                                *(
+                                    [
+                                        kubernetes.core.v1.EnvVarArgs(
+                                            name="WITAN_REMOTE_WRITE_QUEUE_SECONDS",
+                                            value=str(remote_write_queue_seconds),
+                                        )
+                                    ]
+                                    if remote_write_queue_seconds
+                                    else []
+                                ),
+                                # The deadline THIS deployment imposes, told to
+                                # witan so it can refuse a write it has no time
+                                # left to finish. Must track
+                                # WITAN_REQUEST_TIMEOUT above.
+                                *(
+                                    [
+                                        kubernetes.core.v1.EnvVarArgs(
+                                            name="WITAN_REMOTE_CALL_BUDGET_SECONDS",
+                                            value=str(remote_call_budget_seconds),
+                                        )
+                                    ]
+                                    if remote_call_budget_seconds
+                                    else []
+                                ),
+                                # Structured logging + OTel, from the shared
+                                # helper so this workload and the CI indexer
+                                # cannot drift into describing themselves as two
+                                # different services. `otel_env` is empty in CI,
+                                # which has no collector.
+                                *(
+                                    kubernetes.core.v1.EnvVarArgs(
+                                        name=name, value=value
+                                    )
+                                    for name, value in (
+                                        witan_log_env()
+                                        | otel_env(stack_info, "witan", service_version)
+                                    ).items()
+                                ),
+                            ],
+                            # See WITAN_HEALTH_PATH: shallow on purpose, and the
+                            # startupProbe is what lets liveness and readiness
+                            # carry no initial delay of their own.
+                            startup_probe=kubernetes.core.v1.ProbeArgs(
+                                http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                                    path=WITAN_HEALTH_PATH,
+                                    port=WITAN_PORT,
+                                ),
+                                initial_delay_seconds=(
+                                    WITAN_STARTUP_INITIAL_DELAY_SECONDS
+                                ),
+                                period_seconds=WITAN_STARTUP_PERIOD_SECONDS,
+                                failure_threshold=WITAN_STARTUP_FAILURE_THRESHOLD,
+                            ),
+                            readiness_probe=kubernetes.core.v1.ProbeArgs(
+                                http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                                    path=WITAN_HEALTH_PATH,
+                                    port=WITAN_PORT,
+                                ),
+                                # Explicit 0 rather than omitted: a merge that
+                                # only sets the fields it names leaves a
+                                # previously set initialDelaySeconds in place.
+                                initial_delay_seconds=0,
+                                period_seconds=5,
+                            ),
+                            liveness_probe=kubernetes.core.v1.ProbeArgs(
+                                http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                                    path=WITAN_HEALTH_PATH,
+                                    port=WITAN_PORT,
+                                ),
+                                # ★ 20s period against the default
+                                # failureThreshold of 3, so a wedged process is
+                                # killed in ~60s — and, because the probe cannot
+                                # block on the graph, a SATURATED one is never
+                                # killed at all. That is the specific behaviour
+                                # ToolHive's proxy got wrong, at a 5s timeout
+                                # that could not win its race against a 5s
+                                # backend ping.
+                                initial_delay_seconds=0,
+                                period_seconds=20,
+                            ),
+                            resources=WITAN_RESOURCES,
+                            security_context=kubernetes.core.v1.SecurityContextArgs(
+                                allow_privilege_escalation=False,
+                                privileged=False,
+                                read_only_root_filesystem=True,
+                                run_as_non_root=True,
+                                run_as_user=WITAN_RUN_AS,
+                                run_as_group=WITAN_RUN_AS,
+                                capabilities=kubernetes.core.v1.CapabilitiesArgs(
+                                    drop=["ALL"],
+                                ),
+                                seccomp_profile=kubernetes.core.v1.SeccompProfileArgs(
+                                    type="RuntimeDefault",
+                                ),
+                            ),
+                            volume_mounts=[
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="actor-tokens",
+                                    mount_path=ACTOR_TOKENS_MOUNT_PATH,
+                                    read_only=True,
+                                ),
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="tmp",
+                                    mount_path=TMP_MOUNT_PATH,
+                                ),
+                            ],
+                        )
+                    ],
+                    volumes=[
+                        kubernetes.core.v1.VolumeArgs(
+                            name="actor-tokens",
+                            secret=kubernetes.core.v1.SecretVolumeSourceArgs(
+                                secret_name=actor_tokens_secret_name,
+                            ),
+                        ),
+                        kubernetes.core.v1.VolumeArgs(
+                            name="tmp",
+                            empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(
+                                size_limit=TMP_SIZE_LIMIT,
+                            ),
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        # `migration_job` makes the data migrations a genuine pre-deploy gate:
+        # pulumi-kubernetes awaits a Job's completion, so the new image is not
+        # started until the backfills for it have succeeded, and a failed
+        # migration blocks the rollout instead of half-applying it.
+        opts=ResourceOptions(
+            depends_on=[
+                witan_service_account,
+                witan_ci_token_secret,
+                witan_code_token_secret,
+                actor_tokens_secret,
+                migration_job,
+            ]
+        ),
+    )
+
+    witan_service = kubernetes.core.v1.Service(
+        f"witan-service-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=WITAN_SERVICE_NAME,
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+        spec=kubernetes.core.v1.ServiceSpecArgs(
+            selector={"app.kubernetes.io/name": WITAN_SERVICE_NAME},
+            ports=[
+                kubernetes.core.v1.ServicePortArgs(
+                    name="http",
+                    port=WITAN_PORT,
+                    target_port=WITAN_PORT,
+                    protocol="TCP",
+                )
+            ],
+            type="ClusterIP",
+        ),
+        opts=ResourceOptions(depends_on=[witan_deployment]),
+    )
+
+    # The deadline, made explicit. Without this the upstream timeout is whatever
+    # APISIX defaults to — inherited, invisible from this stack, and free to
+    # change under us on a gateway upgrade. See WITAN_REQUEST_TIMEOUT.
+    #
+    # `BackendTrafficPolicy` targets the SERVICE, not the HTTPRoute: it is the
+    # apisix.apache.org/v1alpha1 lever the ingress controller (2.1.0 here)
+    # offers for Gateway API backends, since HTTPRoute's own `rules[].timeouts`
+    # are not honoured by it.
+    kubernetes.apiextensions.CustomResource(
+        f"witan-backend-traffic-policy-{stack_info.env_suffix}",
+        api_version="apisix.apache.org/v1alpha1",
+        kind="BackendTrafficPolicy",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="witan-timeouts",
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+        spec={
+            "targetRefs": [
+                {
+                    "group": "",
+                    "kind": "Service",
+                    "name": WITAN_SERVICE_NAME,
+                }
+            ],
+            "timeout": {
+                "connect": WITAN_CONNECT_TIMEOUT,
+                "send": WITAN_SEND_TIMEOUT,
+                "read": WITAN_REQUEST_TIMEOUT,
+            },
+        },
+        opts=ResourceOptions(depends_on=[witan_service]),
+    )
+
+    return WitanServingTier(
+        deployment=witan_deployment,
+        service=witan_service,
+    )

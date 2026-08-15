@@ -28,33 +28,26 @@ on Alloy at all: they go to stderr and the k8s-monitoring chart ships pod logs
 to Loki. That is why ``witan_log_env`` is unconditional while the OTel block is
 not.
 
-── The ToolHive tier (``toolhive_*`` below) ──
-Everything above configures the *witan process*. The two ToolHive hops in front
-of it — the ``VirtualMCPServer`` aggregator and the ``MCPServer`` proxyrunner —
-are separate Go binaries with their own OTel pipeline, configured through an
-``MCPTelemetryConfig`` CR rather than environment variables. They were dark
-until 2026-08-14 and are why the question "where did the 20s go" had no answer.
+── There is no longer a tier in front of witan (2026-08-15) ──
+Until this date two ToolHive hops sat between APISIX and witan — the
+``VirtualMCPServer`` aggregator and the ``MCPServer`` proxyrunner — each a
+separate Go binary with its own OTel pipeline, configured through
+``MCPTelemetryConfig`` CRs rather than these variables. Instrumenting them was
+what finally answered "where did the 20s go": witan's own ``duration_ms``
+starts INSIDE its middleware, so the ~2.5s a request spent being forwarded to
+it under load was invisible to every signal either side measured.
 
-That gap is not academic. witan's own ``duration_ms`` starts INSIDE its
-middleware; ToolHive's ``toolhive_mcp_request_duration_seconds`` wraps
-``next.ServeHTTP`` (``pkg/telemetry/middleware.go``). On 2026-08-14 a
-concurrency probe run saw the store finish all 8 writes at a normal 12.8s
-median while the client was told 7 of them failed — time spent in an interval
-NEITHER tier measured.
+That investigation is what justified removing them. The answer was that the
+tier's pre-handler interval consumed 8.2% of the very 30s deadline the tier was
+enforcing, and that the deadline fired while witan was still committing a write
+the caller was then told had failed. With the hops gone, the interval they hid
+is gone with them, and what this module configures is once again the whole
+story of a request.
 
-★ WHAT THE METRIC DELTA IS, AND IS NOT. ToolHive's timer starts just before it
-forwards and stops after the downstream response returns, so it spans
-``pre-forward + witan + post-response``. Subtracting witan's ``duration_ms``
-therefore yields the TOTAL TIME OUTSIDE witan's middleware — both outer
-intervals summed — not the pre-handler interval on its own. It also cannot be
-done per request: the ToolHive side is a histogram and the witan side is a log
-field, so they pair only in aggregate (percentile against percentile).
-
-The pre-handler interval specifically needs the SPANS, where ToolHive's and
-witan's are nested with real start timestamps and the two boundaries are
-separable per request. That is why tracing is enabled here and not just
-metrics, and why the probe runs in QA — the metric delta alone would say only
-that time went somewhere outside witan, which is already known.
+So there is nothing to reconcile any more: witan's spans start at the ASGI
+boundary, and the only hop in front is APISIX, which reports its own timings
+under ``service.name: apisix``. Anyone chasing latency should compare those two
+rather than looking for a ToolHive histogram that no longer exists.
 """
 
 import pulumi_kubernetes as kubernetes
@@ -147,48 +140,6 @@ def otel_env(
         "OTEL_PROPAGATORS": PROPAGATORS,
         "OTEL_METRIC_EXPORT_INTERVAL": METRIC_EXPORT_INTERVAL_MS,
     }
-
-
-def downward_api_env_dicts() -> list[dict[str, object]]:
-    """Pod-identity env in plain-dict form, for a ``podTemplateSpec`` patch.
-
-    The ``MCPServer`` CRD's own ``spec.env`` is name/value only, so a
-    ``fieldRef`` cannot go there; ToolHive's PodTemplateSpec escape hatch takes
-    a full ``EnvVar`` and merges it onto the operator-managed ``mcp`` container
-    — which is already how ``spec.secrets`` reaches the pod as
-    ``secretKeyRef`` entries.
-
-    THIS DOES NOT CLOBBER THE OPERATOR'S OWN ENV, and it is worth stating
-    because the obvious worry — that a PodTemplateSpec patch replaces list
-    fields wholesale, RFC 7386 style — is a real failure mode for other CRDs
-    and simply is not how this path works. Traced through toolhive v0.40.1,
-    every step is an explicit append:
-
-    1. ``PodTemplateSpecBuilder.WithSecrets`` starts from *this* template,
-       finds the container named ``mcp``, and does
-       ``Env = append(Env, secretEnvVars...)`` — the vars below are the
-       existing ``Env``, the secrets land after them. The result is what the
-       operator serializes into ``--k8s-pod-patch``.
-    2. The runner applies that patch to an **empty** base PodTemplateSpec, so
-       its ``WithSpec`` whole-spec assignment has nothing to overwrite.
-    3. ``configureContainer`` then calls client-go's
-       ``ContainerApplyConfiguration.WithEnv``, itself an append, to add the
-       ``spec.env`` entries.
-
-    Final order is podTemplateSpec env, then ``spec.secrets``, then
-    ``spec.env`` — all three coexist, which the live workload confirms
-    (2 ``secretKeyRef`` vars from the patch alongside 8 ``spec.env`` vars).
-    The one real constraint is that concatenation does not de-duplicate, so a
-    name used here must not collide with a ``spec.env`` or ``spec.secrets``
-    name; the three below do not.
-    """
-    return [
-        {
-            "name": name,
-            "valueFrom": {"fieldRef": {"fieldPath": field_path}},
-        }
-        for name, field_path in _DOWNWARD_API_FIELDS.items()
-    ]
 
 
 def downward_api_env_args() -> list[kubernetes.core.v1.EnvVarArgs]:
