@@ -2,10 +2,9 @@
 
 This stack owns the ``witan`` namespace and implements the MCP tier of
 ``docs/adr/0009-deploy-witan-as-shared-multi-tenant-mcp-service.md``: witan's
-own FastMCP process (``mcp_servers.py``), run over ``streamable-http``
-transport, registered as an ``MCPServer`` joined to the ``witan-tools``
-``MCPGroup`` and aggregated behind a ``VirtualMCPServer`` exposed through
-APISIX.
+own FastMCP process (``deployment.py``), run over ``streamable-http`` transport
+as an ordinary single-replica ``Deployment`` behind a ``Service``, exposed
+through APISIX.
 
 The data tier — the ``omnigraph-server`` graph service witan reads/writes over
 the cluster network — is a **separate stack** (``applications/omnigraph``),
@@ -15,86 +14,51 @@ Migrations are split along that same boundary. **Schema** convergence belongs
 to the omnigraph stack, which runs ``omnigraph cluster apply`` before its
 server restarts — it declares the graphs and bakes their schema files into the
 omnigraph-server image. This stack runs only witan's own **data** backfills
-(``migrations.py``), gated ahead of the MCPServer so a new image never serves
+(``migrations.py``), gated ahead of the Deployment so a new image never serves
 against a graph its migrations haven't run over. Both those backfills and the
 ad-hoc maintenance operations the MCP path refuses (``break_glass.py``)
 authenticate as ``svc-witan-admin`` where the omnigraph stack has provisioned it —
 see ``docs/witan-admin-break-glass-runbook.md``.
-ToolHive is only the operator that runs this MCP tier; it is an implementation
-detail of this stack, not part of witan's or omnigraph's identity — hence the
-plain ``witan`` / ``omnigraph`` project and namespace names.
 
-Incoming auth — ToolHive's "External OIDC provider" scenario, NOT
-``toolhive_swe``'s "Embedded auth server" scenario:
+Authentication — witan is the identity boundary, and now the only one:
 
-    ``toolhive_swe``'s vMCP is itself an OAuth provider: it brokers login to
-    Keycloak upstream but then mints its **own** JWT (issuer == the vMCP's own
-    URL) for its backends, none of which have any identity of their own — see
-    ``toolhive_swe/__main__.py``'s module docstring. witan is different: its
-    own FastMCP server independently validates a Keycloak-issued JWT and
-    derives a per-request actor id from ``sub`` (agent-kit ADR-0004 D1/D2).
-    Swapping that JWT for a vMCP-minted one before it reaches witan would
-    break D1 outright. So this stack configures ``incomingAuth`` to validate
-    directly against Keycloak's **real** issuer (no ``authServerConfig``,
-    hence no embedded broker, no persistent signing keys, no Redis). See
-    ADR-0009's Resolution addendum and agent-kit ADR-0004's matching
-    Resolution addendum (2026-07-10) for the full decision record.
+    witan's own FastMCP server validates the Keycloak-issued JWT and derives a
+    per-request actor id from ``sub`` (agent-kit ADR-0004 D1/D2). APISIX does
+    not authenticate, and there is no longer a ToolHive tier doing a duplicate
+    validation of the same token against the same issuer before forwarding it.
 
-    This also means clients need an already-valid Keycloak JWT with the right
-    audience before calling — there is no vMCP-brokered interactive login
-    here. That is intentional (agent-kit ADR-0004 D3: per-user omnigraph
-    bearer tokens are pre-provisioned out-of-band, not minted on the fly), but
-    it does mean whatever normally gets a human or CI agent a Keycloak JWT for
-    other internal tools (existing SSO session, device-code flow, etc.) is a
+    Clients therefore need an already-valid Keycloak JWT with the right
+    audience before calling — there is no brokered interactive login here.
+    That is intentional (agent-kit ADR-0004 D3: per-user omnigraph bearer
+    tokens are pre-provisioned out-of-band, not minted on the fly), but it does
+    mean whatever normally gets a human or CI agent a Keycloak JWT for other
+    internal tools (existing SSO session, device-code flow, etc.) is a
     prerequisite this stack does not itself provide.
 
-Outgoing auth — why two settings are needed to forward one token:
+Why ToolHive is gone (removed 2026-08-15):
 
-    Having no embedded broker to substitute a token does NOT mean ToolHive
-    forwards the client's. It forwards **nothing** unless told to. This stack
-    originally assumed otherwise, and the result was a total, silent outage:
-    the vMCP called the backend with no credential at all, witan's JWTVerifier
-    returned 401, and — because a backend whose resolved strategy is
-    ``unauthenticated`` has its 401 read as genuine misconfiguration rather
-    than as proof of life — the vMCP marked its only backend
-    ``unauthenticated`` and excluded it from capability aggregation. Clients
-    got a successful ``initialize`` and then ``tools/list`` failed, so every
-    external signal (pod ready, route resolving, TLS, 200 + session id) looked
-    healthy while the endpoint served zero tools. Two settings fix it, and
-    both are required:
+    ``toolhive_swe`` keeps it and should — five heterogeneous backends, none
+    with any identity of its own, is exactly what a vMCP is for. witan was the
+    inverted case: a group of ONE backend that authenticates itself. The
+    aggregator's OIDC was a second lock on the same door, ``authzConfig`` was
+    null, ``authServerConfig`` absent, and the code-graph tools it might have
+    aggregated are mounted in-process by ``witan serve`` instead.
 
-    - ``passthroughHeaders: ["Authorization"]`` is what actually forwards the
-      user's Keycloak JWT to witan. It applies to real session traffic only.
-    - ``outgoingAuth.backends.witan`` points at a ``headerInjection``
-      ``MCPExternalAuthConfig``. This is NOT how the backend authenticates —
-      witan ignores the injected header entirely. It exists because the
-      periodic backend health probe runs on a background context that carries
-      no client request and therefore no passthrough header, so the probe will
-      always 401. ToolHive treats a probe 401 as healthy when the backend has
-      *some* non-``unauthenticated`` strategy configured, and as a
-      misconfiguration when it does not. Configuring any such strategy is
-      what keeps the backend in the aggregated view; header injection is the
-      only one that neither sets ``Authorization`` (which would clobber the
-      passthrough token) nor needs new Keycloak plumbing.
+    What that redundancy cost was the defect blocking this project: a
+    **hardcoded 30s deadline** on ``tools/call``, in three separate upstream
+    constants, with the CRD field that looks like the knob
+    (``spec.config.operational.timeouts``) read by nothing at runtime. Measured
+    in QA at 16 concurrent writers, the store committed 16 of 16 writes and 15
+    callers were told they had failed — the write landed, the response did not.
+    Plus ~289ms per call of tier overhead when idle, a vMCP memory ceiling near
+    32 concurrent sessions that OOMKilled the aggregator and took the endpoint
+    with it, and an upgrade freeze at 0.42.1 once 0.43 began rejecting the
+    ``passthroughHeaders: ["Authorization"]`` that witan's per-actor auth
+    depended on.
 
-      That 401-is-healthy rule is upstream's deliberate, tested design, not an
-      inference from observed behavior. At ToolHive v0.40.1 it is
-      ``authErrorStatus`` (``pkg/vmcp/health/checker.go:192``), reached from
-      ``categorizeError`` (same file, :154 and :168), and pinned by
-      ``TestHealthChecker_CheckHealth_AuthErrorWithOutgoingAuthIsHealthy``
-      (``pkg/vmcp/health/checker_test.go:691``) — whose table includes a
-      ``header_injection`` row asserting ``BackendHealthy`` and a nil error.
-      Cited because the claim is not verifiable from this repository, and the
-      whole outage came from an unverified assumption about this same hop.
-
-    The alternative, ``tokenExchange``, would authenticate the probe properly
-    via client-credentials instead of relying on 401-as-healthy, and would
-    still preserve per-user identity on real traffic. It is not used here
-    because it requires a confidential Keycloak client, realm-level token
-    exchange, and a rotated secret — where passthrough needs none of that,
-    since ``witan-cli`` already mints tokens with the ``witan`` audience that
-    witan's own verifier checks. Revisit if the probe's 401 noise or the
-    forwarded-header trust model becomes a problem.
+    The deadline did not disappear — it became ours, declared as a
+    ``BackendTrafficPolicy`` on witan's Service. See ``deployment.py``'s
+    ``WITAN_REQUEST_TIMEOUT`` for the full accounting and the sizing.
 
 Follow-up work this stack does NOT cover, tracked separately rather than
 silently assumed:
@@ -132,7 +96,6 @@ from pathlib import Path
 from typing import Any
 
 import pulumi_aws as aws
-import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, export
 
@@ -146,13 +109,11 @@ from ol_infrastructure.applications.witan.ci_indexer import (
     DEFAULT_INDEX_SCHEDULE,
     create_ci_indexer,
 )
-from ol_infrastructure.applications.witan.ingress import create_ingress_resources
-from ol_infrastructure.applications.witan.mcp_servers import (
-    MCP_GROUP_NAME,
-    TOOLHIVE_SERVICE,
-    WITAN_MCPSERVER_NAME,
-    create_mcp_servers,
+from ol_infrastructure.applications.witan.deployment import (
+    WITAN_SERVICE_NAME,
+    create_serving_tier,
 )
+from ol_infrastructure.applications.witan.ingress import create_ingress_resources
 from ol_infrastructure.applications.witan.migrations import create_migration_job
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
@@ -182,12 +143,6 @@ from ol_infrastructure.lib.pulumi_helper import (
     parse_stack,
     require_stack_output_value,
 )
-from ol_infrastructure.lib.toolhive_telemetry import (
-    telemetry_config_name,
-    toolhive_service_name,
-    toolhive_telemetry_spec,
-    toolhive_vmcp_audit,
-)
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 # Resolve the bridge secrets directory once from the sops module's own
@@ -202,12 +157,13 @@ witan_config = Config("witan")
 cluster_stack = make_stack_reference(projects.EKS, f"operations.{stack_info.name}")
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
-# Fail fast if the ToolHive operator and CRDs haven't been deployed yet.
-operator_stack = make_stack_reference(projects.TOOLHIVE_OPERATOR, stack_info.name)
-require_stack_output_value(operator_stack, "toolhive_namespace")
+# No reference to the ToolHive operator stack any more: witan runs as an
+# ordinary Deployment, so none of that operator's CRDs need to exist for this
+# stack to apply. The operator itself stays deployed for `toolhive_swe`, which
+# is still a genuine multi-backend aggregation and keeps earning it.
 
 # Fail fast if the omnigraph data-tier stack hasn't been deployed yet — witan's
-# MCPServer points both WITAN_MEMORY_URI (the `council` graph) and
+# Deployment points both WITAN_MEMORY_URI (the `council` graph) and
 # WITAN_CODE_SERVER (the per-repo `code-<repo>` graphs) at its in-cluster
 # address (below).
 omnigraph_stack = make_stack_reference(projects.OMNIGRAPH, stack_info.name)
@@ -216,7 +172,7 @@ omnigraph_server_addr = require_stack_output_value(
 )
 # The graph id witan addresses on that server (`--graph <id>`), taken from the
 # stack that declares it in cluster.yaml rather than defaulted independently
-# here — see WITAN_MEMORY_GRAPH in mcp_servers.py.
+# here — see WITAN_MEMORY_GRAPH in deployment.py.
 council_graph_id = require_stack_output_value(omnigraph_stack, "council_graph_id")
 # The repos with a `code-<repo>` graph on that server. The CI indexer below is
 # the single entitled writer of each of their default views, so it sweeps the
@@ -282,28 +238,26 @@ k8s_labels = K8sGlobalLabels(
 )
 k8s_global_labels = k8s_labels.model_dump()
 
-# Public hostname the vMCP is served on.
+# Public hostname witan is served on. Unchanged by the ToolHive removal —
+# clients call `https://<this>/mcp` and witan serves `/mcp` itself, exactly as
+# the vMCP did. See ingress.py.
 if stack_info.env_suffix == "production":
-    VMCP_DOMAIN = "witan.ol.mit.edu"
+    WITAN_DOMAIN = "witan.ol.mit.edu"
 else:
-    VMCP_DOMAIN = f"witan.{stack_info.env_suffix}.ol.mit.edu"
-VMCP_RESOURCE_URL = f"https://{VMCP_DOMAIN}"
-VMCP_RESOURCE_ID = f"{VMCP_RESOURCE_URL}/"
+    WITAN_DOMAIN = f"witan.{stack_info.env_suffix}.ol.mit.edu"
 
-# Keycloak realm issuing the JWTs witan validates directly (ADR-0004 D1) —
-# this is the REAL upstream issuer, unlike toolhive_swe's vMCP-local issuer,
-# since there is no embedded broker minting a substitute token here.
+# Keycloak realm issuing the JWTs witan validates directly (ADR-0004 D1).
 if stack_info.env_suffix == "production":
     KEYCLOAK_DOMAIN = "sso.ol.mit.edu"
 else:
     KEYCLOAK_DOMAIN = f"sso-{stack_info.env_suffix}.ol.mit.edu"
 KEYCLOAK_ISSUER = f"https://{KEYCLOAK_DOMAIN}/realms/ol-platform-engineering"
-MCP_OIDC_CONFIG_NAME = "witan-vmcp-oidc"
 
 # The audience witan's own JWTVerifier validates (WITAN_OIDC_AUDIENCE,
-# agent-kit ADR-0004 D1) and the vMCP's incomingAuth checks for. Configurable
-# per stack in case the eventual Keycloak client/audience-mapper work lands a
-# different value; defaults to a plain "witan" audience.
+# agent-kit ADR-0004 D1) — now the only thing that checks it, where the vMCP's
+# incomingAuth used to check the same claim first. Configurable per stack in
+# case the eventual Keycloak client/audience-mapper work lands a different
+# value; defaults to a plain "witan" audience.
 WITAN_OIDC_AUDIENCE = witan_config.get("oidc_audience") or "witan"
 
 # How often the CI indexer sweeps every managed repo's default branch onto its
@@ -318,10 +272,17 @@ WITAN_CI_INDEX_SCHEDULE = (
 # sent to the data tier (agent-kit `witan_core.omnigraph._WriteGate`). This is
 # the GLOBAL bound the data tier's per-actor cap cannot be: every user's write
 # passes through this single-replica pod, so it is the one place total in-flight
-# concurrency is visible. Past ~4 writes in flight against one graph, a write
-# cannot finish inside ToolHive's hardcoded 30s deadline, and what the caller
-# gets is not a slow write but a 502 whose outcome is indeterminate — so the
-# tier refuses with a sentence instead, before anything is sent.
+# concurrency is visible. The gate predicts whether a write can finish inside
+# WITAN_REMOTE_CALL_BUDGET_SECONDS and refuses with a sentence, before anything
+# is sent, rather than letting the caller collect a 502 whose outcome is
+# indeterminate.
+#
+# ★ THE GATE JUST GOT MUCH LOOSER WITHOUT ITS NUMBERS CHANGING, and that is
+# intended. It reasons against the budget below, which rose from 30s to 120s
+# when ToolHive's hardcoded deadline stopped applying — so the same "4 in
+# flight" admits writes it previously refused, because those writes now have
+# time to finish. The refusals it was issuing were correct for a 30s ceiling
+# and wrong for this one.
 #
 # Empty here means "use the code default" (4 writes, 10s queue wait). Set per
 # stack when an environment's measured knee differs — Production's larger graphs
@@ -336,9 +297,10 @@ WITAN_CI_INDEX_SCHEDULE = (
 # property worth having, not a disruption-free edit, and the earlier wording
 # here claimed the latter. Treat an incident retune as a (brief) restart.
 #
-# And persist it: the MCPServer is operator-owned, so a hand-edit is reverted by
-# the next reconcile or `pulumi up`. `kubectl set env` buys the minutes before
-# the config change lands, not a durable setting.
+# And persist it: `kubectl set env` buys the minutes before the config change
+# lands, not a durable setting — the next `pulumi up` reverts it. (It is no
+# longer reverted by an operator reconcile too, now that nothing owns this
+# workload but Pulumi.)
 WITAN_REMOTE_WRITE_MAX_INFLIGHT = witan_config.get("remote_write_max_inflight") or ""
 WITAN_REMOTE_WRITE_QUEUE_SECONDS = witan_config.get("remote_write_queue_seconds") or ""
 
@@ -348,16 +310,25 @@ WITAN_REMOTE_WRITE_QUEUE_SECONDS = witan_config.get("remote_write_queue_seconds"
 # CLI with no deadline at all and from the migration Job, which is happy to wait
 # minutes; a library that assumed 30s would be wrong for both.
 #
-# 30s is ToolHive's, and it is not adjustable: three separate hardcoded
-# constants in v0.42.0 (the vMCP backend client twice, and WriteTimeout on the
-# vMCP's own listener) each cut a `tools/call` at 30s, and the CRD field that
-# looks like the knob — `spec.config.operational.timeouts` — is read by nothing
-# at runtime (tk-toolhive-s-vmcp-operational-timeouts-crd-field-i-c44c7a).
+# ★ 30s -> 120s, AND THIS IS THE POINT OF REMOVING TOOLHIVE. The old value was
+# not chosen, it was ToolHive's: three separate hardcoded constants in v0.42.0
+# (the vMCP backend client twice, and WriteTimeout on the vMCP's own listener)
+# each cut a `tools/call` at 30s, and the CRD field that looked like the knob —
+# `spec.config.operational.timeouts` — was read by nothing at runtime
+# (tk-toolhive-s-vmcp-operational-timeouts-crd-field-i-c44c7a).
+#
+# ★ IT MUST TRACK `WITAN_REQUEST_TIMEOUT` IN deployment.py, which is what
+# APISIX actually enforces. This value is only what witan BELIEVES it has; the
+# BackendTrafficPolicy is what cuts the connection. Setting this higher than
+# that reintroduces exactly the old failure — witan planning against a budget
+# nobody upstream honours — which is how a committed write came to be reported
+# as a failure 15 times out of 16.
+#
 # Telling witan the number lets it refuse a write it cannot finish, instead of
 # being torn down mid-call and returning a 502 whose outcome nobody can
 # determine.
 WITAN_REMOTE_CALL_BUDGET_SECONDS = (
-    witan_config.get("remote_call_budget_seconds") or "30"
+    witan_config.get("remote_call_budget_seconds") or "120"
 )
 
 # The GitHub App the CI indexer clones as, when one is configured. All three
@@ -443,7 +414,7 @@ if _github_app_source:
 WITAN_CI_TOKEN_SECRET_NAME = "witan-ci-token"  # noqa: S105  # pragma: allowlist secret
 WITAN_CI_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 # The MCP tier's own credential against the code graphs (WITAN_CODE_TOKEN, see
-# mcp_servers.py). A SEPARATE Secret holding the same Vault value rather than a
+# deployment.py). A SEPARATE Secret holding the same Vault value rather than a
 # second `spec.secrets` entry against witan-ci-token: that list is keyed by
 # secret name, so two entries naming one Secret are rejected outright
 # (`.spec.secrets: duplicate entries for key [name="witan-ci-token"]`).
@@ -778,69 +749,17 @@ if witan_admin_token_secret is not None:
     )
 
 #########################################
-#   MCPTelemetryConfig (ToolHive tier)   #
+#   witan Deployment + Service           #
 #########################################
-# The two ToolHive hops in front of witan — the proxyrunner and the vMCP — run
-# their own OTel pipeline, configured through these CRs rather than through the
-# OTEL_* environment `observability.otel_env` builds for the witan process. They
-# were dark until 2026-08-14; see observability.py for what that cost.
-#
-# ★ TWO CRs, NOT ONE SHARED. They differ only in `prometheus.enabled`, and that
-# difference is a security boundary: ToolHive serves /metrics on the MAIN
-# TRANSPORT PORT, and the vMCP's is the port APISIX publishes under a `/*`
-# catch-all route (ingress.py). One shared config would either expose an
-# unauthenticated metrics endpoint on the public vMCP host or deny the backend
-# the one read CI can perform. The `serviceName` override on each ref is what
-# keeps the two hops' spans distinguishable.
-witan_telemetry_backend = kubernetes.apiextensions.CustomResource(
-    f"witan-telemetry-backend-{stack_info.env_suffix}",
-    api_version="toolhive.stacklok.dev/v1beta1",
-    kind="MCPTelemetryConfig",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=telemetry_config_name(TOOLHIVE_SERVICE, "backend"),
-        namespace=NAMESPACE,
-        labels=k8s_global_labels,
-    ),
-    # Never None for this hop: Prometheus is enabled in every environment, so
-    # `toolhive_telemetry_spec` always returns a spec here.
-    spec=toolhive_telemetry_spec(
-        stack_info, TOOLHIVE_SERVICE, "mcp-proxy", expose_prometheus=True
-    ),
-    opts=ResourceOptions(depends_on=[cluster_stack]),
-)
-
-# The vMCP's, only where there is an OTLP receiver to export to. With Prometheus
-# off and OTLP unavailable there is nothing left to configure, so CI gets no CR
-# and no `telemetryConfigRef` at all — rather than an inert one that reads like
-# telemetry is on.
-witan_telemetry_vmcp_spec = toolhive_telemetry_spec(
-    stack_info, TOOLHIVE_SERVICE, "vmcp", expose_prometheus=False
-)
-witan_telemetry_vmcp = (
-    kubernetes.apiextensions.CustomResource(
-        f"witan-telemetry-vmcp-{stack_info.env_suffix}",
-        api_version="toolhive.stacklok.dev/v1beta1",
-        kind="MCPTelemetryConfig",
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=telemetry_config_name(TOOLHIVE_SERVICE, "vmcp"),
-            namespace=NAMESPACE,
-            labels=k8s_global_labels,
-        ),
-        spec=witan_telemetry_vmcp_spec,
-        opts=ResourceOptions(depends_on=[cluster_stack]),
-    )
-    if witan_telemetry_vmcp_spec
-    else None
-)
-
-#########################################
-#   MCPGroup + witan MCPServer           #
-#########################################
-mcp_servers = create_mcp_servers(
+# Everything ToolHive used to wrap around this — the MCPGroup, the MCPServer
+# proxyrunner, the VirtualMCPServer aggregator, its MCPOIDCConfig, the
+# header-injection MCPExternalAuthConfig that authenticated nothing, and two
+# MCPTelemetryConfig CRs instrumenting hops that no longer exist — is gone. See
+# this module's docstring for why, and deployment.py for what replaced it.
+witan_serving_tier = create_serving_tier(
     stack_info=stack_info,
     namespace=NAMESPACE,
     k8s_global_labels=k8s_global_labels,
-    cluster_stack=cluster_stack,
     witan_image=witan_image,
     omnigraph_server_addr=omnigraph_server_addr,
     council_graph_id=council_graph_id,
@@ -856,295 +775,37 @@ mcp_servers = create_mcp_servers(
     witan_code_token_secret=witan_code_token_secret,
     migration_job=witan_migration_job,
     service_version=witan_service_version,
-    telemetry_config_name=telemetry_config_name(TOOLHIVE_SERVICE, "backend"),
-    telemetry_config=witan_telemetry_backend,
     remote_write_max_inflight=WITAN_REMOTE_WRITE_MAX_INFLIGHT,
     remote_write_queue_seconds=WITAN_REMOTE_WRITE_QUEUE_SECONDS,
     remote_call_budget_seconds=WITAN_REMOTE_CALL_BUDGET_SECONDS,
 )
 
 #########################################
-#   MCPOIDCConfig (incoming validation)  #
-#########################################
-# Points at Keycloak's REAL issuer (not a vMCP-local one) — see module
-# docstring for why this is the "External OIDC provider" scenario, not
-# toolhive_swe's "Embedded auth server" one.
-mcp_oidc_config = kubernetes.apiextensions.CustomResource(
-    f"witan-mcp-oidc-config-{stack_info.env_suffix}",
-    api_version="toolhive.stacklok.dev/v1beta1",
-    kind="MCPOIDCConfig",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=MCP_OIDC_CONFIG_NAME,
-        namespace=NAMESPACE,
-        labels=k8s_global_labels,
-    ),
-    spec={
-        "type": "inline",
-        "inline": {
-            "issuer": KEYCLOAK_ISSUER,
-        },
-    },
-    opts=ResourceOptions(depends_on=[cluster_stack]),
-)
-
-#########################################
-#   vMCP -> backend probe credential     #
-#########################################
-# Exists only to give the witan backend a non-`unauthenticated` outgoing-auth
-# strategy. See the "Outgoing auth" section of this module's docstring for why
-# that is load-bearing. The value is NOT a credential: witan never reads this
-# header, and the vMCP -> backend hop is ClusterIP-only. It is a fixed marker
-# because ToolHive's `headerInjection` strategy requires a non-empty
-# `valueSecretRef`, so a Secret is the only shape the CRD accepts. Deliberately
-# a plain Secret rather than a Vault-backed one — routing a constant with no
-# secret value through Vault would imply a rotation story that does not exist.
-VMCP_PROBE_HEADER_NAME = "X-Witan-Vmcp"
-VMCP_PROBE_SECRET_NAME = "witan-vmcp-backend-probe"  # noqa: S105  # pragma: allowlist secret
-VMCP_PROBE_SECRET_KEY = "value"  # noqa: S105  # pragma: allowlist secret
-VMCP_BACKEND_AUTH_CONFIG_NAME = "witan-vmcp-backend-auth"
-
-vmcp_probe_secret = kubernetes.core.v1.Secret(
-    f"witan-vmcp-backend-probe-secret-{stack_info.env_suffix}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=VMCP_PROBE_SECRET_NAME,
-        namespace=NAMESPACE,
-        labels=k8s_global_labels,
-    ),
-    string_data={VMCP_PROBE_SECRET_KEY: "witan-vmcp"},  # pragma: allowlist secret
-    opts=ResourceOptions(depends_on=[cluster_stack]),
-)
-
-vmcp_backend_auth_config = kubernetes.apiextensions.CustomResource(
-    f"witan-vmcp-backend-auth-{stack_info.env_suffix}",
-    api_version="toolhive.stacklok.dev/v1beta1",
-    kind="MCPExternalAuthConfig",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=VMCP_BACKEND_AUTH_CONFIG_NAME,
-        namespace=NAMESPACE,
-        labels=k8s_global_labels,
-    ),
-    spec={
-        "type": "headerInjection",
-        "headerInjection": {
-            "headerName": VMCP_PROBE_HEADER_NAME,
-            "valueSecretRef": {
-                "name": VMCP_PROBE_SECRET_NAME,
-                "key": VMCP_PROBE_SECRET_KEY,
-            },
-        },
-    },
-    opts=ResourceOptions(depends_on=[vmcp_probe_secret]),
-)
-
-#########################################
-#   VirtualMCPServer aggregator          #
-#########################################
-# No authServerConfig block: unlike toolhive_swe, this vMCP is NOT an OAuth
-# provider of its own. incomingAuth validates the client's genuine Keycloak
-# JWT directly, and `passthroughHeaders` then forwards that same JWT to the
-# witan MCPServer unmodified — which is exactly the "External OIDC provider"
-# scenario ADR-0009's Resolution addendum specifies. The forwarding is
-# explicit: ToolHive does not do it by default. See the "Outgoing auth"
-# section of this module's docstring.
-witan_virtualmcpserver = kubernetes.apiextensions.CustomResource(
-    f"witan-vmcp-{stack_info.env_suffix}",
-    api_version="toolhive.stacklok.dev/v1beta1",
-    kind="VirtualMCPServer",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="witan-vmcp",
-        namespace=NAMESPACE,
-        labels=k8s_global_labels,
-    ),
-    spec={
-        "groupRef": {"name": MCP_GROUP_NAME},
-        "incomingAuth": {
-            "type": "oidc",
-            "oidcConfigRef": {
-                "name": MCP_OIDC_CONFIG_NAME,
-                "audience": WITAN_OIDC_AUDIENCE,
-                "resourceUrl": VMCP_RESOURCE_ID,
-            },
-        },
-        # The client's Keycloak bearer token, forwarded verbatim to the backend
-        # so witan's own JWTVerifier sees the *user's* token and derives the
-        # per-request actor from its `sub` (ADR-0004 D1/D2). Header-forwarding
-        # runs outermost on the outbound chain and is skip-if-present, so the
-        # header-injection strategy below (a different header name) coexists
-        # with it rather than overwriting it.
-        "passthroughHeaders": ["Authorization"],
-        "outgoingAuth": {
-            # `discovered` inspects each backend's own externalAuthConfigRef;
-            # witan's MCPServer deliberately has none (see mcp_servers.py), so
-            # the per-backend override below is what actually applies.
-            "source": "discovered",
-            "backends": {
-                WITAN_MCPSERVER_NAME: {
-                    "type": "externalAuthConfigRef",
-                    "externalAuthConfigRef": {"name": VMCP_BACKEND_AUTH_CONFIG_NAME},
-                },
-            },
-        },
-        "serviceType": "ClusterIP",
-        # Spans and OTLP metrics for the OUTERMOST hop — the first thing a
-        # client's request touches, and so the root of the trace. Absent in CI,
-        # which has no receiver: see the CR above.
-        #
-        # Unpacked from a dict rather than written as a literal key because the
-        # ref must not appear at all when there is no CR to point at — an
-        # unresolvable `telemetryConfigRef` degrades the vMCP rather than being
-        # ignored.
-        **(
-            {
-                "telemetryConfigRef": {
-                    "name": telemetry_config_name(TOOLHIVE_SERVICE, "vmcp"),
-                    "serviceName": toolhive_service_name(
-                        stack_info, TOOLHIVE_SERVICE, "vmcp"
-                    ),
-                }
-            }
-            if witan_telemetry_vmcp
-            else {}
-        ),
-        # VirtualMCPServerSpec has no `resources` field of its own (unlike
-        # MCPServer), so the aggregator's limits can only be set through the
-        # documented PodTemplateSpec escape hatch, targeting the operator-managed
-        # `vmcp` container by name — the same mechanism mcp_servers.py uses for
-        # the backend.
-        #
-        # ── WHY THIS EXISTS ──
-        # The operator's default is 500m CPU / 512Mi memory, and 512Mi is not
-        # enough. Measured against CI on 2026-08-07: the vMCP holds per-session
-        # aggregated capability state — its log emits `session capabilities
-        # injected from core … tool_count:67` once PER SESSION — and grows from
-        # 17Mi idle to past 512Mi at ~32 concurrent sessions, i.e. roughly 15Mi
-        # resident per session. It was OOMKilled (`exitCode: 137`), APISIX lost
-        # its only upstream, and every client got a 502 HTML page until it came
-        # back. Two identical 32-client bursts four seconds apart read
-        # `{200: 32}` then `{200: 3, 502: 29}` — the first burst killed it.
-        #
-        # Nothing else in the path was under any strain: the proxy runner stayed
-        # Ready at 11m against its 500m CPU limit (~2%) and the backend never
-        # restarted. This is a memory ceiling and nothing else, which is also why
-        # replicas are not the answer to it — see the VPA note below and the same
-        # lesson already learned in `infrastructure/aws/eks/traefik.py`.
-        #
-        # ── SIZING ──
-        # 2Gi supports roughly 130 concurrent SESSIONS at the measured
-        # ~15Mi/session. Sessions, not people: the burst above opened all 32
-        # from a single token, so one user running a fleet of agents can hold
-        # many at once and the count of provisioned realm users says nothing
-        # about the ceiling. Size against expected concurrent sessions.
-        #
-        # ★ The 4:1 limit:request ratio is load-bearing, not incidental. The VPA
-        # below controls this container with `controlledValues:
-        # RequestsAndLimits`, which scales the limit to PRESERVE this ratio while
-        # bounding only the request. So the ratio chosen here, multiplied by the
-        # VPA's `maxAllowed`, is what actually caps memory: 4 x 1Gi = 4Gi. Widen
-        # the ratio (say a 256Mi request against the same 2Gi limit) and the
-        # effective ceiling silently becomes 8Gi, which would let a leak grow
-        # until it evicts its node-mates rather than failing loudly.
-        #
-        # The per-session figure is inferred from a single OOM boundary, not a
-        # sweep — treat it as a floor to revise once the VPA has real numbers.
-        # Reproduce with agent-kit's `python -m witan.scripts.concurrency_probe`.
-        "podTemplateSpec": {
-            "spec": {
-                "containers": [
-                    {
-                        "name": "vmcp",
-                        "resources": {
-                            "requests": {"cpu": "100m", "memory": "512Mi"},
-                            "limits": {"cpu": "500m", "memory": "2Gi"},
-                        },
-                    }
-                ],
-            }
-        },
-        "config": {
-            # `priority`, NOT the CRD's `prefix` default, because prefix mode
-            # renames unconditionally: it does no conflict detection at all, so
-            # with witan as the group's only member it still rewrote all 65
-            # tools to `witan_*` and no client asking for `memory_search` could
-            # find them. `priority` leaves a tool whose name is unique across
-            # the group exactly as the backend published it, which — since
-            # nothing else is in the group — is every tool.
-            #
-            # There is no "don't rename anything" setting: the enum is
-            # prefix/priority/manual and an empty prefixFormat is rejected, so
-            # bare names have to come from one of the other two strategies.
-            # `manual` would also work; `priority` is chosen because its one
-            # downside (on a name collision the loser is dropped with only a
-            # log line, where manual fails the whole tools/list loudly) needs
-            # two backends to be reachable, and witan-code is mounted
-            # in-process rather than deployed separately.
-            "aggregation": {
-                "conflictResolution": "priority",
-                # Required and must be non-empty — the vMCP refuses to start
-                # otherwise, and the CRD does not catch it, so a missing entry
-                # here is a CrashLoop rather than a rejected apply.
-                "conflictResolutionConfig": {"priorityOrder": [WITAN_MCPSERVER_NAME]},
-            },
-            # Per-request JSON to stdout -> pod logs -> Loki, so unlike the OTLP
-            # block above this needs no collector and is on in CI too. Unlike
-            # `MCPServer.spec.audit`, this CRD carries the full option set, so
-            # the body-exclusion is stated rather than merely defaulted — see
-            # `toolhive_vmcp_audit`.
-            "audit": toolhive_vmcp_audit(),
-        },
-    },
-    opts=ResourceOptions(
-        depends_on=[
-            mcp_servers.group,
-            *mcp_servers.servers,
-            mcp_oidc_config,
-            vmcp_backend_auth_config,
-            # Every Secret the backend MCPServer consumes, restated here even
-            # though `*mcp_servers.servers` already carries them: Pulumi orders
-            # transitively, so this changes nothing the engine does. It is kept
-            # so the list reads as the complete set of things that must exist
-            # before the aggregator does — a Secret missing from it looks like
-            # an oversight rather than a deliberate omission.
-            witan_ci_token_secret,
-            witan_code_token_secret,
-            actor_tokens_secret,
-            # Absent in CI, where the vMCP references no telemetry config at
-            # all. Filtered rather than conditionally appended so the list above
-            # stays a plain enumeration.
-            *([witan_telemetry_vmcp] if witan_telemetry_vmcp else []),
-        ]
-    ),
-)
-
-#########################################
 #   Vertical rightsizing (VPA)           #
 #########################################
-# Memory only, deliberately. Memory is the resource with a demonstrated failure:
-# the aggregator died of it, and the backend's limits were never applied at all.
-# No CPU pressure has been observed on either of these two workloads — but note
-# that is an absence of evidence, not a measurement: the only CPU figure taken
-# during the incident was the PROXY RUNNER's (11m against its 500m limit), and
-# that is a third workload, not one of the two targeted here. Leaving CPU
-# uncontrolled therefore rests on memory being the known problem, not on proven
-# CPU headroom; it also keeps the door open for a CPU-based HPA later without
-# re-creating the known HPA/VPA conflict that
+# Memory only, deliberately. Memory is the resource with a demonstrated failure
+# on this stack; no CPU pressure has ever been observed on witan itself. That is
+# an absence of evidence rather than a measurement, so leaving CPU uncontrolled
+# rests on memory being the known problem — and it keeps the door open for a
+# CPU-based HPA later without re-creating the known HPA/VPA conflict that
 # `infrastructure/aws/eks/traefik.py` and `apisix_official.py` both document.
 #
-# This is the same remedy, for the same failure, as the one traefik.py describes:
-# a per-pod memory ceiling with no headroom, where "adding replicas doesn't help
-# ... it just means more pods hitting the same wall". Worth stating plainly here
-# because the instinct on seeing 502s under load is to reach for replicas, and
-# for this failure that would have changed nothing.
+# ★ ONE VPA NOW, NOT TWO. The other targeted the vMCP aggregator, which is the
+# workload that actually died of memory — OOMKilled at ~32 concurrent sessions,
+# ~15Mi of per-session capability state each, taking APISIX's only upstream with
+# it. That failure mode left with ToolHive: witan holds no per-session
+# aggregated state, so there is nothing here that grows per connected client.
 #
-# `minAllowed` is what stops the fix from undoing itself: VPA sizes from observed
-# usage, and witan sits idle at ~17Mi for long stretches, so an unbounded
-# recommender would shrink the aggregator back toward its idle footprint and
-# re-introduce the OOM on the next burst. The floors below are the measured safe
-# sizes, not recommendations to be optimised away.
+# `minAllowed` is what stops this from undoing itself: VPA sizes from observed
+# usage and witan sits idle for long stretches, so an unbounded recommender
+# would shrink it toward its idle footprint and re-introduce an OOM on the next
+# burst. The floor is the measured safe size, not a recommendation to be
+# optimised away.
 #
-# ★ THESE TARGETS ARE SINGLETONS, AND THAT NORMALLY DEFEATS THE VPA UPDATER.
+# ★ THIS TARGET IS A SINGLETON, AND THAT NORMALLY DEFEATS THE VPA UPDATER.
 # The updater refuses to touch a controller with fewer than `--min-replicas`
 # pods (upstream default 2, and not overridden on this cluster), which would
-# leave both VPAs below computing recommendations that never reach a pod. What
+# leave the VPA below computing recommendations that never reach a pod. What
 # rescues it is `--in-place-skip-disruption-budget=true` on the
 # `vertical-pod-autoscaler-updater` Deployment in `kube-system`, combined with
 # `make_vpa`'s unconditional `InPlaceOrRecreate` mode — vpa-updater 1.7.1,
@@ -1160,77 +821,53 @@ witan_virtualmcpserver = kubernetes.apiextensions.CustomResource(
 # So a 1-replica controller IS admitted, flagged `belowMinReplicas`. That flag
 # then makes `CanEvict` return false while `CanInPlaceUpdate` still approves —
 # which is exactly the behaviour wanted here: resize the live pod, never evict
-# it. Evicting either of these singletons would drop APISIX's only upstream and
-# recreate the very 502 this stack is fixing.
+# it. Evicting this singleton would drop APISIX's only upstream, which is now
+# witan itself rather than an aggregator in front of it.
 #
 # The dependency is invisible from here, so: if that updater flag is ever
-# removed, or `min-replicas` is set per-VPA, these two VPAs silently degrade to
-# recommendation-only and the OOM protection above goes with them. Raised by
-# review on PR #5320 as a suspected defect; verified against the running
-# updater's args and the 1.7.1 source rather than assumed either way.
-#
-# Only the two workloads whose containers this stack actually declares. The
-# ToolHive proxy runner Deployment is left alone: it showed ~20Mi against a
-# 512Mi limit, its RESOURCES are not settable through the MCPServer CRD, and
-# adding a VPA to a workload under no pressure is churn for its own sake.
-#
-# Resources specifically, not the whole resource. `resourceOverrides
-# .proxyDeployment` carries annotations, labels, podTemplateMetadataOverrides,
-# `env` and imagePullSecrets — there is simply no resources/limits field among
-# them, and no podTemplateSpec either (the one on MCPServer patches the MCP
-# workload's StatefulSet, not this Deployment). The `env` half is load-bearing
-# elsewhere: WITAN_PROXY_HEALTH_ENV in mcp_servers.py rides it to stop a write
-# burst getting this same container killed by its own liveness probe.
-make_vpa(
-    f"witan-vmcp-vpa-{stack_info.env_suffix}",
-    namespace=NAMESPACE,
-    target_kind="Deployment",
-    target_name="witan-vmcp",
-    container_name="vmcp",
-    controlled_resources=["memory"],
-    # Floor = the request declared on the vMCP above; ceiling x the 4:1 ratio
-    # there = a 4Gi hard cap on the limit. See that comment.
-    min_allowed={"memory": "512Mi"},
-    max_allowed={"memory": "1Gi"},
-    disable_other_containers=True,
-    opts=ResourceOptions(depends_on=[witan_virtualmcpserver]),
-)
-
+# removed, or `min-replicas` is set per-VPA, this VPA silently degrades to
+# recommendation-only. Raised by review on PR #5320 as a suspected defect;
+# verified against the running updater's args and the 1.7.1 source rather than
+# assumed either way.
 make_vpa(
     f"witan-backend-vpa-{stack_info.env_suffix}",
     namespace=NAMESPACE,
-    # The backend is a StatefulSet named `witan`; the proxy runner is a
-    # Deployment ALSO named `witan` in this same namespace. Only `target_kind`
-    # separates them, so this is not a place to guess.
-    target_kind="StatefulSet",
-    target_name=WITAN_MCPSERVER_NAME,
+    # ★ Deployment, where this said StatefulSet until 2026-08-15. The ToolHive
+    # operator rendered witan as a StatefulSet and ALSO ran a proxy Deployment
+    # of the same name in this namespace, so `target_kind` was the only thing
+    # telling them apart. Both are gone; witan is a plain Deployment now and the
+    # name is unambiguous.
+    target_kind="Deployment",
+    target_name=WITAN_SERVICE_NAME,
+    # Unchanged: deployment.py keeps the container named `mcp` precisely so this
+    # reference, and every saved log/metric query, survives the migration.
     container_name="mcp",
     controlled_resources=["memory"],
-    # Floor = WITAN_BACKEND_RESOURCES' request. 2:1 ratio there, so the 1Gi
-    # ceiling caps the limit at 2Gi.
+    # Floor = WITAN_RESOURCES' request. 2:1 ratio there, so the 1Gi ceiling caps
+    # the limit at 2Gi.
     min_allowed={"memory": "256Mi"},
     max_allowed={"memory": "1Gi"},
     disable_other_containers=True,
-    opts=ResourceOptions(depends_on=[*mcp_servers.servers]),
+    opts=ResourceOptions(depends_on=[witan_serving_tier.deployment]),
 )
 
 #########################################
 #   Internet exposure via APISIX         #
 #########################################
-vmcp_cert, vmcp_httproute = create_ingress_resources(
+witan_cert, witan_httproute = create_ingress_resources(
     stack_info=stack_info,
     namespace=NAMESPACE,
     k8s_global_labels=k8s_global_labels,
-    vmcp_domain=VMCP_DOMAIN,
-    witan_virtualmcpserver=witan_virtualmcpserver,
+    witan_domain=WITAN_DOMAIN,
+    witan_service=witan_serving_tier.service,
 )
 
 #########################################
 #   CI code-graph indexer (CronJob)      #
 #########################################
 # The single entitled writer of every managed repo's shared code graph. Not
-# gated on the vMCP or the MCPServer: it writes the data tier directly and is
-# useful — arguably most useful — while the serving tier is still rolling.
+# gated on the serving tier: it writes the data tier directly and is useful —
+# arguably most useful — while that tier is still rolling.
 witan_ci_indexer = create_ci_indexer(
     stack_info=stack_info,
     namespace=NAMESPACE,
@@ -1252,10 +889,15 @@ witan_ci_indexer = create_ci_indexer(
 )
 
 export("namespace", NAMESPACE)
-export("mcp_group_name", MCP_GROUP_NAME)
 export("ci_indexer_schedule", WITAN_CI_INDEX_SCHEDULE if witan_ci_indexer else None)
-export("vmcp_domain", VMCP_DOMAIN)
-export("vmcp_oidc_issuer", KEYCLOAK_ISSUER)
+# Renamed from `vmcp_domain`/`vmcp_oidc_issuer` — there is no vMCP any more, and
+# an output named for a resource this stack no longer creates is a trap for the
+# next reader. `mcp_group_name` is dropped outright for the same reason. No
+# other stack in this repo consumes any of the three (checked), so nothing
+# in-tree breaks; a human running `pulumi stack output vmcp_domain` gets an
+# error rather than a stale answer, which is the better failure.
+export("witan_domain", WITAN_DOMAIN)
+export("witan_oidc_issuer", KEYCLOAK_ISSUER)
 export("witan_image_repository", witan_image_repository)
 export("omnigraph_server_addr", omnigraph_server_addr)
 # Which principal ran this environment's migrations, and the name to pass to
