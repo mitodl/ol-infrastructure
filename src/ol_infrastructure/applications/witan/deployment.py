@@ -54,9 +54,12 @@ The deadline does not disappear; it becomes **ours**. See
   its own. It now serves ``GET /health`` (agent-kit witan-council 0.13.0),
   deliberately shallow — see ``WITAN_HEALTH_PATH``.
 * The ``witan-sa`` ServiceAccount was operator-created and owner-referenced by
-  the ``MCPServer``, so it is deleted along with it. Recreated here under the
-  same name; it carries no IRSA annotations and never did (verified against
-  the live SA), because witan reaches only omnigraph-server and Keycloak.
+  the ``MCPServer``, so it is deleted along with it. This stack creates its own
+  as ``witan-server`` — NOT ``witan-sa``, which cannot be reused during the
+  cutover; see ``WITAN_SERVICE_NAME``. It carries no IRSA annotations, as the
+  operator's did not either (verified against the live SA), because witan
+  reaches only omnigraph-server and Keycloak — and for the same reason its
+  token is not projected into the pod at all.
 * Per-request audit JSON came from the ToolHive tier. witan's own structured
   logging (``witan_log_env``) already emits a line per tool call to the same
   Loki pipeline, and its OTel spans are unaffected — those come from
@@ -180,9 +183,33 @@ WITAN_STARTUP_FAILURE_THRESHOLD = 20
 # `connect` is generous for an in-cluster ClusterIP hop that should resolve
 # instantly; if connect is the thing timing out, the pod is gone and 10s of
 # patience changes nothing but the error text.
-WITAN_REQUEST_TIMEOUT = "120s"
+WITAN_REQUEST_TIMEOUT_SECONDS = 120
+WITAN_REQUEST_TIMEOUT = f"{WITAN_REQUEST_TIMEOUT_SECONDS}s"
 WITAN_CONNECT_TIMEOUT = "10s"
 WITAN_SEND_TIMEOUT = "60s"
+
+# ── Shutdown budget, which MUST exceed the request budget ────────────────────
+# ★ A GRACE PERIOD SHORTER THAN THE REQUEST BUDGET RECREATES THE EXACT DEFECT
+# THIS PR REMOVES, just with a different executioner. Kubernetes defaults to 30s:
+# it sends SIGTERM, waits, then SIGKILLs. A write measured at 33.6s under load
+# would be killed mid-commit during a `Recreate` rollout, an eviction, or a node
+# drain — the caller gets a severed connection and cannot tell whether the write
+# landed, which is the definition of the indeterminate write. Trading ToolHive's
+# 30s cut for the kubelet's 30s cut would have been no trade at all.
+#
+# Derived from the request budget rather than written as its own literal,
+# because the invariant is `grace > budget` and two independent numbers drift.
+# Raising WITAN_REQUEST_TIMEOUT_SECONDS now moves this with it.
+#
+# The margin covers uvicorn noticing SIGTERM and finishing a call already at the
+# far end of the budget; it does not need to be large, only positive. The cost is
+# that a node drain can wait this long for witan — acceptable for a
+# single-replica workload whose deploys are already a brief outage by design.
+#
+# This works because uvicorn shuts down gracefully on SIGTERM: it stops
+# accepting connections and waits for in-flight requests rather than dropping
+# them. Without that, a longer grace period would only delay the same kill.
+WITAN_TERMINATION_GRACE_SECONDS = WITAN_REQUEST_TIMEOUT_SECONDS + 30
 
 # Mount path (inside the container) for the actor-tokens Secret volume.
 ACTOR_TOKENS_MOUNT_PATH = "/etc/witan/actor-tokens"  # pragma: allowlist secret
@@ -323,6 +350,17 @@ def create_serving_tier(  # noqa: PLR0913
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=pod_labels),
                 spec=kubernetes.core.v1.PodSpecArgs(
                     service_account_name=WITAN_SERVICE_ACCOUNT_NAME,
+                    # witan reaches omnigraph-server and Keycloak, and never the
+                    # Kubernetes API — so the default projected token would be a
+                    # cluster credential sitting inside the one process in this
+                    # namespace that is reachable from the internet. Same
+                    # reasoning, and the same setting, as `ci_indexer.py`.
+                    automount_service_account_token=False,
+                    # Must outlast the request budget, or a rollout/drain kills
+                    # a write mid-commit and hands the caller exactly the
+                    # indeterminate outcome this stack exists to remove. See
+                    # WITAN_TERMINATION_GRACE_SECONDS.
+                    termination_grace_period_seconds=WITAN_TERMINATION_GRACE_SECONDS,
                     # What makes the /tmp emptyDir writable by a non-root
                     # container — see TMP_FS_GROUP. Under ToolHive this was the
                     # operator's default and worked by luck; here it is ours.
