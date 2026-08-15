@@ -4,7 +4,7 @@ _custom_properties:
 _excluded_environments: 1
 _has_branch_protection: false
 _pushed_at: '2026-07-13T13:04:55Z'
-_ruleset_count: 0
+_ruleset_count: 2
 _visibility: public
 allow_auto_merge: false
 allow_merge_commit: true

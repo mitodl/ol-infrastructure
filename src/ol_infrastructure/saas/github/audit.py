@@ -411,7 +411,77 @@ def population(fleet: Iterable[dict[str, Any]], scope: Scope) -> int:
 
 
 #: Why a direct collaborator grant exists, which is what decides how to remove it.
+def fetch_rosters() -> tuple[
+    dict[str, set[str]], set[str], dict[str, str | None], set[str]
+]:
+    """Team rosters, org members and team nesting, read live from the API.
+
+    NOT read from committed data, and not cached to disk, because there is nowhere
+    safe to put it: `vault-developer-access` and `vault-devops-access` are declared
+    `privacy: secret` in organization/teams.py so their membership is not advertised
+    even inside the org, and ol-infrastructure is a PUBLIC repository. Committing
+    rosters here would publish exactly what that setting exists to withhold.
+
+    Shared by `bin/github-estate-audit access` and `bin/github-collaborator-cleanup`
+    -- both need a roster snapshot no older than "right now" (§ SEC-06: a roster that
+    changed between audit and action turns a `redundant` grant into `no-access`, and
+    acting on the stale classification silently revokes someone's only path in).
+    """
+    import httpx  # noqa: PLC0415 -- only roster-fetching callers need the API
+
+    from ol_infrastructure.lib.github_helper import (  # noqa: PLC0415
+        API_HEADERS,
+        GITHUB_API,
+        get_installation_token,
+    )
+
+    org = "mitodl"
+    token = get_installation_token()
+
+    def paginate(client: httpx.Client, path: str) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        url: str | None = f"{path}{'&' if '?' in path else '?'}per_page=100"
+        while url:
+            response = client.get(url)
+            response.raise_for_status()
+            out.extend(response.json())
+            url = response.links.get("next", {}).get("url")
+        return out
+
+    with httpx.Client(
+        base_url=GITHUB_API,
+        headers={**API_HEADERS, "Authorization": f"Bearer {token}"},
+        timeout=60,
+        follow_redirects=True,
+    ) as client:
+        members = {m["login"] for m in paginate(client, f"/orgs/{org}/members")}
+        # Org OWNERS hold implicit admin on every repo -- a third access path beside
+        # teams and direct grants, and the only one the others cannot revoke. The
+        # plain members list does not distinguish them, so this is a separate call.
+        owners = {
+            m["login"] for m in paginate(client, f"/orgs/{org}/members?role=admin")
+        }
+        teams = paginate(client, f"/orgs/{org}/teams")
+        rosters = {
+            t["slug"]: {
+                m["login"]
+                for m in paginate(client, f"/orgs/{org}/teams/{t['slug']}/members")
+            }
+            for t in teams
+        }
+    parents = {t["slug"]: (t.get("parent") or {}).get("slug") for t in teams}
+    return rosters, members, parents, owners
+
+
 GrantKind = Literal["redundant", "level-only", "owner-implicit", "no-access", "outside"]
+#: The subset of `GrantKind` a caller may safely act on with a delete. Kept as its own
+#: `Literal` (not just a runtime check against `REMOVABLE_KINDS`) so a CLI built on top
+#: -- `bin/github-collaborator-cleanup`'s `--kind` -- gets this enforced at argument
+#: parsing, before any classification or API call runs. `RemovableKind` and
+#: `REMOVABLE_KINDS` must be kept in sync; there is no single source of truth to
+#: generate one from the other because a `Literal`'s members are not introspectable
+#: from a frozenset at the type-checker level.
+RemovableKind = Literal["redundant", "level-only", "owner-implicit"]
 #: The kinds whose removal costs the person nothing. `no-access` and `outside` are
 #: deliberately absent: one revokes access, the other is a membership decision.
 REMOVABLE_KINDS: frozenset[str] = frozenset(

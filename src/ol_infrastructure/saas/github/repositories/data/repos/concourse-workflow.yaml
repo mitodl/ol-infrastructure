@@ -4,11 +4,10 @@ _actions_secret_names:
 _custom_properties:
   tier: tier-1
 _direct_collaborators:
-  Ardiea: admin
   odlbot: admin
 _has_branch_protection: false
 _pushed_at: '2024-06-17T15:06:41Z'
-_ruleset_count: 0
+_ruleset_count: 2
 _visibility: private
 allow_auto_merge: false
 allow_merge_commit: true
