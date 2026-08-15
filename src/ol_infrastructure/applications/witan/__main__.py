@@ -110,6 +110,7 @@ from ol_infrastructure.applications.witan.ci_indexer import (
     create_ci_indexer,
 )
 from ol_infrastructure.applications.witan.deployment import (
+    WITAN_SERVICE_ACCOUNT_NAME,
     WITAN_SERVICE_NAME,
     create_serving_tier,
 )
@@ -460,11 +461,31 @@ WITAN_CI_ACTOR_ID = "svc-witan-ci"
 ##############################################
 #   Vault auth binding (VSO sync only)        #
 ##############################################
-# witan needs no AWS access (no IAM policy attached, iam_policy_document=None);
-# the IRSA service account is required by the binding but unused — witan's pods
-# are created by the ToolHive operator with its own service account. The
-# binding exists for the Vault Secrets Operator sync wiring below. Same shape
-# as toolhive_swe's own no-AWS binding.
+# witan needs no AWS access (no IAM policy attached, iam_policy_document=None).
+# This binding exists for the Vault Secrets Operator sync wiring below — same
+# shape as toolhive_swe's own no-AWS binding.
+#
+# What that leaves is a trust role with an EMPTY permission set: the component
+# builds `OLEKSTrustRole` unconditionally, and skips the RolePolicyAttachment
+# only because there is no policy. So nothing today can use it, and nothing
+# needs to.
+#
+# ★ IF AWS ACCESS IS EVER ADDED HERE, TWO THINGS ARE REQUIRED AND ONLY ONE OF
+# THEM IS OBVIOUS. Setting `iam_policy_document` attaches permissions to a role
+# whose OIDC trust condition names `irsa_service_account_name` below — so that
+# name must equal the ServiceAccount the pods actually run as, which is why it
+# is `WITAN_SERVICE_ACCOUNT_NAME` and not a literal. (It read `"witan"` until
+# 2026-08-15 and matched nothing: the ToolHive operator ran the pods under its
+# own `witan-sa`. Harmless while unused, and a silent no-op the moment it was
+# not.) The non-obvious half: `create_irsa_service_account` stays False because
+# deployment.py owns that ServiceAccount, so the component does NOT annotate it
+# with the role ARN — whoever adds permissions must add that annotation there
+# too, or the pod still gets no credentials.
+#
+# Raised by Sentry's reviewer on PR #5448, which flagged the name mismatch. It
+# was not a live defect — no policy, no role to assume — but the conditional
+# was right and the comment here had gone stale describing the operator that
+# no longer runs these pods.
 witan_auth_binding = OLEKSAuthBinding(
     OLEKSAuthBindingConfig(
         application_name="witan",
@@ -476,7 +497,7 @@ witan_auth_binding = OLEKSAuthBinding(
         cluster_name=cluster_stack.require_output("cluster_name"),
         cluster_identities=cluster_stack.require_output("cluster_identities"),
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
-        irsa_service_account_name="witan",
+        irsa_service_account_name=WITAN_SERVICE_ACCOUNT_NAME,
         vault_sync_service_account_names=["witan-vault"],
         k8s_labels=k8s_labels,
     )
