@@ -26,6 +26,30 @@ vendor-managed namespaces and must never be touched.
 - `ci-mimir.json` — CI's `eks` (the modern 20-rule set) + `linux-host`
 - `qa.md` — why QA needs no separate body dump
 
+## Deletion executed 2026-08-16
+
+Run in the required order per stack — the seven rule namespaces first, the legacy
+Alertmanager config last, so no rule could fire into a default receiver during the
+gap. Production, then QA, then CI.
+
+State after, verified against each stack's live API:
+
+| Stack | Mimir ruler | Loki ruler | Legacy Alertmanager | Grafana-managed rules |
+|---|---|---|---|---|
+| production | `asserts`, `integrations-kubernetes` | none (404) | `{}` — no `rootly` receiver | 24 groups / 72 rules |
+| qa | `asserts`, `integrations-kubernetes` | none (404) | `{}` — no `rootly` receiver | 17 groups / 64 rules |
+| ci | `asserts` | none (404) | 404, storage object gone | 16 groups / 56 rules |
+
+Only the vendor-managed namespaces remain, and the Grafana-managed (Pulumi) rules
+are untouched on all three — the double-delivery path is gone.
+
+Still outstanding: the third verification in the task — that over the following 24h
+no Rootly alert arrives carrying an Explore-deeplink `external_url`, which is the
+ruler-generated signature. Nothing should now be able to produce one.
+
+`BootcampsSAMLIntegrationErrorProd` is uncovered until the `bootcamps` rule group in
+`log_rules/heroku.py` is deployed to all three stacks.
+
 ## Verified equivalences at capture time
 
 - QA `eks` and `linux-host` are **byte-identical** to production's. Restore from
