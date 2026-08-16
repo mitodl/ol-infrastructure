@@ -8,11 +8,6 @@ Note: two rules have been adjusted from the original YAML:
   when the count is 0 (Stage A returns a row with value 0 instead of no rows).
 - Keycloak rules: bare log stream queries wrapped in count_over_time([5m]) > 0
   to make them metric-producing so the two-stage pipeline works correctly.
-
-BootcampsSAMLIntegrationErrorProd was missed by the original migration and was
-recovered from the live Loki ruler before that namespace was deleted. It was the
-only orphaned ruler rule with no equivalent here; see
-docs/plans/grafana-ruler-snapshots/.
 """
 
 from collections.abc import Callable
@@ -87,30 +82,6 @@ def create(
                 datas=rd(
                     'sum by(application, environment) (count_over_time({environment!~".*production", application=~".+", application!="airbyte"}'
                     ' |= "An error occurred (403) when calling the HeadObject operation: Forbidden" [3h])) >=1'
-                ),
-            ),
-        ],
-        opts=resource_opts,
-    )
-
-    alerting.RuleGroup(
-        "loki-heroku-bootcamps",
-        name="bootcamps",
-        folder_uid=folder_uid,
-        interval_seconds=1800,
-        rules=[
-            alerting.RuleGroupRuleArgs(
-                name="BootcampsSAMLIntegrationErrorProd",
-                condition="C",
-                for_="1m",
-                no_data_state="OK",
-                labels={"severity": "critical"},
-                annotations={
-                    "description": "The Bootcamps authentication integration with NovoEd is broken. This prevents learners from accessing courses.",
-                },
-                datas=rd(
-                    'sum by(application, environment) (count_over_time({environment=~".*production", application=~"bootcamp-ecommerce"}'
-                    ' |= "Unable to refresh local metadata" [3h])) >= 1'
                 ),
             ),
         ],

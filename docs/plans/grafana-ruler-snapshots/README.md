@@ -47,8 +47,8 @@ Still outstanding: the third verification in the task — that over the followin
 no Rootly alert arrives carrying an Explore-deeplink `external_url`, which is the
 ruler-generated signature. Nothing should now be able to produce one.
 
-`BootcampsSAMLIntegrationErrorProd` is uncovered until the `bootcamps` rule group in
-`log_rules/heroku.py` is deployed to all three stacks.
+Nothing was left uncovered. The one orphaned rule without a Pulumi equivalent
+belonged to a retired application; see the section above.
 
 ## Verified equivalences at capture time
 
@@ -65,25 +65,28 @@ ruler-generated signature. Nothing should now be able to produce one.
   `production-alertmanager.json` (the bearer credential is the per-stack Rootly
   alert-source token — recoverable from Rootly, not from here).
 
-## Correction to the plan: there *was* one coverage hole
+## Correction to the plan's count — and why it changed nothing
 
 W1 asserts that all 10 orphaned metric rules and all 28 orphaned Loki rules have
 live Pulumi equivalents. The metric half checks out — all 10 names appear in
-`metric_rules/eks_general.py` and `metric_rules/linux_host.py`. The Loki half does
-not: the orphaned ruler holds **29** rules, not 28, and the extra one is
+`metric_rules/eks_general.py` and `metric_rules/linux_host.py`. The Loki count is
+wrong: the orphaned ruler held **29** rules, not 28. The extra one is
 
   heroku-logs / bootcamps / **BootcampsSAMLIntegrationErrorProd**
 
-which had no equivalent anywhere in `log_rules/` (nor anywhere else in the repo —
-`bootcamp` and the literal `Unable to refresh local metadata` both matched nothing).
-Deleting `heroku-logs` on that assumption would have silently dropped the only
-alert covering a broken Bootcamps↔NovoEd SAML integration, which blocks learners
-from reaching their courses.
+and it had no equivalent anywhere in `log_rules/`, nor anywhere else in the repo —
+`bootcamp` and the literal `Unable to refresh local metadata` both matched nothing.
 
-It has been ported into `log_rules/heroku.py` as a new `bootcamps` rule group,
-preserving the 3h window, the `>= 1` threshold, the critical severity and the
-30-minute group interval. **That must be deployed to all three stacks before the
-Loki namespaces are deleted.**
+It was **deliberately not ported**: the Bootcamps application has been fully
+retired, so the alert had nothing left to watch. `bootcamp-ecommerce` stopped
+shipping logs when the app went away, which is also why the rule could never have
+fired again regardless. Deleting it alongside the rest of `heroku-logs` is the
+correct outcome, not a coverage loss.
+
+The count is recorded here anyway because the *method* matters: the plan's
+"everything has an equivalent" claim was a hypothesis, and diffing the two rule-name
+sets rather than trusting the prose is what surfaced the discrepancy. Had the
+service still been live, this would have been a real hole.
 
 ## CI is not a third identical stack
 
