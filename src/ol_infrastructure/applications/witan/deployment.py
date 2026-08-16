@@ -256,9 +256,18 @@ WITAN_SEND_TIMEOUT = "60s"
 # that a node drain can wait this long for witan — acceptable for a
 # single-replica workload whose deploys are already a brief outage by design.
 #
-# This works because uvicorn shuts down gracefully on SIGTERM: it stops
-# accepting connections and waits for in-flight requests rather than dropping
-# them. Without that, a longer grace period would only delay the same kill.
+# ★ THIS IS ONLY HALF THE MECHANISM, AND THE OTHER HALF LIVES IN agent-kit.
+# An earlier version of this comment asserted that uvicorn "waits for in-flight
+# requests rather than dropping them", so a long grace period was sufficient.
+# It is not: FastMCP constructs its uvicorn config with a hardcoded
+# `timeout_graceful_shutdown: 2` (fastmcp `server.py`, `run_http_async`), so on
+# SIGTERM uvicorn gives in-flight work TWO SECONDS and then drops it — a 27s
+# write is severed regardless of how patient the kubelet is being.
+#
+# So this number is necessary and not sufficient. witan must also pass
+# `uvicorn_config={"timeout_graceful_shutdown": ...}` through `mcp.run()`;
+# tracked in agent-kit. Until it does, the grace period below buys the pod time
+# that uvicorn declines to use.
 WITAN_TERMINATION_GRACE_SECONDS = WITAN_REQUEST_TIMEOUT_SECONDS + 30
 
 # Mount path (inside the container) for the actor-tokens Secret volume.
@@ -298,10 +307,76 @@ TMP_SIZE_LIMIT = "2Gi"
 # workaround was to restate them through a `podTemplateSpec` patch and keep the
 # two in step (tk-toolhive-operator-drops-mcpserver-spec-resources-8ea1ff).
 # A Deployment applies what it declares, so there is one declaration again.
-WITAN_RESOURCES = kubernetes.core.v1.ResourceRequirementsArgs(
-    requests={"cpu": "100m", "memory": "256Mi"},
-    limits={"cpu": "500m", "memory": "512Mi"},
-)
+# ★ NO CPU LIMIT, DELIBERATELY — only a request. A CPU limit is enforced by CFS
+# quota: once the container's share is spent the kernel STOPS SCHEDULING IT for
+# the rest of the 100ms period, even on an idle node. For a single-replica,
+# latency-sensitive service that is the worst possible trade — it converts spare
+# node capacity into stalls, and a stalled event loop is what could not answer
+# `/health` inside a probe timeout on 2026-08-16 and got the only replica pulled
+# out of the Service. The `requests` value is what actually matters: it is the
+# guaranteed share and the scheduler's placement input. Above it, witan may now
+# burst into whatever the node has spare.
+#
+# The MEMORY LIMIT STAYS. Memory is incompressible — there is no "throttle", only
+# the OOM killer — so an unlimited container can take its node's neighbours down
+# with it. CPU throttling degrades one pod; memory exhaustion degrades a node.
+#
+# ★ THE MEMORY REQUEST:LIMIT RATIO IS LOAD-BEARING. The VPA in `__main__.py`
+# controls this container with `controlledValues: RequestsAndLimits`, scaling the
+# limit to PRESERVE this ratio while bounding only the request. 256Mi:512Mi is
+# 2:1, so its 1Gi `maxAllowed` caps the effective limit at 2Gi. Widening the
+# ratio silently raises that ceiling.
+#
+# These values also NOW ACTUALLY APPLY. Under ToolHive the identical numbers sat
+# on `MCPServer.spec.resources`, which the operator accepted and never passed to
+# the container — the rendered StatefulSet showed `resources: {}` and the pod ran
+# **BestEffort**, first in line for eviction under node memory pressure
+# (tk-toolhive-operator-drops-mcpserver-spec-resources-8ea1ff). A Deployment
+# applies what it declares.
+# Defaults, overridable per stack via `witan:cpu_request` / `witan:memory_request`
+# / `witan:memory_limit` — see `witan_resources` and the call site in
+# `__main__.py`. Per-stack because the environments differ in corpus size and
+# therefore in what a write costs, and because retuning under load should not
+# need a code release.
+DEFAULT_CPU_REQUEST = "250m"
+DEFAULT_MEMORY_REQUEST = "256Mi"
+DEFAULT_MEMORY_LIMIT = "512Mi"
+
+
+def witan_resources(
+    cpu_request: str = DEFAULT_CPU_REQUEST,
+    memory_request: str = DEFAULT_MEMORY_REQUEST,
+    memory_limit: str = DEFAULT_MEMORY_LIMIT,
+) -> kubernetes.core.v1.ResourceRequirementsArgs:
+    """Build the container's resources, with the CPU limit deliberately absent.
+
+    ★ NO CPU LIMIT, ONLY A REQUEST. A CPU limit is enforced by CFS quota: once
+    the container's share is spent the kernel STOPS SCHEDULING IT for the rest of
+    the 100ms period, even on a completely idle node. For a single-replica,
+    latency-sensitive service that is the worst trade available — it converts
+    spare node capacity into stalls, and a stalled event loop is exactly what
+    failed to answer `/health` inside a probe timeout on 2026-08-16 and got the
+    only replica pulled out of the Service. `requests` is what actually matters:
+    the guaranteed share, and the scheduler's placement input. Above it, witan
+    may burst into whatever the node has spare.
+
+    ★ THE MEMORY LIMIT STAYS, and the asymmetry is the point. Memory is
+    incompressible — there is no throttle, only the OOM killer — so an unbounded
+    container can take its node's neighbours with it. CPU throttling degrades one
+    pod; memory exhaustion degrades a node.
+
+    ★ THE MEMORY REQUEST:LIMIT RATIO IS LOAD-BEARING, which is why both are
+    settable and neither should move alone. The VPA in ``__main__.py`` runs
+    ``controlledValues: RequestsAndLimits``: it bounds the REQUEST by its
+    ``maxAllowed`` and scales the limit to preserve this ratio. At the 2:1
+    default, a 2Gi ``maxAllowed`` caps the effective limit at 4Gi. Set
+    ``memory_limit`` to 4x the request and that ceiling silently becomes 8Gi.
+    """
+    return kubernetes.core.v1.ResourceRequirementsArgs(
+        requests={"cpu": cpu_request, "memory": memory_request},
+        limits={"memory": memory_limit},
+    )
+
 
 # The uid/gid the image runs as, and the hardening the ToolHive operator used to
 # apply on witan's behalf. Reproduced verbatim from the live StatefulSet rather
@@ -339,6 +414,9 @@ def create_serving_tier(  # noqa: PLR0913
     remote_write_max_inflight: str = "",
     remote_write_queue_seconds: str = "",
     remote_call_budget_seconds: str = "",
+    cpu_request: str = DEFAULT_CPU_REQUEST,
+    memory_request: str = DEFAULT_MEMORY_REQUEST,
+    memory_limit: str = DEFAULT_MEMORY_LIMIT,
 ) -> WitanServingTier:
     """Provision witan's ServiceAccount, Deployment, Service and route policy.
 
@@ -651,7 +729,11 @@ def create_serving_tier(  # noqa: PLR0913
                                 period_seconds=20,
                                 timeout_seconds=WITAN_LIVENESS_TIMEOUT_SECONDS,
                             ),
-                            resources=WITAN_RESOURCES,
+                            resources=witan_resources(
+                                cpu_request=cpu_request,
+                                memory_request=memory_request,
+                                memory_limit=memory_limit,
+                            ),
                             security_context=kubernetes.core.v1.SecurityContextArgs(
                                 allow_privilege_escalation=False,
                                 privileged=False,
