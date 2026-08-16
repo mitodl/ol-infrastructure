@@ -1,0 +1,82 @@
+{
+  "_captured_at": "2026-08-16",
+  "_source": "GET /api/alertmanager/grafanacloud-ngalertmanager/config/api/v1/alerts on the production stack",
+  "_note": "QA and CI held byte-identical route trees and receiver names.",
+  "_redactions": {
+    "REDACTED-ROOTLY-BEARER": "receivers[rootly].webhook_configs[0].http_config.authorization.credentials — recover from src/bridge/secrets/grafana_cloud/api.<env>.yaml key `rootly_bearer_token`, or from Rootly itself (it is that stack's alert-source token).",
+    "REDACTED-SLACK-WEBHOOK": "appears TWICE — receivers[slack-notifications-ocw-misc-warning].slack_configs[0].api_url and receivers[slack-notifications-ocw-misc-critical].slack_configs[0].api_url. Recover from the same secrets file, key `slack_notifications_ocw_misc_api_url`.",
+    "_warning": "Restoring this config verbatim leaves BOTH delivery paths broken — Rootly silently, Slack visibly. Substitute both before applying."
+  },
+  "alertmanager_config": {
+    "global": {
+      "http_config": {"follow_redirects": true},
+      "opsgenie_api_url": "https://api.opsgenie.com/",
+      "resolve_timeout": "5m"
+    },
+    "receivers": [
+      {"name": "oblivion"},
+      {
+        "name": "slack-notifications-ocw-misc-warning",
+        "slack_configs": [
+          {
+            "api_url": "REDACTED-SLACK-WEBHOOK",
+            "channel": "#notifications-ocw-misc",
+            "color": "warning",
+            "icon_emoji": ":goose_warning:",
+            "send_resolved": true,
+            "text": "{{ range .Alerts }}\n  {{- if .Annotations.message }}\n      Message - {{ .Annotations.message }}\n  {{- end }}\n  {{- if .Annotations.description }}\n      Description - {{ .Annotations.description }}\n  {{- end }}\n  {{- if .Annotations.summary }}\n      Summary - {{ .Annotations.summary }}\n  {{- end }}\n{{- end }}\n",
+            "title": ":goose_warning: [{{ .Status | toUpper }}{{ if eq .Status \"firing\" }}:{{ .Alerts.Firing | len }}{{- end }}] - {{ .CommonLabels.alertname }}"
+          }
+        ]
+      },
+      {
+        "name": "slack-notifications-ocw-misc-critical",
+        "slack_configs": [
+          {
+            "api_url": "REDACTED-SLACK-WEBHOOK",
+            "channel": "#notifications-ocw-misc",
+            "color": "danger",
+            "send_resolved": true,
+            "text": "{{ range .Alerts }}\n  {{- if .Annotations.message }}\n      {{ .Annotations.message }}\n  {{- end }}\n  {{- if .Annotations.description }}\n      {{ .Annotations.description }}\n  {{- end }}\n{{- end }}\n",
+            "title": ":alert: [{{ .Status | toUpper }}{{ if eq .Status \"firing\" }}:{{ .Alerts.Firing | len }}{{- end }}] - {{ .CommonLabels.alertname }}"
+          }
+        ]
+      },
+      {
+        "name": "rootly",
+        "webhook_configs": [
+          {
+            "http_config": {"authorization": {"credentials": "REDACTED-ROOTLY-BEARER", "type": "Bearer"}},
+            "send_resolved": true,
+            "url": "https://webhooks.rootly.com/webhooks/incoming/alertmanager_webhooks"
+          }
+        ]
+      }
+    ],
+    "route": {
+      "continue": false,
+      "group_by": ["alertname", "environment"],
+      "group_interval": "5m",
+      "group_wait": "60s",
+      "receiver": "oblivion",
+      "repeat_interval": "4h",
+      "routes": [
+        {
+          "continue": false,
+          "matchers": ["channel=\"notifications-ocw-misc\""],
+          "receiver": "oblivion",
+          "routes": [
+            {"continue": false, "matchers": ["severity=\"warning\""], "receiver": "slack-notifications-ocw-misc-warning", "routes": []},
+            {"continue": false, "matchers": ["severity=\"critical\""], "receiver": "slack-notifications-ocw-misc-critical", "routes": []}
+          ]
+        },
+        {"active_time_intervals": [], "continue": false, "matchers": ["alertname=~\"Kube.*\""], "mute_time_intervals": [], "receiver": "oblivion", "routes": []},
+        {"active_time_intervals": [], "continue": false, "matchers": ["alertname=~\"Deploy.*\""], "mute_time_intervals": [], "receiver": "oblivion", "routes": []},
+        {"continue": false, "matchers": ["severity=\"warning\""], "receiver": "rootly", "routes": []},
+        {"continue": false, "matchers": ["severity=\"critical\""], "receiver": "rootly", "routes": []}
+      ]
+    },
+    "templates": []
+  },
+  "template_files": {}
+}

@@ -1,0 +1,319 @@
+{
+  "_captured_at": "2026-08-16",
+  "_source": "GET /api/ruler/grafanacloud-logs/api/v1/rules/{namespace} on the production stack",
+  "_note": "QA and CI held byte-identical copies of all five namespaces at capture time.",
+  "5xx-errors": [
+    {
+      "interval": "5m",
+      "name": "5xx-error-percentage",
+      "rules": [
+        {
+          "alert": "mitxonline-5xx-error-percentage",
+          "annotations": {"description": "An increase in 5xx errors that may indicate an issue with mitxonline"},
+          "expr": "sum(rate({cluster=\"applications-production\", namespace=\"mitxonline\", container=\"nginx\"} | pattern `<client> - - [<_>] \"<method> <uri> <_>\" <status> <bytes> \"<referer>\" \"<agent>\" \"<_>\"` | status=~\"5..\" [5m])) / sum(rate({cluster=\"applications-production\", namespace=\"mitxonline\", container=\"nginx\"} | pattern `<client> - - [<_>] \"<method> <uri> <_>\" <status> <bytes> \"<referer>\" \"<agent>\" \"<_>\"` [5m])) * 100 > 5",
+          "for": "5m",
+          "labels": {"service": "mitxonline", "severity": "critical"}
+        },
+        {
+          "alert": "mitlearn-5xx-error-percentage",
+          "annotations": {"description": "An increase in 5xx errors that may indicate an issue with mitlearn"},
+          "expr": "sum(rate({cluster=\"applications-production\", namespace=\"mitlearn\", container=\"nginx\"} | pattern `<client> - - [<_>] \"<method> <uri> <_>\" <status> <bytes> \"<referer>\" \"<agent>\" \"<_>\"` | status=~\"5..\" [5m])) / sum(rate({cluster=\"applications-production\", namespace=\"mitlearn\", container=\"nginx\"} | pattern `<client> - - [<_>] \"<method> <uri> <_>\" <status> <bytes> \"<referer>\" \"<agent>\" \"<_>\"` [5m])) * 100 > 5",
+          "for": "5m",
+          "labels": {"service": "mitlearn", "severity": "critical"}
+        }
+      ]
+    }
+  ],
+  "cert-manager": [
+    {
+      "interval": "5m",
+      "name": "cert-manager-non-production",
+      "rules": [
+        {
+          "alert": "CertManagerACMEIssuerUnavailableNonProd",
+          "annotations": {
+            "description": "cert-manager in {{ $labels.cluster }} cannot reach the ACME issuer outside of the expected pod startup initialization window. Certificate renewals are blocked in this environment.",
+            "resolution": "Check cert-manager pod logs and verify network connectivity to the ACME API. May indicate a network policy, DNS resolution failure, or a misconfigured ClusterIssuer credential."
+          },
+          "expr": "sum by (cluster) (\n\n  count_over_time(\n    {app_kubernetes_io_name=\"cert-manager\", cluster!~\".*-production\"}\n    |= \"ACME client for issuer not initialised/available\" [15m]\n  )\n) > 3",
+          "for": "20m",
+          "labels": {"environment": "non-production", "severity": "warning"}
+        },
+        {
+          "alert": "CertManagerChallengePresentationFailureNonProd",
+          "annotations": {
+            "description": "cert-manager in {{ $labels.cluster }} is failing to present ACME DNS-01 challenges. Certificate issuance will fail until resolved.",
+            "resolution": "Check IAM permissions for the Route 53 hosted zone used by the cert-manager challenge solver and verify the ClusterIssuer DNS provider configuration."
+          },
+          "expr": "sum by (cluster) (\n\n  count_over_time(\n    {app_kubernetes_io_name=\"cert-manager\", cluster!~\".*-production\"}\n    |= \"error presenting challenge\" [15m]\n  )\n) > 1",
+          "for": "5m",
+          "labels": {"environment": "non-production", "severity": "warning"}
+        }
+      ]
+    },
+    {
+      "interval": "5m",
+      "name": "cert-manager-production",
+      "rules": [
+        {
+          "alert": "CertManagerACMEIssuerUnavailableProduction",
+          "annotations": {
+            "description": "cert-manager in {{ $labels.cluster }} cannot reach the ACME issuer outside of the expected pod startup initialization window. All certificate renewals are blocked until resolved.",
+            "resolution": "Check cert-manager pod logs and verify network connectivity to the ACME API. May indicate a network policy, DNS resolution failure, or a misconfigured ClusterIssuer credential."
+          },
+          "expr": "sum by (cluster) (\n\n  count_over_time(\n    {app_kubernetes_io_name=\"cert-manager\", cluster=~\".*-production\"}\n    |= \"ACME client for issuer not initialised/available\" [15m]\n  )\n) > 3",
+          "for": "20m",
+          "labels": {"environment": "production", "severity": "critical"}
+        },
+        {
+          "alert": "CertManagerChallengePresentationFailureProduction",
+          "annotations": {
+            "description": "cert-manager in {{ $labels.cluster }} is failing to present ACME DNS-01 challenges. Certificate issuance will fail until resolved.",
+            "resolution": "Check IAM permissions for the Route 53 hosted zone used by the cert-manager challenge solver and verify the ClusterIssuer DNS provider configuration."
+          },
+          "expr": "sum by (cluster) (\n\n  count_over_time(\n    {app_kubernetes_io_name=\"cert-manager\", cluster=~\".*-production\"}\n    |= \"error presenting challenge\" [15m]\n  )\n) > 1",
+          "for": "5m",
+          "labels": {"environment": "production", "severity": "critical"}
+        }
+      ]
+    }
+  ],
+  "edxapp-logs": [
+    {
+      "interval": "15m",
+      "name": "all-apps-general-15m",
+      "rules": [
+        {
+          "alert": "RedisMemoryIssuesProduction",
+          "annotations": {
+            "description": "Redis is returning OOM errors to edxapp in {{ $labels.environment }}.",
+            "resolution": "Check on the {{ $labels.environment }} redis cluster in the AWS console and resize if needed."
+          },
+          "expr": "sum by(application,environment)(count_over_time({application=\"edxapp\", environment=~\".*production\"} |json |= \"OOM command not allowed when used memory\"[15m]) >= 1)",
+          "for": "1m",
+          "labels": {"severity": "critical"}
+        },
+        {
+          "alert": "RedisMemoryIssuesNonProd",
+          "annotations": {
+            "description": "Redis is returning OOM errors to edxapp in {{ $labels.environment }}.",
+            "resolution": "Check on the {{ $labels.environment }} redis cluster in the AWS console and resize if needed."
+          },
+          "expr": "sum by(application,environment)(count_over_time({application=\"edxapp\", environment!~\".*production\"} |json |= \"OOM command not allowed when used memory\"[15m]) >= 1)",
+          "for": "1m",
+          "labels": {"severity": "warning"}
+        },
+        {
+          "alert": "CredentialIssueProduction",
+          "annotations": {
+            "description": "A credential issue has been detected in {{ $labels.environment }}.",
+            "resolution": "Check on the {{ $labels.environment }} edxapp instances and initiate an instance refresh if needed"
+          },
+          "expr": "sum by(application,environment)(count_over_time({application=\"edxapp\", environment=~\".*production\"} |json |= \"Access denied for user\"[15m]) >= 1)",
+          "for": "1m",
+          "labels": {"severity": "critical"}
+        },
+        {
+          "alert": "CredentialIssueNonProd",
+          "annotations": {
+            "description": "A credential issue has been detected in {{ $labels.environment }}.",
+            "resolution": "Check on the {{ $labels.environment }} edxapp instances and initiate an instance refresh if needed"
+          },
+          "expr": "sum by(application,environment)(count_over_time({application=\"edxapp\", environment!~\".*production\"} |json |= \"Access denied for user\"[15m]) >= 1)",
+          "for": "1m",
+          "labels": {"severity": "warning"}
+        }
+      ]
+    },
+    {
+      "interval": "1h",
+      "name": "all-apps-general-1h",
+      "rules": [
+        {
+          "alert": "ForumTimeoutProduction",
+          "annotations": {
+            "description": "edxapp {{ $labels.environment }} is having trouble communicating with the forum service.",
+            "resolution": "This typically means that forum is having difficulty talking to MongoAtlas. Check on forum containers and initiate an instance refresh if necessary."
+          },
+          "expr": "sum by (application, environment) (count_over_time({environment=~\".*production\", application=\"edxapp\"} |json  |= \"Read timed out\" |=\"forum\"[1h])) >= 1",
+          "for": "1m",
+          "labels": {"severity": "critical"}
+        },
+        {
+          "alert": "ForumTimeoutNonProd",
+          "annotations": {
+            "description": "edxapp {{ $labels.environment }} is having trouble communicating with the forum service.",
+            "resolution": "This typically means that forum is having difficulty talking to MongoAtlas. Check on forum containers and initiate an instance refresh if necessary."
+          },
+          "expr": "sum by (application, environment) (count_over_time({environment!~\".*production\", application=\"edxapp\"} |json  |= \"Read timed out\" |=\"forum\"[1h])) >= 1",
+          "for": "1m",
+          "labels": {"severity": "warning"}
+        },
+        {
+          "alert": "NoSAMLProviderDataProduction",
+          "annotations": {
+            "description": "A SAML configuration error has been detected in {{ $labels.application }} {{ $labels.environment }}.",
+            "resolution": "ssh into an instance and execute the following\nsudo su - edxapp -s /bin/bash\nsource edxapp_env \npython edx-platform/manage.py lms saml --pull\nTakes several minutes to resolve\n"
+          },
+          "expr": "(sum by(application,environment)(count_over_time({environment=~\".*production\", application=\"edxapp\"} |= \"No SAMLProviderData found for provider\"[1h])) > 1)",
+          "for": "1m",
+          "labels": {"severity": "critical"}
+        },
+        {
+          "alert": "NoSAMLProviderDataNonProd",
+          "annotations": {
+            "description": "A SAML configuration error has been detected in {{ $labels.application }} {{ $labels.environment }}.",
+            "resolution": "ssh into an instance and execute the following\nsudo su - edxapp -s /bin/bash\nsource edxapp_env \npython edx-platform/manage.py lms saml --pull\nTakes several minutes to resolve\n"
+          },
+          "expr": "(sum by(application,environment)(count_over_time({environment!~\".*production\", application=\"edxapp\"} |= \"No SAMLProviderData found for provider\"[1h])) > 1)",
+          "for": "1m",
+          "labels": {"severity": "warning"}
+        }
+      ]
+    },
+    {
+      "interval": "5m",
+      "name": "mitxonline-web-5m",
+      "rules": [
+        {
+          "alert": "MitxOnline500Errors",
+          "annotations": {"description": "High rate of 500 errors on mitxonline-production."},
+          "expr": "sum(count_over_time(({application=\"edxapp\", environment=\"mitxonline-production\"} | json | container_name=~`.*-caddy-.*` | line_format \"{{.message}}\" | json | status >= 500)[5m])) > 100",
+          "for": "5m",
+          "labels": {"severity": "critical"}
+        }
+      ]
+    }
+  ],
+  "heroku-logs": [
+    {
+      "interval": "30m",
+      "name": "all-apps-general",
+      "rules": [
+        {
+          "alert": "InvalidAccessKeyProduction",
+          "annotations": {"description": "An invalid aws key has been detected in {{ $labels.application }} {{ $labels.environment }}."},
+          "expr": "sum by (application, environment) (count_over_time({environment=~\".*production\", application=~\".+\", application!=\"dagster\", application!=\"airbyte\"} | json |= \"InvalidAccessKeyId\"[3h])) >= 1",
+          "for": "1m",
+          "labels": {"severity": "critical"}
+        },
+        {
+          "alert": "InvalidAccessKeyNonProd",
+          "annotations": {"description": "An invalid aws key has been detected in {{ $labels.application }} {{ $labels.environment }}."},
+          "expr": "sum by (application, environment) (count_over_time({environment!~\".*production\", application=~\".+\", application!=\"dagster\", application!=\"airbyte\"} | json |= \"InvalidAccessKeyId\"[3h])) >= 1",
+          "for": "1m",
+          "labels": {"severity": "warning"}
+        },
+        {
+          "alert": "AlternateInvalidAccessKeyProduction",
+          "annotations": {"description": "An invalid aws key has been detected in {{ $labels.application }} {{ $labels.environment }}."},
+          "expr": "sum by(application, environment) (count_over_time({environment=~\".*production\", application=~\".+\", application!=\"airbyte\"} |= \"An error occurred (403) when calling the HeadObject operation: Forbidden\" [3h])) >=1",
+          "for": "1m",
+          "labels": {"severity": "critical"}
+        },
+        {
+          "alert": "AlternateInvalidAccessKeyNonProd",
+          "annotations": {"description": "An invalid aws key has been detected in {{ $labels.application }} {{ $labels.environment }}."},
+          "expr": "sum by(application, environment) (count_over_time({environment!~\".*production\", application=~\".+\", application!=\"airbyte\"} |= \"An error occurred (403) when calling the HeadObject operation: Forbidden\" [3h])) >=1",
+          "for": "1m",
+          "labels": {"severity": "warning"}
+        }
+      ]
+    },
+    {
+      "interval": "30m",
+      "name": "bootcamps",
+      "rules": [
+        {
+          "alert": "BootcampsSAMLIntegrationErrorProd",
+          "annotations": {"description": "The Bootcamps authentication integration with NovoEd is broken. This prevents learners from accessing courses."},
+          "expr": "sum by(application, environment) (count_over_time({environment=~\".*production\", application=~\"bootcamp-ecommerce\"} |= \"Unable to refresh local metadata\" [3h])) >=1",
+          "for": "1m",
+          "labels": {"severity": "critical"}
+        }
+      ]
+    },
+    {
+      "name": "keycloak",
+      "rules": [
+        {
+          "alert": "KeycloakInternalError",
+          "annotations": {"description": "Keycloak has responded with a 500 error which is likely caused by a custimization or configuration change."},
+          "expr": "{application=\"keycloak\"} |= `HTTP 500 Internal Server Error`",
+          "for": "1m",
+          "labels": {"severity": "critical"}
+        },
+        {
+          "alert": "KeycloakSAMLAssertionDecryptError",
+          "annotations": {"description": "Keycloak is unable to decrypt a SAML assertion likely caused by an internal or external configuration change."},
+          "expr": "{application=\"keycloak\"} |= `Not possible to decrypt SAML assertion`",
+          "for": "1m",
+          "labels": {"severity": "warning"}
+        },
+        {
+          "alert": "KeycloakServerError",
+          "annotations": {"description": "Keycloak experienced an error condition that is likely the result of a customization."},
+          "expr": "{application=\"keycloak\"} |= `Uncaught server error`",
+          "for": "1m",
+          "labels": {"severity": "critical"}
+        }
+      ]
+    },
+    {
+      "interval": "5m",
+      "name": "ocw-studio",
+      "rules": [
+        {
+          "alert": "OCWStudio3PlayErrorDetectedNonProd",
+          "annotations": {"description": "A 3play transcript request has failed in NonProduction."},
+          "expr": "sum by (application, environment) (count_over_time({service=\"heroku\", application=\"ocw-studio\", environment!~\".*production\"} |= \"3Play transcript request failed for video_id\" [5m])) >= 1",
+          "for": "1m",
+          "labels": {"channel": "notifications-ocw-misc", "severity": "warning"}
+        },
+        {
+          "alert": "OCWStudio3PlayErrorDetectedProd",
+          "annotations": {"description": "A 3play transcript request has failed in Production."},
+          "expr": "sum by (application, environment) (count_over_time({service=\"heroku\", application=\"ocw-studio\", environment=~\".*production\"} |= \"3Play transcript request failed for video_id\" [5m])) >= 1",
+          "for": "1m",
+          "labels": {"channel": "notifications-ocw-misc", "severity": "warning"}
+        },
+        {
+          "alert": "OCWStudioContentSyncInvalidPasswordNonProd",
+          "annotations": {"description": "An invalid username and password message was detected from content sync. This refer to the password used by OCW to talk to concourse."},
+          "expr": "sum by (application, environment) (count_over_time({application=\"ocw-studio\", environment!~\".*production\"} | json | message=\"Invalid Username and Password\"[5m]))",
+          "for": "1m",
+          "labels": {"severity": "warning"}
+        },
+        {
+          "alert": "OCWStudioContentSyncInvalidPasswordProd",
+          "annotations": {"description": "An invalid username and password message was detected from content sync. This refer to the password used by OCW to talk to concourse."},
+          "expr": "sum by (application, environment) (count_over_time({application=\"ocw-studio\", environment=~\".*production\"} | json | message=\"Invalid Username and Password\"[5m]))",
+          "for": "1m",
+          "labels": {"severity": "critical"}
+        }
+      ]
+    }
+  ],
+  "vault": [
+    {
+      "interval": "5m",
+      "name": "general",
+      "rules": [
+        {
+          "alert": "edxapp_VaultSecretsAbsent",
+          "annotations": {"description": "A Vault or Consul template is attempting to retrieve a secret that doesn't exist. Investigate the possibility of a misconfiguration or an accidentally deleted value."},
+          "expr": "count by (environment) (count_over_time({application=\"edxapp\"} | json | SYSLOG_IDENTIFIER=\"vault\" |~ \"no secret exists\"[5m])) > 0",
+          "for": "5m",
+          "labels": {"severity": "critical"}
+        },
+        {
+          "alert": "edxapp_VaultAuthFailure",
+          "annotations": {"description": "A Vault client is having errors authenticating against the vault servers."},
+          "expr": "count by (environment) (count_over_time({application=\"edxapp\"} | json | SYSLOG_IDENTIFIER=\"vault\" |~ \"error authenticating\"[5m])) > 0",
+          "for": "5m",
+          "labels": {"severity": "critical"}
+        }
+      ]
+    }
+  ]
+}

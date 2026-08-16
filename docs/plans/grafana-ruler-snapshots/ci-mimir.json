@@ -1,0 +1,205 @@
+{
+  "_captured_at": "2026-08-16",
+  "_source": "GET /api/ruler/grafanacloud-prom/api/v1/rules/{eks,linux-host} on the CI stack",
+  "_note": "CI diverges from production and QA: eks holds the modern 20-rule set with correct environment filters and lowercase severities, and linux-host's CPUUsageWarning is the fixed form. Its Loki namespaces are byte-identical to production's (see production-loki.json).",
+  "eks": [
+    {
+      "interval": "1m",
+      "name": "general",
+      "rules": [
+        {
+          "alert": "DaemonsetReplicasMissingWarning",
+          "annotations": {"description": "There is a mismatch between the requested number of instances for daemonset {{ $labels.daemonset }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}. This may mean there is a node stuck leaving or joining the cluster or another issue preventing the daemonset from being correctly scheduled."},
+          "expr": "sum by (cluster, namespace, daemonset) (kube_daemonset_status_current_number_scheduled{cluster=~\".*-(ci|qa)\"}) / sum by (cluster, namespace, daemonset) (kube_daemonset_status_desired_number_scheduled) < 1.0",
+          "for": "10m",
+          "labels": {"severity": "warning"}
+        },
+        {
+          "alert": "DaemonsetReplicasMissingCritical",
+          "annotations": {"description": "There is a mismatch between the requested number of instances for daemonset {{ $labels.daemonset }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}. This may mean there is a node stuck leaving or joining the cluster or another issue preventing the daemonset from being correctly scheduled."},
+          "expr": "sum by (cluster, namespace, daemonset) (kube_daemonset_status_current_number_scheduled{cluster=~\".*-(production)\"}) / sum by (cluster, namespace, daemonset) (kube_daemonset_status_desired_number_scheduled) < 1.0",
+          "for": "10m",
+          "labels": {"severity": "critical"}
+        },
+        {
+          "alert": "DeploymentReplicasMissingCritical",
+          "annotations": {"description": "There is a mismatch between the requested number of instances for deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}."},
+          "expr": "sum by (cluster, namespace, deployment) (kube_deployment_status_replicas_available{cluster=~\".*-(production)\"}) / sum by (cluster, namespace, deployment) (kube_deployment_status_replicas) < 1.0",
+          "for": "10m",
+          "labels": {"severity": "critical"}
+        },
+        {
+          "alert": "DeploymentReplicasMissingWarning",
+          "annotations": {"description": "There is a mismatch between the requested number of instances for deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}."},
+          "expr": "sum by (cluster, namespace, deployment) (kube_deployment_status_replicas_available{cluster=~\".*-(ci|qa)\"}) / sum by (cluster, namespace, deployment) (kube_deployment_status_replicas) < 1.0",
+          "for": "10m",
+          "labels": {"severity": "warning"}
+        },
+        {
+          "alert": "DeploymentUnavailableWarning",
+          "annotations": {"description": "A deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} is not available for an extended period of time."},
+          "expr": "sum by (cluster, namespace, deployment, condition, status) (kube_deployment_status_condition{cluster=~\".*-(ci|qa)\", condition=\"Available\", status=\"false\"}) > 0",
+          "for": "10m",
+          "labels": {"severity": "warning"}
+        },
+        {
+          "alert": "DeploymentUnavailableCritical",
+          "annotations": {"description": "A deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} is not available for an extended period of time."},
+          "expr": "sum by (cluster, namespace, deployment, condition, status) (kube_deployment_status_condition{cluster=~\".*-(production)\", condition=\"Available\", status=\"false\"}) > 0",
+          "for": "10m",
+          "labels": {"severity": "critical"}
+        },
+        {
+          "alert": "StatefulSetReplicasMissingWarning",
+          "annotations": {"description": "There is a mismatch between the requested number of instances for statefulset {{ $labels.statefulset }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}."},
+          "expr": "sum by (cluster, namespace, statefulset) (kube_statefulset_status_replicas_ready{cluster=~\".*-(ci|qa)\"}) / sum by (cluster, namespace, statefulset) (kube_statefulset_replicas) < 1.0",
+          "for": "10m",
+          "labels": {"severity": "warning"}
+        },
+        {
+          "alert": "StatefulSetReplicasMissingCritical",
+          "annotations": {"description": "There is a mismatch between the requested number of instances for statefulset {{ $labels.statefulset }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}."},
+          "expr": "sum by (cluster, namespace, statefulset) (kube_statefulset_status_replicas_ready{cluster=~\".*-(production)\"}) / sum by (cluster, namespace, statefulset) (kube_statefulset_replicas) < 1.0",
+          "for": "10m",
+          "labels": {"severity": "critical"}
+        },
+        {
+          "alert": "NodeNotReadyWarning",
+          "annotations": {"description": "Node {{ $labels.node }} in cluster {{ $labels.cluster }} has been in a not-ready state for more than 5 minutes."},
+          "expr": "sum by (cluster, node) (kube_node_status_condition{cluster=~\".*-(ci|qa)\", condition=\"Ready\", status=\"true\"} == 0)",
+          "for": "5m",
+          "labels": {"severity": "warning"}
+        },
+        {
+          "alert": "NodeNotReadyCritical",
+          "annotations": {"description": "Node {{ $labels.node }} in cluster {{ $labels.cluster }} has been in a not-ready state for more than 5 minutes."},
+          "expr": "sum by (cluster, node) (kube_node_status_condition{cluster=~\".*-(production)\", condition=\"Ready\", status=\"true\"} == 0)",
+          "for": "5m",
+          "labels": {"severity": "critical"}
+        },
+        {
+          "alert": "PodCrashLoopingWarning",
+          "annotations": {"description": "Container {{ $labels.container }} in pod {{ $labels.pod }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} is in CrashLoopBackOff."},
+          "expr": "sum by (cluster, namespace, pod, container) (kube_pod_container_status_waiting_reason{cluster=~\".*-(ci|qa)\", reason=\"CrashLoopBackOff\"}) > 0",
+          "for": "5m",
+          "labels": {"severity": "warning"}
+        },
+        {
+          "alert": "PodCrashLoopingCritical",
+          "annotations": {"description": "Container {{ $labels.container }} in pod {{ $labels.pod }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} is in CrashLoopBackOff."},
+          "expr": "sum by (cluster, namespace, pod, container) (kube_pod_container_status_waiting_reason{cluster=~\".*-(production)\", reason=\"CrashLoopBackOff\"}) > 0",
+          "for": "5m",
+          "labels": {"severity": "critical"}
+        },
+        {
+          "alert": "CeleryBeatPodRestarts",
+          "annotations": {
+            "description": "High restart count suggests OOM kills or crash loops. Verify memory allocation, pod memory requests/limits, and actual usage.",
+            "runbook_url": "https://github.com/mitodl/mit-learn/wiki/Celery-Beat-Troubleshooting",
+            "summary": "Celery Beat pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has restarted {{ $value }} times in the last hour"
+          },
+          "expr": "increase(kube_pod_container_status_restarts_total{cluster=~\".*-(ci|qa)\", pod=~\".*celery-beat.*|.*celerybeat.*\"}[1h]) > 3",
+          "for": "5m",
+          "labels": {"severity": "warning"}
+        },
+        {
+          "alert": "CeleryBeatPodRestartsCritical",
+          "annotations": {
+            "description": "High restart count suggests OOM kills or crash loops. Verify memory allocation, pod memory requests/limits, and actual usage.",
+            "runbook_url": "https://github.com/mitodl/mit-learn/wiki/Celery-Beat-Troubleshooting",
+            "summary": "Celery Beat pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has restarted {{ $value }} times in the last hour"
+          },
+          "expr": "increase(kube_pod_container_status_restarts_total{cluster=~\".*-(production)\", pod=~\".*celery-beat.*|.*celerybeat.*\"}[1h]) > 3",
+          "for": "5m",
+          "labels": {"severity": "critical"}
+        },
+        {
+          "alert": "PodOOMKilledWarning",
+          "annotations": {"description": "Container {{ $labels.container }} in pod {{ $labels.pod }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been OOMKilled and is actively restarting. Memory limits may need to be increased."},
+          "expr": "sum by (cluster, namespace, pod, container) (\n  (kube_pod_container_status_last_terminated_reason{cluster=~\".*-(ci|qa)\", reason=\"OOMKilled\"} == 1)\n  * on (cluster, namespace, pod, container) group_left()\n  (increase(kube_pod_container_status_restarts_total[1h]) > 0)\n)",
+          "for": "5m",
+          "labels": {"severity": "warning"}
+        },
+        {
+          "alert": "PodOOMKilledCritical",
+          "annotations": {"description": "Container {{ $labels.container }} in pod {{ $labels.pod }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been OOMKilled and is actively restarting. Memory limits may need to be increased."},
+          "expr": "sum by (cluster, namespace, pod, container) (\n  (kube_pod_container_status_last_terminated_reason{cluster=~\".*-(production)\", reason=\"OOMKilled\"} == 1)\n  * on (cluster, namespace, pod, container) group_left()\n  (increase(kube_pod_container_status_restarts_total[1h]) > 0)\n)",
+          "for": "5m",
+          "labels": {"severity": "critical"}
+        },
+        {
+          "alert": "KubernetesJobFailedWarning",
+          "annotations": {"description": "Job {{ $labels.job_name }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has failed."},
+          "expr": "sum by (cluster, namespace, job_name) (kube_job_status_failed{cluster=~\".*-(ci|qa)\", namespace!=\"dagster\"} > 0)",
+          "for": "5m",
+          "labels": {"severity": "warning"}
+        },
+        {
+          "alert": "KubernetesJobFailedCritical",
+          "annotations": {"description": "Job {{ $labels.job_name }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has failed."},
+          "expr": "sum by (cluster, namespace, job_name) (kube_job_status_failed{cluster=~\".*-(production)\", namespace!=\"dagster\"} > 0)",
+          "for": "5m",
+          "labels": {"severity": "critical"}
+        },
+        {
+          "alert": "HPAAtMaxReplicasWarning",
+          "annotations": {"description": "HPA {{ $labels.horizontalpodautoscaler }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been at its maximum replica count for 15 minutes. The workload may be unable to scale further under load."},
+          "expr": "sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{cluster=~\".*-(ci|qa)\"}) >= sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{cluster=~\".*-(ci|qa)\"})",
+          "for": "15m",
+          "labels": {"severity": "warning"}
+        },
+        {
+          "alert": "HPAAtMaxReplicasCritical",
+          "annotations": {"description": "HPA {{ $labels.horizontalpodautoscaler }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been at its maximum replica count for 15 minutes. The workload may be unable to scale further under load."},
+          "expr": "sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{cluster=~\".*-(production)\"}) >= sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{cluster=~\".*-(production)\"})",
+          "for": "15m",
+          "labels": {"severity": "critical"}
+        }
+      ]
+    }
+  ],
+  "linux-host": [
+    {
+      "interval": "1h",
+      "name": "cpu-usage",
+      "rules": [
+        {
+          "alert": "CPUUsageWarning",
+          "expr": "1 - (\n  sum by (cluster, instance) (rate(host_cpu_seconds_total{mode=\"idle\", job=\"integrations/linux_host\"}[5m]))\n  / sum by (cluster, instance) (rate(host_cpu_seconds_total{job=\"integrations/linux_host\"}[5m]))\n) > 0.8",
+          "for": "6h",
+          "labels": {"severity": "warning"}
+        }
+      ]
+    },
+    {
+      "interval": "10m",
+      "name": "disk-usage",
+      "rules": [
+        {
+          "alert": "DiskUsageWarning",
+          "expr": "(host_filesystem_used_ratio{device=~\"/dev.*\",filesystem!~\"(squashfs|vfat)\",job=\"integrations/linux_host\"} * 100) > 80",
+          "for": "1h",
+          "labels": {"severity": "warning"}
+        },
+        {
+          "alert": "DiskUsageCritical",
+          "expr": "(host_filesystem_used_ratio{device=~\"/dev.*\",filesystem!~\"(squashfs|vfat)\",job=\"integrations/linux_host\"} * 100) > 95",
+          "for": "10m",
+          "labels": {"severity": "critical"}
+        }
+      ]
+    },
+    {
+      "interval": "30m",
+      "name": "memory-usage",
+      "rules": [
+        {
+          "alert": "MemoryUsageWarning",
+          "expr": "(host_memory_used_bytes / host_memory_total_bytes) > 0.9",
+          "for": "2h",
+          "labels": {"severity": "warning"}
+        }
+      ]
+    }
+  ]
+}
