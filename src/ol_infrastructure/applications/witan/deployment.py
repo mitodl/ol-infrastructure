@@ -159,6 +159,56 @@ WITAN_STARTUP_INITIAL_DELAY_SECONDS = 5
 WITAN_STARTUP_PERIOD_SECONDS = 3
 WITAN_STARTUP_FAILURE_THRESHOLD = 20
 
+# ── ★ HOW LONG A PROBE MAY WAIT, WHICH IS THE VALUE THAT CAUSED AN OUTAGE ─────
+#
+# These were never set, so all three inherited Kubernetes' default of ONE
+# SECOND, and that single unwritten number produced the failure below.
+#
+# MEASURED IN QA, 2026-08-16, first concurrency probe after the ToolHive
+# removal. 16 concurrent writers:
+#
+#   * witan answered EVERY call correctly — 16/16 `memory_store` `outcome: ok`,
+#     all 236 HTTP responses 200, slowest 27.1s against the 120s budget below;
+#   * but `GET /health` could not be answered inside 1s under that load;
+#   * readiness failed 3x at periodSeconds 5, so the pod went NotReady
+#     (`Ready=True last=19:27:40` against a write window of 19:27:00-19:27:37);
+#   * Kubernetes removed it from the Service, and APISIX had nothing to route
+#     to — `failed to set upstream: no valid upstream node`, HTTP 503,
+#     `upstream_addr=-`, `request_time=0.001`, never contacting witan;
+#   * so 15 of 16 callers were told their write failed while every row committed.
+#     An INDETERMINATE write, produced entirely by probe configuration.
+#
+# ★ SHALLOWNESS DOES NOT SAVE YOU HERE, and the handler docstring above is why
+# this comment exists. `/health` is deliberately shallow so it can never block
+# on the graph — that defends against the HANDLER stalling. It does nothing
+# about the EVENT LOOP being starved: a shallow coroutine still has to be
+# SCHEDULED, and under enough concurrency on one process it is not scheduled
+# within a second. Same "backend slowness becomes frontend death" failure, one
+# layer down.
+#
+# ★ AND AT ONE REPLICA, READINESS CAN ONLY EVER CAUSE A TOTAL OUTAGE. Readiness
+# exists to pull a sick pod out of a POOL; witan is pinned to a single replica
+# on purpose (see `replicas=1`), so there is no degraded mode to fall back to —
+# ejection is the whole service, and it fires hardest exactly when load is
+# highest. That asymmetry is why readiness is the most forgiving of the three
+# below rather than the strictest.
+#
+# Liveness is the most patient of all: killing a saturated-but-working process
+# throws away in-flight writes, and restarting it does not make the graph
+# faster. 10s x 3 failures x 20s period is ~60s of sustained unresponsiveness
+# before a restart, which a genuinely wedged process will still reach.
+#
+# These do NOT address WHY /health cannot answer in 1s under load — that is
+# unresolved and tracked separately (CPU throttling read 0 and usage 0.008
+# cores, but Prometheus sampled far too coarsely to resolve a 37-second event).
+# They make saturation degrade instead of amputating the service, which is the
+# same shape of fix as the ToolHive proxy's ping timeout before it.
+WITAN_READINESS_TIMEOUT_SECONDS = 5
+WITAN_READINESS_PERIOD_SECONDS = 5
+WITAN_READINESS_FAILURE_THRESHOLD = 6
+WITAN_LIVENESS_TIMEOUT_SECONDS = 10
+WITAN_STARTUP_TIMEOUT_SECONDS = 5
+
 # ── The request deadline, which is now ours ──────────────────────────────────
 # ★ REMOVING TOOLHIVE DOES NOT REMOVE THE DEADLINE — it moves it here, and the
 # difference is that this number is chosen and tunable where ToolHive's 30s was
@@ -557,6 +607,7 @@ def create_serving_tier(  # noqa: PLR0913
                                 ),
                                 period_seconds=WITAN_STARTUP_PERIOD_SECONDS,
                                 failure_threshold=WITAN_STARTUP_FAILURE_THRESHOLD,
+                                timeout_seconds=WITAN_STARTUP_TIMEOUT_SECONDS,
                             ),
                             readiness_probe=kubernetes.core.v1.ProbeArgs(
                                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
@@ -567,7 +618,15 @@ def create_serving_tier(  # noqa: PLR0913
                                 # only sets the fields it names leaves a
                                 # previously set initialDelaySeconds in place.
                                 initial_delay_seconds=0,
-                                period_seconds=5,
+                                period_seconds=WITAN_READINESS_PERIOD_SECONDS,
+                                # ~30s of unresponsiveness before this singleton
+                                # is pulled out of the Service and the endpoint
+                                # disappears from APISIX. See the block above:
+                                # at 1s x 3 it ejected the only replica under
+                                # ordinary write load and every caller got a 503
+                                # while their writes were committing.
+                                failure_threshold=WITAN_READINESS_FAILURE_THRESHOLD,
+                                timeout_seconds=WITAN_READINESS_TIMEOUT_SECONDS,
                             ),
                             liveness_probe=kubernetes.core.v1.ProbeArgs(
                                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
@@ -576,14 +635,21 @@ def create_serving_tier(  # noqa: PLR0913
                                 ),
                                 # ★ 20s period against the default
                                 # failureThreshold of 3, so a wedged process is
-                                # killed in ~60s — and, because the probe cannot
-                                # block on the graph, a SATURATED one is never
-                                # killed at all. That is the specific behaviour
-                                # ToolHive's proxy got wrong, at a 5s timeout
-                                # that could not win its race against a 5s
-                                # backend ping.
+                                # killed in ~60s.
+                                #
+                                # ★ AN EARLIER VERSION OF THIS COMMENT CLAIMED A
+                                # SATURATED PROCESS "IS NEVER KILLED AT ALL",
+                                # because the probe cannot block on the graph.
+                                # That was wrong, and QA proved it on
+                                # 2026-08-16: at the inherited 1s timeout this
+                                # liveness probe ALSO failed under load, leaving
+                                # the pod ~60s from a restart it did not need.
+                                # Shallowness stops the handler stalling; it does
+                                # not stop a starved event loop from failing to
+                                # schedule it. Hence the explicit 10s below.
                                 initial_delay_seconds=0,
                                 period_seconds=20,
+                                timeout_seconds=WITAN_LIVENESS_TIMEOUT_SECONDS,
                             ),
                             resources=WITAN_RESOURCES,
                             security_context=kubernetes.core.v1.SecurityContextArgs(
