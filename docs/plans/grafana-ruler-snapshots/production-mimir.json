@@ -1,0 +1,123 @@
+{
+  "_captured_at": "2026-08-16",
+  "_source": "GET /api/ruler/grafanacloud-prom/api/v1/rules/{eks,linux-host} on the production stack",
+  "_note": "QA's eks and linux-host were byte-identical to these at capture time.",
+  "eks": [
+    {
+      "interval": "1m",
+      "name": "general",
+      "rules": [
+        {
+          "alert": "DaemonsetReplicasMissingWarning",
+          "annotations": {
+            "description": "There is a mismatch between the requested number of instances for daemonset {{ $labels.daemonset }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}. This may mean there is a node stuck leaving or joining the cluster or another issue preventing the daemonset from being correctly scheduled."
+          },
+          "expr": "sum by (cluster, namespace, daemonset) (kube_daemonset_status_current_number_scheduled{cluster=~\".*-(ci|qa)\"}) / sum by (cluster, namespace, daemonset) (kube_daemonset_status_desired_number_scheduled) < 1.0",
+          "for": "10m",
+          "labels": {"severity": "warning"}
+        },
+        {
+          "alert": "DaemonsetReplicasMissingCritical",
+          "annotations": {
+            "description": "There is a mismatch between the requested number of instances for daemonset {{ $labels.daemonset }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}. This may mean there is a node stuck leaving or joining the cluster or another issue preventing the daemonset from being correctly scheduled."
+          },
+          "expr": "sum by (cluster, namespace, daemonset) (kube_daemonset_status_current_number_scheduled{cluster=~\".*-(production)\"}) / sum by (cluster, namespace, daemonset) (kube_daemonset_status_desired_number_scheduled) < 1.0",
+          "for": "10m",
+          "labels": {"severity": "critical"}
+        },
+        {
+          "alert": "DeploymentReplicasMissingCritical",
+          "annotations": {
+            "description": "There is a mismatch between the requested number of instances for deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}."
+          },
+          "expr": "sum by (cluster, namespace, deployment) (kube_deployment_status_replicas_available{cluster=~\".*-(production)\"}) / sum by (cluster, namespace, deployment) (kube_deployment_status_replicas) < 1.0",
+          "for": "10m",
+          "labels": {"severity": "critical"}
+        },
+        {
+          "alert": "DeploymentReplicasMissingWarning",
+          "annotations": {
+            "description": "There is a mismatch between the requested number of instances for deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}."
+          },
+          "expr": "sum by (cluster, namespace, deployment) (kube_deployment_status_replicas_available{cluster=~\".*-(ci|qa)\"}) / sum by (cluster, namespace, deployment) (kube_deployment_status_replicas) < 1.0",
+          "for": "10m",
+          "labels": {"severity": "Warning"}
+        },
+        {
+          "alert": "DeploymentUnavailableWarning",
+          "annotations": {
+            "description": "A deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} is not available for an extended period of time."
+          },
+          "expr": "sum by (cluster, namespace, deployment, condition, status) (kube_deployment_status_condition{cluster=~\".*-(production)\", condition=\"Available\", status=\"false\"}) > 0",
+          "for": "10m",
+          "labels": {"severity": "warning"}
+        },
+        {
+          "alert": "DeploymentUnavailableCritical",
+          "annotations": {
+            "description": "A deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} is not available for an extended period of time."
+          },
+          "expr": "sum by (cluster, namespace, deployment, condition, status) (kube_deployment_status_condition{cluster=~\".*-(ci|qa)\", condition=\"Available\", status=\"false\"}) > 0",
+          "for": "10m",
+          "labels": {"severity": "critical"}
+        }
+      ]
+    }
+  ],
+  "linux-host": [
+    {
+      "interval": "1h",
+      "name": "cpu-usage",
+      "rules": [
+        {
+          "alert": "CPUUsageWarning",
+          "annotations": {
+            "description": "CPU usage on {{ $labels.instance }} has been at {{ printf \"%.2f\" $value }} for at least 6 hours.\""
+          },
+          "expr": "1 - sum(rate(host_cpu_seconds_total{host=\"$instance\",mode=\"idle\"}[5m])) / count(count by(cpu) (host_cpu_seconds_total{host=\"$instance\",mode=\"idle\"})) > 0.8",
+          "for": "6h",
+          "labels": {"severity": "warning"}
+        }
+      ]
+    },
+    {
+      "interval": "10m",
+      "name": "disk-usage",
+      "rules": [
+        {
+          "alert": "DiskUsageWarning",
+          "annotations": {
+            "description": "Filesystem on {{ $labels.device }} at {{ $labels.instance }} is {{ printf \"%.2f\" $value }}% full."
+          },
+          "expr": "(host_filesystem_used_ratio{device=~\"/dev.*\",filesystem!~\"(squashfs|vfat)\",job=\"integrations/linux_host\"} * 100) > 80",
+          "for": "1h",
+          "labels": {"severity": "warning"}
+        },
+        {
+          "alert": "DiskUsageCritical",
+          "annotations": {
+            "description": "Filesystem on {{ $labels.device }} at {{ $labels.instance }} is {{ printf \"%.2f\" $value }}% full."
+          },
+          "expr": "(host_filesystem_used_ratio{device=~\"/dev.*\",filesystem!~\"(squashfs|vfat)\",job=\"integrations/linux_host\"} * 100) > 95",
+          "for": "10m",
+          "labels": {"severity": "critical"}
+        }
+      ]
+    },
+    {
+      "interval": "30m",
+      "name": "memory-usage",
+      "rules": [
+        {
+          "alert": "MemoryUsageWarning",
+          "annotations": {
+            "description": "Memory usage on {{ $labels.instance }} has been at {{ printf \"%.2f\" $value }} for at least 2 hours.\""
+          },
+          "expr": "(host_memory_used_bytes / host_memory_total_bytes) > 0.9",
+          "for": "2h",
+          "labels": {"severity": "warning"}
+        }
+      ]
+    }
+  ]
+}
