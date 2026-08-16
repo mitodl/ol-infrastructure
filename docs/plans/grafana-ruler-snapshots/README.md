@@ -1,8 +1,10 @@
 # Orphaned cortextool-era ruler snapshots
 
 Captured 2026-08-16 via the Grafana Cloud ruler and Alertmanager APIs, immediately
-before deleting the unmanaged `eks`, `linux-host` and Loki namespaces described in
-`docs/plans/grafana-alerting-remediation-spec.md` (W1).
+before deleting the unmanaged `eks`, `linux-host` and Loki namespaces. That deletion
+is step W1 of the Grafana alerting remediation, whose plan is not committed to this
+repo — this file is written to stand on its own, so nothing below depends on reading
+it.
 
 These namespaces are **not** in Pulumi. Nothing else holds a copy. This directory is
 the only restore source if a deletion turns out to be wrong.
@@ -22,9 +24,30 @@ vendor-managed namespaces and must never be touched.
 
 - `production-mimir.json` — full bodies of prod `eks` + `linux-host`
 - `production-loki.json` — full bodies of all five prod Loki namespaces
-- `production-alertmanager.json` — legacy Cloud Alertmanager config (webhook bearer redacted)
+- `production-alertmanager.json` — legacy Cloud Alertmanager config, with **two**
+  credentials replaced by placeholders (see below)
 - `ci-mimir.json` — CI's `eks` (the modern 20-rule set) + `linux-host`
 - `qa.md` — why QA needs no separate body dump
+
+### Redacted credentials and where to recover them
+
+A restore from `production-alertmanager.json` must substitute both, or delivery
+comes back broken — Rootly silently, Slack visibly. Both live in the same
+SOPS-encrypted per-stack secrets file, `src/bridge/secrets/grafana_cloud/api.<env>.yaml`,
+under the keys the Pulumi program already reads in
+`src/ol_infrastructure/infrastructure/grafana_alerting/alertmanager.py`:
+
+| Placeholder in the snapshot | Secrets key | Used by |
+|---|---|---|
+| `REDACTED-ROOTLY-BEARER` | `rootly_bearer_token` | the `rootly` webhook receiver |
+| `REDACTED-SLACK-WEBHOOK` (appears twice) | `slack_notifications_ocw_misc_api_url` | both `slack-notifications-ocw-misc-*` receivers |
+
+```
+sops -d src/bridge/secrets/grafana_cloud/api.production.yaml | yq -r '.rootly_bearer_token'
+```
+
+The Rootly bearer is additionally recoverable from Rootly itself — it is that
+stack's alert-source token.
 
 ## Deletion executed 2026-08-16
 
