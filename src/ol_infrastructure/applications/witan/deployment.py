@@ -146,15 +146,34 @@ WITAN_HEALTH_PATH = "/health"
 # `Uvicorn running on http://0.0.0.0:8000` at 22:25:21.9 — ~4.9s to serving.
 #
 # The startupProbe gates the other two: while it runs the kubelet suppresses
-# liveness and readiness entirely, and once it passes it never runs again. The
-# Nth failure lands at initial_delay + (N-1) x period, so the container is
-# killed at 5 + 19x3 = 62s, ~12x the measured boot.
+# liveness and readiness entirely, and once it passes it never runs again.
 #
-# That much headroom is deliberate rather than lazy: fastmcp performs an
+# ★ THE BUDGET IS A RANGE, NOT A NUMBER, because a probe worker does not overlap
+# attempts — the next one starts after the previous returns, so the effective
+# interval is roughly max(period, how long the attempt took).
+#
+#   * FAILING FAST (the normal boot): the port is not bound yet, so each attempt
+#     is an immediate connection-refused and the interval is the 3s period. The
+#     Nth failure lands at initial_delay + (N-1) x period → killed at
+#     5 + 19x3 = ~62s, ~12x the measured 4.9s boot.
+#   * FAILING SLOW (the port binds but the handler never answers): each attempt
+#     burns the full 5s timeout below, so the same 20 failures stretch to
+#     roughly 5 + 20x5 = ~105s.
+#
+# An earlier version of this comment stated only the 62s figure, which was true
+# when `timeoutSeconds` was the inherited 1s and is not once the timeout exceeds
+# the period. Raised by review on PR #5449.
+#
+# ★ THE THRESHOLD STAYS AT 20 RATHER THAN DROPPING TO ~12 TO RESTORE 62s. The
+# headroom exists for a specific uncontrolled dependency: fastmcp performs an
 # outbound version check against pypi.org during startup (visible in the pod
-# logs as `GET https://pypi.org/pypi/fastmcp/json`), so boot has an external
-# dependency whose slow path is not ours to control. A boot that blows 62s is
-# stuck, not slow, and killing it is correct.
+# logs as `GET https://pypi.org/pypi/fastmcp/json`). Tightening to 12 would cut
+# the FAST-path budget — the one that actually governs real boots — from 62s to
+# ~38s, or under 8x the measured boot, to buy a shorter kill on a
+# bound-but-wedged process that has never been observed. Slower detection of a
+# hypothetical beats killing a slow-but-healthy start.
+#
+# Either way a boot that blows this is stuck, not slow, and killing it is right.
 WITAN_STARTUP_INITIAL_DELAY_SECONDS = 5
 WITAN_STARTUP_PERIOD_SECONDS = 3
 WITAN_STARTUP_FAILURE_THRESHOLD = 20
