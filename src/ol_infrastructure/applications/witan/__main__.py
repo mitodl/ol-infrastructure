@@ -110,6 +110,9 @@ from ol_infrastructure.applications.witan.ci_indexer import (
     create_ci_indexer,
 )
 from ol_infrastructure.applications.witan.deployment import (
+    DEFAULT_CPU_REQUEST,
+    DEFAULT_MEMORY_LIMIT,
+    DEFAULT_MEMORY_REQUEST,
     WITAN_SERVICE_ACCOUNT_NAME,
     WITAN_SERVICE_NAME,
     create_serving_tier,
@@ -331,6 +334,25 @@ WITAN_REMOTE_WRITE_QUEUE_SECONDS = witan_config.get("remote_write_queue_seconds"
 WITAN_REMOTE_CALL_BUDGET_SECONDS = (
     witan_config.get("remote_call_budget_seconds") or "120"
 )
+
+# Container resources, per stack. The environments differ in corpus size and so
+# in what a write costs, and an incident retune should not need a code release.
+#
+# ★ THERE IS NO CPU LIMIT TO SET — deliberately, see `witan_resources`. A CPU
+# limit is CFS quota: spend the share and the kernel stops scheduling the
+# container for the rest of the period even on an idle node, which is how a
+# stalled event loop misses a probe deadline and gets the only replica ejected.
+# The request is the guaranteed share; above it witan bursts into spare capacity.
+#
+# ★ MOVE `memory_request` AND `memory_limit` TOGETHER. The VPA scales the limit
+# to preserve their ratio, so its `maxAllowed` multiplied by that ratio is the
+# real memory ceiling — changing one silently moves the ceiling. See the VPA.
+#
+# ★ CHANGING EITHER REPLACES THE POD, same as the write-admission vars above:
+# resources are part of the pod template, so a change rolls the single replica.
+WITAN_CPU_REQUEST = witan_config.get("cpu_request") or DEFAULT_CPU_REQUEST
+WITAN_MEMORY_REQUEST = witan_config.get("memory_request") or DEFAULT_MEMORY_REQUEST
+WITAN_MEMORY_LIMIT = witan_config.get("memory_limit") or DEFAULT_MEMORY_LIMIT
 
 # The GitHub App the CI indexer clones as, when one is configured. All three
 # values come from one SOPS file rather than splitting the ids into plain
@@ -799,6 +821,9 @@ witan_serving_tier = create_serving_tier(
     remote_write_max_inflight=WITAN_REMOTE_WRITE_MAX_INFLIGHT,
     remote_write_queue_seconds=WITAN_REMOTE_WRITE_QUEUE_SECONDS,
     remote_call_budget_seconds=WITAN_REMOTE_CALL_BUDGET_SECONDS,
+    cpu_request=WITAN_CPU_REQUEST,
+    memory_request=WITAN_MEMORY_REQUEST,
+    memory_limit=WITAN_MEMORY_LIMIT,
 )
 
 #########################################
@@ -864,10 +889,27 @@ make_vpa(
     # reference, and every saved log/metric query, survives the migration.
     container_name="mcp",
     controlled_resources=["memory"],
-    # Floor = WITAN_RESOURCES' request. 2:1 ratio there, so the 1Gi ceiling caps
-    # the limit at 2Gi.
+    # Floor = WITAN_RESOURCES' request, so the VPA cannot shrink below the size
+    # measured as safe. Ceiling raised 1Gi -> 2Gi on 2026-08-16.
+    #
+    # ★ THE CEILING IS ON THE REQUEST, AND THE LIMIT FOLLOWS IT BY THE RATIO.
+    # `make_vpa` uses `controlledValues: RequestsAndLimits`, which preserves
+    # WITAN_RESOURCES' 256Mi:512Mi = 2:1, so 2Gi here caps the effective LIMIT at
+    # 4Gi. Read those two together before changing either — widening the ratio in
+    # deployment.py raises this ceiling without touching this line.
+    #
+    # Why raise it now: witan's steady state is ~250Mi (VPA `uncappedTarget`
+    # 250Mi, `upperBound` 600Mi in QA), so the old 1Gi was not binding in normal
+    # operation — but the workload that would need it is the one that has never
+    # been given room. `store_merge` exports the whole target graph to reconcile
+    # against, and that grows with the corpus rather than with the caller's
+    # upload. Headroom for that is cheap; discovering the ceiling by OOM during a
+    # migration is not.
+    #
+    # It remains a bound, not an invitation: 4Gi still fails a genuine leak
+    # loudly instead of letting it evict its node-mates.
     min_allowed={"memory": "256Mi"},
-    max_allowed={"memory": "1Gi"},
+    max_allowed={"memory": "2Gi"},
     disable_other_containers=True,
     opts=ResourceOptions(depends_on=[witan_serving_tier.deployment]),
 )

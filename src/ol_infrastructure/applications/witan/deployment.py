@@ -146,18 +146,87 @@ WITAN_HEALTH_PATH = "/health"
 # `Uvicorn running on http://0.0.0.0:8000` at 22:25:21.9 — ~4.9s to serving.
 #
 # The startupProbe gates the other two: while it runs the kubelet suppresses
-# liveness and readiness entirely, and once it passes it never runs again. The
-# Nth failure lands at initial_delay + (N-1) x period, so the container is
-# killed at 5 + 19x3 = 62s, ~12x the measured boot.
+# liveness and readiness entirely, and once it passes it never runs again.
 #
-# That much headroom is deliberate rather than lazy: fastmcp performs an
+# ★ THE BUDGET IS A RANGE, NOT A NUMBER, because a probe worker does not overlap
+# attempts — the next one starts after the previous returns, so the effective
+# interval is roughly max(period, how long the attempt took).
+#
+#   * FAILING FAST (the normal boot): the port is not bound yet, so each attempt
+#     is an immediate connection-refused and the interval is the 3s period. The
+#     Nth failure lands at initial_delay + (N-1) x period → killed at
+#     5 + 19x3 = ~62s, ~12x the measured 4.9s boot.
+#   * FAILING SLOW (the port binds but the handler never answers): each attempt
+#     burns the full 5s timeout below, so the same 20 failures stretch to
+#     roughly 5 + 20x5 = ~105s.
+#
+# An earlier version of this comment stated only the 62s figure, which was true
+# when `timeoutSeconds` was the inherited 1s and is not once the timeout exceeds
+# the period. Raised by review on PR #5449.
+#
+# ★ THE THRESHOLD STAYS AT 20 RATHER THAN DROPPING TO ~12 TO RESTORE 62s. The
+# headroom exists for a specific uncontrolled dependency: fastmcp performs an
 # outbound version check against pypi.org during startup (visible in the pod
-# logs as `GET https://pypi.org/pypi/fastmcp/json`), so boot has an external
-# dependency whose slow path is not ours to control. A boot that blows 62s is
-# stuck, not slow, and killing it is correct.
+# logs as `GET https://pypi.org/pypi/fastmcp/json`). Tightening to 12 would cut
+# the FAST-path budget — the one that actually governs real boots — from 62s to
+# ~38s, or under 8x the measured boot, to buy a shorter kill on a
+# bound-but-wedged process that has never been observed. Slower detection of a
+# hypothetical beats killing a slow-but-healthy start.
+#
+# Either way a boot that blows this is stuck, not slow, and killing it is right.
 WITAN_STARTUP_INITIAL_DELAY_SECONDS = 5
 WITAN_STARTUP_PERIOD_SECONDS = 3
 WITAN_STARTUP_FAILURE_THRESHOLD = 20
+
+# ── ★ HOW LONG A PROBE MAY WAIT, WHICH IS THE VALUE THAT CAUSED AN OUTAGE ─────
+#
+# These were never set, so all three inherited Kubernetes' default of ONE
+# SECOND, and that single unwritten number produced the failure below.
+#
+# MEASURED IN QA, 2026-08-16, first concurrency probe after the ToolHive
+# removal. 16 concurrent writers:
+#
+#   * witan answered EVERY call correctly — 16/16 `memory_store` `outcome: ok`,
+#     all 236 HTTP responses 200, slowest 27.1s against the 120s budget below;
+#   * but `GET /health` could not be answered inside 1s under that load;
+#   * readiness failed 3x at periodSeconds 5, so the pod went NotReady
+#     (`Ready=True last=19:27:40` against a write window of 19:27:00-19:27:37);
+#   * Kubernetes removed it from the Service, and APISIX had nothing to route
+#     to — `failed to set upstream: no valid upstream node`, HTTP 503,
+#     `upstream_addr=-`, `request_time=0.001`, never contacting witan;
+#   * so 15 of 16 callers were told their write failed while every row committed.
+#     An INDETERMINATE write, produced entirely by probe configuration.
+#
+# ★ SHALLOWNESS DOES NOT SAVE YOU HERE, and the handler docstring above is why
+# this comment exists. `/health` is deliberately shallow so it can never block
+# on the graph — that defends against the HANDLER stalling. It does nothing
+# about the EVENT LOOP being starved: a shallow coroutine still has to be
+# SCHEDULED, and under enough concurrency on one process it is not scheduled
+# within a second. Same "backend slowness becomes frontend death" failure, one
+# layer down.
+#
+# ★ AND AT ONE REPLICA, READINESS CAN ONLY EVER CAUSE A TOTAL OUTAGE. Readiness
+# exists to pull a sick pod out of a POOL; witan is pinned to a single replica
+# on purpose (see `replicas=1`), so there is no degraded mode to fall back to —
+# ejection is the whole service, and it fires hardest exactly when load is
+# highest. That asymmetry is why readiness is the most forgiving of the three
+# below rather than the strictest.
+#
+# Liveness is the most patient of all: killing a saturated-but-working process
+# throws away in-flight writes, and restarting it does not make the graph
+# faster. 10s x 3 failures x 20s period is ~60s of sustained unresponsiveness
+# before a restart, which a genuinely wedged process will still reach.
+#
+# These do NOT address WHY /health cannot answer in 1s under load — that is
+# unresolved and tracked separately (CPU throttling read 0 and usage 0.008
+# cores, but Prometheus sampled far too coarsely to resolve a 37-second event).
+# They make saturation degrade instead of amputating the service, which is the
+# same shape of fix as the ToolHive proxy's ping timeout before it.
+WITAN_READINESS_TIMEOUT_SECONDS = 5
+WITAN_READINESS_PERIOD_SECONDS = 5
+WITAN_READINESS_FAILURE_THRESHOLD = 6
+WITAN_LIVENESS_TIMEOUT_SECONDS = 10
+WITAN_STARTUP_TIMEOUT_SECONDS = 5
 
 # ── The request deadline, which is now ours ──────────────────────────────────
 # ★ REMOVING TOOLHIVE DOES NOT REMOVE THE DEADLINE — it moves it here, and the
@@ -206,9 +275,18 @@ WITAN_SEND_TIMEOUT = "60s"
 # that a node drain can wait this long for witan — acceptable for a
 # single-replica workload whose deploys are already a brief outage by design.
 #
-# This works because uvicorn shuts down gracefully on SIGTERM: it stops
-# accepting connections and waits for in-flight requests rather than dropping
-# them. Without that, a longer grace period would only delay the same kill.
+# ★ THIS IS ONLY HALF THE MECHANISM, AND THE OTHER HALF LIVES IN agent-kit.
+# An earlier version of this comment asserted that uvicorn "waits for in-flight
+# requests rather than dropping them", so a long grace period was sufficient.
+# It is not: FastMCP constructs its uvicorn config with a hardcoded
+# `timeout_graceful_shutdown: 2` (fastmcp `server.py`, `run_http_async`), so on
+# SIGTERM uvicorn gives in-flight work TWO SECONDS and then drops it — a 27s
+# write is severed regardless of how patient the kubelet is being.
+#
+# So this number is necessary and not sufficient. witan must also pass
+# `uvicorn_config={"timeout_graceful_shutdown": ...}` through `mcp.run()`;
+# tracked in agent-kit. Until it does, the grace period below buys the pod time
+# that uvicorn declines to use.
 WITAN_TERMINATION_GRACE_SECONDS = WITAN_REQUEST_TIMEOUT_SECONDS + 30
 
 # Mount path (inside the container) for the actor-tokens Secret volume.
@@ -248,10 +326,76 @@ TMP_SIZE_LIMIT = "2Gi"
 # workaround was to restate them through a `podTemplateSpec` patch and keep the
 # two in step (tk-toolhive-operator-drops-mcpserver-spec-resources-8ea1ff).
 # A Deployment applies what it declares, so there is one declaration again.
-WITAN_RESOURCES = kubernetes.core.v1.ResourceRequirementsArgs(
-    requests={"cpu": "100m", "memory": "256Mi"},
-    limits={"cpu": "500m", "memory": "512Mi"},
-)
+# ★ NO CPU LIMIT, DELIBERATELY — only a request. A CPU limit is enforced by CFS
+# quota: once the container's share is spent the kernel STOPS SCHEDULING IT for
+# the rest of the 100ms period, even on an idle node. For a single-replica,
+# latency-sensitive service that is the worst possible trade — it converts spare
+# node capacity into stalls, and a stalled event loop is what could not answer
+# `/health` inside a probe timeout on 2026-08-16 and got the only replica pulled
+# out of the Service. The `requests` value is what actually matters: it is the
+# guaranteed share and the scheduler's placement input. Above it, witan may now
+# burst into whatever the node has spare.
+#
+# The MEMORY LIMIT STAYS. Memory is incompressible — there is no "throttle", only
+# the OOM killer — so an unlimited container can take its node's neighbours down
+# with it. CPU throttling degrades one pod; memory exhaustion degrades a node.
+#
+# ★ THE MEMORY REQUEST:LIMIT RATIO IS LOAD-BEARING. The VPA in `__main__.py`
+# controls this container with `controlledValues: RequestsAndLimits`, scaling the
+# limit to PRESERVE this ratio while bounding only the request. 256Mi:512Mi is
+# 2:1, so its 1Gi `maxAllowed` caps the effective limit at 2Gi. Widening the
+# ratio silently raises that ceiling.
+#
+# These values also NOW ACTUALLY APPLY. Under ToolHive the identical numbers sat
+# on `MCPServer.spec.resources`, which the operator accepted and never passed to
+# the container — the rendered StatefulSet showed `resources: {}` and the pod ran
+# **BestEffort**, first in line for eviction under node memory pressure
+# (tk-toolhive-operator-drops-mcpserver-spec-resources-8ea1ff). A Deployment
+# applies what it declares.
+# Defaults, overridable per stack via `witan:cpu_request` / `witan:memory_request`
+# / `witan:memory_limit` — see `witan_resources` and the call site in
+# `__main__.py`. Per-stack because the environments differ in corpus size and
+# therefore in what a write costs, and because retuning under load should not
+# need a code release.
+DEFAULT_CPU_REQUEST = "250m"
+DEFAULT_MEMORY_REQUEST = "256Mi"
+DEFAULT_MEMORY_LIMIT = "512Mi"
+
+
+def witan_resources(
+    cpu_request: str = DEFAULT_CPU_REQUEST,
+    memory_request: str = DEFAULT_MEMORY_REQUEST,
+    memory_limit: str = DEFAULT_MEMORY_LIMIT,
+) -> kubernetes.core.v1.ResourceRequirementsArgs:
+    """Build the container's resources, with the CPU limit deliberately absent.
+
+    ★ NO CPU LIMIT, ONLY A REQUEST. A CPU limit is enforced by CFS quota: once
+    the container's share is spent the kernel STOPS SCHEDULING IT for the rest of
+    the 100ms period, even on a completely idle node. For a single-replica,
+    latency-sensitive service that is the worst trade available — it converts
+    spare node capacity into stalls, and a stalled event loop is exactly what
+    failed to answer `/health` inside a probe timeout on 2026-08-16 and got the
+    only replica pulled out of the Service. `requests` is what actually matters:
+    the guaranteed share, and the scheduler's placement input. Above it, witan
+    may burst into whatever the node has spare.
+
+    ★ THE MEMORY LIMIT STAYS, and the asymmetry is the point. Memory is
+    incompressible — there is no throttle, only the OOM killer — so an unbounded
+    container can take its node's neighbours with it. CPU throttling degrades one
+    pod; memory exhaustion degrades a node.
+
+    ★ THE MEMORY REQUEST:LIMIT RATIO IS LOAD-BEARING, which is why both are
+    settable and neither should move alone. The VPA in ``__main__.py`` runs
+    ``controlledValues: RequestsAndLimits``: it bounds the REQUEST by its
+    ``maxAllowed`` and scales the limit to preserve this ratio. At the 2:1
+    default, a 2Gi ``maxAllowed`` caps the effective limit at 4Gi. Set
+    ``memory_limit`` to 4x the request and that ceiling silently becomes 8Gi.
+    """
+    return kubernetes.core.v1.ResourceRequirementsArgs(
+        requests={"cpu": cpu_request, "memory": memory_request},
+        limits={"memory": memory_limit},
+    )
+
 
 # The uid/gid the image runs as, and the hardening the ToolHive operator used to
 # apply on witan's behalf. Reproduced verbatim from the live StatefulSet rather
@@ -289,6 +433,9 @@ def create_serving_tier(  # noqa: PLR0913
     remote_write_max_inflight: str = "",
     remote_write_queue_seconds: str = "",
     remote_call_budget_seconds: str = "",
+    cpu_request: str = DEFAULT_CPU_REQUEST,
+    memory_request: str = DEFAULT_MEMORY_REQUEST,
+    memory_limit: str = DEFAULT_MEMORY_LIMIT,
 ) -> WitanServingTier:
     """Provision witan's ServiceAccount, Deployment, Service and route policy.
 
@@ -557,6 +704,7 @@ def create_serving_tier(  # noqa: PLR0913
                                 ),
                                 period_seconds=WITAN_STARTUP_PERIOD_SECONDS,
                                 failure_threshold=WITAN_STARTUP_FAILURE_THRESHOLD,
+                                timeout_seconds=WITAN_STARTUP_TIMEOUT_SECONDS,
                             ),
                             readiness_probe=kubernetes.core.v1.ProbeArgs(
                                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
@@ -567,7 +715,15 @@ def create_serving_tier(  # noqa: PLR0913
                                 # only sets the fields it names leaves a
                                 # previously set initialDelaySeconds in place.
                                 initial_delay_seconds=0,
-                                period_seconds=5,
+                                period_seconds=WITAN_READINESS_PERIOD_SECONDS,
+                                # ~30s of unresponsiveness before this singleton
+                                # is pulled out of the Service and the endpoint
+                                # disappears from APISIX. See the block above:
+                                # at 1s x 3 it ejected the only replica under
+                                # ordinary write load and every caller got a 503
+                                # while their writes were committing.
+                                failure_threshold=WITAN_READINESS_FAILURE_THRESHOLD,
+                                timeout_seconds=WITAN_READINESS_TIMEOUT_SECONDS,
                             ),
                             liveness_probe=kubernetes.core.v1.ProbeArgs(
                                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
@@ -576,16 +732,27 @@ def create_serving_tier(  # noqa: PLR0913
                                 ),
                                 # ★ 20s period against the default
                                 # failureThreshold of 3, so a wedged process is
-                                # killed in ~60s — and, because the probe cannot
-                                # block on the graph, a SATURATED one is never
-                                # killed at all. That is the specific behaviour
-                                # ToolHive's proxy got wrong, at a 5s timeout
-                                # that could not win its race against a 5s
-                                # backend ping.
+                                # killed in ~60s.
+                                #
+                                # ★ AN EARLIER VERSION OF THIS COMMENT CLAIMED A
+                                # SATURATED PROCESS "IS NEVER KILLED AT ALL",
+                                # because the probe cannot block on the graph.
+                                # That was wrong, and QA proved it on
+                                # 2026-08-16: at the inherited 1s timeout this
+                                # liveness probe ALSO failed under load, leaving
+                                # the pod ~60s from a restart it did not need.
+                                # Shallowness stops the handler stalling; it does
+                                # not stop a starved event loop from failing to
+                                # schedule it. Hence the explicit 10s below.
                                 initial_delay_seconds=0,
                                 period_seconds=20,
+                                timeout_seconds=WITAN_LIVENESS_TIMEOUT_SECONDS,
                             ),
-                            resources=WITAN_RESOURCES,
+                            resources=witan_resources(
+                                cpu_request=cpu_request,
+                                memory_request=memory_request,
+                                memory_limit=memory_limit,
+                            ),
                             security_context=kubernetes.core.v1.SecurityContextArgs(
                                 allow_privilege_escalation=False,
                                 privileged=False,
