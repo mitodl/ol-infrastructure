@@ -393,6 +393,38 @@ Component change lands once; per-app behavior changes as each app's stack is dep
   the pods past the declared 4Gi. LMS respawns, by contrast, are ongoing (8 and 10 over
   14 days), which is a second independent reason to keep it at 2 workers for now.
 
+  **LMS canary — `mitx` first, via new per-install config.** Because `k8s_resources.py`
+  is shared, there was no way to move one install's LMS without moving all three. Added
+  `edxapp:k8s_granian.lms` per-stack config: omitted (the default for every stack) keeps
+  the pre-overhaul holding pins, and an install opts in by setting it. `mitx` CI/QA/
+  Production now set `workers: 1, runtime_threads: 1, blocking_threads: 8,
+  backpressure: 16`. Verified in preview: `mitx.CI` updates both edxapp Deployments (LMS
+  to the new args, CMS from the change above) while `mitxonline.CI` updates **only** CMS —
+  its LMS does not appear in the diff at all, so the refactor is a no-op for anything that
+  has not opted in.
+
+  Be honest about what this canary does and does not prove. `mitx` LMS p99 concurrency is
+  0.27 busy threads against the new ceiling of 8 — 30× headroom — so it will never
+  approach the limit. It validates that LMS boots and serves on one worker, that
+  `runtime_mode` auto is fine on this code path, the whole-pod respawn blast radius, and
+  probe/startup behavior. It does **not** test whether 8 threads is enough at LMS-scale
+  concurrency, because `mitx` LMS has no such concurrency. Only `mitxonline` LMS does, and
+  that is precisely the risk being deferred.
+
+  **Replica pre-raise: not applied, and the plan's stated rule is wrong.** This is the
+  first stage where it mattered — stages 1 and 2 dodged it because every app was pinned at
+  `min_replicas`, whereas `mitx` LMS genuinely scales (observed 4→15 over 14 days). By the
+  rule above ("pre-raise for any app whose steady-state CPU sits above ~40% of the 60% HPA
+  target", i.e. above 24% utilization), `mitx` LMS at p95 89m against a 250m request — 36%
+  — would qualify.
+
+  But the premise is false. "Halving per-pod worker count roughly halves per-pod CPU" does
+  not hold: the same traffic arriving at the same number of pods performs the same work
+  regardless of how many worker processes divide it. Worker count changes *capacity*, not
+  *usage*. Stage 2 measured exactly this and it is in the table above — `micromasters` p95
+  CPU 0.0100 → 0.0097 and `xpro` 0.0631 → 0.0608, flat rather than halved. There is no
+  post-deploy scale-down to guard against, so no pre-raise.
+
   **Blast radius.** `k8s_resources.py` is shared, so the CMS edit changes CMS for
   `mitxonline-openedx`, `mitx-openedx` and `mitx-staging-openedx` as each stack deploys —
   three deployments, not one. `xpro-openedx` is *not* affected: it still runs the
