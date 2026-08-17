@@ -1,6 +1,7 @@
 # ruff: noqa: E501
 """APISIX ingress controller components for Kubernetes."""
 
+from pathlib import Path
 from typing import Any, Literal
 
 import pulumi_kubernetes as kubernetes
@@ -13,6 +14,14 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SStaticSecretConfig,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+
+# Read once at import: the file is shipped verbatim as the serverless function
+# body, with configuration passed separately on the plugin config.
+OIDC_ERROR_RECOVERY_LUA = (
+    Path(__file__)
+    .parent.joinpath("files", "oidc_error_callback_recovery.lua")
+    .read_text()
+)
 
 
 class OLApisixPluginConfig(BaseModel):
@@ -145,9 +154,20 @@ def oidc_error_callback_recovery_plugin(
     looping: a persistently broken IdP should surface as an error, not as an
     infinite redirect.
 
+    The Lua itself lives in ``files/oidc_error_callback_recovery.lua`` and is
+    shipped verbatim -- nothing is interpolated into it.  Tunables travel as an
+    ``oidc_error_recovery`` block on the plugin config, which the function reads
+    off ``conf``: ``serverless/init.lua`` invokes each function as
+    ``func(conf, ctx)``, and its schema does not set ``additionalProperties``,
+    so extra keys validate.  Keeping it a real ``.lua`` file means it is
+    syntax-highlighted, reviewable, and testable under APISIX's own test-nginx
+    harness (``t/oidc_error_callback_recovery.t``).
+
     :param recoverable_errors: OAuth 2.0 ``error`` codes to restart the flow
         for.  Defaults to ``temporarily_unavailable``, which is 100% of what
-        production emits today.
+        production emits today.  An explicit empty list makes the plugin a
+        no-op, for turning it off without detaching it from every route that
+        references a shared plugin config.
     :param guard_cookie_name: Name of the loop-breaker cookie.
     :param guard_max_age: Seconds the guard cookie lives, bounding how often one
         browser can be sent back through login.
@@ -155,47 +175,6 @@ def oidc_error_callback_recovery_plugin(
     :returns: A ``serverless-pre-function`` plugin config to attach to routes.
     :rtype: OLApisixPluginConfig
     """
-    # `is None`, not `or`: an explicit empty list means "recover nothing",
-    # which is how a caller turns the plugin into a no-op without detaching it
-    # from every route that references the shared config.  `or` would quietly
-    # turn that back into the default.
-    errors = (
-        ["temporarily_unavailable"]
-        if recoverable_errors is None
-        else recoverable_errors
-    )
-    recoverable_table = ", ".join(f'["{error}"] = true' for error in errors)
-    recovery_function = f"""return function(conf, ctx)
-    local uri = ngx.var.uri
-    if not uri or not uri:match("%.apisix/redirect$") then
-        return
-    end
-    local core = require("apisix.core")
-    local args = core.request.get_uri_args(ctx)
-    if not args then
-        return
-    end
-    local err = args["error"]
-    if type(err) == "table" then
-        err = err[1]
-    end
-    local recoverable = {{{recoverable_table}}}
-    if not err or not recoverable[err] then
-        return
-    end
-    local cookie = ngx.var.http_cookie
-    if cookie then
-        for pair in cookie:gmatch("[^;]+") do
-            if pair:match("^%s*([^=%s]+)=") == "{guard_cookie_name}" then
-                return
-            end
-        end
-    end
-    core.log.warn("oidc callback error=", err, " uri=", uri, " restarting auth")
-    ngx.header["Set-Cookie"] = "{guard_cookie_name}=1; Path=/; Max-Age="
-        .. "{guard_max_age}" .. "; Secure; HttpOnly; SameSite=Lax"
-    return ngx.redirect((uri:gsub("%.apisix/redirect$", "")), 302)
-end"""
     return OLApisixPluginConfig(
         name="serverless-pre-function",
         secretRef=None,
@@ -204,7 +183,22 @@ end"""
         # outranks it (2599), so this gets to inspect the callback and bail out
         # before the plugin turns the error parameter into a 500.  In the access
         # phase it would run after openid-connect had already failed.
-        config={"phase": "rewrite", "functions": [recovery_function]},
+        config={
+            "phase": "rewrite",
+            "functions": [OIDC_ERROR_RECOVERY_LUA],
+            "oidc_error_recovery": {
+                # `is None`, not `or`: an explicit empty list means "recover
+                # nothing", and `or` would quietly turn that back into the
+                # default.
+                "recoverable_errors": (
+                    ["temporarily_unavailable"]
+                    if recoverable_errors is None
+                    else recoverable_errors
+                ),
+                "guard_cookie_name": guard_cookie_name,
+                "guard_max_age": guard_max_age,
+            },
+        },
     )
 
 

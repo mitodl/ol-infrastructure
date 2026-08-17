@@ -359,60 +359,69 @@ def test_recovery_plugin_runs_in_rewrite_before_openid_connect():
     assert plugin.config["phase"] == "rewrite"
 
 
-def test_recovery_plugin_only_recovers_transient_errors_by_default():
+def test_recovery_plugin_defaults_to_the_only_error_production_emits():
     """access_denied means the user pressed Cancel -- restarting the flow there
     would bounce the browser between the gateway and Keycloak.
     """
-    (lua,) = oidc_error_callback_recovery_plugin().config["functions"]
+    options = oidc_error_callback_recovery_plugin().config["oidc_error_recovery"]
 
-    assert '["temporarily_unavailable"] = true' in lua
-    assert "access_denied" not in lua
+    assert options["recoverable_errors"] == ["temporarily_unavailable"]
 
 
 def test_recovery_plugin_honours_a_custom_error_list():
-    (lua,) = oidc_error_callback_recovery_plugin(
+    options = oidc_error_callback_recovery_plugin(
         recoverable_errors=["temporarily_unavailable", "server_error"],
-    ).config["functions"]
+    ).config["oidc_error_recovery"]
 
-    assert '["temporarily_unavailable"] = true' in lua
-    assert '["server_error"] = true' in lua
+    assert options["recoverable_errors"] == ["temporarily_unavailable", "server_error"]
 
 
 def test_recovery_plugin_honours_an_explicit_empty_error_list():
     """An empty list means "recover nothing" -- the way to make the plugin a
     no-op without detaching it from every route on a shared config.
     """
-    (lua,) = oidc_error_callback_recovery_plugin(
+    options = oidc_error_callback_recovery_plugin(
         recoverable_errors=[],
+    ).config["oidc_error_recovery"]
+
+    assert options["recoverable_errors"] == []
+
+
+def test_recovery_plugin_passes_guard_settings_as_config():
+    """Tunables travel on the plugin config and are read off ``conf`` in Lua,
+    so nothing is interpolated into the shipped source.
+    """
+    options = oidc_error_callback_recovery_plugin(
+        guard_cookie_name="custom_guard",
+        guard_max_age=90,
+    ).config["oidc_error_recovery"]
+
+    assert options["guard_cookie_name"] == "custom_guard"
+    assert options["guard_max_age"] == 90
+
+
+def test_recovery_plugin_ships_the_lua_file_verbatim():
+    """The function body is the checked-in .lua file, not a generated string --
+    no configuration is interpolated into it.
+    """
+    (source,) = oidc_error_callback_recovery_plugin(
+        guard_cookie_name="custom_guard",
+        recoverable_errors=["server_error"],
     ).config["functions"]
 
-    assert "local recoverable = {}" in lua
-    assert "temporarily_unavailable" not in lua
+    assert source == apisix_module.OIDC_ERROR_RECOVERY_LUA
+    assert "custom_guard" not in source
+    assert "server_error" not in source
 
 
-def test_recovery_plugin_ignores_non_callback_requests():
-    """Attached to a host's shared plugin config, this sees every route."""
-    (lua,) = oidc_error_callback_recovery_plugin().config["functions"]
+def test_recovery_lua_reads_its_settings_off_conf():
+    """Guards the contract between the .lua file and the config block above."""
+    source = apisix_module.OIDC_ERROR_RECOVERY_LUA
 
-    assert 'uri:match("%.apisix/redirect$")' in lua
-
-
-def test_recovery_plugin_redirects_to_the_callback_s_parent_path():
-    """The parent of <login prefix>/.apisix/redirect is the auth-required route
-    that started the flow, so it re-enters authorization.
-    """
-    (lua,) = oidc_error_callback_recovery_plugin().config["functions"]
-
-    assert 'ngx.redirect((uri:gsub("%.apisix/redirect$", "")), 302)' in lua
-
-
-def test_recovery_plugin_breaks_redirect_loops_with_a_guard_cookie():
-    """A second callback with the same error must 500 rather than loop."""
-    (lua,) = oidc_error_callback_recovery_plugin(guard_max_age=90).config["functions"]
-
-    assert '== "apisix_oidc_recovery"' in lua
-    assert '"90"' in lua
-    assert "Max-Age=" in lua
+    assert "conf.oidc_error_recovery" in source
+    assert "opts.recoverable_errors" in source
+    assert "opts.guard_cookie_name" in source
+    assert "opts.guard_max_age" in source
 
 
 # ─── Shared plugin defaults ────────────────────────────────────────────────────
@@ -573,7 +582,17 @@ def test_recovery_plugin_renders_into_the_v2_plugin_config():
         recovery = plugin_named(spec["plugins"], "serverless-pre-function")
         assert recovery is not None
         assert recovery["config"]["phase"] == "rewrite"
-        assert "temporarily_unavailable" in recovery["config"]["functions"][0]
+        # The settings block is not part of serverless-pre-function's schema.
+        # It reaches the gateway because the CRD marks config
+        # x-kubernetes-preserve-unknown-fields, the controller holds it as raw
+        # apiextensionsv1.JSON, ADC as map[string]any, and APISIX's serverless
+        # schema does not set additionalProperties.  If a future version
+        # tightens any of those, this is the assertion that should fail first.
+        assert recovery["config"]["oidc_error_recovery"] == {
+            "recoverable_errors": ["temporarily_unavailable"],
+            "guard_cookie_name": "apisix_oidc_recovery",
+            "guard_max_age": 60,
+        }
 
     return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
 
