@@ -465,6 +465,51 @@ class OLApplicationK8sKedaWebappScalingConfig(BaseModel):
     )
 
 
+# Pod identity from the downward API. These are the names
+# mitol-django-observability already reads in _get_resource() to set the
+# k8s.pod.name / k8s.namespace.name / k8s.node.name resource attributes, and the
+# same three witan's observability module uses.
+POD_IDENTITY_FIELD_REFS: tuple[tuple[str, str], ...] = (
+    ("KUBERNETES_POD_NAME", "metadata.name"),
+    ("KUBERNETES_NAMESPACE", "metadata.namespace"),
+    ("KUBERNETES_NODE_NAME", "spec.nodeName"),
+)
+
+
+def build_application_env_vars(
+    application_config: dict[str, Any],
+) -> list[kubernetes.core.v1.EnvVarArgs]:
+    """Assemble the non-sensitive container env for an application deployment.
+
+    Ordering carries meaning and is the reason this is a separate function
+    rather than inline: the kubelet resolves a ``$(VAR)`` reference only against
+    entries defined EARLIER in the same container's env list, and
+    OTEL_RESOURCE_ATTRIBUTES refers to ``$(KUBERNETES_POD_NAME)`` for
+    service.instance.id. Emit the downward-API entries after the application
+    config and that reference silently ships as the literal seven characters --
+    which is exactly the bug this replaced.
+    """
+    env_vars = [
+        kubernetes.core.v1.EnvVarArgs(
+            name=env_var_name,
+            value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                field_ref=kubernetes.core.v1.ObjectFieldSelectorArgs(
+                    field_path=field_path,
+                ),
+            ),
+        )
+        for env_var_name, field_path in POD_IDENTITY_FIELD_REFS
+    ]
+    env_vars.extend(
+        kubernetes.core.v1.EnvVarArgs(name=k, value=v)
+        for k, v in application_config.items()
+    )
+    env_vars.append(
+        kubernetes.core.v1.EnvVarArgs(name="PORT", value=str(DEFAULT_WSGI_PORT))
+    )
+    return env_vars
+
+
 class OLApplicationK8sConfig(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -1166,39 +1211,8 @@ class OLApplicationK8s(ComponentResource):
                 )
             )
 
-        # Pod identity from the downward API. These are the names
-        # mitol-django-observability already reads in _get_resource() to set the
-        # k8s.pod.name / k8s.namespace.name / k8s.node.name resource attributes,
-        # and the same three witan's observability module uses.
-        #
-        # These MUST be appended before the application_config loop below: the
-        # kubelet resolves a $(VAR) reference only against entries defined
-        # earlier in the same env list, and OTEL_RESOURCE_ATTRIBUTES refers to
-        # $(KUBERNETES_POD_NAME) for service.instance.id.
-        application_deployment_env_vars = [
-            kubernetes.core.v1.EnvVarArgs(
-                name=env_var_name,
-                value_from=kubernetes.core.v1.EnvVarSourceArgs(
-                    field_ref=kubernetes.core.v1.ObjectFieldSelectorArgs(
-                        field_path=field_path,
-                    ),
-                ),
-            )
-            for env_var_name, field_path in (
-                ("KUBERNETES_POD_NAME", "metadata.name"),
-                ("KUBERNETES_NAMESPACE", "metadata.namespace"),
-                ("KUBERNETES_NODE_NAME", "spec.nodeName"),
-            )
-        ]
-        for k, v in (ol_app_k8s_config.application_config).items():
-            application_deployment_env_vars.append(
-                kubernetes.core.v1.EnvVarArgs(
-                    name=k,
-                    value=v,
-                )
-            )
-        application_deployment_env_vars.append(
-            kubernetes.core.v1.EnvVarArgs(name="PORT", value=str(DEFAULT_WSGI_PORT))
+        application_deployment_env_vars = build_application_env_vars(
+            ol_app_k8s_config.application_config
         )
         # Build a list of sensitive env vars for the deployment config via envFrom
         application_deployment_envfrom = []
