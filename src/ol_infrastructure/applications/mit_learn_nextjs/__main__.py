@@ -182,24 +182,34 @@ raw_env_vars = {
     "NEXT_PUBLIC_FEATURE_home_page_recommendation_bot": "true",  # pragma: allowlist secret  # noqa: E501
     # OpenTelemetry — server-side only (no NEXT_PUBLIC_ prefix).
     # OTEL_EXPORTER_OTLP_ENDPOINT is the base URL; the Node.js SDK appends /v1/traces.
-    # OTEL_TRACES_SAMPLER_ARG is read by sentry.server.config.ts as tracesSampleRate.
     # OTEL_RESOURCE_ATTRIBUTES is read by Sentry's OTEL provider for span metadata.
     #
-    # The following three vars are set here for consistency with other applications
-    # but are NOT read by the Next.js Sentry-managed OTEL provider:
-    #   OTEL_TRACES_SAMPLER  — Sentry uses SentrySampler (not the standard OTEL
-    #                          env var), which already implements parent-based sampling
-    #                          by inheriting a sampled traceparent before applying the
-    #                          tracesSampleRate fallback.
+    # OTEL_TRACES_SAMPLER_ARG is read by instrumentation-node.ts as Sentry's
+    # tracesSampleRate. Sentry owns the OTEL provider, so this governs whether a
+    # span is CREATED — a span it drops reaches neither Sentry nor the OTLP
+    # exporter. It is therefore a ceiling over both destinations, not a Tempo
+    # dial, which is why it is 1.0 rather than the 0.25 used by the Python
+    # services. Sampling for each destination happens downstream and
+    # independently: the Grafana Alloy tail sampler decides what Tempo keeps,
+    # and NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE (0.001, above) decides what
+    # Sentry keeps. Head-sampling here would also degrade the tail sampler,
+    # which needs whole traces to decide.
+    #
+    # OTEL_TRACES_SAMPLER is deliberately NOT set: Sentry's SentrySampler ignores
+    # it and implements parent-based sampling itself. Setting it looked like
+    # config but did nothing, so it is a trap for the next person tuning this.
+    # instrumentation-node.ts now warns at startup if it reappears.
+    #
+    # These two are set for consistency with other applications but are likewise
+    # NOT read by the Sentry-managed OTEL provider:
     #   OTEL_PROPAGATORS     — Sentry sets its own composite propagator (W3C
     #                          tracecontext + baggage + Sentry) internally.
     #   OTEL_EXPORTER_OTLP_PROTOCOL — the OTLPTraceExporter is instantiated directly
-    #                          in sentry.server.config.ts; protocol negotiation is
+    #                          in instrumentation-node.ts; protocol negotiation is
     #                          handled by the exporter's own defaults.
     "OTEL_SERVICE_NAME": "learn-nextjs",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318",
-    "OTEL_TRACES_SAMPLER": "parentbased_traceidratio",
-    "OTEL_TRACES_SAMPLER_ARG": "0.25",
+    "OTEL_TRACES_SAMPLER_ARG": "1.0",
     "OTEL_PROPAGATORS": "tracecontext,baggage",
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
     "OTEL_RESOURCE_ATTRIBUTES": (
