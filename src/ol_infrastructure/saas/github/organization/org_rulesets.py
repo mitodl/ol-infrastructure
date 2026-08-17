@@ -102,6 +102,11 @@ _ADMIN_BYPASS = [
         actor_id=github_teams["arbisoft-contractors"].id.apply(int),
         bypass_mode="pull_request",
     ),
+    github.OrganizationRulesetBypassActorArgs(
+        actor_type="Team",
+        actor_id=github_teams["odl-engineering"].id.apply(int),
+        bypass_mode="pull_request",
+    ),
 ]
 
 #: `~DEFAULT_BRANCH` is GitHub's alias for whatever each repo's default branch is,
