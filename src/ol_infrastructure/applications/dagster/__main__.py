@@ -1455,8 +1455,10 @@ dagster_run_priority_class = kubernetes.scheduling.v1.PriorityClass(
 # Nothing could recover on its own because every recovery path needed the
 # connection that was unavailable.
 #
-# Defaulting to 100 keeps production exactly as it was; QA sets a lower value
-# in its stack config.
+# Production sets 80 and QA 20 in stack config, both sized against their own
+# connection budgets. The 100 here is only a fallback for stacks that set
+# nothing; a stack on a small instance class should set its own value rather
+# than inherit this one.
 dagster_max_concurrent_runs = dagster_config.get_int("max_concurrent_runs") or 100
 
 # Custom Dagster instance ConfigMap with dynamic credentials support
