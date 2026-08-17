@@ -1290,7 +1290,11 @@ collectors:
         values: [p50, p95, max]
         query_ref: recent_run_waits
 
-      - metric_name: dagster_recent_runs_total
+      # No _total suffix on any of the three window metrics below. They are gauges
+      # over a sliding id window, so they fall as runs leave the window -- and _total
+      # tells a consumer this is a monotonic counter, which invites rate() and makes
+      # every ordinary decrease look like a counter reset.
+      - metric_name: dagster_recent_runs
         type: gauge
         help: "Runs in the recent window that reached a terminal state, by status."
         key_labels: [status]
@@ -1305,7 +1309,7 @@ collectors:
               GROUP BY status
           ) AS r ON r.status = s.status
 
-      - metric_name: dagster_recent_retried_runs_total
+      - metric_name: dagster_recent_retried_runs
         type: gauge
         help: "Runs in the recent window carrying a dagster/retry_number tag."
         values: [runs]
@@ -1318,13 +1322,18 @@ collectors:
           WHERE r.id > (SELECT max(id) - {SQL_EXPORTER_RUN_WINDOW} FROM runs)
             AND rt.key = 'dagster/retry_number'
 
-      - metric_name: dagster_recent_job_ticks_total
+      - metric_name: dagster_recent_job_ticks
         type: gauge
         help: "Sensor and schedule ticks in the recent window, by type and status."
         key_labels: [tick_type, status]
         values: [ticks]
         # A sensor that starts erroring stops launching runs and says nothing;
         # the only evidence is FAILURE ticks piling up in this table.
+        #
+        # STARTED is the fourth member of dagster's TickStatus enum and is
+        # persisted like the rest. Leaving it out would drop exactly the ticks
+        # that are in flight or wedged mid-evaluation -- the interesting ones --
+        # from a metric that claims to break ticks down by status.
         query: |
           SELECT c.type AS tick_type, c.status AS status,
                  coalesce(x.n, 0) AS ticks
@@ -1332,8 +1341,8 @@ collectors:
               SELECT t.type, s.status
               FROM (VALUES ('SENSOR'), ('SCHEDULE'),
                            ('AUTO_MATERIALIZE')) AS t (type)
-              CROSS JOIN (VALUES ('SUCCESS'), ('FAILURE'),
-                                 ('SKIPPED')) AS s (status)
+              CROSS JOIN (VALUES ('SUCCESS'), ('FAILURE'), ('SKIPPED'),
+                                 ('STARTED')) AS s (status)
           ) AS c
           LEFT JOIN (
               SELECT type, status, count(*) AS n
@@ -1395,6 +1404,26 @@ collectors:
 # uses. The readonly role grants SELECT and nothing else, which is all of these
 # queries need -- including pg_total_relation_size, confirmed by running the whole
 # collector against a role holding only SELECT.
+#
+# The role is selected by `path` alone. An earlier version of this also passed
+# refresh_after, revoke_on_delete and role_name, copied from dagster_db_secret
+# above -- all three are inert and were removed rather than left to imply a
+# rotation and revocation policy that is not in effect:
+#
+#   refresh_after     is a real field on the config model, but OLVaultK8SSecret
+#                     only renders spec.refreshAfter for STATIC secrets. Moot
+#                     regardless: VSO documents the source lease duration as
+#                     taking precedence whenever it is greater than 0, and this
+#                     mount issues 3-month leases (OLVaultDatabaseConfig
+#                     default_ttl = ONE_MONTH_SECONDS * 3).
+#   revoke_on_delete  is not a field on the config model at all, so Pydantic
+#                     drops it silently. VSO does support spec.revoke; the
+#                     component never renders it, so deleting this resource
+#                     leaves the lease valid for the rest of its TTL. That gap
+#                     is repo-wide, not specific to this resource, and is worth
+#                     fixing in OLVaultK8SSecret rather than here.
+#   role_name         is not a field either, and VSO has no such concept -- the
+#                     Vault role is the last path segment.
 dagster_sql_exporter_db_secret = OLVaultK8SSecret(
     f"dagster-k8s-sql-exporter-db-secret-{stack_info.env_suffix}",
     resource_config=OLVaultK8SDynamicSecretConfig(
@@ -1405,13 +1434,10 @@ dagster_sql_exporter_db_secret = OLVaultK8SSecret(
         name="dagster-sql-exporter-postgresql-secret",
         namespace=dagster_namespace,
         path="creds/readonly",
-        refresh_after="1h",
-        # The DSN is assembled from these at container start, so a rotation only
-        # reaches the process when the pod restarts.
+        # The DSN is assembled from these at container start, so a new credential
+        # only reaches the process when the pod restarts.
         restart_target_kind="Deployment",
         restart_target_name="dagster-sql-exporter",
-        revoke_on_delete=True,
-        role_name="readonly",
         vaultauth=dagster_auth_binding.vault_k8s_resources.auth_name,
         templates={
             "PGUSER": "{{ .Secrets.username }}",

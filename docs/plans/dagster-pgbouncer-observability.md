@@ -354,9 +354,9 @@ Eight gauges, all under a 10s `statement_timeout` and a 2-connection ceiling:
 | `dagster_runs_in_flight{status}` | is `max_concurrent_runs` binding |
 | `dagster_oldest_queued_run_age_seconds` | healthy burst vs. stuck coordinator |
 | `dagster_run_wait_to_start_seconds{quantile}` | p50 / p95 / max wait to start |
-| `dagster_recent_runs_total{status}` | failure rate over the recent window |
-| `dagster_recent_retried_runs_total` | chronic failure masked by `max_retries = 3` |
-| `dagster_recent_job_ticks_total{tick_type,status}` | silently erroring sensors/schedules |
+| `dagster_recent_runs{status}` | failure rate over the recent window |
+| `dagster_recent_retried_runs` | chronic failure masked by `max_retries = 3` |
+| `dagster_recent_job_ticks{tick_type,status}` | silently erroring sensors/schedules |
 | `dagster_daemon_heartbeat_age_seconds{daemon_type}` | the 08-10 symptom, measured directly |
 | `dagster_relation_bytes{relation}` | event-log growth |
 
@@ -378,10 +378,26 @@ Three implementation findings worth keeping, all from testing rather than readin
   `invalid command-line argument for server process: -c`. Confirmed the timeout actually
   reaches the backend by setting it to 1ms and watching every query return `57014`.
 
+The three window metrics carry **no `_total` suffix**. They are gauges over a sliding id
+window and fall as runs leave it; `_total` announces a monotonic counter, which invites
+`rate()` and makes every ordinary decrease look like a counter reset.
+
 The exporter authenticates with `postgres-dagster/creds/readonly` — SELECT and nothing
 more, which covers even `pg_total_relation_size`, verified by running the whole collector
 under a role holding only SELECT. `dagster_server_policy.hcl` had to be widened; it
 granted `creds/app` only.
+
+**`OLVaultK8SSecret` never renders `spec.revoke`, so no dynamic secret in this repo
+revokes its lease on deletion.** Found while reviewing this PR. `revoke_on_delete=True`
+and `role_name=...` are passed at several call sites (including the pre-existing
+`dagster_db_secret`) but are not fields on the config model, so Pydantic drops them
+silently — the intent reads as expressed and none of it is in effect. `refresh_after` is
+a real field but is only rendered for *static* secrets, and would be overridden by the
+lease duration anyway. On `postgres-dagster` that lease is 3 months
+(`OLVaultDatabaseConfig.default_ttl = ONE_MONTH_SECONDS * 3`), so a deleted
+VaultDynamicSecret leaves working database credentials behind for up to a quarter. VSO
+1.5.1 does support `spec.revoke`; the component simply does not emit it. Repo-wide fix,
+tracked separately.
 
 One deliberate omission from the table above: per-code-location failure rate. The join
 from `runs` to `run_tags` for every run in the window is the most expensive query in the
