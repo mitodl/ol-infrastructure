@@ -449,6 +449,13 @@ not appear in the rendered docs):
 This overlaps with what the SQL exporter provides and is strictly less rich (no queue
 time, no retry attribution), so treat it as a cheap stopgap rather than a substitute.
 
+✅ Done 2026-08-17. Re-confirmed against chart **4.4.0** (the version above was 4.3.2):
+the path and the list-replacement trap both hold, `kube-state-metrics` is now 8.1.3, and
+rendering the chart shows
+`--metric-labels-allowlist=nodes=[…],jobs=[dagster/code-location,dagster/job]`. The
+premise was checked live as well — all 829 Jobs in the `dagster` namespace on
+data-production carry `dagster/code-location`, `dagster/job` and `dagster/run-id`.
+
 ## Suggested sequencing
 
 0. **Cap the aggregate connection count.** Set `max_db_connections` so that
