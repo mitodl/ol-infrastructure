@@ -20,8 +20,11 @@
 return function(conf, ctx)
     local uri = ngx.var.uri
     -- Attached to a host's shared plugin config, so this runs on every route on
-    -- the host. APISIX's callback always sits at <login prefix>/.apisix/redirect.
-    if not uri or not uri:match("%.apisix/redirect$") then
+    -- the host. APISIX's callback always sits at <login prefix>/.apisix/redirect,
+    -- and the leading slash is part of the match: without it this also catches
+    -- application paths that merely end in the same characters, such as
+    -- /login/foo.apisix/redirect, and would redirect them.
+    if not uri or not uri:match("/%.apisix/redirect$") then
         return
     end
 
@@ -74,5 +77,8 @@ return function(conf, ctx)
     -- one, so its parent path re-enters the authorization flow that just failed.
     -- Deriving the target here is what lets one attachment cover every route
     -- group on a host (mit-learn serves both /login and /learn/login).
+    --
+    -- Note this strips `.apisix/redirect` and keeps the slash the match above
+    -- required, so /login/.apisix/redirect yields /login/ rather than /login.
     return ngx.redirect((uri:gsub("%.apisix/redirect$", "")), 302)
 end

@@ -163,6 +163,18 @@ def test_non_callback_routes_are_untouched():
     assert uri is None
 
 
+def test_a_path_merely_ending_in_the_callback_suffix_is_untouched():
+    """The suffix match includes the leading slash, so an application path that
+    happens to end in the same characters is not treated as a callback.
+    """
+    uri, _, _ = Harness().callback(
+        "/login/foo.apisix/redirect",
+        {"error": "temporarily_unavailable"},
+    )
+
+    assert uri is None
+
+
 def test_callback_without_an_error_parameter_is_untouched():
     uri, _, _ = Harness().callback("/login/.apisix/redirect", {})
 

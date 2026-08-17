@@ -175,3 +175,27 @@ GET /t/login/.apisix/redirect?error=temporarily_unavailable&error=other&state=x
 --- error_code: 302
 --- response_headers
 Location: /t/login/
+
+
+=== TEST 7: a path merely ending in the callback suffix is untouched
+--- config
+    location /t {
+        rewrite_by_lua_block {
+            local recover = require("apisix.plugins.ol.oidc_error_callback_recovery")
+            local conf = {
+                oidc_error_recovery = {
+                    recoverable_errors = {"temporarily_unavailable"},
+                    guard_cookie_name = "apisix_oidc_recovery",
+                    guard_max_age = 60,
+                },
+            }
+            recover(conf, {var = {}})
+        }
+        content_by_lua_block {
+            ngx.say("passed through")
+        }
+    }
+--- request
+GET /t/login/foo.apisix/redirect?error=temporarily_unavailable&state=x
+--- response_body
+passed through

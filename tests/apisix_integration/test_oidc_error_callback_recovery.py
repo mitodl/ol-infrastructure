@@ -128,6 +128,19 @@ def test_other_routes_on_the_host_are_left_alone(callback):
     assert status != HTTP_FOUND
 
 
+def test_a_path_merely_ending_in_the_callback_suffix_is_left_alone(callback):
+    """The suffix match includes the leading slash. Without it an application
+    path such as /login/foo.apisix/redirect also matches, and — since this is
+    attached host-wide — real requests would get redirected.
+    """
+    status, _ = callback(
+        path="/login/foo.apisix/redirect",
+        query=EXPIRED_SESSION,
+    )
+
+    assert status != HTTP_FOUND
+
+
 def test_repeated_error_parameter_is_handled(callback):
     """?error=a&error=b makes get_uri_args return a table rather than a string;
     indexing it as a string would error out inside the rewrite phase.
