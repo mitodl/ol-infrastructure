@@ -82,7 +82,7 @@ def create(
                 labels={"severity": "warning"},
                 annotations={
                     "summary": "Dagster PgBouncer in cluster {{ $labels.cluster }} is holding {{ $value }} of its aggregate connection cap",
-                    "description": "PgBouncer's server connections across all replicas in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} have exceeded 75% of the aggregate max_db_connections cap. Past the cap, PgBouncer queues clients rather than opening more backends, and query_wait_timeout is 0, so those clients wait indefinitely instead of erroring -- check DagsterPgBouncerClientsWaiting. Either demand has genuinely grown (raise pgbouncer_replica_count or the RDS instance class, which raises the derived cap with it) or something is holding sessions open: pool_mode is session, so a client that stays connected pins its backend for as long as it lives.",
+                    "description": "PgBouncer's server connections across all replicas in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} have exceeded 75% of the aggregate max_db_connections cap. Past the cap, PgBouncer queues clients rather than opening more backends, and query_wait_timeout is 600, so a client that cannot be served within 10 minutes is disconnected and Dagster sees a connection error -- check DagsterPgBouncerClientsWaiting. Either demand has genuinely grown (raise pgbouncer_replica_count or the RDS instance class, which raises the derived cap with it) or something is holding sessions open: pool_mode is session, so a client that stays connected pins its backend for as long as it lives.",
                 },
                 datas=rd(
                     "sum by (cluster, namespace) "
@@ -101,7 +101,7 @@ def create(
                 labels={"severity": "critical"},
                 annotations={
                     "summary": "Dagster PgBouncer in cluster {{ $labels.cluster }} is holding {{ $value }} of its aggregate connection cap",
-                    "description": "PgBouncer's server connections across all replicas in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} have exceeded 75% of the aggregate max_db_connections cap. Past the cap, PgBouncer queues clients rather than opening more backends, and query_wait_timeout is 0, so those clients wait indefinitely instead of erroring -- check DagsterPgBouncerClientsWaiting. Either demand has genuinely grown (raise pgbouncer_replica_count or the RDS instance class, which raises the derived cap with it) or something is holding sessions open: pool_mode is session, so a client that stays connected pins its backend for as long as it lives.",
+                    "description": "PgBouncer's server connections across all replicas in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} have exceeded 75% of the aggregate max_db_connections cap. Past the cap, PgBouncer queues clients rather than opening more backends, and query_wait_timeout is 600, so a client that cannot be served within 10 minutes is disconnected and Dagster sees a connection error -- check DagsterPgBouncerClientsWaiting. Either demand has genuinely grown (raise pgbouncer_replica_count or the RDS instance class, which raises the derived cap with it) or something is holding sessions open: pool_mode is session, so a client that stays connected pins its backend for as long as it lives.",
                 },
                 datas=rd(
                     "sum by (cluster, namespace) "
@@ -116,12 +116,12 @@ def create(
             # The headroom rule above says the pool is close to full; this one says
             # the fullness is costing something. It is a separate rule rather than a
             # tighter threshold on the same one because the cap converts database
-            # exhaustion into in-pool queuing by design, and query_wait_timeout = 0
-            # (chosen so clients ride out RDS checkpoint I/O instead of getting
-            # "server closed the connection unexpectedly") makes that queue
-            # unbounded. Without this rule a wedged pool is indistinguishable from a
-            # healthy idle one from the client's side: nothing errors, nothing
-            # retries, work simply stops.
+            # exhaustion into in-pool queuing by design, and query_wait_timeout
+            # (600s, chosen so clients ride out RDS checkpoint I/O instead of
+            # getting "server closed the connection unexpectedly") means a
+            # saturated pool spends ten minutes looking healthy before it starts
+            # failing queries. Without this rule that window is invisible: the
+            # client side shows nothing wrong until work begins to drop.
             #
             # maxwait is instantaneous -- the age of the oldest client currently in
             # the queue, reset when the queue drains -- so a value that stays high is
@@ -135,7 +135,7 @@ def create(
                 labels={"severity": "warning"},
                 annotations={
                     "summary": "Dagster PgBouncer clients in cluster {{ $labels.cluster }} have been queued for {{ $value }}s waiting for a backend",
-                    "description": "The oldest client waiting for a server connection in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been queued for over 5 seconds for 10 minutes. Queries through this pool normally complete in under a millisecond. query_wait_timeout is 0, so these clients will wait indefinitely rather than failing -- Dagster will appear hung rather than erroring. Check SHOW POOLS on the pods: sv_idle at 0 with sv_active at the cap means every backend is pinned by a live session.",
+                    "description": "The oldest client waiting for a server connection in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been queued for over 5 seconds for 10 minutes. Queries through this pool normally complete in under a millisecond. query_wait_timeout is 600, so a client still unserved at 10 minutes is disconnected and the query fails. Sustained waiting at this level means the pool is saturated and Dagster work is being dropped, not merely slowed. Check SHOW POOLS on the pods: sv_idle at 0 with sv_active at the cap means every backend is pinned by a live session.",
                 },
                 datas=rd(
                     "max by (cluster, namespace) "
@@ -151,7 +151,7 @@ def create(
                 labels={"severity": "critical"},
                 annotations={
                     "summary": "Dagster PgBouncer clients in cluster {{ $labels.cluster }} have been queued for {{ $value }}s waiting for a backend",
-                    "description": "The oldest client waiting for a server connection in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been queued for over 5 seconds for 10 minutes. Queries through this pool normally complete in under a millisecond. query_wait_timeout is 0, so these clients will wait indefinitely rather than failing -- Dagster will appear hung rather than erroring. Check SHOW POOLS on the pods: sv_idle at 0 with sv_active at the cap means every backend is pinned by a live session.",
+                    "description": "The oldest client waiting for a server connection in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been queued for over 5 seconds for 10 minutes. Queries through this pool normally complete in under a millisecond. query_wait_timeout is 600, so a client still unserved at 10 minutes is disconnected and the query fails. Sustained waiting at this level means the pool is saturated and Dagster work is being dropped, not merely slowed. Check SHOW POOLS on the pods: sv_idle at 0 with sv_active at the cap means every backend is pinned by a live session.",
                 },
                 datas=rd(
                     "max by (cluster, namespace) "
