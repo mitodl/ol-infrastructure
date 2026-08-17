@@ -156,9 +156,28 @@ baseline_default_branch = github.OrganizationRuleset(
         # No force-pushing over the default branch, and no deleting it.
         non_fast_forward=True,
         deletion=True,
+        # `dismiss_stale_reviews_on_push` DROPPED 2026-08-17 (Tobias) on the grounds
+        # that it confuses contributors more than it protects anything. It silently
+        # revoked an approval that was visibly green a moment earlier, with the trigger
+        # being any push at all -- a rebase, a lint fix, a typo in a comment -- so the
+        # common experience was a PR bouncing back to "review required" for a change
+        # nobody needed to re-read. Nothing here replaces it: this ruleset now asserts
+        # only that SOME approval exists.
+        #
+        # It is not the last line of defence against merging unreviewed code.
+        # `tier-1-hardening` still sets `require_last_push_approval`, which blocks the
+        # merge outright when the newest push is unapproved -- a stricter rule, and the
+        # one actually doing the work on the 74 tier-1 repos. The gap this opens is on
+        # `standard`-tier repos, which get no equivalent: there, an approval now
+        # survives every subsequent push.
+        # MUST be an explicit `False`, not an omitted argument. The provider treats the
+        # field as optional-and-computed, so deleting the line previews as
+        # "20 unchanged" -- the rule stays live in GitHub while the code reads as
+        # though it were gone. Verified 2026-08-17: omitting produced no diff at all,
+        # `False` produces `dismissStaleReviewsOnPush: true => false`.
         pull_request=github.OrganizationRulesetRulesPullRequestArgs(
             required_approving_review_count=1,
-            dismiss_stale_reviews_on_push=True,
+            dismiss_stale_reviews_on_push=False,
         ),
     ),
     opts=ResourceOptions(protect=True),
@@ -218,8 +237,11 @@ tier_one_hardening = github.OrganizationRuleset(
 #
 # Resolved by DELETING that repo's classic protection entirely (Tobias, 2026-08-17) --
 # every protection it asserted was already met or exceeded here (`baseline` matches its
-# review count and adds dismiss-stale, `tier-1-hardening` adds last-push approval and
-# thread resolution, both cover force-push and deletion). Only `block_creations` was
+# review count, `tier-1-hardening` adds last-push approval and thread resolution, both
+# cover force-push and deletion). That repo's classic protection had
+# `dismiss_stale_reviews: false` anyway, so dropping the ruleset's
+# `dismiss_stale_reviews_on_push` later the same day took nothing away from it that the
+# deletion had not already matched. Only `block_creations` was
 # lost, which is inert on a branch that already exists. The remaining 26 repos have not
 # been swept; SEC-16 in audit.py now reports this class of block instead of leaving it
 # to be found by a contractor with a stuck PR.
