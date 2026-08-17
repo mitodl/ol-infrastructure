@@ -46,6 +46,7 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
     "applications/concourse/": [],
     "applications/dagster/": [
         "DAGSTER_CHART_VERSION",
+        "PGBOUNCER_EXPORTER_VERSION",
         "PGBOUNCER_VERSION",
     ],
     "applications/digital_credentials/": [],

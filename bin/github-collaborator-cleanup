@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+"""Delete direct collaborator grants that cost the holder nothing (SEC-06 wave 1).
+
+`repository.py` does not emit `RepositoryCollaborator` resources at all -- the target
+state is zero direct grants (plan §4.7), and the provider schema carries no documented
+import for the resource anyway. So this is not a Pulumi diff; it is a live mutation
+over `DELETE /repos/{owner}/{repo}/collaborators/{username}`, authenticated as the
+`ol-infrastructure-as-code` App installation (same credential `bin/github-estate-audit
+access` reads with).
+
+Only `redundant`, `level-only` and `owner-implicit` grants are ever touched --
+`ol_infrastructure.saas.github.audit.REMOVABLE_KINDS`. `no-access` (the direct grant
+is the only path in) and `outside` (not an org member) are never acted on here; both
+need a different decision first.
+
+VERIFY IMMEDIATELY BEFORE ACTING, NOT FROM A STALE REPORT. `apply` re-classifies from
+a fresh `audit.fetch_rosters()` call of its own -- it does not accept a plan file from
+an earlier run -- because team rosters are not committed and change without any commit
+landing here. Someone leaving a team between a `plan` run and `apply` turns a
+`redundant` grant into `no-access`; classifying fresh right before deleting is what
+keeps that window closed.
+
+    uv run bin/github-collaborator-cleanup plan             # read-only, always safe
+    uv run bin/github-collaborator-cleanup apply             # dry-run without --yes
+    uv run bin/github-collaborator-cleanup apply --yes       # actually deletes
+    uv run bin/github-collaborator-cleanup apply --yes --kind redundant
+"""
+
+import sys
+from pathlib import Path
+from typing import Annotated, Any
+
+import cyclopts
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from ol_infrastructure.saas.github import audit
+from ol_infrastructure.saas.github.repositories import archetypes
+
+app = cyclopts.App(help="Delete SEC-06 direct-collaborator grants that cost nothing.")
+
+Kind = Annotated[
+    audit.RemovableKind | None,
+    cyclopts.Parameter(help="Restrict to one removable kind. Default: all three."),
+]
+
+
+def _classify_removable(kind: str | None) -> list[dict[str, Any]]:
+    fleet = archetypes.load_fleet()
+    rosters, members, parents, owners = audit.fetch_rosters()
+    rows = audit.classify_direct_grants(fleet, rosters, members, parents, owners)
+    removable = audit.REMOVABLE_KINDS if kind is None else {kind}
+    # Defense in depth, not redundant with the `Kind` annotation above: that only
+    # gates the CLI's own argument parser. Anything calling `_classify_removable`
+    # programmatically -- a test, a future script -- bypasses cyclopts entirely, and
+    # `no-access`/`outside` sailing through here is exactly the failure mode this
+    # tool exists to prevent (deleting a grant that is someone's only path in).
+    if not removable <= audit.REMOVABLE_KINDS:
+        message = (
+            f"kind={kind!r} is not a removable kind "
+            f"({sorted(audit.REMOVABLE_KINDS)}); refusing to classify against it"
+        )
+        raise ValueError(message)
+    return sorted(
+        (r for r in rows if r["kind"] in removable),
+        key=lambda r: (r["repo"], r["login"]),
+    )
+
+
+def _print_plan(rows: list[dict[str, Any]]) -> None:
+    for row in rows:
+        tag = " [archived]" if row["archived"] else ""
+        print(
+            f"  {row['repo']:38}{tag:11} {row['login']:22} "
+            f"{row['role']:8} ({row['kind']})"
+        )
+    from collections import Counter  # noqa: PLC0415
+
+    kinds = Counter(r["kind"] for r in rows)
+    print(f"\n{len(rows)} grant(s) to delete: {dict(kinds)}")
+
+
+@app.command
+def plan(*, kind: Kind = None) -> int:
+    """Print every currently-removable direct grant. Read-only, hits the API."""
+    rows = _classify_removable(kind)
+    _print_plan(rows)
+    return 0
+
+
+@app.command
+def apply(
+    *,
+    kind: Kind = None,
+    yes: Annotated[
+        bool, cyclopts.Parameter(help="Actually delete. Without this, dry-run only.")
+    ] = False,
+) -> int:
+    """Re-classify fresh, then delete every removable grant found.
+
+    Fetches its own live classification rather than reusing a `plan` run's output --
+    see the module docstring for why that staleness window matters.
+    """
+    rows = _classify_removable(kind)
+    _print_plan(rows)
+    if not rows:
+        return 0
+    if not yes:
+        print("\nDry run -- pass --yes to actually delete these grants.")
+        return 0
+
+    import httpx  # noqa: PLC0415 -- only `apply --yes` needs the API
+
+    from ol_infrastructure.lib.github_helper import (  # noqa: PLC0415
+        API_HEADERS,
+        GITHUB_API,
+        get_installation_token,
+    )
+
+    token = get_installation_token()
+    failures: list[str] = []
+    print()
+    with httpx.Client(
+        base_url=GITHUB_API,
+        headers={**API_HEADERS, "Authorization": f"Bearer {token}"},
+        timeout=60,
+        follow_redirects=True,
+    ) as client:
+        for row in rows:
+            repo, login = row["repo"], row["login"]
+            response = client.delete(f"/repos/mitodl/{repo}/collaborators/{login}")
+            if response.status_code == httpx.codes.NO_CONTENT:
+                print(f"  deleted  {repo}:{login}")
+            else:
+                detail = f"{repo}:{login} -> HTTP {response.status_code} {response.text[:200]}"
+                print(f"  FAILED   {detail}")
+                failures.append(detail)
+
+    print(f"\n{len(rows) - len(failures)}/{len(rows)} grant(s) deleted.")
+    if failures:
+        print("Failures:")
+        for f in failures:
+            print(f"  {f}")
+        return 1
+    print(
+        "\nNext: refresh the crawl (`uv run bin/github-org-inventory crawl "
+        "--refresh`) so `_direct_collaborators` in data/repos/ reflects reality, "
+        "then commit that data update."
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    app()

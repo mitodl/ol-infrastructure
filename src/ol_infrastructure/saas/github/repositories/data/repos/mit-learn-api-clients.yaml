@@ -3,14 +3,13 @@ _custom_properties:
   tier: tier-1
 _excluded_environments: 1
 _has_branch_protection: false
-_pushed_at: '2026-08-06T12:25:50Z'
-_ruleset_count: 0
+_pushed_at: '2026-08-13T13:03:19Z'
+_ruleset_count: 2
 _visibility: public
 allow_merge_commit: false
 allow_rebase_merge: false
 allow_squash_merge: true
 archetype: library
-dependabot_security_updates: false
 has_discussions: false
 has_projects: true
 merge_commit_message: PR_TITLE

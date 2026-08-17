@@ -3,12 +3,10 @@ _actions_secret_names:
 - SEMANTIC_RELEASE_GITHUB_TOKEN
 _custom_properties:
   tier: tier-1
-_direct_collaborators:
-  ChristopherChudzicki: admin
 _excluded_environments: 2
 _has_branch_protection: true
-_pushed_at: '2026-08-07T12:50:46Z'
-_ruleset_count: 1
+_pushed_at: '2026-08-13T21:11:00Z'
+_ruleset_count: 3
 _visibility: public
 allow_auto_merge: false
 allow_merge_commit: false
@@ -16,7 +14,6 @@ allow_rebase_merge: false
 allow_squash_merge: true
 archetype: library
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: Design system components for MITODL Projects
 has_discussions: false
 has_projects: true

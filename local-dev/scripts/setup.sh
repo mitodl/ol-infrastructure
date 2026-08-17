@@ -6,6 +6,7 @@
 #   2. Creates the k3d cluster (local-dev) with local image registry
 #   3. Generates mkcert TLS certificates for all local .dev hostnames
 #   4. Adds /etc/hosts entries for all local hostnames
+#      (--skip-hosts prints the entries instead of writing them)
 #
 # What this script does NOT do:
 #   - Install in-cluster resources (Pulumi owns all of those; run `tilt up`)
@@ -45,7 +46,17 @@ HOSTS=(
     "sso.ol.${ROOT_DOMAIN}"
     # Mailpit (captured outbound email)
     "mail.${ROOT_DOMAIN}"
+    # Grafana (logs from every local-dev service)
+    "grafana.${ROOT_DOMAIN}"
 )
+
+# k3d load balancer always listens on 127.0.0.1 for the exposed ports
+INGRESS_IP="127.0.0.1"
+
+# Markers delimiting the managed block inside /etc/hosts (and, on WSL, the
+# Windows hosts file) so it can be rewritten idempotently.
+HOSTS_BLOCK_START="# BEGIN local-dev local-dev"
+HOSTS_BLOCK_END="# END local-dev local-dev"
 
 # mkcert wildcard SANs — one wildcard per subdomain level needed.
 MKCERT_DOMAINS=(
@@ -207,6 +218,16 @@ with open('${win_hosts}', 'w') as f:
     fi
 }
 
+# Emits the /etc/hosts block for all local hostnames on stdout.
+build_hosts_block() {
+    local block="${HOSTS_BLOCK_START}"$'\n'
+    local host
+    for host in "${HOSTS[@]}"; do
+        block+="${INGRESS_IP}  ${host}"$'\n'
+    done
+    printf '%s%s\n' "$block" "${HOSTS_BLOCK_END}"
+}
+
 # ---------------------------------------------------------------------------
 # 1. Validate prerequisites
 # ---------------------------------------------------------------------------
@@ -253,27 +274,53 @@ ok "Prerequisites satisfied (Docker ${DOCKER_MEM_GB} GB RAM)"
 # registry to the cluster via `registries.use`.
 REGISTRY_NAME="k3d-registry.localhost"
 REGISTRY_IMAGE="ghcr.io/project-zot/zot:v2.1.18"
+REGISTRY_VOLUME="k3d-registry-zot-data"
 ZOT_CONFIG="${REPO_ROOT}/local-dev/cluster/zot-config.json"
+
+# `k3d registry create` prefixes the name with 'k3d-'. Image storage is a
+# NAMED volume, not `-v /var/lib/zot`: k3d writes a destination-only volume
+# spec into the container with no volume name attached (Docker's own CLI
+# fills one in; k3d does not). That mount resolves fine for the daemon's
+# lifetime, so the registry works until dockerd restarts — after a reboot the
+# daemon reloads the container, cannot look the volume up by its empty name,
+# and every `docker start` fails with exit 128 "get: no such volume". A named
+# volume survives the reload, and still works with prune-docker.sh's
+# `--volumes-from` wipe (which, as a bonus, can no longer take an anonymous
+# volume with it when its `--rm` helper exits).
+create_registry() {
+    k3d registry create "${REGISTRY_NAME#k3d-}" --port 5001 \
+        --image "${REGISTRY_IMAGE}" \
+        -v "${ZOT_CONFIG}:/etc/zot/config.json" \
+        -v "${REGISTRY_VOLUME}:/var/lib/zot"
+}
 
 log "Setting up local image registry '${REGISTRY_NAME}'..."
 if docker ps -a --format '{{.Names}}' | grep -qx "${REGISTRY_NAME}"; then
     if docker inspect "${REGISTRY_NAME}" --format '{{.Config.Image}}' | grep -q zot; then
-        docker start "${REGISTRY_NAME}" >/dev/null 2>&1 || true
-        ok "Registry '${REGISTRY_NAME}' already exists — skipping creation."
+        # `restart`, not `start`: on an already-running registry `start` is a
+        # no-op, so zot never re-reads the bind-mounted zot-config.json and
+        # config changes (timeouts, retention) silently never take effect.
+        if docker restart "${REGISTRY_NAME}" >/dev/null 2>&1; then
+            ok "Registry '${REGISTRY_NAME}' already exists — restarted to pick up zot-config.json."
+        else
+            # Unstartable registry — an anonymous-volume container left over
+            # from before the named-volume switch cannot be repaired, only
+            # replaced. Contents are disposable: Tilt re-pushes on next build.
+            warn "Registry '${REGISTRY_NAME}' exists but will not start:"
+            warn "  $(docker inspect "${REGISTRY_NAME}" --format '{{.State.Error}}')"
+            warn "Recreating it (cached images are disposable — Tilt re-pushes)."
+            k3d registry delete "${REGISTRY_NAME}" >/dev/null 2>&1 || \
+                docker rm -f "${REGISTRY_NAME}" >/dev/null 2>&1 || true
+            create_registry
+            ok "Registry '${REGISTRY_NAME}' recreated (zot, named volume)."
+        fi
     else
         warn "Registry '${REGISTRY_NAME}' exists but is not zot (pre-2026-07 registry:2)."
         warn "To migrate:  k3d registry delete ${REGISTRY_NAME}  then re-run setup.sh"
         warn "(Tilt re-pushes all images on the next build; see local-dev/README.md)"
     fi
 else
-    # `k3d registry create` prefixes the name with 'k3d-'. The bare
-    # /var/lib/zot mount makes image storage an anonymous volume (zot's image
-    # declares none), so prune-docker.sh can wipe it with the registry
-    # stopped via --volumes-from.
-    k3d registry create "${REGISTRY_NAME#k3d-}" --port 5001 \
-        --image "${REGISTRY_IMAGE}" \
-        -v "${ZOT_CONFIG}:/etc/zot/config.json" \
-        -v /var/lib/zot
+    create_registry
     ok "Registry '${REGISTRY_NAME}' created (zot, retention enabled)."
 fi
 
@@ -358,21 +405,21 @@ fi
 # ---------------------------------------------------------------------------
 if $SKIP_HOSTS; then
     warn "Skipping /etc/hosts update (--skip-hosts)."
+    warn "You must make these ${#HOSTS[@]} hostnames resolve to ${INGRESS_IP} yourself,"
+    warn "either through DNS or by adding the block below to /etc/hosts."
+    warn "'tilt up' fails immediately if sso.ol.${ROOT_DOMAIN} does not resolve."
+    echo ""
+    build_hosts_block | sed 's/^/    /'
+    echo ""
+    if is_wsl; then
+        warn "WSL detected: Windows browsers need the same entries in"
+        warn "C:\\Windows\\System32\\drivers\\etc\\hosts, and /etc/wsl.conf needs"
+        warn "[network] generateHosts = false so WSL does not overwrite /etc/hosts."
+    fi
 else
     log "Updating /etc/hosts..."
 
-    # k3d load balancer always listens on 127.0.0.1 for the exposed ports
-    INGRESS_IP="127.0.0.1"
-
-    HOSTS_BLOCK_START="# BEGIN local-dev local-dev"
-    HOSTS_BLOCK_END="# END local-dev local-dev"
-
-    # Build the new hosts block
-    HOSTS_BLOCK="${HOSTS_BLOCK_START}"$'\n'
-    for host in "${HOSTS[@]}"; do
-        HOSTS_BLOCK+="${INGRESS_IP}  ${host}"$'\n'
-    done
-    HOSTS_BLOCK+="${HOSTS_BLOCK_END}"
+    HOSTS_BLOCK="$(build_hosts_block)"
 
     if grep -q "${HOSTS_BLOCK_START}" /etc/hosts; then
         # Remove existing block and replace

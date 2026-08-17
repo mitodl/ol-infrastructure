@@ -2,8 +2,8 @@
 _custom_properties:
   tier: tier-1
 _has_branch_protection: true
-_pushed_at: '2026-08-05T20:40:46Z'
-_ruleset_count: 0
+_pushed_at: '2026-08-10T23:54:51Z'
+_ruleset_count: 2
 _visibility: public
 allow_auto_merge: false
 allow_merge_commit: true
@@ -12,7 +12,6 @@ allow_squash_merge: true
 archetype: library
 default_branch: master
 delete_branch_on_merge: false
-dependabot_security_updates: false
 has_discussions: false
 has_projects: true
 has_wiki: true

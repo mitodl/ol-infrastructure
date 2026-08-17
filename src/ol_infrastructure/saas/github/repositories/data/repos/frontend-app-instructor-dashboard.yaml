@@ -1,8 +1,6 @@
 ---
 _custom_properties:
   tier: unmanaged
-_direct_collaborators:
-  Anas12091101: admin
 _has_branch_protection: false
 _pushed_at: '2026-07-27T10:48:45Z'
 _ruleset_count: 0
@@ -14,7 +12,6 @@ allow_squash_merge: true
 archetype: fork
 default_branch: main
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: Instructor Dashboard pages in MFE-land
 has_discussions: false
 has_projects: true
@@ -24,7 +21,7 @@ name: frontend-app-instructor-dashboard
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
-  arbisoft-contractors: maintain
+  arbisoft-contractors: push
   odl-engineering: maintain
   odl-engineering-owners: admin
 web_commit_signoff_required: false

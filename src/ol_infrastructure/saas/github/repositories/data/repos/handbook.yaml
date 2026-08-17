@@ -4,7 +4,7 @@ _custom_properties:
 _excluded_environments: 1
 _has_branch_protection: true
 _pushed_at: '2026-06-11T20:45:57Z'
-_ruleset_count: 0
+_ruleset_count: 2
 _visibility: public
 allow_auto_merge: false
 allow_merge_commit: false
@@ -13,7 +13,6 @@ allow_squash_merge: true
 archetype: library
 default_branch: master
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: Information on how we do what we do.
 has_discussions: false
 has_projects: false

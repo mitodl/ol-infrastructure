@@ -81,6 +81,7 @@ Rootly). That path is independent of Grafana and is managed in
 | `metric_rules/eks_general.py` | EKS workload alert rules (replicas, node readiness, crash loops, OOM, jobs, HPA). |
 | `metric_rules/linux_host.py` | Linux host alert rules (CPU, memory, disk usage). |
 | `metric_rules/apisix_edge.py` | Per-host 5xx rate at the APISIX edge (`apisix_http_status`). Two windows (fast cliff / slow creep) with a minimum-traffic gate. Currently unlabelled → `oblivion` while calibrating. |
+| `metric_rules/dagster_pgbouncer.py` | Dagster's PgBouncer pool (`pgbouncer_*`, from the exporter sidecar added in #5426). Aggregate connections against the derived `max_db_connections` cap, clients queued behind it, and exporter health. The denominator is read from `pgbouncer_databases_max_connections` rather than hardcoded, because the cap differs per environment. |
 | `metric_rules/synthetic_monitoring.py` | MIT Learn probe-failure rules (`probe_success`) for the Next.js origin, the API health endpoint, and the homepage. Imported from hand-made UI rules; lives in the Synthetic Monitoring **plugin's** folder, so it takes no `folder_uid`. |
 | `log_rules/` | Package. Grafana-managed alert rule groups for log queries. Migrated from `grafana-alerts/loki-rules/`. |
 | `log_rules/base.py` | Loki datasource UIDs, two-stage pipeline helper, folder creation, delegates to sub-modules. |
@@ -255,6 +256,31 @@ All of the above except `_logs_panel`/`_row_panel` take a `unit` param --
 `_gauge_panel` defaults it to `"percentunit"` (it's built for ratios), the
 rest default to `"short"`. Set it explicitly for anything that isn't a plain
 count: `"percentunit"` for ratios, `"s"` for durations, `"bytes"` for memory.
+
+**`_timeseries_panel`'s legend defaults to summing every series across the
+graph window** ("Total: ..."), which is only meaningful for a genuine
+non-overlapping interval count -- e.g. a Loki `count_over_time(...
+[$__interval])` panel, where each rendered point is a distinct bucket and
+the buckets' sum equals the true total for the selected range. It is
+**not** meaningful for a `rate()`/`irate()`-derived series (`logins/min`,
+an error rate, GC pause time/count by cause): each rendered point is a
+per-second rate sampled at the display resolution, so summing them
+together is rate x sample-count rather than a real total, and the number
+changes with Grafana's query step/`$__rate_interval` even though nothing
+about the underlying data changed -- these need an explicit reducer too.
+Nor is it meaningful for a gauge -- anything that's an instantaneous
+reading rather than an accumulating count (memory used, connection-pool
+size, CPU usage, a hit ratio) -- summing hundreds of samples produces a
+number with no physical meaning: a heap panel summed to "1.73 TiB" against
+a real 2.5 GiB max, `percentunit` CPU usage summed past 3000%.
+`percentunit`/`percent` and duration (`s`) units already default to `mean`
+automatically since both are near-universally gauge- or rate-like. **For
+every other gauge-like or rate-derived panel, pass `legend_calc`
+explicitly** -- `"max"` for a memory/capacity panel (peak usage is the
+number that matters), `"mean"` or `"last"` for others. When adding a new
+`_timeseries_panel` call, ask whether the underlying metric is a
+non-overlapping interval count (`sum` is fine) or a rate/gauge (pass
+`legend_calc`) before shipping it.
 
 No dashboard in this package queries Tempo -- an earlier version of
 `keycloak_activity.py` did, pairing a sampled TraceQL request count against

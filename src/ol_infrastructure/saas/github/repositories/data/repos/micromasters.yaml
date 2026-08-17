@@ -7,8 +7,8 @@ _custom_properties:
   tier: tier-1
 _excluded_environments: 2694
 _has_branch_protection: true
-_pushed_at: '2026-08-06T14:27:37Z'
-_ruleset_count: 0
+_pushed_at: '2026-08-13T21:41:54Z'
+_ruleset_count: 2
 _visibility: public
 allow_auto_merge: false
 allow_merge_commit: true
@@ -17,7 +17,6 @@ allow_squash_merge: true
 archetype: application
 default_branch: master
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: 'Portal for learners and course teams to access MITx Micromasters® programs '
 has_discussions: false
 has_projects: true

@@ -120,6 +120,56 @@ def _live_tier(repo: dict[str, Any]) -> str | None:
     return (repo.get("_custom_properties") or {}).get(TIER_PROPERTY_NAME)
 
 
+#: Team grants that are supposed to carry the ability to merge a pull request.
+#: `triage` and `pull` are excluded because neither can merge anyway, so being left out
+#: of a push allow-list takes nothing away from them.
+MERGE_CAPABLE_PERMISSIONS = frozenset({"push", "maintain", "admin"})
+
+
+def _blocked_by_push_restriction(repo: dict[str, Any]) -> list[str]:
+    """Teams holding a merge-capable grant that the push allow-list leaves out.
+
+    Classic branch protection's "Restrict who can push" is an allow-list, and GitHub
+    counts merging a pull request as a push -- so a team missing from it cannot merge no
+    matter what `teams` says. Neither field shows this alone: `teams` reads `push` and
+    looks fine, `_has_branch_protection` reads `true` and also looks fine. Only the pair
+    reveals it, which is exactly why it went unseen.
+
+    THE INCIDENT THIS RULE IS FOR. `open-edx-plugins` restricted pushes to `main` to the
+    single user `odlbot`. `arbisoft-contractors` and `odl-engineering` both held
+    `admin`, and because `enforce_admins` was false they bypassed the allow-list without
+    anyone noticing it existed. PR #5324 (SEC-15, 2026-08-12) downgraded both to `push`
+    -- the correct call on its own terms -- and in doing so removed the bypass, leaving
+    two teams unable to merge anything. No rule fired, no preview showed a diff, and it
+    surfaced five days later as a contractor reporting a stuck pull request.
+
+    `enforce_admins` is therefore load-bearing rather than trivia: with it off, an
+    `admin` team is genuinely not blocked, so reporting one would be a false positive.
+    Both fields come from the crawl and are only written where a restriction exists, so
+    a repo with no restriction yields no finding rather than an unmeasured pass.
+    """
+    allowed = repo.get("_branch_protection_push_restrictions")
+    if allowed is None:
+        return []
+    allowed_teams = set(allowed.get("teams") or [])
+    enforce_admins = repo.get("_branch_protection_enforce_admins")
+    return sorted(
+        team
+        for team, perm in (repo.get("teams") or {}).items()
+        if perm in MERGE_CAPABLE_PERMISSIONS
+        and team not in allowed_teams
+        and (enforce_admins or perm != "admin")
+    )
+
+
+def _push_allow_list(repo: dict[str, Any]) -> str:
+    """Render the push allow-list, so a SEC-16 finding names who IS still allowed."""
+    allowed = repo.get("_branch_protection_push_restrictions") or {}
+    users = ",".join(allowed.get("users") or []) or "-"
+    teams = ",".join(allowed.get("teams") or []) or "-"
+    return f"push restricted to users={users} teams={teams}"
+
+
 def _unsanctioned_admin(repo: dict[str, Any]) -> list[str]:
     return sorted(
         team
@@ -163,18 +213,17 @@ RULES: tuple[Rule, ...] = (
             else None
         ),
     ),
-    Rule(
-        "SEC-05",
-        "security",
-        "high",
-        "active",
-        "Dependabot security updates disabled",
-        lambda r: (
-            ("disabled", "enabled", "set dependabot_security_updates in the archetype")
-            if not r.get("dependabot_security_updates")
-            else None
-        ),
-    ),
+    # SEC-05 (Dependabot security updates disabled) is RETIRED, not merely quiet.
+    # Closed 2026-08-14 as won't-fix: the org's shared Renovate config
+    # (`mitodl/.github:renovate-config`) already sets
+    # `vulnerabilityAlerts.enabled: true` plus `osvVulnerabilityAlerts: true`, sourced
+    # from the same `vulnerability_alerts` data GitHub's own toggle would use,
+    # bypassing Renovate's normal schedule. Enabling
+    # GitHub's native auto-fix PRs on top of that would duplicate Renovate's PR on every
+    # repo extending the shared config -- see the `base` archetype's comment in
+    # data/archetypes.yaml. A rule left in place here would report that duplication risk
+    # as a "disabled" finding on 174 of 176 active repos, forever, which is the opposite
+    # of what actually happened: the archetype default is `false` on purpose now.
     Rule(
         "SEC-06",
         "security",
@@ -207,6 +256,29 @@ RULES: tuple[Rule, ...] = (
                 "downgrade to push or maintain",
             )
             if _unsanctioned_admin(r)
+            else None
+        ),
+    ),
+    Rule(
+        "SEC-16",
+        "security",
+        "high",
+        "active",
+        "classic push restriction excludes a team that holds a merge-capable grant",
+        # Graded `high` on ACCESS grounds rather than exposure: it does not weaken the
+        # repo, it silently revokes people's ability to ship to it, and it is invisible
+        # in every other field. An unannounced loss of access is a security finding in
+        # the same sense an unannounced grant is -- the declared model and the enforced
+        # one disagree, and nobody can tell which one is live.
+        lambda r: (
+            (
+                f"{_push_allow_list(r)}; "
+                f"blocked: {', '.join(_blocked_by_push_restriction(r))}",
+                "every team with push or better can merge",
+                "drop the push restriction (org rulesets already cover this branch), "
+                "or add the blocked teams to its allow-list",
+            )
+            if _blocked_by_push_restriction(r)
             else None
         ),
     ),
@@ -412,7 +484,77 @@ def population(fleet: Iterable[dict[str, Any]], scope: Scope) -> int:
 
 
 #: Why a direct collaborator grant exists, which is what decides how to remove it.
+def fetch_rosters() -> tuple[
+    dict[str, set[str]], set[str], dict[str, str | None], set[str]
+]:
+    """Team rosters, org members and team nesting, read live from the API.
+
+    NOT read from committed data, and not cached to disk, because there is nowhere
+    safe to put it: `vault-developer-access` and `vault-devops-access` are declared
+    `privacy: secret` in organization/teams.py so their membership is not advertised
+    even inside the org, and ol-infrastructure is a PUBLIC repository. Committing
+    rosters here would publish exactly what that setting exists to withhold.
+
+    Shared by `bin/github-estate-audit access` and `bin/github-collaborator-cleanup`
+    -- both need a roster snapshot no older than "right now" (§ SEC-06: a roster that
+    changed between audit and action turns a `redundant` grant into `no-access`, and
+    acting on the stale classification silently revokes someone's only path in).
+    """
+    import httpx  # noqa: PLC0415 -- only roster-fetching callers need the API
+
+    from ol_infrastructure.lib.github_helper import (  # noqa: PLC0415
+        API_HEADERS,
+        GITHUB_API,
+        get_installation_token,
+    )
+
+    org = "mitodl"
+    token = get_installation_token()
+
+    def paginate(client: httpx.Client, path: str) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        url: str | None = f"{path}{'&' if '?' in path else '?'}per_page=100"
+        while url:
+            response = client.get(url)
+            response.raise_for_status()
+            out.extend(response.json())
+            url = response.links.get("next", {}).get("url")
+        return out
+
+    with httpx.Client(
+        base_url=GITHUB_API,
+        headers={**API_HEADERS, "Authorization": f"Bearer {token}"},
+        timeout=60,
+        follow_redirects=True,
+    ) as client:
+        members = {m["login"] for m in paginate(client, f"/orgs/{org}/members")}
+        # Org OWNERS hold implicit admin on every repo -- a third access path beside
+        # teams and direct grants, and the only one the others cannot revoke. The
+        # plain members list does not distinguish them, so this is a separate call.
+        owners = {
+            m["login"] for m in paginate(client, f"/orgs/{org}/members?role=admin")
+        }
+        teams = paginate(client, f"/orgs/{org}/teams")
+        rosters = {
+            t["slug"]: {
+                m["login"]
+                for m in paginate(client, f"/orgs/{org}/teams/{t['slug']}/members")
+            }
+            for t in teams
+        }
+    parents = {t["slug"]: (t.get("parent") or {}).get("slug") for t in teams}
+    return rosters, members, parents, owners
+
+
 GrantKind = Literal["redundant", "level-only", "owner-implicit", "no-access", "outside"]
+#: The subset of `GrantKind` a caller may safely act on with a delete. Kept as its own
+#: `Literal` (not just a runtime check against `REMOVABLE_KINDS`) so a CLI built on top
+#: -- `bin/github-collaborator-cleanup`'s `--kind` -- gets this enforced at argument
+#: parsing, before any classification or API call runs. `RemovableKind` and
+#: `REMOVABLE_KINDS` must be kept in sync; there is no single source of truth to
+#: generate one from the other because a `Literal`'s members are not introspectable
+#: from a frozenset at the type-checker level.
+RemovableKind = Literal["redundant", "level-only", "owner-implicit"]
 #: The kinds whose removal costs the person nothing. `no-access` and `outside` are
 #: deliberately absent: one revokes access, the other is a membership decision.
 REMOVABLE_KINDS: frozenset[str] = frozenset(

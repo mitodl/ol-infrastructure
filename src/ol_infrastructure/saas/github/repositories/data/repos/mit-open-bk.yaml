@@ -1,8 +1,6 @@
 ---
 _custom_properties:
   tier: unmanaged
-_direct_collaborators:
-  rhysyngsun: admin
 _has_branch_protection: false
 _pushed_at: '2023-07-28T13:16:48Z'
 _ruleset_count: 0
@@ -14,7 +12,6 @@ allow_squash_merge: true
 archetype: fork
 default_branch: master
 delete_branch_on_merge: false
-dependabot_security_updates: false
 has_discussions: false
 has_issues: true
 has_projects: true

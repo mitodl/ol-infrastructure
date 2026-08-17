@@ -18,10 +18,6 @@ _actions_secret_names:
 - POSTHOG_PROJECT_API_KEY_RC
 _custom_properties:
   tier: unmanaged
-_direct_collaborators:
-  ChristopherChudzicki: admin
-  mbertrand: write
-  odlbot: write
 _has_branch_protection: false
 _pushed_at: '2026-07-27T14:15:12Z'
 _ruleset_count: 0

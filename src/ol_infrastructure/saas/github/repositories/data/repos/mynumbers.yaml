@@ -1,10 +1,9 @@
 ---
 _custom_properties:
   tier: unmanaged
-_direct_collaborators:
-  abeglova: admin
+_excluded_environments: 1
 _has_branch_protection: false
-_pushed_at: '2026-06-17T14:28:07Z'
+_pushed_at: '2026-08-13T08:21:52Z'
 _ruleset_count: 0
 _visibility: public
 allow_auto_merge: false
@@ -14,7 +13,6 @@ allow_squash_merge: true
 archetype: fork
 default_branch: main
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: fun wih arithmetic
 has_discussions: false
 has_projects: true
@@ -25,7 +23,7 @@ name: mynumbers
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
-  arbisoft-contractors: triage
+  arbisoft-contractors: push
   code-owners: push
   odl-engineering: push
   odl-engineering-owners: admin

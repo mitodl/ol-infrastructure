@@ -3,7 +3,7 @@ _custom_properties:
   tier: unmanaged
 _excluded_environments: 1
 _has_branch_protection: false
-_pushed_at: '2026-08-06T12:46:19Z'
+_pushed_at: '2026-08-08T10:34:35Z'
 _ruleset_count: 0
 _visibility: public
 allow_auto_merge: false
@@ -13,7 +13,6 @@ allow_squash_merge: true
 archetype: fork
 default_branch: master
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: Python interface for edX REST APIs
 has_discussions: false
 has_issues: true

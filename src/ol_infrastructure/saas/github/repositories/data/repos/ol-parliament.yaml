@@ -12,7 +12,6 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: fork
 default_branch: main
-dependabot_security_updates: false
 description: AWS IAM linting library
 has_discussions: false
 has_projects: true

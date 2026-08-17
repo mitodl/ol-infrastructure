@@ -1,8 +1,6 @@
 ---
 _custom_properties:
   tier: unmanaged
-_direct_collaborators:
-  rhysyngsun: admin
 _has_branch_protection: true
 _pushed_at: '2023-10-20T13:38:04Z'
 _ruleset_count: 0
@@ -22,6 +20,6 @@ name: open-discussions-client
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
-  arbisoft-contractors: admin
+  arbisoft-contractors: push
   odl-engineering: admin
 web_commit_signoff_required: false

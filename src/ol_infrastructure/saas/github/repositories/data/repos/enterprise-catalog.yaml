@@ -12,7 +12,6 @@ allow_squash_merge: true
 archetype: fork
 default_branch: master
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: A Django-based microservice for handling Enterprise catalogs, associating
   enterprise customers with curated courses from the full course catalog.
 has_discussions: false

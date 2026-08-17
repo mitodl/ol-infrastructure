@@ -39,6 +39,7 @@ This environment runs the MIT Learn application stack as Kubernetes workloads in
 | odl-video-service | `https://video.odl.mit.dev` | ODL Video Service (Django/uwsgi) |
 | Keycloak SSO | `https://sso.ol.mit.dev` | Identity provider (olapps realm) |
 | Mailpit | `https://mail.mit.dev` | Captured outbound email (web UI) |
+| Grafana | `https://grafana.mit.dev` | Logs from every service in the cluster (1-week retention) |
 
 All hostnames use a `.dev` TLD that mirrors production (`.edu` → `.dev`), so URLs, CSRF cookies, and OIDC redirect URIs behave identically to deployed environments.
 
@@ -204,6 +205,8 @@ With an app repo checked out next to `ol-infrastructure`, Tilt live-syncs your e
 
 ### Access logs
 
+For a single pod you already have in mind, `kubectl` is the shortest path:
+
 ```bash
 # Web pod
 kubectl logs -n mit-learn deploy/mitlearn-webapp -c app -f
@@ -214,6 +217,21 @@ kubectl logs -n mit-learn deploy/mitlearn-worker-default -f
 # APISIX ingress
 kubectl logs -n operations deploy/apisix -f
 ```
+
+To search across services — or to follow a request from the ingress into the app and on into the worker that picked up the task — use **Grafana at [https://grafana.mit.dev](https://grafana.mit.dev)**. It opens straight into the UI with no login. Every pod in the cluster is collected, including the ones Tilt does not manage (Postgres, Valkey, OpenSearch, Keycloak, APISIX, Mailpit).
+
+The quickest way in is **Drilldown → Logs**, which needs no LogQL at all: pick a service, then narrow by detected label, field, or log level from the sidebar. Its **Patterns** tab groups repetitive lines into templates, which is how you spot one error buried in a wall of health checks.
+
+For anything the point-and-click path cannot express, start from the pre-provisioned **local-dev logs** dashboard, or go to **Explore → Loki** and write LogQL directly:
+
+```logql
+{namespace="mit-learn"}                      # everything in one app's namespace
+{app="mitlearn-webapp"} |= "ERROR"           # one workload, filtered
+{namespace="operations", app="apisix"}       # ingress access logs
+{container="celery"} |= "Traceback"          # across every app's workers
+```
+
+Available labels are `namespace`, `pod`, `container`, and `app`, plus `service_name`, which Loki derives on its own and which is what Drilldown's service list is keyed on. Logs are kept for one week by default — see [Log retention](#log-retention) to change that, and `observability_enabled` in [Pulumi stack config](#pulumi-stack-config) to turn the whole stack off.
 
 ### Run management commands
 
@@ -301,6 +319,7 @@ tilt trigger seed-mit-learn-fixtures
 | `enabled_apps` | all four | Apps to deploy. Omit any to skip it entirely. |
 | `prebuilt_tags` | see example file | `["app=tag"]` list of image tags used when the app repo is not checked out locally. |
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
+| `log_retention_period` | `168h` | How long Grafana/Loki keeps logs — see [Log retention](#log-retention). |
 | `per_app_databases`, `openedx_mode` | — | Declared but not wired to anything yet; setting them has no effect. |
 
 The rule of thumb for which config surface a knob belongs to: settings that change **which/how Tilt runs things** (apps, image tags) go in `tilt_config.json`; anything that sets an **env var or secret value inside a workload** (API keys, feature flags, endpoints) goes in a gitignored `app-env.local.yaml` override ConfigMap — see [Local Configuration Overrides](#local-configuration-overrides).
@@ -312,6 +331,27 @@ Every service hostname derives from the `LOCAL_DEV_ROOT_DOMAIN` environment vari
 `tilt up` fails immediately if `sso.ol.<root_domain>` does not resolve, whether through DNS or `/etc/hosts`.
 
 After changing the value, re-run `./local-dev/scripts/setup.sh` to reissue the TLS certificate and rewrite the `/etc/hosts` block; pass `--skip-hosts` to reissue the certificate only, which is what you want when the hostnames already resolve through DNS. The certificate's SANs cover one root domain, so requests to hostnames outside it fail at the TLS layer.
+
+### Log retention
+
+Logs are kept for **one week** (`168h`). To change that for yourself, set `log_retention_period` in your gitignored `tilt_config.json`:
+
+```json
+{
+  "log_retention_period": "72h"
+}
+```
+
+Tilt forwards it to the core Pulumi stack as `LOCAL_DEV_LOG_RETENTION`, so the same value works for a hand-run `pulumi up`:
+
+```bash
+cd local-dev/infra/core
+LOCAL_DEV_LOG_RETENTION=72h pulumi up --stack local-dev.core.Dev
+```
+
+Loki only honours a retention window that is a **whole number of days**, so give it hours in multiples of 24 (`48h`, `168h`) or days (`3d`, `7d`). Anything else fails the deploy with an explanatory error rather than being silently ignored.
+
+This knob is deliberately *not* pinned in `Pulumi.local-dev.core.Dev.yaml` — Pulumi config takes precedence over the environment, so a value committed there would override every developer's `tilt_config.json`. Changing it replaces the Loki ConfigMap and restarts Loki; already-ingested logs are re-evaluated against the new window on the next compaction pass (within ~15 minutes).
 
 ### Pulumi stack config
 
@@ -326,6 +366,7 @@ The infrastructure is split across two Pulumi stacks:
 | `apisix_version` | `2.12.0` | APISIX Helm chart version |
 | `cnpg_version` | `0.23.0` | CloudNativePG operator Helm chart version |
 | `keycloak_operator_version` | `26.0.7` | Official Keycloak Operator version |
+| `observability_enabled` | `true` | Deploy Grafana + Loki + Alloy (~1.3GB). Set to `false` on a constrained Docker VM. |
 
 **`local-dev/infra/apps_infra/Pulumi.local-dev.apps-infra.Dev.yaml`** — Keycloak realm and OIDC clients:
 
@@ -346,7 +387,7 @@ Each store is bounded by retention config owned by the component that enforces i
 
 | Mechanism | Covers | Where |
 |---|---|---|
-| `disk-janitor` (automatic, runs with every `tilt up`) | Old tilt-built image tags in the local daemon; build-cache size cap | `local-dev/scripts/disk-janitor.sh`, wired as a `serve_cmd` resource in the root Tiltfile |
+| `disk-janitor` (automatic, runs with every `tilt up`) | Old tilt-built image tags in the local daemon; build-cache size cap; registry repos left manifest-less by an interrupted push | `local-dev/scripts/disk-janitor.sh`, wired as a `serve_cmd` resource in the root Tiltfile |
 | zot registry retention + GC | The k3d registry — zot keeps the 10 most recently pushed tags per repo and garbage-collects the rest itself | `local-dev/cluster/zot-config.json` (the registry image is [zot](https://zotregistry.dev), not registry:2; created by `setup.sh`) |
 | kubelet image GC | Node containerd stores | Thresholds in `local-dev/cluster/k3d-config.yaml` (applies at cluster creation; existing clusters keep the old 85/80 until you run `local-dev/scripts/migrate-kubelet-gc-thresholds.sh`) |
 | `prune-docker` (manual, break-glass) | Local daemon + registry, destructively (node stores only with `--sweep-nodes` — read the script header first; it orphans running containers) | Tilt UI button / `tilt trigger prune-docker`, or run `local-dev/scripts/prune-docker.sh` directly |
@@ -365,7 +406,9 @@ Retention (keep the newest N) is safe to apply at any moment — unlike a wipe, 
 - `disk_keep_tags` / `LOCAL_DEV_DISK_KEEP_TAGS` — tags kept per image (default 3). Old tags are nearly pure waste: pods only reference the current tag, and rebuild speed comes from the build cache, not old tags.
 - `disk_buildcache_max_gb` / `LOCAL_DEV_BUILDCACHE_MAX_GB` — build-cache cap in GB (default: 10% of total disk). **This is the one knob whose effect is not scoped to local-dev**: BuildKit keeps a single daemon-wide cache pool, so eviction can slow rebuilds of unrelated projects on your machine (speed only, never correctness). Set to `0` to opt out and manage the pool yourself (e.g. `builder.gc` in your Docker engine config).
 
-If images ever pile up again despite the janitor, `tilt docker-prune --debug` prints Tilt's own per-image skip reasons and is the fastest way to see why something isn't being reclaimed. To check whether zot is doing its part, `docker logs k3d-registry.localhost` shows its retention decisions (`"module":"retention"` lines, logged at info level).
+If images ever pile up again despite the janitor, `tilt docker-prune --debug` prints Tilt's own per-image skip reasons and is the fastest way to see why something isn't being reclaimed. To check whether zot is doing its part, `docker logs k3d-registry.localhost` shows its retention decisions (`"module":"retention"` lines, logged at info level) and its GC results (`"module":"gc"`, one `gc successfully completed` per repo).
+
+One registry case zot cannot reclaim on its own is a repo left with no manifest by an interrupted push — see [zot logs "repo metadata not found"](#zot-logs-repo-metadata-not-found-for-given-repo-name). The janitor sweeps those.
 
 ---
 
@@ -386,6 +429,16 @@ If images ever pile up again despite the janitor, `tilt docker-prune --debug` pr
 ```
 
 > **Note:** The teardown script calls `pulumi destroy` automatically to clean up Pulumi-managed resources before deleting the cluster, so no orphaned resources are left behind.
+
+Pulumi state must never outlive the cluster: everything these stacks manage
+lives inside the cluster, but the state lives in this checkout, so state that
+survives makes the next `pulumi up` skip resources that no longer exist (that
+is the `404 Realm not found` failure). Teardown therefore discards a stack's
+state if its `destroy` fails, discards leftover state when the cluster is
+already gone (deleted by hand, or by an interrupted teardown), and **stops
+before `k3d cluster delete`** if it can neither destroy nor discard — the
+checked-in `Pulumi.<stack>.yaml` config is preserved either way. If it stops,
+it prints the exact `pulumi stack rm` to run; do that and re-run teardown.
 
 ---
 
@@ -523,6 +576,55 @@ Then restart your browser. The cert was generated with the correct wildcard SANs
 The Next.js build needs ~4 GB of memory. If it OOMs:
 - Increase the Docker VM memory allocation (see [Prerequisites](#prerequisites))
 - Or use a prebuilt image by removing `mit-learn` from `enabled_apps` in `tilt_config.json` and letting Tilt use the `prebuilt_tags` value instead
+
+### Image push retries forever on the last layer
+
+Tilt's push stalls partway through one big layer, restarts from zero, and eventually gives up:
+
+```
+89076705fa1d: Pushing [==================>       ]  1.156GB/3.169GB
+```
+
+zot defaults `http.readTimeout` to 60s, and Go's `ReadTimeout` is a deadline on the *entire* request including its body — not an idle timeout. A monolithic blob upload that takes longer than that is killed mid-stream no matter how fast data is flowing; zot deletes the partial upload, Docker retries the layer, and hits the same wall. The registry log shows the deadline verbatim:
+
+```bash
+docker logs k3d-registry.localhost 2>&1 | grep '"level":"error"'
+# PATCH /v2/<repo>/blobs/uploads/<id>  statusCode: 500  latency: "1m0s"
+# "unexpected error, removing .uploads/ files"  error: "read tcp ...: i/o timeout"
+```
+
+Small layers push fine, so this only ever bites the multi-GB `node_modules` layers — those need ~80s on a typical dev box. `zot-config.json` therefore sets `readTimeout` and `writeTimeout` to `30m`. If you see this after editing that file, confirm the running registry actually picked the values up (they need a restart, not a config hot-reload):
+
+```bash
+docker logs k3d-registry.localhost 2>&1 | grep -o '"ReadTimeout":[0-9]*' | tail -1
+# "ReadTimeout":1800000000000   <- nanoseconds; 60000000000 means the default is still in effect
+docker restart k3d-registry.localhost
+```
+
+### zot logs `repo metadata not found for given repo name`
+
+The registry log shows GC failing for one repo, on every zot start and every hourly GC pass:
+
+```
+"failed to run GC for /var/lib/zot/mitodl_mit-learn-nextjs-app"
+error: "repo metadata not found for given repo name"
+"gc unsuccessfully completed for /var/lib/zot/mitodl_mit-learn-nextjs-app"
+```
+
+zot's GC scheduler walks the *storage directory* but its retention logic is driven by the *metadata DB*, so it enqueues a task for every repo dir on disk and then fails on any the metadata DB has never heard of. A repo gets into that state when layer uploads land but the manifest PUT that registers them never does — i.e. any interrupted push (Ctrl-C, cancelled Tilt build, or the 60s upload timeout above). The completed layers stay on disk as blobs no manifest refers to, and GC bails before it can collect them, so they are unreachable *and* un-collectable: multiple GB that nothing reclaims.
+
+`disk-janitor.sh` sweeps these automatically (repo dirs whose `index.json` lists no manifests, untouched for 60 minutes so a live push is never at risk). To clear one immediately:
+
+```bash
+# list repos with no manifest
+docker run --rm --volumes-from k3d-registry.localhost alpine sh -c \
+  'for d in /var/lib/zot/*/; do grep -qE "\"manifests\":(null|\[\])" "$d/index.json" 2>/dev/null && echo "$d"; done'
+
+# remove one (safe: with no manifest there is nothing pullable in it)
+docker run --rm --volumes-from k3d-registry.localhost alpine rm -rf /var/lib/zot/<repo>
+```
+
+The push that follows re-uploads those layers. Note the error names the repo whose push broke — fixing the push (usually the timeout above) stops it recurring.
 
 ### `kubectl exec` fails with a 502 (wedged kubelet streaming)
 

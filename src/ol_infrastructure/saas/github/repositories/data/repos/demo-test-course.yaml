@@ -1,8 +1,6 @@
 ---
 _custom_properties:
   tier: unmanaged
-_direct_collaborators:
-  pdpinch: admin
 _has_branch_protection: false
 _pushed_at: '2021-06-10T06:44:16Z'
 _ruleset_count: 0
@@ -14,7 +12,6 @@ allow_squash_merge: true
 archetype: fork
 default_branch: master
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: A demo course with as many features turned on as possible
 has_discussions: false
 has_projects: true

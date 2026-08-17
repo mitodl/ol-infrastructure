@@ -10,15 +10,14 @@ _custom_properties:
   tier: tier-1
 _excluded_environments: 44
 _has_branch_protection: true
-_pushed_at: '2026-08-07T20:41:25Z'
-_ruleset_count: 1
+_pushed_at: '2026-08-14T20:19:39Z'
+_ruleset_count: 3
 _visibility: public
 allow_auto_merge: false
 allow_merge_commit: false
 allow_rebase_merge: false
 allow_squash_merge: true
 archetype: application
-dependabot_security_updates: false
 has_discussions: true
 has_projects: true
 merge_commit_message: PR_TITLE
@@ -27,7 +26,7 @@ name: mit-learn
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
-  arbisoft-contractors: triage
+  arbisoft-contractors: push
   odl-engineering: push
   odl-engineering-owners: admin
   owners-mit-learn: push

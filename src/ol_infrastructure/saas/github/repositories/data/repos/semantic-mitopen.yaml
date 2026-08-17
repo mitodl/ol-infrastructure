@@ -1,8 +1,6 @@
 ---
 _custom_properties:
   tier: unmanaged
-_direct_collaborators:
-  mbertrand: admin
 _excluded_environments: 1
 _has_branch_protection: false
 _pushed_at: '2024-08-29T20:01:40Z'
@@ -15,7 +13,6 @@ allow_squash_merge: true
 archetype: fork
 default_branch: main
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: Codebase for semantic search of MIT Open Courseware (AI-powered Search
   and Chat for MIT Open Courseware)
 has_discussions: false

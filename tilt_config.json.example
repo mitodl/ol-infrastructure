@@ -16,5 +16,7 @@
 
   "disk_keep_tags": "3",
 
-  "disk_buildcache_max_gb": ""
+  "disk_buildcache_max_gb": "",
+
+  "log_retention_period": "168h"
 }

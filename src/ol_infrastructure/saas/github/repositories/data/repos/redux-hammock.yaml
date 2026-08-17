@@ -2,8 +2,8 @@
 _custom_properties:
   tier: tier-1
 _has_branch_protection: false
-_pushed_at: '2026-08-06T12:44:20Z'
-_ruleset_count: 0
+_pushed_at: '2026-08-08T22:33:06Z'
+_ruleset_count: 2
 _visibility: public
 allow_auto_merge: false
 allow_merge_commit: true
@@ -12,7 +12,6 @@ allow_squash_merge: true
 archetype: library
 default_branch: master
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: 🌴🍹Automatically generate actions and reducers for REST APIs
 has_discussions: false
 has_projects: true

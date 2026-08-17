@@ -12,7 +12,6 @@ allow_squash_merge: true
 archetype: fork
 default_branch: master
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: The micro-frontend for course authoring in Open edX.  Frontend interfaces
   that currently live in Studio/CMS should eventually live here.
 has_discussions: false

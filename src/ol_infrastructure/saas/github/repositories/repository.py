@@ -203,12 +203,39 @@ def build(repo: dict[str, Any]) -> None:
         opts=ResourceOptions(depends_on=[repository]),
     )
 
-    github.RepositoryVulnerabilityAlerts(
+    vulnerability_alerts = github.RepositoryVulnerabilityAlerts(
         f"mitodl-repo-vulnerability-alerts-{name}",
         repository=name,
         enabled=bool(repo.get("vulnerability_alerts")),
         opts=ResourceOptions(depends_on=[repository]),
     )
+
+    # GitHub requires vulnerability alerts to be enabled before Dependabot security
+    # updates can be, so this must not run concurrently with the resource above --
+    # without depends_on, Pulumi is free to create both at once, and a repo that is
+    # new to Pulumi state (nothing yet imported) can fail this nondeterministically.
+    #
+    # ONLY EMITTED WHERE ALERTS ARE ON, and that is not a shortcut for `enabled=False`.
+    # The provider implements `enabled=False` as `DELETE /automated-security-fixes`,
+    # which GitHub answers 422 "Vulnerability alerts must be enabled to configure
+    # automated security fixes" when alerts are off -- so declaring the OFF state on an
+    # alerts-off repo is a create that can never succeed. That took down the whole
+    # deploy on 2026-08-17 (build 4): 29 hard errors, every one of them an alerts-off
+    # repo, and the run aborted before it reached the arbisoft-contractors permission
+    # changes it was supposed to apply. 56 active repos are alerts-off, so this was
+    # never going to converge on its own.
+    #
+    # Skipping is also the accurate statement rather than a workaround: with alerts off
+    # GitHub will not let security updates be on, so there is no second state to assert.
+    # Nothing is orphaned by the skip -- no such resource has ever existed for an
+    # alerts-off repo, since every one of them failed to create.
+    if repo.get("vulnerability_alerts"):
+        github.RepositoryDependabotSecurityUpdates(
+            f"mitodl-repo-dependabot-security-updates-{name}",
+            repository=name,
+            enabled=bool(repo.get("dependabot_security_updates")),
+            opts=ResourceOptions(depends_on=[repository, vulnerability_alerts]),
+        )
 
     _tier_property(name, repo["tier"], repository)
 

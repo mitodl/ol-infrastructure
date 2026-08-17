@@ -1,8 +1,6 @@
 ---
 _custom_properties:
   tier: unmanaged
-_direct_collaborators:
-  rhysyngsun: admin
 _has_branch_protection: false
 _pushed_at: '2024-06-17T15:05:43Z'
 _ruleset_count: 0
@@ -22,6 +20,6 @@ name: mitxpro-openedx-extensions
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
-  arbisoft-contractors: admin
+  arbisoft-contractors: push
   odl-engineering: admin
 web_commit_signoff_required: false

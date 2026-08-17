@@ -2,7 +2,7 @@
 _custom_properties:
   tier: unmanaged
 _has_branch_protection: false
-_pushed_at: '2026-08-03T14:22:38Z'
+_pushed_at: '2026-08-12T11:08:22Z'
 _ruleset_count: 0
 _visibility: public
 allow_auto_merge: false
@@ -12,7 +12,6 @@ allow_squash_merge: true
 archetype: fork
 default_branch: main
 delete_branch_on_merge: false
-dependabot_security_updates: false
 description: Open edX Official Documentation
 has_discussions: false
 has_projects: true
@@ -23,7 +22,7 @@ name: docs.openedx.org
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
-  arbisoft-contractors: maintain
+  arbisoft-contractors: push
   odl-engineering: push
   odl-engineering-owners: admin
 web_commit_signoff_required: false

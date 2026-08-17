@@ -3,8 +3,8 @@ _custom_properties:
   tier: tier-1
 _excluded_environments: 6
 _has_branch_protection: true
-_pushed_at: '2026-08-05T20:26:29Z'
-_ruleset_count: 0
+_pushed_at: '2026-08-13T20:52:43Z'
+_ruleset_count: 2
 _visibility: public
 allow_auto_merge: false
 allow_merge_commit: true
@@ -12,7 +12,6 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: application
 default_branch: master
-dependabot_security_updates: false
 description: building blocks for a basic video service for ODL
 has_discussions: false
 has_projects: true

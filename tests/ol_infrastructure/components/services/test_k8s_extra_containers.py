@@ -928,3 +928,45 @@ def test_container_security_context_applied_to_celery_worker():
         assert worker["security_context"]["read_only_root_filesystem"] is True
 
     return app.celery_deployments[0].spec.template.spec.containers.apply(check)
+
+
+# ─── Granian webapp PodMonitor selector ───────────────────────────────────────
+
+
+@pulumi.runtime.test
+def test_pod_monitor_selector_excludes_security_group_labels():
+    """The PodMonitor must not select on either pod-security-group label.
+
+    Prometheus SD flattens a label name by replacing every non-alphanumeric
+    character with ``_``, so ``ol.mit.edu/pod-security-group`` and
+    ``ol.mit.edu/pod_security_group`` collapse to the same meta-label. Selecting
+    on both emits two ``keep`` rules against that one meta-label demanding
+    different values, the scrape pool resolves to zero targets, and the app goes
+    silently unmonitored -- no ``up`` series and no error. mitxonline lost every
+    granian_* metric this way.
+    """
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="monitored",
+            k8s_global_labels={
+                "ol.mit.edu/application": "monitored",
+                "ol.mit.edu/environment": "qa",
+                "ol.mit.edu/pod_security_group": "monitored",
+            },
+            granian_config=GranianConfig(
+                application_module="monitored.wsgi:application",
+                enable_metrics=True,
+            ),
+        )
+    )
+
+    def check(spec):
+        match_labels = spec["selector"]["matchLabels"]
+        assert "ol.mit.edu/pod-security-group" not in match_labels
+        assert "ol.mit.edu/pod_security_group" not in match_labels
+        assert match_labels == {
+            "ol.mit.edu/application": "monitored",
+            "ol.mit.edu/component": "webapp",
+        }
+
+    return app.webapp_pod_monitor.spec.apply(check)

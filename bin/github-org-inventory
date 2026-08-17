@@ -253,6 +253,37 @@ def _count(client: httpx.Client, path: str) -> int | None:
     return len(payload)
 
 
+def _push_restrictions(
+    protection: dict[str, Any] | None,
+) -> dict[str, list[str]] | None:
+    """Who classic branch protection lets push to the default branch, or None.
+
+    `None` means unrestricted -- either no classic protection at all, or protection
+    without the "Restrict who can push" toggle. An actual dict is an ALLOW-LIST: nobody
+    outside it can push, and GitHub counts merging a pull request as a push, so this
+    silently decides who can press Merge no matter what team grants or rulesets say.
+
+    RECORDED BECAUSE THE BOOLEAN WAS NOT ENOUGH. `has_branch_protection` said `true` for
+    open-edx-plugins for months while its allow-list held exactly `odlbot`. Nothing in
+    the inventory, the audit or Pulumi could see that, so when PR #5324 downgraded
+    arbisoft-contractors and odl-engineering from `admin` to `push` on 2026-08-12 -- and
+    with it the admin bypass that `enforce_admins: false` was granting them -- both teams
+    silently lost the ability to merge anything. It took a contractor reporting a stuck
+    PR five days later to find it. SEC-16 exists so the next one shows up in a report.
+
+    An empty allow-list is preserved as `{}` rather than collapsed to `None`: restricted
+    to nobody is the most restrictive state there is, not the absence of a restriction.
+    """
+    restrictions = (protection or {}).get("restrictions")
+    if restrictions is None:
+        return None
+    return {
+        "users": sorted(u["login"] for u in restrictions.get("users") or []),
+        "teams": sorted(t["slug"] for t in restrictions.get("teams") or []),
+        "apps": sorted(a["slug"] for a in restrictions.get("apps") or []),
+    }
+
+
 def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
     """Collect everything about one repo that the import or the audit needs."""
     name = listed["name"]
@@ -308,6 +339,7 @@ def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
             required_checks = (protection.get("required_status_checks") or {}).get(
                 "contexts", []
             )
+        push_restrictions = _push_restrictions(protection)
 
         return {
             "name": name,
@@ -343,6 +375,14 @@ def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
                 security.get("secret_scanning_push_protection") or {}
             ).get("status"),
             "has_branch_protection": protection is not None,
+            "branch_protection_push_restrictions": push_restrictions,
+            # Decides whether an `admin` team grant still gets past the allow-list above,
+            # so SEC-16 cannot be exact without it. False fleet-wide as of 2026-08-17,
+            # which is why downgrading a team from `admin` to `push` was enough to take
+            # its merge access away on a restricted repo.
+            "branch_protection_enforce_admins": bool(
+                (protection or {}).get("enforce_admins", {}).get("enabled")
+            ),
             "required_status_checks": required_checks,
             "ruleset_count": len(rulesets),
             "rulesets": [
@@ -536,6 +576,42 @@ def _is_stale(repo: dict[str, Any]) -> bool:
     return age.days > STALE_DAYS
 
 
+#: Team grants that are supposed to carry the ability to merge a pull request.
+#: `triage` and `pull` are excluded because neither can merge in the first place, so a
+#: push restriction takes nothing away from them.
+MERGE_CAPABLE_PERMISSIONS = frozenset({"push", "maintain", "admin"})
+
+
+def _blocked_by_push_restriction(repo: dict[str, Any]) -> list[str]:
+    """Teams that hold a merge-capable grant but are outside the push allow-list.
+
+    A push restriction is an allow-list, and GitHub treats merging a pull request as a
+    push, so a team absent from it cannot merge however generous its grant looks. That
+    combination is invisible in `teams` alone -- which reads `push`, i.e. fine -- and
+    invisible in `has_branch_protection` alone, which reads `true`, i.e. also fine. Only
+    the two together show the problem, and until now the inventory recorded only the
+    second. See `_push_restrictions` for the incident that motivated this.
+
+    `enforce_admins` decides whether an `admin` grant still gets through: with it off
+    (the fleet-wide state today) admins bypass the allow-list and are not blocked, so
+    they are only reported when it is on. That distinction is the whole mechanism behind
+    the open-edx-plugins outage -- the teams were fine at `admin` and broke at `push`
+    without the restriction itself changing at all.
+    """
+    allowed = repo.get("branch_protection_push_restrictions")
+    if allowed is None:
+        return []
+    allowed_teams = set(allowed.get("teams") or [])
+    enforce_admins = repo.get("branch_protection_enforce_admins")
+    return sorted(
+        team
+        for team, perm in (repo.get("teams") or {}).items()
+        if perm in MERGE_CAPABLE_PERMISSIONS
+        and team not in allowed_teams
+        and (enforce_admins or perm not in ADMIN_PERMISSIONS)
+    )
+
+
 def propose_archetype(repo: dict[str, Any]) -> str:
     """Best-guess archetype. A human confirms -- this only has to be mostly right.
 
@@ -631,6 +707,9 @@ def _findings(
             r["name"]
             for r in live
             if not r["has_branch_protection"] and r["ruleset_count"] == 0
+        ],
+        "SEC-16 push restriction excludes a team that holds push": [
+            r["name"] for r in live if _blocked_by_push_restriction(r)
         ],
         "SEC-03 no required status checks": [
             r["name"] for r in live if not r["required_status_checks"]
@@ -811,6 +890,38 @@ def report(
     )
 
 
+def _team_permission_conflicts(
+    out: Path, repo_name: str, new_teams: dict[str, str]
+) -> list[str]:
+    """Team-grant changes this crawl is about to write over what's already committed.
+
+    `teams:` is emitted verbatim from live GitHub on every crawl (see `crawl`), with no
+    comparison against the archetype -- so it doubles as both "what the fleet observed"
+    and "what a phase-5 remediation declares as the target". Those two roles collide the
+    moment a human edits a repo's `teams:` to a tighter value (e.g. SEC-15's admin ->
+    push) and a `crawl --refresh` runs before `pulumi up` has applied it: the refresh
+    re-observes the still-unfixed live grant and silently overwrites the declared fix
+    back to match it. Caught twice by PR review, not by any tooling -- see witan task
+    tk-github-org-inventory-crawl-silently-reverts-pending-e65389.
+
+    Returns one human-readable line per team whose grant is about to change, or an empty
+    list if the file doesn't exist yet or nothing about `teams:` would change.
+    """
+    existing_path = out / f"{repo_name}.yaml"
+    if not existing_path.exists():
+        return []
+    existing_teams = (yaml.safe_load(existing_path.read_text()) or {}).get(
+        "teams"
+    ) or {}
+    if existing_teams == new_teams:
+        return []
+    return [
+        f"{repo_name}: {team} {existing_teams.get(team)!r} -> {new_teams.get(team)!r}"
+        for team in sorted(set(existing_teams) | set(new_teams))
+        if existing_teams.get(team) != new_teams.get(team)
+    ]
+
+
 def _resolve_archetype(archetypes: dict[str, Any], name: str) -> dict[str, Any]:
     """Flatten an archetype's `extends` chain into the effective settings.
 
@@ -866,6 +977,18 @@ def crawl(
     out: Annotated[
         Path, cyclopts.Parameter(help="Directory for per-repo YAML.")
     ] = DATA_DIR / "repos",
+    allow_team_drift: Annotated[
+        bool,
+        cyclopts.Parameter(
+            help=(
+                "Write over a repo's committed `teams:` even though live GitHub still "
+                "disagrees with it -- i.e. accept live as ground truth instead of "
+                "treating the committed value as a pending-but-unapplied remediation. "
+                "Without this, a repo whose `teams:` would change is refused rather "
+                "than silently reverted."
+            )
+        ),
+    ] = False,
 ) -> None:
     """Emit one YAML file per repo, carrying only deviations from its archetype.
 
@@ -926,6 +1049,34 @@ def crawl(
         raise SystemExit(message)
 
     out.mkdir(parents=True, exist_ok=True)
+
+    # Detect before writing anything: once a repo's file is overwritten the previously
+    # committed (possibly pending-but-unapplied) `teams:` value is gone, and there's no
+    # signal left in this run to warn from.
+    team_drift = sorted(
+        line
+        for repo in data["repos"]
+        for line in _team_permission_conflicts(out, repo["name"], repo["teams"] or {})
+    )
+    if team_drift and not allow_team_drift:
+        message = (
+            f"{len(team_drift)} team grant(s) would change on this crawl, which would "
+            "overwrite a committed value that live GitHub does not yet match -- most "
+            "likely a phase-5 remediation (e.g. SEC-15) that hasn't had `pulumi up` run "
+            "for it yet:\n  "
+            + "\n  ".join(team_drift)
+            + "\nRun `pulumi up` for the affected repos first so live matches the "
+            "committed value, then re-crawl. If live is correct and the committed value "
+            "is simply stale, re-run with --allow-team-drift to accept live."
+        )
+        raise SystemExit(message)
+    if team_drift:
+        print(
+            f"--allow-team-drift set: accepting {len(team_drift)} live team grant "
+            "change(s) over the committed value:\n  " + "\n  ".join(team_drift),
+            file=sys.stderr,
+        )
+
     written = 0
     for repo in data["repos"]:
         archetype = assigned[repo["name"]]
@@ -972,6 +1123,16 @@ def crawl(
         doc["_visibility"] = repo["visibility"]
         doc["_pushed_at"] = repo["pushed_at"]
         doc["_has_branch_protection"] = repo["has_branch_protection"]
+        # Emitted only where a restriction EXISTS. Unlike `_custom_properties`, absence
+        # here is not a finding but the normal, healthy state -- writing `null` onto 300+
+        # repos would bury the handful that are actually restricted. See SEC-16.
+        if repo["branch_protection_push_restrictions"] is not None:
+            doc["_branch_protection_push_restrictions"] = repo[
+                "branch_protection_push_restrictions"
+            ]
+            doc["_branch_protection_enforce_admins"] = repo[
+                "branch_protection_enforce_admins"
+            ]
         doc["_ruleset_count"] = repo["ruleset_count"]
         if repo.get("direct_collaborators"):
             doc["_direct_collaborators"] = repo["direct_collaborators"]
