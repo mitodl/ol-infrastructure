@@ -865,9 +865,20 @@ def create_k8s_configmaps(  # noqa: PLR0915
         from ..production import *  # noqa: F401,F403
         """
     )
+    # Gated on enable_courseware_index as well as on Typesense being configured,
+    # so the override only points reads at Typesense where something is actually
+    # writing to it. Without that third condition, production -- Typesense
+    # enabled, indexing off -- would have its LMS moved off the Elasticsearch
+    # engine that upstream's clobber currently selects and onto a Typesense
+    # cluster holding zero collections. Neither backend returns useful results
+    # in production today, but swapping one empty index for another is not this
+    # PR's business; production behaviour stays byte-identical until indexing is
+    # turned on there. Where the flag is off this module is a pure passthrough.
     typesense_config = Config("typesense")
-    if typesense_config.get_bool("enabled") and typesense_config.get_bool(
-        "course_search_enabled"
+    if (
+        edxapp_config.get_bool("enable_courseware_index")
+        and typesense_config.get_bool("enabled")
+        and typesense_config.get_bool("course_search_enabled")
     ):
         settings_override_module += textwrap.dedent(
             """
