@@ -6,7 +6,11 @@ on:
     branches: [main]
   pull_request:
 
-permissions: {}
+# Every job here only reads the checkout: nothing publishes, comments, or writes
+# back. Set at the workflow level rather than per job so a job added later
+# inherits the restriction instead of silently getting the default token.
+permissions:
+  contents: read
 
 jobs:
   test:
