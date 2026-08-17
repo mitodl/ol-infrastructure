@@ -1336,6 +1336,7 @@ class OLApplicationK8s(ComponentResource):
         self.celery_deployment_names: list[str] = []
         self.celery_deployments: list[kubernetes.apps.v1.Deployment] = []
         self.beat_deployment_name: str | None = None
+        self.webapp_pod_monitor: kubernetes.apiextensions.CustomResource | None = None
 
         if pre_deploy_commands := ol_app_k8s_config.pre_deploy_commands:
             _pre_deploy_job = kubernetes.batch.v1.Job(
@@ -1559,10 +1560,14 @@ class OLApplicationK8s(ComponentResource):
             # app goes silently unmonitored -- no `up` series, no error, the PodMonitor
             # looks healthy. mitxonline lost every granian_* metric this way.
             #
-            # Namespace + application + component=webapp already identifies these pods
-            # uniquely (celery pods carry component=celery), and leaving the security
-            # group name out also stops a security group replacement from silently
-            # breaking the scrape.
+            # Namespace + application + component=webapp is enough to reach the webapp
+            # pods: celery and beat pods carry component=celery. The pre/post-deploy Job
+            # pods do stamp these same labels, but their containers declare no port named
+            # `metrics`, so service discovery yields no target for them -- give a Job
+            # container such a port and it would join this scrape pool.
+            #
+            # Leaving the security group name out also stops a security group replacement
+            # from silently breaking the scrape.
             _pod_monitor_selector_labels = {
                 "ol.mit.edu/application": ol_app_k8s_config.application_name,
                 "ol.mit.edu/component": "webapp",
