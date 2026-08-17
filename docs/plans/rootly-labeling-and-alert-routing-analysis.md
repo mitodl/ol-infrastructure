@@ -711,11 +711,13 @@ proposed §7.4 urgency table; environment-based handling belongs in routing
 
 > **§7, §8 and §9 of this document are superseded by
 > [rootly-label-routing-implementation-spec.md](rootly-label-routing-implementation-spec.md)
-> (2026-08-17).** The measurements in §0-§6 stand, with three corrections recorded in
+> (2026-08-17).** The measurements in §0-§6 stand, with the corrections recorded in
 > that spec's §0: the kube-state-metrics change needs *two* independent gates rather
 > than one (the chart's own allow-list also drops `kube_*_labels`); §7.3's code sketch
-> nests the Helm value one level too deep and would silently no-op; and the join target
-> differs per rule, so 16 of 20 EKS rules are rewritable rather than all 18.
+> nests the Helm value one level too deep and would silently no-op; the join target
+> differs per rule, so 16 of 20 EKS rules are rewritable rather than all 18; and §5.5's
+> speculation that the `Grafana` source might be dead has since become true — PR #5400
+> repointed the Synthetic Monitoring rules away from it (Q4 below).
 
 **Q1. — RESOLVED 2026-08-17.** CI alerts keep reaching Rootly; do not drop them to
 `oblivion` in the CI stack. CI ships no metrics, so the volume is zero — the hazard is
@@ -723,10 +725,11 @@ the CI source's **High** default urgency, which is fixed at the source (High →
 rather than by hiding the path. Keeping delivery visible in Rootly keeps it auditable.
 See spec §1.1.
 
-**Q2. — RESOLVED 2026-07-30 (tmacey).** QA alerts are deferred to business hours but
-not silenced: they often act as precursors to production issues as QA changes get
-promoted. Implemented as Slack-only notification with no paging and no deferral path
-— see §8.1 for the reasoning and the resulting change to §7.4.
+**Q2. — RESOLVED 2026-07-30 (tmacey).** QA alerts **notify without paging**, and are not
+silenced: they often act as precursors to production issues as QA changes get promoted.
+Implemented as Slack-only notification, delivered immediately, with no paging target and
+deliberately **no** deferral path — §8.1 explains why deferral is the wrong tool here
+even though it is the mechanism used for Medium urgency elsewhere.
 
 **Q3. — RESOLVED 2026-08-17 (tmacey).** The demotion was **deliberate**. MySQL,
 MongoDB, OpenSearch, Qdrant, ClickHouse and StarRocks are replicated enough that a
@@ -736,15 +739,19 @@ behaviour but expressing it per-workload rather than per-alertname. **This inval
 benefit to near zero — the remaining justification is routing precision and
 maintainability, stated explicitly in spec §1.2.
 
-**Q4. — RESOLVED 2026-08-17, by evidence.** The `Grafana` source is **live**. The
-UI-created `Rootly` contact point (uid `eel3rjpiwahoge`) posts to
-`grafana_webhooks?secret=09f9d82f…`, byte-identical to source `f4d836c0`'s secret; its
-traffic is the three Synthetic Monitoring rules that set
-`notification_settings.receiver: "Rootly"`. So the route is not removable — but its
-three `component` rules are still unreachable, because SM alerts carry no `component`
-and the EKS alerts that will carry one arrive at the `alertmanager` sources instead.
-They must be **moved** to the Grafana Production Service Route, not repaired in place.
-See spec §0.4.
+**Q4. — RESOLVED 2026-08-17, by evidence.** The `Grafana` source (`f4d836c0`) is now
+**inert**, and the "Grafana Service Route" bound to it is dead — as this section
+originally suspected. It *was* fed by the three MIT Learn Synthetic Monitoring rules via
+the UI-created `Rootly` contact point (`eel3rjpiwahoge`, the `grafana_webhooks`
+endpoint), but **PR #5400 removed that override on 2026-08-13**; live provisioning API
+confirms all six SM rules now carry `receiver: policy-tree`, routing through Pulumi's
+`rootly` contact point to the production `alertmanager` source `90cda8ea` instead.
+
+Those rules emit `service=mitlearn` and `component=webapp|api|nextjs`, so **two of the
+three "dead" `component` rules would match today** if moved to the Grafana Production
+Service Route — reaching `MIT Learn - API` and `MIT Learn - NextJS`, two of the 19
+orphaned services in §5.3, with no label-pipeline work at all. Move them; delete the
+route they sit on. See spec §0.4 and step P1.5.
 
 **Q5. — RESOLVED 2026-08-17 (tmacey).** Keep both, with distinct jobs: `ou` is the
 cost-allocation axis, `product` is the alerting/ownership roll-up that maps onto the

@@ -13,9 +13,18 @@ Mimir tenant, the production Grafana provisioning API, the Rootly API, the
 **Companion document.** [grafana-alerting-remediation-spec.md](grafana-alerting-remediation-spec.md)
 (2026-08-07) owns the alert-rule-quality and Rootly-hygiene workstreams W0–W7. This
 spec covers all three phases of the label project, so §2 restates the Phase 1 items
-that overlap W0/W2 — but as *status and prerequisites*, deferring the implementation
-detail to that spec. Where the two disagree about a Rootly object, that spec wins on
-W0–W2 and this one wins on anything touching a label.
+that overlap it — but as *status*, deferring the implementation detail to that spec.
+
+Precedence, narrowly: that spec is authoritative for **W0** (enabling the two disabled
+CI/QA route rules) and **W2a** (the CI source's High default urgency), both still open.
+This one is authoritative for anything touching a label. **Its W2b is superseded and
+should not be implemented** — it proposes adding a Low-urgency deferral path on the
+grounds that Low has no non-paging path, which was true on 2026-08-07 and is not now:
+PRs #5354 and #5377 shipped `escalation_path_defer_low_urgency_off_hours` and
+`escalation_path_medium_urgency_slack_only`, giving both bands a Slack-only destination
+(§0.1). Building W2b on top would add a second, redundant path over the same urgency.
+Likewise its §0.7c and W5b describe Synthetic Monitoring receiver overrides that
+PR #5400 has since removed — see §0.4.
 
 ---
 
@@ -43,17 +52,36 @@ __name__ values matching kube_(pod|deployment|statefulset|namespace)_(labels|inf
 ```
 
 `kube_pod_info` and `kube_pod_owner` are present, so kube-state-metrics *is* being
-scraped. The `*_labels` metrics are absent entirely. That distinction is the finding
-in §0.2.
+scraped and reaching Mimir. The `*_labels` metrics are absent entirely.
 
 ### 0.2 [New] There are **two** independent gates, not one — and the analysis only found the first
 
-kube-state-metrics emits `kube_pod_labels` / `kube_deployment_labels` /
-`kube_statefulset_labels` unconditionally; `--metric-labels-allowlist` controls only
-which `label_*` *columns* those series carry, not whether the series exist. Their
-total absence from Mimir therefore cannot be explained by the missing allowlist.
+**Gate 1 — kube-state-metrics emits nothing at all when the allowlist is empty.**
+From the generator, `internal/store/pod.go`:
 
-The second gate is the chart's own scrape filter. In `k8s-monitoring` 4.4.0,
+```go
+func createPodLabelsGenerator(allowLabelsList []string) generator.FamilyGenerator {
+    ... wrapPodFunc(func(p *v1.Pod) *metric.Family {
+        if len(allowLabelsList) == 0 {
+            return &metric.Family{}          // <-- no series for any pod
+        }
+        labelKeys, labelValues := createPrometheusLabelKeysValues("label", p.Labels, allowLabelsList)
+        m := metric.Metric{LabelKeys: labelKeys, LabelValues: labelValues, Value: 1}
+        return &metric.Family{Metrics: []*metric.Metric{&m}}
+    })
+}
+```
+
+So the absence of `kube_pod_labels` from Mimir today is fully explained by the missing
+`--metric-labels-allowlist`, and today's live state tells us nothing about gate 2 either
+way. **Note also the second branch: once the allowlist *is* configured, a series is
+emitted for every pod with `Value: 1`, whether or not that pod carries any allowlisted
+label.** An unlabeled workload therefore gets a join partner with the join keys and no
+`label_ol_mit_edu_*` columns — which is what §4 depends on, and why the coverage gate
+is about routing quality rather than alert availability.
+
+**Gate 2 — the chart drops the metric post-scrape**, independently and verifiably.
+In `k8s-monitoring` 4.4.0,
 `clusterMetrics.kube-state-metrics.metricsTuning.useDefaultAllowList` defaults to
 `true` (`charts/feature-cluster-metrics/values.yaml:676`), and the default allow-list
 (`charts/feature-cluster-metrics/default-allow-lists/kube-state-metrics.yaml`)
@@ -73,8 +101,13 @@ joins would still drop every series. Both of these are required:
 
 | Gate | Where | Effect if omitted |
 |---|---|---|
-| `metricLabelsAllowlist` | `telemetryServices["kube-state-metrics"]` | series exist, carry no `label_ol_mit_edu_*` columns; `group_left` adds nothing |
-| `metricsTuning.includeMetrics` | `clusterMetrics["kube-state-metrics"]` | series never reach Mimir; `group_left` drops every row |
+| `metricLabelsAllowlist` | `telemetryServices["kube-state-metrics"]` | no `kube_*_labels` series produced at all |
+| `metricsTuning.includeMetrics` | `clusterMetrics["kube-state-metrics"]` | series produced but dropped by Alloy before remote_write |
+
+Both failure modes look identical from Mimir — the metric is simply absent — so there
+is no query that distinguishes them from outside. The only way to tell gate 2 is still
+closed is to apply gate 1 and observe that `kube_pod_labels` is *still* missing.
+Apply both together and check once.
 
 ### 0.3 [New] The §7.3 code sketch has the wrong values path, and would silently no-op
 
@@ -111,36 +144,52 @@ Helm replaces lists rather than merging them. Supplying only `pods=[...]` silent
 drops 20 node labels that the Grafana Cloud Kubernetes integration's node views
 depend on. The `nodes=[...]` entry must be carried forward verbatim.
 
-### 0.4 Q4 resolved: the `Grafana` source is live. The three dead rules are dead for a different reason.
+### 0.4 Q4 resolved: the `Grafana` source is now inert — and two of its dead rules can be made live today, without Phase 3
 
 Analysis Q4 asked what still delivers to alert source `f4d836c0`
-(`source_type: "grafana"`). Answer, from the production provisioning API:
+(`source_type: "grafana"`). It *was* fed by the three MIT Learn Synthetic Monitoring
+rules, which set `notification_settings.receiver: "Rootly"` — the UI-created duplicate
+contact point (`eel3rjpiwahoge`, posting to the `grafana_webhooks` endpoint with a
+token matching that source), distinct from Pulumi's `rootly` (`bfsoqo63lsyrka`, the
+`alertmanager_webhooks` endpoint).
 
-```
-contact point "Rootly"  uid eel3rjpiwahoge
-  url = https://webhooks.rootly.com/webhooks/incoming/grafana_webhooks?secret=09f9d82f…
-```
+**PR #5400 (2026-08-13) removed that override**, adopting all three rules into
+`metric_rules/synthetic_monitoring.py` and routing them through `alertmanager.py`'s
+policy tree instead. Confirmed applied — production `/api/v1/provisioning/alert-rules`
+for folder `grafana-synthetic-monitoring-app`:
 
-That secret is byte-identical to alert source `f4d836c0`'s `secret`. The source is
-fed by the three Synthetic Monitoring rules that set
-`notification_settings.receiver: "Rootly"` (remediation spec §0.7c) — the
-UI-created duplicate contact point, distinct from Pulumi's `rootly`
-(`bfsoqo63lsyrka`, the `alertmanager_webhooks` endpoint).
+| Rule | receiver | labels |
+|---|---|---|
+| `Learn Homepage - Check Failed` | `policy-tree` | `component=webapp`, `service=mitlearn`, `severity=critical` |
+| `Learn API Health Endpoint - Check Failed` | `policy-tree` | `component=api`, `service=mitlearn`, `severity=critical` |
+| `Learn NextJS Homepage (Bypass Fastly) - Check Failed` | `policy-tree` | `component=nextjs`, `service=mitlearn`, `severity=warning` |
 
-So the "Grafana Service Route" is **not** an orphan route to be deleted. But its five
-rules are still unreachable, and the reason matters for Phase 3:
+(plus three `- Elevated Probe Failure Rate` rules #5400 added, same labels, no severity.)
 
-- Its only traffic is Synthetic Monitoring probe alerts, which carry neither
-  `commonLabels.service` nor `commonLabels.component`.
-- The EKS metric alerts that *will* carry a `component` label after Phase 3 arrive at
-  the three `alertmanager`-type sources, never at `f4d836c0`.
+So source `f4d836c0` now has **no feed at all**, and the "Grafana Service Route" bound
+to it is genuinely dead — which is what analysis §5.5 suspected. This also supersedes
+remediation spec §0.7c, which still describes the three receiver overrides as live;
+deleting the duplicate `Rootly` contact point (its W5b) is now safe.
 
-**Therefore the three `component`-matching rules must be *moved* to the Grafana
-Production Service Route (bound to source `90cda8ea`), not repaired in place.**
-Repairing them where they sit — which is what analysis §8 step 3 implies — leaves
-them dead forever. Correcting analysis §5.5, which speculated the route might be
-entirely dead and removable: it is live, and removing it would break nothing today
-but would remove the only route the SM alerts can match.
+**The three `component` rules must still be moved to the Grafana Production Service
+Route (bound to `90cda8ea`) — and the reason is now much better than "so they work
+after Phase 3".** Those SM alerts route through the Pulumi contact point to the
+production `alertmanager` source *today*, carrying exactly the payload fields those
+rules test:
+
+| Rule | Condition | Matches today? |
+|---|---|---|
+| MIT Learn API → `MIT Learn - API` (`3ad10823`) | `service contains "mitlearn"` AND `component contains "api"` | **yes** |
+| MIT Learn NextJS → `MIT Learn - NextJS` (`b2389961`) | `service contains "mitlearn"` AND `component contains "nextjs"` | **yes** |
+| MIT Learn AI API → `MIT Learn AI - API` | `service contains "learn-ai"` AND `component contains "api"` | no — no rule emits `service=learn-ai` |
+
+**Two of the 19 orphaned Rootly services (§5.3) become reachable the moment those two
+rules are moved.** No label pipeline, no kube-state-metrics change, no Phase 2. This is
+the cheapest item in the whole project and it is available now — see P1.5 in §5.
+
+Caution on ordering: the `Check Failed` rules carry `severity`, the `Elevated Probe
+Failure Rate` rules do not, so the latter drop to `oblivion` in the policy tree. Only
+the three `Check Failed` rules actually arrive at Rootly to be routed.
 
 ### 0.5 [New] The join target differs per rule, and two rule pairs cannot be joined at all
 
@@ -201,22 +250,29 @@ volume), and exclude the `dagster` namespace from the pod-level series via
 already excluded from `KubernetesJobFailed*` in PromQL (`namespace!="dagster"`) and
 are tiered `ticket`, so no signal is lost.
 
-### 0.7 [New] Making `Component` strict breaks 3 of its 5 live call sites
+### 0.7 [New] Making `Component` strict breaks nothing — there is exactly one call site
 
-`component` is set at exactly five places in `src/`, with these values:
+A `grep` for `component=` across `src/` returns five hits, but only one of them is the
+`K8sAppLabels` field:
 
-```
-"webapp"    ← in Component
-"frontend"  ← in Component
-"api"       ← NOT in Component
-"nextjs"    ← NOT in Component
-pgbouncer   ← NOT in Component (bare identifier, a local variable)
-```
+| Hit | What it actually is |
+|---|---|
+| `mit_learn_nextjs/__main__.py:49` `component="frontend"` | **the only `K8sAppLabels.component` call site** — and `frontend` is already in the enum |
+| `synthetic_monitoring.py:206,229,245` `component="nextjs"/"api"/"webapp"` | the `_Check` dataclass's own `component: str` field — a Grafana *alert label*, unrelated to the K8s label classes |
+| `dagster/__main__.py:947` `component=pgbouncer` | inside a **comment**, describing a raw Kubernetes Service label used as a `ServiceMonitor` selector |
 
-The `Component | str | None` type is what permits this. Dropping `| str` without
-first extending the enum is a three-site breakage, and `pgbouncer` is a value nobody
-proposed adding. This makes the ordering in §3.2 mandatory: extend the enum, migrate
-call sites, *then* tighten the type — three commits, not one.
+So dropping `| str` from `Component | str | None` breaks **zero** call sites, and the
+three-commit ordering is not forced by breakage. Extending the enum first is still the
+right order — a strict enum with four members would reject `api`/`nextjs` the moment
+anyone sets them, and those values are already in live use as alert labels (§0.4) — but
+it is a design choice, not a migration constraint. §3.1 can be two commits.
+
+Note the corollary for §4.5: `component` as a Rootly routing key already has two
+distinct producers with no shared vocabulary — `synthetic_monitoring.py`'s `_Check`
+and (after Phase 3) the `ol.mit.edu/component` label. They agree on `api`, `nextjs` and
+`webapp` today by coincidence, not by construction. Making `_Check.component` typed as
+`Component` is a one-line change that turns that coincidence into a guarantee, and is
+worth doing in the same commit as the enum extension.
 
 ---
 
@@ -307,7 +363,7 @@ explicit.
 | 1b | `QA Non-Paging Escalation Policy` (`d63b7456`) has one service and zero levels — those CloudWatch alarms notify nobody | this project | **open** — delete the policy and move `MITx Online QA - Open edX - Redis` onto `CI/QA Slack Notifications` |
 | 1c | Account-wide "default alerts channel" toggle posts every alert to `#devops-alerts` regardless of routing (`__main__.py:513-521`) | this project | **open** — until this is off, the CI/QA separation has no observable effect |
 | 2 | Delete `exampleDeleteMe-EscalationPolicy` (`__main__.py:538`); finish `Cloudwatch - Critical` source setup | this project | **open** |
-| 3 | Three dead `component` rules in the Grafana Service Route | this project | **re-specified** — *move* to the Grafana Production Service Route (§0.4), do not repair in place; sequence with Phase 3 step 13, since they only become live once `component` is emitted |
+| 3 | Three dead `component` rules in the Grafana Service Route | this project | **re-specified and promoted** — *move* to the Grafana Production Service Route, don't repair in place; two of the three match live payloads **today** (§0.4), so this is step **P1.5**, not a Phase 3 item. Delete the now-inert Grafana Service Route with them |
 | 4 | Import the six unmanaged alert routes | — | **closed** by PR #5218 |
 | 5 | Low urgency pages like High | — | **closed** by PRs #5354, #5377 |
 
@@ -321,9 +377,10 @@ before Phase 3's verification step, not before its implementation.
 
 ### 3.1 Schema changes, in dependency order
 
-Three commits, because §0.7 makes the ordering load-bearing.
+Two commits. §0.7 establishes that nothing currently assigns a non-enum value to the
+typed field, so the type can be tightened in the same commit that extends the enum.
 
-**Commit A — extend `Component`, keep the permissive type.**
+**Commit A — extend `Component`, and tighten the type.**
 
 ```python
 @unique
@@ -351,10 +408,16 @@ class Component(StrEnum):
     worker = "worker"
 ```
 
-`api`, `nextjs` and `pgbouncer` are present because they are already in use (§0.7).
-`gateway` and `queue` are added for APISIX/Traefik and RabbitMQ/Redis-as-broker,
-which have no current member and are exactly the wide-blast-radius workloads in
-`operations-production`.
+`api`, `nextjs` and `webapp` are present because `synthetic_monitoring.py`'s `_Check`
+already emits them as Grafana alert labels (§0.4); `pgbouncer` because Dagster uses it
+as a raw Kubernetes Service label. `gateway` and `queue` are added for APISIX/Traefik
+and RabbitMQ/Redis-as-broker, which have no current member and are exactly the
+wide-blast-radius workloads in `operations-production`.
+
+Same commit: `component: Component | None` (dropping `| str`), and retype
+`_Check.component` from `str` to `Component` so the two producers of Rootly's
+`component` routing key share one vocabulary by construction rather than by
+coincidence (§0.7).
 
 **Commit B — add `alert_tier`, and move the roll-up fields into the base class.**
 
@@ -393,10 +456,6 @@ all four new fields default to `None` and `exclude_none=True` already drops them
 `release_tag` and re-declares `product`, `application` and `source_repository` as
 required, so it stays the stricter contract it is today.
 
-**Commit C — tighten the types, after the call sites are migrated.** `component:
-Component | None`, dropping `| str`. Requires Commit A plus the `pgbouncer` call site
-converted from a bare identifier to `Component.pgbouncer`.
-
 ### 3.2 Enum hygiene, same phase
 
 - `Services.learn_ai = ("learn-ai",)` → `"learn-ai"` (analysis §3.2d). Harmless today
@@ -427,19 +486,37 @@ Order by blast radius, not by count:
 
 Also backfill CI/QA clusters, which the analysis explicitly did not measure. Coverage
 there does not affect paging (CI/QA alerts go Slack-only per §8.1) but an unlabeled QA
-workload makes the join drop the series, so a rule that works in production silently
-returns nothing in QA — which is how a Phase 3 regression would hide.
+workload routes as untier-ed, so the QA stack stops being a rehearsal for the
+production routing behaviour — which is how a Phase 3 mis-tiering would go unnoticed
+until it reached production.
 
 ### 3.4 The CI gate
 
-A `pytest` check (not a `pre-commit` hook — it needs to import the label classes) that
-walks every `K8sGlobalLabels(...)` / `K8sAppLabels(...)` construction reachable from
-`src/ol_infrastructure/applications/` and asserts `component` and `alert_tier` are
-set. Fails the build on a new workload without them.
+The obvious shape — walk every `K8sGlobalLabels(...)` / `K8sAppLabels(...)`
+construction and assert the fields are set — does not enforce the invariant that
+matters, for two reasons:
 
-Gate on an explicit allowlist of currently-unlabeled construction sites that shrinks
-as §3.3 lands, rather than a flag day: the check goes in green on day one and the
-allowlist is the backfill's progress bar.
+1. **It cannot see a workload that never constructs a label object at all.** A new
+   `Deployment` with a hand-written `metadata.labels` dict, or one that reuses another
+   module's `k8s_global_labels` variable, passes a constructor-walking check while
+   producing an unlabeled workload. The failure mode the gate exists to catch is
+   precisely "someone added a workload and didn't think about labels".
+2. **It cannot tell where the labels landed.** `kube_pod_labels` reads the **pod
+   template's** labels, not the workload object's. A `Deployment` labeled only at
+   `metadata.labels` satisfies a constructor check and still joins against nothing.
+   The analysis flagged this distinction in §3.1 and it is the difference between the
+   gate working and the gate lying.
+
+So the check must assert against **rendered workload resources**, not constructor call
+sites: enumerate the `Deployment` / `StatefulSet` / `DaemonSet` resources each Pulumi
+program registers, and assert the required keys are present in **both**
+`metadata.labels` and `spec.template.metadata.labels`. `pulumi.runtime.set_mocks` gives
+this without a cluster.
+
+Gate on an explicit allowlist keyed to **resource names**, not call sites, that shrinks
+as §3.3 lands: the check goes in green on day one and the allowlist is the backfill's
+progress bar. Keying it to resources rather than call sites is also what makes the
+allowlist a faithful progress bar — one call site can produce many workloads.
 
 ### 3.5 Acceptance criteria
 
@@ -448,16 +525,28 @@ allowlist is the backfill's progress bar.
   `ol.mit.edu/component` and `ol.mit.edu/alert_tier`.
 - 100% for `operations-production`.
 - The CI gate's allowlist is empty.
-- `mypy` clean after Commit C, which is what proves the `| str` escape hatch is gone.
+- `mypy` clean after Commit A, which is what proves the `| str` escape hatch is gone.
 
 ---
 
 ## 4. Phase 3 — wiring labels into alerting
 
-**Hard prerequisite: §3.5 met.** The `group_left` join drops any series whose join
-partner is missing, so an unlabeled workload does not degrade to "no tier" — it
-degrades to **no alert at all**. Shipping Phase 3 at today's 22% coverage would
-silence 78% of EKS alerting. This is the single largest risk in the project.
+**Coverage is a routing-quality gate, not an alert-availability gate.** Per §0.2, once
+`metricLabelsAllowlist` is configured kube-state-metrics emits a `kube_pod_labels`
+series for **every** pod with `Value: 1`, carrying the join keys whether or not that pod
+has any of the allowlisted labels. So `group_left` succeeds for an unlabeled workload
+and simply copies no `label_ol_mit_edu_*` column: the alert fires with an empty
+`alert_tier` and falls through to §4.4's `severity` catch-all — warning → Low, critical
+→ High, i.e. today's behaviour. It is **not** silenced.
+
+That makes §3.5 a strong recommendation rather than a hard prerequisite: shipping
+Phase 3 at partial coverage degrades gracefully to the status quo for the unlabeled
+tail, workload by workload, and each backfilled label improves routing the moment it
+lands. §5 sequences P3.B after P2.D for that reason rather than after all of P2.
+
+**The one case that does silence is a missing right-hand series**, and §4.1's Dagster
+drop rule is the only thing in this spec that creates one. It is scoped accordingly —
+see the note there.
 
 ### 4.1 kube-state-metrics: both gates (§0.2, §0.3)
 
@@ -502,15 +591,27 @@ In `substructure/aws/eks/grafana.py`:
                 "kube_job_labels",
             ],
         },
-        # Dagster mints a pod name per job run, so pod-level label series churn
-        # hard in data-production (2,004 of the estate's 2,606 production pods).
-        # Those pods are tiered `ticket` and already excluded from
-        # KubernetesJobFailed* in PromQL, so nothing is lost by not paying for them.
+        # Dagster mints a pod name per run, so pod-level label series churn hard
+        # in data-production (2,004 of the estate's 2,606 production pods).
+        #
+        # Scoped to run/step pods BY NAME rather than to the whole `dagster`
+        # namespace. Dropping the namespace would also drop the long-lived
+        # services in it -- the daemon, the webserver, the code-location
+        # deployments -- and per section 4, a missing right-hand series is the
+        # one case where group_left silences an alert outright rather than
+        # leaving it untier-ed. Those services would lose PodOOMKilled* and
+        # PodCrashLooping* entirely; excluding Dagster from KubernetesJobFailed*
+        # in PromQL does not compensate, because that is a different rule.
+        #
+        # Verify the prefixes against live pod names before applying -- they are
+        # set by the Dagster K8s run launcher and are not a stable API. If they
+        # drift, the cost of getting this wrong is a re-added series, not a lost
+        # alert, provided the regex stays anchored to run/step pods.
         "extraMetricProcessingRules": textwrap.dedent("""
             rule {
-              source_labels = ["__name__", "namespace"]
+              source_labels = ["__name__", "namespace", "pod"]
               separator     = "@"
-              regex         = "kube_pod_labels@dagster"
+              regex         = "kube_pod_labels@dagster@dagster-(run|step)-.*"
               action        = "drop"
             }
         """),
@@ -518,18 +619,26 @@ In `substructure/aws/eks/grafana.py`:
 },
 ```
 
+If the run-pod naming turns out not to be reliably matchable, drop this rule entirely
+and pay for the ~2,000 series. Cost is the lesser risk here.
+
 where `_OL_LABEL_KEYS = "ol.mit.edu/service,ol.mit.edu/component,ol.mit.edu/alert_tier,ol.mit.edu/environment"`.
 
 **Verification, before touching any alert rule:**
 
 ```
-count(kube_pod_labels)                                    → ~600  (2,606 minus dagster)
+count(kube_pod_labels)                                    → ~600  (2,606 minus dagster run pods)
 count(kube_deployment_labels)                             → >0
 count(kube_pod_labels{label_ol_mit_edu_alert_tier!=""})    → matches §3.5 coverage
 count(kube_node_labels{label_topology_kubernetes_io_zone!=""})  → unchanged from today
+count(kube_pod_labels{namespace="dagster"})               → >0, and covers the daemon,
+                                                             webserver and code-location
+                                                             pods but no dagster-run-* pod
 ```
 
-That last one is the regression check for the `nodes=[...]` trap in §0.3.
+The fourth is the regression check for the `nodes=[...]` trap in §0.3; the fifth is the
+regression check for the drop rule's scoping — a zero there means the rule is matching
+the whole namespace and would silence Dagster's long-lived services.
 
 ### 4.2 Rewrite the 16 joinable rules
 
@@ -554,18 +663,37 @@ label_replace(
 Per §1.7 the rule emits `alert_tier` and `ol_component`; `label_ol_mit_edu_*` never
 leaves PromQL.
 
-**Environment (§5.4 fix).** For the four rule pairs that currently encode environment
-by cluster-name regex, join `label_ol_mit_edu_environment` and filter on it instead of
-on `cluster=~`. Keep the cluster filter as well during the transition — it is the
-fallback for any workload that has not declared an environment, and removing it is a
-separate change once §3.5 holds.
+**Environment (§5.4 fix).** **All eight joinable pairs** select warning-vs-critical by
+`cluster=~".*-(ci|qa)"` / `".*-(production)"` — `DaemonsetReplicasMissing*`, both
+`Deployment*` pairs, `StatefulSetReplicasMissing*`, `PodCrashLooping*`,
+`CeleryBeatPodRestarts*`, `PodOOMKilled*` and `KubernetesJobFailed*`. (`NodeNotReady*`
+and `HPAAtMaxReplicas*` do too, but they are out of scope per §1.5.)
 
-**Two rules stay as they are:** `HPAAtMaxReplicas*` (no joinable label, §0.5) and
+Adding a positive environment matcher alongside the cluster matcher is **not** a
+fallback: `label_ol_mit_edu_environment="production"` excludes every workload that has
+not declared one, so an unlabeled workload would drop out of the critical branch
+entirely — the one place in this spec where a naive transition really does silence
+alerts. Use a **negative** matcher instead, which in PromQL matches an absent label:
+
+```promql
+# critical branch: production clusters, minus anything that declares itself non-prod
+kube_pod_labels{label_ol_mit_edu_environment!~"ci|qa|staging|rc"}
+
+# warning branch: ci/qa clusters, plus anything in a prod cluster declaring non-prod
+kube_pod_labels{label_ol_mit_edu_environment=~"ci|qa|staging|rc"}
+```
+
+Keep the `cluster=~` filter as the outer selector throughout. An unlabeled workload then
+lands in its cluster's branch exactly as today, and a declared `staging` workload in
+`residential-production` moves to the warning branch — which is the §5.4 fix. Removing
+the cluster filter is a separate change once §3.5 holds, if ever.
+
+**Two rule pairs stay as they are:** `HPAAtMaxReplicas*` (no joinable label, §0.5) and
 `NodeNotReady*` (not a workload).
 
 **Roll out one rule pair at a time**, verifying firing counts before and after. A
-`group_left` that drops rows produces silence, and silence is the failure mode this
-whole project is meant to remove.
+`group_left` whose right-hand series is missing produces silence, and silence is the
+failure mode this whole project is meant to remove.
 
 ### 4.3 Alertmanager grouping
 
@@ -610,8 +738,21 @@ and now defer and divert per-workload rather than per-alertname.
 
 Add rules to the **Grafana Production Service Route** (bound to `90cda8ea`) of the form
 `namespace contains "<ns>"` AND `$.commonLabels.ol_component is "<component>"` →
-`<Service>`. Every Celery service becomes reachable this way. Move the three dead
-`component` rules here from the Grafana Service Route (§0.4) as part of the same change.
+`<Service>`. Every Celery service becomes reachable this way.
+
+**Two of the 19 do not need any of that** — moving the existing `component` rules off
+the now-inert Grafana Service Route reaches `MIT Learn - API` and `MIT Learn - NextJS`
+immediately, because the Synthetic Monitoring rules already emit `service=mitlearn` and
+`component=api|nextjs` to this source (§0.4). Sequenced separately as **P1.5** so it is
+not blocked behind Phase 2.
+
+Note the label-name mismatch this creates and resolve it deliberately: SM rules emit a
+bare `component`, while §1.7 has the EKS rules emit `ol_component` to avoid colliding
+with anything Grafana or a vendor integration might set. Either rename `_Check`'s label
+to `ol_component` when P1.5 moves the rules, or accept two keys and write the routing
+rules against both. Renaming is cleaner and is a one-line change in
+`synthetic_monitoring.py`, but it retitles a live alert label — do it in the same change
+as the rule move, not later.
 
 Ordering caution, unchanged from analysis §4.3: conditions are `contains`, so the
 narrow rules must precede the broad ones. Now that all 12 routes are in Pulumi
@@ -620,14 +761,19 @@ hand-maintained invariant has been visible at all.
 
 ### 4.6 Acceptance criteria
 
-- `count(kube_pod_labels{label_ol_mit_edu_alert_tier!=""})` ≥ 95% of non-dagster
+- `count(kube_pod_labels{label_ol_mit_edu_alert_tier!=""})` ≥ 95% of non-dagster-run
   production pods.
 - Firing counts per rule within ±20% of the pre-change 14-day baseline for the 16
-  rewritten rules. A rule that goes to zero is a dropped join, not a fixed alert.
+  rewritten rules. A rule that goes to zero is a dropped right-hand series, not a
+  fixed alert.
+- `count(kube_pod_labels{namespace="dagster"}) > 0` — the drop rule is scoped to run
+  pods and Dagster's long-lived services still join.
 - Zero Rootly services with no routing rule targeting them, down from 19.
 - The Production source carries four urgency rules, not twelve.
 - `kube_node_labels` zone/instance-type columns unchanged (§0.3 regression check).
 - A staging workload in `residential-production` receives `notify`, not `page`.
+- An **unlabeled** production workload still alerts, at today's urgency — the check
+  that coverage is a quality gate and not an availability gate (§4 preamble).
 
 ---
 
@@ -639,20 +785,28 @@ hand-maintained invariant has been visible at all.
 | P1.2 CI source urgency High → Low | — | small |
 | P1.3 Turn off the account-wide default alerts channel | P1.1 | small |
 | P1.4 Delete `exampleDeleteMe`, fix `QA Non-Paging`, finish `Cloudwatch - Critical` | — | small |
-| P2.A Extend `Component`; enum hygiene | — | small |
+| **P1.5 Move the 2 live `component` rules to the Production Service Route; delete the inert Grafana Service Route** | — | **small — reaches 2 orphaned services today (§0.4)** |
+| P2.A Extend `Component` + tighten the type; retype `_Check.component`; enum hygiene | — | small |
 | P2.B Add `AlertTier`; move roll-up fields to base; explicit `environment` | P2.A | small |
-| P2.C Tighten `component` type | P2.B + call-site migration | small |
-| P2.D Backfill `operations-production` | P2.B | medium |
-| P2.E Backfill `data-production`, `applications-production`, CI/QA | P2.B | **long pole** |
-| P2.F CI gate with shrinking allowlist | P2.B | small |
-| P3.A Both kube-state-metrics gates + verification queries | P2.D | small |
-| P3.B Rewrite 16 rules, one pair at a time | P3.A + §3.5 | medium |
+| P2.C Backfill `operations-production` | P2.B | medium |
+| P2.D Backfill `data-production`, `applications-production`, CI/QA | P2.B | **long pole** |
+| P2.E CI gate against rendered workloads, shrinking allowlist | P2.B | small |
+| P3.A Both kube-state-metrics gates + verification queries | P2.C | small |
+| P3.B Rewrite 16 rules, one pair at a time | P3.A | medium |
 | P3.C Alertmanager `group_bies` | P3.B | small |
 | P3.D Rootly urgency rules: 12 → 4 | P3.B | small |
-| P3.E Component routing for the 19 orphaned services; move the 3 dead rules | P3.B | medium |
+| P3.E Component routing for the remaining orphaned services | P3.B | medium |
 
-P3.A can start once `operations-production` is labeled (P2.D) — the gates are
-cluster-wide and harmless with partial coverage. P3.B cannot start until §3.5 holds.
+P1.5 is independent of everything else here and is the cheapest item in the project —
+do it first.
+
+P3.A can start once `operations-production` is labeled (P2.C) — the gates are
+cluster-wide and harmless with partial coverage. **P3.B does not need §3.5 met**: per
+the §4 preamble, an unlabeled workload routes as untier-ed rather than going silent, so
+the rewrite degrades to today's behaviour for the backfill's tail and improves
+workload-by-workload as P2.D lands. Do P3.D last regardless — the urgency rules are what
+turn a tier into a paging decision, and there is no reason to flip them before the tiers
+they read are broadly populated.
 
 ---
 
