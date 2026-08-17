@@ -23,5 +23,13 @@ config:
   dagster:edx_pipeline_xpro_edx_bucket_name: dagster-data-qa
   dagster:edx_pipeline_xpro_edx_course_bucket_name: xpro-qa-edxapp-courses
   dagster:edx_pipeline_xpro_edx_xpro_purpose: mitx-etl-xpro-qa
+  # QA's aggregate PgBouncer connection cap is 764 (db.m7g.large, 2 replicas)
+  # against production's 4248. At the global default of 100 concurrent runs,
+  # QA deadlocked its own pool on 2026-08-17 and stayed wedged for days. 20
+  # runs at the ~22 connections apiece measured during that incident is ~440,
+  # leaving room for the daemon, webserver and ten code location servers.
+  # Revisit once the pgbouncer exporter has enough history to show what a run
+  # worker really holds outside a deadlock.
+  dagster:max_concurrent_runs: 20
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa

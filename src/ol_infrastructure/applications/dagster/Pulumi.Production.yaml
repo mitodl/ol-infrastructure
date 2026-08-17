@@ -26,3 +26,12 @@ config:
   vault_server:env_namespace: operations.production
   dagster:db_instance_type: db.r7g.2xlarge
   dagster:pgbouncer_replica_count: 6
+  # Down from the previous global 100. Production has never come close to
+  # needing it: three days of 1-minute exporter samples peaked at 122 active
+  # server connections against an aggregate cap of 4248, and the pool sat on
+  # its min_pool_size floor of 900 the entire time. 80 trims the worst case
+  # without touching anything observed. Note the aggregate cap overstates real
+  # headroom -- max_db_connections is budget / replica count, which assumes
+  # load spreads evenly across replicas, and measured distribution is heavily
+  # skewed, so the binding limit is whichever replica saturates first.
+  dagster:max_concurrent_runs: 80
