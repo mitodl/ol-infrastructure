@@ -159,11 +159,37 @@ def test_con07_only_looks_at_archived_repos() -> None:
 
 
 def test_fleet_scoped_rules_cover_archived_repos() -> None:
-    """SEC-06 and SEC-15 have no exemptions -- an admin grant on an archived repo is
-    inert only until someone unarchives it.
+    """SEC-06 has no exemptions -- a direct grant on an archived repo is inert only
+    until someone unarchives it.
     """
     archived = repo(archived=True, _direct_collaborators={"someone": "admin"})
     assert "SEC-06" in fired([archived])
+
+
+def test_unsanctioned_admin_splits_by_archived_state() -> None:
+    """The exposure is the same on both sides; the cost to fix is not.
+
+    An active repo is one `pulumi up` away. An archived one cannot be changed at all
+    without unarchiving first -- GitHub makes permissions read-only -- so it gets its
+    own id rather than sitting in SEC-15 as a finding nobody can action.
+    """
+    grants = {"arbisoft-contractors": "admin"}
+    assert "SEC-15" in fired([repo(archived=False, teams=grants)])
+    assert "SEC-15A" not in fired([repo(archived=False, teams=grants)])
+    assert "SEC-15A" in fired([repo(archived=True, teams=grants)])
+    assert "SEC-15" not in fired([repo(archived=True, teams=grants)])
+
+
+def test_sec15a_says_how_the_fix_actually_works() -> None:
+    """Downgrading in place is a 403 here, so the remediation text must not imply it."""
+    finding = next(
+        f
+        for f in audit.evaluate(
+            [repo(archived=True, teams={"arbisoft-contractors": "admin"})]
+        )
+        if f.rule_id == "SEC-15A"
+    )
+    assert "unarchive" in finding.remediation
 
 
 def test_population_matches_each_rules_scope() -> None:

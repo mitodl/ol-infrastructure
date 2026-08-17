@@ -138,7 +138,16 @@ DEFAULT_BRANCH_EXEMPT_ARCHETYPES = frozenset({"fork", "archived"})
 
 # Rules whose population is the archived fleet, not the active one. Reporting these as a
 # share of active repos overstates them badly (92 of 138 archived reads as "52% of active").
-ARCHIVED_SCOPED_RULES = frozenset({"CON-07 archived repo still grants team write"})
+ARCHIVED_SCOPED_RULES = frozenset(
+    {
+        "CON-07 archived repo still grants team write",
+        # Split out of SEC-15 on 2026-08-17. Same exposure, different cost: GitHub makes
+        # permissions read-only on an archived repo, so this one is fixed by an
+        # unarchive/change/re-archive cycle rather than by `pulumi up`. Keeping both in
+        # one rule put 59 unactionable findings in a `high` security bucket.
+        "SEC-15A archived repo grants admin outside the sanctioned set",
+    }
+)
 
 # Rules whose population is the WHOLE fleet, active and archived alike. SEC-06 is here
 # because the no-direct-collaborators policy (2026-08-05) admits no exceptions: an admin
@@ -147,7 +156,6 @@ ARCHIVED_SCOPED_RULES = frozenset({"CON-07 archived repo still grants team write
 FLEET_SCOPED_RULES = frozenset(
     {
         "SEC-06 direct collaborator on repo (policy: repo access via teams only)",
-        "SEC-15 admin held by a team outside the sanctioned set",
     }
 )
 
@@ -582,6 +590,18 @@ def _is_stale(repo: dict[str, Any]) -> bool:
 MERGE_CAPABLE_PERMISSIONS = frozenset({"push", "maintain", "admin"})
 
 
+def _unsanctioned_admin_grant(repo: dict[str, Any]) -> bool:
+    """Report whether any team outside `ADMIN_TEAMS` holds admin on this repo.
+
+    Shared by SEC-15 and SEC-15A so the two halves of the split cannot drift apart --
+    they must differ only in which population they look at, never in what counts.
+    """
+    return any(
+        perm in ADMIN_PERMISSIONS and team not in ADMIN_TEAMS
+        for team, perm in (repo.get("teams") or {}).items()
+    )
+
+
 def _blocked_by_push_restriction(repo: dict[str, Any]) -> list[str]:
     """Teams that hold a merge-capable grant but are outside the push allow-list.
 
@@ -692,13 +712,18 @@ def _findings(
                 if (r.get("teams") or {})
                 != (archetype_teams.get(propose_archetype(r)) or {})
             ],
+            # Split active/archived: the archived half cannot be fixed by `pulumi up`
+            # at all (GitHub makes permissions read-only there), so reporting both under
+            # one id produced findings whose stated remediation returns 403.
             "SEC-15 admin held by a team outside the sanctioned set": [
                 r["name"]
                 for r in repos
-                if any(
-                    perm in ADMIN_PERMISSIONS and team not in ADMIN_TEAMS
-                    for team, perm in (r.get("teams") or {}).items()
-                )
+                if not r["archived"] and _unsanctioned_admin_grant(r)
+            ],
+            "SEC-15A archived repo grants admin outside the sanctioned set": [
+                r["name"]
+                for r in repos
+                if r["archived"] and _unsanctioned_admin_grant(r)
             ],
         }
     return {

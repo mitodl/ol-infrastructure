@@ -22,6 +22,6 @@ name: edx-username-changer
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
-  arbisoft-contractors: admin
-  odl-engineering: admin
+  arbisoft-contractors: pull
+  odl-engineering: pull
 web_commit_signoff_required: false
