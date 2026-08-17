@@ -184,14 +184,17 @@ RULES: tuple[Rule, ...] = (
         "security",
         "high",
         "active",
-        "default branch has no ruleset and no branch protection",
+        "default branch has no ruleset and no branch protection"
+        " (unmanaged tier exempt)",
         lambda r: (
             (
                 "unprotected",
                 "covered by an org ruleset",
                 "set `tier` so a ruleset matches",
             )
-            if not r.get("_has_branch_protection") and not r.get("_ruleset_count")
+            if not r.get("_has_branch_protection")
+            and not r.get("_ruleset_count")
+            and r.get("tier") != "unmanaged"
             else None
         ),
     ),
