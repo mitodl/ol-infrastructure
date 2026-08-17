@@ -643,12 +643,29 @@ dagster_db_secret = OLVaultK8SSecret(
 
 # Replica count is needed here to size the per-pod connection cap below, so it is
 # resolved before the ConfigMap rather than next to the Deployment that consumes it.
+#
+# Production's 6 is not load-derived and the exporter now says so: over seven days the
+# busiest replica peaked at 0.09 CPU cores and 35 active clients. PgBouncer is
+# single-threaded, which is the usual reason to run several, but nothing here is close
+# to needing the parallelism.
+#
+# The count is not free either. It divides the aggregate budget into per-pod caps, so at
+# 6 replicas one pod saturates at 708 while 3540 connections sit unused on the other
+# five -- and the binding limit is whichever pod saturates first, not the aggregate.
+# That gap is real on QA, which measured 221 active servers on one replica against 4 on
+# the other. Production was checked for the same skew before this re-tune and does not
+# show it: instantaneous load spreads evenly (1-18 active per pod), so fewer/larger
+# replicas is a live option rather than an urgent fix.
+#
+# Left alone here deliberately. This pass changes min_pool_size, and changing the
+# multiplier in the same breath would make the result unattributable -- which is the
+# failure mode the whole exercise exists to stop repeating.
 pgbouncer_replica_count = dagster_config.get_int("pgbouncer_replica_count") or 2
 
 # Cap the connections PgBouncer can open against RDS, in aggregate across every replica.
 #
 # Without this, nothing bounds the total. In session pool mode each client pins a server
-# connection for its whole session, so the per-pod bound is
+# connection for its whole session, so the per-pod bound was
 # min(max_client_conn, default_pool_size + reserve_pool_size) = 1500 -- which at 6
 # replicas is 9000 possible backends against a hard max_connections of 5000. On
 # 2026-08-10 the pool reached that limit and held it for 88 consecutive minutes
@@ -696,15 +713,58 @@ pgbouncer_ini_template = dagster_db.db_instance.address.apply(
             "listen_port = 5432",
             "auth_type = any",
             "pool_mode = session",
+            # Clients are cheap -- an accepted client that is waiting for a backend
+            # costs a socket, not a connection to RDS -- and this number has to stay
+            # well above max_db_connections or a saturated pool refuses clients
+            # instead of queueing them. Observed peak is 35 on the busiest replica,
+            # so 1500 is not a number the data argues about; it is deliberately far
+            # larger than demand.
             "max_client_conn = 1500",
-            "default_pool_size = 800",
-            "min_pool_size = 150",
-            "reserve_pool_size = 2000",
+            # One binding ceiling, not three.
+            #
+            # These were 800 / 150 / 2000, all set before there was any feedback
+            # signal. Seven days of 1-minute exporter samples (the exporter landed in
+            # #5426) say what they are actually worth:
+            #
+            #   held server connections   flat 900, every sample, all week
+            #   peak server_active        122 aggregate
+            #   peak client_active        129 aggregate, 35 on one replica
+            #   maxwait                   0 at every sample
+            #   clients waiting           peaked at 1
+            #
+            # 900 was not demand. It is min_pool_size x 6 replicas -- a configured
+            # constant, which is exactly what made CloudWatch DatabaseConnections
+            # useless as a signal. Nine hundred backends were parked permanently to
+            # serve a peak of 122, a 7:1 idle ratio, and the pool never once grew
+            # past its own floor.
+            #
+            # min_pool_size 150 -> 40 keeps the whole measured per-replica peak (35)
+            # warm, so nothing in normal operation waits on a connect, and drops the
+            # parked total from 900 to 240.
+            #
+            # default_pool_size and reserve_pool_size were dead numbers: 800 + 2000
+            # per pod against a derived cap of 708 means max_db_connections already
+            # bound first, so neither value could take effect on production. Rather
+            # than pick new guesses, tie default_pool_size to the cap and disable the
+            # reserve. With a single database and a single user the two settings act
+            # on the same axis, so this makes the derived cap the only ceiling
+            # instead of the smallest of three.
+            #
+            # That property is load-bearing beyond tidiness:
+            # DagsterPgBouncerConnectionHeadroom alerts on server connections as a
+            # fraction of pgbouncer_databases_max_connections. Any pool number set
+            # below the cap would become the real ceiling while the alert kept
+            # measuring against the old denominator, and the alert would go quietly
+            # dead -- saturation would surface only as clients queueing, which is the
+            # symptom the headroom rule exists to get ahead of.
+            f"default_pool_size = {pgbouncer_max_db_connections}",
+            "min_pool_size = 40",
+            "reserve_pool_size = 0",
             # The aggregate ceiling. See the derivation above; this is the
             # only setting here that bounds total backends across replicas,
             # and it converts "exhaust RDS" into "queue inside PgBouncer",
-            # which is the failure mode query_wait_timeout = 0 below was
-            # already chosen to tolerate.
+            # which is the failure mode query_wait_timeout below is set high
+            # enough to ride out.
             f"max_db_connections = {pgbouncer_max_db_connections}",
             "max_prepared_statements = 0",
             "server_connect_timeout = 15",
@@ -1069,14 +1129,18 @@ pgbouncer_service = kubernetes.core.v1.Service(
 # whole integration. Pattern (including the "release": "prometheus" discovery label)
 # follows applications/clickhouse/__main__.py.
 #
-# These are the metrics every open pool-sizing question turns on:
-#   pgbouncer_pools_server_active_connections   -- is default_pool_size = 800 right?
-#   pgbouncer_pools_server_idle_connections     -- what is min_pool_size parking?
-#   pgbouncer_pools_client_active_connections   -- is max_client_conn a real ceiling?
+# These are the metrics the pool-sizing questions turn on. The first pass of answers
+# is what the numbers above were re-tuned from; keep watching them, because the
+# settings are now supposed to track demand rather than sit above it:
+#   pgbouncer_pools_server_active_connections   -- real demand (peak 122 aggregate)
+#   pgbouncer_pools_server_idle_connections     -- what min_pool_size parks (was 900)
+#   pgbouncer_pools_client_active_connections   -- client demand (peak 129 / 35 a pod)
 #   pgbouncer_pools_client_waiting_connections  -- is max_db_connections too tight?
 #   pgbouncer_pools_client_maxwait_seconds      -- the number pool tuning turns on,
 #                                                  unobtainable from the stats log
 #   sum of the above vs. max_connections        -- the 2026-08-10 headroom alert
+# Per-pod, not just aggregate: max_db_connections is derived as budget / replica
+# count, so a skewed pod saturates while the aggregate still looks calm.
 pgbouncer_service_monitor = kubernetes.apiextensions.CustomResource(
     f"dagster-pgbouncer-service-monitor-{stack_info.env_suffix}",
     api_version="monitoring.coreos.com/v1",
