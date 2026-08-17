@@ -6,13 +6,11 @@ _has_branch_protection: true
 _pushed_at: '2026-06-11T20:45:57Z'
 _ruleset_count: 2
 _visibility: public
-allow_auto_merge: false
 allow_merge_commit: false
 allow_rebase_merge: false
 allow_squash_merge: true
 archetype: library
 default_branch: master
-delete_branch_on_merge: false
 description: Information on how we do what we do.
 has_discussions: false
 has_projects: false

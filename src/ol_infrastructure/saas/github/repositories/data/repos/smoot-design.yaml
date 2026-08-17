@@ -8,12 +8,10 @@ _has_branch_protection: true
 _pushed_at: '2026-08-13T21:11:00Z'
 _ruleset_count: 3
 _visibility: public
-allow_auto_merge: false
 allow_merge_commit: false
 allow_rebase_merge: false
 allow_squash_merge: true
 archetype: library
-delete_branch_on_merge: false
 description: Design system components for MITODL Projects
 has_discussions: false
 has_projects: true

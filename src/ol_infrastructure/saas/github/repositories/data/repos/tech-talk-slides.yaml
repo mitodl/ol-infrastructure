@@ -6,7 +6,6 @@ _has_branch_protection: false
 _pushed_at: '2026-08-14T20:57:56Z'
 _ruleset_count: 2
 _visibility: public
-allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true

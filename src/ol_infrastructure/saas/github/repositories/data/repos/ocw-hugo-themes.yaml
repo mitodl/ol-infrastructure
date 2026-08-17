@@ -19,12 +19,10 @@ _has_branch_protection: true
 _pushed_at: '2026-08-13T14:33:51Z'
 _ruleset_count: 2
 _visibility: public
-allow_auto_merge: false
 allow_merge_commit: false
 allow_rebase_merge: false
 allow_squash_merge: true
 archetype: application
-delete_branch_on_merge: false
 description: A Hugo theme for building OCW websites
 has_discussions: false
 has_projects: true

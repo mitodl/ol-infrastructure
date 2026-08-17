@@ -6,12 +6,10 @@ _has_branch_protection: false
 _pushed_at: '2026-08-13T19:43:16Z'
 _ruleset_count: 2
 _visibility: public
-allow_auto_merge: false
 allow_merge_commit: false
 allow_rebase_merge: false
 allow_squash_merge: true
 archetype: library
-delete_branch_on_merge: false
 has_discussions: false
 has_projects: true
 has_wiki: true

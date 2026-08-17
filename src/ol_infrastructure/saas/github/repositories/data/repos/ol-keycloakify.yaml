@@ -6,12 +6,10 @@ _has_branch_protection: false
 _pushed_at: '2026-08-12T02:52:33Z'
 _ruleset_count: 3
 _visibility: public
-allow_auto_merge: false
 allow_merge_commit: false
 allow_rebase_merge: false
 allow_squash_merge: true
 archetype: library
-delete_branch_on_merge: false
 description: Customization of the theme and UX for OL SSO
 has_discussions: false
 has_projects: true

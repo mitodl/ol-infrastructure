@@ -5,13 +5,11 @@ _has_branch_protection: false
 _pushed_at: '2021-06-10T06:44:16Z'
 _ruleset_count: 0
 _visibility: public
-allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true
 archetype: fork
 default_branch: master
-delete_branch_on_merge: false
 description: A demo course with as many features turned on as possible
 has_discussions: false
 has_projects: true
