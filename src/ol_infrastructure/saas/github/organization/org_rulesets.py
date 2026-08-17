@@ -32,6 +32,12 @@ failing anyone's push.
   before; promoting straight to `active` is the first real signal on those, not a
   confirmation of already-observed safety.
 
+  THAT SIGNAL CAME BACK NEGATIVE ON ONE OF THE TWO. `require_last_push_approval` was
+  dropped on 2026-08-17 (#5459) after three days of real use, along with
+  `dismiss_stale_reviews_on_push` on the baseline -- both punished the ordinary
+  approve-with-a-nit review by invalidating an approval the author's cleanup push was
+  meant to satisfy. `required_review_thread_resolution` stays. See each ruleset below.
+
   ONE KNOWN REGRESSION, ACCEPTED RATHER THAN FIXED. PR #5412 found that
   `ChristopherChudzicki` holds a personal PR-review bypass on `smoot-design` (a
   `tier-1` repo) with no equivalent under `_ADMIN_BYPASS` -- they are in
@@ -91,6 +97,11 @@ _ENFORCEMENT = "active"
 # can merge PRs without being blocked by `require_last_push_approval`. The `always`
 # mode would also let them bypass non_fast_forward and deletion on direct pushes,
 # which is not intended. The `pull_request` mode only applies at PR merge time.
+#
+# That original motive is now moot -- `require_last_push_approval` was dropped in #5459
+# -- but these entries stay. They are what keeps `required_review_thread_resolution` and
+# the baseline's approval requirement overridable at merge time by the teams that own
+# these repos, which is the same admin parity `enforce_admins: false` used to provide.
 _ADMIN_BYPASS = [
     github.OrganizationRulesetBypassActorArgs(
         actor_type="Team",
@@ -156,18 +167,46 @@ baseline_default_branch = github.OrganizationRuleset(
         # No force-pushing over the default branch, and no deleting it.
         non_fast_forward=True,
         deletion=True,
+        # `dismiss_stale_reviews_on_push` dropped in #5459: it cost contributors more
+        # than it protected. Any push revoked an approval that was green a moment
+        # earlier -- a rebase, a lint fix, a typo in a comment -- so PRs bounced back to
+        # "review required" for changes nobody needed to re-read. What remains is the
+        # bare requirement that SOME approval exists; see `tier_one_hardening` below,
+        # which no longer backstops it.
+        #
+        # BOTH REVIEW FLAGS HERE MUST BE WRITTEN AS EXPLICIT `False`. The provider
+        # treats them as optional-and-computed, so deleting the line is not the same as
+        # turning the rule off: the preview comes back clean, the code reads as though
+        # the rule were gone, and GitHub goes on enforcing it. Anything that looks like
+        # a redundant `False` in this block is load-bearing.
         pull_request=github.OrganizationRulesetRulesPullRequestArgs(
             required_approving_review_count=1,
-            dismiss_stale_reviews_on_push=True,
+            dismiss_stale_reviews_on_push=False,
         ),
     ),
     opts=ResourceOptions(protect=True),
 )
 
-# Tier-1 is application, library and infrastructure -- 74 repos. The two extra rules
-# are the ones that cost a reviewer nothing but close real gaps: an approval that
-# predates the last push is not an approval of what merges, and an unresolved
-# conversation is feedback that was never answered.
+# Tier-1 is application, library and infrastructure -- 74 repos. Down to ONE extra rule:
+# an unresolved conversation is feedback that was never answered, and blocking on it
+# costs a reviewer nothing.
+#
+# `require_last_push_approval` dropped in #5459, having been added on 2026-08-07 with
+# the reasoning that "an approval that predates the last push is not an approval of what
+# merges". That is true in the abstract and wrong in the common case. The routine review
+# is an approval WITH a minor cleanup request -- fix the typo, rename the variable,
+# then merge. Under this rule the author's cleanup push invalidated the approval that
+# explicitly anticipated it, and shipping a one-line change then required the reviewer
+# to come back for a second round that told them nothing new. It deadlocked two people
+# over work already agreed to.
+#
+# What is genuinely lost: an author can now push anything after approval and merge it
+# unreviewed. `required_review_thread_resolution` does not cover that -- it gates on
+# threads being answered, not on the diff being re-read. This is accepted, not
+# overlooked: the same push is equally unreviewed under a rule everyone routes around,
+# and `baseline-default-branch` still requires an approval to exist at all.
+#
+# The `False` is required, not redundant -- see the note in `baseline_default_branch`.
 tier_one_hardening = github.OrganizationRuleset(
     "mitodl-ruleset-tier-1-hardening",
     name="tier-1-hardening",
@@ -177,7 +216,7 @@ tier_one_hardening = github.OrganizationRuleset(
     conditions=_tier_condition(TIER_ONE),
     rules=github.OrganizationRulesetRulesArgs(
         pull_request=github.OrganizationRulesetRulesPullRequestArgs(
-            require_last_push_approval=True,
+            require_last_push_approval=False,
             required_review_thread_resolution=True,
         ),
     ),
@@ -218,8 +257,11 @@ tier_one_hardening = github.OrganizationRuleset(
 #
 # Resolved by DELETING that repo's classic protection entirely (Tobias, 2026-08-17) --
 # every protection it asserted was already met or exceeded here (`baseline` matches its
-# review count and adds dismiss-stale, `tier-1-hardening` adds last-push approval and
-# thread resolution, both cover force-push and deletion). Only `block_creations` was
+# review count, `tier-1-hardening` adds thread resolution, both cover force-push and
+# deletion). The two rules dropped later that same day (#5459) do not reopen a gap on
+# this repo specifically: its classic protection had `dismiss_stale_reviews: false` and
+# `require_last_push_approval: false` already, so the rulesets are still no weaker than
+# what was deleted. Only `block_creations` was
 # lost, which is inert on a branch that already exists. The remaining 26 repos have not
 # been swept; SEC-16 in audit.py now reports this class of block instead of leaving it
 # to be found by a contractor with a stuck PR.
