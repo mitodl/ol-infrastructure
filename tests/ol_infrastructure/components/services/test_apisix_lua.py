@@ -41,11 +41,10 @@ ngx = {
     end,
 }
 
-function run(fn, uri, args, cookie)
+function run(fn, conf, uri, args, ctx_vars)
     captured = {args = args, headers = {}, redirect = nil}
     ngx.var.uri = uri
-    ngx.var.http_cookie = cookie
-    fn({}, {})
+    fn(conf, {var = ctx_vars})
     local redirect = captured.redirect
     return redirect and redirect.uri or nil,
            redirect and redirect.code or nil,
@@ -55,25 +54,45 @@ end
 
 
 class Harness:
-    """Loads one generated function into a fresh Lua runtime."""
+    """Runs the shipped Lua against a stubbed ngx/apisix.core.
+
+    Both the function source and the ``conf`` table come from
+    ``oidc_error_callback_recovery_plugin``, so these exercise the same plugin
+    config the gateway is handed rather than a hand-built approximation.
+    """
 
     def __init__(self, **plugin_kwargs):
         self.lua = lupa.LuaRuntime(unpack_returned_tuples=True)
         self.lua.execute(LUA_STUBS)
-        (source,) = oidc_error_callback_recovery_plugin(**plugin_kwargs).config[
-            "functions"
-        ]
+        plugin_config = oidc_error_callback_recovery_plugin(**plugin_kwargs).config
+        (source,) = plugin_config["functions"]
         self.fn = self.lua.execute(source)
+        self.conf = self._to_lua(plugin_config)
 
-    def callback(self, uri, args=None, cookie=None):
-        """Return (redirect_uri, redirect_status, set_cookie) for one request."""
-        table = self.lua.table_from(
-            {
-                key: self.lua.table_from(value) if isinstance(value, list) else value
-                for key, value in (args or {}).items()
-            }
+    def _to_lua(self, value):
+        """Deep-convert Python containers to Lua tables."""
+        if isinstance(value, dict):
+            return self.lua.table_from(
+                {key: self._to_lua(item) for key, item in value.items()}
+            )
+        if isinstance(value, list):
+            return self.lua.table_from([self._to_lua(item) for item in value])
+        return value
+
+    def callback(self, uri, args=None, cookies=None):
+        """Return (redirect_uri, redirect_status, set_cookie) for one request.
+
+        ``cookies`` is a name -> value mapping, exposed the way nginx exposes
+        it: one ``ctx.var["cookie_<name>"]`` entry per cookie, parsed by nginx
+        rather than by the plugin.
+        """
+        return self.lua.globals().run(
+            self.fn,
+            self.conf,
+            uri,
+            self._to_lua(args or {}),
+            self._to_lua({f"cookie_{n}": v for n, v in (cookies or {}).items()}),
         )
-        return self.lua.globals().run(self.fn, uri, table, cookie)
 
 
 def test_expired_auth_session_is_sent_back_through_login():
@@ -157,18 +176,20 @@ def test_guard_cookie_stops_a_second_recovery():
     uri, _, _ = Harness().callback(
         "/login/.apisix/redirect",
         {"error": "temporarily_unavailable"},
-        cookie="other=1; apisix_oidc_recovery=1; another=2",
+        cookies={"other": "1", "apisix_oidc_recovery": "1", "another": "2"},
     )
 
     assert uri is None
 
 
-def test_guard_matches_the_whole_cookie_name():
-    """Substring matching here would let an unrelated cookie disable recovery."""
+def test_guard_reads_the_exact_cookie_name():
+    """The lookup is a single ctx.var["cookie_<name>"] read, so a cookie whose
+    name merely contains the guard's must not disable recovery.
+    """
     uri, _, _ = Harness().callback(
         "/login/.apisix/redirect",
         {"error": "temporarily_unavailable"},
-        cookie="not_apisix_oidc_recovery=1",
+        cookies={"not_apisix_oidc_recovery": "1"},
     )
 
     assert uri == "/login/"
