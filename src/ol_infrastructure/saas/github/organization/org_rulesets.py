@@ -86,11 +86,21 @@ _ENFORCEMENT = "active"
 # installed org-wide and leaves a genuine APPROVED review on every renovate PR
 # (confirmed live on ol-infrastructure#5343) -- a bypass would be redundant with an
 # approval that already exists.
+#
+# arbisoft-contractors gets a `pull_request`-mode bypass (not `always`) so that they
+# can merge PRs without being blocked by `require_last_push_approval`. The `always`
+# mode would also let them bypass non_fast_forward and deletion on direct pushes,
+# which is not intended. The `pull_request` mode only applies at PR merge time.
 _ADMIN_BYPASS = [
     github.OrganizationRulesetBypassActorArgs(
         actor_type="Team",
         actor_id=github_teams["odl-engineering-owners"].id.apply(int),
         bypass_mode="always",
+    ),
+    github.OrganizationRulesetBypassActorArgs(
+        actor_type="Team",
+        actor_id=github_teams["arbisoft-contractors"].id.apply(int),
+        bypass_mode="pull_request",
     ),
 ]
 
