@@ -237,7 +237,16 @@ APPS = [
 # Core stack (operators, foundational services, Keycloak instance)
 local_resource(
     "local-infra-core",
-    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} LOCAL_DEV_LOG_RETENTION={lr} PULUMI_CONFIG_PASSPHRASE='' bash -c 'pulumi stack init local-dev.core.Dev 2>/dev/null; pulumi refresh --yes --skip-preview --stack local-dev.core.Dev && pulumi up --yes --skip-preview --logtostderr --stack local-dev.core.Dev'".format(rd=root_domain, lr=log_retention_period),
+    cmd="bash -c 'pulumi stack init local-dev.core.Dev 2>/dev/null; pulumi refresh --yes --skip-preview --stack local-dev.core.Dev && pulumi up --yes --skip-preview --logtostderr --stack local-dev.core.Dev'",
+    # Passed as environment rather than interpolated into the command string:
+    # log_retention_period is developer-supplied, and a value containing shell
+    # metacharacters would otherwise be interpreted here instead of reaching
+    # validate_retention_period() in observability.py.
+    env={
+        "LOCAL_DEV_ROOT_DOMAIN": root_domain,
+        "LOCAL_DEV_LOG_RETENTION": log_retention_period,
+        "PULUMI_CONFIG_PASSPHRASE": "",
+    },
     dir="./local-dev/infra/core",
     deps=["./local-dev/infra/modules", "./local-dev/infra/core/__main__.py"],
     labels=["infra"],

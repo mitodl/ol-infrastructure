@@ -541,7 +541,21 @@ def _create_alloy(
                     "volumes": [
                         {"name": "config", "configMap": {"name": "alloy-config"}},
                         {"name": "varlog", "hostPath": {"path": "/var/log"}},
-                        {"name": "data", "emptyDir": {}},
+                        # loki.source.file records its read offsets under the
+                        # storage path, so this has to outlive the pod. On an
+                        # emptyDir every DaemonSet replacement loses every
+                        # position and, since tail_from_end defaults to false,
+                        # Alloy re-reads each still-present pod log from byte
+                        # zero -- duplicate lines in Loki and a load spike on
+                        # every restart. hostPath keeps the offsets per node,
+                        # which is the shape a DaemonSet wants.
+                        {
+                            "name": "data",
+                            "hostPath": {
+                                "path": "/var/lib/alloy/data",
+                                "type": "DirectoryOrCreate",
+                            },
+                        },
                     ],
                 },
             },
