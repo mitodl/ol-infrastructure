@@ -143,6 +143,13 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
             # ahead of those rules being routed anywhere, so that promoting them
             # really is only a matter of adding a `severity` label.
             "matched_host",
+            # Same reasoning for the CronJob staleness rules in
+            # metric_rules/eks_general.py, which aggregate `max by (cluster,
+            # namespace, cronjob)`. `job_name` above identifies an individual Job
+            # (`<cronjob>-<timestamp>`); a stale CronJob never produces one, so
+            # without `cronjob` here every stalled schedule in a cluster would
+            # arrive as a single grouped notification.
+            "cronjob",
         ],
         # "1m", not "60s" — Grafana normalizes durations to the largest unit and
         # a mismatched spelling shows as a perpetual diff on every preview.
