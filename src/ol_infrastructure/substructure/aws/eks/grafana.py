@@ -498,7 +498,45 @@ def setup_grafana(
                 # v4: kepler and kube-state-metrics moved to telemetryServices;
                 #     opencost moved here from clusterMetrics
                 "telemetryServices": {
-                    "kube-state-metrics": {"deploy": True},
+                    "kube-state-metrics": {
+                        "deploy": True,
+                        # kube-state-metrics only emits kube_<resource>_labels for
+                        # resources named here, so without this every kube_job_*
+                        # series is anonymous -- on data-production that is ~2000
+                        # series where run-worker successes and failures can be
+                        # counted but not attributed to anything.
+                        #
+                        # Dagster's K8sRunLauncher already puts dagster/job,
+                        # dagster/code-location and dagster/run-id on every run
+                        # Job, so allowlisting the first two turns kube_job_status_*
+                        # into a per-code-location, per-job breakdown for free.
+                        # dagster/run-id is deliberately excluded: it is unique per
+                        # run at ~53k runs/day, which is a cardinality bomb.
+                        #
+                        # This is a list, so Helm replaces rather than merges it --
+                        # the nodes entry is the chart's own default, repeated here
+                        # verbatim so adding jobs does not silently drop the node
+                        # labels that the Grafana Cloud Kubernetes app relies on.
+                        # Harmless on clusters with no Dagster: they just get a
+                        # kube_job_labels series per Job with no dagster_* labels.
+                        "metricLabelsAllowlist": [
+                            "nodes=[agentpool,alpha.eksctl.io/cluster-name,"
+                            "alpha.eksctl.io/nodegroup-name,"
+                            "beta.kubernetes.io/instance-type,"
+                            "cloud.google.com/gke-nodepool,cluster-name,"
+                            "ec2.amazonaws.com/Name,"
+                            "ec2.amazonaws.com/aws-autoscaling-groupName,"
+                            "ec2.amazonaws.com/aws-autoscaling-group-name,"
+                            "ec2.amazonaws.com/name,eks.amazonaws.com/nodegroup,"
+                            "k8s.io/cloud-provider-aws,karpenter.sh/nodepool,"
+                            "kubernetes.azure.com/cluster,kubernetes.io/arch,"
+                            "kubernetes.io/hostname,kubernetes.io/os,"
+                            "node.kubernetes.io/instance-type,"
+                            "topology.kubernetes.io/region,"
+                            "topology.kubernetes.io/zone]",
+                            "jobs=[dagster/code-location,dagster/job]",
+                        ],
+                    },
                     "kepler": {"deploy": True},
                     "opencost": {
                         "deploy": True,
