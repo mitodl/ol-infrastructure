@@ -3065,7 +3065,17 @@ alerts_source_grafana_prometheus_production = rootly.AlertsSource(
                 "CeleryBeatPodRestartsCritical",
                 "DaemonsetReplicasMissingCritical",
                 "StatefulSetReplicasMissingCritical",
-                "KubernetesJobFailedCritical",
+                # Renamed from KubernetesJobFailedCritical: the Grafana notification
+                # policy silences `alertname =~ "Kube.*"` above the severity routes,
+                # so under the old name it was never delivered here at all. This
+                # matcher must track that rename or production job failures bypass
+                # the demotion below and page at the source's default urgency.
+                "WorkloadJobFailedCritical",
+                # A CronJob that has not succeeded in 6h/15d is behind, not on fire:
+                # by the time either fires the schedule has already been missed for
+                # hours or weeks, so there is nothing a 3am page buys.
+                "ScheduledJobStaleFastCritical",
+                "ScheduledJobStaleSlowCritical",
                 "CertManagerACMEIssuerUnavailableProduction",
                 "CertManagerChallengePresentationFailureProduction",
                 "OCWStudioContentSyncInvalidPasswordProd",

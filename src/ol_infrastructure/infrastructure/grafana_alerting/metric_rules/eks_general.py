@@ -435,10 +435,17 @@ def create(
             ),
             # --- CronJob staleness ---
             # Job-failure alerting above only sees runs that STARTED and failed. A
-            # CronJob that stops firing entirely -- suspended, deleted, controller
-            # wedged, schedule never matching -- produces no failed Job and no alert
-            # at all. That is the gap that let an empty Open edX course-search index
-            # sit unnoticed for months.
+            # CronJob that stops firing while still existing -- suspended, controller
+            # wedged, every run failing -- produces no successful run and no failed
+            # Job to alert on. That is the gap that let an empty Open edX
+            # course-search index sit unnoticed for months.
+            #
+            # What this does NOT cover is a CronJob that stops EXISTING: delete it and
+            # kube-state-metrics drops the series, which is NoData, which
+            # no_data_state=OK keeps silent. Detecting a resource that should be there
+            # and isn't isn't an age-of-last-success question at all -- it needs an
+            # expected-inventory check, which is a different rule (see the gap note
+            # below, which the same `unless` construction would answer).
             #
             # Two buckets because PromQL cannot parse a cron expression to derive a
             # per-job threshold. Membership is an explicit cronjob list; validate a
@@ -446,14 +453,20 @@ def create(
             # adding it. Current inventory:
             #   0/5 * * * *  cron-deploy-pipelines, cron-reindex   -> fast
             #   17 * * * *   witan-token-sync                      -> fast
-            #   0 */4 * * *  witan-ci-indexer                      -> fast
             #   20 3 * * *   omnigraph-optimize                    -> slow
             #   20 4 * * 0   omnigraph-cleanup                     -> slow
             #   30 7 * * 0   cms-edxapp-reindex-courses            -> slow
             #
-            # witan-break-glass is deliberately absent from both: its schedule is
-            # `0 0 31 2 *` -- February 31st, a date that never occurs -- because it is
-            # triggered by hand, so it is permanently "stale" by design.
+            # Two CronJobs are deliberately absent from both buckets:
+            #
+            #   witan-break-glass -- schedule `0 0 31 2 *`, February 31st, a date that
+            #     never occurs, because it is triggered by hand. Permanently "stale"
+            #     by design.
+            #   witan-ci-indexer  -- same known break that is excluded from the
+            #     job-failure rules above. It is not merely failing some runs: over a
+            #     7-day window its age-since-last-success peaked at 518,714s (6.0
+            #     days), so a 6h staleness rule would page for it continuously.
+            #     Remove from both places together once it is fixed.
             #
             # `> 0` guards the never-yet-succeeded case: kube-state-metrics reports 0
             # (or omits the series) until a CronJob's first success, and time() minus
@@ -483,7 +496,7 @@ def create(
                 datas=rd(
                     "max by (cluster, namespace, cronjob) (time() - "
                     "(kube_cronjob_status_last_successful_time"
-                    '{cluster=~".*-(ci|qa)", cronjob=~"cron-deploy-pipelines|cron-reindex|witan-token-sync|witan-ci-indexer"} > 0)) > 21600'
+                    '{cluster=~".*-(ci|qa)", cronjob=~"cron-deploy-pipelines|cron-reindex|witan-token-sync"} > 0)) > 21600'
                 ),
             ),
             alerting.RuleGroupRuleArgs(
@@ -498,7 +511,7 @@ def create(
                 datas=rd(
                     "max by (cluster, namespace, cronjob) (time() - "
                     "(kube_cronjob_status_last_successful_time"
-                    '{cluster=~".*-(production)", cronjob=~"cron-deploy-pipelines|cron-reindex|witan-token-sync|witan-ci-indexer"} > 0)) > 21600'
+                    '{cluster=~".*-(production)", cronjob=~"cron-deploy-pipelines|cron-reindex|witan-token-sync"} > 0)) > 21600'
                 ),
             ),
             alerting.RuleGroupRuleArgs(
