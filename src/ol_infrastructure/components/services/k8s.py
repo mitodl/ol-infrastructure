@@ -57,6 +57,11 @@ def celery_beat_deployment_name(application_name: str) -> str:
     return truncate_k8s_metanames(f"{application_name}-celery-beat".replace("_", "-"))
 
 
+def scheduled_job_name(application_name: str, job_name: str) -> str:
+    """Name of a CronJob OLApplicationK8s creates."""
+    return truncate_k8s_metanames(f"{application_name}-{job_name}".replace("_", "-"))
+
+
 def application_deployment_names(
     application_name: str,
     celery_worker_configs: "list[OLApplicationK8sCeleryWorkerConfig] | None" = None,
@@ -216,6 +221,61 @@ class OLApplicationK8sCeleryBeatConfig(BaseModel):
     )
     resource_limits: dict[str, str] = Field(default={"memory": "512Mi"})
     scheduler: str = "celery.beat.PersistentScheduler"
+
+
+class OLApplicationK8sScheduledJobConfig(BaseModel):
+    """Configuration for a CronJob running a command in the application image.
+
+    For recurring maintenance that belongs to the application but does not belong
+    in celery: reindex sweeps, cache warms, reconciliation passes. Each entry
+    becomes one CronJob whose pod carries the application's image, env, volumes
+    and security group, so the command sees exactly what the webapp sees.
+
+    Not a substitute for celery beat. Use ``celery_beat_config`` for work the
+    application already schedules internally; use this when the work is a
+    management command that should run on a wall-clock schedule regardless of
+    whether the app's own scheduler is healthy.
+
+    Deliberately NOT run via ``pre_deploy_commands``: those block the rollout and
+    fire on every deploy, which is wrong for anything slow or periodic.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    name: str = Field(
+        description=(
+            "Short name for this job, unique within the application. Becomes part "
+            "of the CronJob name and its pod labels."
+        )
+    )
+    schedule: str = Field(description="Cron schedule, e.g. '30 4 * * 0'.")
+    command: list[str] = Field(description="Command array to run in the app image.")
+    resource_requests: dict[str, str] = Field(
+        default={"cpu": "100m", "memory": "512Mi"}
+    )
+    resource_limits: dict[str, str] = Field(default={"memory": "512Mi"})
+    # Forbid rather than Replace: these jobs are expected to be idempotent but not
+    # necessarily safe to run twice at once, and a long run overlapping itself is a
+    # signal worth seeing rather than papering over by killing the in-flight one.
+    concurrency_policy: Literal["Allow", "Forbid", "Replace"] = "Forbid"
+    # A missed schedule (node pressure, controller restart) should be picked up if
+    # it can still start promptly, and otherwise skipped rather than stampeding.
+    starting_deadline_seconds: PositiveInt = 600
+    successful_jobs_history_limit: NonNegativeInt = 1
+    # Keep more failures than successes: on a weekly schedule a failure can
+    # otherwise age out before anyone looks at it.
+    failed_jobs_history_limit: NonNegativeInt = 3
+    backoff_limit: NonNegativeInt = 1
+    active_deadline_seconds: PositiveInt | None = Field(
+        default=None,
+        description=(
+            "Hard timeout for one run. Leave unset for jobs whose duration scales "
+            "with data volume, where a wrong guess turns a slow run into a failure."
+        ),
+    )
+    suspend: bool = Field(
+        default=False,
+        description="Create the CronJob but do not schedule it. Useful for landing a job ahead of the environment being ready for it.",
+    )
 
 
 class GranianConfig(BaseModel):
@@ -592,6 +652,25 @@ class OLApplicationK8sConfig(BaseModel):
             msg = (
                 f"Only one worker may have run_beat=True, but found: '{names}'. "
                 "Multiple beat schedulers will corrupt the RedBeat schedule in Redis."
+            )
+            raise ValueError(msg)
+        return self
+
+    scheduled_jobs: list[OLApplicationK8sScheduledJobConfig] = Field(
+        default_factory=list,
+        description="CronJobs to run in the application image on a wall-clock schedule.",
+    )
+
+    @model_validator(mode="after")
+    def check_scheduled_job_names_unique(self):
+        """Reject duplicate scheduled job names, which would collide on CronJob name."""
+        names = [job.name for job in self.scheduled_jobs]
+        if len(names) != len(set(names)):
+            duplicates = sorted({n for n in names if names.count(n) > 1})
+            msg = (
+                f"scheduled_jobs names must be unique, but found duplicates: "
+                f"{', '.join(duplicates)}. Each job's name is part of its CronJob "
+                "name and pod labels."
             )
             raise ValueError(msg)
         return self
@@ -1336,6 +1415,8 @@ class OLApplicationK8s(ComponentResource):
         self.celery_deployment_names: list[str] = []
         self.celery_deployments: list[kubernetes.apps.v1.Deployment] = []
         self.beat_deployment_name: str | None = None
+        self.scheduled_job_names: list[str] = []
+        self.scheduled_jobs: list[kubernetes.batch.v1.CronJob] = []
 
         if pre_deploy_commands := ol_app_k8s_config.pre_deploy_commands:
             _pre_deploy_job = kubernetes.batch.v1.Job(
@@ -2240,6 +2321,116 @@ class OLApplicationK8s(ComponentResource):
                 ),
                 opts=resource_options,
             )
+
+        for scheduled_job in ol_app_k8s_config.scheduled_jobs:
+            # Deliberately NOT application_labels: those are the webapp Deployment's
+            # selector, so a job pod carrying them is counted by the webapp's HPA/KEDA
+            # while it runs. The pre-deploy Job has to accept that because it is
+            # short-lived and gated on the rollout; a job that runs on a schedule and
+            # can be slow must not perturb webapp scaling. The pod-security-group label
+            # is kept because the SecurityGroupPolicy below selects on it, and without
+            # it the job has no route to RDS/Mongo/the search cluster.
+            scheduled_job_labels = ol_app_k8s_config.k8s_global_labels | {
+                "ol.mit.edu/component": "scheduled-job",
+                "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
+                "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
+                    truncate_k8s_metanames
+                ),
+                "ol.mit.edu/job-name": scheduled_job.name,
+            }
+            _scheduled_job_name = scheduled_job_name(
+                ol_app_k8s_config.application_name, scheduled_job.name
+            )
+            self.scheduled_job_names.append(_scheduled_job_name)
+            _scheduled_job = kubernetes.batch.v1.CronJob(
+                f"{ol_app_k8s_config.application_name}-{scheduled_job.name}-{stack_info.env_suffix}-cronjob",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name=_scheduled_job_name,
+                    namespace=ol_app_k8s_config.application_namespace,
+                    labels=scheduled_job_labels,
+                ),
+                spec=kubernetes.batch.v1.CronJobSpecArgs(
+                    schedule=scheduled_job.schedule,
+                    suspend=scheduled_job.suspend,
+                    concurrency_policy=scheduled_job.concurrency_policy,
+                    starting_deadline_seconds=scheduled_job.starting_deadline_seconds,
+                    successful_jobs_history_limit=scheduled_job.successful_jobs_history_limit,
+                    failed_jobs_history_limit=scheduled_job.failed_jobs_history_limit,
+                    job_template=kubernetes.batch.v1.JobTemplateSpecArgs(
+                        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                            labels=scheduled_job_labels,
+                        ),
+                        spec=kubernetes.batch.v1.JobSpecArgs(
+                            backoff_limit=scheduled_job.backoff_limit,
+                            active_deadline_seconds=scheduled_job.active_deadline_seconds,
+                            template=kubernetes.core.v1.PodTemplateSpecArgs(
+                                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                                    labels=scheduled_job_labels,
+                                    annotations=pod_config_hash_annotations or None,
+                                ),
+                                spec=kubernetes.core.v1.PodSpecArgs(
+                                    service_account_name=ol_app_k8s_config.application_service_account_name,
+                                    dns_policy="ClusterFirst",
+                                    volumes=ol_app_k8s_config.extra_volumes or None,
+                                    # Init containers are included because they are how
+                                    # the application's runtime config gets built (e.g.
+                                    # edxapp's config aggregator writing lms/cms.env.yml);
+                                    # without them the command starts with no settings.
+                                    init_containers=[
+                                        *[
+                                            kubernetes.core.v1.ContainerArgs(
+                                                **{
+                                                    k: v
+                                                    for k, v in vars(c).items()
+                                                    if k != "volume_mounts"
+                                                    and v is not None
+                                                },
+                                                volume_mounts=[
+                                                    *(
+                                                        getattr(
+                                                            c, "volume_mounts", None
+                                                        )
+                                                        or []
+                                                    ),
+                                                    *ol_app_k8s_config.extra_volume_mounts,
+                                                    *ol_app_k8s_config.extra_init_volume_mounts,
+                                                ],
+                                            )
+                                            for c in ol_app_k8s_config.extra_init_containers
+                                        ]
+                                    ]
+                                    or None,
+                                    # extra_sidecar_containers is deliberately omitted.
+                                    # Sidecars here are long-running (log shippers and
+                                    # the like) and never exit, so a Job carrying one
+                                    # stays Running forever and never completes.
+                                    containers=[
+                                        kubernetes.core.v1.ContainerArgs(
+                                            name=scheduled_job.name,
+                                            image=app_image,
+                                            command=scheduled_job.command,
+                                            image_pull_policy=image_pull_policy,
+                                            env=application_deployment_env_vars,
+                                            env_from=application_deployment_envfrom,
+                                            resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                                requests=scheduled_job.resource_requests,
+                                                limits=scheduled_job.resource_limits,
+                                            ),
+                                            volume_mounts=ol_app_k8s_config.extra_volume_mounts
+                                            or None,
+                                            **app_container_security_context,
+                                        ),
+                                    ],
+                                    restart_policy="Never",
+                                    **worker_pod_spec_args,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                opts=resource_options,
+            )
+            self.scheduled_jobs.append(_scheduled_job)
 
         _application_pod_security_group_policy = (
             kubernetes.apiextensions.CustomResource(

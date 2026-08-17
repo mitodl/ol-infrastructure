@@ -50,6 +50,7 @@ from ol_infrastructure.components.services.k8s import (
     GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sConfig,
+    OLApplicationK8sScheduledJobConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
@@ -543,6 +544,52 @@ def create_k8s_resources(  # noqa: C901
         stack_info=stack_info,
         edxapp_config=edxapp_config,
     )
+
+    # Periodic full sweep of the course search index.
+    #
+    # Enabling FEATURES["ENABLE_COURSEWARE_INDEX"] only starts INCREMENTAL indexing:
+    # the course_published signal enqueues update_search_index per publish. A course
+    # that is never republished is never indexed, and an index lost to a rebuilt
+    # Typesense PVC, a deleted collection, or a new environment does not repair
+    # itself. This sweep is the backstop for all of those.
+    #
+    # --active, not --all: reindex_course's --all path calls query_yes_no(), which is
+    # a bare input() loop, so it raises EOFError with no TTY. --active skips the
+    # prompt and scopes to courses that have started and have not ended -- the right
+    # working set for a recurring run. --warning drops per-block INFO logging.
+    #
+    # Only scheduled where indexing is on, since otherwise there is no engine being
+    # fed and the sweep would just be an expensive no-op.
+    courseware_reindex_jobs = []
+    if edxapp_config.get_bool("enable_courseware_index"):
+        courseware_reindex_jobs.append(
+            OLApplicationK8sScheduledJobConfig(
+                name="reindex-courses",
+                schedule=edxapp_config.get("courseware_reindex_schedule")
+                or "30 7 * * 0",
+                command=[
+                    "python",
+                    "manage.py",
+                    "cms",
+                    "reindex_course",
+                    "--active",
+                    "--warning",
+                ],
+                # Tracks the CMS celery worker: the sweep walks the modulestore in
+                # process rather than fanning out to celery, so it wants comparable
+                # headroom.
+                resource_requests={
+                    "cpu": resources_dict["celery"]["cms"]["cpu_request"],
+                    "memory": resources_dict["celery"]["cms"]["memory_request"],
+                },
+                resource_limits={
+                    "memory": resources_dict["celery"]["cms"]["memory_limit"],
+                },
+                # No active_deadline_seconds: runtime scales with the size of the
+                # course catalog, and a wrong guess converts a slow sweep into a
+                # recurring failure.
+            )
+        )
 
     ############################################
     # lms deployment resources
@@ -1168,6 +1215,7 @@ def create_k8s_resources(  # noqa: C901
                     ["python", "manage.py", "cms", "migrate", "--noinput"],
                 ),
             ],
+            scheduled_jobs=courseware_reindex_jobs,
             webapp_keda_config=cms_webapp_keda_config,
             webapp_deployment_aliases=[
                 pulumi.Alias(
