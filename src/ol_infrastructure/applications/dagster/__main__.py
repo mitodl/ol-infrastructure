@@ -648,6 +648,97 @@ pgbouncer_max_db_connections = int(
 
 # ConfigMap containing the pgbouncer.ini template; ${PGUSER} and ${PGPASSWORD}
 # placeholders are substituted at pod start time by the init container.
+pgbouncer_ini_template = dagster_db.db_instance.address.apply(
+    lambda addr: "\n".join(
+        [
+            "[databases]",
+            f"dagster = host={addr} port={DEFAULT_POSTGRES_PORT}"
+            " dbname=dagster user=${PGUSER} password=${PGPASSWORD}",
+            "",
+            "[pgbouncer]",
+            "listen_addr = 0.0.0.0",
+            "listen_port = 5432",
+            "auth_type = any",
+            "pool_mode = session",
+            "max_client_conn = 1500",
+            "default_pool_size = 800",
+            "min_pool_size = 150",
+            "reserve_pool_size = 2000",
+            # The aggregate ceiling. See the derivation above; this is the
+            # only setting here that bounds total backends across replicas,
+            # and it converts "exhaust RDS" into "queue inside PgBouncer",
+            # which is the failure mode query_wait_timeout = 0 below was
+            # already chosen to tolerate.
+            f"max_db_connections = {pgbouncer_max_db_connections}",
+            "max_prepared_statements = 0",
+            "server_connect_timeout = 15",
+            # Dagster uses NullPool with AUTOCOMMIT isolation - no session
+            # state is left between queries, so DISCARD ALL is unnecessary
+            # and adds latency + a race-condition window on each disconnect.
+            "server_reset_query =",
+            # PgBouncer 1.25 defaults server_check_query to empty (disabled).
+            # Re-enable it so PgBouncer verifies server connections are alive
+            # before assigning them to clients. server_check_delay=30 means
+            # any connection idle >30s is health-checked before use. Note:
+            # server_check_delay=0 DISABLES checks (PgBouncer behavior since
+            # v1.7 when the default was changed from 0 to 30).
+            "server_check_query = ;",
+            "server_check_delay = 30",
+            # Proactively recycle backend connections every 30 min to prevent
+            # stale connections accumulating.
+            "server_lifetime = 1800",
+            # Release idle backend connections after 2 min. This is
+            # intentionally shorter than RDS's tcp_keepalives_idle (300s) so
+            # PgBouncer always closes idle connections before RDS silently
+            # terminates them, preventing zombie connections from being
+            # assigned to clients.
+            "server_idle_timeout = 120",
+            # Raised well above the 120s default, but NOT disabled.
+            #
+            # The default was too short: during heavy RDS checkpoint I/O,
+            # queries slow from milliseconds to seconds and the pool backs up,
+            # and at 120s clients that can't immediately get a server
+            # connection are disconnected with "server closed the connection
+            # unexpectedly" in psycopg2. That pressure clears within 1-2
+            # minutes, so the fix was to wait it out.
+            #
+            # This was previously 0, which disables the timeout entirely, and
+            # that turned out to be a different failure rather than the absence
+            # of one. A timeout is the only thing that breaks a pool deadlock:
+            # when every server connection is held by a client that is itself
+            # blocked waiting for a server connection, nothing is released
+            # until something gives up. With 0, nothing ever gives up. QA sat
+            # in exactly that state for days on 2026-08-17 -- all 764 backends
+            # pinned, sv_idle 0, the oldest client queued 2.4 days, the daemon
+            # frozen mid-backfill-cancellation -- and it could only be cleared
+            # by deleting run workers by hand.
+            #
+            # 600s keeps the original intent with a large margin (5x the 1-2
+            # minutes checkpoint pressure actually lasts) while restoring the
+            # property that a wedged pool eventually unwedges itself. A client
+            # that waits ten minutes for a connection is not going to be
+            # rescued by waiting longer; it needs to fail so the pool can drain
+            # and Dagster's own retry logic can take over.
+            "query_wait_timeout = 600",
+            # Dagster uses NullPool, so it opens a fresh connection per query
+            # and every connection logs with age=0s. Measured on one production
+            # pod: 27,738 lines in 3 minutes, ~154 lines/s per replica and
+            # ~925/s across six, all of it shipped to Loki. The one line that
+            # carries signal -- the per-minute `stats:` aggregate -- was 1 in
+            # ~9,000. The pgbouncer_exporter sidecar now collects the same
+            # connection counts as metrics, so these logs are pure cost.
+            "log_connections = 0",
+            "log_disconnections = 0",
+            # Required by pgbouncer_exporter: its PostgreSQL driver sends
+            # extra_float_digits on connect, and PgBouncer rejects unknown
+            # startup parameters unless they are listed here.
+            "ignore_startup_parameters = extra_float_digits",
+            "application_name_add_host = 1",
+            "",
+        ]
+    )
+)
+
 pgbouncer_config = kubernetes.core.v1.ConfigMap(
     f"dagster-pgbouncer-config-{stack_info.env_suffix}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -655,104 +746,42 @@ pgbouncer_config = kubernetes.core.v1.ConfigMap(
         namespace=dagster_namespace,
         labels=k8s_global_labels.model_dump(),
     ),
-    data={
-        "pgbouncer.ini.template": dagster_db.db_instance.address.apply(
-            lambda addr: "\n".join(
-                [
-                    "[databases]",
-                    f"dagster = host={addr} port={DEFAULT_POSTGRES_PORT}"
-                    " dbname=dagster user=${PGUSER} password=${PGPASSWORD}",
-                    "",
-                    "[pgbouncer]",
-                    "listen_addr = 0.0.0.0",
-                    "listen_port = 5432",
-                    "auth_type = any",
-                    "pool_mode = session",
-                    "max_client_conn = 1500",
-                    "default_pool_size = 800",
-                    "min_pool_size = 150",
-                    "reserve_pool_size = 2000",
-                    # The aggregate ceiling. See the derivation above; this is the
-                    # only setting here that bounds total backends across replicas,
-                    # and it converts "exhaust RDS" into "queue inside PgBouncer",
-                    # which is the failure mode query_wait_timeout = 0 below was
-                    # already chosen to tolerate.
-                    f"max_db_connections = {pgbouncer_max_db_connections}",
-                    "max_prepared_statements = 0",
-                    "server_connect_timeout = 15",
-                    # Dagster uses NullPool with AUTOCOMMIT isolation - no session
-                    # state is left between queries, so DISCARD ALL is unnecessary
-                    # and adds latency + a race-condition window on each disconnect.
-                    "server_reset_query =",
-                    # PgBouncer 1.25 defaults server_check_query to empty (disabled).
-                    # Re-enable it so PgBouncer verifies server connections are alive
-                    # before assigning them to clients. server_check_delay=30 means
-                    # any connection idle >30s is health-checked before use. Note:
-                    # server_check_delay=0 DISABLES checks (PgBouncer behavior since
-                    # v1.7 when the default was changed from 0 to 30).
-                    "server_check_query = ;",
-                    "server_check_delay = 30",
-                    # Proactively recycle backend connections every 30 min to prevent
-                    # stale connections accumulating.
-                    "server_lifetime = 1800",
-                    # Release idle backend connections after 2 min. This is
-                    # intentionally shorter than RDS's tcp_keepalives_idle (300s) so
-                    # PgBouncer always closes idle connections before RDS silently
-                    # terminates them, preventing zombie connections from being
-                    # assigned to clients.
-                    "server_idle_timeout = 120",
-                    # Raised well above the 120s default, but NOT disabled.
-                    #
-                    # The default was too short: during heavy RDS checkpoint I/O,
-                    # queries slow from milliseconds to seconds and the pool backs up,
-                    # and at 120s clients that can't immediately get a server
-                    # connection are disconnected with "server closed the connection
-                    # unexpectedly" in psycopg2. That pressure clears within 1-2
-                    # minutes, so the fix was to wait it out.
-                    #
-                    # This was previously 0, which disables the timeout entirely, and
-                    # that turned out to be a different failure rather than the absence
-                    # of one. A timeout is the only thing that breaks a pool deadlock:
-                    # when every server connection is held by a client that is itself
-                    # blocked waiting for a server connection, nothing is released
-                    # until something gives up. With 0, nothing ever gives up. QA sat
-                    # in exactly that state for days on 2026-08-17 -- all 764 backends
-                    # pinned, sv_idle 0, the oldest client queued 2.4 days, the daemon
-                    # frozen mid-backfill-cancellation -- and it could only be cleared
-                    # by deleting run workers by hand.
-                    #
-                    # 600s keeps the original intent with a large margin (5x the 1-2
-                    # minutes checkpoint pressure actually lasts) while restoring the
-                    # property that a wedged pool eventually unwedges itself. A client
-                    # that waits ten minutes for a connection is not going to be
-                    # rescued by waiting longer; it needs to fail so the pool can drain
-                    # and Dagster's own retry logic can take over.
-                    "query_wait_timeout = 600",
-                    # Dagster uses NullPool, so it opens a fresh connection per query
-                    # and every connection logs with age=0s. Measured on one production
-                    # pod: 27,738 lines in 3 minutes, ~154 lines/s per replica and
-                    # ~925/s across six, all of it shipped to Loki. The one line that
-                    # carries signal -- the per-minute `stats:` aggregate -- was 1 in
-                    # ~9,000. The pgbouncer_exporter sidecar now collects the same
-                    # connection counts as metrics, so these logs are pure cost.
-                    "log_connections = 0",
-                    "log_disconnections = 0",
-                    # Required by pgbouncer_exporter: its PostgreSQL driver sends
-                    # extra_float_digits on connect, and PgBouncer rejects unknown
-                    # startup parameters unless they are listed here.
-                    "ignore_startup_parameters = extra_float_digits",
-                    "application_name_add_host = 1",
-                    "",
-                ]
-            )
-        )
-    },
+    data={"pgbouncer.ini.template": pgbouncer_ini_template},
     # The provider replaces this ConfigMap on any data change, and its name is fixed,
     # so the replacement can only be delete-then-create. Make that ordering explicit
     # rather than letting the default create-before-delete attempt fail on
     # "configmaps ... already exists" and recover on the retry.
     opts=ResourceOptions(depends_on=[dagster_db_secret], delete_before_replace=True),
 )
+
+# An init container renders the template above into pgbouncer.ini at pod start, so
+# PgBouncer only ever reads this config once, when its pod boots. Updating the
+# ConfigMap therefore changes nothing about a running pool -- and because the
+# Deployment's pod template does not otherwise reference the ConfigMap's content,
+# nothing rolls the pods either. A config edit deploys clean, reports success, and
+# silently never takes effect.
+#
+# That is not hypothetical: it has now happened twice. max_db_connections (#5426)
+# only became live because someone manually restarted the deployment, and
+# query_wait_timeout = 600 (#5454) sat inert in production and QA -- ConfigMaps
+# showing 600, all eight running pods still on 0 -- until the pods were restarted
+# by hand after the fact. The deadlock protection that change exists to provide was
+# absent for as long as nobody thought to check SHOW CONFIG.
+#
+# Injecting the rendered template's hash into the pod template makes a config edit
+# roll the pods the same way an image change would. This mirrors
+# dagster_instance_checksum_annotation further down, which exists for exactly this
+# reason on the other ConfigMap mounted into these pods (#5373).
+#
+# The hash is stable across deploys that change nothing: the template embeds
+# ${PGUSER}/${PGPASSWORD} as literal placeholders rather than resolved credentials,
+# so Vault rotation does not perturb it, and the only inputs that move it are the
+# RDS address and the pool settings themselves.
+pgbouncer_config_checksum_annotation = {
+    "checksum/ol-pgbouncer-config": pgbouncer_ini_template.apply(
+        lambda template: hashlib.sha256(template.encode()).hexdigest()
+    ),
+}
 
 # PgBouncer Deployment; replica count (default 2, for HA) is resolved above.
 pgbouncer_deployment = kubernetes.apps.v1.Deployment(
@@ -792,6 +821,10 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
                     "component": "pgbouncer",
                     **k8s_global_labels.model_dump(),
                 },
+                # Rolls these pods when the pgbouncer ConfigMap changes; without it a
+                # config edit never reaches the running processes. See the annotation's
+                # definition above.
+                annotations=pgbouncer_config_checksum_annotation,
             ),
             spec=kubernetes.core.v1.PodSpecArgs(
                 init_containers=[
