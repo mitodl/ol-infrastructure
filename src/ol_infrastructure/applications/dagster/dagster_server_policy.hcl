@@ -38,6 +38,14 @@ path "postgres-dagster/creds/app/*" {
 path "postgres-dagster/creds/app" {
   capabilities = ["read"]
 }
+# Read-only credentials for the sql_exporter deployment, which reads the Dagster
+# metadata tables directly rather than through PgBouncer. SELECT is all it needs.
+path "postgres-dagster/creds/readonly/*" {
+  capabilities = ["read"]
+}
+path "postgres-dagster/creds/readonly" {
+  capabilities = ["read"]
+}
 path "postgres-dagster-data-production/creds/app/*" {
   capabilities = ["read"]
 }

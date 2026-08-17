@@ -345,6 +345,51 @@ Two constraints on the implementation: every query must be time-bounded and inde
 not through PgBouncer, so its polling doesn't contaminate the pool metrics we're
 collecting in parallel.
 
+#### Shipped 2026-08-17 — `burningalchemist/sql_exporter`, one Deployment in `dagster`
+
+Eight gauges, all under a 10s `statement_timeout` and a 2-connection ceiling:
+
+| Metric | Answers |
+|---|---|
+| `dagster_runs_in_flight{status}` | is `max_concurrent_runs` binding |
+| `dagster_oldest_queued_run_age_seconds` | healthy burst vs. stuck coordinator |
+| `dagster_run_wait_to_start_seconds{quantile}` | p50 / p95 / max wait to start |
+| `dagster_recent_runs_total{status}` | failure rate over the recent window |
+| `dagster_recent_retried_runs_total` | chronic failure masked by `max_retries = 3` |
+| `dagster_recent_job_ticks_total{tick_type,status}` | silently erroring sensors/schedules |
+| `dagster_daemon_heartbeat_age_seconds{daemon_type}` | the 08-10 symptom, measured directly |
+| `dagster_relation_bytes{relation}` | event-log growth |
+
+Three implementation findings worth keeping, all from testing rather than reading:
+
+- **Bound by primary key, not by time.** Neither `runs` nor `job_ticks` has an index on a
+  bare timestamp, so a "last N minutes" predicate is a full index scan that grows with the
+  table. `id > (SELECT max(id) - N)` is a range scan whose cost is fixed at N rows forever.
+  `EXPLAIN (ANALYZE, BUFFERS)` against a local Postgres carrying this exact schema with
+  60k runs / 200k ticks: every query an index scan, no sequential scans, full scrape 31ms.
+- **`SQLEXPORTER_TARGET_DSN` is only read when the config file declares no `target:` block
+  at all.** A `target:` with `data_source_name` omitted does not fall back to the
+  environment — it fails at startup with `missing data_source_name for target`. So the
+  ConfigMap carries collectors only and the target is entirely environment-driven, which
+  is also what keeps the Vault credential out of the ConfigMap.
+- **`statement_timeout` must use the libpq `--name=value` form**:
+  `options=--statement_timeout%3D10000`. The more familiar `-c name=value` form is mangled
+  in transit and the server rejects it with
+  `invalid command-line argument for server process: -c`. Confirmed the timeout actually
+  reaches the backend by setting it to 1ms and watching every query return `57014`.
+
+The exporter authenticates with `postgres-dagster/creds/readonly` — SELECT and nothing
+more, which covers even `pg_total_relation_size`, verified by running the whole collector
+under a role holding only SELECT. `dagster_server_policy.hcl` had to be widened; it
+granted `creds/app` only.
+
+One deliberate omission from the table above: per-code-location failure rate. The join
+from `runs` to `run_tags` for every run in the window is the most expensive query in the
+set, and the kube-state-metrics label allowlist in §5 answers a near-enough version of
+the same question for free. Revisit if the two ever disagree — they measure different
+things (Dagster run status vs. run-worker Job exit) and a systematic gap between them
+would itself be worth knowing about.
+
 ### 4. OpenTelemetry auto-instrumentation — the "why", not the "what"
 
 Worth evaluating separately from the SQL exporter, because the two answer different
@@ -475,9 +520,11 @@ time, no retry attribution), so treat it as a cheap stopgap rather than a substi
    not, as an earlier draft of this line claimed, because the alarms omit `ok_actions`;
    `OLCloudWatchAlarmSimpleRDS` sets `ok_actions=alarm_actions`
    (`components/aws/cloudwatch.py:211-212`), so they do auto-resolve in Rootly.
-5. **Dagster SQL exporter.** Larger build; sequence after the pool picture is clear.
-   Note it must connect **directly to RDS**, which means it consumes from the same 5000 —
-   budget for it in (0).
+5. **Dagster SQL exporter.** ✅ Done 2026-08-17 — see
+   [Shipped](#shipped-2026-08-17--burningalchemistsql_exporter-one-deployment-in-dagster).
+   It connects directly to RDS and so consumes from the same 5000, which is already
+   budgeted: `DB_CONNECTION_HEADROOM_FACTOR = 0.85` leaves ~750 connections outside the
+   pool's cap and the exporter takes 2 of them.
 6. **Re-tune from data.** ✅ Done 2026-08-17 — see
    [The answers](#the-answers-2026-08-17-seven-days-of-1-minute-samples-on-production).
    `min_pool_size` 150 → 40, `default_pool_size` → the derived cap, `reserve_pool_size`
