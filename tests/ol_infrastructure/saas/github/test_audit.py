@@ -84,6 +84,15 @@ def test_sec01_needs_both_missing() -> None:
     assert "SEC-01" not in fired([repo(_has_branch_protection=True, _ruleset_count=0)])
 
 
+def test_sec01_exempts_unmanaged_tier() -> None:
+    """Forks and other `tier: unmanaged` repos have no org ruleset targeting them by
+    design (§5.4, §9.2) -- reporting them as "unprotected" is noise, not a finding.
+    """
+    assert "SEC-01" not in fired(
+        [repo(_has_branch_protection=False, _ruleset_count=0, tier="unmanaged")]
+    )
+
+
 def test_sec15_is_an_allowlist_not_a_denylist() -> None:
     """A team nobody has sanctioned must fire, which a denylist would miss."""
     assert "SEC-15" in fired([repo(teams={"a-brand-new-team": "admin"})])
