@@ -63,7 +63,11 @@ from ol_infrastructure.lib.aws.eks_helper import (
     ecr_image_uri,
     setup_k8s_provider,
 )
-from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
+from ol_infrastructure.lib.aws.iam_helper import (
+    IAM_POLICY_VERSION,
+    cross_environment_glue_denial,
+    data_lake_glue_resources,
+)
 from ol_infrastructure.lib.aws.rds_helper import postgres_max_connections
 from ol_infrastructure.lib.ol_types import (
     Application,
@@ -275,12 +279,9 @@ athena_permissions: list[dict[str, str | list[str]]] = [
             "glue:UpdatePartition",
             "glue:UpdateTable",
         ],
-        "Resource": [
-            "arn:aws:glue:*:*:catalog",
-            f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}*",
-            f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}*/*",
-        ],
+        "Resource": data_lake_glue_resources(stack_info.env_suffix),
     },
+    *cross_environment_glue_denial(stack_info.env_suffix),
 ]
 
 

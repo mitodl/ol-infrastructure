@@ -55,6 +55,8 @@ from ol_infrastructure.lib.aws.ec2_helper import default_egress_args
 from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
 from ol_infrastructure.lib.aws.iam_helper import (
     IAM_POLICY_VERSION,
+    cross_environment_glue_denial,
+    data_lake_glue_resources,
     lint_iam_policy,
 )
 from ol_infrastructure.lib.ol_types import (
@@ -281,13 +283,12 @@ data_lake_policy_document = {
                 "glue:UpdateTable",
             ],
             "Resource": [
-                "arn:aws:glue:*:*:catalog",
                 "arn:aws:glue:*:*:database/airbyte_test_namespace",
                 "arn:aws:glue:*:*:table/airbyte_test_namespace/*",
-                f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}*",
-                f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}*/*",
+                *data_lake_glue_resources(stack_info.env_suffix),
             ],
         },
+        *cross_environment_glue_denial(stack_info.env_suffix),
     ],
 }
 data_lake_policy = iam.Policy(
