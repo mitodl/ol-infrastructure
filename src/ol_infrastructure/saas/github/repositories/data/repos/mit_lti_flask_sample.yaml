@@ -21,7 +21,7 @@ name: mit_lti_flask_sample
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
-  arbisoft-contractors: admin
+  arbisoft-contractors: push
   odl-engineering: admin
   odl-engineering-owners: admin
 topics:
