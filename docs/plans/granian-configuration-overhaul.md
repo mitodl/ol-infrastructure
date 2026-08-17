@@ -350,6 +350,58 @@ Component change lands once; per-app behavior changes as each app's stack is dep
      `count by (namespace) (granian_workers_spawns)` and `up{namespace="mitxonline"}`
      after the production deploy.
 
+  **Resequenced 2026-08-17: `edxapp` CMS goes first, and LMS is pulled out of stage 3.**
+  With `mitxonline` blocked and `edxapp` blocked by nothing, CMS went ahead. Measuring to
+  order the rest produced a result the plan did not anticipate.
+
+  Concurrency demand per pod, measured as
+  `sum by (pod) (rate(granian_blocking_busy_cumulative[5m])) / 1e6` — mean
+  concurrently-busy blocking threads. Today each pod has 2 × 32 = 64; after the change,
+  1 × 8 = 8.
+
+  | workload | pods | rps | mean | **p99** | max |
+  | --- | --- | --- | --- | --- | --- |
+  | `mitxonline` CMS | 3 | 0.9 | 0.06 | **8.7** | 21.6 |
+  | `mitxonline` **LMS** | 16 | 62.4 | 0.41 | **17.7** | 56.4 |
+  | `mitx` LMS | 4 | 4.4 | 0.11 | 0.27 | 20.9 |
+  | `mitx` CMS | 2 | 0.25 | 0.005 | 0.07 | 8.0 |
+  | `mitx-staging` CMS/LMS | 1 each | ~0.15 | ~0.06 | ~0.07 | ~1 |
+
+  `mitxonline` LMS is the **only** workload in the estate whose measured demand exceeds
+  the new default, and it does so at the 99th percentile by more than 2×. Everything else
+  is one to two orders of magnitude below 8. So LMS does not want the default at all — it
+  wants `blocking_threads` set explicitly from measurement, somewhere around 16–24. That
+  is this plan's own open item 3 arriving early, and it is tracked as
+  `tk-edxapp-lms-needs-blocking-threads-sized-from-mea-317fe2`.
+
+  Note what this says about the original ordering. "CMS first, it takes far less traffic
+  than LMS" is true on traffic and wrong on risk: `mitxonline` CMS at 0.9 rps needs p99
+  8.7 threads while `mitx` LMS at 4.4 rps needs 0.27. Concurrency is rate × service time,
+  and Studio's long authoring operations dominate the second term. **Ordering a staged
+  rollout by request rate put the riskier workload in the "safe canary" slot.** Method
+  recorded as `pat-size-granian-blocking-threads-from-busy-thread-c-3a8b48`; note in
+  particular that `granian_blocking_threads` measures threads *spawned*, not busy, and
+  reads 32 for every edxapp workload including those needing 0.07.
+
+  CMS was judged safe despite p99 8.7 sitting right at the ceiling: 0.9 rps over 3 pods,
+  and the spikes are Studio import/export bursts whose blast radius is a slow authoring
+  operation rather than learner traffic. Its `workers_max_rss` is unchanged in aggregate —
+  the component derives `floor(limit / workers × 0.9)`, so 2 × 921MiB and 1 × 1843MiB cap
+  the pod identically (verified in the CI preview diff). What *does* change is that a
+  respawn now costs the pod's whole serving capacity instead of half; CMS showed 71 RSS
+  respawns and 77 restarts over 14 days but **zero over the last 3**, once its VPA grew
+  the pods past the declared 4Gi. LMS respawns, by contrast, are ongoing (8 and 10 over
+  14 days), which is a second independent reason to keep it at 2 workers for now.
+
+  **Blast radius.** `k8s_resources.py` is shared, so the CMS edit changes CMS for
+  `mitxonline-openedx`, `mitx-openedx` and `mitx-staging-openedx` as each stack deploys —
+  three deployments, not one. `xpro-openedx` is *not* affected: it still runs the
+  hand-rolled pre-`OLApplicationK8s` deployments (175 days old, granian args with no
+  `--blocking-threads`, `--backpressure` or `--metrics`, i.e. predating stage 0). Whenever
+  that stack next deploys it jumps roughly six months of drift in one step, which is worth
+  handling deliberately rather than discovering mid-incident
+  (`tk-xpro-edxapp-is-6-months-stale-still-on-the-hand--43a5a4`).
+
   `edxapp` is **not** affected by either finding — `mitxonline-openedx` reports
   `granian_*` normally (`cms-edxapp-webapp-pod-monitor` and `lms-edxapp-webapp-pod-monitor`
   both up), and it is behind APISIX so `apisix_http_latency_bucket` gives it the real
