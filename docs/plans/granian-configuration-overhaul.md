@@ -316,18 +316,39 @@ Component change lands once; per-app behavior changes as each app's stack is dep
   1. `tk-stage-3-blocker-mitxonline-s-vpa-never-runs-at-t-cc6acf` — the
      `workers_max_rss` retraction above. The corrected edit is known; it needs sign-off
      because it inverts what this plan told the implementer to do.
-  2. `tk-mitxonline-is-the-only-granian-workload-in-produ-b3dffd` — `mitxonline` is the
-     only Granian workload in production emitting **no** `granian_*` series.
-     `mitxonline-webapp-pod-monitor` exists (158d), its selector matches all four pods,
-     the container serves `--metrics` on a port named `metrics`, its pod security group
-     is byte-identical to `micromasters`', and alloy-metrics logs
-     `found pod monitor … name=mitxonline-webapp-pod-monitor` with no scrape errors —
-     yet there is not even an `up` series for the namespace. Root cause still open.
+  2. `tk-mitxonline-is-the-only-granian-workload-in-produ-b3dffd` — **root-caused and
+     fixed the same day; awaiting deploy.** `mitxonline` was the only Granian workload in
+     production emitting no `granian_*` series, for the entire 158 days its PodMonitor
+     had existed.
 
-     This one is the harder blocker: `granian_workers_respawns_for_rss` is precisely the
-     signal that would show a retargeted RSS cap thrashing, and it is dark for this app.
-     Shipping a `workers_max_rss` change to `mitxonline` while blind to worker respawns
-     means the first evidence of a bad cap would be user-visible latency.
+     Prometheus SD flattens a label name by replacing every non-alphanumeric character
+     with `_`, so `ol.mit.edu/pod-security-group` and `ol.mit.edu/pod_security_group`
+     both become `__meta_kubernetes_pod_label_ol_mit_edu_pod_security_group`. The
+     PodMonitor selector was the app's full label set, which for `mitxonline` contains
+     both — the component always sets the hyphenated one, and
+     `K8sAppLabels.pod_security_group` emits the underscored one for its single caller,
+     `mitxonline`. That generated two `keep` rules on one meta-label demanding
+     `(mitxonline-app-access-production-e9f43bb)` and `(mitxonline)`. Unsatisfiable, so
+     zero targets — and therefore no `up` series to alert on, no scrape error, and a
+     PodMonitor that looks perfectly healthy. Alloy's own
+     `net_conntrack_dialer_conn_attempted_total` for the pool reads `0` against 512 for
+     `micromasters`, which is the tell.
+
+     Fixed by narrowing the PodMonitor selector to namespace + application +
+     `component=webapp` (celery pods carry `component=celery`), with a regression test —
+     the failure mode is silent, so nothing else would catch it. This also stops a
+     security group replacement silently breaking any app's scrape, which was a latent
+     hazard everywhere, not just here. Lesson
+     `les-two-k8s-labels-differing-only-in-vs-collide-unde-bb7ec4`; the redundant
+     `K8sAppLabels.pod_security_group` field still wants deleting, but it sits in the
+     Deployment's immutable `spec.selector`, so that needs a replacement window
+     (`tk-delete-the-redundant-k8sapplabels-pod-security-g-ac508d`).
+
+     **`mitxonline` stage 3 stays blocked until this is deployed and verified**, because
+     `granian_workers_respawns_for_rss` is exactly the signal that would show a
+     retargeted RSS cap thrashing. Confirm with
+     `count by (namespace) (granian_workers_spawns)` and `up{namespace="mitxonline"}`
+     after the production deploy.
 
   `edxapp` is **not** affected by either finding — `mitxonline-openedx` reports
   `granian_*` normally (`cms-edxapp-webapp-pod-monitor` and `lms-edxapp-webapp-pod-monitor`
