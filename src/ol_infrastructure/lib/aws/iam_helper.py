@@ -422,9 +422,15 @@ def cross_environment_glue_denial(env_suffix: str) -> list[dict[str, Any]]:
             "Sid": "DenyCrossEnvironmentGlueAccess",
             "Effect": "Deny",
             "Action": "glue:*",
+            # Built from the same namespaces the Allow is built from, so the two
+            # cannot fall out of step. Denying only ``ol_warehouse_production*``
+            # would leave the raw landing databases -- ``ol_data_lake_*_production``
+            # and ``ol-data-lake-*-production`` -- uncovered, which is exactly the
+            # gap this statement exists to close.
             "Resource": [
-                f"arn:aws:glue:*:*:{resource_type}/ol_warehouse_{environment}*{suffix}"
+                f"arn:aws:glue:*:*:{resource_type}/{namespace}{suffix}"
                 for environment in protected
+                for namespace in data_lake_glue_namespaces(environment)
                 for resource_type, suffix in _GLUE_RESOURCE_SUFFIXES.items()
             ],
         }
