@@ -147,6 +147,38 @@ def _check_public_repo_teams(fleet: list[dict[str, Any]]) -> None:
         raise ValueError(message)
 
 
+def _check_dependabot_requires_alerts(fleet: list[dict[str, Any]]) -> None:
+    """Fail if a repo asks for Dependabot security updates with alerts off.
+
+    GitHub refuses that combination outright -- `/automated-security-fixes` answers 422
+    unless vulnerability alerts are enabled -- so it is unsatisfiable data, not a
+    preference Pulumi could honour.
+
+    This exists because `repository.py` now SKIPS `RepositoryDependabotSecurityUpdates`
+    entirely on an alerts-off repo (see the comment there for why declaring the OFF
+    state broke the 2026-08-17 deploy). That skip is correct for every combination the
+    fleet actually holds, but it would swallow this one: a repo asking for updates it
+    cannot have would simply get no resource and no complaint. Failing here keeps the
+    skip from turning an impossible request into a silent one.
+    """
+    conflicting = sorted(
+        repo["name"]
+        for repo in fleet
+        if not repo.get("archived")
+        and repo.get("dependabot_security_updates")
+        and not repo.get("vulnerability_alerts")
+    )
+    if conflicting:
+        message = (
+            "repos request dependabot_security_updates with vulnerability_alerts "
+            "disabled, which GitHub rejects (422):\n  "
+            + "\n  ".join(conflicting)
+            + "\nEnable vulnerability_alerts on these repos, or drop the "
+            "dependabot_security_updates request."
+        )
+        raise ValueError(message)
+
+
 def _check_team_references(fleet: list[dict[str, Any]]) -> None:
     """Fail if any repo grants to a team slug absent from teams.yaml.
 
@@ -205,6 +237,7 @@ def load_fleet() -> list[dict[str, Any]]:
     _check_team_references(fleet)
     _check_permission_values(fleet)
     _check_public_repo_teams(fleet)
+    _check_dependabot_requires_alerts(fleet)
 
     # The dotfile trap is silent by construction, so assert rather than trust.
     assignments = yaml.safe_load((DATA_DIR / "archetypes-proposed.yaml").read_text())
