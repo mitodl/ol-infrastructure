@@ -411,18 +411,17 @@ rds_defaults = defaults(stack_info)["rds"]
 # third was not, and is why the 2026-08-10 connection exhaustion could not be attributed
 # to anything after the fact.
 #
-# The CloudWatch alarm profile stays disabled for now. Turning it on is not a
-# no-op -- it creates the standard production alarm set against SNS, and the alarms
-# this repo generates do not send ok_actions, so anything that fires never
-# auto-resolves in Rootly. That is worth doing deliberately, with thresholds checked
-# against this instance, rather than as a side effect of enabling Performance Insights.
+# The CloudWatch alarm profile stays disabled for now, but only pending a threshold
+# review -- it creates the standard production alarm set against SNS and none of those
+# thresholds have been checked against this instance. That is worth doing deliberately
+# rather than as a side effect of enabling Performance Insights.
 rds_defaults["monitoring_profile_name"] = "disabled"
 # Enhanced Monitoring stays off. Unlike Performance Insights it is not free -- the OS
 # metric stream bills as CloudWatch Logs ingestion at a 60s interval -- and it answers a
 # question we are not asking. The gap here was never host-level CPU/disk; it was which
 # queries and wait events were on the database, which is exactly what PI covers.
 rds_defaults["enhanced_monitoring_interval"] = 0
-# Performance Insights, back on.
+# Performance Insights, back on -- production only.
 #
 # The PgBouncer exporter added in #5426 gives the pool's view of connections; it cannot
 # say what those connections were *doing*. With PI off there was no way to attribute the
@@ -432,12 +431,19 @@ rds_defaults["enhanced_monitoring_interval"] = 0
 # maxwait, which is the signal the pool alerts turn on.
 #
 # Free, and no reboot. Performance Insights includes 7 days of history and 1M API
-# requests/month at no charge, and retention is inherited from the house default at
+# requests/month at no charge, and retention comes from the house production default at
 # exactly that 7 days -- raising it, or switching Database Insights from Standard to
 # Advanced mode (which forces 15-month retention), is what starts costing money.
-# Toggling PI on an instance does not require a reboot, so this applies in place to
-# ol-etl-db-production.
-rds_defaults["performance_insights_enabled"] = True
+# Toggling PI on an instance does not require a reboot, so this applies in place.
+#
+# Gated on the environment because the surrounding rds_defaults edits are unconditional
+# and QA and CI are live stacks with real instances -- ol-etl-db-qa and ol-etl-db-ci
+# would both pick this up otherwise. Both support PI and previewed clean, so this is a
+# scope choice rather than a compatibility one: the incident being instrumented is on
+# production, and the QA/CI instances can be turned on deliberately when something
+# actually needs them.
+if stack_info.env_suffix == "production":
+    rds_defaults["performance_insights_enabled"] = True
 rds_defaults["use_blue_green"] = False
 rds_defaults["read_replica"] = None
 rds_defaults["instance_size"] = (

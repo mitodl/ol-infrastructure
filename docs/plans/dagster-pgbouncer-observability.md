@@ -428,13 +428,15 @@ time, no retry attribution), so treat it as a cheap stopgap rather than a substi
 3. **Alert on connection headroom.** `sum(pgbouncer_pools_server_*) / 5000` with a burn
    threshold. This is the alert that would have fired on 08-10.
 4. **Re-enable Performance Insights** on `ol-etl-db-production`. ✅ Done 2026-08-17 —
-   `performance_insights_enabled = True`, retention inherited at the free 7 days.
-   `pulumi preview` confirmed an in-place update
+   `performance_insights_enabled = True`, gated to the production stack, retention
+   inherited at the free 7 days. `pulumi preview` confirmed an in-place update
    (`performanceInsightsEnabled: false => true`), no replacement and no reboot.
    Enhanced Monitoring and the CloudWatch alarm profile stay off deliberately; see the
-   comments at the override site for why, and note that enabling the alarm profile is
-   its own decision because this repo's alarms send no `ok_actions` and so never
-   auto-resolve in Rootly.
+   comments at the override site for why. Enabling the alarm profile is its own
+   decision because none of its thresholds have been checked against this instance —
+   not, as an earlier draft of this line claimed, because the alarms omit `ok_actions`;
+   `OLCloudWatchAlarmSimpleRDS` sets `ok_actions=alarm_actions`
+   (`components/aws/cloudwatch.py:211-212`), so they do auto-resolve in Rootly.
 5. **Dagster SQL exporter.** Larger build; sequence after the pool picture is clear.
    Note it must connect **directly to RDS**, which means it consumes from the same 5000 —
    budget for it in (0).
