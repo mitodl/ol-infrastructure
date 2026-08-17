@@ -19,11 +19,26 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
 _ROOT_DOMAIN="${LOCAL_DEV_ROOT_DOMAIN:-mit.dev}"
 KC_URL="${KC_URL:-https://sso.ol.${_ROOT_DOMAIN}}"
 REALM="olapps"
 KC_USER="admin"
 KC_PASS="admin"  # pragma: allowlist secret
+
+# The ingress serves an mkcert-issued cert (setup.sh generates it) whose root CA
+# is not in the system trust store, so every curl below must validate against
+# that CA explicitly. Without it curl exits 60 on the handshake, the token comes
+# back empty, and get_token's retry loop reports it as "waiting for Keycloak" —
+# which sends you looking at a Keycloak that was healthy the whole time.
+KC_CACERT="${KC_CACERT:-${REPO_ROOT}/local-dev/certs/rootCA.pem}"
+if [ ! -f "${KC_CACERT}" ]; then
+    echo "[kc-seed-users] ERROR: CA certificate not found at ${KC_CACERT}" >&2
+    echo "[kc-seed-users] Run local-dev/scripts/setup.sh to generate the local certs." >&2
+    exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # Helper: obtain an admin access token, retrying up to 5 times.
@@ -31,7 +46,7 @@ KC_PASS="admin"  # pragma: allowlist secret
 get_token() {
     local token attempt
     for attempt in 1 2 3 4 5; do
-        token=$(curl -sf --max-time 10 \
+        token=$(curl -sf --cacert "${KC_CACERT}" --max-time 10 \
             -X POST "${KC_URL}/realms/master/protocol/openid-connect/token" \
             -d "client_id=admin-cli" \
             -d "grant_type=password" \
@@ -57,13 +72,13 @@ TOKEN=$(get_token)
 # ---------------------------------------------------------------------------
 ensure_admin_role() {
     local existing
-    existing=$(curl -sf --max-time 10 \
+    existing=$(curl -sf --cacert "${KC_CACERT}" --max-time 10 \
         -H "Authorization: Bearer ${TOKEN}" \
         "${KC_URL}/admin/realms/${REALM}/roles/admin" 2>/dev/null \
         | jq -r '.name // empty' 2>/dev/null || true)
     if [ -z "$existing" ]; then
         echo "[kc-seed-users] Creating 'admin' realm role in ${REALM} ..."
-        curl -sf --max-time 10 \
+        curl -sf --cacert "${KC_CACERT}" --max-time 10 \
             -X POST \
             -H "Authorization: Bearer ${TOKEN}" \
             -H "Content-Type: application/json" \
@@ -93,7 +108,7 @@ for USERNAME in admin student prof; do
     # the email address (e.g. "admin@odl.local", not "admin"). A username=
     # lookup would always miss and the script would try to re-create existing
     # users on every run, breaking idempotency.
-    EXISTING_ID=$(curl -sf --max-time 10 \
+    EXISTING_ID=$(curl -sf --cacert "${KC_CACERT}" --max-time 10 \
         -H "Authorization: Bearer ${TOKEN}" \
         "${KC_URL}/admin/realms/${REALM}/users?email=${EMAIL}&exact=true" 2>/dev/null \
         | jq -r '.[0].id // empty' 2>/dev/null || true)
@@ -104,7 +119,7 @@ for USERNAME in admin student prof; do
     fi
 
     echo "[kc-seed-users] Creating user: ${USERNAME} <${EMAIL}> ..."
-    curl -sf --max-time 10 \
+    curl -sf --cacert "${KC_CACERT}" --max-time 10 \
         -X POST \
         -H "Authorization: Bearer ${TOKEN}" \
         -H "Content-Type: application/json" \
@@ -125,7 +140,7 @@ for USERNAME in admin student prof; do
         -o /dev/null
 
     # Re-fetch the new user ID for role assignment (by email; see note above).
-    NEW_ID=$(curl -sf --max-time 10 \
+    NEW_ID=$(curl -sf --cacert "${KC_CACERT}" --max-time 10 \
         -H "Authorization: Bearer ${TOKEN}" \
         "${KC_URL}/admin/realms/${REALM}/users?email=${EMAIL}&exact=true" 2>/dev/null \
         | jq -r '.[0].id // empty' 2>/dev/null || true)
@@ -134,10 +149,10 @@ for USERNAME in admin student prof; do
     for admin_user in "${ADMIN_USERS[@]}"; do
         if [ "$admin_user" = "$USERNAME" ] && [ -n "$NEW_ID" ]; then
             echo "[kc-seed-users] Assigning 'admin' realm role to ${USERNAME} ..."
-            ROLE_JSON=$(curl -sf --max-time 10 \
+            ROLE_JSON=$(curl -sf --cacert "${KC_CACERT}" --max-time 10 \
                 -H "Authorization: Bearer ${TOKEN}" \
                 "${KC_URL}/admin/realms/${REALM}/roles/admin" 2>/dev/null || true)
-            curl -sf --max-time 10 \
+            curl -sf --cacert "${KC_CACERT}" --max-time 10 \
                 -X POST \
                 -H "Authorization: Bearer ${TOKEN}" \
                 -H "Content-Type: application/json" \

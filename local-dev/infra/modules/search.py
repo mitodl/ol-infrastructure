@@ -38,6 +38,31 @@ def create_search(
                         {
                             "name": "qdrant",
                             "image": "qdrant/qdrant:v1.12.5",
+                            # Qdrant mmaps ~30 files per segment and mit-learn
+                            # shards its collections 6 ways, so it needs far
+                            # more than the 1024-fd soft limit a pod inherits
+                            # from the k3d node container. Being a Rust binary
+                            # it does not raise its own soft limit the way a
+                            # JVM does, so it dies partway through
+                            # create_qdrant_collections with "Failed to save
+                            # structure on disk with error: Too many open files
+                            # (os error 24)". k3d-config.yaml now sets the
+                            # cluster-wide default, but raising it here too
+                            # means existing clusters are fixed without a
+                            # teardown/recreate. `|| true` keeps a lower
+                            # inherited hard limit from blocking startup.
+                            # ./entrypoint.sh is the image's own entrypoint and
+                            # handles SIGTERM/SIGINT plus OOM recovery mode, so
+                            # exec into it rather than calling ./qdrant.
+                            "command": [
+                                "/bin/bash",
+                                "-c",
+                                # -Sn raises only the soft limit; a bare
+                                # `ulimit -n` would also drop the hard limit
+                                # from 524288 to 65536, discarding headroom.
+                                "ulimit -Sn 65536 2>/dev/null || true; "
+                                "exec ./entrypoint.sh",
+                            ],
                             "ports": [
                                 {"containerPort": 6333, "name": "http"},
                                 {"containerPort": 6334, "name": "grpc"},
