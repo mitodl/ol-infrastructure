@@ -81,6 +81,7 @@ Rootly). That path is independent of Grafana and is managed in
 | `metric_rules/eks_general.py` | EKS workload alert rules (replicas, node readiness, crash loops, OOM, jobs, HPA). |
 | `metric_rules/linux_host.py` | Linux host alert rules (CPU, memory, disk usage). |
 | `metric_rules/apisix_edge.py` | Per-host 5xx rate at the APISIX edge (`apisix_http_status`). Two windows (fast cliff / slow creep) with a minimum-traffic gate. Currently unlabelled → `oblivion` while calibrating. |
+| `metric_rules/dagster_pgbouncer.py` | Dagster's PgBouncer pool (`pgbouncer_*`, from the exporter sidecar added in #5426). Aggregate connections against the derived `max_db_connections` cap, clients queued behind it, and exporter health. The denominator is read from `pgbouncer_databases_max_connections` rather than hardcoded, because the cap differs per environment. |
 | `metric_rules/synthetic_monitoring.py` | MIT Learn probe-failure rules (`probe_success`) for the Next.js origin, the API health endpoint, and the homepage. Imported from hand-made UI rules; lives in the Synthetic Monitoring **plugin's** folder, so it takes no `folder_uid`. |
 | `log_rules/` | Package. Grafana-managed alert rule groups for log queries. Migrated from `grafana-alerts/loki-rules/`. |
 | `log_rules/base.py` | Loki datasource UIDs, two-stage pipeline helper, folder creation, delegates to sub-modules. |

@@ -37,6 +37,11 @@ Sub-modules
   eks_general  — Source: grafana-alerts/cortex-rules/eks_general.yaml
   linux_host   — Source: grafana-alerts/cortex-rules/linux-host.yaml
   apisix_edge  — New in 2026-08. Per-host 5xx rate at the APISIX edge.
+  dagster_pgbouncer
+               — New in 2026-08. Dagster's PgBouncer pool: aggregate connection
+                 headroom against the max_db_connections cap, queued clients, and
+                 exporter health. Depends on the pgbouncer_exporter sidecar added
+                 to the dagster stack in #5426.
   synthetic_monitoring
                — Imported 2026-08 from three hand-made UI rules. Unlike the
                  others it takes no folder_uid: its rules live in the Synthetic
@@ -51,6 +56,7 @@ from pulumiverse_grafana.oss.folder import Folder
 
 from ol_infrastructure.infrastructure.grafana_alerting.metric_rules import (
     apisix_edge,
+    dagster_pgbouncer,
     eks_general,
     linux_host,
     synthetic_monitoring,
@@ -154,6 +160,7 @@ def create(resource_opts: ResourceOptions) -> None:
     eks_general.create(alerts_folder.uid, rd, resource_opts)
     linux_host.create(alerts_folder.uid, rd, resource_opts)
     apisix_edge.create(alerts_folder.uid, rd, resource_opts)
+    dagster_pgbouncer.create(alerts_folder.uid, rd, resource_opts)
     # No folder_uid: these rules live in the Synthetic Monitoring plugin's own
     # folder rather than the one created above. See the module docstring.
     synthetic_monitoring.create(rd, resource_opts)
