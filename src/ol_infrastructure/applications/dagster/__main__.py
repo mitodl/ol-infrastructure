@@ -701,16 +701,33 @@ pgbouncer_config = kubernetes.core.v1.ConfigMap(
                     # terminates them, preventing zombie connections from being
                     # assigned to clients.
                     "server_idle_timeout = 120",
-                    # Disable the default 120s query_wait_timeout. During heavy RDS
-                    # checkpoint I/O, queries slow from milliseconds to seconds, which
-                    # temporarily backs up the pool. With the default of 120s, clients
-                    # that can't immediately get a server connection are disconnected
-                    # and psycopg2 sees "server closed the connection unexpectedly".
-                    # Setting to 0 disables the timeout so clients wait as long as
-                    # needed. This is safe because server_idle_timeout=120 continuously
-                    # cycles idle connections and the pool self-recovers within 1-2
-                    # minutes of I/O pressure dropping.
-                    "query_wait_timeout = 0",
+                    # Raised well above the 120s default, but NOT disabled.
+                    #
+                    # The default was too short: during heavy RDS checkpoint I/O,
+                    # queries slow from milliseconds to seconds and the pool backs up,
+                    # and at 120s clients that can't immediately get a server
+                    # connection are disconnected with "server closed the connection
+                    # unexpectedly" in psycopg2. That pressure clears within 1-2
+                    # minutes, so the fix was to wait it out.
+                    #
+                    # This was previously 0, which disables the timeout entirely, and
+                    # that turned out to be a different failure rather than the absence
+                    # of one. A timeout is the only thing that breaks a pool deadlock:
+                    # when every server connection is held by a client that is itself
+                    # blocked waiting for a server connection, nothing is released
+                    # until something gives up. With 0, nothing ever gives up. QA sat
+                    # in exactly that state for days on 2026-08-17 -- all 764 backends
+                    # pinned, sv_idle 0, the oldest client queued 2.4 days, the daemon
+                    # frozen mid-backfill-cancellation -- and it could only be cleared
+                    # by deleting run workers by hand.
+                    #
+                    # 600s keeps the original intent with a large margin (5x the 1-2
+                    # minutes checkpoint pressure actually lasts) while restoring the
+                    # property that a wedged pool eventually unwedges itself. A client
+                    # that waits ten minutes for a connection is not going to be
+                    # rescued by waiting longer; it needs to fail so the pool can drain
+                    # and Dagster's own retry logic can take over.
+                    "query_wait_timeout = 600",
                     # Dagster uses NullPool, so it opens a fresh connection per query
                     # and every connection logs with age=0s. Measured on one production
                     # pod: 27,738 lines in 3 minutes, ~154 lines/s per replica and
@@ -1419,10 +1436,36 @@ dagster_run_priority_class = kubernetes.scheduling.v1.PriorityClass(
     ),
 )
 
+# How many runs the QueuedRunCoordinator will have in flight at once.
+#
+# This has to be sized against the environment's PgBouncer connection budget,
+# not set globally. Dagster's storage uses NullPool, so a run worker opens a
+# fresh connection per query and holds one per concurrent step; measured on
+# data-qa on 2026-08-17, 32 run workers were holding ~700 client connections
+# between them, around 22 each. At the previous global value of 100, that is
+# ~2200 connections -- fine against production's aggregate cap of 4248, and
+# 2.9x QA's 764.
+#
+# QA duly deadlocked. Once the pool was full, every remaining client queued
+# behind it, and because query_wait_timeout was 0 (see below) none of them ever
+# timed out. The run workers held connections while waiting on connections that
+# could only be released by the workers themselves, the daemon blocked
+# mid-way through cancelling a backfill, and the whole stack sat frozen for
+# days -- 764/764 servers pinned, sv_idle 0, one client queued 2.4 days.
+# Nothing could recover on its own because every recovery path needed the
+# connection that was unavailable.
+#
+# Defaulting to 100 keeps production exactly as it was; QA sets a lower value
+# in its stack config.
+dagster_max_concurrent_runs = dagster_config.get_int("max_concurrent_runs") or 100
+
 # Custom Dagster instance ConfigMap with dynamic credentials support
 # Note: We create this before the Helm release so it gets proper ownership
 dagster_instance_yaml = (
-    Path(__file__).parent.joinpath("dagster_instance.yaml").read_text()
+    Path(__file__)
+    .parent.joinpath("dagster_instance.yaml")
+    .read_text()
+    .replace("MAX_CONCURRENT_RUNS", str(dagster_max_concurrent_runs))
 )
 # The daemon and webserver mount dagster.yaml from the dagster-instance
 # ConfigMap via subPath, which kubelet never live-refreshes, and the chart's

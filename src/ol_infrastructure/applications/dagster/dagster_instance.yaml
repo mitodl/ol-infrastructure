@@ -135,11 +135,16 @@ event_log_storage:
       params:
         connect_timeout: 30
 
+# The max_concurrent_runs value below is a placeholder token, substituted in
+# __main__.py from the dagster:max_concurrent_runs stack config -- see the
+# rationale there. It is a placeholder rather than a literal because run
+# concurrency has to be sized against the environment's PgBouncer connection
+# budget, and QA's is 5.5x smaller than production's.
 run_coordinator:
   module: dagster.core.run_coordinator
   class: QueuedRunCoordinator
   config:
-    max_concurrent_runs: 100
+    max_concurrent_runs: MAX_CONCURRENT_RUNS
 
 # Configures how long Dagster waits for code locations
 # to load before timing out.
