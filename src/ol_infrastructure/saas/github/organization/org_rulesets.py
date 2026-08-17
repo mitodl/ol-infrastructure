@@ -200,3 +200,26 @@ tier_one_hardening = github.OrganizationRuleset(
 #                     Supported on OrganizationRuleset and arguably belongs here --
 #                     six repos carry a hand-made per-repo ruleset for it today. Left
 #                     out pending the decision in the Copilot governance task (§4.6).
+#
+# THE CLASSIC BRANCH PROTECTION STILL OUT THERE IS NOT INERT. These rulesets are
+# ADDITIVE to it, not a replacement: an action must satisfy classic protection AND
+# every ruleset that matches, and a `bypass_actors` entry here grants no relief from the
+# classic layer at all. 27 active repos still carry a classic object that nothing here
+# manages (repository.py declines to declare BranchProtection), so it is invisible drift
+# that can override everything decided in this file.
+#
+# open-edx-plugins made that concrete on 2026-08-17. Its classic protection restricted
+# pushes to `main` to the single user `odlbot`, and GitHub counts merging a pull request
+# as a push -- so arbisoft-contractors and odl-engineering could not merge, and adding
+# them as `pull_request` bypass actors above did nothing, because the block was never in
+# a ruleset. It had been masked for months by both teams holding `admin` while
+# `enforce_admins` was false; PR #5324 downgrading them to `push` on 2026-08-12 removed
+# that accidental bypass and broke merges outright.
+#
+# Resolved by DELETING that repo's classic protection entirely (Tobias, 2026-08-17) --
+# every protection it asserted was already met or exceeded here (`baseline` matches its
+# review count and adds dismiss-stale, `tier-1-hardening` adds last-push approval and
+# thread resolution, both cover force-push and deletion). Only `block_creations` was
+# lost, which is inert on a branch that already exists. The remaining 26 repos have not
+# been swept; SEC-16 in audit.py now reports this class of block instead of leaving it
+# to be found by a contractor with a stuck PR.

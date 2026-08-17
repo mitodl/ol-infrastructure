@@ -54,6 +54,17 @@ def test_clean_repo_fires_nothing() -> None:
         ("SEC-04", {"secret_scanning": "disabled"}),  # pragma: allowlist secret
         ("SEC-06", {"_direct_collaborators": {"someone": "admin"}}),
         ("SEC-15", {"teams": {"arbisoft-contractors": "admin"}}),
+        (
+            "SEC-16",
+            {
+                "_branch_protection_push_restrictions": {
+                    "users": ["odlbot"],
+                    "teams": [],
+                    "apps": [],
+                },
+                "_branch_protection_enforce_admins": False,
+            },
+        ),
         ("CON-02", {"delete_branch_on_merge": False}),
         ("CON-03", {"default_branch": "master"}),
         ("CON-05", {"topics": []}),
@@ -79,6 +90,53 @@ def test_sec15_is_an_allowlist_not_a_denylist() -> None:
     assert "SEC-15" not in fired([repo(teams={"devops": "admin"})])
     # Non-admin from an unsanctioned team is fine -- the rule is about the level.
     assert "SEC-15" not in fired([repo(teams={"arbisoft-contractors": "push"})])
+
+
+def _restricted(**overrides: Any) -> dict[str, Any]:
+    """Build a repo whose default branch only `odlbot` may push to."""
+    return repo(
+        **{
+            "_branch_protection_push_restrictions": {
+                "users": ["odlbot"],
+                "teams": [],
+                "apps": [],
+            },
+            "_branch_protection_enforce_admins": False,
+            **overrides,
+        }
+    )
+
+
+def test_sec16_needs_a_restriction_to_fire() -> None:
+    """No restriction is the normal state -- `push` alone must stay silent."""
+    assert "SEC-16" not in fired([repo(teams={"odl-engineering": "push"})])
+
+
+def test_sec16_ignores_grants_that_could_never_merge() -> None:
+    """An allow-list takes nothing from `pull` or `triage`, so neither is a finding."""
+    assert "SEC-16" not in fired([_restricted(teams={"odl-engineering": "pull"})])
+    assert "SEC-16" not in fired([_restricted(teams={"odl-engineering": "triage"})])
+
+
+def test_sec16_follows_enforce_admins_for_admin_teams() -> None:
+    """The exact mechanism behind the open-edx-plugins outage.
+
+    With `enforce_admins` off an admin team bypasses the allow-list and is genuinely
+    not blocked; the same team at `push` is. Reporting the admin case would be a false
+    positive, and NOT reporting the push case is the miss that let this run for days.
+    """
+    admins = {"odl-engineering": "admin"}
+    assert "SEC-16" not in fired([_restricted(teams=admins)])
+    assert "SEC-16" in fired(
+        [_restricted(teams=admins, _branch_protection_enforce_admins=True)]
+    )
+    assert "SEC-16" in fired([_restricted(teams={"odl-engineering": "push"})])
+
+
+def test_sec16_clears_when_the_team_is_on_the_allow_list() -> None:
+    listed = _restricted(teams={"odl-engineering": "push"})
+    listed["_branch_protection_push_restrictions"]["teams"] = ["odl-engineering"]
+    assert "SEC-16" not in fired([listed])
 
 
 def test_con03_exempts_forks_and_archived() -> None:

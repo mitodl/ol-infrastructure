@@ -120,6 +120,56 @@ def _live_tier(repo: dict[str, Any]) -> str | None:
     return (repo.get("_custom_properties") or {}).get(TIER_PROPERTY_NAME)
 
 
+#: Team grants that are supposed to carry the ability to merge a pull request.
+#: `triage` and `pull` are excluded because neither can merge anyway, so being left out
+#: of a push allow-list takes nothing away from them.
+MERGE_CAPABLE_PERMISSIONS = frozenset({"push", "maintain", "admin"})
+
+
+def _blocked_by_push_restriction(repo: dict[str, Any]) -> list[str]:
+    """Teams holding a merge-capable grant that the push allow-list leaves out.
+
+    Classic branch protection's "Restrict who can push" is an allow-list, and GitHub
+    counts merging a pull request as a push -- so a team missing from it cannot merge no
+    matter what `teams` says. Neither field shows this alone: `teams` reads `push` and
+    looks fine, `_has_branch_protection` reads `true` and also looks fine. Only the pair
+    reveals it, which is exactly why it went unseen.
+
+    THE INCIDENT THIS RULE IS FOR. `open-edx-plugins` restricted pushes to `main` to the
+    single user `odlbot`. `arbisoft-contractors` and `odl-engineering` both held
+    `admin`, and because `enforce_admins` was false they bypassed the allow-list without
+    anyone noticing it existed. PR #5324 (SEC-15, 2026-08-12) downgraded both to `push`
+    -- the correct call on its own terms -- and in doing so removed the bypass, leaving
+    two teams unable to merge anything. No rule fired, no preview showed a diff, and it
+    surfaced five days later as a contractor reporting a stuck pull request.
+
+    `enforce_admins` is therefore load-bearing rather than trivia: with it off, an
+    `admin` team is genuinely not blocked, so reporting one would be a false positive.
+    Both fields come from the crawl and are only written where a restriction exists, so
+    a repo with no restriction yields no finding rather than an unmeasured pass.
+    """
+    allowed = repo.get("_branch_protection_push_restrictions")
+    if allowed is None:
+        return []
+    allowed_teams = set(allowed.get("teams") or [])
+    enforce_admins = repo.get("_branch_protection_enforce_admins")
+    return sorted(
+        team
+        for team, perm in (repo.get("teams") or {}).items()
+        if perm in MERGE_CAPABLE_PERMISSIONS
+        and team not in allowed_teams
+        and (enforce_admins or perm != "admin")
+    )
+
+
+def _push_allow_list(repo: dict[str, Any]) -> str:
+    """Render the push allow-list, so a SEC-16 finding names who IS still allowed."""
+    allowed = repo.get("_branch_protection_push_restrictions") or {}
+    users = ",".join(allowed.get("users") or []) or "-"
+    teams = ",".join(allowed.get("teams") or []) or "-"
+    return f"push restricted to users={users} teams={teams}"
+
+
 def _unsanctioned_admin(repo: dict[str, Any]) -> list[str]:
     return sorted(
         team
@@ -206,6 +256,29 @@ RULES: tuple[Rule, ...] = (
                 "downgrade to push or maintain",
             )
             if _unsanctioned_admin(r)
+            else None
+        ),
+    ),
+    Rule(
+        "SEC-16",
+        "security",
+        "high",
+        "active",
+        "classic push restriction excludes a team that holds a merge-capable grant",
+        # Graded `high` on ACCESS grounds rather than exposure: it does not weaken the
+        # repo, it silently revokes people's ability to ship to it, and it is invisible
+        # in every other field. An unannounced loss of access is a security finding in
+        # the same sense an unannounced grant is -- the declared model and the enforced
+        # one disagree, and nobody can tell which one is live.
+        lambda r: (
+            (
+                f"{_push_allow_list(r)}; "
+                f"blocked: {', '.join(_blocked_by_push_restriction(r))}",
+                "every team with push or better can merge",
+                "drop the push restriction (org rulesets already cover this branch), "
+                "or add the blocked teams to its allow-list",
+            )
+            if _blocked_by_push_restriction(r)
             else None
         ),
     ),
