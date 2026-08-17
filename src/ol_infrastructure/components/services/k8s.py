@@ -165,6 +165,16 @@ class OLApplicationK8sCeleryWorkerConfig(BaseModel):
     min_replicas: NonNegativeInt = 1
     max_replicas: NonNegativeInt = 10
     autoscale_queue_depth: NonNegativeInt = 10
+    # Resident set size, in KiB, above which celery retires a pool child. Checked
+    # after each task returns, so it bounds what a child *carries into the next
+    # task* -- it cannot stop a single task that blows the cgroup limit on its own.
+    # Without it the only recycle trigger is --max-tasks-per-child (100), so a
+    # child that balloons on task 1 stays resident for 99 more and the kernel
+    # OOM-kills the whole container, taking unrelated in-flight tasks with it.
+    # Size it so master + concurrency * (cap + one task's growth) clears the
+    # *smallest* limit the pod can run under, which under a VPA is the floor-
+    # derived limit, not the declared one.
+    max_memory_per_child_kib: PositiveInt | None = None
     redis_database_index: str = "1"
     redis_host: Output[str]
     redis_password: str
@@ -2077,6 +2087,18 @@ class OLApplicationK8s(ComponentResource):
                                         celery_worker_config.log_level,
                                         "--max-tasks-per-child",  # Max number of tasks the pool worker will process before being replaced
                                         "100",
+                                        *(
+                                            [
+                                                # Max RSS (KiB) a pool worker may
+                                                # hold before being replaced
+                                                "--max-memory-per-child",
+                                                str(
+                                                    celery_worker_config.max_memory_per_child_kib
+                                                ),
+                                            ]
+                                            if celery_worker_config.max_memory_per_child_kib
+                                            else []
+                                        ),
                                         "--concurrency=2",  # Don't try to use all cores on node
                                         "--prefetch-multiplier=1",
                                     ],

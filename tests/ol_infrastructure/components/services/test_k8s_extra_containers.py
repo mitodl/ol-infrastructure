@@ -970,3 +970,65 @@ def test_pod_monitor_selector_excludes_security_group_labels():
         }
 
     return app.webapp_pod_monitor.spec.apply(check)
+
+
+# ─── celery --max-memory-per-child ────────────────────────────────────────────
+
+
+def _celery_worker_config(**overrides) -> OLApplicationK8sCeleryWorkerConfig:
+    defaults = {
+        "application_name": "memcapped",
+        "worker_name": "default",
+        "redis_host": pulumi.Output.from_input("redis.example.com"),
+        "redis_password": "hunter2",  # pragma: allowlist secret
+    }
+    defaults.update(overrides)
+    return OLApplicationK8sCeleryWorkerConfig(**defaults)
+
+
+@pulumi.runtime.test
+def test_max_memory_per_child_omitted_by_default():
+    """Existing OLApplicationK8s consumers must be unaffected.
+
+    The flag changes when celery retires a pool child, so it has to stay opt-in
+    rather than arriving with a default that silently reshapes every other
+    application's worker recycling behaviour.
+    """
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="memcapped",
+            celery_worker_configs=[_celery_worker_config()],
+        )
+    )
+
+    def check(containers):
+        worker = next(c for c in containers if c["name"] == "celery-worker")
+        assert "--max-memory-per-child" not in worker["command"]
+        # the sibling recycle trigger stays unconditional
+        assert "--max-tasks-per-child" in worker["command"]
+
+    return app.celery_deployments[0].spec.template.spec.containers.apply(check)
+
+
+@pulumi.runtime.test
+def test_max_memory_per_child_emitted_as_flag_and_value():
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="memcapped",
+            celery_worker_configs=[
+                _celery_worker_config(max_memory_per_child_kib=655360)
+            ],
+        )
+    )
+
+    def check(containers):
+        command = next(c for c in containers if c["name"] == "celery-worker")["command"]
+        # celery takes the value as a separate argv entry, not --flag=value
+        assert command[command.index("--max-memory-per-child") + 1] == "655360"
+
+    return app.celery_deployments[0].spec.template.spec.containers.apply(check)
+
+
+def test_max_memory_per_child_rejects_non_positive():
+    with pytest.raises(ValidationError):
+        _celery_worker_config(max_memory_per_child_kib=0)

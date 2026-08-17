@@ -1600,6 +1600,24 @@ mitlearn_k8s_app = OLApplicationK8s(
                 redis_password=redis_config.require("password"),
                 resource_requests=celery_default_resource_requests,
                 resource_limits=celery_default_resource_limits,
+                # 640Mi. A healthy child on this queue sits at ~165Mi (observed
+                # on applications-production 2026-08-17: whole container ~480Mi
+                # for master + 2 children), so this only fires on a child that
+                # has genuinely ballooned, not in steady state.
+                #
+                # Sized against the *floor*-derived limit (1Gi request x the 2:1
+                # ratio = 2Gi), not the 2560Mi declared above or the 6144Mi the
+                # VPA is currently enforcing, because the floor is the smallest
+                # limit a pod can run under: 150Mi master + 2 x (640 + one task's
+                # growth) has to clear 2Gi. Coupled to --concurrency=2 and to
+                # _worker_vpa_bounds["min_allowed"] below -- revisit all three
+                # together.
+                #
+                # This bounds *carry-over* only. A single task that allocates
+                # past the cgroup limit in one go still OOM-kills the container,
+                # because celery checks RSS between tasks. See the 0.77.3
+                # get_learning_resource_views regression.
+                max_memory_per_child_kib=655360,
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="edx_content",
