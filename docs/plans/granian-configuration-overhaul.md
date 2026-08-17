@@ -1,7 +1,9 @@
 # Granian configuration overhaul
 
 **Status:** stage 0 merged 2026-07-23 (#5083); stage 1 merged 2026-07-27 (#5135), validated
-in production 2026-08-07; stage 2 in review; stages 3–4 pending
+in production 2026-08-07; stage 2 merged 2026-08-10 (#5344), validated in production
+2026-08-17; stage 3 `mitxonline` **blocked** (see stage 3), `edxapp` unblocked; stage 4
+pending
 **Project:** `wp-granian-configuration-overhaul-expose-blocking-t-3debc2`
 **Component:** `src/ol_infrastructure/components/services/k8s.py` — `GranianConfig`
 **Evidence:** witan lessons `les-granianconfig-never-exposes-blocking-threads-bac-874462`,
@@ -132,10 +134,39 @@ after the concurrency changes are validated in production.
 
 Consequences:
 
-- `mitxonline`'s ceiling-derived override (`__main__.py:536-543, 563-569`) is **removed**,
-  along with `MITXONLINE_GRANIAN_WORKERS` and `GRANIAN_MASTER_OVERHEAD_MIB`. It reverts to
-  the component default, which at `workers=1` / `1200Mi` gives ~1080MiB — a cap that
-  actually fires before the cgroup OOM killer instead of ~2816MiB, which never did.
+- ~~`mitxonline`'s ceiling-derived override (`__main__.py:536-543, 563-569`) is
+  **removed**, along with `MITXONLINE_GRANIAN_WORKERS` and `GRANIAN_MASTER_OVERHEAD_MIB`.
+  It reverts to the component default, which at `workers=1` / `1200Mi` gives ~1080MiB — a
+  cap that actually fires before the cgroup OOM killer instead of ~2816MiB, which never
+  did.~~
+
+  > **Retracted 2026-08-17, before stage 3 was written.** This is wrong and would have
+  > broken production. `mitxonline`'s VPA runs an admission controller: pods are
+  > *admitted* at request=limit=3Gi, carrying
+  > `vpaUpdates: Pod resources updated by mitxonline-app-memory-vpa`. The `1200Mi` in the
+  > Deployment template is never the enforced limit — over 14 days
+  > `kube_pod_container_resource_limits` for the container ranged 1953MiB–3072MiB and
+  > never touched 1200MiB. Measured usage is avg 992MiB working set, **p95 2645MiB**,
+  > peak 2978MiB. The component default would derive 1080MiB and put the single worker
+  > into a permanent respawn loop at normal traffic.
+  >
+  > The "derive from the current declared limit, not the ceiling" rule assumes the pod
+  > starts at its declared floor and the VPA grows it later, leaving a window where a
+  > ceiling-derived cap is above the real cgroup limit. With an admission-time mutation
+  > there is no such window: ceiling *is* the current declared limit, from the pod's first
+  > instant. For `mitxonline` the two answers converge.
+  >
+  > **Corrected action:** keep the ceiling-derived override and retarget it at one worker
+  > — `MITXONLINE_GRANIAN_WORKERS` 2 → 1, giving `(3072 − 256) // 1 = 2816MiB`, still
+  > under the 3072MiB limit. Keep `GRANIAN_MASTER_OVERHEAD_MIB` and
+  > `mitxonline_granian_workers_max_rss`. The rest of the stage-3 `mitxonline` edit
+  > (dropping the concurrency holding pins) is unaffected. Tracked as
+  > `tk-stage-3-blocker-mitxonline-s-vpa-never-runs-at-t-cc6acf`; lesson
+  > `les-a-vpa-with-an-admission-controller-makes-resourc-944b12`.
+  >
+  > This makes `mitxonline` the strongest case for the runtime cgroup-derived cap
+  > (open item 1): it is the only app where the synth-time limit and the runtime limit
+  > differ by 2.5x.
 - `mit_learn`'s explicit `workers_max_rss=1080` needs re-derivation at `workers=1`
   (3200Mi × 0.9 ≈ 2880MiB) or removal in favor of the default. Its inline comment about
   `floor(limit/workers*0.9)` becomes stale either way.
@@ -237,9 +268,94 @@ Component change lands once; per-app behavior changes as each app's stack is dep
   limit (`micromasters`) and ≈ 1236MiB of a 2Gi limit (`xpro`) — stays under the new
   single-worker RSS caps of 1800MiB and 1843MiB, so the cap still fires ahead of the
   cgroup OOM killer.
-- **Stage 3 — high traffic.** `mitxonline` (plus removal of the ceiling-based
-  `workers_max_rss` override), then `edxapp` LMS and CMS separately — CMS first, it takes
-  far less traffic than LMS.
+
+  **Validated 2026-08-17.** Production deploys landed 2026-08-10 18:37Z (`xpro`) and
+  2026-08-12 18:07Z (`micromasters`); both args verified live on the Deployments. Windows
+  compared are weekday-aligned 4-day spans (before ending 2026-08-10 18:00Z, after ending
+  2026-08-17 14:00Z) with near-identical nginx log volume (1.21M lines each).
+
+  | signal | `micromasters` before → after | `xpro` before → after |
+  | --- | --- | --- |
+  | throughput (req/s) | 0.332 → 0.324 | 1.059 → 1.139 |
+  | `granian_blocking_queue` avg / max | 0.0000085 / 1 → 0 / 0 | 0.0013 / 7 → 0.0119 / 8 |
+  | blocking-thread busy µs per request | 31 431 → 27 771 (−12%) | 142 122 → 135 327 (−5%) |
+  | `granian_py_wait` µs per request | 22.5 → 49.1 | 681 → 989 |
+  | `granian_connections_err` | 0 → 0 | 0 → 0 |
+  | RSS / error worker respawns | 0 / 0 → 0 / 0 | 0 / 0 → 0 / 0 |
+  | p95 CPU, all pods (cores) | 0.0100 → 0.0097 | 0.0631 → 0.0608 |
+  | peak working set | 912MiB → 524MiB (cap 1800) | 1171MiB → 607MiB (cap 1843) |
+  | container restarts | 0 → 0 | 0 → 0 |
+  | webapp HPA `currentReplicas` | 2 → 2 | 2 → 2 |
+  | nginx 5xx | 34 → 3 | 1 → 0 |
+  | nginx 502/504 | 0 → 1 | 1 → 0 |
+
+  No regression on any axis. The two directional moves are both non-events in absolute
+  terms: `xpro`'s mean blocking-queue depth rose 9× to 0.012 requests (max depth is
+  unchanged at 7→8, and it was *already* queueing at 32 threads, which is the GIL-
+  contention pattern the change targets), and per-request GIL wait rose to 989µs against
+  135ms of thread-busy time — 0.7% of service time. Memory is the headline win: peak
+  working set fell 43–48%, so both apps now sit at ~30% of their RSS cap instead of ~50%
+  of a cap sized for two workers. The one post-change 502 was a single readiness probe
+  during a pod start on 2026-08-13; the other two 5xx were application-level Django 500s
+  (a social-auth callback and an enrollment POST), unrelated to Granian.
+
+  **Instrumentation gap found while validating.** The spec's "latency p50/p95/p99" is not
+  measurable for these apps: Granian's metrics endpoint exposes only counters and gauges
+  (no request-duration histogram), the nginx sidecar uses the stock combined log format
+  with no `$request_time`/`$upstream_response_time`, and neither app is fronted by APISIX
+  or Traefik. Busy-µs-per-request plus queue depth were used as the proxy. Stage 3
+  (`mitxonline`, `edxapp`) *is* behind APISIX and has `apisix_http_latency_bucket`, so it
+  gets real percentiles; stage 4's `mit_learn` needs this checked before its window opens.
+- **Stage 3 — high traffic.** `mitxonline` (plus ~~removal of~~ **retargeting** the
+  ceiling-based `workers_max_rss` override — see the retraction under §4), then `edxapp`
+  LMS and CMS separately — CMS first, it takes far less traffic than LMS.
+
+  **`mitxonline` is blocked as of 2026-08-17** on two findings, both raised while opening
+  the stage:
+
+  1. `tk-stage-3-blocker-mitxonline-s-vpa-never-runs-at-t-cc6acf` — the
+     `workers_max_rss` retraction above. The corrected edit is known; it needs sign-off
+     because it inverts what this plan told the implementer to do.
+  2. `tk-mitxonline-is-the-only-granian-workload-in-produ-b3dffd` — **root-caused and
+     fixed the same day; awaiting deploy.** `mitxonline` was the only Granian workload in
+     production emitting no `granian_*` series, for the entire 158 days its PodMonitor
+     had existed.
+
+     Prometheus SD flattens a label name by replacing every non-alphanumeric character
+     with `_`, so `ol.mit.edu/pod-security-group` and `ol.mit.edu/pod_security_group`
+     both become `__meta_kubernetes_pod_label_ol_mit_edu_pod_security_group`. The
+     PodMonitor selector was the app's full label set, which for `mitxonline` contains
+     both — the component always sets the hyphenated one, and
+     `K8sAppLabels.pod_security_group` emits the underscored one for its single caller,
+     `mitxonline`. That generated two `keep` rules on one meta-label demanding
+     `(mitxonline-app-access-production-e9f43bb)` and `(mitxonline)`. Unsatisfiable, so
+     zero targets — and therefore no `up` series to alert on, no scrape error, and a
+     PodMonitor that looks perfectly healthy. Alloy's own
+     `net_conntrack_dialer_conn_attempted_total` for the pool reads `0` against 512 for
+     `micromasters`, which is the tell.
+
+     Fixed by narrowing the PodMonitor selector to namespace + application +
+     `component=webapp` (celery pods carry `component=celery`), with a regression test —
+     the failure mode is silent, so nothing else would catch it. This also stops a
+     security group replacement silently breaking any app's scrape, which was a latent
+     hazard everywhere, not just here. Lesson
+     `les-two-k8s-labels-differing-only-in-vs-collide-unde-bb7ec4`; the redundant
+     `K8sAppLabels.pod_security_group` field still wants deleting, but it sits in the
+     Deployment's immutable `spec.selector`, so that needs a replacement window
+     (`tk-delete-the-redundant-k8sapplabels-pod-security-g-ac508d`).
+
+     **`mitxonline` stage 3 stays blocked until this is deployed and verified**, because
+     `granian_workers_respawns_for_rss` is exactly the signal that would show a
+     retargeted RSS cap thrashing. Confirm with
+     `count by (namespace) (granian_workers_spawns)` and `up{namespace="mitxonline"}`
+     after the production deploy.
+
+  `edxapp` is **not** affected by either finding — `mitxonline-openedx` reports
+  `granian_*` normally (`cms-edxapp-webapp-pod-monitor` and `lms-edxapp-webapp-pod-monitor`
+  both up), and it is behind APISIX so `apisix_http_latency_bucket` gives it the real
+  latency percentiles that stage 2 had to proxy for. Doing `edxapp` CMS first while
+  `mitxonline` is unblocked is a viable resequencing, but it is a production-rollout
+  ordering change and belongs to whoever owns the rollout, not to the implementer.
 - **Stage 4 — async apps.** `mit_learn`, `learn_ai`: `workers=2→1` for `mit_learn` and an
   explicit `backpressure` for both. No `blocking_threads` involvement. Lowest expected
   impact, sequenced last because it shares no evidence with the WSGI stages.
@@ -252,6 +368,17 @@ Before/after per stage, comparing the same weekday-hour window:
 
 - **Latency** — granian request duration p50/p95/p99 from the existing PodMonitor scrape;
   nginx upstream response time as the independent check.
+
+  > **Correction (stage 2 validation).** Neither source exists. Granian's metrics endpoint
+  > exposes only counters and gauges — there is no request-duration histogram — and the
+  > nginx sidecar logs the stock combined format with no `$request_time` /
+  > `$upstream_response_time`. Real percentiles are available *only* for apps behind
+  > APISIX (`apisix_http_latency_bucket`): `mitxonline` and `edxapp`. For `micromasters`,
+  > `xpro`, `ocw_studio` and `odl_video_service` the working proxy is
+  > `rate(granian_blocking_busy_cumulative) / rate(granian_requests_handled)`
+  > (µs of thread time per request) plus `granian_blocking_queue` avg/max for saturation.
+  > Check `mit_learn` before stage 4 opens. Lesson
+  > `les-granian-request-latency-percentiles-are-unmeasur-d2f2ab`.
 - **Errors** — 5xx rate at nginx and at APISIX; specifically 502/504, which is where
   backpressure saturation would surface.
 - **Saturation** — pod CPU utilization vs request, HPA `currentReplicas`, and any
