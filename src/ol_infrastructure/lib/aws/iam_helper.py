@@ -402,6 +402,14 @@ def cross_environment_glue_denial(env_suffix: str) -> list[dict[str, Any]]:
     undone by a later Allow, and widening a grant for some unrelated reason is
     the way this would realistically regress.
 
+    ``arn:aws:glue:*:*:catalog`` is deliberately absent, and must stay absent.
+    Every Glue operation requires permission on the catalog, so denying it would
+    deny every Glue call these identities make -- including the ones against
+    their own databases -- rather than hardening anything. Confirmed with the
+    IAM policy simulator: adding it turns ``glue:GetTable`` on the catalog from
+    ``allowed`` into ``explicitDeny``. The catalog belongs in the Allow, which is
+    where ``data_lake_glue_resources`` puts it.
+
     :param env_suffix: The environment the policy is being generated for.
     :type env_suffix: str
 
