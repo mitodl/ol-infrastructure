@@ -1546,7 +1546,28 @@ class OLApplicationK8s(ComponentResource):
             _pod_monitor_name = truncate_k8s_metanames(
                 f"{ol_app_k8s_config.application_name}-webapp-pod-monitor"
             )
-            kubernetes.apiextensions.CustomResource(
+            # Deliberately a narrower selector than `application_labels`.
+            #
+            # Prometheus service discovery flattens a label name into a meta-label by
+            # replacing every non-alphanumeric character with `_`, so
+            # `ol.mit.edu/pod-security-group` and `ol.mit.edu/pod_security_group` both
+            # become `__meta_kubernetes_pod_label_ol_mit_edu_pod_security_group`. An app
+            # carrying both (the component always sets the hyphenated one; K8sAppLabels
+            # emits the underscored one when `pod_security_group` is set) generates two
+            # `keep` rules against that single meta-label demanding different values.
+            # Nothing can satisfy both, the scrape pool resolves to zero targets, and the
+            # app goes silently unmonitored -- no `up` series, no error, the PodMonitor
+            # looks healthy. mitxonline lost every granian_* metric this way.
+            #
+            # Namespace + application + component=webapp already identifies these pods
+            # uniquely (celery pods carry component=celery), and leaving the security
+            # group name out also stops a security group replacement from silently
+            # breaking the scrape.
+            _pod_monitor_selector_labels = {
+                "ol.mit.edu/application": ol_app_k8s_config.application_name,
+                "ol.mit.edu/component": "webapp",
+            }
+            self.webapp_pod_monitor = kubernetes.apiextensions.CustomResource(
                 _pod_monitor_name,
                 api_version="monitoring.coreos.com/v1",
                 kind="PodMonitor",
@@ -1556,7 +1577,7 @@ class OLApplicationK8s(ComponentResource):
                     labels=ol_app_k8s_config.k8s_global_labels,
                 ),
                 spec={
-                    "selector": {"matchLabels": application_labels},
+                    "selector": {"matchLabels": _pod_monitor_selector_labels},
                     "podMetricsEndpoints": [
                         {
                             "port": "metrics",
