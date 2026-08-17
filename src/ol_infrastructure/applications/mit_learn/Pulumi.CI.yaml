@@ -72,7 +72,6 @@ config:
     MITX_ONLINE_BASE_URL: "https://mitxonline.mit.edu/"
     MITX_ONLINE_COURSES_API_URL: "https://mitxonline.mit.edu/api/v2/courses/"
     MITX_ONLINE_PROGRAMS_API_URL: "https://mitxonline.mit.edu/api/v2/programs/"
-    OPENTELEMETRY_ENABLED: "true"
     MITOL_SUPPORT_EMAIL: "odl-learn-ci-support@mit.edu" # Need to verify
     MITPE_API_ENABLED: "true"
     OCW_ITERATOR_CHUNK_SIZE: 300

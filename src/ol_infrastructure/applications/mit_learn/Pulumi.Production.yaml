@@ -109,7 +109,6 @@ config:
     OCW_ITERATOR_CHUNK_SIZE: 300
     OCW_LIVE_BUCKET: "ocw-content-live-production"
     OIDC_ENDPOINT: "https://sso.ol.mit.edu/realms/olapps"
-    OPENTELEMETRY_ENABLED: "true"
     OPENTELEMETRY_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces"
     OPENTELEMETRY_SERVICE_NAME: "learn-webapp"
     OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=production,service.namespace=learn,service.version=${GIT_SHA:-unknown},service.instance.id=${HOSTNAME}"
