@@ -53,7 +53,7 @@ config:
     OPENTELEMETRY_ENABLED: "true"
     OPENTELEMETRY_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces"
     OPENTELEMETRY_SERVICE_NAME: "mitxonline-webapp"
-    OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=qa,service.namespace=mitxonline,service.version=${GIT_SHA:-unknown},service.instance.id=${HOSTNAME}"
+    OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=qa,service.namespace=mitxonline,service.instance.id=$(KUBERNETES_POD_NAME)"
     OTEL_TRACES_SAMPLER: "parentbased_traceidratio"
     OTEL_TRACES_SAMPLER_ARG: "0.25"
     OTEL_PROPAGATORS: "tracecontext,baggage"

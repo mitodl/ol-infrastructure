@@ -1166,8 +1166,30 @@ class OLApplicationK8s(ComponentResource):
                 )
             )
 
-        # Build a list of not-sensitive env vars for the deployment config
-        application_deployment_env_vars = []
+        # Pod identity from the downward API. These are the names
+        # mitol-django-observability already reads in _get_resource() to set the
+        # k8s.pod.name / k8s.namespace.name / k8s.node.name resource attributes,
+        # and the same three witan's observability module uses.
+        #
+        # These MUST be appended before the application_config loop below: the
+        # kubelet resolves a $(VAR) reference only against entries defined
+        # earlier in the same env list, and OTEL_RESOURCE_ATTRIBUTES refers to
+        # $(KUBERNETES_POD_NAME) for service.instance.id.
+        application_deployment_env_vars = [
+            kubernetes.core.v1.EnvVarArgs(
+                name=env_var_name,
+                value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                    field_ref=kubernetes.core.v1.ObjectFieldSelectorArgs(
+                        field_path=field_path,
+                    ),
+                ),
+            )
+            for env_var_name, field_path in (
+                ("KUBERNETES_POD_NAME", "metadata.name"),
+                ("KUBERNETES_NAMESPACE", "metadata.namespace"),
+                ("KUBERNETES_NODE_NAME", "spec.nodeName"),
+            )
+        ]
         for k, v in (ol_app_k8s_config.application_config).items():
             application_deployment_env_vars.append(
                 kubernetes.core.v1.EnvVarArgs(
