@@ -5,12 +5,10 @@ _has_branch_protection: false
 _pushed_at: '2026-08-08T14:36:03Z'
 _ruleset_count: 2
 _visibility: private
-allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true
 archetype: library
-delete_branch_on_merge: false
 description: Plug and play apisix/keycloak setup for local dev
 has_discussions: false
 has_projects: true
