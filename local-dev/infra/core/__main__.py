@@ -11,6 +11,7 @@ Provisions the foundational layer for the local k3d development environment:
   - Search (OpenSearch Helm)
   - AI services (Qdrant, Tika, LiteLLM)
   - Messaging (Mailpit)
+  - Observability (Loki, Alloy, Grafana) — optional, see observability_enabled
 
 The apps-infra stack depends on this core stack being deployed first.
 It provisions the Keycloak realm and any other app-specific resources.
@@ -35,6 +36,7 @@ from modules.identity_core import create_identity_core
 from modules.ingress import create_ingress
 from modules.messaging import create_messaging
 from modules.namespaces import create_namespaces
+from modules.observability import create_observability
 from modules.search import create_search
 from modules.tls import create_tls_resources
 from pulumi import Config
@@ -60,6 +62,21 @@ keycloak_url = config.get("keycloak_url") or f"https://{keycloak_hostname}"
 
 apisix_admin_key = config.require_secret("apisix_admin_key")
 apisix_viewer_key = config.require_secret("apisix_viewer_key")
+
+# Observability (Grafana + Loki + Alloy). Roughly 1.3GB of workloads, so it is
+# opt-out for developers on a constrained Docker VM.
+observability_enabled = config.get_bool("observability_enabled") is not False
+
+# How long Loki keeps logs. The per-developer override lives in the gitignored
+# tilt_config.json, which the Tiltfile forwards as LOCAL_DEV_LOG_RETENTION.
+# Deliberately not pinned in Pulumi.local-dev.core.Dev.yaml: Pulumi config wins
+# over the environment here, so a pinned value would silently defeat it --
+# the same trap the domain settings in that file warn about.
+log_retention_period = (
+    config.get("log_retention_period")
+    or os.environ.get("LOCAL_DEV_LOG_RETENTION")
+    or "168h"
+)
 
 cert_manager_version = config.get("cert_manager_version") or "v1.16.2"
 cnpg_version = config.get("cnpg_version") or "0.23.0"
@@ -164,6 +181,18 @@ messaging = create_messaging(
     mail_hostname=f"mail.{root_domain}",
 )
 
+# Logging pipeline: Alloy tails every pod's stdout into Loki, browsable in
+# Grafana. Nothing else depends on it, so it can be switched off wholesale.
+if observability_enabled:
+    create_observability(
+        _k8s,
+        namespaces["operations"],
+        apisix_release=ingress.apisix,
+        tls_secret_ops=tls.tls_secret_ops,
+        grafana_hostname=f"grafana.{root_domain}",
+        log_retention_period=log_retention_period,
+    )
+
 # Create database cluster (needed by Keycloak, LiteLLM)
 db = create_database(_k8s, namespaces["local-infra"], cnpg_version)
 
@@ -199,3 +228,9 @@ pulumi.export(
 pulumi.export("tika_url", "http://tika.local-infra.svc.cluster.local:9998")
 pulumi.export("litellm_url", "http://litellm.local-infra.svc.cluster.local:4000")
 pulumi.export("mailpit_ui_url", "http://mailpit.local-infra.svc.cluster.local:8025")
+
+if observability_enabled:
+    pulumi.export("grafana_url", f"https://grafana.{root_domain}")
+    pulumi.export("loki_url", "http://loki.operations.svc.cluster.local:3100")
+    pulumi.export("otlp_endpoint", "http://alloy.operations.svc.cluster.local:4318")
+    pulumi.export("log_retention_period", log_retention_period)

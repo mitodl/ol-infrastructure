@@ -46,6 +46,8 @@ HOSTS=(
     "sso.ol.${ROOT_DOMAIN}"
     # Mailpit (captured outbound email)
     "mail.${ROOT_DOMAIN}"
+    # Grafana (logs from every local-dev service)
+    "grafana.${ROOT_DOMAIN}"
 )
 
 # k3d load balancer always listens on 127.0.0.1 for the exposed ports

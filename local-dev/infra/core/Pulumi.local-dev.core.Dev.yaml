@@ -12,6 +12,13 @@ config:
   # APISIX secrets for core infrastructure
   ol-local-dev-core:apisix_admin_key: "local-dev-apisix-admin-key"
   ol-local-dev-core:apisix_viewer_key: "local-dev-apisix-viewer-key"
+  # Observability (Grafana + Loki + Alloy, ~1.3GB of workloads).
+  # Set to false to skip it on a constrained Docker VM.
+  ol-local-dev-core:observability_enabled: "true"
+  # log_retention_period: unset on purpose. Pinning it here would override
+  # LOCAL_DEV_LOG_RETENTION and therefore tilt_config.json. Default is 168h
+  # (1 week); set "log_retention_period" in your gitignored tilt_config.json
+  # to change it.
   # Helm chart versions
   ol-local-dev-core:cert_manager_version: "v1.16.2"
   ol-local-dev-core:cnpg_version: "0.23.0"
