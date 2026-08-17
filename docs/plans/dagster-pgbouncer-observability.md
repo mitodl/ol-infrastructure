@@ -252,6 +252,44 @@ whether the new `max_db_connections` cap is set too tight.
 Pin the exporter at **>= v0.12.1**: earlier releases report the `reserve_pool` metric
 incorrectly against PgBouncer >= 1.24, and `PGBOUNCER_VERSION` is 1.25.2.
 
+#### The answers (2026-08-17, seven days of 1-minute samples on production)
+
+The exporter shipped in #5426; this is what it said. Every number is a max over the
+full window unless stated.
+
+| Question | Answer |
+|---|---|
+| Is `default_pool_size = 800` anywhere near right? | No — it was never reachable. The derived `max_db_connections` is 708/pod, so 800 could not bind on production. Peak `sv_active` was **122 aggregate**. |
+| Is `min_pool_size = 150` × 6 justified? | **No.** Held connections sat at a flat **900 every single sample, all week**, and the pool never once grew past its own floor. 900 parked to serve a peak of 122. |
+| Is `reserve_pool_size = 2000` ever entered? | Not since the cap landed, and it cannot be: 800 + 2000 per pod is far above the 708 cap, so it was dead configuration. |
+| Is `max_client_conn = 1500` a real ceiling? | No — peak `cl_active` was **129 aggregate, 35 on the busiest pod**. It is deliberately far above demand so a saturated pool queues rather than refuses. |
+| Was disabling `query_wait_timeout` the right call? | No, and it was already reverted to 600 in #5454 after QA deadlocked for days. `maxwait` was **0 at every sample** on production; `client_waiting` peaked at 1. |
+| Do we need 6 replicas? | Not for load — peak **0.09 CPU cores** and 35 active clients on the busiest pod. See below. |
+| Are we heading for another 08-10? | Not on this evidence: 122 against a 4248 aggregate cap, and the cap now makes the 08-10 mode structurally unreachable. |
+
+**Skew: production does not have QA's.** The QA deadlock measured 221 active servers on
+one replica against 4 on the other, which matters because `max_db_connections` is derived
+as budget ÷ replica count and therefore assumes even distribution — under skew the real
+ceiling is whichever pod saturates first, not the aggregate. Production was checked
+specifically for this before re-tuning and spreads evenly (1–18 active per pod at any
+instant). So the aggregate cap is an honest number here, and fewer/larger replicas is an
+option rather than a fix that is owed.
+
+**What changed as a result.** `min_pool_size` 150 → 40 (sized to the measured 35-per-pod
+peak, so nothing in normal operation waits on a connect; parked total 900 → 240).
+`default_pool_size` → the derived cap and `reserve_pool_size` → 0, which retires two dead
+numbers and leaves `max_db_connections` as the pool's single binding ceiling. That last
+part is not cosmetic: `DagsterPgBouncerConnectionHeadroom` alerts on a fraction of
+`pgbouncer_databases_max_connections`, so any pool number set *below* the cap would
+become the real limit while the alert kept measuring against one the pool could no longer
+reach — a rule that can never fire.
+
+`pgbouncer_replica_count` was left at 6 on purpose. Changing the multiplier in the same
+pass as `min_pool_size` would make the result unattributable, which is the habit this
+whole exercise exists to break. It is the obvious next lever once this change has a week
+of its own data: at 6 replicas a single hot pod saturates at 708 while 3540 connections
+sit idle on the other five.
+
 ### 2. RDS — re-enable Performance Insights
 
 The exporter gives us the pool's view; it does not tell us what those connections are
@@ -440,10 +478,11 @@ time, no retry attribution), so treat it as a cheap stopgap rather than a substi
 5. **Dagster SQL exporter.** Larger build; sequence after the pool picture is clear.
    Note it must connect **directly to RDS**, which means it consumes from the same 5000 —
    budget for it in (0).
-6. **Re-tune from data.** Specifically: whether `min_pool_size = 150` is buying anything
-   at 6 replicas when steady-state demand is 27 servers, and whether 6 replicas are
-   justified at ~30 mCPU each. `reserve_pool_size` is no longer an open question — it is
-   reachable, it was reached, and (0) is what bounds it.
+6. **Re-tune from data.** ✅ Done 2026-08-17 — see
+   [The answers](#the-answers-2026-08-17-seven-days-of-1-minute-samples-on-production).
+   `min_pool_size` 150 → 40, `default_pool_size` → the derived cap, `reserve_pool_size`
+   → 0. Replica count deliberately held at 6 so this change is attributable; it is the
+   next lever.
 
 ## Open question worth flagging
 
