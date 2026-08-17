@@ -1,4 +1,10 @@
 ---
+_branch_protection_enforce_admins: false
+_branch_protection_push_restrictions:
+  apps: []
+  teams: []
+  users:
+  - odlbot
 _custom_properties:
   tier: tier-1
 _excluded_environments: 1
