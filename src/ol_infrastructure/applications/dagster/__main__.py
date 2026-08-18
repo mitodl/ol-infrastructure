@@ -618,8 +618,9 @@ dagster_db_secret = OLVaultK8SSecret(
         # re-renders pgbouncer.ini with fresh credentials.
         restart_target_kind="Deployment",
         restart_target_name="dagster-pgbouncer",
+        # The Vault role is the last path segment (creds/app); revoke the
+        # lease on delete so credentials don't outlive this resource.
         revoke_on_delete=True,
-        role_name="app",
         vaultauth=dagster_auth_binding.vault_k8s_resources.auth_name,
         # Map Vault's fields to both Dagster Helm chart format and environment variables
         templates={
