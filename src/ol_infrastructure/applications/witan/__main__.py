@@ -161,6 +161,12 @@ witan_config = Config("witan")
 cluster_stack = make_stack_reference(projects.EKS, f"operations.{stack_info.name}")
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
+# One Sentry project (`project_witan`) covers CI/QA/Production, distinguished
+# by the SDK's `environment` tag rather than by separate projects — same
+# convention as dagster's `project_dagster`. See
+# infrastructure/sentry/__main__.py and its IMPORT_SUMMARY.md.
+sentry_stack = make_stack_reference(projects.SENTRY, "default")
+
 # No reference to the ToolHive operator stack any more: witan runs as an
 # ordinary Deployment, so none of that operator's CRDs need to exist for this
 # stack to apply. The operator itself stays deployed for `toolhive_swe`, which
@@ -462,6 +468,15 @@ ACTOR_TOKENS_SECRET_KEY = "tokens.json"  # noqa: S105  # pragma: allowlist secre
 WITAN_CI_TOKEN_VAULT_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 ACTOR_TOKENS_VAULT_KEY = "tokens_json"  # pragma: allowlist secret
 
+# The Sentry DSN, owned by the ol-infrastructure-sentry stack rather than this
+# one. Same shape as dagster's dagster-sentry-secrets: a stack-owned value
+# written to Vault by *this* stack (the sentry stack only exports it as a
+# stack output, it never writes Vault itself), then synced into a k8s Secret
+# the Deployment reads via secret_key_ref.
+WITAN_SENTRY_DSN_SECRET_NAME = "witan-sentry-secrets"  # noqa: S105  # pragma: allowlist secret
+WITAN_SENTRY_DSN_SECRET_KEY = "SENTRY_DSN"  # noqa: S105  # pragma: allowlist secret
+WITAN_SENTRY_DSN_VAULT_KEY = "dsn"  # pragma: allowlist secret
+
 # The break-glass maintenance principal (agent-kit ADR-0005 path b / ADR-0002 D4
 # as amended). Written to Vault by the omnigraph stack alongside the CI token;
 # read here because the two things that use it — the pre-deploy migration Job and
@@ -590,6 +605,47 @@ witan_code_token_secret = OLVaultK8SSecret(
     opts=ResourceOptions(
         delete_before_replace=True,
         depends_on=witan_auth_binding.vault_k8s_resources,
+    ),
+)
+
+# The DSN is created by the ol-infrastructure-sentry stack, which owns the
+# Sentry project and its client key, so Pulumi manages the value end to end
+# and nobody has to hand-write it into Vault. Mirrors dagster's
+# dagster_sentry_vault_secret/dagster_sentry_secrets pair.
+witan_sentry_vault_secret = vault.generic.Secret(
+    f"witan-sentry-dsn-{stack_info.env_suffix}",
+    path="secret-operations/witan/sentry",
+    data_json=sentry_stack.require_output("witan_sentry_dsn").apply(
+        lambda dsn: json.dumps({WITAN_SENTRY_DSN_VAULT_KEY: dsn})
+    ),
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
+witan_sentry_secret = OLVaultK8SSecret(
+    f"witan-sentry-secret-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name=WITAN_SENTRY_DSN_SECRET_NAME,
+        namespace=NAMESPACE,
+        labels=k8s_global_labels,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name=WITAN_SENTRY_DSN_SECRET_NAME,
+        dest_secret_type="Opaque",  # pragma: allowlist secret  # noqa: S106
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="witan/sentry",
+        exclude_raw=True,
+        excludes=[".*"],
+        templates={
+            WITAN_SENTRY_DSN_SECRET_KEY: (
+                f'{{{{ get .Secrets "{WITAN_SENTRY_DSN_VAULT_KEY}" }}}}'
+            )
+        },
+        refresh_after="1h",
+        vaultauth=witan_auth_binding.vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[witan_auth_binding.vault_k8s_resources, witan_sentry_vault_secret],
     ),
 )
 
@@ -816,6 +872,9 @@ witan_serving_tier = create_serving_tier(
     witan_code_token_secret_name=WITAN_CODE_TOKEN_SECRET_NAME,
     witan_code_token_secret_key=WITAN_CODE_TOKEN_SECRET_KEY,
     witan_code_token_secret=witan_code_token_secret,
+    sentry_dsn_secret_name=WITAN_SENTRY_DSN_SECRET_NAME,
+    sentry_dsn_secret_key=WITAN_SENTRY_DSN_SECRET_KEY,
+    sentry_dsn_secret=witan_sentry_secret,
     migration_job=witan_migration_job,
     service_version=witan_service_version,
     remote_write_max_inflight=WITAN_REMOTE_WRITE_MAX_INFLIGHT,
