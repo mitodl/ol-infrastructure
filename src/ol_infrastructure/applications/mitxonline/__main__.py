@@ -1000,6 +1000,20 @@ uai_b2c_redirect_vcl = "\n".join(
     for path, target in uai_b2c_redirects.items()
 )
 
+# Course and program product pages redirect 1:1 to their MIT Learn counterparts.
+# Matches only the top-level /courses/{readable_id} and /programs/{readable_id}
+# routes (no sub-paths exist under them today - CourseProgramChildPage.serve()
+# 404s unconditionally, so certificate/flexible-pricing child pages are never
+# directly routable). Uses a distinct error code (603) from the UAI B2C
+# redirects (602) above so this is fully additive.
+course_program_redirect_vcl = "\n".join(
+    f'if (req.url.path ~ "^/{prefix}/([^/]+)/?$") {{\n'
+    f'  set req.http.x-redir-location = "https://{learn_frontend_domain}/{prefix}/" re.group.1;\n'
+    f"  error 603;\n"
+    f"}}"
+    for prefix in ("courses", "programs")
+)
+
 gzip_settings: dict[str, set[str]] = {"extensions": set(), "content_types": set()}
 for k, v in mimetypes.types_map.items():
     if k in (
@@ -1093,6 +1107,15 @@ mitxonline_service = fastly.ServiceVcl(
             type="recv",
         ),
         fastly.ServiceVclSnippetArgs(
+            content=course_program_redirect_vcl,
+            name="Redirect course and program pages to MIT Learn",
+            # Runs after the UAI B2C redirects (priority 100) so that their
+            # exact-match overrides (e.g. program-v1:UAI+B2C.1 -> /courses/p/...)
+            # take precedence over this generic 1:1 redirect.
+            priority=150,
+            type="recv",
+        ),
+        fastly.ServiceVclSnippetArgs(
             content=textwrap.dedent("""\
             if (obj.status == 602) {
               set obj.status = 301;
@@ -1108,6 +1131,25 @@ mitxonline_service = fastly.ServiceVcl(
               return(deliver);
             }"""),
             name="Handle UAI B2C external redirects",
+            type="error",
+        ),
+        fastly.ServiceVclSnippetArgs(
+            content=textwrap.dedent("""\
+            if (obj.status == 603) {
+              set obj.status = 301;
+              set obj.response = "Moved Permanently";
+              set obj.http.Location = req.http.x-redir-location;
+              set obj.http.Cache-Control = "no-store";
+              if (req.url.qs != "") {
+                if (obj.http.Location !~ "\\?") {
+                  set obj.http.Location = obj.http.Location "?" req.url.qs;
+                } else {
+                  set obj.http.Location = obj.http.Location "&" req.url.qs;
+                }
+              }
+              return(deliver);
+            }"""),
+            name="Handle course/program redirects to MIT Learn",
             type="error",
         ),
         fastly.ServiceVclSnippetArgs(
