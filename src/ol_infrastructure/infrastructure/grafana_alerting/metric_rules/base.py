@@ -39,9 +39,12 @@ Sub-modules
   apisix_edge  — New in 2026-08. Per-host 5xx rate at the APISIX edge.
   dagster_pgbouncer
                — New in 2026-08. Dagster's PgBouncer pool: aggregate connection
-                 headroom against the max_db_connections cap, queued clients, and
-                 exporter health. Depends on the pgbouncer_exporter sidecar added
-                 to the dagster stack in #5426.
+                 headroom against the max_db_connections cap, queued clients,
+                 connection turnover, and exporter health. Depends on the
+                 pgbouncer_exporter sidecar added to the dagster stack in #5426.
+                 Pairs with log_rules/dagster_database.py, which covers the
+                 client side of the same relationship -- nothing here can see a
+                 client that fails before it becomes a connection.
   synthetic_monitoring
                — Imported 2026-08 from three hand-made UI rules. Unlike the
                  others it takes no folder_uid: its rules live in the Synthetic
