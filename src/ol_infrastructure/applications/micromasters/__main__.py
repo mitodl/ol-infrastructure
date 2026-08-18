@@ -919,16 +919,14 @@ micromasters_k8s_app = OLApplicationK8s(
         # (already in ALLOWED_HOSTS) instead of the pod IP; this only
         # overrides the header kubelet sends, not the connection target.
         probe_configs={
+            # TCP rather than HTTP so a saturated Granian worker pool cannot
+            # fail liveness and trigger a restart that removes capacity from an
+            # already overloaded service. Readiness stays on HTTP, and keeps the
+            # Host header because it still reaches Django's ALLOWED_HOSTS check.
+            # See default_probe_configs in components/services/k8s.py.
             "liveness_probe": kubernetes.core.v1.ProbeArgs(
-                http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                    path="/health/liveness/",
+                tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
                     port=DEFAULT_NGINX_PORT,
-                    http_headers=[
-                        kubernetes.core.v1.HTTPHeaderArgs(
-                            name="Host",
-                            value=backend_domain,
-                        )
-                    ],
                 ),
                 initial_delay_seconds=30,
                 period_seconds=30,

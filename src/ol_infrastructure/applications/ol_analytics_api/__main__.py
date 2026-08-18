@@ -441,11 +441,12 @@ _probe_configs = {
         failure_threshold=3,
         timeout_seconds=3,
     ),
+    # TCP rather than HTTP so a saturated Granian worker pool cannot fail
+    # liveness and trigger a restart that removes capacity from an already
+    # overloaded service. Readiness stays on HTTP. See default_probe_configs in
+    # components/services/k8s.py.
     "liveness_probe": kubernetes.core.v1.ProbeArgs(
-        http_get=kubernetes.core.v1.HTTPGetActionArgs(
-            path="/health/liveness/",
-            port=APPLICATION_PORT,
-        ),
+        tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(port=APPLICATION_PORT),
         initial_delay_seconds=30,
         period_seconds=30,
         failure_threshold=3,

@@ -885,9 +885,12 @@ ovs_k8s_app = OLApplicationK8s(
         resource_requests={"cpu": "250m", "memory": "512Mi"},
         resource_limits={"memory": "1Gi"},
         probe_configs={
+            # TCP rather than HTTP so a saturated Granian worker pool cannot
+            # fail liveness and trigger a restart that removes capacity from an
+            # already overloaded service. Readiness stays on HTTP. See
+            # default_probe_configs in components/services/k8s.py.
             "liveness_probe": kubernetes.core.v1.ProbeArgs(
-                http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                    path="/health/liveness/",
+                tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
                     port=DEFAULT_WSGI_PORT,
                 ),
                 initial_delay_seconds=30,
