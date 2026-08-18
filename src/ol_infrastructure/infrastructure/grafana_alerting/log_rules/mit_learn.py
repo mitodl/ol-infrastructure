@@ -29,6 +29,7 @@ def create(
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical", "service": "mitxonline"},
                 annotations={
                     "description": "An increase in 5xx errors that may indicate an issue with mitxonline",
@@ -48,6 +49,7 @@ def create(
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical", "service": "mitlearn"},
                 annotations={
                     "description": "An increase in 5xx errors that may indicate an issue with mitlearn",

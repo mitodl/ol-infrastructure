@@ -26,6 +26,7 @@ def create(
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": "High rate of 500 errors on mitxonline-production.",
@@ -54,6 +55,7 @@ def create(
                 condition="C",
                 for_="1m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": "Redis is returning OOM errors to edxapp in {{ $labels.environment }}.",
@@ -69,6 +71,7 @@ def create(
                 condition="C",
                 for_="1m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "description": "Redis is returning OOM errors to edxapp in {{ $labels.environment }}.",
@@ -84,6 +87,7 @@ def create(
                 condition="C",
                 for_="1m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": "A credential issue has been detected in {{ $labels.environment }}.",
@@ -99,6 +103,7 @@ def create(
                 condition="C",
                 for_="1m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "description": "A credential issue has been detected in {{ $labels.environment }}.",
@@ -124,6 +129,7 @@ def create(
                 condition="C",
                 for_="1m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": "edxapp {{ $labels.environment }} is having trouble communicating with the forum service.",
@@ -139,6 +145,7 @@ def create(
                 condition="C",
                 for_="1m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "description": "edxapp {{ $labels.environment }} is having trouble communicating with the forum service.",
@@ -154,6 +161,7 @@ def create(
                 condition="C",
                 for_="1m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": "A SAML configuration error has been detected in {{ $labels.application }} {{ $labels.environment }}.",
@@ -175,6 +183,7 @@ def create(
                 condition="C",
                 for_="1m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "description": "A SAML configuration error has been detected in {{ $labels.application }} {{ $labels.environment }}.",

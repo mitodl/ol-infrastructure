@@ -164,6 +164,7 @@ def create(
                 condition="C",
                 for_="15m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 # No severity label: routes to `oblivion` while calibrating.
                 # See the module docstring.
                 labels={},
@@ -178,6 +179,7 @@ def create(
                 condition="C",
                 for_="1h",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={},
                 annotations={
                     "summary": "{{ $labels.matched_host }} OIDC callback 500 rate has been over 5% for hours",

@@ -105,6 +105,7 @@ def create(
                 condition="C",
                 for_="15m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning", "environment": "non-production"},
                 annotations={
                     "summary": _SUMMARY,
@@ -124,6 +125,7 @@ def create(
                 condition="C",
                 for_="15m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical", "environment": "production"},
                 annotations={
                     "summary": _SUMMARY,

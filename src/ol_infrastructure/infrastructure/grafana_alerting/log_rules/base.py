@@ -34,6 +34,12 @@ Differences from the original YAML
   Loki tenant; rules filtered to production clusters return no data on CI/QA
   stacks and vice versa. OK keeps those rules silent rather than surfacing
   NoData alerts.
+- exec_err_state is set explicitly on every rule, same reasoning as
+  metric_rules: left unset it silently defaults to "Alerting", so a
+  transient datasource blip pages like a real incident. "OK" for
+  warning-tier rules, "KeepLast" for critical-tier rules. See
+  metric_rules/eks_general.py's docstring for the incident that prompted
+  this.
 
 Sub-modules
 -----------
