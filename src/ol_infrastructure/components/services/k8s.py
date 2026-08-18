@@ -115,14 +115,27 @@ def default_probe_configs(port: int) -> dict[str, kubernetes.core.v1.ProbeArgs]:
     Built per-instance rather than held as a class default so the port tracks
     whatever the application container actually listens on. Apps with the nginx
     sidecar are probed at the sidecar; apps without it are probed at Granian.
+
+    Liveness is a TCP connect, not an HTTP GET, while readiness and startup stay
+    on HTTP. An HTTP liveness request has to be served by the same bounded pool
+    of Granian blocking threads that is serving user traffic, so a pod that is
+    merely saturated fails liveness and gets restarted -- which removes capacity
+    from an already-overloaded service and makes the saturation worse. Granian's
+    maintainer reports exactly this pod-churn spiral in emmett-framework/granian
+    discussion #663. A TCP connect is answered by the listener rather than by a
+    worker thread, so it distinguishes "the process is gone" from "the process
+    is busy".
+
+    The trade-off is deliberate: liveness no longer restarts a pod whose Granian
+    workers are wedged but whose listener still accepts. Readiness does still
+    fail in that case, so the pod is pulled from the Service endpoints and stops
+    receiving traffic -- it just is not killed automatically.
     """
     return {
-        # Liveness probe to check if the application is still running
+        # Liveness probe to check that the process is still there at all. See the
+        # docstring for why this is TCP while the other two probes are HTTP.
         "liveness_probe": kubernetes.core.v1.ProbeArgs(
-            http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                path="/health/liveness/",
-                port=port,
-            ),
+            tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(port=port),
             initial_delay_seconds=30,  # Wait 30 seconds before first probe
             period_seconds=30,
             failure_threshold=3,  # Consider failed after 3 attempts

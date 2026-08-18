@@ -707,7 +707,16 @@ _PROBE_KEYS = ("liveness_probe", "readiness_probe", "startup_probe")
 
 
 def _probe_ports(container) -> set[int]:
-    return {container[key]["http_get"]["port"] for key in _PROBE_KEYS}
+    """Ports the probes target, whichever action kind each one uses.
+
+    Liveness is a tcp_socket action and the other two are http_get, so this
+    reads whichever of the two the probe actually carries.
+    """
+    ports = set()
+    for key in _PROBE_KEYS:
+        action = container[key].get("http_get") or container[key]["tcp_socket"]
+        ports.add(action["port"])
+    return ports
 
 
 def _app_container(containers, application_name="myapp"):
@@ -718,16 +727,33 @@ def test_default_probe_configs_follow_port():
     """The generated probes all target the port they were built for."""
     probes = default_probe_configs(9999)
     assert set(probes) == {"liveness_probe", "readiness_probe", "startup_probe"}
-    for probe in probes.values():
-        assert probe.http_get.port == 9999
+    assert probes["liveness_probe"].tcp_socket.port == 9999
+    assert probes["readiness_probe"].http_get.port == 9999
+    assert probes["startup_probe"].http_get.port == 9999
 
 
 def test_default_probe_configs_paths_unchanged():
-    """django-health-check endpoints, one per probe kind."""
+    """django-health-check endpoints, for the two probes that still speak HTTP."""
     probes = default_probe_configs(DEFAULT_WSGI_PORT)
-    assert probes["liveness_probe"].http_get.path == "/health/liveness/"
     assert probes["readiness_probe"].http_get.path == "/health/readiness/"
     assert probes["startup_probe"].http_get.path == "/health/startup/"
+
+
+def test_liveness_is_tcp_while_readiness_stays_http():
+    """The probe split from granian discussion #663.
+
+    An HTTP liveness request is served by the same bounded pool of Granian
+    blocking threads as user traffic, so a merely-saturated pod fails liveness
+    and is restarted -- shedding capacity from a service that is already
+    overloaded. A TCP connect is answered by the listener instead, so it
+    reports "the process is gone" rather than "the process is busy". Readiness
+    stays on HTTP so a wedged pod is still pulled from the Service endpoints.
+    """
+    probes = default_probe_configs(DEFAULT_NGINX_PORT)
+    assert probes["liveness_probe"].tcp_socket is not None
+    assert probes["liveness_probe"].http_get is None
+    assert probes["readiness_probe"].http_get is not None
+    assert probes["readiness_probe"].tcp_socket is None
 
 
 @pulumi.runtime.test

@@ -794,17 +794,14 @@ def create_k8s_resources(  # noqa: C901
                 limit_workers_max_rss=True,
             ),
             probe_configs={
+                # TCP rather than HTTP so a saturated Granian worker pool
+                # cannot fail liveness and trigger a restart that removes
+                # capacity from an already overloaded service. Readiness stays
+                # on HTTP, and keeps the Host header because it still reaches
+                # Django's ALLOWED_HOSTS check. See default_probe_configs in
+                # components/services/k8s.py.
                 "liveness_probe": kubernetes.core.v1.ProbeArgs(
-                    http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                        path="/heartbeat",
-                        port=8000,
-                        http_headers=[
-                            kubernetes.core.v1.HTTPHeaderArgs(
-                                name="Host",
-                                value=edxapp_config.require_object("domains")["lms"],
-                            ),
-                        ],
-                    ),
+                    tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(port=8000),
                     initial_delay_seconds=30,
                     period_seconds=30,
                     failure_threshold=3,
@@ -1139,17 +1136,14 @@ def create_k8s_resources(  # noqa: C901
                 limit_workers_max_rss=True,
             ),
             probe_configs={
+                # TCP rather than HTTP so a saturated Granian worker pool
+                # cannot fail liveness and trigger a restart that removes
+                # capacity from an already overloaded service. Readiness stays
+                # on HTTP, and keeps the Host header because it still reaches
+                # Django's ALLOWED_HOSTS check. See default_probe_configs in
+                # components/services/k8s.py.
                 "liveness_probe": kubernetes.core.v1.ProbeArgs(
-                    http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                        path="/heartbeat",
-                        port=8000,
-                        http_headers=[
-                            kubernetes.core.v1.HTTPHeaderArgs(
-                                name="Host",
-                                value=edxapp_config.require_object("domains")["studio"],
-                            ),
-                        ],
-                    ),
+                    tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(port=8000),
                     initial_delay_seconds=30,
                     period_seconds=30,
                     failure_threshold=3,
