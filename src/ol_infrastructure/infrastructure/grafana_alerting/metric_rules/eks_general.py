@@ -475,20 +475,26 @@ def create(
             # fired this rule continuously, unrelated to any real incident.
             #
             # At-max is a capacity fact, not an incident -- one resize
-            # decision, not a page. `channel: notifications-ocw-misc` routes
-            # it to the dedicated Slack channel and terminates there
-            # (alertmanager.py's top policy branch, continue_=False), so it
-            # never reaches Rootly at all -- deliberately not a `severity`
-            # tier change, since that would route it through Rootly's
-            # urgency/escalation machinery instead of bypassing it. See
+            # decision, not a page. `channel: devops-warnings` routes it to a
+            # dedicated Slack channel and terminates there (alertmanager.py's
+            # top policy branch, continue_=False), so it never reaches Rootly
+            # at all -- deliberately not a `severity` tier change, since that
+            # would route it through Rootly's urgency/escalation machinery
+            # instead of bypassing it. See
             # docs/plans/grafana-alerting-remediation-spec.md §3c.
+            #
+            # Not `channel: notifications-ocw-misc`: this rule covers every
+            # HPA cluster-wide, not just OCW's, so that channel would be the
+            # wrong audience for most of what it fires on (flagged in review
+            # on #5503). `devops-warnings` is its own contact-point pair in
+            # alertmanager.py, reusing the same Slack webhook/token.
             alerting.RuleGroupRuleArgs(
                 name="HPAAtMaxReplicasWarning",
                 condition="C",
                 for_="15m",
                 no_data_state="OK",
                 exec_err_state="OK",
-                labels={"severity": "warning", "channel": "notifications-ocw-misc"},
+                labels={"severity": "warning", "channel": "devops-warnings"},
                 annotations={
                     "description": "HPA {{ $labels.horizontalpodautoscaler }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been at its maximum replica count for 15 minutes. The workload may be unable to scale further under load."
                 },
@@ -509,7 +515,7 @@ def create(
                 for_="15m",
                 no_data_state="OK",
                 exec_err_state="KeepLast",
-                labels={"severity": "critical", "channel": "notifications-ocw-misc"},
+                labels={"severity": "critical", "channel": "devops-warnings"},
                 annotations={
                     "description": "HPA {{ $labels.horizontalpodautoscaler }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been at its maximum replica count for 15 minutes. The workload may be unable to scale further under load."
                 },
