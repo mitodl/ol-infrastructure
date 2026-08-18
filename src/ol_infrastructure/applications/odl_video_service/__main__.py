@@ -816,6 +816,42 @@ k8s_extra_vars: dict[str, str | Output[str]] = {
 }
 app_env_vars.update(k8s_extra_vars)
 
+# OVS has no `vars:` block in its stack configs -- every non-secret env var is
+# literal here -- so unlike micromasters/xpro/ocw_studio the OTel block lives in
+# the program rather than in Pulumi.{QA,Production}.yaml.
+#
+# Gated on CI because `setup_grafana` (substructure/aws/eks/grafana.py) returns
+# early for `ci`, so no Grafana Alloy runs there and
+# grafana-k8s-monitoring-alloy-receiver does not resolve. Setting the endpoint
+# uniformly is not free: it buys a connection failure per span batch, forever,
+# in the one environment nobody watches.
+#
+# OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES are read straight from the
+# environment; OPENTELEMETRY_ENDPOINT is a Django setting odl_video/settings.py
+# reads, which is why it carries the full /v1/traces path rather than a base URL
+# the SDK would append to.
+if stack_info.env_suffix != "ci":
+    app_env_vars.update(
+        {
+            "OPENTELEMETRY_ENDPOINT": (
+                "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc"
+                ".cluster.local:4318/v1/traces"
+            ),
+            "OTEL_RESOURCE_ATTRIBUTES": (
+                f"service.namespace={ovs_namespace},"
+                "service.instance.id=$(KUBERNETES_POD_NAME)"
+            ),
+            "OTEL_SERVICE_NAME": "ovs-webapp",
+            "OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT": "128",
+            # Alloy tail-samples (keep errors, keep >5000ms, 15% of the rest --
+            # substructure/aws/eks/grafana.py), so head sampling here would
+            # multiply with it rather than compose. `parentbased_` still honours
+            # an inbound "not sampled" so a trace crossing from APISIX stays
+            # coherent.
+            "OTEL_TRACES_SAMPLER": "parentbased_always_on",
+        }
+    )
+
 # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
 # signals carry organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(app_env_vars, k8s_app_labels)

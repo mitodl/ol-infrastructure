@@ -40,6 +40,11 @@ config:
     OCW_STUDIO_LIVE_URL: https://ocw.mit.edu/
     OCW_STUDIO_LOG_LEVEL: INFO
     OCW_STUDIO_SUPPORT_EMAIL: 'ocw-studio-support@mit.edu'
+    OPENTELEMETRY_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces"
+    OTEL_RESOURCE_ATTRIBUTES: "service.namespace=ocw-studio,service.instance.id=$(KUBERNETES_POD_NAME)"
+    OTEL_SERVICE_NAME: "ocw-studio-webapp"
+    OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT: "128"
+    OTEL_TRACES_SAMPLER: "parentbased_always_on"
     OPEN_CATALOG_URLS: 'https://open.mit.edu/api/v0/ocw_next_webhook/,https://api.learn.mit.edu/api/v1/ocw_next_webhook/'
     POST_TRANSCODE_ACTIONS: 'videos.api.update_video_job'
     PUBLISH_POSTHOG_API_HOST: https://ph.ol.mit.edu
