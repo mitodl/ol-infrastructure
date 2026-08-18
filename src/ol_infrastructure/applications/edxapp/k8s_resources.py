@@ -1053,12 +1053,15 @@ def create_k8s_resources(  # noqa: C901
                 # 8 blocking threads, 16 backpressure) in place of the 2 workers x
                 # 32 threads Granian used to derive from backlog=128.
                 #
-                # workers_max_rss is unaffected in aggregate: the component derives
-                # floor(limit / workers * 0.9), so 2 x 1843MiB and 1 x 3686MiB cap
-                # the pod at the same total. What changes is the blast radius of a
-                # respawn -- with one worker it costs the pod's whole serving
-                # capacity rather than half -- which is why LMS, whose respawns are
-                # ongoing, is NOT part of this change.
+                # workers_max_rss is unaffected in aggregate, for every stack that
+                # shares this config: the component derives
+                # floor(limit / workers * 0.9), so halving the worker count doubles
+                # the per-worker cap and the pod total is unchanged whatever the
+                # declared limit. (mitxonline CMS at 4Gi: 2 x 1843MiB -> 1 x 3686MiB.
+                # mitx and mitx-staging CMS at 2Gi: 2 x 921MiB -> 1 x 1843MiB.)
+                # What changes is the blast radius of a respawn -- with one worker it
+                # costs the pod's whole serving capacity rather than half -- which is
+                # why LMS, whose respawns are ongoing, is NOT part of this change.
                 respawn_failed_workers=True,
                 backlog=128,
                 static_path_mounts=["/openedx/staticfiles"],
