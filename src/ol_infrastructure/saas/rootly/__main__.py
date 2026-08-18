@@ -3010,6 +3010,17 @@ alerts_source_grafana_prometheus_ci = rootly.AlertsSource(
         {"alertFieldId": "4a3add3c-5611-4dd9-ba65-4fb60b7f4fc6"},
         {"alertFieldId": "45a09cf3-b0f2-43cf-b596-34aaab9279dc"},
     ],
+    # Deliberately left at High, not Low. Demoting to Low is unsafe as a
+    # belt-and-braces fallback here: on the Default Escalation Policy's Low
+    # Urgency path (notification_type=quiet), at least one on-call
+    # engineer's personal notification rules have quiet/audible inverted --
+    # quiet triggers an immediate phone call where audible does not. If
+    # W0's route rule (see the AlertRoute below) is ever disabled, CI
+    # alerts falling through to the Default Escalation Policy at Low would
+    # page that person harder than the current High/audible setting does.
+    # Fix the inverted per-user rule first, or route-fix instead of
+    # urgency-demote, before changing this. See
+    # tk-make-severity-mean-something-split-warning-criti-27f976.
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
     deduplication_key_kind="payload",
     name="Grafana Prometheus - CI",
@@ -3154,6 +3165,13 @@ escalation_level_ci_qa_slack_notifications = rootly.EscalationLevel(
     opts=rootly_opts,
 )
 
+# `AlertRouteRuleArgs` has no `enabled` field, so Pulumi cannot manage or
+# detect whether the fallback rule below is toggled on. It shipped disabled
+# on both this route and the QA one below (2026-07-22), which made the
+# Slack diversion a no-op until 2026-08-18 -- CI/QA alerts fell through to
+# the paging default policy the whole time. Re-verify via `GET
+# /v1/alert_routes` -> `.rules[].enabled == true` for these two routes if
+# CI/QA paging noise reappears.
 alert_route_grafana_prometheus_ci_slack_warnings_route = rootly.AlertRoute(
     "grafana-prometheus-ci-slack-warnings-route",
     alerts_source_ids=[alerts_source_grafana_prometheus_ci.id],
