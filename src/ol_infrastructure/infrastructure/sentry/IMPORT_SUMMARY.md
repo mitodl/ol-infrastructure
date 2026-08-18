@@ -121,3 +121,14 @@ configuration, then `pulumi import --file sentry_imports.json` followed by
   `bin/import-sentry-config` run will regenerate `name`/`slug` back to
   whatever the live project is named at that point -- expect it to match
   `mit-learn` unless it's renamed again live.
+- `project_witan` / `key_witan`: added by hand, same reason as
+  `project_ol_analytics_api`/`project_dagster` -- the witan Sentry project
+  does not exist live yet, so `pulumi up` creates both. One project covers
+  CI/QA/Production, distinguished by the SDK's `environment` tag rather than
+  by separate projects. The hand-added export is `witan_sentry_dsn`, consumed
+  by the witan application stack, which writes it to Vault at
+  `secret-operations/witan/sentry`. The same naming-convergence caveat as
+  `project_ol_analytics_api` applies: if this project is later created live
+  and `bin/import-sentry-config` is re-run, diff the regenerated
+  `key_witan_default_*` block against this one before accepting it -- a
+  `pulumi state rename` may be needed to converge onto the live key's id.

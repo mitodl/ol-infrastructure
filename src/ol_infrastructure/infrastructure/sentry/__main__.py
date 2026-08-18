@@ -4952,6 +4952,41 @@ key_dagster = sentry.SentryKey(
 
 pulumi.export("dagster_sentry_dsn", key_dagster.dsn_public)
 
+# Hand-authored addition, same rationale as project_ol_analytics_api above --
+# see IMPORT_SUMMARY.md.
+#
+# One project covers CI/QA/Production, distinguished by the SDK's
+# `environment` tag rather than by separate projects -- same convention as
+# project_dagster.
+project_witan = sentry.SentryProject(
+    "project_witan",
+    organization=ORGANIZATION,
+    name="witan",
+    slug="witan",
+    platform="python-fastapi",
+    # devops owns witan (an internal ops/platform tool, not a product-facing
+    # app); mit-office-of-digital-learning gets the same blanket access it
+    # holds on the other infrastructure projects.
+    teams=[
+        "devops",
+        "mit-office-of-digital-learning",
+    ],
+    digests_min_delay=300,
+    digests_max_delay=1800,
+    resolve_age=0,
+    opts=sentry_opts,
+)
+
+key_witan = sentry.SentryKey(
+    "key_witan",  # pragma: allowlist secret
+    organization=ORGANIZATION,
+    project=project_witan.slug,
+    name="Default",
+    opts=sentry_opts,
+)
+
+pulumi.export("witan_sentry_dsn", key_witan.dsn_public)
+
 # Hand-added stack outputs (not produced by bin/import-sentry-config) exposing
 # each project's DSN so consuming stacks can read it via
 # sentry_stack.require_output(...) instead of a hard-coded/SOPS/Vault secret.

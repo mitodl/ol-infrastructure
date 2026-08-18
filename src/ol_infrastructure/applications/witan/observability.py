@@ -1,4 +1,4 @@
-"""OpenTelemetry + structured-logging environment for the witan workloads.
+"""OpenTelemetry + structured-logging + Sentry environment for the witan workloads.
 
 agent-kit ``witan_core.observability`` (PR #193) installs structlog plus OTel
 tracer and meter providers, but it deliberately installs **no provider at all**
@@ -52,11 +52,11 @@ rather than looking for a ToolHive histogram that no longer exists.
 
 import pulumi_kubernetes as kubernetes
 
-from ol_infrastructure.lib.pulumi_helper import StackInfo
-from ol_infrastructure.lib.toolhive_telemetry import (
+from ol_infrastructure.lib.otel import (
     OTLP_ENDPOINT,
     ships_telemetry,
 )
+from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 # Sample everything here; Alloy's `tailSampling` does the filtering (keep
 # errors, keep >5000ms, 15% of the rest — substructure/aws/eks/grafana.py).
@@ -145,6 +145,28 @@ def otel_env(
         "OTEL_TRACES_SAMPLER_ARG": TRACES_SAMPLER_ARG,
         "OTEL_PROPAGATORS": PROPAGATORS,
         "OTEL_METRIC_EXPORT_INTERVAL": METRIC_EXPORT_INTERVAL_MS,
+    }
+
+
+def sentry_env(stack_info: StackInfo, service_version: str) -> dict[str, str]:
+    """Build the standard ``SENTRY_*`` variables the SDK reads on init.
+
+    Unlike ``otel_env`` this is never empty: witan has one Sentry project
+    covering CI/QA/Production (``ol-infrastructure-sentry``'s ``project_witan``),
+    distinguished by ``SENTRY_ENVIRONMENT`` rather than by a per-environment
+    project, so there is no CI-dark case to return early on the way
+    ``ships_telemetry`` does for Alloy. ``SENTRY_DSN`` itself is set
+    separately, from the Vault-synced secret — see ``deployment.py``'s
+    ``sentry_dsn_secret_name``/``key`` — because it is owned by the sentry
+    stack rather than a literal this stack can construct.
+
+    :param service_version: the image tag or digest this workload runs, same
+        value passed to ``otel_env`` — ties each Sentry issue to the image it
+        came from.
+    """
+    return {
+        "SENTRY_ENVIRONMENT": stack_info.env_suffix,
+        "SENTRY_RELEASE": service_version,
     }
 
 

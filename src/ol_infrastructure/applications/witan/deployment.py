@@ -78,6 +78,7 @@ from pulumi import Output, Resource, ResourceOptions
 from ol_infrastructure.applications.witan.observability import (
     downward_api_env_args,
     otel_env,
+    sentry_env,
     witan_log_env,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
@@ -428,6 +429,9 @@ def create_serving_tier(  # noqa: PLR0913
     witan_code_token_secret_name: str,
     witan_code_token_secret_key: str,
     witan_code_token_secret: Resource,
+    sentry_dsn_secret_name: str,
+    sentry_dsn_secret_key: str,
+    sentry_dsn_secret: Resource,
     migration_job: Resource,
     service_version: str,
     remote_write_max_inflight: str = "",
@@ -636,6 +640,20 @@ def create_serving_tier(  # noqa: PLR0913
                                         )
                                     ),
                                 ),
+                                # The DSN is Vault-synced rather than a literal
+                                # like the rest of `otel_env` below: it is
+                                # owned by the ol-infrastructure-sentry stack,
+                                # not this one, so it travels through Vault the
+                                # same way dagster's does.
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="SENTRY_DSN",
+                                    value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                        secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                            name=sentry_dsn_secret_name,
+                                            key=sentry_dsn_secret_key,
+                                        )
+                                    ),
+                                ),
                                 # Client-side write admission, per graph, inside
                                 # this pod. Only emitted when the stack sets a
                                 # value: witan's own defaults are the measured
@@ -678,9 +696,13 @@ def create_serving_tier(  # noqa: PLR0913
                                 ),
                                 # Structured logging + OTel, from the shared
                                 # helper so this workload and the CI indexer
-                                # cannot drift into describing themselves as two
-                                # different services. `otel_env` is empty in CI,
-                                # which has no collector.
+                                # cannot drift into describing themselves as
+                                # two different services. `otel_env` is empty
+                                # in CI, which has no collector. `sentry_env`
+                                # is this workload's own addition, not shared
+                                # with the CI indexer -- it carries no
+                                # CI-empty case since one Sentry project covers
+                                # every environment.
                                 *(
                                     kubernetes.core.v1.EnvVarArgs(
                                         name=name, value=value
@@ -688,6 +710,7 @@ def create_serving_tier(  # noqa: PLR0913
                                     for name, value in (
                                         witan_log_env()
                                         | otel_env(stack_info, "witan", service_version)
+                                        | sentry_env(stack_info, service_version)
                                     ).items()
                                 ),
                             ],
@@ -806,6 +829,7 @@ def create_serving_tier(  # noqa: PLR0913
                 witan_service_account,
                 witan_ci_token_secret,
                 witan_code_token_secret,
+                sentry_dsn_secret,
                 actor_tokens_secret,
                 migration_job,
             ]
