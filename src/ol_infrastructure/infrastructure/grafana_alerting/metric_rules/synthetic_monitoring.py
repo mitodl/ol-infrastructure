@@ -273,7 +273,13 @@ def _rules(
     check: _Check, rd: Callable[[str], list[alerting.RuleGroupRuleDataArgs]]
 ) -> list[alerting.RuleGroupRuleArgs]:
     """Build the fast (cliff) and slow (creep) rules for one check."""
-    base_labels = {"component": check.component, "service": "mitlearn"}
+    # `ol_component`, not a bare `component`: this key is what Rootly's Grafana
+    # Production Service Route matches on to reach the per-component services,
+    # and `component` is generic enough that a vendor integration or a future
+    # rule elsewhere could set it and be routed to a MIT Learn service by
+    # accident. Not in alertmanager.py's `group_bies`, so the rename does not
+    # regroup any notification.
+    base_labels = {"ol_component": check.component, "service": "mitlearn"}
     # The slow rules deliberately carry no `severity` -- see "The slow rules
     # ship unrouted" in the module docstring.
     fast_labels = base_labels | {"severity": check.severity}
