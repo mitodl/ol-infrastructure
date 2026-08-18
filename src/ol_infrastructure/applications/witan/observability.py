@@ -54,21 +54,52 @@ import pulumi_kubernetes as kubernetes
 
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 from ol_infrastructure.lib.toolhive_telemetry import (
-    DEFAULT_TRACE_SAMPLING_RATE,
     OTLP_ENDPOINT,
     ships_telemetry,
 )
 
-# Sampling and propagation, matched to the mit_learn/learn_ai precedent rather
-# than chosen fresh, so a trace that crosses from one of those services into
-# witan is sampled consistently instead of being decided twice.
+# ★ SAMPLE EVERYTHING HERE AND LET THE TAIL SAMPLER DECIDE, because head
+# sampling in the SDK was actively DEFEATING the collector that is already
+# configured to do this properly.
 #
-# TRACES_SAMPLER_ARG is the SHARED default rather than a second literal: witan
-# runs `parentbased_traceidratio`, so it honours whatever ToolHive decided at
-# the root, and the two drifting apart would mean the ratio witan declares is
-# not the ratio it gets. See `toolhive_trace_sampling_rate`.
-TRACES_SAMPLER = "parentbased_traceidratio"
-TRACES_SAMPLER_ARG = DEFAULT_TRACE_SAMPLING_RATE
+# Alloy runs `tailSampling` (substructure/aws/eks/grafana.py) with three
+# policies, every one of which is a decision made AFTER a trace completes:
+#
+#     keep-errors          any trace carrying an ERROR span
+#     sample-slow-traces   anything over 5000ms
+#     sample-15pct-traces  15% of whatever is left
+#
+# A 0.25 head ratio meant Alloy only ever saw a QUARTER of witan's traces, so
+# `keep-errors` and `sample-slow-traces` could only rescue traces that had
+# already survived a coin flip which knew nothing about whether they errored or
+# were slow. Effective retention for a slow trace was 25%, not 100% — the two
+# stages were multiplying rather than composing.
+#
+# ★ THAT IS NOT AN ABSTRACT LOSS. witan's claim path runs 25-30s under
+# concurrent write load, so every one of those traces clears the 5000ms
+# threshold and should be kept unconditionally; three quarters were being
+# discarded before the policy could fire. The mutual-exclusion investigation
+# (tk-mutual-exclusion-violated-2-of-8-racers-both-got-52b3dd) is where that
+# bill came due: a ~1-in-4 event, times a 1-in-4 sampler, is a trace roughly
+# once every sixteen runs.
+#
+# ── WHY `parentbased_traceidratio` WAS HERE, AND WHY THAT REASON IS GONE ──
+# The rationale it carried was: "witan runs `parentbased_traceidratio`, so it
+# honours whatever ToolHive decided at the root". ToolHive was REMOVED in
+# ol-infrastructure#5448 — witan is served directly behind APISIX and is the
+# root of its own traces. There is no upstream ratio left to honour, so the
+# sampler was tracking a decision nobody makes any more.
+#
+# `parentbased_always_on` rather than plain `always_on`: an inbound
+# `traceparent` that says "not sampled" is still respected, which keeps a trace
+# arriving from another service coherent instead of half-recorded.
+#
+# COST: witan is one replica serving a handful of concurrent writes, against a
+# tail sampler sized for `expectedNewTracesPerSec: 1000` and `numTraces: 50000`
+# (APISIX alone contributes ~280 req/s). 4x of witan's share is noise in that
+# budget.
+TRACES_SAMPLER = "parentbased_always_on"
+TRACES_SAMPLER_ARG = "1.0"
 PROPAGATORS = "tracecontext,baggage"
 METRIC_EXPORT_INTERVAL_MS = "60000"
 
