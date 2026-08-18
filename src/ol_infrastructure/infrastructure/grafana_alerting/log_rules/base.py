@@ -40,6 +40,10 @@ Sub-modules
   apisix_oidc  — OIDC callback failure rate at the gateway. Not a migration;
                  written 2026-08-14 against the APISIX access log.
   cert_manager — Source: grafana-alerts/loki-rules/cert-manager.yaml
+  dagster_database — Dagster's own rate of failed connections to its metadata
+                 database. Not a migration; written 2026-08-18 to cover the
+                 client-side half of a failure that metric_rules/
+                 dagster_pgbouncer.py structurally cannot see.
   edxapp       — Source: grafana-alerts/loki-rules/edxapp-logs.yaml
   heroku       — Source: grafana-alerts/loki-rules/heroku-logs.yaml
   mit_learn    — Source: grafana-alerts/loki-rules/mit-learn.yaml
@@ -55,6 +59,7 @@ from pulumiverse_grafana.oss.folder import Folder
 from ol_infrastructure.infrastructure.grafana_alerting.log_rules import (
     apisix_oidc,
     cert_manager,
+    dagster_database,
     edxapp,
     heroku,
     mit_learn,
@@ -161,6 +166,7 @@ def create(resource_opts: ResourceOptions) -> None:
 
     apisix_oidc.create(log_alerts_folder.uid, rd, resource_opts)
     cert_manager.create(log_alerts_folder.uid, rd, resource_opts)
+    dagster_database.create(log_alerts_folder.uid, rd, resource_opts)
     edxapp.create(log_alerts_folder.uid, rd, resource_opts)
     heroku.create(log_alerts_folder.uid, rd, resource_opts)
     mit_learn.create(log_alerts_folder.uid, rd, resource_opts)
