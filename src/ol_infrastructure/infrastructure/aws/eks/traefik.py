@@ -256,6 +256,34 @@ def setup_traefik(
                             "resourceAttributes": {
                                 "deployment.environment": stack_info.env_suffix,
                             },
+                            # Spans for routers, middlewares and entrypoints.
+                            # Without it a request is one opaque proxy hop, so
+                            # time spent in auth or redirect middleware is
+                            # indistinguishable from time spent in the backend
+                            # -- which is exactly the question an edge trace
+                            # gets opened to answer.
+                            "addInternals": True,
+                            # Traefik names spans by method alone, so the only
+                            # way to tell one route from another is by
+                            # attribute. x-request-id ties a span to the APISIX
+                            # and application logs that carry the same id, and
+                            # traceparent makes a propagation failure visible
+                            # in the trace itself rather than only by its
+                            # absence -- this is what would have shown, in one
+                            # query, that Traefik was injecting correctly and
+                            # the app was dropping it.
+                            "capturedRequestHeaders": [
+                                "Referer",
+                                "User-Agent",
+                                "X-Request-Id",
+                                "traceparent",
+                            ],
+                            "capturedResponseHeaders": ["X-Request-Id"],
+                            # Every query parameter is redacted by default.
+                            # These three are the ones worth reading on a slow
+                            # search or catalog request, and none carries
+                            # anything user-identifying.
+                            "safeQueryParams": ["page", "q", "resource_type"],
                             "otlp": {
                                 "enabled": True,
                                 "http": {
