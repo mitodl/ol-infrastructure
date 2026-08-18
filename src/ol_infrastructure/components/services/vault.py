@@ -738,9 +738,12 @@ class OLVaultK8SDynamicSecretConfig(OLVaultK8SSecretConfig):
     )
     renewal_percent: int | None = Field(
         default=None,
+        ge=0,
+        le=90,
         description=(
-            "Percentage out of 100 of the lease duration after which VSO "
-            "renews the secret. VSO defaults to 67 when unset."
+            "Percent of the lease duration after which VSO renews the "
+            "secret. VSO's CRD bounds this to 0-90 and defaults to 67 "
+            "when unset."
         ),
     )
 

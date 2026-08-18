@@ -46,6 +46,15 @@ path "postgres-dagster/creds/readonly/*" {
 path "postgres-dagster/creds/readonly" {
   capabilities = ["read"]
 }
+# VSO's revoke_on_delete for dagster_db_secret calls sys/leases/revoke, which
+# requires an explicit grant beyond the default policy's sys/leases/renew.
+# Ref: https://github.com/hashicorp/vault-secrets-operator/blob/main/CHANGELOG.md
+path "sys/leases/revoke" {
+  capabilities = ["update"]
+  allowed_parameters = {
+    "lease_id" = ["postgres-dagster/creds/app/*"]
+  }
+}
 path "postgres-dagster-data-production/creds/app/*" {
   capabilities = ["read"]
 }
