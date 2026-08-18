@@ -3,24 +3,29 @@
 Written 2026-08-18, after the data-production Dagster daemon spent days unable to
 open a socket to PgBouncer -- 28232 of 28232 ephemeral ports consumed by TIME_WAIT
 toward the PgBouncer service address, psycopg2 raising "Cannot assign requested
-address", and user-visible run failures -- while every rule in
-metric_rules/dagster_pgbouncer.py stayed correctly quiet.
+address", and user-visible run failures -- while every rule that existed in
+metric_rules/dagster_pgbouncer.py at the time stayed correctly quiet.
 
-Why the pool-side rules could not have caught it
-------------------------------------------------
-Those rules measure PgBouncer: server connections against max_db_connections,
-cl_waiting, maxwait, pgbouncer_up. During the incident PgBouncer read 12 active
-clients, 11 active server connections, 0 waiting, 40 of a ~708 per-replica cap --
-a pool with nothing wrong with it. The failure was entirely in the client's own
-network namespace, upstream of anything PgBouncer can observe: a client that
-cannot allocate a source port never becomes a connection PgBouncer counts.
+Why the concurrency rules could not have caught it
+---------------------------------------------------
+Those rules measure how much of PgBouncer is occupied: server connections against
+max_db_connections, cl_waiting, maxwait, pgbouncer_up. During the incident
+PgBouncer read 12 active clients, 11 active server connections, 0 waiting, 40 of
+a ~708 per-replica cap -- a pool with nothing wrong with it. The failure was
+entirely in the client's own network namespace, upstream of anything PgBouncer
+can observe: a client that cannot allocate a source port never becomes a
+connection PgBouncer counts.
 
 The two signatures are opposites, not points on one scale. The harder the client
 churns, the *emptier* the pool looks, because connections that fail to establish
-are connections the pool never sees. No threshold on a pool-side rule can cover
-this, which is why it lives in its own module rather than being bolted onto
-dagster_pgbouncer.py as a tighter bound on an existing series. Do not delete
-either side as redundant with the other.
+are connections the pool never sees. No threshold on a concurrency rule can cover
+this, which is why this lives in its own module rather than being bolted onto
+dagster_pgbouncer.py as a tighter bound on an existing series.
+
+DagsterPgBouncerConnectionChurn was added to that file alongside this module and
+is the one pool-side series that does see the churn, earlier than this rule does
+-- but it measures arrival rate, a third axis again, and it covers only the one
+failure mode. See below. Do not delete any of the three as redundant.
 
 Why a log rule rather than a metric
 ------------------------------------
@@ -33,14 +38,35 @@ logs every failed connection attempt regardless of cause -- DNS, refused, port
 exhaustion, pool cap, RDS failover -- so it needs no new plumbing and is not
 specific to the one failure mode that prompted it.
 
+Why this outlives the metric rule it is paired with
+----------------------------------------------------
+DagsterPgBouncerConnectionChurn watches the precondition for port exhaustion and
+is the earlier warning, but it only sees that one failure mode. The 2026-08-18
+remediation is the proof, and it ran in two phases rather than one:
+
+  until ~16:40Z  non-pooling storages -- churn 415/s, ~270 retries/min,
+                 psycopg2 "Cannot assign requested address". Real port exhaustion.
+  ~16:50-17:50Z  churn already down at 0.7/s, yet the daemon still could not get
+                 connections, at ~30/min and now with a different error entirely:
+                 "QueuePool limit of size 10 overflow 10 reached, connection timed
+                 out". Client-side SQLAlchemy pool saturation, not the network.
+  after ~17:50Z  clean.
+
+The churn metric went quiet 70 minutes before the daemon stopped failing. This
+rule spanned both phases because it matches Dagster's retry wrapper rather than
+any particular psycopg2 error -- the generality is the point, not laziness about
+the filter. Resist narrowing it to the error string of whichever incident is
+freshest.
+
 Threshold, from 14 days of Loki
 --------------------------------
 Quiet hours on data-production top out at 54 lines/hour (8, 8, 54, 21, 7 across
-the pre-incident samples), or ~9 per 10 minutes. The storm ran 10,000-29,000
-lines/hour, ~2,700 per 10 minutes, continuously from 2026-08-09 until the pooled
-storage classes landed at 17:22Z on 2026-08-18 and dropped it to zero. 100 per
-10 minutes therefore sits an order of magnitude above the noisiest quiet hour and
-27x below the incident, on a signal whose two states are separated by ~500x.
+the pre-incident samples), or ~9 per 10 minutes. Phase one ran 10,000-29,000
+lines/hour, ~2,700 per 10 minutes, continuously from 2026-08-09. 100 per 10
+minutes therefore sits an order of magnitude above the noisiest quiet hour and
+27x below the incident, on a signal whose two states are separated by ~500x. It
+also clears phase two's ~300 per 10 minutes by 3x, so that hour would have paged
+too -- correctly, since runs were still failing throughout it.
 
 Background: docs/plans/dagster-pgbouncer-observability.md.
 """
