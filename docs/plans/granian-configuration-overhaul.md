@@ -210,10 +210,18 @@ nginx and the listen backlog hold the overflow.
 
 **Replica re-sizing.** `application_min_replicas` comes from per-stack Pulumi config
 (`min_replicas`) for every affected app, so this is a config change per stack, not code.
-Baseline recommendation at each stage: leave `min_replicas` alone initially and let the
-HPA respond, but pre-raise it for any app whose steady-state CPU utilization already sits
-above ~40% of the 60% HPA target, since halving per-pod worker count roughly halves
-per-pod CPU and will otherwise trigger a scale-*down* before the load reappears.
+
+Baseline recommendation at each stage: **leave `min_replicas` alone.** Do not pre-raise.
+
+> This reverses the rule originally stated here, which was to pre-raise for any app whose
+> steady-state CPU utilization already sat above ~40% of the 60% HPA target, "since
+> halving per-pod worker count roughly halves per-pod CPU". **That premise is false and
+> was disproven by measurement in stage 2.** The same traffic arriving at the same number
+> of pods performs the same work regardless of how many worker processes divide it —
+> worker count changes *capacity*, not *usage*. Measured p95 CPU across the stage-2
+> deploys: `micromasters` 0.0100 → 0.0097, `xpro` 0.0631 → 0.0608. Flat, not halved.
+> There is no post-deploy scale-*down* to guard against, so there is nothing to pre-raise
+> against. See the stage-3 `mitx` LMS entry below, which is where this was caught.
 
 ## Rollout
 

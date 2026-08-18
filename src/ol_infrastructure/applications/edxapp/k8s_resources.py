@@ -150,7 +150,8 @@ def create_k8s_resources(  # noqa: C901
     # Omitted (the default) means the pre-overhaul holding pins: 2 workers x 32
     # blocking threads, backpressure 64, runtime-mode mt, runtime-threads 2 -- the
     # values Granian derived from backlog=128 before the overhaul. An install opts
-    # in by setting edxapp:k8s_granian.lms in its stack config.
+    # in by setting edxapp:k8s_granian.lms in its stack config; setting it to an
+    # empty mapping opts in to the component defaults with no overrides.
     #
     # See docs/plans/granian-configuration-overhaul.md stage 3.
     LMS_GRANIAN_HOLDING_PINS = {
@@ -160,9 +161,16 @@ def create_k8s_resources(  # noqa: C901
         "blocking_threads": 32,
         "backpressure": 64,
     }
-    lms_granian_concurrency = (edxapp_config.get_object("k8s_granian") or {}).get(
-        "lms"
-    ) or LMS_GRANIAN_HOLDING_PINS
+    # `is None` rather than a falsy check: an explicitly configured empty mapping
+    # means "take the component defaults with no per-install overrides", which is a
+    # real thing for a stack to want and is not the same request as omitting the key.
+    # `or` would collapse the two and silently re-pin such a stack to the old values.
+    _lms_granian_override = (edxapp_config.get_object("k8s_granian") or {}).get("lms")
+    lms_granian_concurrency = (
+        LMS_GRANIAN_HOLDING_PINS
+        if _lms_granian_override is None
+        else _lms_granian_override
+    )
 
     # Get various VPC / network configuration information
     data_vpc = network_stack.require_output("data_vpc")
