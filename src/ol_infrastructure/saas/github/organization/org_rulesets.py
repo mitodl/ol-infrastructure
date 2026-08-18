@@ -243,9 +243,9 @@ tier_one_hardening = github.OrganizationRuleset(
 # THE CLASSIC BRANCH PROTECTION STILL OUT THERE IS NOT INERT. These rulesets are
 # ADDITIVE to it, not a replacement: an action must satisfy classic protection AND
 # every ruleset that matches, and a `bypass_actors` entry here grants no relief from the
-# classic layer at all. 27 active repos still carry a classic object that nothing here
-# manages (repository.py declines to declare BranchProtection), so it is invisible drift
-# that can override everything decided in this file.
+# classic layer at all. Whatever classic protection remains is invisible drift --
+# repository.py declines to declare BranchProtection -- and can override everything
+# decided in this file.
 #
 # open-edx-plugins made that concrete on 2026-08-17. Its classic protection restricted
 # pushes to `main` to the single user `odlbot`, and GitHub counts merging a pull request
@@ -261,7 +261,39 @@ tier_one_hardening = github.OrganizationRuleset(
 # deletion). The two rules dropped later that same day (#5459) do not reopen a gap on
 # this repo specifically: its classic protection had `dismiss_stale_reviews: false` and
 # `require_last_push_approval: false` already, so the rulesets are still no weaker than
-# what was deleted. Only `block_creations` was
-# lost, which is inert on a branch that already exists. The remaining 26 repos have not
-# been swept; SEC-16 in audit.py now reports this class of block instead of leaving it
-# to be found by a contractor with a stuck PR.
+# what was deleted. Only `block_creations` was lost, which is inert on a branch that
+# already exists.
+#
+# THE FLEET WAS THEN SWEPT (2026-08-17). `mit-learn` turned out to carry the identical
+# odlbot-only restriction, silently blocking three teams with nobody reporting it, so
+# this was never a one-repo problem. Default-branch classic rules were deleted on 16
+# repos; NO PUSH RESTRICTION SURVIVES ON ANY ACTIVE REPO -- deliberately not "anywhere",
+# since the seven archived repos below were never examined -- and SEC-16 in audit.py now
+# reports this class of block rather than leaving it to a contractor with a stuck PR.
+#
+# WHAT IS LEFT, and why each part was kept rather than missed:
+#
+#   4 active, default branch   `handbook` (the only `enforce_admins: true` repo) and
+#                              three `frontend-*-mitol` forks. The forks are tier
+#                              `unmanaged`, so NO ruleset here targets them -- their
+#                              classic rule is their only protection, not a redundant
+#                              one, and deleting it would have left them bare.
+#
+#   7 active, release branches `release*` / `release-candidate` on mit-learn,
+#                              mitxonline, mitxpro, ocw-hugo-themes, ocw-studio,
+#                              odl-video-service and open-discussions. They block
+#                              force-push and deletion, and every ruleset here targets
+#                              `~DEFAULT_BRANCH` only, so nothing replaces them.
+#
+#   7 archived                 bootcamp-ecommerce, ccxcon, mit-open-login-button,
+#                              ol-npm-libraries, open-discussions-client,
+#                              unified-ecommerce, unified-ecommerce-frontend. NOT
+#                              EXAMINED: both sweeps filtered `isArchived: false`. An
+#                              archived repo is read-only so a push restriction there
+#                              blocks nothing today, but this is an unmeasured set, not
+#                              a cleared one -- and it becomes real the moment one is
+#                              unarchived.
+#
+# COUNT THESE FROM THE CODE, NOT FROM `_has_branch_protection`. That field records the
+# DEFAULT BRANCH only, so it reads 11 -- it cannot see the seven release-branch rules at
+# all. A note written from that field alone would be accurate and still wrong.

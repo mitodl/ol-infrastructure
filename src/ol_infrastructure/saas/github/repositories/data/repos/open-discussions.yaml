@@ -5,7 +5,7 @@ _actions_secret_names:
 _custom_properties:
   tier: tier-1
 _excluded_environments: 1723
-_has_branch_protection: true
+_has_branch_protection: false
 _pushed_at: '2026-08-12T15:50:43Z'
 _ruleset_count: 2
 _visibility: public

@@ -262,13 +262,57 @@ RULES: tuple[Rule, ...] = (
         "SEC-15",
         "security",
         "high",
-        "fleet",
+        "active",
         "admin held by a team outside the sanctioned set",
+        # NARROWED FROM `fleet` TO `active` ON 2026-08-17, with SEC-15A below taking
+        # the archived half. Not a weakening -- a split, because the two halves need
+        # different actions and merging them made one of them undoable.
+        #
+        # Until today this rule read the COMMITTED grant and so reported 59 archived
+        # repos as clean while live GitHub had them at `admin`. When the crawl was
+        # finally allowed to record the truth, all 59 findings landed here at once --
+        # in a rule whose remediation line says "downgrade to push or maintain", which
+        # on an archived repo is not something anyone can do. GitHub makes permissions
+        # read-only on an archived repo ("you cannot add or remove collaborators or
+        # teams"), so the fix requires an unarchive/change/re-archive cycle and cannot
+        # come from `pulumi up` at all.
+        #
+        # Leaving them here would have parked 59 permanently-unactionable findings in a
+        # `high` security rule, which is how a gate stops being read. The archived case
+        # is still reported, just under an id that states what it actually costs.
         lambda r: (
             (
                 ", ".join(_unsanctioned_admin(r)),
                 f"admin only for {', '.join(sorted(ADMIN_TEAMS))}",
                 "downgrade to push or maintain",
+            )
+            if _unsanctioned_admin(r)
+            else None
+        ),
+    ),
+    Rule(
+        "SEC-15A",
+        "security",
+        "high",
+        "archived",
+        "archived repo grants admin to a team outside the sanctioned set",
+        # Same exposure as SEC-15, different cost to fix, which is the whole reason it
+        # is a separate id. Admin on an archived repo cannot push code -- the repo is
+        # read-only -- but it can UNARCHIVE, delete, and change settings, which is the
+        # same reasoning that keeps SEC-06 fleet-scoped rather than active-only.
+        #
+        # Remediation is deliberately spelled out, because "downgrade the grant" is not
+        # a thing you can do here and the next person will otherwise try it and get a
+        # 403: unarchive, set the grant, re-archive, verify it went back. The 2026-08-17
+        # pass did exactly that for 59 repos and downgraded to `pull` rather than
+        # `push`, since CON-07 states the expectation for an archived repo as read-only
+        # and fires on push/maintain/admin alike -- stopping at `push` would have
+        # cleared this rule while leaving CON-07 firing on a repo just opened to fix it.
+        lambda r: (
+            (
+                ", ".join(_unsanctioned_admin(r)),
+                f"admin only for {', '.join(sorted(ADMIN_TEAMS))}",
+                "unarchive, downgrade to pull, re-archive, then verify it re-archived",
             )
             if _unsanctioned_admin(r)
             else None

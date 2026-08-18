@@ -2,7 +2,7 @@
 _custom_properties:
   tier: tier-1
 _has_branch_protection: false
-_pushed_at: '2026-08-14T05:33:25Z'
+_pushed_at: '2026-08-15T03:31:31Z'
 _ruleset_count: 2
 _visibility: public
 allow_merge_commit: true
@@ -21,7 +21,6 @@ name: vault-raft-backup
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
-  devops-contractors: push
   odl-engineering: push
   odl-engineering-owners: admin
 web_commit_signoff_required: false
