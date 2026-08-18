@@ -1,4 +1,4 @@
-"""Shared ToolHive telemetry + audit configuration for every MCP stack.
+"""ToolHive-specific telemetry + audit configuration for the ToolHive CRDs.
 
 A ToolHive deployment is at least two hops of Go binary in front of whatever
 actually serves the tools: a ``VirtualMCPServer`` aggregator and, per backend,
@@ -6,59 +6,30 @@ an ``MCPServer`` proxyrunner. Both run their own OTel pipeline, configured
 through an ``MCPTelemetryConfig`` CR rather than through the ``OTEL_*``
 environment a Python or Go workload would read. Neither is on by default.
 
-This module builds those specs. It lives in ``lib`` rather than under one
-application because the witan and toolhive_swe stacks both need it and the
-security-relevant decisions below — which hop may expose ``/metrics``, what an
-audit event is allowed to carry — must not be re-derived per stack.
+This module builds those specs. It lives in ``lib`` rather than under
+``toolhive_swe`` because a second ToolHive-fronted stack could exist someday
+and the security-relevant decisions below — which hop may expose
+``/metrics``, what an audit event is allowed to carry — must not be
+re-derived per stack. The endpoint and shipping predicate every OTel-exporting
+stack needs, ToolHive-fronted or not, live in ``lib/otel.py`` instead — witan
+sits directly behind APISIX with no ToolHive tier (removed 2026-08-15) and
+imports from there, not from here.
 
-── Why CI gets logs but no traces or metrics ──
-``setup_grafana`` (``substructure/aws/eks/grafana.py``) returns early for CI, so
-operations-ci runs no Grafana Alloy: its ``grafana`` namespace exists and is
-empty, and ``grafana-k8s-monitoring-alloy-receiver`` resolves in QA and
-Production only. ``ships_telemetry`` mirrors that condition, so CI lands on the
-no-exporter path by construction instead of buying a connection failure per
-batch forever in the one environment nobody is watching.
-
-Audit logging and the Prometheus ``/metrics`` path are NOT gated that way — see
-their own notes below. Both work in CI.
+Audit logging and the Prometheus ``/metrics`` path are NOT gated by
+``ships_telemetry`` — see their own notes below. Both work in CI.
 """
 
-from ol_infrastructure.lib.pulumi_helper import StackInfo
-
-# The in-cluster OTLP/HTTP receiver, shared with mit_learn, learn_ai and edxapp
-# (see their Pulumi.{QA,Production}.yaml and edxapp/k8s_configmaps.py). Port
-# 4318 is http/protobuf; 4317 on the same Service is gRPC, which we do not use.
-# ToolHive's exporter is `otlptracehttp`/`otlpmetrichttp` (toolhive-core
-# `telemetry/providers/otlp`), so 4318 is the correct one for it too.
-OTLP_ENDPOINT = (
-    "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318"
+from ol_infrastructure.lib.otel import (
+    DEFAULT_TRACE_SAMPLING_RATE,
+    OTLP_ENDPOINT,
+    ships_telemetry,
 )
-
-# Matched to the mit_learn/learn_ai precedent rather than chosen fresh, so a
-# trace crossing from one of those services is sampled consistently instead of
-# being decided twice.
-DEFAULT_TRACE_SAMPLING_RATE = "0.25"
+from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 # QA samples everything: it is where the concurrency probe runs, and a
 # sampled-away trace is a probe run that measured nothing. Affordable precisely
 # because QA carries no organic traffic.
 _FULL_SAMPLE_ENVS = frozenset({"qa"})
-
-
-def ships_telemetry(stack_info: StackInfo) -> bool:
-    """Whether this environment has an OTLP receiver to export to.
-
-    Mirrors ``setup_grafana``'s CI early-return. Kept as a named predicate so
-    the reason a stack is dark is one grep away from the reason the collector
-    is absent.
-
-    The ``.lower()`` is redundant and deliberate: ``parse_stack`` builds
-    ``env_suffix`` as ``stack_name.lower()``, so it is lowercase by
-    construction. It is kept only so this predicate is character-for-character
-    the condition ``setup_grafana`` tests — the two drifting apart is the
-    failure this function exists to prevent.
-    """
-    return stack_info.env_suffix.lower() != "ci"
 
 
 def telemetry_config_name(service: str, hop: str) -> str:
@@ -121,7 +92,8 @@ def toolhive_telemetry_spec(
     that configures nothing — a referenced-but-inert config is the kind of thing
     that reads as "telemetry is on" to the next person to look.
 
-    :param service: the stack, e.g. ``"witan"``. Becomes ``service.namespace``.
+    :param service: the stack, e.g. ``"toolhive-swe"``. Becomes
+        ``service.namespace``.
     :param component: the hop, e.g. ``"vmcp"`` or a backend's name. Recorded as
         ``toolhive.component``; the per-ref ``serviceName`` carries it too.
     :param expose_prometheus: whether to serve the Prometheus ``/metrics`` path.
@@ -130,11 +102,11 @@ def toolhive_telemetry_spec(
         RUN. ToolHive serves ``/metrics`` on the *main transport port* — there
         is no separate admin listener (toolhive `pkg/telemetry/config.go`: "The
         metrics are served on the main transport port at /metrics"). A vMCP's
-        4483 is the port APISIX publishes, and both witan's and toolhive_swe's
-        ``ingress.py`` route ``paths=["/*"]`` at it, so enabling the path there
-        would put an unauthenticated ``https://<vmcp-host>/metrics`` on the
-        public internet listing every tool name and its call counts. A backend
-        proxy's 8080 is ClusterIP-only and never routed, so it is safe there.
+        4483 is the port APISIX publishes, and toolhive_swe's ``ingress.py``
+        routes ``paths=["/*"]`` at it, so enabling the path there would put an
+        unauthenticated ``https://<vmcp-host>/metrics`` on the public internet
+        listing every tool name and its call counts. A backend proxy's 8080 is
+        ClusterIP-only and never routed, so it is safe there.
 
         Revisit only alongside a path-level deny in the APISIX route — not by
         flipping this flag.
@@ -221,19 +193,15 @@ def toolhive_mcpserver_audit() -> dict[str, object]:
     Capture requires a TOP-LEVEL JSON-RPC ``error``; ``pkg/mcp/response.go``
     "intentionally omit[s] `result`". Whether a tool failure lands in one or the
     other is decided by the BACKEND'S MCP SDK, not by ToolHive — so it has to be
-    established per backend, not once. All six we run, verified 2026-08-14:
+    established per backend, not once. All five we run, verified 2026-08-14:
 
-    * **FastMCP 4.0.0b2** (witan) — every tool-level failure becomes an
-      ``isError`` result. Confirmed against a live server: an exception echoing
-      the caller's payload, a pydantic error carrying ``input_value=``, and an
-      unknown tool ALL stayed in ``result``; only ``no/such/method`` produced a
-      top-level error, message ``"Method not found"``. Nothing content-bearing
-      is captured.
-    * **FastMCP** (toolhive_swe ``aws``) — mcp-proxy-for-aws 1.6.4 is FastMCP
-      too, and its ``ToolErrorMiddleware.on_call_tool`` catches EVERY exception
-      and re-raises ``ToolError``, which is the same path. This matters more
-      than the others because the managed AWS endpoint behind it exposes a
-      ``run_script`` tool, so its requests carry user-authored scripts.
+    * **FastMCP** (toolhive_swe ``aws``) — mcp-proxy-for-aws 1.6.4 is FastMCP,
+      and its ``ToolErrorMiddleware.on_call_tool`` catches EVERY exception and
+      re-raises ``ToolError``: every tool-level failure becomes an ``isError``
+      result rather than a top-level JSON-RPC error, so nothing content-bearing
+      is captured. This matters more than the others because the managed AWS
+      endpoint behind it exposes a ``run_script`` tool, so its requests carry
+      user-authored scripts.
     * **modelcontextprotocol/go-sdk** (``fetch``) — same outcome by a different
       route: ``mcp/server.go`` returns a structured ``*jsonrpc.Error`` directly
       but wraps a *plain* error in ``CallToolResult{IsError: true}``, and

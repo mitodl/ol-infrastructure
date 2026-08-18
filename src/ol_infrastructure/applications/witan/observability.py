@@ -52,11 +52,11 @@ rather than looking for a ToolHive histogram that no longer exists.
 
 import pulumi_kubernetes as kubernetes
 
-from ol_infrastructure.lib.pulumi_helper import StackInfo
-from ol_infrastructure.lib.toolhive_telemetry import (
+from ol_infrastructure.lib.otel import (
     OTLP_ENDPOINT,
     ships_telemetry,
 )
+from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 # Sample everything here; Alloy's `tailSampling` does the filtering (keep
 # errors, keep >5000ms, 15% of the rest — substructure/aws/eks/grafana.py).
