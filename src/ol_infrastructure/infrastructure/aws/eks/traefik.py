@@ -203,9 +203,16 @@ def setup_traefik(
                         # Only websecure: web exists to 301 to it, so tracing
                         # that hop in detail buys a span per redirect and no
                         # information.
-                        "observability": {
-                            "traceVerbosity": "detailed",
-                        },
+                        #
+                        # Gated on the same predicate as the exporter below.
+                        # Verbosity without a collector to send to is a setting
+                        # that reads as configured and does nothing, which is
+                        # the drift ships_telemetry exists to prevent.
+                        **(
+                            {"observability": {"traceVerbosity": "detailed"}}
+                            if ships_telemetry(stack_info)
+                            else {}
+                        ),
                     },
                 },
                 "log": {
