@@ -193,6 +193,19 @@ def setup_traefik(
                                 "insecure": False,
                             },
                         },
+                        # Router, middleware and service spans come from the
+                        # entrypoint's verbosity, which defaults to "minimal" --
+                        # one span for the request and nothing about what
+                        # happened inside Traefik. "detailed" is what separates
+                        # time spent in auth or redirect middleware from time
+                        # spent in the backend.
+                        #
+                        # Only websecure: web exists to 301 to it, so tracing
+                        # that hop in detail buys a span per redirect and no
+                        # information.
+                        "observability": {
+                            "traceVerbosity": "detailed",
+                        },
                     },
                 },
                 "log": {
@@ -256,13 +269,6 @@ def setup_traefik(
                             "resourceAttributes": {
                                 "deployment.environment": stack_info.env_suffix,
                             },
-                            # Spans for routers, middlewares and entrypoints.
-                            # Without it a request is one opaque proxy hop, so
-                            # time spent in auth or redirect middleware is
-                            # indistinguishable from time spent in the backend
-                            # -- which is exactly the question an edge trace
-                            # gets opened to answer.
-                            "addInternals": True,
                             # Traefik names spans by method alone, so the only
                             # way to tell one route from another is by
                             # attribute. x-request-id ties a span to the APISIX
@@ -272,18 +278,28 @@ def setup_traefik(
                             # absence -- this is what would have shown, in one
                             # query, that Traefik was injecting correctly and
                             # the app was dropping it.
+                            #
+                            # Referer is deliberately absent. It carries the
+                            # full referring URL including path and query, so
+                            # it would smuggle exactly the values
+                            # safeQueryParams exists to withhold, from any
+                            # service behind this shared gateway.
                             "capturedRequestHeaders": [
-                                "Referer",
                                 "User-Agent",
                                 "X-Request-Id",
                                 "traceparent",
                             ],
                             "capturedResponseHeaders": ["X-Request-Id"],
-                            # Every query parameter is redacted by default.
-                            # These three are the ones worth reading on a slow
-                            # search or catalog request, and none carries
-                            # anything user-identifying.
-                            "safeQueryParams": ["page", "q", "resource_type"],
+                            # Every query parameter is redacted by default,
+                            # which is the right default. These two are
+                            # bounded, low-cardinality values that make a slow
+                            # catalog request legible.
+                            #
+                            # `q` is NOT here: it is free-text search input, so
+                            # its contents are whatever a user typed --
+                            # potentially their own name or email. Pagination
+                            # and a resource type are not.
+                            "safeQueryParams": ["page", "resource_type"],
                             "otlp": {
                                 "enabled": True,
                                 "http": {
