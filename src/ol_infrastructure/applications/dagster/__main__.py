@@ -2247,10 +2247,13 @@ dagster_max_concurrent_runs = dagster_config.get_int("max_concurrent_runs") or 1
 # event_log_storage's pool_size/max_overflow, same reasoning as
 # max_concurrent_runs above: sized against the environment's PgBouncer
 # per-pod cap, so it has to be a stack config value rather than a literal in
-# dagster_instance.yaml. Production needed a large bump after 2026-08-18 (see
-# the rationale in dagster_instance.yaml); the 10+10 fallback here is the
-# pre-incident size, deliberately conservative for any stack -- QA included
-# -- that has not set its own value and has not demonstrated the same need.
+# dagster_instance.yaml. Production sets 100+50 and QA 30+15, each derived
+# against its own cap (see the rationale in dagster_instance.yaml).
+#
+# The 10+10 fallback here is the pre-incident size. Treat a stack sitting on it
+# as unsized, not as measured and fine: QA sat here for a day after Production
+# was fixed, on the assumption it had not shown the failure, while its daemon
+# logged QueuePool timeouts continuously the whole time.
 #
 # `or 10` would be wrong here: max_overflow=0 is a legitimate, deliberately
 # conservative stack choice (forbid burst connections entirely), and `0 or 10`

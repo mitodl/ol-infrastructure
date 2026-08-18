@@ -205,14 +205,22 @@ run_retries:
 # config, the same mechanism as run_coordinator's MAX_CONCURRENT_RUNS below --
 # not a literal, because the right ceiling depends on the environment's own
 # PgBouncer budget. Production sets 100+50, a 150-connection ceiling for this
-# storage alone; the fallback in __main__.py is the original 10+10 for any
-# stack, QA included, that has not set its own value and has not shown the
-# same need. Giving every stack Production's number by default is exactly
-# what put QA's pool at risk here: QA's per-pod cap is 382 against
-# Production's 708, and QA has already deadlocked its whole pool once from
-# run-worker connections alone (see the 2026-08-17 incident notes in
-# __main__.py) -- it cannot absorb a 150-connection ceiling on top of that
-# without its own sizing pass.
+# storage alone; QA sets 30+15 for a 45-connection one; the fallback in
+# __main__.py is the original 10+10 for any stack that has set neither.
+#
+# QA's own number is the cautionary tale for how these get chosen. It was left
+# on the fallback when Production was sized, on the stated grounds that it had
+# not shown this failure -- and it had, continuously, at 100-250 timeout lines
+# per 10 minutes, unnoticed for as long as nothing was watching for them.
+# Assume a stack on the fallback is unsized rather than measured-and-fine, and
+# check DagsterDatabaseConnectionFailures before concluding otherwise.
+#
+# What was right about that decision is that QA did not simply inherit
+# Production's number: QA's per-pod cap is 382 against Production's 708, and
+# QA has already deadlocked its whole pool once from run-worker connections
+# alone (see the 2026-08-17 incident notes in __main__.py), so it cannot absorb
+# a 150-connection ceiling on top of that. Its 45 is derived against its own
+# cap by the same arithmetic used for Production below.
 #
 # Production's number, checked against __main__.py's per-pod PgBouncer math
 # (not just the aggregate budget, for the reason in the top-of-file comment):
