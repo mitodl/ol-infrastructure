@@ -76,14 +76,28 @@ ol_infrastructure_image = AnonymousResource(
 )
 
 # Refresh the crawl cache (reads live GitHub, writes nothing to the checkout),
-# then diff it against the committed fleet data. `drift` exits 1 when it finds
-# anything, which would otherwise abort the script under `set -e` -- `|| true`
-# on that one line is deliberate, not a mistake: a non-empty report is the
-# expected, useful output of this job, not a failure of it.
+# then run `drift`. Its own contract is `return 1 if total else 0` (findings
+# present vs. clean) -- but an unhandled Python exception also exits 1 and
+# would be indistinguishable from a real "N differences found" result by exit
+# code alone. `drift()` only ever calls plain `print()` (stdout), never
+# `file=sys.stderr`, so a non-empty stderr reliably means something broke
+# rather than that it found something -- checked explicitly below so an
+# execution failure aborts the job instead of silently committing a partial
+# or empty report as if it were a clean/successful run.
 DRIFT_REPORT_COMMAND = (
     f"mkdir -p ol-infrastructure/{REPORT_PATH.rsplit('/', 1)[0]}\n"
     "python ol-infrastructure/bin/github-org-inventory report --refresh"
     " --cache /tmp/github-drift-cache.json > /dev/null\n"
+    "if ! python ol-infrastructure/bin/github-estate-audit drift"
+    " --cache /tmp/github-drift-cache.json"
+    " > /tmp/drift-stdout.txt 2> /tmp/drift-stderr.txt; then\n"
+    "  if [ -s /tmp/drift-stderr.txt ]; then\n"
+    "    echo 'github-estate-audit drift failed unexpectedly -- aborting"
+    " before writing or pushing a report:' >&2\n"
+    "    cat /tmp/drift-stderr.txt >&2\n"
+    "    exit 1\n"
+    "  fi\n"
+    "fi\n"
     "{\n"
     '  echo "# GitHub estate drift report"\n'
     "  echo\n"
@@ -97,21 +111,47 @@ DRIFT_REPORT_COMMAND = (
     ' phase-5 remediation."\n'
     "  echo\n"
     "  echo '```'\n"
-    "  python ol-infrastructure/bin/github-estate-audit drift"
-    " --cache /tmp/github-drift-cache.json || true\n"
+    "  cat /tmp/drift-stdout.txt\n"
     "  echo '```'\n"
     f"}} > ol-infrastructure/{REPORT_PATH}\n"
 )
 
+# `open-drift-pr` decides whether to push by comparing the FULL working tree
+# against the remote branch's tree (see its own `_remote_tree`), which is the
+# right comparison for iam_drift (the only file its analyzer ever touches
+# moves in step with real drift). It's the wrong one here: this checkout is
+# always freshly cloned from `main`'s current tip, so the full tree changes
+# every night regardless of whether the report content changed, purely
+# because `main` itself moved -- defeating the "skip when unchanged"
+# optimization `open-drift-pr` exists to provide, and pushing/updating the PR
+# every night even when nothing in the report is new. Compare just the report
+# file's content against what's already on the remote branch ourselves, and
+# only invoke `open-drift-pr` when that comparison shows a real change (or
+# the branch doesn't exist yet, i.e. the first run).
 OPEN_PR_COMMAND = (
-    "echo 'Nightly GitHub estate drift report. See the file diff for what"
+    "cd ol-infrastructure\n"
+    'git config --global --add safe.directory "$(pwd)"\n'
+    'REMOTE_REPORT=""\n'
+    f"if git ls-remote --exit-code origin refs/heads/{DRIFT_BRANCH}"
+    " > /dev/null 2>&1; then\n"
+    f"  git fetch --quiet origin refs/heads/{DRIFT_BRANCH}\n"
+    f'  REMOTE_REPORT="$(git show "FETCH_HEAD:{REPORT_PATH}" 2>/dev/null'
+    ' || true)"\n'
+    "fi\n"
+    f'if [ "$REMOTE_REPORT" = "$(cat {REPORT_PATH})" ]; then\n'
+    '  echo "Report unchanged since the last run on'
+    f' {DRIFT_BRANCH}; not pushing."\n'
+    "else\n"
+    "  cd ..\n"
+    "  echo 'Nightly GitHub estate drift report. See the file diff for what"
     " changed; findings are not applied automatically.' > /tmp/pr_body.md\n"
-    "python ol-infrastructure/bin/open-drift-pr"
+    "  python ol-infrastructure/bin/open-drift-pr"
     " --repo-dir ol-infrastructure"
     f" --repo {GITHUB_REPOSITORY}"
     f" --branch {DRIFT_BRANCH}"
     " --title 'chore(github): nightly estate drift report'"
     " --body-file /tmp/pr_body.md\n"
+    "fi\n"
 )
 
 
