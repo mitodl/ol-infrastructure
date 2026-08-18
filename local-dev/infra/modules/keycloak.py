@@ -145,7 +145,14 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     for alias, default in [
         ("CONFIGURE_TOTP", False),
         ("VERIFY_EMAIL", verify_email),
-        # UPDATE_EMAIL was removed in Keycloak 26 — omit to avoid validation error.
+        # UPDATE_EMAIL is gated behind Keycloak's `update-email` preview feature,
+        # which the mitodl/keycloak image bakes in at build time (see
+        # Dockerfile.hosted in ol-keycloak). Declaring it here keeps the action
+        # enabled for MIT Learn's application-initiated update-email flow -- an
+        # AIA request for an action the realm has disabled comes back as
+        # kc_action_status=error. If the provider rejects this alias as unknown,
+        # the image lost the feature flag rather than the action being obsolete.
+        ("UPDATE_EMAIL", False),
         ("UPDATE_PASSWORD", False),
     ]:
         keycloak.RequiredAction(
