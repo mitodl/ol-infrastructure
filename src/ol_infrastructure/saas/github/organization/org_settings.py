@@ -50,21 +50,23 @@ ORGANIZATION_SETTINGS = github.OrganizationSettings(
     secret_scanning_enabled_for_new_repositories=True,
     secret_scanning_push_protection_enabled_for_new_repositories=True,
     # --- What members may create ----------------------------------------------------
-    # SEC-10: any of 39 members can create a public repo, AND flip an existing private
-    # repo public with no review step. The decision to close the second half is made
-    # (2026-08-14: restrict visibility changes, leave creation alone -- see below), but
-    # the SETTING ITSELF IS STILL LIVE AND UNCHANGED. There is no Pulumi resource for
-    # it here or anywhere else: `members_can_change_repo_visibility` does not exist in
-    # `pulumi_github.OrganizationSettings`'s 6.14.1 argument list at all -- verified
-    # against the installed provider's own generated bindings, not docs. The GitHub
-    # REST API has this field (`PATCH /orgs/{org}`); the Terraform/Pulumi provider
-    # never wired it up. Same shape as the `Membership` exclusion in plan §4.7: not
-    # modelling a setting is not the same as having already applied the decision.
-    # PENDING: an org owner must still toggle it off by hand in
-    # Settings -> Member privileges -> "Allow members to change repository
-    # visibilities for this organization". Tracked in tk-sec-10 until that happens;
-    # this comment records the decision, not its completion. Re-check for provider
-    # support on any pulumi_github version bump.
+    # SEC-10, RESOLVED 2026-08-18 -- left as-is, both halves.
+    #
+    # VISIBILITY CHANGE. The original finding described this as "any of 39 members can
+    # flip a private repo public," which overstated it: GitHub's own control panel text
+    # for `members_can_change_repo_visibility` scopes it to members who already hold
+    # **admin** on that specific repository, not the general membership. Since SEC-15
+    # (PR #5324) restricted `admin` fleet-wide to the two sanctioned teams
+    # (`odl-engineering-owners`, `devops`), the actual population who could flip a
+    # repo's visibility is that small, deliberately-trusted admin set, not 39 people.
+    # Accepted as-is on that corrected understanding -- no toggle needed. There is
+    # still no Pulumi resource for this field regardless: `members_can_change_repo_
+    # visibility` does not exist in `pulumi_github.OrganizationSettings`'s 6.14.1
+    # argument list -- verified against the installed provider's own generated
+    # bindings, not docs. The GitHub REST API has the field (`PATCH /orgs/{org}`); the
+    # Terraform/Pulumi provider never wired it up. Re-check for provider support on any
+    # pulumi_github version bump, in case this ever needs to become an enforced value
+    # rather than a manually-verified one.
     #
     # `members_can_create_public_repositories` stays true on purpose (decision
     # 2026-08-14): restricting repo/public-repo *creation* is the bigger workflow
