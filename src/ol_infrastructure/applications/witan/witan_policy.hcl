@@ -58,6 +58,15 @@ path "secret-operations/witan/github-app" {
   capabilities = ["read"]
 }
 
+# Sentry DSN for this workload, owned by the ol-infrastructure-sentry stack
+# and written here by this stack (witan_sentry_vault_secret in __main__.py) —
+# the sentry stack only exports the DSN as a stack output, it never writes
+# Vault itself. Synced into the witan-sentry-secrets k8s Secret and read as
+# SENTRY_DSN by the Deployment (deployment.py).
+path "secret-operations/witan/sentry" {
+  capabilities = ["read"]
+}
+
 path "sys/leases/renew" {
   capabilities = ["update"]
 }
