@@ -170,10 +170,12 @@ Consequences:
 - `mit_learn`'s explicit `workers_max_rss=1080` needs re-derivation at `workers=1`
   (3200Mi × 0.9 ≈ 2880MiB) or removal in favor of the default. Its inline comment about
   `floor(limit/workers*0.9)` becomes stale either way.
-- The `webapp_vpa_max_allowed_memory` docstring caveat ("`--workers-max-rss` … will NOT
+- ~~The `webapp_vpa_max_allowed_memory` docstring caveat ("`--workers-max-rss` … will NOT
   track this ceiling — set `GranianConfig.workers_max_rss` explicitly to keep the two in
   sync") is **inverted**: pinning to the ceiling is now the documented anti-pattern. The
-  docstring must say so and point at the follow-on cgroup task.
+  docstring must say so and point at the follow-on cgroup task.~~ **Done.** The docstring
+  states the anti-pattern *and* the admission-controller carve-out retracted above, so the
+  next reader does not apply the rule to a pod that never runs at its manifest limit.
 
 ### 5. Health probes — deferred, not dropped
 
