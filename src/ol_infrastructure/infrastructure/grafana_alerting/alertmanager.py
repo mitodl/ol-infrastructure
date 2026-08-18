@@ -5,10 +5,16 @@ Translates grafana-alerts/alertmanager.yaml into Pulumi-managed resources.
 Routing logic (mirrors the original alertmanager.yaml route tree):
   1. Alerts labelled channel=notifications-ocw-misc go to dedicated Slack
      channels by severity; anything else with that channel label is silenced.
-  2. Alerts whose name matches Kube.* are silenced (built-in k8s noise).
-  3. All remaining warning-severity alerts → Rootly.
-  4. All remaining critical-severity alerts → Rootly.
-  5. Everything else → oblivion (default receiver, acts as a drop sink).
+  2. Alerts labelled channel=devops-warnings go to a separate pair of Slack
+     channels by severity, same pattern as (1) -- for alerts that aren't any
+     one team's concern (e.g. cluster-wide capacity signals).
+  3. Alerts whose name matches Kube.* are silenced (built-in k8s noise).
+  4. Pod(OOMKilled|CrashLooping)(Warning|Critical) → Rootly, but grouped at
+     the namespace level (not pod/container) with a longer group_interval,
+     to stop a churning workload from minting one alert per pod name.
+  5. All remaining warning-severity alerts → Rootly.
+  6. All remaining critical-severity alerts → Rootly.
+  7. Everything else → oblivion (default receiver, acts as a drop sink).
 """
 
 from typing import Any
@@ -81,6 +87,50 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
             alerting.ContactPointSlackArgs(
                 url=grafana_secrets["slack_notifications_ocw_misc_api_url"],
                 recipient="#notifications-ocw-misc",
+                color="danger",
+                title=':alert: [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{- end }}] - {{ .CommonLabels.alertname }}',
+                text="{{ range .Alerts }}\n  {{- if .Annotations.message }}\n      {{ .Annotations.message }}\n  {{- end }}\n  {{- if .Annotations.description }}\n      {{ .Annotations.description }}\n  {{- end }}\n{{- end }}",
+                disable_resolve_message=False,
+            )
+        ],
+        opts=resource_opts,
+    )
+
+    # devops-warnings Slack — non-paging visibility for cluster-wide capacity
+    # signals that aren't any one team's concern (e.g. HPAAtMaxReplicas*,
+    # which fires for every CI/QA/production workload). Reuses the OCW misc
+    # webhook/token above rather than a new secret -- ContactPointSlackArgs'
+    # `recipient` picks the channel independently of `url`, and this Slack
+    # app is already invited to #devops-warnings (it posts there today via
+    # Rootly's separate `CI/QA Slack Notifications` escalation policy).
+    # Deliberately a distinct pair of contact points, not a shared one with
+    # ocw-misc: routing here is decided per-rule by the `channel` label
+    # (see the policy branch below), and giving each destination its own
+    # contact point keeps that mapping obvious from resource names alone.
+    alerting.ContactPoint(
+        "slack-devops-warnings-warning",
+        name="slack-devops-warnings-warning",
+        slacks=[
+            alerting.ContactPointSlackArgs(
+                url=grafana_secrets["slack_notifications_ocw_misc_api_url"],
+                recipient="#devops-warnings",
+                color="warning",
+                icon_emoji=":goose_warning:",
+                title=':goose_warning: [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{- end }}] - {{ .CommonLabels.alertname }}',
+                text="{{ range .Alerts }}\n  {{- if .Annotations.message }}\n      Message - {{ .Annotations.message }}\n  {{- end }}\n  {{- if .Annotations.description }}\n      Description - {{ .Annotations.description }}\n  {{- end }}\n  {{- if .Annotations.summary }}\n      Summary - {{ .Annotations.summary }}\n  {{- end }}\n{{- end }}",
+                disable_resolve_message=False,
+            )
+        ],
+        opts=resource_opts,
+    )
+
+    alerting.ContactPoint(
+        "slack-devops-warnings-critical",
+        name="slack-devops-warnings-critical",
+        slacks=[
+            alerting.ContactPointSlackArgs(
+                url=grafana_secrets["slack_notifications_ocw_misc_api_url"],
+                recipient="#devops-warnings",
                 color="danger",
                 title=':alert: [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{- end }}] - {{ .CommonLabels.alertname }}',
                 text="{{ range .Alerts }}\n  {{- if .Annotations.message }}\n      {{ .Annotations.message }}\n  {{- end }}\n  {{- if .Annotations.description }}\n      {{ .Annotations.description }}\n  {{- end }}\n{{- end }}",
@@ -195,6 +245,47 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
                     ),
                 ],
             ),
+            # devops-warnings: same pattern as OCW misc above, for alerts that
+            # aren't any one team's concern (e.g. HPAAtMaxReplicas* in
+            # metric_rules/eks_general.py, which fires for every workload
+            # cluster-wide). Kept as its own top-level branch rather than
+            # folded into the OCW misc one above, so the `channel` label
+            # value always names its actual destination.
+            alerting.NotificationPolicyPolicyArgs(
+                matchers=[
+                    alerting.NotificationPolicyPolicyMatcherArgs(
+                        label="channel",
+                        match="=",
+                        value="devops-warnings",
+                    )
+                ],
+                contact_point="oblivion",
+                continue_=False,
+                policies=[
+                    alerting.NotificationPolicyPolicyPolicyArgs(
+                        matchers=[
+                            alerting.NotificationPolicyPolicyPolicyMatcherArgs(
+                                label="severity",
+                                match="=",
+                                value="warning",
+                            )
+                        ],
+                        contact_point="slack-devops-warnings-warning",
+                        continue_=False,
+                    ),
+                    alerting.NotificationPolicyPolicyPolicyArgs(
+                        matchers=[
+                            alerting.NotificationPolicyPolicyPolicyMatcherArgs(
+                                label="severity",
+                                match="=",
+                                value="critical",
+                            )
+                        ],
+                        contact_point="slack-devops-warnings-critical",
+                        continue_=False,
+                    ),
+                ],
+            ),
             # Silence built-in Kubernetes alerts — too noisy, not actionable.
             alerting.NotificationPolicyPolicyArgs(
                 matchers=[
@@ -206,6 +297,45 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
                 ],
                 contact_point="oblivion",
                 continue_=False,
+            ),
+            # Pod OOM/crash-loop storms: override the root grouping instead of
+            # reverting it. The root group_bies above deliberately includes
+            # `pod`/`container` so unrelated resources get their own
+            # notification thread, but for these two rule families that same
+            # granularity is the storm mechanism -- a churning workload mints
+            # a new pod name per restart, and the root grouping then mints a
+            # new Rootly alert per name (296 PodOOMKilledCritical firings in
+            # 30 days from what was, in practice, one workload). Grouping at
+            # the namespace level here reports the workload once. Sits above
+            # the severity routes so it applies before either one, and still
+            # ends at the same `rootly` contact point.
+            #
+            # Grouping on `deployment` collapses to namespace level as
+            # written -- these rules aggregate by (cluster, namespace, pod,
+            # container) and emit no `deployment` label. Accepted rather than
+            # adding a kube_pod_owner/kube_replicaset_owner join: the
+            # storm this fixes was one deployment in one namespace, so
+            # namespace-level grouping already reports it as intended. See
+            # docs/plans/grafana-alerting-remediation-spec.md §3b.
+            alerting.NotificationPolicyPolicyArgs(
+                matchers=[
+                    alerting.NotificationPolicyPolicyMatcherArgs(
+                        label="alertname",
+                        match="=~",
+                        value="Pod(OOMKilled|CrashLooping)(Warning|Critical)",
+                    )
+                ],
+                contact_point="rootly",
+                continue_=False,
+                group_bies=[
+                    "alertname",
+                    "grafana_folder",
+                    "cluster",
+                    "namespace",
+                    "deployment",
+                ],
+                group_interval="30m",
+                repeat_interval="12h",
             ),
             # All warning-severity alerts → Rootly.
             alerting.NotificationPolicyPolicyArgs(

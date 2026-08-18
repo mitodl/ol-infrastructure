@@ -5,6 +5,21 @@ Source: grafana-alerts/cortex-rules/eks_general.yaml
 Warning rules filter cluster=~".*-(ci|qa)"    — fire on CI and QA stacks.
 Critical rules filter cluster=~".*-(production)" — fire on prod stack only.
 Rules with no matching data on a given stack stay silent (no_data_state=OK).
+
+exec_err_state (query-evaluation failure, distinct from no_data_state) was
+never set here before 2026-08, so it silently defaulted to Grafana's
+"Alerting" -- meaning a transient datasource blip (confirmed: a 2026-07-09
+provisioning race on the CI stack) escalated into a real, severity-labelled,
+Rootly-routed page for every single rule that failed to evaluate. Warning
+rules get exec_err_state="OK" -- same reasoning as no_data_state=OK, since a
+warning-tier rule going silent during an error is an acceptable trade.
+Critical rules get exec_err_state="KeepLast" instead of "OK": going silent on
+a production-critical rule during an error is not acceptable (it could mask
+a genuine ongoing incident), but flipping to Alerting on every transient blip
+isn't either, so the rule holds its last known state through the error.
+Neither choice makes a datasource-wide outage visible on its own; that needs
+a dedicated canary rule, tracked separately (not yet added -- see
+tk-exec-err-state-is-never-set-every-grafana-rule-p-3aa620).
 """
 
 from collections.abc import Callable
@@ -33,6 +48,7 @@ def create(
                 condition="C",
                 for_="10m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "description": "There is a mismatch between the requested number of instances for daemonset {{ $labels.daemonset }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}. This may mean there is a node stuck leaving or joining the cluster or another issue preventing the daemonset from being correctly scheduled."
@@ -46,6 +62,7 @@ def create(
                 condition="C",
                 for_="10m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": "There is a mismatch between the requested number of instances for daemonset {{ $labels.daemonset }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}. This may mean there is a node stuck leaving or joining the cluster or another issue preventing the daemonset from being correctly scheduled."
@@ -61,6 +78,7 @@ def create(
                 condition="C",
                 for_="10m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "description": "There is a mismatch between the requested number of instances for deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}."
@@ -74,6 +92,7 @@ def create(
                 condition="C",
                 for_="10m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": "There is a mismatch between the requested number of instances for deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}."
@@ -119,6 +138,7 @@ def create(
                 condition="C",
                 for_="10m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "description": "A deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} is not available for an extended period of time."
@@ -134,6 +154,7 @@ def create(
                 condition="C",
                 for_="10m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": "A deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} is not available for an extended period of time."
@@ -165,6 +186,7 @@ def create(
                 condition="C",
                 for_="20m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "description": "There is a mismatch between the requested number of instances for statefulset {{ $labels.statefulset }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}."
@@ -178,6 +200,7 @@ def create(
                 condition="C",
                 for_="20m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": "There is a mismatch between the requested number of instances for statefulset {{ $labels.statefulset }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}."
@@ -193,6 +216,7 @@ def create(
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "description": "Node {{ $labels.node }} in cluster {{ $labels.cluster }} has been in a not-ready state for more than 5 minutes."
@@ -206,6 +230,7 @@ def create(
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": "Node {{ $labels.node }} in cluster {{ $labels.cluster }} has been in a not-ready state for more than 5 minutes."
@@ -216,11 +241,24 @@ def create(
             ),
             # --- Pod crash looping ---
             # Fires when a container is in CrashLoopBackOff state.
+            #
+            # keep_firing_for + missing_series_evals_to_resolve attack the
+            # storm mechanism directly: a churning pod's series vanishes the
+            # moment Kubernetes replaces it (new pod name), which reads as
+            # the alert resolving -- and then the replacement pod mints a
+            # brand new alert instance under its own name the moment it
+            # starts crash-looping too. keep_firing_for holds the alert open
+            # across that gap; missing_series_evals_to_resolve stops a
+            # vanished series from resolving-and-refiring in the first
+            # place. See docs/plans/grafana-alerting-remediation-spec.md §3a.
             alerting.RuleGroupRuleArgs(
                 name="PodCrashLoopingWarning",
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
+                exec_err_state="OK",
+                keep_firing_for="30m",
+                missing_series_evals_to_resolve=10,
                 labels={"severity": "warning"},
                 annotations={
                     "description": "Container {{ $labels.container }} in pod {{ $labels.pod }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} is in CrashLoopBackOff."
@@ -234,6 +272,9 @@ def create(
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
+                keep_firing_for="30m",
+                missing_series_evals_to_resolve=10,
                 labels={"severity": "critical"},
                 annotations={
                     "description": "Container {{ $labels.container }} in pod {{ $labels.pod }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} is in CrashLoopBackOff."
@@ -251,6 +292,7 @@ def create(
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "summary": "Celery Beat pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has restarted {{ $value }} times in the last hour",
@@ -266,6 +308,7 @@ def create(
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "summary": "Celery Beat pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has restarted {{ $value }} times in the last hour",
@@ -313,11 +356,16 @@ def create(
             # case; ">= 3" reliably means "at least 3 real restarts" either
             # way, since extrapolation can't push 2 real restarts' value
             # anywhere near 3.
+            # keep_firing_for + missing_series_evals_to_resolve: same
+            # replaced-pod storm mechanism as PodCrashLooping above.
             alerting.RuleGroupRuleArgs(
                 name="PodOOMKilledWarning",
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
+                exec_err_state="OK",
+                keep_firing_for="30m",
+                missing_series_evals_to_resolve=10,
                 labels={"severity": "warning"},
                 annotations={
                     "description": "Container {{ $labels.container }} in pod {{ $labels.pod }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been OOMKilled and is actively restarting. Memory limits may need to be increased."
@@ -335,6 +383,9 @@ def create(
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
+                keep_firing_for="30m",
+                missing_series_evals_to_resolve=10,
                 labels={"severity": "critical"},
                 annotations={
                     "description": "Container {{ $labels.container }} in pod {{ $labels.pod }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been OOMKilled and is repeatedly restarting (3+ restarts within the past hour). Memory limits may need to be increased."
@@ -389,6 +440,7 @@ def create(
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "description": "Job {{ $labels.job_name }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has failed."
@@ -402,6 +454,7 @@ def create(
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": "Job {{ $labels.job_name }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has failed."
@@ -420,12 +473,28 @@ def create(
             # carries no signal about the workload actually being saturated.
             # Observed in production 2026-07: xqwatcher's HPAs (min=max=1)
             # fired this rule continuously, unrelated to any real incident.
+            #
+            # At-max is a capacity fact, not an incident -- one resize
+            # decision, not a page. `channel: devops-warnings` routes it to a
+            # dedicated Slack channel and terminates there (alertmanager.py's
+            # top policy branch, continue_=False), so it never reaches Rootly
+            # at all -- deliberately not a `severity` tier change, since that
+            # would route it through Rootly's urgency/escalation machinery
+            # instead of bypassing it. See
+            # docs/plans/grafana-alerting-remediation-spec.md §3c.
+            #
+            # Not `channel: notifications-ocw-misc`: this rule covers every
+            # HPA cluster-wide, not just OCW's, so that channel would be the
+            # wrong audience for most of what it fires on (flagged in review
+            # on #5503). `devops-warnings` is its own contact-point pair in
+            # alertmanager.py, reusing the same Slack webhook/token.
             alerting.RuleGroupRuleArgs(
                 name="HPAAtMaxReplicasWarning",
                 condition="C",
                 for_="15m",
                 no_data_state="OK",
-                labels={"severity": "warning"},
+                exec_err_state="OK",
+                labels={"severity": "warning", "channel": "devops-warnings"},
                 annotations={
                     "description": "HPA {{ $labels.horizontalpodautoscaler }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been at its maximum replica count for 15 minutes. The workload may be unable to scale further under load."
                 },
@@ -445,7 +514,8 @@ def create(
                 condition="C",
                 for_="15m",
                 no_data_state="OK",
-                labels={"severity": "critical"},
+                exec_err_state="KeepLast",
+                labels={"severity": "critical", "channel": "devops-warnings"},
                 annotations={
                     "description": "HPA {{ $labels.horizontalpodautoscaler }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has been at its maximum replica count for 15 minutes. The workload may be unable to scale further under load."
                 },
@@ -509,6 +579,7 @@ def create(
                 condition="C",
                 for_="15m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "description": "CronJob {{ $labels.cronjob }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has not succeeded in over 6 hours."
@@ -524,6 +595,7 @@ def create(
                 condition="C",
                 for_="15m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": "CronJob {{ $labels.cronjob }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has not succeeded in over 6 hours."
@@ -539,6 +611,7 @@ def create(
                 condition="C",
                 for_="15m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "description": "CronJob {{ $labels.cronjob }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has not succeeded in over 15 days."
@@ -554,6 +627,7 @@ def create(
                 condition="C",
                 for_="15m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": "CronJob {{ $labels.cronjob }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has not succeeded in over 15 days."
