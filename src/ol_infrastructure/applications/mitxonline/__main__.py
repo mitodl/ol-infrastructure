@@ -536,12 +536,13 @@ secret_names, secret_resources = create_mitxonline_k8s_secrets(
 )
 
 # Webapp memory is owned by the VPA (see the VPA block at the end of this file), not
-# the HPA. `mitxonline_web_memory_limit` is what the Deployment template declares, but
-# the VPA's admission controller rewrites requests and limits as each pod is admitted,
-# so no pod ever actually runs with this value -- measured over 14d in production,
-# kube_pod_container_resource_limits for mitxonline-app ranged 1953MiB-3072MiB and
-# never once reported 1200Mi. Treat it as the floor the VPA sizes up from, not as a
-# limit anything enforces.
+# the HPA. `mitxonline_web_memory_limit` is what the Deployment template declares; the
+# VPA's admission controller rewrites requests and limits as each pod is admitted, so
+# most pods do not run with this value -- but some do. Measured in production,
+# kube_pod_container_resource_limits for mitxonline-app ranged 1200MiB-3072MiB over 30d,
+# sitting at exactly 1200Mi for ~30 hours. It is the VPA's minAllowed floor (defaulted
+# from resource_requests), and a pod admitted while the recommendation is low really is
+# admitted there.
 mitxonline_web_memory_limit = "1200Mi"
 mitxonline_web_memory_ceiling = "3Gi"
 
@@ -553,14 +554,24 @@ mitxonline_web_memory_ceiling = "3Gi"
 # workers would recycle at ~540MiB forever without ever using the headroom the VPA
 # granted.
 #
-# DO NOT "fix" this by dropping to the component default. The docstring on
-# OLApplicationK8sConfig.webapp_vpa_max_allowed_memory calls ceiling-pinning an
-# anti-pattern, and for a pod that boots at its declared floor it is one. This app is
-# the documented carve-out: the admission controller means ceiling and current declared
-# limit are the same number from the pod's first instant, so there is no window where
-# the cap sits above the real cgroup limit. The default would derive 1080MiB against a
-# p95 working set of ~2645MiB and respawn the single worker continuously under normal
-# traffic. See tk-stage-3-blocker-mitxonline-s-vpa-never-runs-at-t-cc6acf.
+# KNOWN GAP, deliberately left as-is -- this is not a safe cap, it is the least-bad one.
+# Both available synth-time answers are wrong for some pod:
+#   - Ceiling-derived (what this does): 2816MiB aggregate. Above the real cgroup limit
+#     for any pod admitted below that, which production shows happens routinely on
+#     scale-up -- the admitted limit was under 2816MiB for roughly 13 of the last 30
+#     days' samples. For those pods the RSS cap never fires and the kernel OOM killer
+#     gets there first, i.e. the safety net is off exactly when new pods arrive.
+#   - Floor-derived (the component default): 1080MiB. Below the p95 working set of
+#     ~2645MiB, so it would respawn the worker continuously under normal traffic.
+# Ceiling-derived is kept because it is correct for the steady-state majority and merely
+# absent for the rest, whereas floor-derived is actively harmful for all of them. Do not
+# read the choice as an endorsement, and do not "simplify" it to the component default.
+#
+# There is no synth-time value that closes this. The two real fixes are reading the
+# cgroup at runtime (tk-evaluate-runtime-cgroup-derived-workers-max-rss--1cd258) or
+# raising the VPA's minAllowed toward the ceiling so every admitted pod starts near it,
+# at the cost of a guaranteed per-pod reservation.
+# See tk-stage-3-blocker-mitxonline-s-vpa-never-runs-at-t-cc6acf.
 #
 # The MiB value is parsed from `mitxonline_web_memory_ceiling` rather than restated as
 # a literal, so the ceiling has exactly one source of truth and changing its value or
