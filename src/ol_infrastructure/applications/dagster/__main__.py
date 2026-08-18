@@ -2102,8 +2102,18 @@ dagster_max_concurrent_runs = dagster_config.get_int("max_concurrent_runs") or 1
 # the rationale in dagster_instance.yaml); the 10+10 fallback here is the
 # pre-incident size, deliberately conservative for any stack -- QA included
 # -- that has not set its own value and has not demonstrated the same need.
-dagster_event_log_pool_size = dagster_config.get_int("event_log_pool_size") or 10
-dagster_event_log_max_overflow = dagster_config.get_int("event_log_max_overflow") or 10
+#
+# `or 10` would be wrong here: max_overflow=0 is a legitimate, deliberately
+# conservative stack choice (forbid burst connections entirely), and `0 or 10`
+# would silently discard it. get_int() returns None when the key is unset, so
+# check for that explicitly instead.
+dagster_event_log_pool_size = dagster_config.get_int("event_log_pool_size")
+if dagster_event_log_pool_size is None:
+    dagster_event_log_pool_size = 10
+
+dagster_event_log_max_overflow = dagster_config.get_int("event_log_max_overflow")
+if dagster_event_log_max_overflow is None:
+    dagster_event_log_max_overflow = 10
 
 # Custom Dagster instance ConfigMap with dynamic credentials support
 # Note: We create this before the Helm release so it gets proper ownership
