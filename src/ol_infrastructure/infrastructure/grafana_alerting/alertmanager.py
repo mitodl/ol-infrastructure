@@ -6,9 +6,12 @@ Routing logic (mirrors the original alertmanager.yaml route tree):
   1. Alerts labelled channel=notifications-ocw-misc go to dedicated Slack
      channels by severity; anything else with that channel label is silenced.
   2. Alerts whose name matches Kube.* are silenced (built-in k8s noise).
-  3. All remaining warning-severity alerts → Rootly.
-  4. All remaining critical-severity alerts → Rootly.
-  5. Everything else → oblivion (default receiver, acts as a drop sink).
+  3. Pod(OOMKilled|CrashLooping)(Warning|Critical) → Rootly, but grouped at
+     the namespace level (not pod/container) with a longer group_interval,
+     to stop a churning workload from minting one alert per pod name.
+  4. All remaining warning-severity alerts → Rootly.
+  5. All remaining critical-severity alerts → Rootly.
+  6. Everything else → oblivion (default receiver, acts as a drop sink).
 """
 
 from typing import Any
@@ -206,6 +209,45 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
                 ],
                 contact_point="oblivion",
                 continue_=False,
+            ),
+            # Pod OOM/crash-loop storms: override the root grouping instead of
+            # reverting it. The root group_bies above deliberately includes
+            # `pod`/`container` so unrelated resources get their own
+            # notification thread, but for these two rule families that same
+            # granularity is the storm mechanism -- a churning workload mints
+            # a new pod name per restart, and the root grouping then mints a
+            # new Rootly alert per name (296 PodOOMKilledCritical firings in
+            # 30 days from what was, in practice, one workload). Grouping at
+            # the namespace level here reports the workload once. Sits above
+            # the severity routes so it applies before either one, and still
+            # ends at the same `rootly` contact point.
+            #
+            # Grouping on `deployment` collapses to namespace level as
+            # written -- these rules aggregate by (cluster, namespace, pod,
+            # container) and emit no `deployment` label. Accepted rather than
+            # adding a kube_pod_owner/kube_replicaset_owner join: the
+            # storm this fixes was one deployment in one namespace, so
+            # namespace-level grouping already reports it as intended. See
+            # docs/plans/grafana-alerting-remediation-spec.md §3b.
+            alerting.NotificationPolicyPolicyArgs(
+                matchers=[
+                    alerting.NotificationPolicyPolicyMatcherArgs(
+                        label="alertname",
+                        match="=~",
+                        value="Pod(OOMKilled|CrashLooping)(Warning|Critical)",
+                    )
+                ],
+                contact_point="rootly",
+                continue_=False,
+                group_bies=[
+                    "alertname",
+                    "grafana_folder",
+                    "cluster",
+                    "namespace",
+                    "deployment",
+                ],
+                group_interval="30m",
+                repeat_interval="12h",
             ),
             # All warning-severity alerts → Rootly.
             alerting.NotificationPolicyPolicyArgs(

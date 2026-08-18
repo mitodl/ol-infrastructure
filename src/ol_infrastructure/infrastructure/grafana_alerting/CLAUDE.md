@@ -389,11 +389,18 @@ The notification policy in `alertmanager.py` mirrors the original
 `grafana-alerts/alertmanager.yaml` route tree:
 
 1. `channel=notifications-ocw-misc` → Slack by severity (warning/critical),
-   anything else with that label is silenced.
+   anything else with that label is silenced. `HPAAtMaxReplicas*` uses this
+   route deliberately (see `metric_rules/eks_general.py`) to stay off the
+   paging path entirely -- at-max is a capacity fact, not an incident.
 2. `alertname=~Kube.*` → silenced (built-in k8s noise, not actionable).
-3. `severity=warning` → Rootly.
-4. `severity=critical` → Rootly.
-5. Default (catch-all) → `oblivion` (empty contact point, acts as drop sink).
+3. `alertname=~Pod(OOMKilled|CrashLooping)(Warning|Critical)` → Rootly, but
+   grouped at the namespace level (root `group_bies` drops to `deployment`,
+   no `pod`/`container`) with `group_interval=30m`/`repeat_interval=12h`, so
+   a churning workload reports once instead of minting one alert per pod
+   name.
+4. `severity=warning` → Rootly.
+5. `severity=critical` → Rootly.
+6. Default (catch-all) → `oblivion` (empty contact point, acts as drop sink).
 
 OpsGenie is no longer active. All actionable alerts route to Rootly.
 
