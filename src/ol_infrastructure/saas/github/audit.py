@@ -204,6 +204,18 @@ RULES: tuple[Rule, ...] = (
         "high",
         "active",
         "secret scanning or push protection disabled",
+        # ACCEPTED RISK on the 10 active private repos (decision 2026-08-17, closing
+        # SEC-04/13): enabling secret scanning on a PRIVATE repo spends a paid "Secret
+        # Protection" seat (`maximum_advanced_security_committers`, capped at 6 on the
+        # org's Team plan; public-repo scanning is free and does not count against it).
+        # Buying more seats was the blocker (see tk-sec-04-13 in the workflow project);
+        # the org has decided not to purchase them, so `secret_scanning: disabled`
+        # stays the deliberate value on `hq`, `access-forge`, `alerting-omnibus`,
+        # `apisix-testbed`, `common-access`, `concourse-workflow`, `gwarek`,
+        # `oldevops-scratch`, `open-collaboration`, `product` -- see each repo's YAML.
+        # Left firing rather than exempted: unlike SEC-01's fork exemption, this IS a
+        # real, standing risk on those 10 repos, just a knowingly accepted one -- the
+        # audit should keep naming it rather than going quiet.
         lambda r: (
             (
                 f"scanning={r.get('secret_scanning')} "
