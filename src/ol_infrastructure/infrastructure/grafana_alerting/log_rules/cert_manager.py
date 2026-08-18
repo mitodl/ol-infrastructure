@@ -32,6 +32,7 @@ def create(
                 condition="C",
                 for_="20m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical", "environment": "production"},
                 annotations={
                     "description": "cert-manager in {{ $labels.cluster }} cannot reach the ACME issuer outside of the expected pod startup initialization window. All certificate renewals are blocked until resolved.",
@@ -51,6 +52,7 @@ def create(
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical", "environment": "production"},
                 annotations={
                     "description": "cert-manager in {{ $labels.cluster }} is failing to present ACME DNS-01 challenges. Certificate issuance will fail until resolved.",
@@ -80,6 +82,7 @@ def create(
                 condition="C",
                 for_="20m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning", "environment": "non-production"},
                 annotations={
                     "description": "cert-manager in {{ $labels.cluster }} cannot reach the ACME issuer outside of the expected pod startup initialization window. Certificate renewals are blocked in this environment.",
@@ -99,6 +102,7 @@ def create(
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning", "environment": "non-production"},
                 annotations={
                     "description": "cert-manager in {{ $labels.cluster }} is failing to present ACME DNS-01 challenges. Certificate issuance will fail until resolved.",

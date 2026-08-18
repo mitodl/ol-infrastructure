@@ -33,6 +33,7 @@ def create(
                 condition="C",
                 for_="1m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": "An invalid aws key has been detected in {{ $labels.application }} {{ $labels.environment }}.",
@@ -47,6 +48,7 @@ def create(
                 condition="C",
                 for_="1m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "description": "An invalid aws key has been detected in {{ $labels.application }} {{ $labels.environment }}.",
@@ -61,6 +63,7 @@ def create(
                 condition="C",
                 for_="1m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": "An invalid aws key has been detected in {{ $labels.application }} {{ $labels.environment }}.",
@@ -75,6 +78,7 @@ def create(
                 condition="C",
                 for_="1m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "description": "An invalid aws key has been detected in {{ $labels.application }} {{ $labels.environment }}.",
@@ -99,6 +103,7 @@ def create(
                 condition="C",
                 for_="1m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning", "channel": "notifications-ocw-misc"},
                 annotations={
                     "description": "A 3play transcript request has failed in NonProduction.",
@@ -113,6 +118,7 @@ def create(
                 condition="C",
                 for_="1m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning", "channel": "notifications-ocw-misc"},
                 annotations={
                     "description": "A 3play transcript request has failed in Production.",
@@ -127,6 +133,7 @@ def create(
                 condition="C",
                 for_="1m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "description": "An invalid username and password message was detected from content sync. This refers to the password used by OCW to talk to concourse.",
@@ -141,6 +148,7 @@ def create(
                 condition="C",
                 for_="1m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": "An invalid username and password message was detected from content sync. This refers to the password used by OCW to talk to concourse.",
@@ -165,6 +173,7 @@ def create(
                 condition="C",
                 for_="1m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": "Keycloak has responded with a 500 error which is likely caused by a customization or configuration change.",
@@ -178,6 +187,7 @@ def create(
                 condition="C",
                 for_="1m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "description": "Keycloak is unable to decrypt a SAML assertion likely caused by an internal or external configuration change.",
@@ -191,6 +201,7 @@ def create(
                 condition="C",
                 for_="1m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": "Keycloak experienced an error condition that is likely the result of a customization.",

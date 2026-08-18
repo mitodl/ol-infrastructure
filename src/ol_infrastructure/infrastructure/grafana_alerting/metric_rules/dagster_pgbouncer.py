@@ -125,6 +125,7 @@ def create(
                 condition="C",
                 for_="15m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "summary": "Dagster PgBouncer in cluster {{ $labels.cluster }} is holding {{ $value }} of its aggregate connection cap",
@@ -144,6 +145,7 @@ def create(
                 condition="C",
                 for_="15m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "summary": "Dagster PgBouncer in cluster {{ $labels.cluster }} is holding {{ $value }} of its aggregate connection cap",
@@ -178,6 +180,7 @@ def create(
                 condition="C",
                 for_="10m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "summary": "Dagster PgBouncer clients in cluster {{ $labels.cluster }} have been queued for {{ $value }}s waiting for a backend",
@@ -194,6 +197,7 @@ def create(
                 condition="C",
                 for_="10m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "summary": "Dagster PgBouncer clients in cluster {{ $labels.cluster }} have been queued for {{ $value }}s waiting for a backend",
@@ -221,6 +225,7 @@ def create(
                 condition="C",
                 for_="15m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "summary": "Dagster PgBouncer in cluster {{ $labels.cluster }} is serving {{ $value }} new client connections per second",
@@ -238,6 +243,7 @@ def create(
                 condition="C",
                 for_="15m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "summary": "Dagster PgBouncer in cluster {{ $labels.cluster }} is serving {{ $value }} new client connections per second",
@@ -274,6 +280,7 @@ def create(
                 condition="C",
                 for_="15m",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "summary": "The pgbouncer_exporter sidecar on {{ $labels.pod }} cannot reach PgBouncer's admin console",

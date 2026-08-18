@@ -31,6 +31,7 @@ def create(
                 condition="C",
                 for_="6h",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "description": 'CPU usage on {{ $labels.instance }} has been at {{ printf "%.2f" $value }} for at least 6 hours.'
@@ -58,6 +59,7 @@ def create(
                 condition="C",
                 for_="2h",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "description": 'Memory usage on {{ $labels.instance }} has been at {{ printf "%.2f" $value }} for at least 2 hours.'
@@ -81,6 +83,7 @@ def create(
                 condition="C",
                 for_="1h",
                 no_data_state="OK",
+                exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
                     "description": 'Filesystem on {{ $labels.device }} at {{ $labels.instance }} is {{ printf "%.2f" $value }}% full.'
@@ -94,6 +97,7 @@ def create(
                 condition="C",
                 for_="10m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": 'Filesystem on {{ $labels.device }} at {{ $labels.instance }} is {{ printf "%.2f" $value }}% full.'

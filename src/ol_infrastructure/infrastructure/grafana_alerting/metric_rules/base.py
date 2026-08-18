@@ -32,6 +32,18 @@ tenant, which only has metrics from the matching environment's clusters. When
 the selector returns no data (e.g. the production filter on the CI stack),
 no_data_state="OK" keeps the rule silent instead of surfacing a NoData alert.
 
+exec_err_state
+---------------
+Distinct from no_data_state: this fires on a query-evaluation *failure* (e.g.
+a transient datasource blip), not on an empty result set. Left unset, it
+silently defaults to Grafana's "Alerting" -- a datasource hiccup then pages
+like a real incident on every affected rule. Every rule here sets it
+explicitly: "OK" for warning-tier rules (going silent during an error is an
+acceptable trade), "KeepLast" for critical-tier rules (holds the rule's last
+known state through the error instead of either paging on a blip or going
+silent through a genuine ongoing incident). See eks_general.py's docstring
+for the incident that prompted this.
+
 Sub-modules
 -----------
   eks_general  — Source: grafana-alerts/cortex-rules/eks_general.yaml

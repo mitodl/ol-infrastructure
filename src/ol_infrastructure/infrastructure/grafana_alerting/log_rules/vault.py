@@ -26,6 +26,7 @@ def create(
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": "A Vault or Consul template is attempting to retrieve a secret that doesn't exist. Investigate the possibility of a misconfiguration or an accidentally deleted value.",
@@ -40,6 +41,7 @@ def create(
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
+                exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
                     "description": "A Vault client is having errors authenticating against the vault servers.",
