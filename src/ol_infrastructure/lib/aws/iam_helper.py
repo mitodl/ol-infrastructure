@@ -307,3 +307,139 @@ def oidc_trust_policy_template(
         "Version": IAM_POLICY_VERSION,
         "Statement": statements,
     }
+
+
+# Glue database naming conventions for the OL data lake, per environment.
+#
+# Anchored on purpose. These were previously a bare substring match --
+# ``database/*{env_suffix}*`` -- which grants an environment access to any
+# database whose name happens to contain its own name anywhere. That is not a
+# scoping rule, it is a coincidence of naming: the QA identities reached
+# ``ol_warehouse_production_qa_{external,intermediate,mart,staging}``, dbt
+# developer schemas in the *production* namespace, one of them registered under
+# ``s3://ol-data-lake-staging-production/``.
+#
+# "ci" makes the same failure far likelier than "qa" does, being two characters
+# that appear inside ordinary words: a future
+# ``ol_warehouse_production_pricing_mart`` would be reachable by the CI
+# identities.
+DATA_LAKE_GLUE_NAMESPACES = (
+    # dbt writes ol_warehouse_{env}_{layer}, plus ol_warehouse_{env}_{user}_{layer}
+    # for developer and branch schemas.
+    "ol_warehouse_{env_suffix}",
+    "ol_warehouse_{env_suffix}_*",
+    # The raw landing databases exist in both separator styles.
+    "ol_data_lake_*_{env_suffix}",
+    "ol-data-lake-*-{env_suffix}",
+)
+
+# Environments that lower environments must never reach into, whatever the Allow
+# statements happen to say. Deliberately one-directional: the risk being managed
+# is QA or CI writing to production, not the reverse, and denying the production
+# identities access to QA would break developers whose DAGSTER_ENV=dev targets
+# the production dbt profile.
+PROTECTED_DATA_LAKE_ENVIRONMENTS = ("production",)
+
+# Glue resource types the data lake identities act on, with the suffix each ARN
+# needs after the database name.
+_GLUE_RESOURCE_SUFFIXES = {
+    "database": "",
+    "table": "/*",
+    "userDefinedFunction": "/*",
+}
+
+
+def data_lake_glue_namespaces(env_suffix: str) -> list[str]:
+    """Database-name patterns belonging to one environment's data lake.
+
+    :param env_suffix: The environment being scoped, e.g. ``qa``.
+    :type env_suffix: str
+
+    :returns: Glue database name patterns, anchored so that another
+              environment's namespace cannot match.
+
+    :rtype: list[str]
+    """
+    return [
+        namespace.format(env_suffix=env_suffix)
+        for namespace in DATA_LAKE_GLUE_NAMESPACES
+    ]
+
+
+def data_lake_glue_resources(
+    env_suffix: str,
+    resource_types: tuple[str, ...] = ("database", "table"),
+) -> list[str]:
+    """Glue ARNs scoped to one environment's data lake namespaces.
+
+    :param env_suffix: The environment being scoped, e.g. ``qa``.
+    :type env_suffix: str
+
+    :param resource_types: Which Glue resource types to emit ARNs for. Defaults
+        to databases and tables; the query engine passes
+        ``userDefinedFunction`` as well, because it manages those too.
+    :type resource_types: tuple[str, ...]
+
+    :returns: A resource list for an IAM statement, including the catalog ARN
+              that every Glue call needs.
+
+    :rtype: list[str]
+    """
+    namespaces = data_lake_glue_namespaces(env_suffix)
+    return ["arn:aws:glue:*:*:catalog"] + [
+        f"arn:aws:glue:*:*:{resource_type}/{namespace}"
+        f"{_GLUE_RESOURCE_SUFFIXES[resource_type]}"
+        for resource_type in resource_types
+        for namespace in namespaces
+    ]
+
+
+def cross_environment_glue_denial(env_suffix: str) -> list[dict[str, Any]]:
+    """Deny a lower environment any Glue action on a protected environment.
+
+    Defence in depth rather than the primary control -- ``data_lake_glue_resources``
+    already declines to grant it. This exists because an explicit Deny cannot be
+    undone by a later Allow, and widening a grant for some unrelated reason is
+    the way this would realistically regress.
+
+    ``arn:aws:glue:*:*:catalog`` is deliberately absent, and must stay absent.
+    Every Glue operation requires permission on the catalog, so denying it would
+    deny every Glue call these identities make -- including the ones against
+    their own databases -- rather than hardening anything. Confirmed with the
+    IAM policy simulator: adding it turns ``glue:GetTable`` on the catalog from
+    ``allowed`` into ``explicitDeny``. The catalog belongs in the Allow, which is
+    where ``data_lake_glue_resources`` puts it.
+
+    :param env_suffix: The environment the policy is being generated for.
+    :type env_suffix: str
+
+    :returns: A single Deny statement, or an empty list when the environment is
+              itself protected and so has nothing to be kept out of.
+
+    :rtype: list[dict[str, Any]]
+    """
+    protected = [
+        environment
+        for environment in PROTECTED_DATA_LAKE_ENVIRONMENTS
+        if environment != env_suffix
+    ]
+    if not protected:
+        return []
+    return [
+        {
+            "Sid": "DenyCrossEnvironmentGlueAccess",
+            "Effect": "Deny",
+            "Action": "glue:*",
+            # Built from the same namespaces the Allow is built from, so the two
+            # cannot fall out of step. Denying only ``ol_warehouse_production*``
+            # would leave the raw landing databases -- ``ol_data_lake_*_production``
+            # and ``ol-data-lake-*-production`` -- uncovered, which is exactly the
+            # gap this statement exists to close.
+            "Resource": [
+                f"arn:aws:glue:*:*:{resource_type}/{namespace}{suffix}"
+                for environment in protected
+                for namespace in data_lake_glue_namespaces(environment)
+                for resource_type, suffix in _GLUE_RESOURCE_SUFFIXES.items()
+            ],
+        }
+    ]

@@ -30,9 +30,7 @@ config:
   - courses-backend.learn.mit.edu
   - courses-backend.xpro.mit.edu
   - dcc.learn.mit.edu
-  - meilisearch-staging.mitx.mit.edu
   - meilisearch.courses.learn.mit.edu
-  - meilisearch.mitx.mit.edu
   - meilisearch.xpro.mit.edu
   - micromasters-backend.odl.mit.edu
   - nb.learn.mit.edu

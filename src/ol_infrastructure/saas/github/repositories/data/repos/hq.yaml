@@ -5,15 +5,13 @@ _actions_secret_names:
 _custom_properties:
   tier: tier-1
 _has_branch_protection: false
-_pushed_at: '2026-08-13T05:50:56Z'
+_pushed_at: '2026-08-15T07:03:26Z'
 _ruleset_count: 2
 _visibility: private
-allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true
 archetype: library
-delete_branch_on_merge: false
 description: OL Engineering & Products - headquarters
 has_discussions: true
 has_projects: true

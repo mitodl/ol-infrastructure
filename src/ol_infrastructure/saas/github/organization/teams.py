@@ -1,4 +1,4 @@
-"""The 14 mitodl teams, as data plus a loop.
+"""The 11 mitodl teams, as data plus a loop.
 
 Teams are declared here; team ROSTERS are not (plan section 4.7). Pulumi manages
 which teams exist and -- in the repositories project -- what each team can do. It
@@ -16,25 +16,26 @@ import pulumi_github as github
 from pulumi import ResourceOptions
 
 # Read off `GET /orgs/mitodl/teams` on 2026-08-05. `notification_setting` is
-# `notifications_enabled` on all 14, so the loop sets it once rather than repeating it.
+# `notifications_enabled` on all 11, so the loop sets it once rather than repeating it.
 TEAMS: dict[str, dict[str, Any]] = {
     "arbisoft-contractors": {
         "name": "Arbisoft Contractors",
         "description": "software engineers from Arbisoft or Edly",
         "privacy": "closed",
     },
-    "code-owners": {
-        "name": "Code Owners",
-        "description": "default code owners for MIT ODL",
-        "privacy": "closed",
-        "parent": "odl-engineering-owners",
-    },
-    "code-owners-mitx-online": {
-        "name": "code-owners-mitx-online",
-        "description": "CODEOWNERS for MITx Online",
-        "privacy": "closed",
-        "parent": "code-owners",
-    },
+    # `code-owners` and `code-owners-mitx-online` DELETED 2026-08-17. They existed to
+    # back `@mitodl/code-owners*` entries in CODEOWNERS files, and no CODEOWNERS file
+    # in the org referenced either one -- nor did any branch protection require code
+    # owner review, so even a stale reference would have been inert. What they did
+    # instead was launder permissions: both nested under `odl-engineering-owners`, so
+    # membership conferred inherited admin on ~190 repos while the team's own name
+    # suggested a review role. `/orgs/.../teams/{slug}/repos` reports that inherited
+    # admin indistinguishably from a direct grant, which is how it stayed unexamined.
+    #
+    # Deleting cost nobody access: all five members of `code-owners` and all three of
+    # `code-owners-mitx-online` are already DIRECT members of `odl-engineering-owners`.
+    # Verified before deletion rather than assumed -- a child team's members do not
+    # automatically belong to its parent, so this had to be checked per person.
     "copilot": {
         "name": "copilot",
         "description": "users with copilot seats",
@@ -46,12 +47,17 @@ TEAMS: dict[str, dict[str, Any]] = {
         "description": "",
         "privacy": "closed",
     },
-    "devops-contractors": {
-        "name": "DevOps Contractors",
-        "description": "",
-        "privacy": "closed",
-        "parent": "devops",
-    },
+    # `devops-contractors` DELETED 2026-08-17. It held ONE member, who is a direct
+    # member of both `devops` (its parent) and `odl-engineering-owners`, so deleting it
+    # took nobody's access away. It also ends a permanent no-op diff: nested under
+    # `devops`, its grant on `ol-infrastructure` read back as the INHERITED `admin`
+    # while the declared value was `push`, so every preview planned an update that the
+    # next refresh undid.
+    #
+    # `concourse-pulumi-resource` is left with no team grant at all as a result. That is
+    # accepted rather than overlooked: the repo is archived, so it is read-only, CON-12
+    # (scope `active`) does not cover it, and org owners keep implicit admin either way.
+    #
     # NOTE: 'Enginineering' is the live value, typo and all.
     # Recording reality is the point (section 6); fix it in phase 5.
     "odl-engineering": {
@@ -59,8 +65,8 @@ TEAMS: dict[str, dict[str, Any]] = {
         "description": "ODL Enginineering",
         "privacy": "closed",
     },
-    # NOTE: `None`, not `""`. The API returns JSON null here, whereas devops,
-    # devops-contractors and odlengweb genuinely hold empty strings. Both forms
+    # NOTE: `None`, not `""`. The API returns JSON null here, whereas devops
+    # and odlengweb genuinely hold empty strings. Both forms
     # preview clean (verified), so this is a fidelity choice: `""` would assert an
     # empty description where GitHub reports absence.
     "odl-engineering-owners": {
@@ -140,7 +146,7 @@ for slug in _in_parent_order(TEAMS):
         name=spec["name"],
         description=spec.get("description"),
         privacy=spec["privacy"],
-        # Uniform across all 14 today; move into TEAMS if that stops being true.
+        # Uniform across all 11 today; move into TEAMS if that stops being true.
         notification_setting="notifications_enabled",
         # `parent_team_id` accepts a slug as well as a numeric id, so nesting needs
         # no output plumbing. depends_on still has to be explicit: a plain string

@@ -31,6 +31,55 @@ installs are actually scoped to. There is no REST endpoint that reports it to an
 requires the app's own token. It has to be read from each install's settings page. Treat
 "selected" below as "narrower than all, extent unknown".
 
+## Decisions (2026-08-18)
+
+None of these are Pulumi-manageable — every removal or narrowing below is a manual step
+under Settings -> GitHub Apps -> Installed GitHub Apps (distinct from SEC-10's
+`members_can_change_repo_visibility`, which lives under Settings -> Member privileges).
+This section is the source of truth for what was decided; the inventory table below is
+left as originally measured rather than edited in place, so the evidence trail stays
+intact.
+
+**Already resolved, no action needed:** `google-labs-jules` and
+`concourse-github-issue-pulumi` are no longer installed — re-checked 2026-08-18 against
+`GET /orgs/mitodl/installations`, neither appears. Whoever removed them did so outside
+this audit.
+
+**Remove** (dormant, no owner objection):
+- `jetify-cloud` — confirmed dormant a second time 2026-08-18 (still no `devbox.json`
+  anywhere in the org). Removing this also closes finding 1's `organization_hooks:write`
+  count from three grantees to two.
+- `render` — no repo runs anything on Render.
+- `digitalocean` — no repo runs anything on DigitalOcean App Platform.
+- `minware-data-ingest` — contract confirmed not live.
+- `haticahq` — contract confirmed not live. This is the higher-value removal of the
+  four: it was reading every secret-scanning alert and security event in the org
+  (finding 3) for a dead contract.
+
+**Keep:**
+- `netlify` — still hosting at least one site, despite no `netlify.toml` in the org
+  (config lives outside the repo, e.g. Netlify's own UI or a build hook).
+- `gitguardian`'s `organization_hooks:write` (finding 1) — accepted knowingly rather
+  than narrowed. GitGuardian is load-bearing and repository scope does not constrain
+  this permission anyway (org hooks are not per-repo), so narrowing its repo selection
+  would not have reduced this specific grant. Recorded here rather than left as an
+  open question.
+
+**Deferred, not blocking:**
+- `codecov` and `claude` narrowing (finding 3) — both stay org-wide for now. Neither
+  target set is confirmed: `codecov`'s 13 repos are a **floor, not the set** (the
+  inventory row's own caveat — `codecov.yml` is optional and CLI uploads from
+  unintegrated CI are invisible to this search), and `claude`'s is not visible at all,
+  since Anthropic's own install page is the only place that shows it (finding 4's blind
+  spot applies to our own app installs too, not just third-party ones). Confirm the real
+  set against each vendor's own repo list before narrowing either; revisit independently
+  of this SEC-11 pass.
+- `slack`'s `contents:write` + `workflows:write` (broader than a notification
+  integration needs) — flagged for follow-up with whoever manages the Slack
+  integration, not acted on now. Unlike the five removals above, nobody has confirmed
+  whether the Slack GitHub app even supports narrowing, so this needs a person to check
+  before it becomes an action item rather than a question.
+
 ## Permissions are vendor-side; scope is ours
 
 An installed app's permission set is declared by the app's author. We cannot reduce

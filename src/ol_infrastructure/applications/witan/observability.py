@@ -54,21 +54,27 @@ import pulumi_kubernetes as kubernetes
 
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 from ol_infrastructure.lib.toolhive_telemetry import (
-    DEFAULT_TRACE_SAMPLING_RATE,
     OTLP_ENDPOINT,
     ships_telemetry,
 )
 
-# Sampling and propagation, matched to the mit_learn/learn_ai precedent rather
-# than chosen fresh, so a trace that crosses from one of those services into
-# witan is sampled consistently instead of being decided twice.
+# Sample everything here; Alloy's `tailSampling` does the filtering (keep
+# errors, keep >5000ms, 15% of the rest — substructure/aws/eks/grafana.py).
+# That is the house pattern, stated in components/services/apisix.py: the
+# gateway runs `always_on` for the same reason. witan was the outlier.
 #
-# TRACES_SAMPLER_ARG is the SHARED default rather than a second literal: witan
-# runs `parentbased_traceidratio`, so it honours whatever ToolHive decided at
-# the root, and the two drifting apart would mean the ratio witan declares is
-# not the ratio it gets. See `toolhive_trace_sampling_rate`.
-TRACES_SAMPLER = "parentbased_traceidratio"
-TRACES_SAMPLER_ARG = DEFAULT_TRACE_SAMPLING_RATE
+# ★ THIS MOSTLY AFFECTS PARENTLESS TRACES, WHICH IS NARROWER THAN IT LOOKS.
+# APISIX runs `always_on` and propagates a sampled `traceparent`, and
+# `parentbased_*` honours a parent's decision — so anything arriving through
+# the gateway was already sampled at 100%. The old 0.25 ratio only ever applied
+# to traces witan roots itself: CronJobs, the CI indexer, migration Jobs.
+#
+# The rationale this replaces was "honour whatever ToolHive decided at the
+# root". ToolHive was removed in #5448, so that decision-maker is gone; APISIX
+# is the parent now, and `parentbased_always_on` still respects an inbound
+# "not sampled" so a cross-service trace stays coherent.
+TRACES_SAMPLER = "parentbased_always_on"
+TRACES_SAMPLER_ARG = "1.0"
 PROPAGATORS = "tracecontext,baggage"
 METRIC_EXPORT_INTERVAL_MS = "60000"
 

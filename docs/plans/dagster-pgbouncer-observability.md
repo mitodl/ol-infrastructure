@@ -252,6 +252,44 @@ whether the new `max_db_connections` cap is set too tight.
 Pin the exporter at **>= v0.12.1**: earlier releases report the `reserve_pool` metric
 incorrectly against PgBouncer >= 1.24, and `PGBOUNCER_VERSION` is 1.25.2.
 
+#### The answers (2026-08-17, seven days of 1-minute samples on production)
+
+The exporter shipped in #5426; this is what it said. Every number is a max over the
+full window unless stated.
+
+| Question | Answer |
+|---|---|
+| Is `default_pool_size = 800` anywhere near right? | No — it was never reachable. The derived `max_db_connections` is 708/pod, so 800 could not bind on production. Peak `sv_active` was **122 aggregate**. |
+| Is `min_pool_size = 150` × 6 justified? | **No.** Held connections sat at a flat **900 every single sample, all week**, and the pool never once grew past its own floor. 900 parked to serve a peak of 122. |
+| Is `reserve_pool_size = 2000` ever entered? | Not since the cap landed, and it cannot be: 800 + 2000 per pod is far above the 708 cap, so it was dead configuration. |
+| Is `max_client_conn = 1500` a real ceiling? | No — peak `cl_active` was **129 aggregate, 35 on the busiest pod**. It is deliberately far above demand so a saturated pool queues rather than refuses. |
+| Was disabling `query_wait_timeout` the right call? | No, and it was already reverted to 600 in #5454 after QA deadlocked for days. `maxwait` was **0 at every sample** on production; `client_waiting` peaked at 1. |
+| Do we need 6 replicas? | Not for load — peak **0.09 CPU cores** and 35 active clients on the busiest pod. See below. |
+| Are we heading for another 08-10? | Not on this evidence: 122 against a 4248 aggregate cap, and the cap now makes the 08-10 mode structurally unreachable. |
+
+**Skew: production does not have QA's.** The QA deadlock measured 221 active servers on
+one replica against 4 on the other, which matters because `max_db_connections` is derived
+as budget ÷ replica count and therefore assumes even distribution — under skew the real
+ceiling is whichever pod saturates first, not the aggregate. Production was checked
+specifically for this before re-tuning and spreads evenly (1–18 active per pod at any
+instant). So the aggregate cap is an honest number here, and fewer/larger replicas is an
+option rather than a fix that is owed.
+
+**What changed as a result.** `min_pool_size` 150 → 40 (sized to the measured 35-per-pod
+peak, so nothing in normal operation waits on a connect; parked total 900 → 240).
+`default_pool_size` → the derived cap and `reserve_pool_size` → 0, which retires two dead
+numbers and leaves `max_db_connections` as the pool's single binding ceiling. That last
+part is not cosmetic: `DagsterPgBouncerConnectionHeadroom` alerts on a fraction of
+`pgbouncer_databases_max_connections`, so any pool number set *below* the cap would
+become the real limit while the alert kept measuring against one the pool could no longer
+reach — a rule that can never fire.
+
+`pgbouncer_replica_count` was left at 6 on purpose. Changing the multiplier in the same
+pass as `min_pool_size` would make the result unattributable, which is the habit this
+whole exercise exists to break. It is the obvious next lever once this change has a week
+of its own data: at 6 replicas a single hot pod saturates at 708 while 3540 connections
+sit idle on the other five.
+
 ### 2. RDS — re-enable Performance Insights
 
 The exporter gives us the pool's view; it does not tell us what those connections are
@@ -306,6 +344,67 @@ Two constraints on the implementation: every query must be time-bounded and inde
 (`runs` and `event_logs` are large), and the exporter should connect **directly to RDS**,
 not through PgBouncer, so its polling doesn't contaminate the pool metrics we're
 collecting in parallel.
+
+#### Shipped 2026-08-17 — `burningalchemist/sql_exporter`, one Deployment in `dagster`
+
+Eight gauges, all under a 10s `statement_timeout` and a 2-connection ceiling:
+
+| Metric | Answers |
+|---|---|
+| `dagster_runs_in_flight{status}` | is `max_concurrent_runs` binding |
+| `dagster_oldest_queued_run_age_seconds` | healthy burst vs. stuck coordinator |
+| `dagster_run_wait_to_start_seconds{quantile}` | p50 / p95 / max wait to start |
+| `dagster_recent_runs{status}` | failure rate over the recent window |
+| `dagster_recent_retried_runs` | chronic failure masked by `max_retries = 3` |
+| `dagster_recent_job_ticks{tick_type,status}` | silently erroring sensors/schedules |
+| `dagster_daemon_heartbeat_age_seconds{daemon_type}` | the 08-10 symptom, measured directly |
+| `dagster_relation_bytes{relation}` | event-log growth |
+
+Three implementation findings worth keeping, all from testing rather than reading:
+
+- **Bound by primary key, not by time.** Neither `runs` nor `job_ticks` has an index on a
+  bare timestamp, so a "last N minutes" predicate is a full index scan that grows with the
+  table. `id > (SELECT max(id) - N)` is a range scan whose cost is fixed at N rows forever.
+  `EXPLAIN (ANALYZE, BUFFERS)` against a local Postgres carrying this exact schema with
+  60k runs / 200k ticks: every query an index scan, no sequential scans, full scrape 31ms.
+- **`SQLEXPORTER_TARGET_DSN` is only read when the config file declares no `target:` block
+  at all.** A `target:` with `data_source_name` omitted does not fall back to the
+  environment — it fails at startup with `missing data_source_name for target`. So the
+  ConfigMap carries collectors only and the target is entirely environment-driven, which
+  is also what keeps the Vault credential out of the ConfigMap.
+- **`statement_timeout` must use the libpq `--name=value` form**:
+  `options=--statement_timeout%3D10000`. The more familiar `-c name=value` form is mangled
+  in transit and the server rejects it with
+  `invalid command-line argument for server process: -c`. Confirmed the timeout actually
+  reaches the backend by setting it to 1ms and watching every query return `57014`.
+
+The three window metrics carry **no `_total` suffix**. They are gauges over a sliding id
+window and fall as runs leave it; `_total` announces a monotonic counter, which invites
+`rate()` and makes every ordinary decrease look like a counter reset.
+
+The exporter authenticates with `postgres-dagster/creds/readonly` — SELECT and nothing
+more, which covers even `pg_total_relation_size`, verified by running the whole collector
+under a role holding only SELECT. `dagster_server_policy.hcl` had to be widened; it
+granted `creds/app` only.
+
+**`OLVaultK8SSecret` never renders `spec.revoke`, so no dynamic secret in this repo
+revokes its lease on deletion.** Found while reviewing this PR. `revoke_on_delete=True`
+and `role_name=...` are passed at several call sites (including the pre-existing
+`dagster_db_secret`) but are not fields on the config model, so Pydantic drops them
+silently — the intent reads as expressed and none of it is in effect. `refresh_after` is
+a real field but is only rendered for *static* secrets, and would be overridden by the
+lease duration anyway. On `postgres-dagster` that lease is 3 months
+(`OLVaultDatabaseConfig.default_ttl = ONE_MONTH_SECONDS * 3`), so a deleted
+VaultDynamicSecret leaves working database credentials behind for up to a quarter. VSO
+1.5.1 does support `spec.revoke`; the component simply does not emit it. Repo-wide fix,
+tracked separately.
+
+One deliberate omission from the table above: per-code-location failure rate. The join
+from `runs` to `run_tags` for every run in the window is the most expensive query in the
+set, and the kube-state-metrics label allowlist in §5 answers a near-enough version of
+the same question for free. Revisit if the two ever disagree — they measure different
+things (Dagster run status vs. run-worker Job exit) and a systematic gap between them
+would itself be worth knowing about.
 
 ### 4. OpenTelemetry auto-instrumentation — the "why", not the "what"
 
@@ -411,6 +510,13 @@ not appear in the rendered docs):
 This overlaps with what the SQL exporter provides and is strictly less rich (no queue
 time, no retry attribution), so treat it as a cheap stopgap rather than a substitute.
 
+✅ Done 2026-08-17. Re-confirmed against chart **4.4.0** (the version above was 4.3.2):
+the path and the list-replacement trap both hold, `kube-state-metrics` is now 8.1.3, and
+rendering the chart shows
+`--metric-labels-allowlist=nodes=[…],jobs=[dagster/code-location,dagster/job]`. The
+premise was checked live as well — all 829 Jobs in the `dagster` namespace on
+data-production carry `dagster/code-location`, `dagster/job` and `dagster/run-id`.
+
 ## Suggested sequencing
 
 0. **Cap the aggregate connection count.** Set `max_db_connections` so that
@@ -427,14 +533,26 @@ time, no retry attribution), so treat it as a cheap stopgap rather than a substi
    density, and the pipeline is already there.
 3. **Alert on connection headroom.** `sum(pgbouncer_pools_server_*) / 5000` with a burn
    threshold. This is the alert that would have fired on 08-10.
-4. **Re-enable Performance Insights** on `ol-etl-db-production`. No reboot, no cost.
-5. **Dagster SQL exporter.** Larger build; sequence after the pool picture is clear.
-   Note it must connect **directly to RDS**, which means it consumes from the same 5000 —
-   budget for it in (0).
-6. **Re-tune from data.** Specifically: whether `min_pool_size = 150` is buying anything
-   at 6 replicas when steady-state demand is 27 servers, and whether 6 replicas are
-   justified at ~30 mCPU each. `reserve_pool_size` is no longer an open question — it is
-   reachable, it was reached, and (0) is what bounds it.
+4. **Re-enable Performance Insights** on `ol-etl-db-production`. ✅ Done 2026-08-17 —
+   `performance_insights_enabled = True`, gated to the production stack, retention
+   inherited at the free 7 days. `pulumi preview` confirmed an in-place update
+   (`performanceInsightsEnabled: false => true`), no replacement and no reboot.
+   Enhanced Monitoring and the CloudWatch alarm profile stay off deliberately; see the
+   comments at the override site for why. Enabling the alarm profile is its own
+   decision because none of its thresholds have been checked against this instance —
+   not, as an earlier draft of this line claimed, because the alarms omit `ok_actions`;
+   `OLCloudWatchAlarmSimpleRDS` sets `ok_actions=alarm_actions`
+   (`components/aws/cloudwatch.py:211-212`), so they do auto-resolve in Rootly.
+5. **Dagster SQL exporter.** ✅ Done 2026-08-17 — see
+   [Shipped](#shipped-2026-08-17--burningalchemistsql_exporter-one-deployment-in-dagster).
+   It connects directly to RDS and so consumes from the same 5000, which is already
+   budgeted: `DB_CONNECTION_HEADROOM_FACTOR = 0.85` leaves ~750 connections outside the
+   pool's cap and the exporter takes 2 of them.
+6. **Re-tune from data.** ✅ Done 2026-08-17 — see
+   [The answers](#the-answers-2026-08-17-seven-days-of-1-minute-samples-on-production).
+   `min_pool_size` 150 → 40, `default_pool_size` → the derived cap, `reserve_pool_size`
+   → 0. Replica count deliberately held at 6 so this change is attributable; it is the
+   next lever.
 
 ## Open question worth flagging
 

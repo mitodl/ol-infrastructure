@@ -3,15 +3,13 @@ _custom_properties:
   tier: tier-1
 _excluded_environments: 3
 _has_branch_protection: false
-_pushed_at: '2026-08-14T19:28:21Z'
+_pushed_at: '2026-08-14T23:15:21Z'
 _ruleset_count: 3
 _visibility: public
-allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true
 archetype: application
-delete_branch_on_merge: false
 description: Multi-tenant read-only FastAPI analytics gateway over StarRocks (B2B
   site-license analytics for MIT Learn)
 has_discussions: false

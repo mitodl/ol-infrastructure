@@ -3,16 +3,14 @@ _custom_properties:
   tier: unmanaged
 _excluded_environments: 1
 _has_branch_protection: false
-_pushed_at: '2026-08-13T05:56:07Z'
+_pushed_at: '2026-08-15T07:16:10Z'
 _ruleset_count: 0
 _visibility: public
-allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true
 archetype: fork
 default_branch: main
-delete_branch_on_merge: false
 description: AI tutor MIT open Learning
 has_discussions: false
 has_issues: true

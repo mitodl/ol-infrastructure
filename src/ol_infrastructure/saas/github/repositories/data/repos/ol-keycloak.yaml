@@ -1,11 +1,10 @@
 ---
 _custom_properties:
   tier: tier-1
-_has_branch_protection: true
-_pushed_at: '2026-08-10T20:05:34Z'
+_has_branch_protection: false
+_pushed_at: '2026-08-15T03:16:54Z'
 _ruleset_count: 2
 _visibility: public
-allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true

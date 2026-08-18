@@ -6,12 +6,10 @@ _has_branch_protection: false
 _pushed_at: '2026-03-01T08:32:07Z'
 _ruleset_count: 2
 _visibility: public
-allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true
 archetype: library
-delete_branch_on_merge: false
 description: Video Subtitles Translation Demo
 has_discussions: false
 has_issues: false

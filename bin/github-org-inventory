@@ -138,7 +138,16 @@ DEFAULT_BRANCH_EXEMPT_ARCHETYPES = frozenset({"fork", "archived"})
 
 # Rules whose population is the archived fleet, not the active one. Reporting these as a
 # share of active repos overstates them badly (92 of 138 archived reads as "52% of active").
-ARCHIVED_SCOPED_RULES = frozenset({"CON-07 archived repo still grants team write"})
+ARCHIVED_SCOPED_RULES = frozenset(
+    {
+        "CON-07 archived repo still grants team write",
+        # Split out of SEC-15 on 2026-08-17. Same exposure, different cost: GitHub makes
+        # permissions read-only on an archived repo, so this one is fixed by an
+        # unarchive/change/re-archive cycle rather than by `pulumi up`. Keeping both in
+        # one rule put 59 unactionable findings in a `high` security bucket.
+        "SEC-15A archived repo grants admin outside the sanctioned set",
+    }
+)
 
 # Rules whose population is the WHOLE fleet, active and archived alike. SEC-06 is here
 # because the no-direct-collaborators policy (2026-08-05) admits no exceptions: an admin
@@ -147,7 +156,6 @@ ARCHIVED_SCOPED_RULES = frozenset({"CON-07 archived repo still grants team write
 FLEET_SCOPED_RULES = frozenset(
     {
         "SEC-06 direct collaborator on repo (policy: repo access via teams only)",
-        "SEC-15 admin held by a team outside the sanctioned set",
     }
 )
 
@@ -582,6 +590,18 @@ def _is_stale(repo: dict[str, Any]) -> bool:
 MERGE_CAPABLE_PERMISSIONS = frozenset({"push", "maintain", "admin"})
 
 
+def _unsanctioned_admin_grant(repo: dict[str, Any]) -> bool:
+    """Report whether any team outside `ADMIN_TEAMS` holds admin on this repo.
+
+    Shared by SEC-15 and SEC-15A so the two halves of the split cannot drift apart --
+    they must differ only in which population they look at, never in what counts.
+    """
+    return any(
+        perm in ADMIN_PERMISSIONS and team not in ADMIN_TEAMS
+        for team, perm in (repo.get("teams") or {}).items()
+    )
+
+
 def _blocked_by_push_restriction(repo: dict[str, Any]) -> list[str]:
     """Teams that hold a merge-capable grant but are outside the push allow-list.
 
@@ -692,13 +712,18 @@ def _findings(
                 if (r.get("teams") or {})
                 != (archetype_teams.get(propose_archetype(r)) or {})
             ],
+            # Split active/archived: the archived half cannot be fixed by `pulumi up`
+            # at all (GitHub makes permissions read-only there), so reporting both under
+            # one id produced findings whose stated remediation returns 403.
             "SEC-15 admin held by a team outside the sanctioned set": [
                 r["name"]
                 for r in repos
-                if any(
-                    perm in ADMIN_PERMISSIONS and team not in ADMIN_TEAMS
-                    for team, perm in (r.get("teams") or {}).items()
-                )
+                if not r["archived"] and _unsanctioned_admin_grant(r)
+            ],
+            "SEC-15A archived repo grants admin outside the sanctioned set": [
+                r["name"]
+                for r in repos
+                if r["archived"] and _unsanctioned_admin_grant(r)
             ],
         }
     return {
@@ -890,6 +915,38 @@ def report(
     )
 
 
+def _team_permission_conflicts(
+    out: Path, repo_name: str, new_teams: dict[str, str]
+) -> list[str]:
+    """Team-grant changes this crawl is about to write over what's already committed.
+
+    `teams:` is emitted verbatim from live GitHub on every crawl (see `crawl`), with no
+    comparison against the archetype -- so it doubles as both "what the fleet observed"
+    and "what a phase-5 remediation declares as the target". Those two roles collide the
+    moment a human edits a repo's `teams:` to a tighter value (e.g. SEC-15's admin ->
+    push) and a `crawl --refresh` runs before `pulumi up` has applied it: the refresh
+    re-observes the still-unfixed live grant and silently overwrites the declared fix
+    back to match it. Caught twice by PR review, not by any tooling -- see witan task
+    tk-github-org-inventory-crawl-silently-reverts-pending-e65389.
+
+    Returns one human-readable line per team whose grant is about to change, or an empty
+    list if the file doesn't exist yet or nothing about `teams:` would change.
+    """
+    existing_path = out / f"{repo_name}.yaml"
+    if not existing_path.exists():
+        return []
+    existing_teams = (yaml.safe_load(existing_path.read_text()) or {}).get(
+        "teams"
+    ) or {}
+    if existing_teams == new_teams:
+        return []
+    return [
+        f"{repo_name}: {team} {existing_teams.get(team)!r} -> {new_teams.get(team)!r}"
+        for team in sorted(set(existing_teams) | set(new_teams))
+        if existing_teams.get(team) != new_teams.get(team)
+    ]
+
+
 def _resolve_archetype(archetypes: dict[str, Any], name: str) -> dict[str, Any]:
     """Flatten an archetype's `extends` chain into the effective settings.
 
@@ -945,6 +1002,18 @@ def crawl(
     out: Annotated[
         Path, cyclopts.Parameter(help="Directory for per-repo YAML.")
     ] = DATA_DIR / "repos",
+    allow_team_drift: Annotated[
+        bool,
+        cyclopts.Parameter(
+            help=(
+                "Write over a repo's committed `teams:` even though live GitHub still "
+                "disagrees with it -- i.e. accept live as ground truth instead of "
+                "treating the committed value as a pending-but-unapplied remediation. "
+                "Without this, a repo whose `teams:` would change is refused rather "
+                "than silently reverted."
+            )
+        ),
+    ] = False,
 ) -> None:
     """Emit one YAML file per repo, carrying only deviations from its archetype.
 
@@ -1005,6 +1074,34 @@ def crawl(
         raise SystemExit(message)
 
     out.mkdir(parents=True, exist_ok=True)
+
+    # Detect before writing anything: once a repo's file is overwritten the previously
+    # committed (possibly pending-but-unapplied) `teams:` value is gone, and there's no
+    # signal left in this run to warn from.
+    team_drift = sorted(
+        line
+        for repo in data["repos"]
+        for line in _team_permission_conflicts(out, repo["name"], repo["teams"] or {})
+    )
+    if team_drift and not allow_team_drift:
+        message = (
+            f"{len(team_drift)} team grant(s) would change on this crawl, which would "
+            "overwrite a committed value that live GitHub does not yet match -- most "
+            "likely a phase-5 remediation (e.g. SEC-15) that hasn't had `pulumi up` run "
+            "for it yet:\n  "
+            + "\n  ".join(team_drift)
+            + "\nRun `pulumi up` for the affected repos first so live matches the "
+            "committed value, then re-crawl. If live is correct and the committed value "
+            "is simply stale, re-run with --allow-team-drift to accept live."
+        )
+        raise SystemExit(message)
+    if team_drift:
+        print(
+            f"--allow-team-drift set: accepting {len(team_drift)} live team grant "
+            "change(s) over the committed value:\n  " + "\n  ".join(team_drift),
+            file=sys.stderr,
+        )
+
     written = 0
     for repo in data["repos"]:
         archetype = assigned[repo["name"]]

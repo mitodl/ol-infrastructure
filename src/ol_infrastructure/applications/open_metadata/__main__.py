@@ -39,7 +39,12 @@ from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
 )
-from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.aws.iam_helper import (
+    IAM_POLICY_VERSION,
+    cross_environment_glue_denial,
+    data_lake_glue_resources,
+    lint_iam_policy,
+)
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.ol_types import (
     Application,
@@ -502,12 +507,9 @@ open_metadata_glue_policy_document = {
                 "glue:GetPartition",
                 "glue:GetPartitions",
             ],
-            "Resource": [
-                "arn:aws:glue:*:*:catalog",
-                f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}*",
-                f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}*/*",
-            ],
+            "Resource": data_lake_glue_resources(stack_info.env_suffix),
         },
+        *cross_environment_glue_denial(stack_info.env_suffix),
         {
             "Effect": "Allow",
             "Action": [

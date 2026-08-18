@@ -7,8 +7,9 @@ being RDS's own rdsadmin sessions) -- for 88 consecutive 1-minute samples, durin
 every new Dagster connection was refused and the daemon sat Pending behind 178 run
 workers. Nothing alerted, because nothing was collected: the only signal available was
 CloudWatch DatabaseConnections, which min_pool_size x replicas pins to a constant floor
-(900 in production) and which therefore reports a configured constant rather than
-observed demand. Background: docs/plans/dagster-pgbouncer-observability.md.
+(900 in production at the time, 240 after the pool re-tune) and which therefore reports
+a configured constant rather than observed demand. Background:
+docs/plans/dagster-pgbouncer-observability.md.
 
 Two things had to land before these rules could exist, and both did in #5426:
 the pgbouncer_exporter sidecar that produces these metrics, and the max_db_connections
@@ -36,11 +37,17 @@ from pulumi import Input, ResourceOptions
 from pulumiverse_grafana import alerting
 
 # Fraction of the aggregate max_db_connections cap at which the pool is considered
-# short of headroom. Production's floor is min_pool_size (150) x 6 replicas = 900
-# against a 4248 cap, so the baseline ratio is 0.21 and 3 days of 1-minute samples
-# never moved off it -- peak server_active over that window was 122. 0.75 therefore
-# sits ~3.5x above anything observed while still leaving a quarter of the pool in
-# reserve, which at 6 replicas is over 1000 connections of runway to act in.
+# short of headroom. Production's floor is min_pool_size x 6 replicas, which the pool
+# re-tune cut from 900 to 240 against the same 4248 cap -- so the baseline ratio moved
+# from 0.21 to 0.06, and the week of 1-minute samples behind that re-tune never left
+# the floor (peak server_active 122, peak client_active 129). 0.75 therefore sits far
+# above anything observed while still leaving a quarter of the pool in reserve, which
+# at 6 replicas is over 1000 connections of runway to act in.
+#
+# The denominator only means anything while max_db_connections is the pool's single
+# binding ceiling. It is, deliberately: default_pool_size is set equal to the cap and
+# reserve_pool_size is 0, precisely so no smaller number can quietly become the real
+# limit and leave this rule measuring against one the pool can no longer reach.
 _HEADROOM_RATIO = 0.75
 
 # Seconds the oldest queued client has been waiting before the queue counts as

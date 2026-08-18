@@ -3,15 +3,13 @@ _custom_properties:
   tier: tier-1
 _excluded_environments: 2
 _has_branch_protection: false
-_pushed_at: '2026-08-10T19:41:36Z'
+_pushed_at: '2026-08-17T17:56:21Z'
 _ruleset_count: 2
 _visibility: public
-allow_auto_merge: false
 allow_merge_commit: false
 allow_rebase_merge: false
 allow_squash_merge: true
 archetype: library
-delete_branch_on_merge: false
 description: The MIT Online Learning Platform Engineering Site Repository
 has_discussions: false
 has_projects: true

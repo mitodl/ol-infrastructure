@@ -32,6 +32,7 @@ from bridge.lib.versions import (
     DAGSTER_CHART_VERSION,
     PGBOUNCER_EXPORTER_VERSION,
     PGBOUNCER_VERSION,
+    SQL_EXPORTER_VERSION,
 )
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
@@ -63,7 +64,11 @@ from ol_infrastructure.lib.aws.eks_helper import (
     ecr_image_uri,
     setup_k8s_provider,
 )
-from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
+from ol_infrastructure.lib.aws.iam_helper import (
+    IAM_POLICY_VERSION,
+    cross_environment_glue_denial,
+    data_lake_glue_resources,
+)
 from ol_infrastructure.lib.aws.rds_helper import postgres_max_connections
 from ol_infrastructure.lib.ol_types import (
     Application,
@@ -275,12 +280,9 @@ athena_permissions: list[dict[str, str | list[str]]] = [
             "glue:UpdatePartition",
             "glue:UpdateTable",
         ],
-        "Resource": [
-            "arn:aws:glue:*:*:catalog",
-            f"arn:aws:glue:*:*:database/*{stack_info.env_suffix}*",
-            f"arn:aws:glue:*:*:table/*{stack_info.env_suffix}*/*",
-        ],
+        "Resource": data_lake_glue_resources(stack_info.env_suffix),
     },
+    *cross_environment_glue_denial(stack_info.env_suffix),
 ]
 
 
@@ -405,9 +407,45 @@ dagster_db_security_group = ec2.SecurityGroup(
 
 # Keep existing RDS database (Dagster metadata storage)
 rds_defaults = defaults(stack_info)["rds"]
+# This stack opts out of all three of the house RDS monitoring defaults
+# (monitoring_profile_name="production", enhanced_monitoring_interval=60,
+# performance_insights_enabled=True). Two of those opt-outs are still deliberate; the
+# third was not, and is why the 2026-08-10 connection exhaustion could not be attributed
+# to anything after the fact.
+#
+# The CloudWatch alarm profile stays disabled for now, but only pending a threshold
+# review -- it creates the standard production alarm set against SNS and none of those
+# thresholds have been checked against this instance. That is worth doing deliberately
+# rather than as a side effect of enabling Performance Insights.
 rds_defaults["monitoring_profile_name"] = "disabled"
+# Enhanced Monitoring stays off. Unlike Performance Insights it is not free -- the OS
+# metric stream bills as CloudWatch Logs ingestion at a 60s interval -- and it answers a
+# question we are not asking. The gap here was never host-level CPU/disk; it was which
+# queries and wait events were on the database, which is exactly what PI covers.
 rds_defaults["enhanced_monitoring_interval"] = 0
-rds_defaults["performance_insights_enabled"] = False
+# Performance Insights, back on -- production only.
+#
+# The PgBouncer exporter added in #5426 gives the pool's view of connections; it cannot
+# say what those connections were *doing*. With PI off there was no way to attribute the
+# 2026-08-10 event -- 4989 connections held for 88 minutes -- to a query, a lock, or a
+# checkpoint, and no way to tell a slow-query pileup from a leak the next time it
+# happens. PI's DBLoad-by-wait-event is the database-side counterpart to PgBouncer's
+# maxwait, which is the signal the pool alerts turn on.
+#
+# Free, and no reboot. Performance Insights includes 7 days of history and 1M API
+# requests/month at no charge, and retention comes from the house production default at
+# exactly that 7 days -- raising it, or switching Database Insights from Standard to
+# Advanced mode (which forces 15-month retention), is what starts costing money.
+# Toggling PI on an instance does not require a reboot, so this applies in place.
+#
+# Gated on the environment because the surrounding rds_defaults edits are unconditional
+# and QA and CI are live stacks with real instances -- ol-etl-db-qa and ol-etl-db-ci
+# would both pick this up otherwise. Both support PI and previewed clean, so this is a
+# scope choice rather than a compatibility one: the incident being instrumented is on
+# production, and the QA/CI instances can be turned on deliberately when something
+# actually needs them.
+if stack_info.env_suffix == "production":
+    rds_defaults["performance_insights_enabled"] = True
 rds_defaults["use_blue_green"] = False
 rds_defaults["read_replica"] = None
 rds_defaults["instance_size"] = (
@@ -607,12 +645,29 @@ dagster_db_secret = OLVaultK8SSecret(
 
 # Replica count is needed here to size the per-pod connection cap below, so it is
 # resolved before the ConfigMap rather than next to the Deployment that consumes it.
+#
+# Production's 6 is not load-derived and the exporter now says so: over seven days the
+# busiest replica peaked at 0.09 CPU cores and 35 active clients. PgBouncer is
+# single-threaded, which is the usual reason to run several, but nothing here is close
+# to needing the parallelism.
+#
+# The count is not free either. It divides the aggregate budget into per-pod caps, so at
+# 6 replicas one pod saturates at 708 while 3540 connections sit unused on the other
+# five -- and the binding limit is whichever pod saturates first, not the aggregate.
+# That gap is real on QA, which measured 221 active servers on one replica against 4 on
+# the other. Production was checked for the same skew before this re-tune and does not
+# show it: instantaneous load spreads evenly (1-18 active per pod), so fewer/larger
+# replicas is a live option rather than an urgent fix.
+#
+# Left alone here deliberately. This pass changes min_pool_size, and changing the
+# multiplier in the same breath would make the result unattributable -- which is the
+# failure mode the whole exercise exists to stop repeating.
 pgbouncer_replica_count = dagster_config.get_int("pgbouncer_replica_count") or 2
 
 # Cap the connections PgBouncer can open against RDS, in aggregate across every replica.
 #
 # Without this, nothing bounds the total. In session pool mode each client pins a server
-# connection for its whole session, so the per-pod bound is
+# connection for its whole session, so the per-pod bound was
 # min(max_client_conn, default_pool_size + reserve_pool_size) = 1500 -- which at 6
 # replicas is 9000 possible backends against a hard max_connections of 5000. On
 # 2026-08-10 the pool reached that limit and held it for 88 consecutive minutes
@@ -648,6 +703,140 @@ pgbouncer_max_db_connections = int(
 
 # ConfigMap containing the pgbouncer.ini template; ${PGUSER} and ${PGPASSWORD}
 # placeholders are substituted at pod start time by the init container.
+pgbouncer_ini_template = dagster_db.db_instance.address.apply(
+    lambda addr: "\n".join(
+        [
+            "[databases]",
+            f"dagster = host={addr} port={DEFAULT_POSTGRES_PORT}"
+            " dbname=dagster user=${PGUSER} password=${PGPASSWORD}",
+            "",
+            "[pgbouncer]",
+            "listen_addr = 0.0.0.0",
+            "listen_port = 5432",
+            "auth_type = any",
+            "pool_mode = session",
+            # Clients are cheap -- an accepted client that is waiting for a backend
+            # costs a socket, not a connection to RDS -- and this number has to stay
+            # well above max_db_connections or a saturated pool refuses clients
+            # instead of queueing them. Observed peak is 35 on the busiest replica,
+            # so 1500 is not a number the data argues about; it is deliberately far
+            # larger than demand.
+            "max_client_conn = 1500",
+            # One binding ceiling, not three.
+            #
+            # These were 800 / 150 / 2000, all set before there was any feedback
+            # signal. Seven days of 1-minute exporter samples (the exporter landed in
+            # #5426) say what they are actually worth:
+            #
+            #   held server connections   flat 900, every sample, all week
+            #   peak server_active        122 aggregate
+            #   peak client_active        129 aggregate, 35 on one replica
+            #   maxwait                   0 at every sample
+            #   clients waiting           peaked at 1
+            #
+            # 900 was not demand. It is min_pool_size x 6 replicas -- a configured
+            # constant, which is exactly what made CloudWatch DatabaseConnections
+            # useless as a signal. Nine hundred backends were parked permanently to
+            # serve a peak of 122, a 7:1 idle ratio, and the pool never once grew
+            # past its own floor.
+            #
+            # min_pool_size 150 -> 40 keeps the whole measured per-replica peak (35)
+            # warm, so nothing in normal operation waits on a connect, and drops the
+            # parked total from 900 to 240.
+            #
+            # default_pool_size and reserve_pool_size were dead numbers: 800 + 2000
+            # per pod against a derived cap of 708 means max_db_connections already
+            # bound first, so neither value could take effect on production. Rather
+            # than pick new guesses, tie default_pool_size to the cap and disable the
+            # reserve. With a single database and a single user the two settings act
+            # on the same axis, so this makes the derived cap the only ceiling
+            # instead of the smallest of three.
+            #
+            # That property is load-bearing beyond tidiness:
+            # DagsterPgBouncerConnectionHeadroom alerts on server connections as a
+            # fraction of pgbouncer_databases_max_connections. Any pool number set
+            # below the cap would become the real ceiling while the alert kept
+            # measuring against the old denominator, and the alert would go quietly
+            # dead -- saturation would surface only as clients queueing, which is the
+            # symptom the headroom rule exists to get ahead of.
+            f"default_pool_size = {pgbouncer_max_db_connections}",
+            "min_pool_size = 40",
+            "reserve_pool_size = 0",
+            # The aggregate ceiling. See the derivation above; this is the
+            # only setting here that bounds total backends across replicas,
+            # and it converts "exhaust RDS" into "queue inside PgBouncer",
+            # which is the failure mode query_wait_timeout below is set high
+            # enough to ride out.
+            f"max_db_connections = {pgbouncer_max_db_connections}",
+            "max_prepared_statements = 0",
+            "server_connect_timeout = 15",
+            # Dagster uses NullPool with AUTOCOMMIT isolation - no session
+            # state is left between queries, so DISCARD ALL is unnecessary
+            # and adds latency + a race-condition window on each disconnect.
+            "server_reset_query =",
+            # PgBouncer 1.25 defaults server_check_query to empty (disabled).
+            # Re-enable it so PgBouncer verifies server connections are alive
+            # before assigning them to clients. server_check_delay=30 means
+            # any connection idle >30s is health-checked before use. Note:
+            # server_check_delay=0 DISABLES checks (PgBouncer behavior since
+            # v1.7 when the default was changed from 0 to 30).
+            "server_check_query = ;",
+            "server_check_delay = 30",
+            # Proactively recycle backend connections every 30 min to prevent
+            # stale connections accumulating.
+            "server_lifetime = 1800",
+            # Release idle backend connections after 2 min. This is
+            # intentionally shorter than RDS's tcp_keepalives_idle (300s) so
+            # PgBouncer always closes idle connections before RDS silently
+            # terminates them, preventing zombie connections from being
+            # assigned to clients.
+            "server_idle_timeout = 120",
+            # Raised well above the 120s default, but NOT disabled.
+            #
+            # The default was too short: during heavy RDS checkpoint I/O,
+            # queries slow from milliseconds to seconds and the pool backs up,
+            # and at 120s clients that can't immediately get a server
+            # connection are disconnected with "server closed the connection
+            # unexpectedly" in psycopg2. That pressure clears within 1-2
+            # minutes, so the fix was to wait it out.
+            #
+            # This was previously 0, which disables the timeout entirely, and
+            # that turned out to be a different failure rather than the absence
+            # of one. A timeout is the only thing that breaks a pool deadlock:
+            # when every server connection is held by a client that is itself
+            # blocked waiting for a server connection, nothing is released
+            # until something gives up. With 0, nothing ever gives up. QA sat
+            # in exactly that state for days on 2026-08-17 -- all 764 backends
+            # pinned, sv_idle 0, the oldest client queued 2.4 days, the daemon
+            # frozen mid-backfill-cancellation -- and it could only be cleared
+            # by deleting run workers by hand.
+            #
+            # 600s keeps the original intent with a large margin (5x the 1-2
+            # minutes checkpoint pressure actually lasts) while restoring the
+            # property that a wedged pool eventually unwedges itself. A client
+            # that waits ten minutes for a connection is not going to be
+            # rescued by waiting longer; it needs to fail so the pool can drain
+            # and Dagster's own retry logic can take over.
+            "query_wait_timeout = 600",
+            # Dagster uses NullPool, so it opens a fresh connection per query
+            # and every connection logs with age=0s. Measured on one production
+            # pod: 27,738 lines in 3 minutes, ~154 lines/s per replica and
+            # ~925/s across six, all of it shipped to Loki. The one line that
+            # carries signal -- the per-minute `stats:` aggregate -- was 1 in
+            # ~9,000. The pgbouncer_exporter sidecar now collects the same
+            # connection counts as metrics, so these logs are pure cost.
+            "log_connections = 0",
+            "log_disconnections = 0",
+            # Required by pgbouncer_exporter: its PostgreSQL driver sends
+            # extra_float_digits on connect, and PgBouncer rejects unknown
+            # startup parameters unless they are listed here.
+            "ignore_startup_parameters = extra_float_digits",
+            "application_name_add_host = 1",
+            "",
+        ]
+    )
+)
+
 pgbouncer_config = kubernetes.core.v1.ConfigMap(
     f"dagster-pgbouncer-config-{stack_info.env_suffix}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -655,104 +844,42 @@ pgbouncer_config = kubernetes.core.v1.ConfigMap(
         namespace=dagster_namespace,
         labels=k8s_global_labels.model_dump(),
     ),
-    data={
-        "pgbouncer.ini.template": dagster_db.db_instance.address.apply(
-            lambda addr: "\n".join(
-                [
-                    "[databases]",
-                    f"dagster = host={addr} port={DEFAULT_POSTGRES_PORT}"
-                    " dbname=dagster user=${PGUSER} password=${PGPASSWORD}",
-                    "",
-                    "[pgbouncer]",
-                    "listen_addr = 0.0.0.0",
-                    "listen_port = 5432",
-                    "auth_type = any",
-                    "pool_mode = session",
-                    "max_client_conn = 1500",
-                    "default_pool_size = 800",
-                    "min_pool_size = 150",
-                    "reserve_pool_size = 2000",
-                    # The aggregate ceiling. See the derivation above; this is the
-                    # only setting here that bounds total backends across replicas,
-                    # and it converts "exhaust RDS" into "queue inside PgBouncer",
-                    # which is the failure mode query_wait_timeout = 0 below was
-                    # already chosen to tolerate.
-                    f"max_db_connections = {pgbouncer_max_db_connections}",
-                    "max_prepared_statements = 0",
-                    "server_connect_timeout = 15",
-                    # Dagster uses NullPool with AUTOCOMMIT isolation - no session
-                    # state is left between queries, so DISCARD ALL is unnecessary
-                    # and adds latency + a race-condition window on each disconnect.
-                    "server_reset_query =",
-                    # PgBouncer 1.25 defaults server_check_query to empty (disabled).
-                    # Re-enable it so PgBouncer verifies server connections are alive
-                    # before assigning them to clients. server_check_delay=30 means
-                    # any connection idle >30s is health-checked before use. Note:
-                    # server_check_delay=0 DISABLES checks (PgBouncer behavior since
-                    # v1.7 when the default was changed from 0 to 30).
-                    "server_check_query = ;",
-                    "server_check_delay = 30",
-                    # Proactively recycle backend connections every 30 min to prevent
-                    # stale connections accumulating.
-                    "server_lifetime = 1800",
-                    # Release idle backend connections after 2 min. This is
-                    # intentionally shorter than RDS's tcp_keepalives_idle (300s) so
-                    # PgBouncer always closes idle connections before RDS silently
-                    # terminates them, preventing zombie connections from being
-                    # assigned to clients.
-                    "server_idle_timeout = 120",
-                    # Raised well above the 120s default, but NOT disabled.
-                    #
-                    # The default was too short: during heavy RDS checkpoint I/O,
-                    # queries slow from milliseconds to seconds and the pool backs up,
-                    # and at 120s clients that can't immediately get a server
-                    # connection are disconnected with "server closed the connection
-                    # unexpectedly" in psycopg2. That pressure clears within 1-2
-                    # minutes, so the fix was to wait it out.
-                    #
-                    # This was previously 0, which disables the timeout entirely, and
-                    # that turned out to be a different failure rather than the absence
-                    # of one. A timeout is the only thing that breaks a pool deadlock:
-                    # when every server connection is held by a client that is itself
-                    # blocked waiting for a server connection, nothing is released
-                    # until something gives up. With 0, nothing ever gives up. QA sat
-                    # in exactly that state for days on 2026-08-17 -- all 764 backends
-                    # pinned, sv_idle 0, the oldest client queued 2.4 days, the daemon
-                    # frozen mid-backfill-cancellation -- and it could only be cleared
-                    # by deleting run workers by hand.
-                    #
-                    # 600s keeps the original intent with a large margin (5x the 1-2
-                    # minutes checkpoint pressure actually lasts) while restoring the
-                    # property that a wedged pool eventually unwedges itself. A client
-                    # that waits ten minutes for a connection is not going to be
-                    # rescued by waiting longer; it needs to fail so the pool can drain
-                    # and Dagster's own retry logic can take over.
-                    "query_wait_timeout = 600",
-                    # Dagster uses NullPool, so it opens a fresh connection per query
-                    # and every connection logs with age=0s. Measured on one production
-                    # pod: 27,738 lines in 3 minutes, ~154 lines/s per replica and
-                    # ~925/s across six, all of it shipped to Loki. The one line that
-                    # carries signal -- the per-minute `stats:` aggregate -- was 1 in
-                    # ~9,000. The pgbouncer_exporter sidecar now collects the same
-                    # connection counts as metrics, so these logs are pure cost.
-                    "log_connections = 0",
-                    "log_disconnections = 0",
-                    # Required by pgbouncer_exporter: its PostgreSQL driver sends
-                    # extra_float_digits on connect, and PgBouncer rejects unknown
-                    # startup parameters unless they are listed here.
-                    "ignore_startup_parameters = extra_float_digits",
-                    "application_name_add_host = 1",
-                    "",
-                ]
-            )
-        )
-    },
+    data={"pgbouncer.ini.template": pgbouncer_ini_template},
     # The provider replaces this ConfigMap on any data change, and its name is fixed,
     # so the replacement can only be delete-then-create. Make that ordering explicit
     # rather than letting the default create-before-delete attempt fail on
     # "configmaps ... already exists" and recover on the retry.
     opts=ResourceOptions(depends_on=[dagster_db_secret], delete_before_replace=True),
 )
+
+# An init container renders the template above into pgbouncer.ini at pod start, so
+# PgBouncer only ever reads this config once, when its pod boots. Updating the
+# ConfigMap therefore changes nothing about a running pool -- and because the
+# Deployment's pod template does not otherwise reference the ConfigMap's content,
+# nothing rolls the pods either. A config edit deploys clean, reports success, and
+# silently never takes effect.
+#
+# That is not hypothetical: it has now happened twice. max_db_connections (#5426)
+# only became live because someone manually restarted the deployment, and
+# query_wait_timeout = 600 (#5454) sat inert in production and QA -- ConfigMaps
+# showing 600, all eight running pods still on 0 -- until the pods were restarted
+# by hand after the fact. The deadlock protection that change exists to provide was
+# absent for as long as nobody thought to check SHOW CONFIG.
+#
+# Injecting the rendered template's hash into the pod template makes a config edit
+# roll the pods the same way an image change would. This mirrors
+# dagster_instance_checksum_annotation further down, which exists for exactly this
+# reason on the other ConfigMap mounted into these pods (#5373).
+#
+# The hash is stable across deploys that change nothing: the template embeds
+# ${PGUSER}/${PGPASSWORD} as literal placeholders rather than resolved credentials,
+# so Vault rotation does not perturb it, and the only inputs that move it are the
+# RDS address and the pool settings themselves.
+pgbouncer_config_checksum_annotation = {
+    "checksum/ol-pgbouncer-config": pgbouncer_ini_template.apply(
+        lambda template: hashlib.sha256(template.encode()).hexdigest()
+    ),
+}
 
 # PgBouncer Deployment; replica count (default 2, for HA) is resolved above.
 pgbouncer_deployment = kubernetes.apps.v1.Deployment(
@@ -792,6 +919,10 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
                     "component": "pgbouncer",
                     **k8s_global_labels.model_dump(),
                 },
+                # Rolls these pods when the pgbouncer ConfigMap changes; without it a
+                # config edit never reaches the running processes. See the annotation's
+                # definition above.
+                annotations=pgbouncer_config_checksum_annotation,
             ),
             spec=kubernetes.core.v1.PodSpecArgs(
                 init_containers=[
@@ -1000,14 +1131,18 @@ pgbouncer_service = kubernetes.core.v1.Service(
 # whole integration. Pattern (including the "release": "prometheus" discovery label)
 # follows applications/clickhouse/__main__.py.
 #
-# These are the metrics every open pool-sizing question turns on:
-#   pgbouncer_pools_server_active_connections   -- is default_pool_size = 800 right?
-#   pgbouncer_pools_server_idle_connections     -- what is min_pool_size parking?
-#   pgbouncer_pools_client_active_connections   -- is max_client_conn a real ceiling?
+# These are the metrics the pool-sizing questions turn on. The first pass of answers
+# is what the numbers above were re-tuned from; keep watching them, because the
+# settings are now supposed to track demand rather than sit above it:
+#   pgbouncer_pools_server_active_connections   -- real demand (peak 122 aggregate)
+#   pgbouncer_pools_server_idle_connections     -- what min_pool_size parks (was 900)
+#   pgbouncer_pools_client_active_connections   -- client demand (peak 129 / 35 a pod)
 #   pgbouncer_pools_client_waiting_connections  -- is max_db_connections too tight?
 #   pgbouncer_pools_client_maxwait_seconds      -- the number pool tuning turns on,
 #                                                  unobtainable from the stats log
 #   sum of the above vs. max_connections        -- the 2026-08-10 headroom alert
+# Per-pod, not just aggregate: max_db_connections is derived as budget / replica
+# count, so a skewed pod saturates while the aggregate still looks calm.
 pgbouncer_service_monitor = kubernetes.apiextensions.CustomResource(
     f"dagster-pgbouncer-service-monitor-{stack_info.env_suffix}",
     api_version="monitoring.coreos.com/v1",
@@ -1050,6 +1185,504 @@ pgbouncer_service_monitor = kubernetes.apiextensions.CustomResource(
         ],
     },
     opts=ResourceOptions(depends_on=[pgbouncer_service]),
+)
+
+# ============================================================================
+# SQL exporter against the Dagster metadata database
+# ============================================================================
+# Dagster OSS exposes no /metrics endpoint and ships no OTel instrumentation, so
+# the metadata Postgres is the only place Dagster-domain signal exists at all.
+# Everything the cluster knows today is about containers: kube_job_* says a run
+# worker exited, never that a run waited nine minutes to start, that the queue is
+# 400 deep, or that the sensor daemon stopped heartbeating -- which is precisely
+# what nobody could see on 2026-08-10, when the daemon sat 25 minutes behind 178
+# run workers and the only visible number was a connection count.
+#
+# Two properties are load-bearing, not incidental:
+#
+# 1. It connects DIRECTLY to RDS, not through PgBouncer. The pool's own metrics
+#    are the other half of this project, and an exporter polling through the pool
+#    would add its connections to the very counts being used to size it.
+#
+# 2. Every query is bounded, and bounded by primary key rather than by time.
+#    runs and job_ticks are large and neither has an index on a bare timestamp, so
+#    a "last 10 minutes" predicate is a full index scan that grows with the table.
+#    id is monotonic, so `id > (SELECT max(id) - N)` is a range scan whose cost is
+#    fixed at N rows no matter how big the table gets. Verified with EXPLAIN
+#    (ANALYZE, BUFFERS) against a local Postgres carrying this exact schema and
+#    60k runs / 200k ticks: every query is an index scan, none touch the heap
+#    beyond the window, and the full scrape completes in ~31ms.
+#
+# The connection budget is deliberately tiny -- 2 connections, and the DSN sets a
+# 10s statement_timeout so no plan this exporter issues can pin a backend. That
+# timeout is not decorative: it was confirmed to reach the server by setting it to
+# 1ms and watching every query come back 57014.
+SQL_EXPORTER_RUN_WINDOW = 20000
+SQL_EXPORTER_TICK_WINDOW = 20000
+SQL_EXPORTER_STATEMENT_TIMEOUT_MS = 10000
+SQL_EXPORTER_PORT = 9399
+
+# Note on time arithmetic: Dagster stores create_timestamp/timestamp as naive UTC.
+# now() is timestamptz, and subtracting a naive timestamp from it silently converts
+# using the *session* timezone -- correct only as long as nobody changes it. Every
+# such expression below pins it with `now() AT TIME ZONE 'UTC'`. start_time is
+# already epoch seconds, so it is compared against extract(epoch FROM ...) instead.
+# The S608 suppression on the closing quote is because the only interpolations are
+# the integer window constants defined directly above -- nothing user-supplied or
+# config-supplied reaches these queries.
+sql_exporter_config = f"""\
+global:
+  scrape_timeout_offset: 500ms
+  # A floor on how often the collector may hit the database, independent of how
+  # often Prometheus scrapes. The ServiceMonitor asks for 60s, so this only binds
+  # if something else starts scraping too.
+  min_interval: 30s
+  max_connections: 2
+  max_idle_connections: 2
+  max_connection_lifetime: 10m
+
+# No `target:` block on purpose. The DSN carries a Vault-issued credential, so it
+# arrives as an environment variable rather than in this ConfigMap -- and
+# SQLEXPORTER_TARGET_DSN is only consulted when the file declares no target at all.
+# A target block with the DSN omitted does not fall back to the environment; it
+# fails at startup with "missing data_source_name for target".
+collectors:
+  - collector_name: dagster
+    metrics:
+      - metric_name: dagster_runs_in_flight
+        type: gauge
+        help: "Runs that have not reached a terminal state, by status."
+        key_labels: [status]
+        values: [runs]
+        # LEFT JOINed against a VALUES list so every status reports a number even
+        # when it has no rows. A GROUP BY alone would drop the series entirely,
+        # and "no QUEUED runs" and "the exporter stopped reporting" would look
+        # identical to an alert.
+        query: |
+          SELECT s.status AS status, coalesce(r.n, 0) AS runs
+          FROM (VALUES ('QUEUED'), ('NOT_STARTED'), ('STARTING'), ('STARTED'),
+                       ('CANCELING')) AS s (status)
+          LEFT JOIN (
+              SELECT status, count(*) AS n
+              FROM runs
+              WHERE status IN ('QUEUED', 'NOT_STARTED', 'STARTING', 'STARTED',
+                               'CANCELING')
+              GROUP BY status
+          ) AS r ON r.status = s.status
+
+      - metric_name: dagster_oldest_queued_run_age_seconds
+        type: gauge
+        help: "Age of the oldest run still in QUEUED, in seconds. 0 when none."
+        values: [seconds]
+        # Queue depth alone cannot distinguish a healthy burst from a stuck
+        # coordinator; this can. Reads only the QUEUED slice of idx_run_status.
+        query: |
+          SELECT coalesce(
+              extract(epoch FROM ((now() AT TIME ZONE 'UTC')
+                                  - min(create_timestamp))), 0) AS seconds
+          FROM runs
+          WHERE status = 'QUEUED'
+
+      - metric_name: dagster_run_wait_to_start_seconds
+        type: gauge
+        help: "Seconds from run creation to run start over the recent window."
+        value_label: quantile
+        values: [p50, p95, max]
+        query_ref: recent_run_waits
+
+      # No _total suffix on any of the three window metrics below. They are gauges
+      # over a sliding id window, so they fall as runs leave the window -- and _total
+      # tells a consumer this is a monotonic counter, which invites rate() and makes
+      # every ordinary decrease look like a counter reset.
+      - metric_name: dagster_recent_runs
+        type: gauge
+        help: "Runs in the recent window that reached a terminal state, by status."
+        key_labels: [status]
+        values: [runs]
+        query: |
+          SELECT s.status AS status, coalesce(r.n, 0) AS runs
+          FROM (VALUES ('SUCCESS'), ('FAILURE'), ('CANCELED')) AS s (status)
+          LEFT JOIN (
+              SELECT status, count(*) AS n
+              FROM runs
+              WHERE id > (SELECT max(id) - {SQL_EXPORTER_RUN_WINDOW} FROM runs)
+              GROUP BY status
+          ) AS r ON r.status = s.status
+
+      - metric_name: dagster_recent_retried_runs
+        type: gauge
+        help: "Runs in the recent window carrying a dagster/retry_number tag."
+        values: [runs]
+        # run_retries.max_retries = 3 means a job can fail repeatedly and still
+        # report SUCCESS, so the run status alone hides chronic flakiness.
+        query: |
+          SELECT count(*) AS runs
+          FROM runs AS r
+          INNER JOIN run_tags AS rt ON rt.run_id = r.run_id
+          WHERE r.id > (SELECT max(id) - {SQL_EXPORTER_RUN_WINDOW} FROM runs)
+            AND rt.key = 'dagster/retry_number'
+
+      - metric_name: dagster_recent_job_ticks
+        type: gauge
+        help: "Sensor and schedule ticks in the recent window, by type and status."
+        key_labels: [tick_type, status]
+        values: [ticks]
+        # A sensor that starts erroring stops launching runs and says nothing;
+        # the only evidence is FAILURE ticks piling up in this table.
+        #
+        # STARTED is the fourth member of dagster's TickStatus enum and is
+        # persisted like the rest. Leaving it out would drop exactly the ticks
+        # that are in flight or wedged mid-evaluation -- the interesting ones --
+        # from a metric that claims to break ticks down by status.
+        query: |
+          SELECT c.type AS tick_type, c.status AS status,
+                 coalesce(x.n, 0) AS ticks
+          FROM (
+              SELECT t.type, s.status
+              FROM (VALUES ('SENSOR'), ('SCHEDULE'),
+                           ('AUTO_MATERIALIZE')) AS t (type)
+              CROSS JOIN (VALUES ('SUCCESS'), ('FAILURE'), ('SKIPPED'),
+                                 ('STARTED')) AS s (status)
+          ) AS c
+          LEFT JOIN (
+              SELECT type, status, count(*) AS n
+              FROM job_ticks
+              WHERE id > (SELECT max(id) - {SQL_EXPORTER_TICK_WINDOW}
+                          FROM job_ticks)
+              GROUP BY type, status
+          ) AS x ON x.type = c.type AND x.status = c.status
+
+      - metric_name: dagster_daemon_heartbeat_age_seconds
+        type: gauge
+        help: "Seconds since each Dagster daemon last wrote a heartbeat."
+        key_labels: [daemon_type]
+        values: [seconds]
+        # The 2026-08-10 incident surfaced as a daemon falling 25 minutes behind.
+        # This is that symptom, measured directly, off a table with five rows.
+        query: |
+          SELECT daemon_type,
+                 extract(epoch FROM ((now() AT TIME ZONE 'UTC') - timestamp))
+                     AS seconds
+          FROM daemon_heartbeats
+
+      - metric_name: dagster_relation_bytes
+        type: gauge
+        help: "On-disk size of the Dagster metadata tables, including indexes."
+        key_labels: [relation]
+        values: [bytes]
+        query: |
+          SELECT c.relname AS relation, pg_total_relation_size(c.oid) AS bytes
+          FROM pg_class AS c
+          INNER JOIN pg_namespace AS n ON n.oid = c.relnamespace
+          WHERE n.nspname = 'public'
+            AND c.relkind = 'r'
+            AND c.relname IN ('runs', 'run_tags', 'event_logs', 'job_ticks',
+                              'asset_event_tags', 'asset_keys',
+                              'concurrency_slots', 'bulk_actions')
+
+    queries:
+      - query_name: recent_run_waits
+        # create_timestamp is naive UTC and start_time is epoch seconds, so the
+        # difference is taken in epoch space rather than as an interval.
+        query: |
+          WITH recent AS (
+              SELECT start_time - extract(epoch FROM create_timestamp) AS wait
+              FROM runs
+              WHERE id > (SELECT max(id) - {SQL_EXPORTER_RUN_WINDOW} FROM runs)
+                AND start_time IS NOT NULL
+          )
+          SELECT
+              coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY wait), 0)
+                  AS p50,
+              coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY wait), 0)
+                  AS p95,
+              coalesce(max(wait), 0) AS max
+          FROM recent
+"""  # noqa: S608
+
+# Read-only Vault credentials, on the same postgres-dagster mount the application
+# uses. The readonly role grants SELECT and nothing else, which is all of these
+# queries need -- including pg_total_relation_size, confirmed by running the whole
+# collector against a role holding only SELECT.
+#
+# The role is selected by `path` alone. An earlier version of this also passed
+# refresh_after, revoke_on_delete and role_name, copied from dagster_db_secret
+# above -- all three are inert and were removed rather than left to imply a
+# rotation and revocation policy that is not in effect:
+#
+#   refresh_after     is a real field on the config model, but OLVaultK8SSecret
+#                     only renders spec.refreshAfter for STATIC secrets. Moot
+#                     regardless: VSO documents the source lease duration as
+#                     taking precedence whenever it is greater than 0, and this
+#                     mount issues 3-month leases (OLVaultDatabaseConfig
+#                     default_ttl = ONE_MONTH_SECONDS * 3).
+#   revoke_on_delete  is not a field on the config model at all, so Pydantic
+#                     drops it silently. VSO does support spec.revoke; the
+#                     component never renders it, so deleting this resource
+#                     leaves the lease valid for the rest of its TTL. That gap
+#                     is repo-wide, not specific to this resource, and is worth
+#                     fixing in OLVaultK8SSecret rather than here.
+#   role_name         is not a field either, and VSO has no such concept -- the
+#                     Vault role is the last path segment.
+dagster_sql_exporter_db_secret = OLVaultK8SSecret(
+    f"dagster-k8s-sql-exporter-db-secret-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SDynamicSecretConfig(
+        dest_secret_labels=k8s_global_labels.model_dump(),
+        dest_secret_name="dagster-sql-exporter-postgresql-secret",  # pragma: allowlist secret  # noqa: E501, S106
+        labels=k8s_global_labels.model_dump(),
+        mount="postgres-dagster",
+        name="dagster-sql-exporter-postgresql-secret",
+        namespace=dagster_namespace,
+        path="creds/readonly",
+        # The DSN is assembled from these at container start, so a new credential
+        # only reaches the process when the pod restarts.
+        restart_target_kind="Deployment",
+        restart_target_name="dagster-sql-exporter",
+        vaultauth=dagster_auth_binding.vault_k8s_resources.auth_name,
+        templates={
+            "PGUSER": "{{ .Secrets.username }}",
+            "PGPASSWORD": "{{ .Secrets.password }}",
+        },
+    ),
+    opts=ResourceOptions(depends_on=[dagster_auth_binding]),
+)
+
+sql_exporter_config_map = kubernetes.core.v1.ConfigMap(
+    f"dagster-sql-exporter-config-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-sql-exporter-config",
+        namespace=dagster_namespace,
+        labels=k8s_global_labels.model_dump(),
+    ),
+    data={"sql_exporter.yml": sql_exporter_config},
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
+# sql_exporter reads its config once, at process start. Same trap as pgbouncer.ini
+# and dagster_instance.yaml before it: without this, editing a query deploys clean,
+# reports success, and changes nothing about the running exporter. See the comment
+# on pgbouncer_config_checksum_annotation for the two times that actually happened.
+sql_exporter_config_checksum_annotation = {
+    "checksum/ol-sql-exporter-config": hashlib.sha256(
+        sql_exporter_config.encode()
+    ).hexdigest(),
+}
+
+sql_exporter_deployment = kubernetes.apps.v1.Deployment(
+    f"dagster-sql-exporter-deployment-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-sql-exporter",
+        namespace=dagster_namespace,
+        labels=k8s_global_labels.model_dump(),
+    ),
+    spec=kubernetes.apps.v1.DeploymentSpecArgs(
+        # One replica, deliberately. A second would double every gauge's cardinality
+        # by pod label while measuring the same database, and there is nothing here
+        # to make highly available -- a gap in metrics is a gap in metrics.
+        replicas=1,
+        selector=kubernetes.meta.v1.LabelSelectorArgs(
+            match_labels={
+                "component": "sql-exporter",
+                **k8s_global_labels.model_dump(),
+            },
+        ),
+        template=kubernetes.core.v1.PodTemplateSpecArgs(
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                labels={
+                    "component": "sql-exporter",
+                    **k8s_global_labels.model_dump(),
+                },
+                annotations=sql_exporter_config_checksum_annotation,
+            ),
+            spec=kubernetes.core.v1.PodSpecArgs(
+                containers=[
+                    kubernetes.core.v1.ContainerArgs(
+                        name="sql-exporter",
+                        image=(f"burningalchemist/sql_exporter:{SQL_EXPORTER_VERSION}"),
+                        args=[
+                            "-config.file=/etc/sql_exporter/sql_exporter.yml",
+                        ],
+                        env=[
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="PGUSER",
+                                value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                    secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                        name="dagster-sql-exporter-postgresql-secret",
+                                        key="PGUSER",
+                                    ),
+                                ),
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="PGPASSWORD",
+                                value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                    secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                        name="dagster-sql-exporter-postgresql-secret",
+                                        key="PGPASSWORD",
+                                    ),
+                                ),
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="SQLEXPORTER_TARGET_NAME",
+                                value="dagster",
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="SQLEXPORTER_TARGET_COLLECTORS",
+                                value="dagster",
+                            ),
+                            # $(VAR) is expanded by Kubernetes from the two secret
+                            # vars declared above it, so the credential never lands
+                            # in the ConfigMap or in this repo. Same mechanism as
+                            # GCLOUD_FM_COLLECTOR_ID in substructure/aws/eks/grafana.
+                            #
+                            # This is a URL, so the password has to be URL-safe.
+                            # Vault's default database password generator emits
+                            # [A-Za-z0-9-] only and no password_policy is set on this
+                            # mount, so it is -- but that is an assumption worth
+                            # knowing about if anyone ever sets one.
+                            #
+                            # options=--statement_timeout is the libpq --name=value
+                            # form on purpose: the more common `-c name=value` form
+                            # is mangled in transit and the server rejects it with
+                            # "invalid command-line argument for server process: -c".
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="SQLEXPORTER_TARGET_DSN",
+                                value=dagster_db.db_instance.address.apply(
+                                    lambda addr: (
+                                        "postgres://$(PGUSER):$(PGPASSWORD)@"
+                                        f"{addr}:{DEFAULT_POSTGRES_PORT}/dagster"
+                                        "?sslmode=require&options=--statement_timeout"
+                                        f"%3D{SQL_EXPORTER_STATEMENT_TIMEOUT_MS}"
+                                    )
+                                ),
+                            ),
+                        ],
+                        ports=[
+                            kubernetes.core.v1.ContainerPortArgs(
+                                name="metrics",
+                                container_port=SQL_EXPORTER_PORT,
+                                protocol="TCP",
+                            ),
+                        ],
+                        volume_mounts=[
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="config",
+                                mount_path="/etc/sql_exporter",
+                                read_only=True,
+                            ),
+                        ],
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            requests={
+                                "cpu": "10m",
+                                "memory": "32Mi",
+                            },
+                            limits={
+                                "memory": "128Mi",
+                            },
+                        ),
+                        # /healthz, not /metrics. /metrics fails whenever the
+                        # database is unreachable, which is exactly when this
+                        # exporter should stay up and report up=0 rather than
+                        # crash-loop and report nothing.
+                        liveness_probe=kubernetes.core.v1.ProbeArgs(
+                            http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                                path="/healthz",
+                                port=SQL_EXPORTER_PORT,
+                            ),
+                            initial_delay_seconds=10,
+                            period_seconds=30,
+                            failure_threshold=3,
+                        ),
+                    ),
+                ],
+                volumes=[
+                    kubernetes.core.v1.VolumeArgs(
+                        name="config",
+                        config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                            name="dagster-sql-exporter-config",
+                        ),
+                    ),
+                ],
+            ),
+        ),
+    ),
+    opts=ResourceOptions(
+        depends_on=[dagster_sql_exporter_db_secret, sql_exporter_config_map]
+    ),
+)
+
+sql_exporter_service = kubernetes.core.v1.Service(
+    f"dagster-sql-exporter-service-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-sql-exporter",
+        namespace=dagster_namespace,
+        labels={
+            "component": "sql-exporter",
+            **k8s_global_labels.model_dump(),
+        },
+    ),
+    spec=kubernetes.core.v1.ServiceSpecArgs(
+        type="ClusterIP",
+        selector={
+            "component": "sql-exporter",
+            **k8s_global_labels.model_dump(),
+        },
+        ports=[
+            kubernetes.core.v1.ServicePortArgs(
+                name="metrics",
+                port=SQL_EXPORTER_PORT,
+                target_port=SQL_EXPORTER_PORT,
+                protocol="TCP",
+            ),
+        ],
+    ),
+    opts=ResourceOptions(depends_on=[sql_exporter_deployment]),
+)
+
+# 60s is the resolution these questions need -- a queue that is 400 deep for two
+# minutes matters, a single scrape does not -- and it keeps the collector's
+# min_interval of 30s from ever serving a cached result.
+sql_exporter_service_monitor = kubernetes.apiextensions.CustomResource(
+    f"dagster-sql-exporter-service-monitor-{stack_info.env_suffix}",
+    api_version="monitoring.coreos.com/v1",
+    kind="ServiceMonitor",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-sql-exporter",
+        namespace=dagster_namespace,
+        labels={
+            **k8s_global_labels.model_dump(),
+            # Label required for Prometheus Operator to discover this ServiceMonitor
+            "release": "prometheus",
+        },
+    ),
+    spec={
+        "selector": {
+            "matchLabels": {
+                "component": "sql-exporter",
+                **k8s_global_labels.model_dump(),
+            },
+        },
+        "namespaceSelector": {"matchNames": [dagster_namespace]},
+        "endpoints": [
+            {
+                "port": "metrics",
+                "path": "/metrics",
+                "scheme": "http",
+                "interval": "60s",
+                "scrapeTimeout": "30s",
+                "relabelings": [
+                    {
+                        "sourceLabels": ["__meta_kubernetes_pod_name"],
+                        "targetLabel": "pod",
+                    },
+                    {
+                        "sourceLabels": ["__meta_kubernetes_namespace"],
+                        "targetLabel": "namespace",
+                    },
+                ],
+            }
+        ],
+    },
+    opts=ResourceOptions(depends_on=[sql_exporter_service]),
 )
 
 # APISix OIDC configuration for authentication

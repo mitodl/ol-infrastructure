@@ -1088,6 +1088,7 @@ gateway_api_crds = setup_traefik(
     lb_controller=lb_controller,
     fastly_provider=fastly_provider,
     vpa_release=vpa_release,
+    stack_info=stack_info,
 )
 
 setup_apisix(

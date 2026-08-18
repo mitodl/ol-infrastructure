@@ -5,13 +5,11 @@ _has_branch_protection: false
 _pushed_at: '2017-10-03T19:38:47Z'
 _ruleset_count: 0
 _visibility: public
-allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true
 archetype: fork
 default_branch: reddit
-delete_branch_on_merge: false
 description: Python Thrift driver for Apache Cassandra
 has_discussions: false
 has_projects: true

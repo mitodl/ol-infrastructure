@@ -5,13 +5,11 @@ _has_branch_protection: false
 _pushed_at: '2025-10-20T14:45:02Z'
 _ruleset_count: 0
 _visibility: public
-allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true
 archetype: fork
 default_branch: master
-delete_branch_on_merge: false
 description: A Django-based microservice for handling Enterprise catalogs, associating
   enterprise customers with curated courses from the full course catalog.
 has_discussions: false

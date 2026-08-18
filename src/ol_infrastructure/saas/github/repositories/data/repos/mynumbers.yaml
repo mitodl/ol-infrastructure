@@ -3,16 +3,14 @@ _custom_properties:
   tier: unmanaged
 _excluded_environments: 1
 _has_branch_protection: false
-_pushed_at: '2026-08-13T08:21:52Z'
+_pushed_at: '2026-08-17T07:33:19Z'
 _ruleset_count: 0
 _visibility: public
-allow_auto_merge: false
 allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true
 archetype: fork
 default_branch: main
-delete_branch_on_merge: false
 description: fun wih arithmetic
 has_discussions: false
 has_projects: true
@@ -24,7 +22,6 @@ squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
   arbisoft-contractors: push
-  code-owners: push
   odl-engineering: push
   odl-engineering-owners: admin
 web_commit_signoff_required: false

@@ -9,11 +9,10 @@ _actions_secret_names:
 _custom_properties:
   tier: tier-1
 _excluded_environments: 44
-_has_branch_protection: true
-_pushed_at: '2026-08-14T20:19:39Z'
+_has_branch_protection: false
+_pushed_at: '2026-08-17T20:27:55Z'
 _ruleset_count: 3
 _visibility: public
-allow_auto_merge: false
 allow_merge_commit: false
 allow_rebase_merge: false
 allow_squash_merge: true

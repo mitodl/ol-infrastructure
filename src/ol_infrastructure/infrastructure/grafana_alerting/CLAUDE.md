@@ -78,7 +78,7 @@ Rootly). That path is independent of Grafana and is managed in
 | `alertmanager.py` | Contact points (Rootly, Slack, oblivion drop sink) and the notification policy route tree. Translates `grafana-alerts/alertmanager.yaml`. |
 | `metric_rules/` | Package. Grafana-managed alert rule groups for Prometheus/Mimir metrics. Migrated from `grafana-alerts/cortex-rules/`. |
 | `metric_rules/base.py` | Mimir datasource UIDs, two-stage pipeline helper, folder creation, delegates to sub-modules. |
-| `metric_rules/eks_general.py` | EKS workload alert rules (replicas, node readiness, crash loops, OOM, jobs, HPA). |
+| `metric_rules/eks_general.py` | EKS workload alert rules (replicas, node readiness, crash loops, OOM, job failures, CronJob staleness, HPA). |
 | `metric_rules/linux_host.py` | Linux host alert rules (CPU, memory, disk usage). |
 | `metric_rules/apisix_edge.py` | Per-host 5xx rate at the APISIX edge (`apisix_http_status`). Two windows (fast cliff / slow creep) with a minimum-traffic gate. Currently unlabelled → `oblivion` while calibrating. |
 | `metric_rules/dagster_pgbouncer.py` | Dagster's PgBouncer pool (`pgbouncer_*`, from the exporter sidecar added in #5426). Aggregate connections against the derived `max_db_connections` cap, clients queued behind it, and exporter health. The denominator is read from `pgbouncer_databases_max_connections` rather than hardcoded, because the cap differs per environment. |
@@ -414,6 +414,15 @@ The same mechanism silently swallows rules that lost their label *by accident*:
 `HTTPRequestDurationTooHighAvg` fired 1,168 times in 30 days into `oblivion`
 before anyone noticed. When adding a rule, be explicit about which of the two
 you mean.
+
+**Route 2 swallows by *name*, not just by missing label.** `alertname =~ Kube.*`
+sits above the severity routes and carries `continue_=False`, so any rule whose
+name starts with `Kube` goes to `oblivion` no matter what `severity` it carries.
+Our own `KubernetesJobFailedWarning`/`Critical` matched it and were undeliverable
+for as long as they existed — 254 firings in 30 days on the production stack and
+104 on QA, none of which reached Rootly. They are now `WorkloadJobFailed*`.
+**Do not name a rule `Kube*` unless you intend it to be silenced**; route 2 is
+meant for the built-in kube-state-metrics alerts, not for rules defined here.
 
 ---
 

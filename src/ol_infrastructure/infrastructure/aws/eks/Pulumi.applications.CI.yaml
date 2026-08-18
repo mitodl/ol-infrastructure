@@ -29,9 +29,7 @@ config:
   - courses-backend.ci.learn.mit.edu
   - courses-backend.ci.xpro.mit.edu
   - dcc.ci.learn.mit.edu
-  - meilisearch-ci.mitx.mit.edu
   - meilisearch-ci.xpro.mit.edu
-  - meilisearch-staging-ci.mitx.mit.edu
   - meilisearch.courses.ci.learn.mit.edu
   - micromasters-ci-backend.odl.mit.edu
   - nb.ci.learn.mit.edu

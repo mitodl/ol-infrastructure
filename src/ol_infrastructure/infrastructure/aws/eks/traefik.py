@@ -7,6 +7,8 @@ from pulumi import Config, InvokeOptions, Output, ResourceOptions
 from bridge.lib.magic_numbers import AWS_LOAD_BALANCER_NAME_MAX_LENGTH
 from ol_infrastructure.lib.aws.eks_helper import ECR_DOCKERHUB_REGISTRY
 from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.pulumi_helper import StackInfo
+from ol_infrastructure.lib.toolhive_telemetry import ships_telemetry
 
 
 def setup_traefik(
@@ -25,6 +27,7 @@ def setup_traefik(
     lb_controller,
     fastly_provider: fastly.Provider,
     vpa_release: kubernetes.helm.v3.Release,
+    stack_info: StackInfo,
 ):
     """
     Configure and install the Traefik ingress controller.
@@ -44,6 +47,7 @@ def setup_traefik(
     :param lb_controller: The AWS Load Balancer Controller.
     :param fastly_provider: The Fastly provider instance.
     :param vpa_release: The VPA Helm release; ensures VPA CRDs exist before the VPA object is created.
+    :param stack_info: Stack identity, used to tag traces with deployment.environment.
 
     :return: The Gateway API CRDs.
     """
@@ -226,6 +230,48 @@ def setup_traefik(
                         },
                     },
                 },
+                # Without this, everything Traefik fronts starts its own trace.
+                # learn-nextjs is the clearest case: every one of its traces
+                # roots at learn-nextjs rather than at the edge, so a request
+                # cannot be followed from the gateway into the SSR render --
+                # unlike the services behind APISIX, which do get an edge root
+                # span and a propagated traceparent.
+                #
+                # Traefik emits a server span per request and injects
+                # traceparent upstream, which is the piece that was missing.
+                #
+                # Gated on ships_telemetry because setup_grafana early-returns
+                # on CI: there is no Alloy receiver there, and pointing an
+                # exporter at a Service that does not resolve buys a steady
+                # stream of export errors and nothing else.
+                **(
+                    {
+                        "tracing": {
+                            "serviceName": "traefik",
+                            # No head sampling. The Grafana Alloy tail sampler
+                            # owns that decision and needs whole traces to make
+                            # it, so sampling here would only degrade it.
+                            # APISIX runs always_on for the same reason.
+                            "sampleRate": 1.0,
+                            "resourceAttributes": {
+                                "deployment.environment": stack_info.env_suffix,
+                            },
+                            "otlp": {
+                                "enabled": True,
+                                "http": {
+                                    "enabled": True,
+                                    # Explicit /v1/traces. The chart documents
+                                    # its default as /v1/tracing, which is not
+                                    # the OTLP path and would 404 against the
+                                    # Alloy receiver.
+                                    "endpoint": "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces",
+                                },
+                            },
+                        }
+                    }
+                    if ships_telemetry(stack_info)
+                    else {}
+                ),
                 "service": {
                     # These control the configuration of the network load balancer that EKS will create
                     # automatically and point at every traefik pod.
