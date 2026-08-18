@@ -1774,6 +1774,30 @@ dagster_helm_values = {
             {"name": "dagster-dbt-secrets"},
             {"name": "dagster-postgresql-secret"},
         ],
+        # Every connection the daemon makes goes to one destination tuple -- the
+        # PgBouncer ClusterIP on 5432 -- so its concurrent connection ceiling is
+        # the size of the pod's ephemeral port range, and nothing else in the
+        # cluster shares those ports because each pod has its own netns. The
+        # kernel default of 32768-60999 is 28232 ports, and on 2026-08-18 the
+        # daemon consumed all of them: TIME_WAIT is a fixed 60s, so the 331
+        # connects/second the NullPool storages were doing parked ~20k sockets
+        # at steady state and any burst pushed the total past the range, after
+        # which connect() returns EADDRNOTAVAIL.
+        #
+        # The pooled storage classes in dagster_instance.yaml are the actual fix
+        # for that churn; this widens the range to 55296 ports so the pod has
+        # room to absorb a burst regardless, and so a future regression degrades
+        # instead of failing outright. It is deliberately not a substitute --
+        # doubling the range only doubles the rate that exhausts it.
+        #
+        # net.ipv4.ip_local_port_range has been a Kubernetes safe sysctl since
+        # 1.27 (the cluster runs 1.36), so it needs no kubelet allowlist and
+        # passes the baseline Pod Security Standard.
+        "podSecurityContext": {
+            "sysctls": [
+                {"name": "net.ipv4.ip_local_port_range", "value": "10240 65535"},
+            ],
+        },
         "resources": {
             "requests": {
                 "cpu": "500m",
