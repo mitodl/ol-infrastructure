@@ -3125,14 +3125,18 @@ alerts_source_grafana_prometheus_qa = rootly.AlertsSource(
     opts=rootly_alert_source_opts,
 )
 
-# CI/QA alerts currently have no effective routing to any Slack-visible
-# destination (confirmed against the live Rootly account), unlike Production,
-# which has two catch-all routes. So these alerts aren't cluttering
-# #devops-alerts today -- they're most likely not reaching Slack anywhere.
-# This adds a real route for both, additive alongside whatever else (if
-# anything) exists per source, per Rootly's own guidance: alerts fan out
-# across every route connected to their source, so adding a second route
-# here doesn't disturb any other existing routing.
+# As of 2026-07-22 (when this was added), CI/QA alerts had no effective
+# routing to any Slack-visible destination (confirmed against the live
+# Rootly account), unlike Production, which has two catch-all routes -- so
+# they weren't cluttering #devops-alerts, but were most likely not reaching
+# Slack anywhere either. This adds a real route for both, additive alongside
+# whatever else (if anything) exists per source, per Rootly's own guidance:
+# alerts fan out across every route connected to their source, so adding a
+# second route here doesn't disturb any other existing routing.
+#
+# That route's fallback rule then shipped disabled until 2026-08-18 -- see
+# the AlertRoute resources below -- so the "no effective routing" gap
+# persisted well past this comment being written. It's closed now.
 #
 # Per Rootly support: the recommended way to target a Slack channel is via an
 # EscalationPolicy whose level notifies the channel directly (as opposed to
