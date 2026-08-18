@@ -35,3 +35,13 @@ config:
   # load spreads evenly across replicas, and measured distribution is heavily
   # skewed, so the binding limit is whichever replica saturates first.
   dagster:max_concurrent_runs: 80
+  # event_log_storage's QueuePool ceiling, sized after the daemon logged
+  # 1000+ "QueuePool limit" timeouts in 41 minutes on 2026-08-18 under
+  # automation_condition_evaluator load. See the full derivation, including
+  # the per-pod PgBouncer math this is checked against, in
+  # dagster_instance.yaml's event_log_storage comment. Not set on QA: its
+  # per-pod cap (382) is already tight enough that a prior run-worker
+  # incident deadlocked the whole pool, and it has not shown this failure
+  # mode, so it stays on the conservative fallback in __main__.py.
+  dagster:event_log_pool_size: 100
+  dagster:event_log_max_overflow: 50
