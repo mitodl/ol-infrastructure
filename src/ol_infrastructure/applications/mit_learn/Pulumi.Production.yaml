@@ -106,7 +106,24 @@ config:
     MITX_ONLINE_COURSES_API_URL: "https://mitxonline.mit.edu/api/internal/courses/"
     MITX_ONLINE_PROGRAMS_API_URL: "https://mitxonline.mit.edu/api/v2/programs/"
     MITPE_API_ENABLED: "true"
-    OCW_ITERATOR_CHUNK_SIZE: 300
+    # Lowered 2026-08-17, 300 -> 50, to stop the default celery worker
+    # OOMKilling. This is the batch size get_ocw_data chunks by when it fans out
+    # get_ocw_courses tasks, so it sets how many OCW courses one task pulls from
+    # S3 and holds at once -- i.e. it is the dominant term in that task's peak
+    # RSS, and nothing else bounds it. Default workers idle at ~550Mi but were
+    # observed at 3.7-4.9Gi while running get_ocw_courses (two at a time, since
+    # the shared component hardcodes --concurrency=2), against a VPA-derived 6Gi
+    # limit: ~301 container restarts in 24h, exit 137. The worker's VPA is
+    # already pinned at its 3Gi max_allowed ceiling with an uncappedTarget of
+    # 5.15Gi, so it has no room left to absorb this -- raising memory again
+    # (#5142, #5152, #5162, #5321) would be the fifth such round. 50 cuts the
+    # per-task working set ~6x, which lands peak well under the existing limit
+    # without touching the ceiling. Chunking smaller costs more task dispatches,
+    # but KEDA already scales this queue to 20 replicas so throughput is
+    # unaffected. QA/CI still carry 300; they idle and have never OOMKilled.
+    # The durable fix belongs in mit-learn: ocw_courses_etl should stream a
+    # chunk rather than materialize it, so this value stops being load-bearing.
+    OCW_ITERATOR_CHUNK_SIZE: 50
     OCW_LIVE_BUCKET: "ocw-content-live-production"
     OIDC_ENDPOINT: "https://sso.ol.mit.edu/realms/olapps"
     OPENTELEMETRY_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces"
