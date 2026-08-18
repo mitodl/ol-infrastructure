@@ -348,7 +348,23 @@ def create(
                 ),
             ),
             # --- Job failures ---
-            # Fires when a Job's failed pod count > 0.
+            # Fires when a Job reaches the Failed condition -- i.e. it exhausted its
+            # backoffLimit and gave up.
+            #
+            # Deliberately NOT kube_job_status_failed > 0, which counts failed PODS
+            # rather than failed JOBS. A Job that burns a retry and then succeeds keeps
+            # a non-zero failed-pod count for the rest of its life, so that expression
+            # alerts on work that completed fine. Observed the day this rule first
+            # became deliverable: mitlearn-app-pre-deploy in applications-qa sat at
+            # `Complete, succeeded=1, failed=2` and paged anyway, and for_="5m" did not
+            # save it because the Job ran for 7m1s. Over 7 days in production the same
+            # shape covered 11 distinct xqueue-grader-* jobs in
+            # mitxonline-openedx-graders; kube_job_failed{condition="true"} has no
+            # series at all for any of them.
+            #
+            # This was pre-existing logic rather than a regression -- it simply never
+            # mattered while every firing went to oblivion. Making the rule deliverable
+            # is what exposed it.
             #
             # Named Workload* rather than Kubernetes*: alertmanager.py silences
             # `alertname =~ "Kube.*"` (built-in k8s noise) with continue_=False, and
@@ -360,10 +376,14 @@ def create(
             #
             # Exclusions:
             #   dagster          -- manages its own job retry logic.
-            #   witan-ci-indexer -- currently failing every run in both operations-qa
-            #                       and operations-production; excluded so the rename
-            #                       above does not immediately page for a known break.
-            #                       Remove this exclusion once that job is fixed.
+            #   witan-ci-indexer -- genuinely reaches the Failed condition on both
+            #                       operations-qa and operations-production (confirmed
+            #                       under kube_job_failed{condition="true"}, not just
+            #                       the noisier failed-pod signal above); excluded so
+            #                       the rename does not immediately page for a known
+            #                       break. Remove this exclusion once that job is
+            #                       fixed -- see tk-witan-ci-indexer-cronjob-fails-on
+            #                       -nearly-every-r-4c1462.
             alerting.RuleGroupRuleArgs(
                 name="WorkloadJobFailedWarning",
                 condition="C",
@@ -374,7 +394,7 @@ def create(
                     "description": "Job {{ $labels.job_name }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has failed."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, job_name) (kube_job_status_failed{cluster=~".*-(ci|qa)", namespace!="dagster", job_name!~"witan-ci-indexer.*"} > 0)'
+                    'sum by (cluster, namespace, job_name) (kube_job_failed{cluster=~".*-(ci|qa)", condition="true", namespace!="dagster", job_name!~"witan-ci-indexer.*"} == 1)'
                 ),
             ),
             alerting.RuleGroupRuleArgs(
@@ -387,7 +407,7 @@ def create(
                     "description": "Job {{ $labels.job_name }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has failed."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, job_name) (kube_job_status_failed{cluster=~".*-(production)", namespace!="dagster", job_name!~"witan-ci-indexer.*"} > 0)'
+                    'sum by (cluster, namespace, job_name) (kube_job_failed{cluster=~".*-(production)", condition="true", namespace!="dagster", job_name!~"witan-ci-indexer.*"} == 1)'
                 ),
             ),
             # --- HPA at max replicas ---
