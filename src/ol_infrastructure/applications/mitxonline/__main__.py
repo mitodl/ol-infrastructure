@@ -536,9 +536,13 @@ secret_names, secret_resources = create_mitxonline_k8s_secrets(
 )
 
 # Webapp memory is owned by the VPA (see the VPA block at the end of this file), not
-# the HPA. `mitxonline_web_memory_limit` is only the starting/floor budget pods launch
-# with; the VPA raises requests and limits toward `mitxonline_web_memory_ceiling` based
-# on observed usage.
+# the HPA. `mitxonline_web_memory_limit` is what the Deployment template declares; the
+# VPA's admission controller rewrites requests and limits as each pod is admitted, so
+# most pods do not run with this value -- but some do. Measured in production,
+# kube_pod_container_resource_limits for mitxonline-app ranged 1200MiB-3072MiB over 30d,
+# sitting at exactly 1200Mi for ~30 hours. It is the VPA's minAllowed floor (defaulted
+# from resource_requests), and a pod admitted while the recommendation is low really is
+# admitted there.
 mitxonline_web_memory_limit = "1200Mi"
 mitxonline_web_memory_ceiling = "3Gi"
 
@@ -549,6 +553,25 @@ mitxonline_web_memory_ceiling = "3Gi"
 # (limit / workers * 0.9) it would stay pinned to the 1200Mi starting budget, and
 # workers would recycle at ~540MiB forever without ever using the headroom the VPA
 # granted.
+#
+# KNOWN GAP, deliberately left as-is -- this is not a safe cap, it is the least-bad one.
+# Both available synth-time answers are wrong for some pod:
+#   - Ceiling-derived (what this does): 2816MiB aggregate. Above the real cgroup limit
+#     for any pod admitted below that, which production shows happens routinely on
+#     scale-up -- the admitted limit was under 2816MiB for roughly 13 of the last 30
+#     days' samples. For those pods the RSS cap never fires and the kernel OOM killer
+#     gets there first, i.e. the safety net is off exactly when new pods arrive.
+#   - Floor-derived (the component default): 1080MiB. Below the p95 working set of
+#     ~2645MiB, so it would respawn the worker continuously under normal traffic.
+# Ceiling-derived is kept because it is correct for the steady-state majority and merely
+# absent for the rest, whereas floor-derived is actively harmful for all of them. Do not
+# read the choice as an endorsement, and do not "simplify" it to the component default.
+#
+# There is no synth-time value that closes this. The two real fixes are reading the
+# cgroup at runtime (tk-evaluate-runtime-cgroup-derived-workers-max-rss--1cd258) or
+# raising the VPA's minAllowed toward the ceiling so every admitted pod starts near it,
+# at the cost of a guaranteed per-pod reservation.
+# See tk-stage-3-blocker-mitxonline-s-vpa-never-runs-at-t-cc6acf.
 #
 # The MiB value is parsed from `mitxonline_web_memory_ceiling` rather than restated as
 # a literal, so the ceiling has exactly one source of truth and changing its value or

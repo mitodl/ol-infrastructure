@@ -170,10 +170,40 @@ Consequences:
 - `mit_learn`'s explicit `workers_max_rss=1080` needs re-derivation at `workers=1`
   (3200Mi × 0.9 ≈ 2880MiB) or removal in favor of the default. Its inline comment about
   `floor(limit/workers*0.9)` becomes stale either way.
-- The `webapp_vpa_max_allowed_memory` docstring caveat ("`--workers-max-rss` … will NOT
+- ~~The `webapp_vpa_max_allowed_memory` docstring caveat ("`--workers-max-rss` … will NOT
   track this ceiling — set `GranianConfig.workers_max_rss` explicitly to keep the two in
   sync") is **inverted**: pinning to the ceiling is now the documented anti-pattern. The
-  docstring must say so and point at the follow-on cgroup task.
+  docstring must say so and point at the follow-on cgroup task.~~ **Done.** The docstring
+  states the anti-pattern and, importantly, why an active VPA admission controller does
+  *not* earn an exception to it — see the retraction-of-the-retraction below.
+
+  > **The admission-controller carve-out proposed on 2026-08-17 is itself withdrawn
+  > (2026-08-18).** It claimed that because `mitxonline`'s VPA mutates at admission, the
+  > ceiling *is* the current declared limit "from the pod's first instant", so there is no
+  > window in which a ceiling-derived cap sits above the real cgroup limit. That was an
+  > artifact of a 14-day measurement window.
+  >
+  > `maxAllowed` bounds the recommendation; it does not pin it. A pod admitted while the
+  > recommendation is low is admitted low. Measured on `mitxonline` in production:
+  >
+  > | window | admitted limit range | time below the 2816MiB cap |
+  > | --- | --- | --- |
+  > | 14d | 2838–3072MiB | none |
+  > | 30d | **1200**–3072MiB | ~1893 of the 10-min samples (~13 days' worth) |
+  >
+  > The 30d floor of 1200MiB is exactly the VPA's `minAllowed`, defaulted from
+  > `resource_requests`, and pods sat there for ~30 hours. So the original rule holds
+  > unchanged: **size the cap below the lowest limit a pod can be admitted with —
+  > `minAllowed`, not `maxAllowed`.**
+  >
+  > For `mitxonline` neither synth-time answer is safe (ceiling-derived 2816MiB is above
+  > the cgroup limit for freshly-admitted pods; floor-derived 1080MiB is below a p95
+  > working set of ~2645MiB). The ceiling-derived override stays as the least-bad option
+  > and the gap is documented in place rather than papered over. Closing it needs either
+  > the runtime cgroup read
+  > (`tk-evaluate-runtime-cgroup-derived-workers-max-rss--1cd258`) or a higher
+  > `minAllowed`. Note this exposure already exists in the live `workers=2` config, whose
+  > aggregate cap is the same 2816MiB — it is not introduced by stage 3.
 
 ### 5. Health probes — deferred, not dropped
 
