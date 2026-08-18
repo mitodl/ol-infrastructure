@@ -1119,19 +1119,21 @@ def create_k8s_resources(  # noqa: C901
             granian_config=GranianConfig(
                 application_module="cms.wsgi:application",
                 port=8000,
-                workers=2,
                 no_ws=True,
-                runtime_mode="mt",
-                runtime_threads=2,
-                # Holding pins: preserve the pre-overhaul effective concurrency
-                # until this app's stage of the rollout. Granian derived
-                # backpressure=64 (backlog=128 // workers=2) and
-                # blocking_threads=64 // 2 = 32. Delete these (plus workers,
-                # runtime_mode, runtime_threads above) to adopt the component
-                # defaults (1 worker, 8 blocking threads, 16 backpressure).
-                # See docs/plans/granian-configuration-overhaul.md
-                blocking_threads=32,
-                backpressure=64,
+                # Stage 3 of docs/plans/granian-configuration-overhaul.md: holding
+                # pins deleted, so this adopts the component defaults (1 worker,
+                # 8 blocking threads, 16 backpressure) in place of the 2 workers x
+                # 32 threads Granian used to derive from backlog=128.
+                #
+                # workers_max_rss is unaffected in aggregate, for every stack that
+                # shares this config: the component derives
+                # floor(limit / workers * 0.9), so halving the worker count doubles
+                # the per-worker cap and the pod total is unchanged whatever the
+                # declared limit. (mitxonline CMS at 4Gi: 2 x 1843MiB -> 1 x 3686MiB.
+                # mitx and mitx-staging CMS at 2Gi: 2 x 921MiB -> 1 x 1843MiB.)
+                # What changes is the blast radius of a respawn -- with one worker it
+                # costs the pod's whole serving capacity rather than half -- which is
+                # why LMS, whose respawns are ongoing, is NOT part of this change.
                 respawn_failed_workers=True,
                 backlog=128,
                 static_path_mounts=["/openedx/staticfiles"],
