@@ -39,9 +39,10 @@ config:
   # 1000+ "QueuePool limit" timeouts in 41 minutes on 2026-08-18 under
   # automation_condition_evaluator load. See the full derivation, including
   # the per-pod PgBouncer math this is checked against, in
-  # dagster_instance.yaml's event_log_storage comment. Not set on QA: its
-  # per-pod cap (382) is already tight enough that a prior run-worker
-  # incident deadlocked the whole pool, and it has not shown this failure
-  # mode, so it stays on the conservative fallback in __main__.py.
+  # dagster_instance.yaml's event_log_storage comment. QA sets its own, smaller
+  # value (45, see Pulumi.QA.yaml): it turned out to have the same failure and
+  # to have been logging it continuously, but its per-pod cap is 382 against
+  # this stack's 708 and a prior run-worker incident deadlocked its whole pool,
+  # so it gets a sizing pass of its own rather than this number.
   dagster:event_log_pool_size: 100
   dagster:event_log_max_overflow: 50

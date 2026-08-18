@@ -31,5 +31,32 @@ config:
   # Revisit once the pgbouncer exporter has enough history to show what a run
   # worker really holds outside a deadlock.
   dagster:max_concurrent_runs: 20
+  # event_log_storage's QueuePool ceiling. QA was left on the 10+10 fallback
+  # when Production was sized on 2026-08-18, on the stated grounds that it had
+  # not shown the failure mode. It had, and still does: at 20:38Z the daemon was
+  # logging "QueuePool limit of size 10 overflow 10 reached, connection timed
+  # out" continuously -- 100-250 lines per 10 minutes, sustained over at least
+  # eight hours, with both user-code servers contributing as well. Same failure
+  # Production fixed, never fixed here.
+  #
+  # 45 rather than Production's 150, by the same per-pod arithmetic in
+  # dagster_instance.yaml's event_log_storage comment: worst case the daemon and
+  # both webserver replicas peg this ceiling on one pgbouncer pod, which is
+  # 3 x (45 + run storage 30 + schedule storage 30) = 315 against QA's 382 cap.
+  # That is 82%, deliberately under Production's own 630/708 = 89%, because QA
+  # carries risks Production does not: it has already deadlocked its entire pool
+  # once from run-worker connections alone, and its per-pod distribution is
+  # badly skewed (221 vs 4 measured) where Production's is even (1-18), so the
+  # worst case here is a real scenario rather than a pessimistic bound. Measured
+  # headroom at the time of writing: 183 and 182 connections per pod of 382.
+  #
+  # This is sized to be safe, not proven sufficient -- Production needed 7.5x
+  # (20 -> 150) and this is 2.25x, and QA runs the same code locations, so if
+  # automation-tick concurrency tracks asset count rather than run count it may
+  # still be short. DagsterDatabaseConnectionFailuresWarning fires on exactly
+  # these log lines and was firing on QA when this was written: if it stays
+  # firing once this ships, raise both numbers again.
+  dagster:event_log_pool_size: 30
+  dagster:event_log_max_overflow: 15
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
