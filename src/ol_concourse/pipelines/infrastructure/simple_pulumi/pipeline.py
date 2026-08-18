@@ -456,6 +456,12 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_name="ol-infrastructure-sentry",
         stages=["default"],
         topology="preview-gated",
+        # The stack manages ~350 Sentry-API-backed resources (code mappings,
+        # dashboards). `pulumi refresh` fans out GETs for all of them at once,
+        # which blows past Sentry's per-org rate/concurrency limits (429s) and
+        # fails the deploy before `up` even runs. Skipping refresh avoids that
+        # burst; `up` still diffs/applies whatever it actually changes.
+        refresh_stack=False,
     ),
     "starrocks": SimplePulumiParams(
         app_name="starrocks",
