@@ -1205,21 +1205,59 @@ pgbouncer_service_monitor = kubernetes.apiextensions.CustomResource(
 #    are the other half of this project, and an exporter polling through the pool
 #    would add its connections to the very counts being used to size it.
 #
-# 2. Every query is bounded, and bounded by primary key rather than by time.
-#    runs and job_ticks are large and neither has an index on a bare timestamp, so
-#    a "last 10 minutes" predicate is a full index scan that grows with the table.
-#    id is monotonic, so `id > (SELECT max(id) - N)` is a range scan whose cost is
-#    fixed at N rows no matter how big the table gets. Verified with EXPLAIN
-#    (ANALYZE, BUFFERS) against a local Postgres carrying this exact schema and
-#    60k runs / 200k ticks: every query is an index scan, none touch the heap
-#    beyond the window, and the full scrape completes in ~31ms.
+# 2. Every window query is bounded twice -- by primary key for cost, and by time
+#    for meaning. The two bounds do different jobs and neither is sufficient alone.
+#
+#    The id bound is what keeps the cost fixed. runs and job_ticks are large and
+#    neither has an index on a bare timestamp, so a time predicate on its own is a
+#    full index scan that grows with the table forever. id is monotonic, so
+#    `id > (SELECT max(id) - N)` is a range scan capped at N rows no matter how big
+#    the table gets, and the time predicate is then evaluated against only those N.
+#
+#    The time bound is what makes the number mean something, and it was missing on
+#    the first pass. These windows were originally id-only, sized off an assumed
+#    ~53k runs/day that turned out to be wrong by more than an order of magnitude.
+#    Measured from kube-state-metrics over the seven days to 2026-08-18:
+#
+#      quiet day        ~143 runs/hour        (3.4k/day)
+#      seven-day mean   ~484 runs/hour        (11.6k/day)
+#      busiest hour    ~1990 runs
+#      busiest 6h      ~7416 runs
+#
+#    A 14x swing between quiet and peak. So a fixed 20000-id window covered
+#    anything from ~10 hours to ~6 days depending on when you looked -- and
+#    `dagster_recent_runs` reported a six-day trailing count while claiming, in its
+#    own name, to be recent. A failure-rate change had to persist for days before
+#    it moved the number. That is the defect this pairing fixes.
+#
+#    The id caps are now sized as cost ceilings that stay clear of the time bound
+#    at peak: 20000 against a busiest-6h of ~7416 is 2.7x headroom, so in practice
+#    the time predicate is what binds and the id cap only ever engages to stop a
+#    pathological burst from turning into a pathological scan.
+#
+#    Which one is actually binding is no longer a matter of belief:
+#    dagster_id_window_span_seconds reports the age of the oldest row inside each
+#    id window. Span comfortably above the lookback means the time bound is doing
+#    the work. Span at or below the lookback means the id cap is truncating and
+#    wants raising -- the exact failure that went unnoticed the first time.
 #
 # The connection budget is deliberately tiny -- 2 connections, and the DSN sets a
 # 10s statement_timeout so no plan this exporter issues can pin a backend. That
 # timeout is not decorative: it was confirmed to reach the server by setting it to
 # 1ms and watching every query come back 57014.
 SQL_EXPORTER_RUN_WINDOW = 20000
-SQL_EXPORTER_TICK_WINDOW = 20000
+# Ticks accrue far faster than runs -- the daemon evaluates every sensor on a ~30s
+# cadence whether or not it yields a run -- so the same id count buys a much shorter
+# span. Sized larger against a shorter lookback for that reason; the span metric
+# will say whether 40000 is enough, since unlike the run rate this one has not been
+# measured directly.
+SQL_EXPORTER_TICK_WINDOW = 40000
+# Runs get 6h: long enough that a failure rate is built from thousands of runs at
+# peak and hundreds when quiet, short enough that a sustained problem moves it
+# within the hour. Ticks get 1h, because a sensor that starts erroring is an acute
+# signal and averaging it over six hours only delays noticing.
+SQL_EXPORTER_RUN_LOOKBACK = "6 hours"
+SQL_EXPORTER_TICK_LOOKBACK = "1 hour"
 SQL_EXPORTER_STATEMENT_TIMEOUT_MS = 10000
 SQL_EXPORTER_PORT = 9399
 
@@ -1286,7 +1324,9 @@ collectors:
 
       - metric_name: dagster_run_wait_to_start_seconds
         type: gauge
-        help: "Seconds from run creation to run start over the recent window."
+        help: >-
+          Seconds from run creation to run start, over runs started in the last
+          {SQL_EXPORTER_RUN_LOOKBACK}.
         value_label: quantile
         values: [p50, p95, max]
         query_ref: recent_run_waits
@@ -1297,9 +1337,17 @@ collectors:
       # every ordinary decrease look like a counter reset.
       - metric_name: dagster_recent_runs
         type: gauge
-        help: "Runs in the recent window that reached a terminal state, by status."
+        help: >-
+          Runs reaching a terminal state in the last {SQL_EXPORTER_RUN_LOOKBACK},
+          by status.
         key_labels: [status]
         values: [runs]
+        # update_timestamp, not create_timestamp: dagster rewrites it on every
+        # status change and sets it to the event time (sql_run_storage.py
+        # handle_run_event), so for a terminal status it is when the run finished.
+        # A failure rate wants runs that ended in the window, not runs that started
+        # in it -- otherwise a long run straddling the boundary is counted before
+        # anyone knows how it turned out.
         query: |
           SELECT s.status AS status, coalesce(r.n, 0) AS runs
           FROM (VALUES ('SUCCESS'), ('FAILURE'), ('CANCELED')) AS s (status)
@@ -1307,12 +1355,16 @@ collectors:
               SELECT status, count(*) AS n
               FROM runs
               WHERE id > (SELECT max(id) - {SQL_EXPORTER_RUN_WINDOW} FROM runs)
+                AND update_timestamp > (now() AT TIME ZONE 'UTC')
+                                       - interval '{SQL_EXPORTER_RUN_LOOKBACK}'
               GROUP BY status
           ) AS r ON r.status = s.status
 
       - metric_name: dagster_recent_retried_runs
         type: gauge
-        help: "Runs in the recent window carrying a dagster/retry_number tag."
+        help: >-
+          Runs finishing in the last {SQL_EXPORTER_RUN_LOOKBACK} that carry a
+          dagster/retry_number tag.
         values: [runs]
         # run_retries.max_retries = 3 means a job can fail repeatedly and still
         # report SUCCESS, so the run status alone hides chronic flakiness.
@@ -1321,11 +1373,15 @@ collectors:
           FROM runs AS r
           INNER JOIN run_tags AS rt ON rt.run_id = r.run_id
           WHERE r.id > (SELECT max(id) - {SQL_EXPORTER_RUN_WINDOW} FROM runs)
+            AND r.update_timestamp > (now() AT TIME ZONE 'UTC')
+                                     - interval '{SQL_EXPORTER_RUN_LOOKBACK}'
             AND rt.key = 'dagster/retry_number'
 
       - metric_name: dagster_recent_job_ticks
         type: gauge
-        help: "Sensor and schedule ticks in the recent window, by type and status."
+        help: >-
+          Sensor and schedule ticks in the last {SQL_EXPORTER_TICK_LOOKBACK}, by
+          type and status.
         key_labels: [tick_type, status]
         values: [ticks]
         # A sensor that starts erroring stops launching runs and says nothing;
@@ -1350,6 +1406,8 @@ collectors:
               FROM job_ticks
               WHERE id > (SELECT max(id) - {SQL_EXPORTER_TICK_WINDOW}
                           FROM job_ticks)
+                AND timestamp > (now() AT TIME ZONE 'UTC')
+                                - interval '{SQL_EXPORTER_TICK_LOOKBACK}'
               GROUP BY type, status
           ) AS x ON x.type = c.type AND x.status = c.status
 
@@ -1365,6 +1423,33 @@ collectors:
                  extract(epoch FROM ((now() AT TIME ZONE 'UTC') - timestamp))
                      AS seconds
           FROM daemon_heartbeats
+
+      - metric_name: dagster_id_window_span_seconds
+        type: gauge
+        help: >-
+          Age of the oldest row inside each id window. Compare against the
+          lookback to see which bound is binding.
+        key_labels: [relation]
+        values: [seconds]
+        # The instrument that would have caught the original mistake. Each windowed
+        # metric is bounded by both an id cap and a lookback, and only one of them
+        # binds at a time: if this span sits well above the lookback the time bound
+        # is doing the work and the numbers mean what they say, and if it falls to
+        # the lookback or below then the id cap is truncating and the metric is
+        # quietly reporting a shorter period than advertised. Reads the same index
+        # range the other queries already scan, so it costs a min() and nothing else.
+        query: |
+          SELECT 'runs' AS relation,
+                 coalesce(extract(epoch FROM ((now() AT TIME ZONE 'UTC')
+                                              - min(create_timestamp))), 0) AS seconds
+          FROM runs
+          WHERE id > (SELECT max(id) - {SQL_EXPORTER_RUN_WINDOW} FROM runs)
+          UNION ALL
+          SELECT 'job_ticks' AS relation,
+                 coalesce(extract(epoch FROM ((now() AT TIME ZONE 'UTC')
+                                              - min(timestamp))), 0) AS seconds
+          FROM job_ticks
+          WHERE id > (SELECT max(id) - {SQL_EXPORTER_TICK_WINDOW} FROM job_ticks)
 
       - metric_name: dagster_relation_bytes
         type: gauge
@@ -1391,6 +1476,8 @@ collectors:
               FROM runs
               WHERE id > (SELECT max(id) - {SQL_EXPORTER_RUN_WINDOW} FROM runs)
                 AND start_time IS NOT NULL
+                AND start_time > extract(epoch FROM ((now() AT TIME ZONE 'UTC')
+                                 - interval '{SQL_EXPORTER_RUN_LOOKBACK}'))
           )
           SELECT
               coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY wait), 0)

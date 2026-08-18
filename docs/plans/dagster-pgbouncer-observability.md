@@ -347,26 +347,49 @@ collecting in parallel.
 
 #### Shipped 2026-08-17 — `burningalchemist/sql_exporter`, one Deployment in `dagster`
 
-Eight gauges, all under a 10s `statement_timeout` and a 2-connection ceiling:
+Nine gauges, all under a 10s `statement_timeout` and a 2-connection ceiling:
 
 | Metric | Answers |
 |---|---|
 | `dagster_runs_in_flight{status}` | is `max_concurrent_runs` binding |
 | `dagster_oldest_queued_run_age_seconds` | healthy burst vs. stuck coordinator |
 | `dagster_run_wait_to_start_seconds{quantile}` | p50 / p95 / max wait to start |
-| `dagster_recent_runs{status}` | failure rate over the recent window |
+| `dagster_recent_runs{status}` | failure rate over the last 6h |
 | `dagster_recent_retried_runs` | chronic failure masked by `max_retries = 3` |
-| `dagster_recent_job_ticks{tick_type,status}` | silently erroring sensors/schedules |
+| `dagster_recent_job_ticks{tick_type,status}` | silently erroring sensors/schedules, last 1h |
 | `dagster_daemon_heartbeat_age_seconds{daemon_type}` | the 08-10 symptom, measured directly |
+| `dagster_id_window_span_seconds{relation}` | which bound is binding (see below) |
 | `dagster_relation_bytes{relation}` | event-log growth |
 
 Three implementation findings worth keeping, all from testing rather than reading:
 
-- **Bound by primary key, not by time.** Neither `runs` nor `job_ticks` has an index on a
-  bare timestamp, so a "last N minutes" predicate is a full index scan that grows with the
-  table. `id > (SELECT max(id) - N)` is a range scan whose cost is fixed at N rows forever.
-  `EXPLAIN (ANALYZE, BUFFERS)` against a local Postgres carrying this exact schema with
-  60k runs / 200k ticks: every query an index scan, no sequential scans, full scrape 31ms.
+- **Bound by primary key *and* by time — the two do different jobs.** Neither `runs` nor
+  `job_ticks` has an index on a bare timestamp, so a "last N minutes" predicate on its own
+  is a full index scan that grows with the table; `id > (SELECT max(id) - N)` is a range
+  scan capped at N rows forever, and the time predicate is then evaluated against only
+  those N. `EXPLAIN (ANALYZE, BUFFERS)` against a local Postgres carrying this exact schema
+  with 60k runs / 200k ticks: every query an index scan, no sequential scans, full scrape
+  17ms.
+
+  **The time half was missing on the first pass, and that was a real defect.** The windows
+  shipped id-only, sized against an assumed ~53k runs/day that is wrong by more than an
+  order of magnitude. Measured from kube-state-metrics over the seven days to 2026-08-18:
+  ~143 runs/hour on a quiet day, ~484/hour averaged over the week, ~1,990 in the busiest
+  hour, ~7,416 in the busiest six. A 14x swing — so a fixed 20,000-id window covered
+  anywhere from ~10 hours to ~6 days depending on when you looked, and `dagster_recent_runs`
+  reported a six-day trailing count while calling itself recent. A failure-rate change had
+  to persist for days before it moved the number.
+
+  Now: `SQL_EXPORTER_RUN_WINDOW = 20000` with a 6h lookback (2.7x headroom over the
+  busiest observed six hours), `SQL_EXPORTER_TICK_WINDOW = 40000` with a 1h lookback —
+  larger id cap, shorter lookback, because the daemon evaluates every sensor on a ~30s
+  cadence whether or not it yields a run, so the same id count buys far less time.
+
+  And `dagster_id_window_span_seconds{relation}` reports the age of the oldest row in each
+  id window, so which bound is binding is now observable rather than assumed. Span well
+  above the lookback means the time bound is doing the work. Span at or below it means the
+  id cap is truncating and the metric is quietly covering less than it claims — which is
+  precisely the failure that went unnoticed the first time.
 - **`SQLEXPORTER_TARGET_DSN` is only read when the config file declares no `target:` block
   at all.** A `target:` with `data_source_name` omitted does not fall back to the
   environment — it fails at startup with `missing data_source_name for target`. So the
