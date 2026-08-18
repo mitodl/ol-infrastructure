@@ -726,6 +726,23 @@ class OLVaultK8SStaticSecretConfig(OLVaultK8SSecretConfig):
 
 class OLVaultK8SDynamicSecretConfig(OLVaultK8SSecretConfig):
     kind: str = "VaultDynamicSecret"
+    # Ref: https://developer.hashicorp.com/vault/docs/platform/k8s/vso/api-reference#vaultdynamicsecretspec
+    revoke_on_delete: bool | None = Field(
+        default=None,
+        description=(
+            "Revoke the Vault lease backing this secret when the "
+            "VaultDynamicSecret resource is deleted. Without this, credentials "
+            "issued for the deleted resource remain valid for the rest of "
+            "their TTL."
+        ),
+    )
+    renewal_percent: int | None = Field(
+        default=None,
+        description=(
+            "Percentage out of 100 of the lease duration after which VSO "
+            "renews the secret. VSO defaults to 67 when unset."
+        ),
+    )
 
     @field_validator("kind")
     @classmethod
@@ -814,6 +831,11 @@ class OLVaultK8SSecret(ComponentResource):
                         lambda mount: f"{mount}/{resource_config.path}"
                     ),
                 )
+        elif isinstance(resource_config, OLVaultK8SDynamicSecretConfig):
+            if resource_config.revoke_on_delete is not None:
+                secret_def["spec"]["revoke"] = resource_config.revoke_on_delete
+            if resource_config.renewal_percent is not None:
+                secret_def["spec"]["renewalPercent"] = resource_config.renewal_percent
 
         self.vault_secret_resource = kubernetes.yaml.v2.ConfigGroup(
             f"OLVaultK8SSecret-{resource_config.namespace}-{resource_config.name}",
