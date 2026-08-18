@@ -116,8 +116,6 @@ config:
     OTEL_TRACES_SAMPLER_ARG: "0.25"
     OTEL_PROPAGATORS: "tracecontext,baggage"
     OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
-    OTEL_LOGS_EXPORTER: "otlp"
-    OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/logs"
     OTEL_METRIC_EXPORT_INTERVAL: "60000"
     OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT: "128"
     OPENSEARCH_INDEX: "mitlearn"
