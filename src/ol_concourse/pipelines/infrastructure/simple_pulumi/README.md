@@ -204,7 +204,8 @@ Some apps need to watch additional directories beyond the standard Pulumi paths:
     pulumi_project_path="saas/rootly/",
     pulumi_project_name="ol-saas-rootly",
     additional_watched_paths=["sdks/rootly/"],
-    stages=["Production"],
+    stages=["default"],
+    topology="preview-gated",
 ),
 ```
 
