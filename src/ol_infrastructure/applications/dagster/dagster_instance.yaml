@@ -36,25 +36,35 @@ compute_logs:
 # On the sizing: connections above pool_size are closed when returned rather
 # than retained, so overflow churns exactly like NullPool does. pool_size must
 # therefore cover a process's real concurrency or the churn this exists to stop
-# simply continues at a lower rate. The daemon -- the only process with
-# meaningful concurrency, and the one that failed -- holds 13-21 connections
-# across all three storages, so 10 per storage covers it with headroom.
+# simply continues at a lower rate. The original 10-per-storage sizing was
+# based on a snapshot of 13-21 connections held across all three storages, but
+# within an hour of shipping it the daemon was logging sustained
+# "QueuePool limit of size 10 overflow 10 reached" timeouts -- 1000+ in 41
+# minutes, 20-100/min continuously, not a burst. Tracebacks put the great
+# majority of them in sql_event_log.py under automation_condition_evaluator,
+# confirming the auto_run_reexecution amplifier called out below: evaluating
+# automation conditions across many assets holds more concurrent event-log
+# connections than a static snapshot caught. schedule_storage and run_storage
+# did not show up in the tracebacks, so they get a smaller bump; event_log_storage
+# gets sized for real headroom instead of another guess -- see its own comment
+# below for the per-pod PgBouncer math behind that number.
 #
 # pool_size is a retention ceiling, not a preallocation: QueuePool opens
 # connections lazily, so the 97 processes that share this ConfigMap (daemon, 2
 # webservers, 14 code locations, up to max_concurrent_runs workers) only hold
 # what they actually used. Run workers hold none when idle and live 7-9
-# seconds, which is why the worst-case product of 97 x 3 x 20 overstates the
-# real total by more than an order of magnitude -- measured peak across the
-# whole fleet is 122 active server connections against an aggregate budget of
-# 4248. Check that number against pgbouncer_pools_server_active_connections
-# after this ships rather than trusting the estimate.
+# seconds, which is why the worst-case product of 97 x 3 x pool ceiling
+# overstates the real total by more than an order of magnitude -- measured
+# peak across the whole fleet was 122 active server connections before this
+# change, rising to ~184 as the event log pool started saturating, against an
+# aggregate budget of 4248. Check pgbouncer_pools_server_active_connections
+# again after this ships rather than trusting the estimate.
 schedule_storage:
   module: ol_orchestrate.lib.postgres.schedule_storage
   class: PooledPostgresScheduleStorage
   config:
-    pool_size: 10
-    max_overflow: 10
+    pool_size: 15
+    max_overflow: 15
     pool_recycle: 3600
     pool_timeout: 30
     postgres_db:
@@ -132,8 +142,8 @@ run_storage:
   module: ol_orchestrate.lib.postgres.run_storage
   class: PooledPostgresRunStorage
   config:
-    pool_size: 10
-    max_overflow: 10
+    pool_size: 15
+    max_overflow: 15
     pool_recycle: 3600
     pool_timeout: 30
     postgres_db:
@@ -169,12 +179,34 @@ run_retries:
 # closes (dagster_postgres/event_log/event_log.py:363) -- one extra connect per
 # call under NullPool. The auto_run_reexecution path emits one planned event per
 # asset, so retrying a large dbt job is a burst of exactly these.
+#
+# Confirmed, not just predicted: switching this to QueuePool on 2026-08-18
+# immediately produced sustained "QueuePool limit of size 10 overflow 10
+# reached" timeouts -- 1000+ in 41 minutes, continuous, not a burst -- traced
+# to automation_condition_evaluator driving concurrent event-log queries
+# during automation-tick evaluation. 10+10 measured the daemon's connections
+# at rest, not what a tick evaluating many assets at once actually needs, so
+# this gets real headroom rather than another guess at a tight number.
+#
+# 100+50 gives the daemon a 150-connection ceiling for this storage alone.
+# Checked against __main__.py's pgbouncer sizing, not just the aggregate
+# budget: max_db_connections there is derived as budget / replica count
+# because a client's connections land on whichever of the 6 pgbouncer pods
+# kube-proxy routes them to, not spread evenly by construction, so the
+# binding constraint is the per-pod cap (708 currently) and not the aggregate
+# (4248). Worst case every process sharing this ConfigMap that touches event
+# log storage heavily -- the daemon plus the 2 webserver replicas -- pegs its
+# ceiling on the same pod at once: 3 x 150 = 450, still comfortably under 708.
+# Run workers are excluded from that sum because they hold connections for
+# 7-9 seconds, not the process lifetime. Recheck
+# pgbouncer_pools_server_active_connections (per-pod, not just summed) after
+# this ships.
 event_log_storage:
   module: ol_orchestrate.lib.postgres.event_log
   class: PooledPostgresEventLogStorage
   config:
-    pool_size: 10
-    max_overflow: 10
+    pool_size: 100
+    max_overflow: 50
     pool_recycle: 3600
     pool_timeout: 30
     postgres_db:
