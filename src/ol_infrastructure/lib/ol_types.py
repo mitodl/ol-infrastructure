@@ -161,10 +161,16 @@ class Component(StrEnum):
     The discriminator for paging decisions: a Celery worker and a Postgres
     StatefulSet fail differently and should not share an alert tier.
 
-    Also the vocabulary for Rootly's `component` routing key, which has two
-    producers -- this label and `metric_rules/synthetic_monitoring.py`'s
-    `_Check` -- so both are typed against this enum rather than agreeing by
-    coincidence.
+    Also the vocabulary for Rootly's `ol_component` routing key, which has two
+    producers -- this label, surfaced as `ol.mit.edu/component`, and
+    `metric_rules/synthetic_monitoring.py`'s `_Check` -- so both are typed
+    against this enum rather than agreeing by coincidence.
+
+    Note the two spellings are deliberate and not interchangeable: the
+    Kubernetes label is `ol.mit.edu/component`, while what reaches Rootly is
+    `ol_component`. Alert rules rename it at the boundary so a routing
+    condition never has to read `label_ol_mit_edu_component`, and so the key
+    cannot collide with a bare `component` set by a vendor integration.
     """
 
     api = "api"
