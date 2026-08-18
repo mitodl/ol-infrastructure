@@ -14,10 +14,49 @@ compute_logs:
       env: DAGSTER_BUCKET_NAME
     prefix: compute-logs/
 
+# All three storages below use the pooled subclasses from ol-data-platform
+# (ol_orchestrate.lib.postgres) rather than the stock dagster_postgres classes.
+# The stock classes build every engine with poolclass=NullPool
+# (dagster_postgres/event_log/event_log.py:102), so a process's connection count
+# is a function of its query rate with no upper bound and no reuse: each
+# operation is a fresh TCP connect and close.
+#
+# On 2026-08-18 that cost the daemon its ephemeral port space. It sustained 331
+# outbound connects/second to the PgBouncer ClusterIP while holding only 13 of
+# them open at a time; TIME_WAIT is a fixed 60s, so all 28232 ports in the pod's
+# 32768-60999 range were consumed by a single destination tuple and connect()
+# began returning EADDRNOTAVAIL -- surfacing as psycopg2 "Cannot assign
+# requested address", which reads like PgBouncer is down but is raised by bind()
+# before a packet is sent. PgBouncer was healthy throughout: 12 active clients,
+# 11 active server connections, 0 waiting, against a 708-per-replica cap.
+#
+# QueuePool bounds each process at pool_size + max_overflow and, more to the
+# point here, reuses the pool_size connections instead of reopening them.
+#
+# On the sizing: connections above pool_size are closed when returned rather
+# than retained, so overflow churns exactly like NullPool does. pool_size must
+# therefore cover a process's real concurrency or the churn this exists to stop
+# simply continues at a lower rate. The daemon -- the only process with
+# meaningful concurrency, and the one that failed -- holds 13-21 connections
+# across all three storages, so 10 per storage covers it with headroom.
+#
+# pool_size is a retention ceiling, not a preallocation: QueuePool opens
+# connections lazily, so the 97 processes that share this ConfigMap (daemon, 2
+# webservers, 14 code locations, up to max_concurrent_runs workers) only hold
+# what they actually used. Run workers hold none when idle and live 7-9
+# seconds, which is why the worst-case product of 97 x 3 x 20 overstates the
+# real total by more than an order of magnitude -- measured peak across the
+# whole fleet is 122 active server connections against an aggregate budget of
+# 4248. Check that number against pgbouncer_pools_server_active_connections
+# after this ships rather than trusting the estimate.
 schedule_storage:
-  module: dagster_postgres.schedule_storage
-  class: PostgresScheduleStorage
+  module: ol_orchestrate.lib.postgres.schedule_storage
+  class: PooledPostgresScheduleStorage
   config:
+    pool_size: 10
+    max_overflow: 10
+    pool_recycle: 3600
+    pool_timeout: 30
     postgres_db:
       username:
         env: DAGSTER_PG_USER
@@ -88,10 +127,15 @@ run_launcher:
       # Sentry DSN has to reach them here as well.
     - dagster-sentry-secrets
 
+# Pooled for the reasons documented on schedule_storage above.
 run_storage:
-  module: dagster_postgres.run_storage
-  class: PostgresRunStorage
+  module: ol_orchestrate.lib.postgres.run_storage
+  class: PooledPostgresRunStorage
   config:
+    pool_size: 10
+    max_overflow: 10
+    pool_recycle: 3600
+    pool_timeout: 30
     postgres_db:
       username:
         env: DAGSTER_PG_USER
@@ -118,10 +162,21 @@ run_retries:
   enabled: true
   max_retries: 3
 
+# Pooled for the reasons documented on schedule_storage above. This is the
+# hottest of the three: store_event runs per event, and each asset check event
+# additionally reaches supports_asset_checks, an uncached @property on
+# SqlEventLogStorage whose has_table implementation opens a connection it never
+# closes (dagster_postgres/event_log/event_log.py:363) -- one extra connect per
+# call under NullPool. The auto_run_reexecution path emits one planned event per
+# asset, so retrying a large dbt job is a burst of exactly these.
 event_log_storage:
-  module: dagster_postgres.event_log
-  class: PostgresEventLogStorage
+  module: ol_orchestrate.lib.postgres.event_log
+  class: PooledPostgresEventLogStorage
   config:
+    pool_size: 10
+    max_overflow: 10
+    pool_recycle: 3600
+    pool_timeout: 30
     postgres_db:
       username:
         env: DAGSTER_PG_USER
