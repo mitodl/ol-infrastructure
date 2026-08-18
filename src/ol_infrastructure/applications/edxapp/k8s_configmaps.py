@@ -156,6 +156,24 @@ def _build_interpolated_config_dict(
             },
             "STORAGE_TYPE": "S3",
         },
+        # File storage for the openedx_content media store, which the
+        # modulestore_migrator writes a course's static assets into when
+        # importing it to a v2 library. edx-platform ships no default for this
+        # outside of its test settings, so without it openedx_content raises
+        # ImproperlyConfigured and the import fails. These files must not be
+        # publicly readable, hence a prefix that the storage bucket's public-read
+        # policy statement (media/video-images/*) does not cover.
+        "OPENEDX_LEARNING": {
+            "MEDIA": {
+                "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+                "OPTIONS": {
+                    "bucket_name": storage_bucket_name,
+                    "location": "openedx-learning/",
+                    "default_acl": "private",
+                    "querystring_auth": True,
+                },
+            },
+        },
         "LANGUAGE_COOKIE": f"{env_name}-openedx-language-preference",
         "MIT_LEARN_AI_API_URL": f"https://{edxapp_config.require('mit_learn_api_domain')}/ai",
         "MIT_LEARN_API_BASE_URL": f"https://{edxapp_config.require('mit_learn_api_domain')}/learn",
