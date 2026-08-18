@@ -2980,6 +2980,14 @@ alerts_source_cloudwatch_warning = rootly.AlertsSource(
     opts=rootly_alert_source_opts,
 )
 
+# Inert. Fed only by the three MIT Learn synthetic monitoring rules, via a
+# `notification_settings.receiver="Rootly"` override pointing at a UI-created
+# contact point (eel3rjpiwahoge) that bypassed the policy tree. PR #5400 removed
+# that override, so nothing has delivered here since; its "Grafana Service Route"
+# is being retired below. Kept rather than destroyed -- deleting the source
+# discards its webhook secret, and the field-mapping attributes below are the
+# only worked example of a grafana-type source in this file. Do not point
+# anything at it without giving it a route again.
 alerts_source_grafana = rootly.AlertsSource(
     "grafana",
     alert_source_fields_attributes=[
@@ -3720,6 +3728,29 @@ alert_route_cloudwatch_service_route = rootly.AlertRoute(
     opts=rootly_imported_route_opts("61d2fb04-f85f-4d9c-a1bc-1a6afad7ca0f"),
 )
 
+# Slated for deletion; this apply only clears the `protect` flag so the next one
+# can remove it.
+#
+# The route is inert. It is bound to alert source `grafana` (f4d836c0), which was
+# fed only by the three MIT Learn synthetic monitoring rules through a
+# `notification_settings.receiver="Rootly"` override. PR #5400 removed that
+# override and routed them through alertmanager.py's policy tree instead, so
+# nothing has delivered here since. Verified 2026-08-18 against production
+# `/api/v1/provisioning/alert-rules`: all six SM rules carry `receiver: null`.
+#
+# Its two live rules (`service=mitlearn` + `component=api|nextjs`) have moved to
+# the Grafana Production Service Route below, where the SM alerts actually land.
+# The two that remain are dead and stay dead: nothing emits `service=learn-ai`.
+# The Synthetic Monitoring plugin's own `sm-*` rules carry only `__grafana_origin`
+# and `namespace=synthetic_monitoring` -- check labels are not propagated to them
+# -- so pingdom_checks.py's `service: learn-ai` never reaches Rootly.
+#
+# Why this is two applies rather than one: every resource in this stack is
+# `protect=True`, and Pulumi refuses to delete a protected resource. Deleting the
+# declaration outright makes `pulumi up` fail in the simple_pulumi pipeline until
+# someone runs `pulumi state unprotect` by hand against production. Clearing the
+# flag in code first is the path Pulumi's own error message recommends, and it
+# keeps the whole operation inside the pipeline.
 alert_route_grafana_service_route = rootly.AlertRoute(
     "grafana-service-route",
     alerts_source_ids=[alerts_source_grafana.id],
@@ -3784,6 +3815,44 @@ alert_route_grafana_service_route = rootly.AlertRoute(
             "position": 2,
         },
         {
+            "destinations": [
+                {
+                    "targetId": "96629210-cc41-4e57-b059-b182a0f01c5b",
+                    "targetType": "EscalationPolicy",
+                },
+            ],
+            "fallbackRule": True,
+            "name": "Fallback Rule for Grafana Service Route",
+            "position": 3,
+        },
+    ],
+    opts=ResourceOptions.merge(
+        rootly_imported_route_opts("c1e812d2-e14b-4233-a368-c240e9a03d17"),
+        ResourceOptions(protect=False),
+    ),
+)
+
+alert_route_grafana_production_service_route = rootly.AlertRoute(
+    "grafana-production-service-route",
+    alerts_source_ids=[alerts_source_grafana_prometheus_production.id],
+    enabled=True,
+    name="Grafana Production Service Route",
+    owning_team_ids=[
+        "9f00e9f1-2f13-470e-a856-50ab5003f260",
+    ],
+    rules=[
+        # Moved off the Grafana Service Route above, which is bound to an alert
+        # source nothing feeds any more. The MIT Learn synthetic monitoring
+        # rules route through alertmanager.py's policy tree to this source
+        # instead, and they emit exactly the `service`/`ol_component` pair
+        # these two match on -- so both reach their service from here. Until
+        # this move they matched nothing and MIT Learn - API and
+        # MIT Learn - NextJS were among the Rootly services no rule targeted.
+        #
+        # These sit ahead of the `namespace`-keyed rules below because
+        # conditions are `contains` and the first match wins: a narrow rule
+        # placed after a broad one never runs.
+        {
             "conditionGroups": [
                 {
                     "conditions": [
@@ -3795,7 +3864,7 @@ alert_route_grafana_service_route = rootly.AlertRoute(
                         },
                         {
                             "propertyFieldConditionType": "contains",
-                            "propertyFieldName": "$.commonLabels.component",
+                            "propertyFieldName": "$.commonLabels.ol_component",
                             "propertyFieldType": "payload",
                             "propertyFieldValue": "api",
                         },
@@ -3810,8 +3879,8 @@ alert_route_grafana_service_route = rootly.AlertRoute(
                 },
             ],
             "fallbackRule": False,
-            "name": "MIT Learn API to MIT Learn - API Service",
-            "position": 3,
+            "name": "mitlearn service + api component to MIT Learn - API",
+            "position": 1,
         },
         {
             "conditionGroups": [
@@ -3825,7 +3894,7 @@ alert_route_grafana_service_route = rootly.AlertRoute(
                         },
                         {
                             "propertyFieldConditionType": "contains",
-                            "propertyFieldName": "$.commonLabels.component",
+                            "propertyFieldName": "$.commonLabels.ol_component",
                             "propertyFieldType": "payload",
                             "propertyFieldValue": "nextjs",
                         },
@@ -3840,33 +3909,9 @@ alert_route_grafana_service_route = rootly.AlertRoute(
                 },
             ],
             "fallbackRule": False,
-            "name": "MIT Learn NextJS to NextJS Service",
-            "position": 4,
+            "name": "mitlearn service + nextjs component to MIT Learn - NextJS",
+            "position": 2,
         },
-        {
-            "destinations": [
-                {
-                    "targetId": "96629210-cc41-4e57-b059-b182a0f01c5b",
-                    "targetType": "EscalationPolicy",
-                },
-            ],
-            "fallbackRule": True,
-            "name": "Fallback Rule for Grafana Service Route",
-            "position": 5,
-        },
-    ],
-    opts=rootly_imported_route_opts("c1e812d2-e14b-4233-a368-c240e9a03d17"),
-)
-
-alert_route_grafana_production_service_route = rootly.AlertRoute(
-    "grafana-production-service-route",
-    alerts_source_ids=[alerts_source_grafana_prometheus_production.id],
-    enabled=True,
-    name="Grafana Production Service Route",
-    owning_team_ids=[
-        "9f00e9f1-2f13-470e-a856-50ab5003f260",
-    ],
-    rules=[
         {
             "conditionGroups": [
                 {
@@ -3889,7 +3934,7 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
             ],
             "fallbackRule": False,
             "name": "learn-ai namespace to MIT Learn AI - Django Webapp",
-            "position": 1,
+            "position": 3,
         },
         {
             "conditionGroups": [
@@ -3913,7 +3958,7 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
             ],
             "fallbackRule": False,
             "name": "mitlearn namespace to MIT Learn - Django Webapp",
-            "position": 2,
+            "position": 4,
         },
         {
             "conditionGroups": [
@@ -3937,7 +3982,7 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
             ],
             "fallbackRule": False,
             "name": "mitxonline-openedx namespace to MITx Online Open edX LMS Webapp",
-            "position": 3,
+            "position": 5,
         },
         {
             "conditionGroups": [
@@ -3961,7 +4006,7 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
             ],
             "fallbackRule": False,
             "name": "mitxonline namespace to MITx Online - Django Webapp",
-            "position": 4,
+            "position": 6,
         },
         {
             "conditionGroups": [
@@ -3991,7 +4036,7 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
             ],
             "fallbackRule": False,
             "name": "openedx service + xpro- env to MIT XPro Open edX LMS Webapp",
-            "position": 5,
+            "position": 7,
         },
         {
             "conditionGroups": [
@@ -4021,7 +4066,7 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
             ],
             "fallbackRule": False,
             "name": "openedx service + mitx- env to MITx Residential Open edX LMS Webapp",  # noqa: E501
-            "position": 6,
+            "position": 8,
         },
         {
             "conditionGroups": [
@@ -4045,7 +4090,7 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
             ],
             "fallbackRule": False,
             "name": "openedx service label to MITx Online Open edX LMS Webapp",
-            "position": 7,
+            "position": 9,
         },
         {
             "destinations": [
@@ -4056,7 +4101,7 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
             ],
             "fallbackRule": True,
             "name": "Fallback Rule for Grafana Production Service Route",
-            "position": 8,
+            "position": 10,
         },
     ],
     opts=rootly_imported_route_opts("e7b002f8-e13f-4b63-b0df-af1c78aee890"),
