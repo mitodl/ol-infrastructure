@@ -388,6 +388,13 @@ def build_base_general_config() -> ConfigDict:
             "ENABLE_COUNTRY_ACCESS": False,
             "ENABLE_COURSE_BLOCKS_NAVIGATION_API": True,
             "ENABLE_COURSE_HOME_REDIRECT": True,
+            # Off by default; per-stack `edxapp:enable_courseware_index` turns it on
+            # via build_general_config(). MUST stay inside FEATURES: the course
+            # publish signal reads FEATURES["ENABLE_COURSEWARE_INDEX"], while
+            # cms/envs/production.py reads a *separate* top-level setting of the
+            # same name and, when that one is truthy, overwrites SEARCH_ENGINE with
+            # search.elastic.ElasticSearchEngine -- which would silently send every
+            # index write to Elasticsearch instead of Typesense.
             "ENABLE_COURSEWARE_INDEX": False,
             "ENABLE_COURSEWARE_SEARCH": True,
             "ENABLE_CREDIT_API": False,
@@ -665,11 +672,18 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
     return deployment_overrides.get(env_prefix, {})
 
 
-def build_general_config(env_prefix: str) -> ConfigDict:
+def build_general_config(
+    env_prefix: str,
+    *,
+    enable_courseware_index: bool = False,
+) -> ConfigDict:
     """Build complete 50-general-config.yaml for a deployment.
 
     Args:
         env_prefix: Environment prefix (mitx, xpro, mitxonline, mitx-staging)
+        enable_courseware_index: Whether the course publish signal should enqueue
+            search indexing. Sourced from the per-stack `edxapp:enable_courseware_index`
+            config key.
 
     Returns:
         Complete configuration dictionary for the deployment
@@ -678,7 +692,15 @@ def build_general_config(env_prefix: str) -> ConfigDict:
     overrides = get_deployment_overrides(env_prefix)
 
     # Merge FEATURES and OAUTH2_PROVIDER nested dicts properly
-    return deep_merge(base, overrides)
+    config = deep_merge(base, overrides)
+
+    # Applied after the merge so a deployment override cannot silently win over the
+    # per-stack setting. CourseAboutSearchIndexer subclasses CoursewareSearchIndexer
+    # and inherits its ENABLE_INDEXING_KEY, so this single flag gates both the
+    # courseware_content and course_info indices.
+    config["FEATURES"]["ENABLE_COURSEWARE_INDEX"] = enable_courseware_index
+
+    return config
 
 
 def render_yaml(config: ConfigDict) -> str:

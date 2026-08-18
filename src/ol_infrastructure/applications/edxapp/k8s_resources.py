@@ -50,6 +50,7 @@ from ol_infrastructure.components.services.k8s import (
     GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sConfig,
+    OLApplicationK8sScheduledJobConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
@@ -394,6 +395,26 @@ def create_k8s_resources(  # noqa: C901
             mount_path="/openedx/edx-platform/uwsgi.ini",
             sub_path="uwsgi.ini",
         ),
+        # Settings entrypoint that DJANGO_SETTINGS_MODULE points at instead of
+        # <service>.envs.production -- see the comment on the settings_override
+        # ConfigMap in k8s_configmaps.py. Mounted at both service paths because the
+        # module is identical for each (its `from ..production import *` is relative),
+        # and the extra file is inert in the service it does not belong to. subPath so
+        # it lands alongside the image's existing envs/mitol/{assets,i18n}.py rather
+        # than replacing that directory. Appended rather than inserted so the rendered
+        # volumeMounts list stays index-stable for existing entries.
+        kubernetes.core.v1.VolumeMountArgs(
+            name=configmaps.settings_override_config_name,
+            mount_path="/openedx/edx-platform/lms/envs/mitol/production.py",
+            sub_path="production.py",
+            read_only=True,
+        ),
+        kubernetes.core.v1.VolumeMountArgs(
+            name=configmaps.settings_override_config_name,
+            mount_path="/openedx/edx-platform/cms/envs/mitol/production.py",
+            sub_path="production.py",
+            read_only=True,
+        ),
     ]
 
     # The Vector log-shipping sidecar mounts differ per service (lms vs cms log paths).
@@ -524,6 +545,52 @@ def create_k8s_resources(  # noqa: C901
         edxapp_config=edxapp_config,
     )
 
+    # Periodic full sweep of the course search index.
+    #
+    # Enabling FEATURES["ENABLE_COURSEWARE_INDEX"] only starts INCREMENTAL indexing:
+    # the course_published signal enqueues update_search_index per publish. A course
+    # that is never republished is never indexed, and an index lost to a rebuilt
+    # Typesense PVC, a deleted collection, or a new environment does not repair
+    # itself. This sweep is the backstop for all of those.
+    #
+    # --active, not --all: reindex_course's --all path calls query_yes_no(), which is
+    # a bare input() loop, so it raises EOFError with no TTY. --active skips the
+    # prompt and scopes to courses that have started and have not ended -- the right
+    # working set for a recurring run. --warning drops per-block INFO logging.
+    #
+    # Only scheduled where indexing is on, since otherwise there is no engine being
+    # fed and the sweep would just be an expensive no-op.
+    courseware_reindex_jobs = []
+    if edxapp_config.get_bool("enable_courseware_index"):
+        courseware_reindex_jobs.append(
+            OLApplicationK8sScheduledJobConfig(
+                name="reindex-courses",
+                schedule=edxapp_config.get("courseware_reindex_schedule")
+                or "30 7 * * 0",
+                command=[
+                    "python",
+                    "manage.py",
+                    "cms",
+                    "reindex_course",
+                    "--active",
+                    "--warning",
+                ],
+                # Tracks the CMS celery worker: the sweep walks the modulestore in
+                # process rather than fanning out to celery, so it wants comparable
+                # headroom.
+                resource_requests={
+                    "cpu": resources_dict["celery"]["cms"]["cpu_request"],
+                    "memory": resources_dict["celery"]["cms"]["memory_request"],
+                },
+                resource_limits={
+                    "memory": resources_dict["celery"]["cms"]["memory_limit"],
+                },
+                # No active_deadline_seconds: runtime scales with the size of the
+                # course catalog, and a wrong guess converts a slow sweep into a
+                # recurring failure.
+            )
+        )
+
     ############################################
     # lms deployment resources
     ############################################
@@ -579,6 +646,9 @@ def create_k8s_resources(  # noqa: C901
         configmaps.interpolated_config_name,
         configmaps.lms_general_config_name,
         configmaps.lms_interpolated_config_name,
+        # Volume only -- deliberately absent from lms_edxapp_config_sources, which the
+        # init container cats into lms.env.yml. This is a Python module, not config.
+        configmaps.settings_override_config_name,
     ]
 
     lms_edxapp_volumes = [
@@ -680,7 +750,7 @@ def create_k8s_resources(  # noqa: C901
             registry="dockerhub",
             application_config={
                 "SERVICE_VARIANT": "lms",
-                "DJANGO_SETTINGS_MODULE": "lms.envs.production",
+                "DJANGO_SETTINGS_MODULE": "lms.envs.mitol.production",
                 "UWSGI_WORKERS": "2",
             },
             application_lb_service_name=lms_webapp_deployment_name,
@@ -926,6 +996,8 @@ def create_k8s_resources(  # noqa: C901
         configmaps.interpolated_config_name,
         configmaps.cms_general_config_name,
         configmaps.cms_interpolated_config_name,
+        # Volume only -- see the note on lms_edxapp_configmap_names.
+        configmaps.settings_override_config_name,
     ]
 
     cms_edxapp_volumes = [
@@ -1023,7 +1095,7 @@ def create_k8s_resources(  # noqa: C901
             registry="dockerhub",
             application_config={
                 "SERVICE_VARIANT": "cms",
-                "DJANGO_SETTINGS_MODULE": "cms.envs.production",
+                "DJANGO_SETTINGS_MODULE": "cms.envs.mitol.production",
                 "UWSGI_WORKERS": "2",
             },
             application_lb_service_name=cms_webapp_deployment_name,
@@ -1143,6 +1215,7 @@ def create_k8s_resources(  # noqa: C901
                     ["python", "manage.py", "cms", "migrate", "--noinput"],
                 ),
             ],
+            scheduled_jobs=courseware_reindex_jobs,
             webapp_keda_config=cms_webapp_keda_config,
             webapp_deployment_aliases=[
                 pulumi.Alias(
@@ -1294,7 +1367,7 @@ def create_k8s_resources(  # noqa: C901
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="DJANGO_SETTINGS_MODULE",
-                                    value="lms.envs.production",
+                                    value="lms.envs.mitol.production",
                                 ),
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
@@ -1471,7 +1544,7 @@ def create_k8s_resources(  # noqa: C901
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="DJANGO_SETTINGS_MODULE",
-                                    value="lms.envs.production",
+                                    value="lms.envs.mitol.production",
                                 ),
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
@@ -1600,7 +1673,7 @@ def create_k8s_resources(  # noqa: C901
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="DJANGO_SETTINGS_MODULE",
-                                    value="lms.envs.production",
+                                    value="lms.envs.mitol.production",
                                 ),
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
@@ -1710,7 +1783,7 @@ def create_k8s_resources(  # noqa: C901
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="DJANGO_SETTINGS_MODULE",
-                                    value="lms.envs.production",
+                                    value="lms.envs.mitol.production",
                                 ),
                             ],
                             volume_mounts=celery_volume_mounts,
@@ -1825,7 +1898,7 @@ def create_k8s_resources(  # noqa: C901
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="DJANGO_SETTINGS_MODULE",
-                                    value="cms.envs.production",
+                                    value="cms.envs.mitol.production",
                                 ),
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
