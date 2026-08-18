@@ -347,11 +347,25 @@ def create(
                     ")"
                 ),
             ),
-            # --- Kubernetes Job failures ---
+            # --- Job failures ---
             # Fires when a Job's failed pod count > 0.
-            # Dagster namespace is excluded — it manages its own job retry logic.
+            #
+            # Named Workload* rather than Kubernetes*: alertmanager.py silences
+            # `alertname =~ "Kube.*"` (built-in k8s noise) with continue_=False, and
+            # that route sits ABOVE the severity routes. Under the old
+            # KubernetesJobFailed* names these rules matched it, so despite carrying
+            # severity labels they were delivered to oblivion -- 254 firings in 30
+            # days on the production stack and 104 on QA, none of which reached
+            # Rootly. Keep any new rule name here clear of the Kube.* prefix.
+            #
+            # Exclusions:
+            #   dagster          -- manages its own job retry logic.
+            #   witan-ci-indexer -- currently failing every run in both operations-qa
+            #                       and operations-production; excluded so the rename
+            #                       above does not immediately page for a known break.
+            #                       Remove this exclusion once that job is fixed.
             alerting.RuleGroupRuleArgs(
-                name="KubernetesJobFailedWarning",
+                name="WorkloadJobFailedWarning",
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
@@ -360,11 +374,11 @@ def create(
                     "description": "Job {{ $labels.job_name }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has failed."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, job_name) (kube_job_status_failed{cluster=~".*-(ci|qa)", namespace!="dagster"} > 0)'
+                    'sum by (cluster, namespace, job_name) (kube_job_status_failed{cluster=~".*-(ci|qa)", namespace!="dagster", job_name!~"witan-ci-indexer.*"} > 0)'
                 ),
             ),
             alerting.RuleGroupRuleArgs(
-                name="KubernetesJobFailedCritical",
+                name="WorkloadJobFailedCritical",
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
@@ -373,7 +387,7 @@ def create(
                     "description": "Job {{ $labels.job_name }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has failed."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, job_name) (kube_job_status_failed{cluster=~".*-(production)", namespace!="dagster"} > 0)'
+                    'sum by (cluster, namespace, job_name) (kube_job_status_failed{cluster=~".*-(production)", namespace!="dagster", job_name!~"witan-ci-indexer.*"} > 0)'
                 ),
             ),
             # --- HPA at max replicas ---
@@ -417,6 +431,117 @@ def create(
                 },
                 datas=rd(
                     'sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_status_current_replicas{cluster=~".*-(production)", horizontalpodautoscaler!="keda-hpa-mitxonline-hubspot-sync-celery-worker"}) >= sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{cluster=~".*-(production)"}) and sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_max_replicas{cluster=~".*-(production)"}) != sum by (cluster, namespace, horizontalpodautoscaler) (kube_horizontalpodautoscaler_spec_min_replicas{cluster=~".*-(production)"})'
+                ),
+            ),
+            # --- CronJob staleness ---
+            # Job-failure alerting above only sees runs that STARTED and failed. A
+            # CronJob that stops firing while still existing -- suspended, controller
+            # wedged, every run failing -- produces no successful run and no failed
+            # Job to alert on. That is the gap that let an empty Open edX
+            # course-search index sit unnoticed for months.
+            #
+            # What this does NOT cover is a CronJob that stops EXISTING: delete it and
+            # kube-state-metrics drops the series, which is NoData, which
+            # no_data_state=OK keeps silent. Detecting a resource that should be there
+            # and isn't isn't an age-of-last-success question at all -- it needs an
+            # expected-inventory check, which is a different rule (see the gap note
+            # below, which the same `unless` construction would answer).
+            #
+            # Two buckets because PromQL cannot parse a cron expression to derive a
+            # per-job threshold. Membership is an explicit cronjob list; validate a
+            # new entry against its `schedule` label on kube_cronjob_info before
+            # adding it. Current inventory:
+            #   0/5 * * * *  cron-deploy-pipelines, cron-reindex   -> fast
+            #   17 * * * *   witan-token-sync                      -> fast
+            #   20 3 * * *   omnigraph-optimize                    -> slow
+            #   20 4 * * 0   omnigraph-cleanup                     -> slow
+            #   30 7 * * 0   cms-edxapp-reindex-courses            -> slow
+            #
+            # Two CronJobs are deliberately absent from both buckets:
+            #
+            #   witan-break-glass -- schedule `0 0 31 2 *`, February 31st, a date that
+            #     never occurs, because it is triggered by hand. Permanently "stale"
+            #     by design.
+            #   witan-ci-indexer  -- same known break that is excluded from the
+            #     job-failure rules above. It is not merely failing some runs: over a
+            #     7-day window its age-since-last-success peaked at 518,714s (6.0
+            #     days), so a 6h staleness rule would page for it continuously.
+            #     Remove from both places together once it is fixed.
+            #
+            # `> 0` guards the never-yet-succeeded case: kube-state-metrics reports 0
+            # (or omits the series) until a CronJob's first success, and time() minus
+            # zero would otherwise fire instantly on every newly created CronJob.
+            #
+            # KNOWN GAP, deliberate: this cannot see a CronJob that has never
+            # succeeded at all, because kube-state-metrics omits
+            # last_successful_time entirely until the first success -- an absent
+            # series is NoData, and no_data_state=OK keeps it silent. Two live
+            # CronJobs are in exactly that state today (open-metadata's
+            # cron-deploy-pipelines and cron-reindex in data-production have
+            # neither a last_successful_time nor a last_schedule_time). Catching
+            # that needs a separate `kube_cronjob_info unless
+            # kube_cronjob_status_last_successful_time` rule, which is left out
+            # here because it would page immediately for those two pre-existing
+            # cases and for witan-break-glass. It also means a newly created
+            # CronJob is uncovered until its first successful run.
+            alerting.RuleGroupRuleArgs(
+                name="ScheduledJobStaleFastWarning",
+                condition="C",
+                for_="15m",
+                no_data_state="OK",
+                labels={"severity": "warning"},
+                annotations={
+                    "description": "CronJob {{ $labels.cronjob }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has not succeeded in over 6 hours."
+                },
+                datas=rd(
+                    "max by (cluster, namespace, cronjob) (time() - "
+                    "(kube_cronjob_status_last_successful_time"
+                    '{cluster=~".*-(ci|qa)", cronjob=~"cron-deploy-pipelines|cron-reindex|witan-token-sync"} > 0)) > 21600'
+                ),
+            ),
+            alerting.RuleGroupRuleArgs(
+                name="ScheduledJobStaleFastCritical",
+                condition="C",
+                for_="15m",
+                no_data_state="OK",
+                labels={"severity": "critical"},
+                annotations={
+                    "description": "CronJob {{ $labels.cronjob }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has not succeeded in over 6 hours."
+                },
+                datas=rd(
+                    "max by (cluster, namespace, cronjob) (time() - "
+                    "(kube_cronjob_status_last_successful_time"
+                    '{cluster=~".*-(production)", cronjob=~"cron-deploy-pipelines|cron-reindex|witan-token-sync"} > 0)) > 21600'
+                ),
+            ),
+            alerting.RuleGroupRuleArgs(
+                name="ScheduledJobStaleSlowWarning",
+                condition="C",
+                for_="15m",
+                no_data_state="OK",
+                labels={"severity": "warning"},
+                annotations={
+                    "description": "CronJob {{ $labels.cronjob }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has not succeeded in over 15 days."
+                },
+                datas=rd(
+                    "max by (cluster, namespace, cronjob) (time() - "
+                    "(kube_cronjob_status_last_successful_time"
+                    '{cluster=~".*-(ci|qa)", cronjob=~"omnigraph-optimize|omnigraph-cleanup|cms-edxapp-reindex-courses"} > 0)) > 1296000'
+                ),
+            ),
+            alerting.RuleGroupRuleArgs(
+                name="ScheduledJobStaleSlowCritical",
+                condition="C",
+                for_="15m",
+                no_data_state="OK",
+                labels={"severity": "critical"},
+                annotations={
+                    "description": "CronJob {{ $labels.cronjob }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has not succeeded in over 15 days."
+                },
+                datas=rd(
+                    "max by (cluster, namespace, cronjob) (time() - "
+                    "(kube_cronjob_status_last_successful_time"
+                    '{cluster=~".*-(production)", cronjob=~"omnigraph-optimize|omnigraph-cleanup|cms-edxapp-reindex-courses"} > 0)) > 1296000'
                 ),
             ),
         ],
