@@ -16,9 +16,12 @@ the pgbouncer_exporter sidecar that produces these metrics, and the max_db_conne
 cap that gives the headroom rule a denominator worth measuring against.
 
 Every rule here measures PgBouncer, which means none of them can see a client
-that fails before it becomes a connection. That half is covered by
+that fails before it becomes a connection, nor one that fails against its own
+in-process pool without reaching the network. Those are covered by
 log_rules/dagster_database.py, written after a daemon spent days unable to open a
-socket at all while these rules read perfectly healthy. Keep both.
+socket at all while the rules in this file read perfectly healthy. The 2026-08-18
+remediation then produced a second, unrelated hour of failures against the
+client's SQLAlchemy pool that nothing here saw either. Keep both files.
 
 Warning rules filter cluster=~".*-(ci|qa)"      -- fire on CI and QA stacks.
 Critical rules filter cluster=~".*-(production)" -- fire on prod stack only.
@@ -77,8 +80,7 @@ _MAXWAIT_SECONDS = 5
 # have blown the max_db_connections cap in seconds, and the cap never moved off
 # 40 of 708 throughout.
 #
-# That makes it the one pool-side series that was not blind to the 2026-08-18
-# daemon incident, and a different quantity from everything above: those measure
+# That makes it a different quantity from everything above: those measure
 # concurrency -- how many connections exist at an instant -- while this measures
 # how fast clients arrive. Under pool_mode = session each client session takes an
 # assignment, so this is a direct count of the client-side connects that consume
@@ -88,13 +90,24 @@ _MAXWAIT_SECONDS = 5
 # space. Both readings are true at once; only this one is alarming.
 #
 # Measured, not guessed. data-production sat at 407-511/s continuously from
-# 2026-08-09 until the pooled storage classes rolled at 17:22Z on 2026-08-18,
-# after which it fell to 0.2-4.4/s with a single 22.9/s spike. data-qa ran a flat
-# 59/s over the same period and fell to 0.25/s. 50 is therefore below both
+# 2026-08-09 until the pooled storage classes rolled at ~16:40Z on 2026-08-18,
+# falling 415 -> 50.7 -> 0.7/s across the 16:37-16:47Z samples and settling at
+# 0.2-4.4/s with a single 22.9/s spike. data-qa ran a flat 59/s over the same
+# period and fell to 0.25/s in the same window. 50 is therefore below both
 # observed pathological levels and more than twice the largest post-fix spike --
 # but it rests on roughly an hour of healthy baseline, so revisit it once a week
 # of post-fix series exists. for_=15m means a sustained ~45,000 client connects
 # before it fires, which no burst of legitimate work produces.
+#
+# Know what this rule stops seeing at that point. The 16:40Z rollout ended the
+# port exhaustion but not the connection failures: for the next ~70 minutes the
+# daemon kept failing to get connections at ~30/min, now against its own
+# SQLAlchemy pool ("QueuePool limit of size 10 overflow 10 reached, connection
+# timed out"), with churn already down at 0.7/s. Client-side pool saturation is a
+# third axis that neither this rule nor the concurrency rules above can reach --
+# only DagsterDatabaseConnectionFailures in log_rules/dagster_database.py spans
+# all of it, because it matches Dagster's retry wrapper rather than any one error.
+# Treat this rule as the leading indicator for one failure mode, not as coverage.
 _SERVER_ASSIGNMENTS_PER_SECOND = 50
 
 
