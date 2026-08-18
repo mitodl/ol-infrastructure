@@ -139,6 +139,40 @@ def create_k8s_resources(  # noqa: C901
     replicas_dict = edxapp_config.require_object("k8s_replicas")
     resources_dict = edxapp_config.require_object("k8s_resources")
 
+    # Per-install Granian concurrency for the LMS webapp.
+    #
+    # CMS took the component defaults everywhere in stage 3, but LMS cannot: the
+    # measured p99 concurrency demand differs by ~65x across installs (mitxonline
+    # LMS needs 17.7 concurrently-busy blocking threads, mitx LMS needs 0.27), so a
+    # single value is either unsafe for one or wasteful for the other. This file is
+    # shared by every install, so the only place that distinction can live is
+    # per-stack config.
+    #
+    # Omitted (the default) means the pre-overhaul holding pins: 2 workers x 32
+    # blocking threads, backpressure 64, runtime-mode mt, runtime-threads 2 -- the
+    # values Granian derived from backlog=128 before the overhaul. An install opts
+    # in by setting edxapp:k8s_granian.lms in its stack config; setting it to an
+    # empty mapping opts in to the component defaults with no overrides.
+    #
+    # See docs/plans/granian-configuration-overhaul.md stage 3.
+    LMS_GRANIAN_HOLDING_PINS = {
+        "workers": 2,
+        "runtime_mode": "mt",
+        "runtime_threads": 2,
+        "blocking_threads": 32,
+        "backpressure": 64,
+    }
+    # `is None` rather than a falsy check: an explicitly configured empty mapping
+    # means "take the component defaults with no per-install overrides", which is a
+    # real thing for a stack to want and is not the same request as omitting the key.
+    # `or` would collapse the two and silently re-pin such a stack to the old values.
+    _lms_granian_override = (edxapp_config.get_object("k8s_granian") or {}).get("lms")
+    lms_granian_concurrency = (
+        LMS_GRANIAN_HOLDING_PINS
+        if _lms_granian_override is None
+        else _lms_granian_override
+    )
+
     # Get various VPC / network configuration information
     data_vpc = network_stack.require_output("data_vpc")
     operations_vpc = network_stack.require_output("operations_vpc")
@@ -774,19 +808,9 @@ def create_k8s_resources(  # noqa: C901
             granian_config=GranianConfig(
                 application_module="lms.wsgi:application",
                 port=8000,
-                workers=2,
                 no_ws=True,
-                runtime_mode="mt",
-                runtime_threads=2,
-                # Holding pins: preserve the pre-overhaul effective concurrency
-                # until this app's stage of the rollout. Granian derived
-                # backpressure=64 (backlog=128 // workers=2) and
-                # blocking_threads=64 // 2 = 32. Delete these (plus workers,
-                # runtime_mode, runtime_threads above) to adopt the component
-                # defaults (1 worker, 8 blocking threads, 16 backpressure).
-                # See docs/plans/granian-configuration-overhaul.md
-                blocking_threads=32,
-                backpressure=64,
+                # Concurrency is per-install; see lms_granian_concurrency above.
+                **lms_granian_concurrency,
                 respawn_failed_workers=True,
                 backlog=128,
                 static_path_mounts=["/openedx/staticfiles"],

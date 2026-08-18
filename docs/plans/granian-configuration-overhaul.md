@@ -240,10 +240,18 @@ nginx and the listen backlog hold the overflow.
 
 **Replica re-sizing.** `application_min_replicas` comes from per-stack Pulumi config
 (`min_replicas`) for every affected app, so this is a config change per stack, not code.
-Baseline recommendation at each stage: leave `min_replicas` alone initially and let the
-HPA respond, but pre-raise it for any app whose steady-state CPU utilization already sits
-above ~40% of the 60% HPA target, since halving per-pod worker count roughly halves
-per-pod CPU and will otherwise trigger a scale-*down* before the load reappears.
+
+Baseline recommendation at each stage: **leave `min_replicas` alone.** Do not pre-raise.
+
+> This reverses the rule originally stated here, which was to pre-raise for any app whose
+> steady-state CPU utilization already sat above ~40% of the 60% HPA target, "since
+> halving per-pod worker count roughly halves per-pod CPU". **That premise is false and
+> was disproven by measurement in stage 2.** The same traffic arriving at the same number
+> of pods performs the same work regardless of how many worker processes divide it —
+> worker count changes *capacity*, not *usage*. Measured p95 CPU across the stage-2
+> deploys: `micromasters` 0.0100 → 0.0097, `xpro` 0.0631 → 0.0608. Flat, not halved.
+> There is no post-deploy scale-*down* to guard against, so there is nothing to pre-raise
+> against. See the stage-3 `mitx` LMS entry below, which is where this was caught.
 
 ## Rollout
 
@@ -420,13 +428,16 @@ Component change lands once; per-app behavior changes as each app's stack is dep
 
   CMS was judged safe despite p99 8.7 sitting right at the ceiling: 0.9 rps over 3 pods,
   and the spikes are Studio import/export bursts whose blast radius is a slow authoring
-  operation rather than learner traffic. Its `workers_max_rss` is unchanged in aggregate —
-  the component derives `floor(limit / workers × 0.9)`, so 2 × 921MiB and 1 × 1843MiB cap
-  the pod identically (verified in the CI preview diff). What *does* change is that a
-  respawn now costs the pod's whole serving capacity instead of half; CMS showed 71 RSS
-  respawns and 77 restarts over 14 days but **zero over the last 3**, once its VPA grew
-  the pods past the declared 4Gi. LMS respawns, by contrast, are ongoing (8 and 10 over
-  14 days), which is a second independent reason to keep it at 2 workers for now.
+  operation rather than learner traffic. Its `workers_max_rss` is unchanged in aggregate
+  for every install — the component derives `floor(limit / workers × 0.9)`, so halving
+  the worker count doubles the per-worker cap and the pod total is identical whatever the
+  declared limit (`mitxonline` at 4Gi: 2 × 1843MiB → 1 × 3686MiB; `mitx` and
+  `mitx-staging` at 2Gi: 2 × 921MiB → 1 × 1843MiB; both verified in the CI preview diff).
+  What *does* change is that a respawn now costs the pod's whole serving capacity instead
+  of half; CMS showed 71 RSS respawns and 77 restarts over 14 days but **zero over the
+  last 3**, once its VPA grew the pods past the declared 4Gi. LMS respawns, by contrast,
+  are ongoing (8 and 10 over 14 days), which is a second independent reason to keep it at
+  2 workers for now.
 
   > Growing *past* the declared 4Gi limit looks impossible given
   > `webapp_vpa_max_allowed_memory="4Gi"`, and a reviewer read it that way. It is not.
@@ -436,6 +447,40 @@ Component change lands once; per-app behavior changes as each app's stack is dep
   > `applications-production`: request 2990.9MiB (under the 4096MiB `maxAllowed`), limit
   > 5981.8MiB, ratio exactly 2.0, and the 14d limit series ranges 4096–7755MiB. Anything
   > sizing a cap against `maxAllowed` needs to multiply by that ratio first.
+
+  **LMS canary — `mitx` first, via new per-install config.** Because `k8s_resources.py`
+  is shared, there was no way to move one install's LMS without moving all three. Added
+  `edxapp:k8s_granian.lms` per-stack config: omitted (the default for every stack) keeps
+  the pre-overhaul holding pins, and an install opts in by setting it. `mitx` CI/QA/
+  Production now set `workers: 1, runtime_threads: 1, blocking_threads: 8,
+  backpressure: 16`. Verified in preview: `mitx.CI` updates both edxapp Deployments (LMS
+  to the new args, CMS from the change above) while `mitxonline.CI` updates **only** CMS —
+  its LMS does not appear in the diff at all, so the refactor is a no-op for anything that
+  has not opted in.
+
+  Be honest about what this canary does and does not prove. `mitx` LMS p99 concurrency is
+  0.27 busy threads against the new ceiling of 8 — 30× headroom — so it will never
+  approach the limit. It validates that LMS boots and serves on one worker, that
+  `runtime_mode` auto is fine on this code path, the whole-pod respawn blast radius, and
+  probe/startup behavior. It does **not** test whether 8 threads is enough at LMS-scale
+  concurrency, because `mitx` LMS has no such concurrency. Only `mitxonline` LMS does, and
+  that is precisely the risk being deferred.
+
+  **Replica pre-raise: not applied. This is where the plan's original rule was caught.**
+  Stage 3 is the first stage where it mattered — stages 1 and 2 dodged it because every
+  app was pinned at `min_replicas`, whereas `mitx` LMS genuinely scales (observed 4→15
+  over 14 days). Under the rule as originally written ("pre-raise for any app whose
+  steady-state CPU sits above ~40% of the 60% HPA target", i.e. above 24% utilization),
+  `mitx` LMS at p95 89m against a 250m request — 36% — would have qualified.
+
+  It does not, because the premise is false. "Halving per-pod worker count roughly halves
+  per-pod CPU" does not hold: the same traffic arriving at the same number of pods
+  performs the same work regardless of how many worker processes divide it. Worker count
+  changes *capacity*, not *usage*. Stage 2 measured exactly this and it is in the table
+  above — `micromasters` p95 CPU 0.0100 → 0.0097 and `xpro` 0.0631 → 0.0608, flat rather
+  than halved. There is no post-deploy scale-down to guard against, so no pre-raise. The
+  **Replica re-sizing** baseline earlier in this document has been rewritten to say so
+  directly, rather than leaving the disproven rule standing to be contradicted here.
 
   **Blast radius.** `k8s_resources.py` is shared, so the CMS edit changes CMS for
   `mitxonline-openedx`, `mitx-openedx` and `mitx-staging-openedx` as each stack deploys —
