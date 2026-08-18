@@ -73,8 +73,13 @@ _DESCRIPTION = (
     " the PgBouncer service address -- confirm with `ss -tan state time-wait | wc"
     " -l` in the pod, which will sit at net.ipv4.ip_local_port_range -- and points"
     " at a Dagster storage configured with a non-pooling connection class."
-    " 'Connection refused' or a DNS failure points at PgBouncer itself, in which"
-    " case DagsterPgBouncerExporterDown should be firing alongside this."
+    " 'Connection refused' or a DNS failure points at the path to PgBouncer"
+    " rather than at Dagster -- but do not wait for a pool-side alert to confirm"
+    " it. The exporter reaches PgBouncer over 127.0.0.1 inside the same pod,"
+    " while Dagster reaches it through the Service DNS name and its ClusterIP,"
+    " so anything broken between those two points leaves pgbouncer_up at 1 and"
+    " DagsterPgBouncerExporterDown silent. Resolve the Service name from a"
+    " Dagster pod and connect to it there."
 )
 
 _SUMMARY = (
