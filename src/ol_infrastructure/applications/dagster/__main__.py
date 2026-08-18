@@ -32,6 +32,7 @@ from bridge.lib.versions import (
     DAGSTER_CHART_VERSION,
     PGBOUNCER_EXPORTER_VERSION,
     PGBOUNCER_VERSION,
+    SQL_EXPORTER_VERSION,
 )
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
@@ -1184,6 +1185,504 @@ pgbouncer_service_monitor = kubernetes.apiextensions.CustomResource(
         ],
     },
     opts=ResourceOptions(depends_on=[pgbouncer_service]),
+)
+
+# ============================================================================
+# SQL exporter against the Dagster metadata database
+# ============================================================================
+# Dagster OSS exposes no /metrics endpoint and ships no OTel instrumentation, so
+# the metadata Postgres is the only place Dagster-domain signal exists at all.
+# Everything the cluster knows today is about containers: kube_job_* says a run
+# worker exited, never that a run waited nine minutes to start, that the queue is
+# 400 deep, or that the sensor daemon stopped heartbeating -- which is precisely
+# what nobody could see on 2026-08-10, when the daemon sat 25 minutes behind 178
+# run workers and the only visible number was a connection count.
+#
+# Two properties are load-bearing, not incidental:
+#
+# 1. It connects DIRECTLY to RDS, not through PgBouncer. The pool's own metrics
+#    are the other half of this project, and an exporter polling through the pool
+#    would add its connections to the very counts being used to size it.
+#
+# 2. Every query is bounded, and bounded by primary key rather than by time.
+#    runs and job_ticks are large and neither has an index on a bare timestamp, so
+#    a "last 10 minutes" predicate is a full index scan that grows with the table.
+#    id is monotonic, so `id > (SELECT max(id) - N)` is a range scan whose cost is
+#    fixed at N rows no matter how big the table gets. Verified with EXPLAIN
+#    (ANALYZE, BUFFERS) against a local Postgres carrying this exact schema and
+#    60k runs / 200k ticks: every query is an index scan, none touch the heap
+#    beyond the window, and the full scrape completes in ~31ms.
+#
+# The connection budget is deliberately tiny -- 2 connections, and the DSN sets a
+# 10s statement_timeout so no plan this exporter issues can pin a backend. That
+# timeout is not decorative: it was confirmed to reach the server by setting it to
+# 1ms and watching every query come back 57014.
+SQL_EXPORTER_RUN_WINDOW = 20000
+SQL_EXPORTER_TICK_WINDOW = 20000
+SQL_EXPORTER_STATEMENT_TIMEOUT_MS = 10000
+SQL_EXPORTER_PORT = 9399
+
+# Note on time arithmetic: Dagster stores create_timestamp/timestamp as naive UTC.
+# now() is timestamptz, and subtracting a naive timestamp from it silently converts
+# using the *session* timezone -- correct only as long as nobody changes it. Every
+# such expression below pins it with `now() AT TIME ZONE 'UTC'`. start_time is
+# already epoch seconds, so it is compared against extract(epoch FROM ...) instead.
+# The S608 suppression on the closing quote is because the only interpolations are
+# the integer window constants defined directly above -- nothing user-supplied or
+# config-supplied reaches these queries.
+sql_exporter_config = f"""\
+global:
+  scrape_timeout_offset: 500ms
+  # A floor on how often the collector may hit the database, independent of how
+  # often Prometheus scrapes. The ServiceMonitor asks for 60s, so this only binds
+  # if something else starts scraping too.
+  min_interval: 30s
+  max_connections: 2
+  max_idle_connections: 2
+  max_connection_lifetime: 10m
+
+# No `target:` block on purpose. The DSN carries a Vault-issued credential, so it
+# arrives as an environment variable rather than in this ConfigMap -- and
+# SQLEXPORTER_TARGET_DSN is only consulted when the file declares no target at all.
+# A target block with the DSN omitted does not fall back to the environment; it
+# fails at startup with "missing data_source_name for target".
+collectors:
+  - collector_name: dagster
+    metrics:
+      - metric_name: dagster_runs_in_flight
+        type: gauge
+        help: "Runs that have not reached a terminal state, by status."
+        key_labels: [status]
+        values: [runs]
+        # LEFT JOINed against a VALUES list so every status reports a number even
+        # when it has no rows. A GROUP BY alone would drop the series entirely,
+        # and "no QUEUED runs" and "the exporter stopped reporting" would look
+        # identical to an alert.
+        query: |
+          SELECT s.status AS status, coalesce(r.n, 0) AS runs
+          FROM (VALUES ('QUEUED'), ('NOT_STARTED'), ('STARTING'), ('STARTED'),
+                       ('CANCELING')) AS s (status)
+          LEFT JOIN (
+              SELECT status, count(*) AS n
+              FROM runs
+              WHERE status IN ('QUEUED', 'NOT_STARTED', 'STARTING', 'STARTED',
+                               'CANCELING')
+              GROUP BY status
+          ) AS r ON r.status = s.status
+
+      - metric_name: dagster_oldest_queued_run_age_seconds
+        type: gauge
+        help: "Age of the oldest run still in QUEUED, in seconds. 0 when none."
+        values: [seconds]
+        # Queue depth alone cannot distinguish a healthy burst from a stuck
+        # coordinator; this can. Reads only the QUEUED slice of idx_run_status.
+        query: |
+          SELECT coalesce(
+              extract(epoch FROM ((now() AT TIME ZONE 'UTC')
+                                  - min(create_timestamp))), 0) AS seconds
+          FROM runs
+          WHERE status = 'QUEUED'
+
+      - metric_name: dagster_run_wait_to_start_seconds
+        type: gauge
+        help: "Seconds from run creation to run start over the recent window."
+        value_label: quantile
+        values: [p50, p95, max]
+        query_ref: recent_run_waits
+
+      # No _total suffix on any of the three window metrics below. They are gauges
+      # over a sliding id window, so they fall as runs leave the window -- and _total
+      # tells a consumer this is a monotonic counter, which invites rate() and makes
+      # every ordinary decrease look like a counter reset.
+      - metric_name: dagster_recent_runs
+        type: gauge
+        help: "Runs in the recent window that reached a terminal state, by status."
+        key_labels: [status]
+        values: [runs]
+        query: |
+          SELECT s.status AS status, coalesce(r.n, 0) AS runs
+          FROM (VALUES ('SUCCESS'), ('FAILURE'), ('CANCELED')) AS s (status)
+          LEFT JOIN (
+              SELECT status, count(*) AS n
+              FROM runs
+              WHERE id > (SELECT max(id) - {SQL_EXPORTER_RUN_WINDOW} FROM runs)
+              GROUP BY status
+          ) AS r ON r.status = s.status
+
+      - metric_name: dagster_recent_retried_runs
+        type: gauge
+        help: "Runs in the recent window carrying a dagster/retry_number tag."
+        values: [runs]
+        # run_retries.max_retries = 3 means a job can fail repeatedly and still
+        # report SUCCESS, so the run status alone hides chronic flakiness.
+        query: |
+          SELECT count(*) AS runs
+          FROM runs AS r
+          INNER JOIN run_tags AS rt ON rt.run_id = r.run_id
+          WHERE r.id > (SELECT max(id) - {SQL_EXPORTER_RUN_WINDOW} FROM runs)
+            AND rt.key = 'dagster/retry_number'
+
+      - metric_name: dagster_recent_job_ticks
+        type: gauge
+        help: "Sensor and schedule ticks in the recent window, by type and status."
+        key_labels: [tick_type, status]
+        values: [ticks]
+        # A sensor that starts erroring stops launching runs and says nothing;
+        # the only evidence is FAILURE ticks piling up in this table.
+        #
+        # STARTED is the fourth member of dagster's TickStatus enum and is
+        # persisted like the rest. Leaving it out would drop exactly the ticks
+        # that are in flight or wedged mid-evaluation -- the interesting ones --
+        # from a metric that claims to break ticks down by status.
+        query: |
+          SELECT c.type AS tick_type, c.status AS status,
+                 coalesce(x.n, 0) AS ticks
+          FROM (
+              SELECT t.type, s.status
+              FROM (VALUES ('SENSOR'), ('SCHEDULE'),
+                           ('AUTO_MATERIALIZE')) AS t (type)
+              CROSS JOIN (VALUES ('SUCCESS'), ('FAILURE'), ('SKIPPED'),
+                                 ('STARTED')) AS s (status)
+          ) AS c
+          LEFT JOIN (
+              SELECT type, status, count(*) AS n
+              FROM job_ticks
+              WHERE id > (SELECT max(id) - {SQL_EXPORTER_TICK_WINDOW}
+                          FROM job_ticks)
+              GROUP BY type, status
+          ) AS x ON x.type = c.type AND x.status = c.status
+
+      - metric_name: dagster_daemon_heartbeat_age_seconds
+        type: gauge
+        help: "Seconds since each Dagster daemon last wrote a heartbeat."
+        key_labels: [daemon_type]
+        values: [seconds]
+        # The 2026-08-10 incident surfaced as a daemon falling 25 minutes behind.
+        # This is that symptom, measured directly, off a table with five rows.
+        query: |
+          SELECT daemon_type,
+                 extract(epoch FROM ((now() AT TIME ZONE 'UTC') - timestamp))
+                     AS seconds
+          FROM daemon_heartbeats
+
+      - metric_name: dagster_relation_bytes
+        type: gauge
+        help: "On-disk size of the Dagster metadata tables, including indexes."
+        key_labels: [relation]
+        values: [bytes]
+        query: |
+          SELECT c.relname AS relation, pg_total_relation_size(c.oid) AS bytes
+          FROM pg_class AS c
+          INNER JOIN pg_namespace AS n ON n.oid = c.relnamespace
+          WHERE n.nspname = 'public'
+            AND c.relkind = 'r'
+            AND c.relname IN ('runs', 'run_tags', 'event_logs', 'job_ticks',
+                              'asset_event_tags', 'asset_keys',
+                              'concurrency_slots', 'bulk_actions')
+
+    queries:
+      - query_name: recent_run_waits
+        # create_timestamp is naive UTC and start_time is epoch seconds, so the
+        # difference is taken in epoch space rather than as an interval.
+        query: |
+          WITH recent AS (
+              SELECT start_time - extract(epoch FROM create_timestamp) AS wait
+              FROM runs
+              WHERE id > (SELECT max(id) - {SQL_EXPORTER_RUN_WINDOW} FROM runs)
+                AND start_time IS NOT NULL
+          )
+          SELECT
+              coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY wait), 0)
+                  AS p50,
+              coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY wait), 0)
+                  AS p95,
+              coalesce(max(wait), 0) AS max
+          FROM recent
+"""  # noqa: S608
+
+# Read-only Vault credentials, on the same postgres-dagster mount the application
+# uses. The readonly role grants SELECT and nothing else, which is all of these
+# queries need -- including pg_total_relation_size, confirmed by running the whole
+# collector against a role holding only SELECT.
+#
+# The role is selected by `path` alone. An earlier version of this also passed
+# refresh_after, revoke_on_delete and role_name, copied from dagster_db_secret
+# above -- all three are inert and were removed rather than left to imply a
+# rotation and revocation policy that is not in effect:
+#
+#   refresh_after     is a real field on the config model, but OLVaultK8SSecret
+#                     only renders spec.refreshAfter for STATIC secrets. Moot
+#                     regardless: VSO documents the source lease duration as
+#                     taking precedence whenever it is greater than 0, and this
+#                     mount issues 3-month leases (OLVaultDatabaseConfig
+#                     default_ttl = ONE_MONTH_SECONDS * 3).
+#   revoke_on_delete  is not a field on the config model at all, so Pydantic
+#                     drops it silently. VSO does support spec.revoke; the
+#                     component never renders it, so deleting this resource
+#                     leaves the lease valid for the rest of its TTL. That gap
+#                     is repo-wide, not specific to this resource, and is worth
+#                     fixing in OLVaultK8SSecret rather than here.
+#   role_name         is not a field either, and VSO has no such concept -- the
+#                     Vault role is the last path segment.
+dagster_sql_exporter_db_secret = OLVaultK8SSecret(
+    f"dagster-k8s-sql-exporter-db-secret-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SDynamicSecretConfig(
+        dest_secret_labels=k8s_global_labels.model_dump(),
+        dest_secret_name="dagster-sql-exporter-postgresql-secret",  # pragma: allowlist secret  # noqa: E501, S106
+        labels=k8s_global_labels.model_dump(),
+        mount="postgres-dagster",
+        name="dagster-sql-exporter-postgresql-secret",
+        namespace=dagster_namespace,
+        path="creds/readonly",
+        # The DSN is assembled from these at container start, so a new credential
+        # only reaches the process when the pod restarts.
+        restart_target_kind="Deployment",
+        restart_target_name="dagster-sql-exporter",
+        vaultauth=dagster_auth_binding.vault_k8s_resources.auth_name,
+        templates={
+            "PGUSER": "{{ .Secrets.username }}",
+            "PGPASSWORD": "{{ .Secrets.password }}",
+        },
+    ),
+    opts=ResourceOptions(depends_on=[dagster_auth_binding]),
+)
+
+sql_exporter_config_map = kubernetes.core.v1.ConfigMap(
+    f"dagster-sql-exporter-config-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-sql-exporter-config",
+        namespace=dagster_namespace,
+        labels=k8s_global_labels.model_dump(),
+    ),
+    data={"sql_exporter.yml": sql_exporter_config},
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
+# sql_exporter reads its config once, at process start. Same trap as pgbouncer.ini
+# and dagster_instance.yaml before it: without this, editing a query deploys clean,
+# reports success, and changes nothing about the running exporter. See the comment
+# on pgbouncer_config_checksum_annotation for the two times that actually happened.
+sql_exporter_config_checksum_annotation = {
+    "checksum/ol-sql-exporter-config": hashlib.sha256(
+        sql_exporter_config.encode()
+    ).hexdigest(),
+}
+
+sql_exporter_deployment = kubernetes.apps.v1.Deployment(
+    f"dagster-sql-exporter-deployment-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-sql-exporter",
+        namespace=dagster_namespace,
+        labels=k8s_global_labels.model_dump(),
+    ),
+    spec=kubernetes.apps.v1.DeploymentSpecArgs(
+        # One replica, deliberately. A second would double every gauge's cardinality
+        # by pod label while measuring the same database, and there is nothing here
+        # to make highly available -- a gap in metrics is a gap in metrics.
+        replicas=1,
+        selector=kubernetes.meta.v1.LabelSelectorArgs(
+            match_labels={
+                "component": "sql-exporter",
+                **k8s_global_labels.model_dump(),
+            },
+        ),
+        template=kubernetes.core.v1.PodTemplateSpecArgs(
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                labels={
+                    "component": "sql-exporter",
+                    **k8s_global_labels.model_dump(),
+                },
+                annotations=sql_exporter_config_checksum_annotation,
+            ),
+            spec=kubernetes.core.v1.PodSpecArgs(
+                containers=[
+                    kubernetes.core.v1.ContainerArgs(
+                        name="sql-exporter",
+                        image=(f"burningalchemist/sql_exporter:{SQL_EXPORTER_VERSION}"),
+                        args=[
+                            "-config.file=/etc/sql_exporter/sql_exporter.yml",
+                        ],
+                        env=[
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="PGUSER",
+                                value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                    secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                        name="dagster-sql-exporter-postgresql-secret",
+                                        key="PGUSER",
+                                    ),
+                                ),
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="PGPASSWORD",
+                                value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                    secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                        name="dagster-sql-exporter-postgresql-secret",
+                                        key="PGPASSWORD",
+                                    ),
+                                ),
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="SQLEXPORTER_TARGET_NAME",
+                                value="dagster",
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="SQLEXPORTER_TARGET_COLLECTORS",
+                                value="dagster",
+                            ),
+                            # $(VAR) is expanded by Kubernetes from the two secret
+                            # vars declared above it, so the credential never lands
+                            # in the ConfigMap or in this repo. Same mechanism as
+                            # GCLOUD_FM_COLLECTOR_ID in substructure/aws/eks/grafana.
+                            #
+                            # This is a URL, so the password has to be URL-safe.
+                            # Vault's default database password generator emits
+                            # [A-Za-z0-9-] only and no password_policy is set on this
+                            # mount, so it is -- but that is an assumption worth
+                            # knowing about if anyone ever sets one.
+                            #
+                            # options=--statement_timeout is the libpq --name=value
+                            # form on purpose: the more common `-c name=value` form
+                            # is mangled in transit and the server rejects it with
+                            # "invalid command-line argument for server process: -c".
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="SQLEXPORTER_TARGET_DSN",
+                                value=dagster_db.db_instance.address.apply(
+                                    lambda addr: (
+                                        "postgres://$(PGUSER):$(PGPASSWORD)@"
+                                        f"{addr}:{DEFAULT_POSTGRES_PORT}/dagster"
+                                        "?sslmode=require&options=--statement_timeout"
+                                        f"%3D{SQL_EXPORTER_STATEMENT_TIMEOUT_MS}"
+                                    )
+                                ),
+                            ),
+                        ],
+                        ports=[
+                            kubernetes.core.v1.ContainerPortArgs(
+                                name="metrics",
+                                container_port=SQL_EXPORTER_PORT,
+                                protocol="TCP",
+                            ),
+                        ],
+                        volume_mounts=[
+                            kubernetes.core.v1.VolumeMountArgs(
+                                name="config",
+                                mount_path="/etc/sql_exporter",
+                                read_only=True,
+                            ),
+                        ],
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            requests={
+                                "cpu": "10m",
+                                "memory": "32Mi",
+                            },
+                            limits={
+                                "memory": "128Mi",
+                            },
+                        ),
+                        # /healthz, not /metrics. /metrics fails whenever the
+                        # database is unreachable, which is exactly when this
+                        # exporter should stay up and report up=0 rather than
+                        # crash-loop and report nothing.
+                        liveness_probe=kubernetes.core.v1.ProbeArgs(
+                            http_get=kubernetes.core.v1.HTTPGetActionArgs(
+                                path="/healthz",
+                                port=SQL_EXPORTER_PORT,
+                            ),
+                            initial_delay_seconds=10,
+                            period_seconds=30,
+                            failure_threshold=3,
+                        ),
+                    ),
+                ],
+                volumes=[
+                    kubernetes.core.v1.VolumeArgs(
+                        name="config",
+                        config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                            name="dagster-sql-exporter-config",
+                        ),
+                    ),
+                ],
+            ),
+        ),
+    ),
+    opts=ResourceOptions(
+        depends_on=[dagster_sql_exporter_db_secret, sql_exporter_config_map]
+    ),
+)
+
+sql_exporter_service = kubernetes.core.v1.Service(
+    f"dagster-sql-exporter-service-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-sql-exporter",
+        namespace=dagster_namespace,
+        labels={
+            "component": "sql-exporter",
+            **k8s_global_labels.model_dump(),
+        },
+    ),
+    spec=kubernetes.core.v1.ServiceSpecArgs(
+        type="ClusterIP",
+        selector={
+            "component": "sql-exporter",
+            **k8s_global_labels.model_dump(),
+        },
+        ports=[
+            kubernetes.core.v1.ServicePortArgs(
+                name="metrics",
+                port=SQL_EXPORTER_PORT,
+                target_port=SQL_EXPORTER_PORT,
+                protocol="TCP",
+            ),
+        ],
+    ),
+    opts=ResourceOptions(depends_on=[sql_exporter_deployment]),
+)
+
+# 60s is the resolution these questions need -- a queue that is 400 deep for two
+# minutes matters, a single scrape does not -- and it keeps the collector's
+# min_interval of 30s from ever serving a cached result.
+sql_exporter_service_monitor = kubernetes.apiextensions.CustomResource(
+    f"dagster-sql-exporter-service-monitor-{stack_info.env_suffix}",
+    api_version="monitoring.coreos.com/v1",
+    kind="ServiceMonitor",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-sql-exporter",
+        namespace=dagster_namespace,
+        labels={
+            **k8s_global_labels.model_dump(),
+            # Label required for Prometheus Operator to discover this ServiceMonitor
+            "release": "prometheus",
+        },
+    ),
+    spec={
+        "selector": {
+            "matchLabels": {
+                "component": "sql-exporter",
+                **k8s_global_labels.model_dump(),
+            },
+        },
+        "namespaceSelector": {"matchNames": [dagster_namespace]},
+        "endpoints": [
+            {
+                "port": "metrics",
+                "path": "/metrics",
+                "scheme": "http",
+                "interval": "60s",
+                "scrapeTimeout": "30s",
+                "relabelings": [
+                    {
+                        "sourceLabels": ["__meta_kubernetes_pod_name"],
+                        "targetLabel": "pod",
+                    },
+                    {
+                        "sourceLabels": ["__meta_kubernetes_namespace"],
+                        "targetLabel": "namespace",
+                    },
+                ],
+            }
+        ],
+    },
+    opts=ResourceOptions(depends_on=[sql_exporter_service]),
 )
 
 # APISix OIDC configuration for authentication

@@ -109,6 +109,8 @@ PGBOUNCER_VERSION = "1.25.2"
 # Keep at >= v0.12.1: earlier releases report the reserve_pool metric incorrectly
 # against PgBouncer >= 1.24, which is the version PGBOUNCER_VERSION pins.
 PGBOUNCER_EXPORTER_VERSION = "v0.12.1"
+# renovate: datasource=docker depName=sql-exporter packageName=burningalchemist/sql_exporter
+SQL_EXPORTER_VERSION = "0.24.6"
 # renovate: datasource=github-releases depName=local-path-provisioner packageName=rancher/local-path-provisioner
 LOCAL_PATH_PROVISIONER_CHART_VERSION = "0.0.37"
 # renovate: datasource=github-releases depName=qdrant packageName=qdrant/qdrant
