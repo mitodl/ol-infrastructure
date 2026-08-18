@@ -193,6 +193,26 @@ def setup_traefik(
                                 "insecure": False,
                             },
                         },
+                        # Router, middleware and service spans come from the
+                        # entrypoint's verbosity, which defaults to "minimal" --
+                        # one span for the request and nothing about what
+                        # happened inside Traefik. "detailed" is what separates
+                        # time spent in auth or redirect middleware from time
+                        # spent in the backend.
+                        #
+                        # Only websecure: web exists to 301 to it, so tracing
+                        # that hop in detail buys a span per redirect and no
+                        # information.
+                        #
+                        # Gated on the same predicate as the exporter below.
+                        # Verbosity without a collector to send to is a setting
+                        # that reads as configured and does nothing, which is
+                        # the drift ships_telemetry exists to prevent.
+                        **(
+                            {"observability": {"traceVerbosity": "detailed"}}
+                            if ships_telemetry(stack_info)
+                            else {}
+                        ),
                     },
                 },
                 "log": {
@@ -256,6 +276,37 @@ def setup_traefik(
                             "resourceAttributes": {
                                 "deployment.environment": stack_info.env_suffix,
                             },
+                            # Traefik names spans by method alone, so the only
+                            # way to tell one route from another is by
+                            # attribute. x-request-id ties a span to the APISIX
+                            # and application logs that carry the same id, and
+                            # traceparent makes a propagation failure visible
+                            # in the trace itself rather than only by its
+                            # absence -- this is what would have shown, in one
+                            # query, that Traefik was injecting correctly and
+                            # the app was dropping it.
+                            #
+                            # Referer is deliberately absent. It carries the
+                            # full referring URL including path and query, so
+                            # it would smuggle exactly the values
+                            # safeQueryParams exists to withhold, from any
+                            # service behind this shared gateway.
+                            "capturedRequestHeaders": [
+                                "User-Agent",
+                                "X-Request-Id",
+                                "traceparent",
+                            ],
+                            "capturedResponseHeaders": ["X-Request-Id"],
+                            # Every query parameter is redacted by default,
+                            # which is the right default. These two are
+                            # bounded, low-cardinality values that make a slow
+                            # catalog request legible.
+                            #
+                            # `q` is NOT here: it is free-text search input, so
+                            # its contents are whatever a user typed --
+                            # potentially their own name or email. Pagination
+                            # and a resource type are not.
+                            "safeQueryParams": ["page", "resource_type"],
                             "otlp": {
                                 "enabled": True,
                                 "http": {
