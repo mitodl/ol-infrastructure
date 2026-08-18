@@ -347,26 +347,69 @@ collecting in parallel.
 
 #### Shipped 2026-08-17 — `burningalchemist/sql_exporter`, one Deployment in `dagster`
 
-Eight gauges, all under a 10s `statement_timeout` and a 2-connection ceiling:
+Nine gauges, all under a 10s `statement_timeout` and a 2-connection ceiling:
 
 | Metric | Answers |
 |---|---|
 | `dagster_runs_in_flight{status}` | is `max_concurrent_runs` binding |
 | `dagster_oldest_queued_run_age_seconds` | healthy burst vs. stuck coordinator |
 | `dagster_run_wait_to_start_seconds{quantile}` | p50 / p95 / max wait to start |
-| `dagster_recent_runs{status}` | failure rate over the recent window |
+| `dagster_recent_runs{status}` | failure rate over the last 6h |
 | `dagster_recent_retried_runs` | chronic failure masked by `max_retries = 3` |
-| `dagster_recent_job_ticks{tick_type,status}` | silently erroring sensors/schedules |
+| `dagster_recent_job_ticks{tick_type,status}` | silently erroring sensors/schedules, last 1h |
 | `dagster_daemon_heartbeat_age_seconds{daemon_type}` | the 08-10 symptom, measured directly |
+| `dagster_id_window_span_seconds{relation}` | which bound is binding (see below) |
 | `dagster_relation_bytes{relation}` | event-log growth |
 
 Three implementation findings worth keeping, all from testing rather than reading:
 
-- **Bound by primary key, not by time.** Neither `runs` nor `job_ticks` has an index on a
-  bare timestamp, so a "last N minutes" predicate is a full index scan that grows with the
-  table. `id > (SELECT max(id) - N)` is a range scan whose cost is fixed at N rows forever.
-  `EXPLAIN (ANALYZE, BUFFERS)` against a local Postgres carrying this exact schema with
-  60k runs / 200k ticks: every query an index scan, no sequential scans, full scrape 31ms.
+- **Every window is bounded by time; how that is made cheap depends on the metric.** The
+  rule that came out of two rounds of getting this wrong: *a cost bound may never cut
+  across the dimension the metric is defined on.*
+
+  The first pass was id-only, sized against an assumed ~53k runs/day that is wrong by more
+  than an order of magnitude. Measured from kube-state-metrics over the seven days to
+  2026-08-18: ~143 runs/hour on a quiet day, ~484/hour averaged over the week, ~1,990 in
+  the busiest hour, ~7,416 in the busiest six. A 14x swing — so a fixed 20,000-id window
+  covered anywhere from ~10 hours to ~6 days depending on when you looked, and
+  `dagster_recent_runs` reported a six-day trailing count while calling itself recent.
+
+  Adding a lookback fixed the span and introduced a subtler fault, caught in review: `id`
+  is **creation** order, and the completion-time metrics filter on `update_timestamp`. Any
+  run created before the cap but finishing inside the lookback was silently dropped —
+  long-running and long-queued runs first, which are exactly the ones worth counting.
+  Demonstrated on the fixture with a run created nine days ago that finished five minutes
+  ago: the id-capped query returns 0, the corrected one returns 1.
+
+  So the cost bound now follows what the metric measures:
+
+  - **Completion-time metrics** (`dagster_recent_runs`, `dagster_recent_retried_runs`)
+    carry **no id cap at all**. `idx_run_range` is `(status, update_timestamp,
+    create_timestamp)`, so pairing the status predicate they already need with an
+    `update_timestamp` range makes them index-only range scans whose cost tracks
+    rows-in-window rather than table size. This is the exception to "no index on a bare
+    timestamp" — there isn't one, but there is a usable composite index the moment status
+    is pinned. Faster as well as correct: **0.3ms against 4.6ms**, and even a deliberately
+    pathological 30-day lookback stays a range scan (48k rows, 9.4ms).
+  - **Creation-ordered metrics** keep the id cap because it agrees with them.
+    `dagster_run_wait_to_start_seconds` is a cohort of recently *created* runs — there is
+    no index on `start_time`, so it can't be driven off an event-time index — and
+    `job_ticks.id` tracks tick timestamp. Cap and predicate move together, so nothing
+    falls between them. The stated limitation, in the metric's own `help`: a run created
+    just before the window and starting just inside it isn't counted.
+
+  `SQL_EXPORTER_RUN_WINDOW = 20000` (2.7x headroom over the busiest observed 6h of
+  creations), `SQL_EXPORTER_TICK_WINDOW = 40000` with a 1h lookback — larger cap, shorter
+  lookback, because the daemon evaluates every sensor on a ~30s cadence whether or not it
+  yields a run.
+
+  `dagster_id_window_span_seconds{relation}` reports whether those remaining id caps are
+  truncating: span well above the lookback means the time predicate binds; span at or
+  below it means the cap does and wants raising. It covers **only** the two id-capped
+  windows and says so. An earlier revision claimed to cover the completion-time metrics
+  too and could not — it measured creation age against a completion-time filter, so a
+  healthy-looking span would have sat happily beside a metric dropping every long-running
+  run. That is the same class of mistake as the one the gauge exists to catch, one level up.
 - **`SQLEXPORTER_TARGET_DSN` is only read when the config file declares no `target:` block
   at all.** A `target:` with `data_source_name` omitted does not fall back to the
   environment — it fails at startup with `missing data_source_name for target`. So the

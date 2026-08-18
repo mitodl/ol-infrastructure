@@ -1205,21 +1205,71 @@ pgbouncer_service_monitor = kubernetes.apiextensions.CustomResource(
 #    are the other half of this project, and an exporter polling through the pool
 #    would add its connections to the very counts being used to size it.
 #
-# 2. Every query is bounded, and bounded by primary key rather than by time.
-#    runs and job_ticks are large and neither has an index on a bare timestamp, so
-#    a "last 10 minutes" predicate is a full index scan that grows with the table.
-#    id is monotonic, so `id > (SELECT max(id) - N)` is a range scan whose cost is
-#    fixed at N rows no matter how big the table gets. Verified with EXPLAIN
-#    (ANALYZE, BUFFERS) against a local Postgres carrying this exact schema and
-#    60k runs / 200k ticks: every query is an index scan, none touch the heap
-#    beyond the window, and the full scrape completes in ~31ms.
+# 2. Every window is bounded by time. How that is made cheap differs per metric,
+#    and the rule is that a cost bound may never cut across the dimension the
+#    metric is defined on.
+#
+#    The original pass got this wrong twice over. The windows shipped id-only,
+#    sized off an assumed ~53k runs/day. Measured from kube-state-metrics over the
+#    seven days to 2026-08-18:
+#
+#      quiet day        ~143 runs/hour        (3.4k/day)
+#      seven-day mean   ~484 runs/hour        (11.6k/day)
+#      busiest hour    ~1990 runs
+#      busiest 6h      ~7416 runs
+#
+#    A 14x swing, so a fixed 20000-id window covered anything from ~10 hours to
+#    ~6 days depending on when you looked, and `dagster_recent_runs` reported a
+#    six-day trailing count while calling itself recent. Adding a lookback fixed
+#    the span but introduced a subtler fault: id is CREATION order, and the
+#    completion-time metrics filter on update_timestamp, so any run created before
+#    the cap but finishing inside the lookback was silently dropped -- long-running
+#    and long-queued runs first, which are the ones most worth counting.
+#
+#    So the cost bound now depends on what the metric measures:
+#
+#    - Completion-time metrics (dagster_recent_runs, dagster_recent_retried_runs)
+#      carry NO id cap. idx_run_range is (status, update_timestamp,
+#      create_timestamp), so pairing the status predicate they already need with an
+#      update_timestamp range turns them into index-only range scans whose cost
+#      tracks rows-in-window rather than table size. This is the exception to "no
+#      index on a bare timestamp": there is no such index, but there is a usable
+#      composite one the moment status is pinned. Faster as well as correct --
+#      0.3ms against 4.6ms for the id-capped version.
+#
+#    - Creation-ordered metrics keep the id cap, because it agrees with them.
+#      dagster_run_wait_to_start_seconds is a cohort of recently CREATED runs
+#      (start_time has no index, so it cannot be driven off an event-time index),
+#      and job_ticks.id tracks tick timestamp. Cap and predicate move together, so
+#      nothing falls between them.
+#
+#    dagster_id_window_span_seconds reports whether those remaining id caps are
+#    truncating: span well above the lookback means the time predicate binds, span
+#    at or below it means the cap does and wants raising. It covers only the two
+#    id-capped windows, and says so -- a span metric that reported creation age for
+#    a completion-time window would be the same mistake wearing a diagnostic hat.
 #
 # The connection budget is deliberately tiny -- 2 connections, and the DSN sets a
 # 10s statement_timeout so no plan this exporter issues can pin a backend. That
 # timeout is not decorative: it was confirmed to reach the server by setting it to
 # 1ms and watching every query come back 57014.
+# Applies only to the creation-ordered run metric (wait-to-start) and the span
+# gauge. The completion-time run metrics range-scan idx_run_range instead and take
+# no id cap at all -- see the note on dagster_recent_runs. 20000 against a
+# busiest-observed 6h of ~7416 creations is 2.7x headroom.
 SQL_EXPORTER_RUN_WINDOW = 20000
-SQL_EXPORTER_TICK_WINDOW = 20000
+# Ticks accrue far faster than runs -- the daemon evaluates every sensor on a ~30s
+# cadence whether or not it yields a run -- so the same id count buys a much shorter
+# span. Sized larger against a shorter lookback for that reason; the span metric
+# will say whether 40000 is enough, since unlike the run rate this one has not been
+# measured directly.
+SQL_EXPORTER_TICK_WINDOW = 40000
+# Runs get 6h: long enough that a failure rate is built from thousands of runs at
+# peak and hundreds when quiet, short enough that a sustained problem moves it
+# within the hour. Ticks get 1h, because a sensor that starts erroring is an acute
+# signal and averaging it over six hours only delays noticing.
+SQL_EXPORTER_RUN_LOOKBACK = "6 hours"
+SQL_EXPORTER_TICK_LOOKBACK = "1 hour"
 SQL_EXPORTER_STATEMENT_TIMEOUT_MS = 10000
 SQL_EXPORTER_PORT = 9399
 
@@ -1286,7 +1336,9 @@ collectors:
 
       - metric_name: dagster_run_wait_to_start_seconds
         type: gauge
-        help: "Seconds from run creation to run start over the recent window."
+        help: >-
+          Seconds from run creation to run start, over runs CREATED in the last
+          {SQL_EXPORTER_RUN_LOOKBACK} that have started.
         value_label: quantile
         values: [p50, p95, max]
         query_ref: recent_run_waits
@@ -1297,35 +1349,72 @@ collectors:
       # every ordinary decrease look like a counter reset.
       - metric_name: dagster_recent_runs
         type: gauge
-        help: "Runs in the recent window that reached a terminal state, by status."
+        help: >-
+          Runs reaching a terminal state in the last {SQL_EXPORTER_RUN_LOOKBACK},
+          by status.
         key_labels: [status]
         values: [runs]
+        # update_timestamp, not create_timestamp: dagster rewrites it on every
+        # status change and sets it to the event time (sql_run_storage.py
+        # handle_run_event), so for a terminal status it is when the run finished.
+        # A failure rate wants runs that ended in the window, not runs that started
+        # in it -- otherwise a long run straddling the boundary is counted before
+        # anyone knows how it turned out.
+        #
+        # No id cap here, deliberately, and this is the one place the "no index on
+        # a bare timestamp" rule does not apply. idx_run_range is
+        # (status, update_timestamp, create_timestamp), so pairing the status
+        # predicate these metrics already need with an update_timestamp range makes
+        # update_timestamp the second index column and the whole thing an index-only
+        # range scan. Cost then tracks rows-in-window rather than table size, which
+        # is the property the id cap was there to provide.
+        #
+        # Capping by id as well would be actively wrong, not merely redundant: id is
+        # creation order, so a run created before the cap but finishing inside the
+        # lookback would be dropped. Long-running and long-queued runs are exactly
+        # the ones that would go missing, and they are exactly the ones worth
+        # counting. Measured on the schema fixture: index-only scan, 573 rows,
+        # 0.3ms, against 4.6ms for the id-capped version it replaces. Even a
+        # deliberately pathological 30-day lookback stays a range scan (48k rows,
+        # 9.4ms) rather than degrading with the table.
         query: |
           SELECT s.status AS status, coalesce(r.n, 0) AS runs
           FROM (VALUES ('SUCCESS'), ('FAILURE'), ('CANCELED')) AS s (status)
           LEFT JOIN (
               SELECT status, count(*) AS n
               FROM runs
-              WHERE id > (SELECT max(id) - {SQL_EXPORTER_RUN_WINDOW} FROM runs)
+              WHERE status IN ('SUCCESS', 'FAILURE', 'CANCELED')
+                AND update_timestamp > (now() AT TIME ZONE 'UTC')
+                                       - interval '{SQL_EXPORTER_RUN_LOOKBACK}'
               GROUP BY status
           ) AS r ON r.status = s.status
 
       - metric_name: dagster_recent_retried_runs
         type: gauge
-        help: "Runs in the recent window carrying a dagster/retry_number tag."
+        help: >-
+          Runs finishing in the last {SQL_EXPORTER_RUN_LOOKBACK} that carry a
+          dagster/retry_number tag.
         values: [runs]
         # run_retries.max_retries = 3 means a job can fail repeatedly and still
         # report SUCCESS, so the run status alone hides chronic flakiness.
+        #
+        # Driven off idx_run_range the same way, and for the same reason: the cohort
+        # has to match dagster_recent_runs exactly or the retry share is a ratio of
+        # two different populations.
         query: |
           SELECT count(*) AS runs
           FROM runs AS r
           INNER JOIN run_tags AS rt ON rt.run_id = r.run_id
-          WHERE r.id > (SELECT max(id) - {SQL_EXPORTER_RUN_WINDOW} FROM runs)
+          WHERE r.status IN ('SUCCESS', 'FAILURE', 'CANCELED')
+            AND r.update_timestamp > (now() AT TIME ZONE 'UTC')
+                                     - interval '{SQL_EXPORTER_RUN_LOOKBACK}'
             AND rt.key = 'dagster/retry_number'
 
       - metric_name: dagster_recent_job_ticks
         type: gauge
-        help: "Sensor and schedule ticks in the recent window, by type and status."
+        help: >-
+          Sensor and schedule ticks in the last {SQL_EXPORTER_TICK_LOOKBACK}, by
+          type and status.
         key_labels: [tick_type, status]
         values: [ticks]
         # A sensor that starts erroring stops launching runs and says nothing;
@@ -1350,6 +1439,8 @@ collectors:
               FROM job_ticks
               WHERE id > (SELECT max(id) - {SQL_EXPORTER_TICK_WINDOW}
                           FROM job_ticks)
+                AND timestamp > (now() AT TIME ZONE 'UTC')
+                                - interval '{SQL_EXPORTER_TICK_LOOKBACK}'
               GROUP BY type, status
           ) AS x ON x.type = c.type AND x.status = c.status
 
@@ -1365,6 +1456,48 @@ collectors:
                  extract(epoch FROM ((now() AT TIME ZONE 'UTC') - timestamp))
                      AS seconds
           FROM daemon_heartbeats
+
+      - metric_name: dagster_id_window_span_seconds
+        type: gauge
+        help: >-
+          Age of the oldest row in each id-capped window, in its own ordering
+          dimension. Covers dagster_run_wait_to_start_seconds (runs) and
+          dagster_recent_job_ticks (job_ticks) only.
+        key_labels: [relation]
+        values: [seconds]
+        # Says whether an id cap is truncating a window before its lookback does.
+        # Span well above the lookback means the time predicate is what binds and
+        # the metric covers the period it claims; span at or below the lookback
+        # means the cap is biting and wants raising.
+        #
+        # It can only speak for metrics whose cap and predicate share an ordering
+        # dimension, which is now exactly two of them. runs is measured on
+        # create_timestamp because the id cap is creation order and the metric it
+        # guards, dagster_run_wait_to_start_seconds, is a creation cohort; job_ticks
+        # is measured on timestamp, which tracks insertion order.
+        #
+        # It deliberately says NOTHING about dagster_recent_runs or
+        # dagster_recent_retried_runs. Those have no id cap at all any more -- they
+        # range-scan idx_run_range by update_timestamp, so there is no truncation to
+        # detect. An earlier revision of this metric did claim to cover them, and
+        # could not: it reported a creation span while they filtered on completion
+        # time, so a healthy-looking span would have sat happily alongside a metric
+        # dropping every long-running run. Reviewers caught that; it is the same
+        # class of mistake as the one this metric exists to catch, one level up.
+        #
+        # Reads index ranges the other queries already touch, so it costs a min().
+        query: |
+          SELECT 'runs' AS relation,
+                 coalesce(extract(epoch FROM ((now() AT TIME ZONE 'UTC')
+                                              - min(create_timestamp))), 0) AS seconds
+          FROM runs
+          WHERE id > (SELECT max(id) - {SQL_EXPORTER_RUN_WINDOW} FROM runs)
+          UNION ALL
+          SELECT 'job_ticks' AS relation,
+                 coalesce(extract(epoch FROM ((now() AT TIME ZONE 'UTC')
+                                              - min(timestamp))), 0) AS seconds
+          FROM job_ticks
+          WHERE id > (SELECT max(id) - {SQL_EXPORTER_TICK_WINDOW} FROM job_ticks)
 
       - metric_name: dagster_relation_bytes
         type: gauge
@@ -1385,11 +1518,27 @@ collectors:
       - query_name: recent_run_waits
         # create_timestamp is naive UTC and start_time is epoch seconds, so the
         # difference is taken in epoch space rather than as an interval.
+        #
+        # This one is a CREATION cohort, and it has to be. There is no index on
+        # start_time, so unlike the two metrics above it cannot be driven off an
+        # event-time index -- it keeps the id cap. That makes the cap and the
+        # predicate the same dimension, since id is creation order: every run the
+        # cap admits, create_timestamp also admits, and vice versa. Filtering it by
+        # start_time instead would reintroduce the mismatch, silently dropping any
+        # run that queued long enough to fall outside the newest ids before starting
+        # -- which is precisely the slow-start case this metric exists to measure.
+        #
+        # The cost is that a run created just before the window and starting just
+        # inside it is not counted. That is a real limitation, stated in the help
+        # text rather than papered over: this is the wait experienced by runs
+        # created recently, not by every run that started recently.
         query: |
           WITH recent AS (
               SELECT start_time - extract(epoch FROM create_timestamp) AS wait
               FROM runs
               WHERE id > (SELECT max(id) - {SQL_EXPORTER_RUN_WINDOW} FROM runs)
+                AND create_timestamp > (now() AT TIME ZONE 'UTC')
+                                       - interval '{SQL_EXPORTER_RUN_LOOKBACK}'
                 AND start_time IS NOT NULL
           )
           SELECT
