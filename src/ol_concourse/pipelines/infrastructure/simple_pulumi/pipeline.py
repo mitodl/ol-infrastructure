@@ -455,6 +455,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_path="infrastructure/sentry/",
         pulumi_project_name="ol-infrastructure-sentry",
         stages=["default"],
+        topology="preview-gated",
     ),
     "starrocks": SimplePulumiParams(
         app_name="starrocks",
@@ -478,6 +479,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         ],
         stages=["Production"],
         prior_stage_stack="lakehouse.QA",
+        topology="preview-gated",
     ),
     "starrocks-substructure-qa": SimplePulumiParams(
         app_name="starrocks_substructure",
@@ -487,6 +489,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             "lakehouse",
         ],
         stages=["QA"],
+        topology="preview-gated",
     ),
     "starrocks-substructure-ci": SimplePulumiParams(
         app_name="starrocks_substructure",
@@ -537,6 +540,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_path="infrastructure/aws/ecr/",
         pulumi_project_name="ol-infrastructure-ecr",
         stages=["default"],
+        topology="preview-gated",
     ),
     "aws-sftp": SimplePulumiParams(
         app_name="aws-sftp",
@@ -558,24 +562,28 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_path="infrastructure/monitoring/",
         pulumi_project_name="ol-infrastructure-monitoring",
         stages=["default"],
+        topology="preview-gated",
     ),
     "starburst": SimplePulumiParams(
         app_name="starburst",
         pulumi_project_path="applications/starburst/",
         pulumi_project_name="ol-application-starburst",
         stages=["Production"],
+        topology="preview-gated",
     ),
     "xpro-partner-dns": SimplePulumiParams(
         app_name="xpro-partner-dns",
         pulumi_project_path="substructure/xpro_partner_dns/",
         pulumi_project_name="ol-substructure-xpro-partner-dns",
         stages=["default"],
+        topology="preview-gated",
     ),
     "release-bot": SimplePulumiParams(
         app_name="release-bot",
         pulumi_project_path="applications/release_bot/",
         pulumi_project_name="ol-infrastructure-release-bot",
         stages=["default"],
+        topology="preview-gated",
         # __main__.py is a singleton (stack "default") and always creates the
         # ECR repository named "release-bot-production" regardless of stage.
         docker_image=DockerImageConfig(
