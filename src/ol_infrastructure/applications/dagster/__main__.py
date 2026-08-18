@@ -2095,6 +2095,26 @@ dagster_run_priority_class = kubernetes.scheduling.v1.PriorityClass(
 # than inherit this one.
 dagster_max_concurrent_runs = dagster_config.get_int("max_concurrent_runs") or 100
 
+# event_log_storage's pool_size/max_overflow, same reasoning as
+# max_concurrent_runs above: sized against the environment's PgBouncer
+# per-pod cap, so it has to be a stack config value rather than a literal in
+# dagster_instance.yaml. Production needed a large bump after 2026-08-18 (see
+# the rationale in dagster_instance.yaml); the 10+10 fallback here is the
+# pre-incident size, deliberately conservative for any stack -- QA included
+# -- that has not set its own value and has not demonstrated the same need.
+#
+# `or 10` would be wrong here: max_overflow=0 is a legitimate, deliberately
+# conservative stack choice (forbid burst connections entirely), and `0 or 10`
+# would silently discard it. get_int() returns None when the key is unset, so
+# check for that explicitly instead.
+dagster_event_log_pool_size = dagster_config.get_int("event_log_pool_size")
+if dagster_event_log_pool_size is None:
+    dagster_event_log_pool_size = 10
+
+dagster_event_log_max_overflow = dagster_config.get_int("event_log_max_overflow")
+if dagster_event_log_max_overflow is None:
+    dagster_event_log_max_overflow = 10
+
 # Custom Dagster instance ConfigMap with dynamic credentials support
 # Note: We create this before the Helm release so it gets proper ownership
 dagster_instance_yaml = (
@@ -2102,6 +2122,8 @@ dagster_instance_yaml = (
     .parent.joinpath("dagster_instance.yaml")
     .read_text()
     .replace("MAX_CONCURRENT_RUNS", str(dagster_max_concurrent_runs))
+    .replace("EVENT_LOG_POOL_SIZE", str(dagster_event_log_pool_size))
+    .replace("EVENT_LOG_MAX_OVERFLOW", str(dagster_event_log_max_overflow))
 )
 # The daemon and webserver mount dagster.yaml from the dagster-instance
 # ConfigMap via subPath, which kubelet never live-refreshes, and the chart's
