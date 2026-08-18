@@ -11,7 +11,6 @@ from ol_concourse.lib.models.pipeline import (
     Identifier,
     Input,
     Job,
-    LoadVarStep,
     Output,
     Platform,
     PutStep,
@@ -251,14 +250,9 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
                 trigger=True,
                 passed=[container_fragment.jobs[-1].name],
             ),
-            LoadVarStep(
-                load_var="image_digest",
-                file=f"{keycloak_registry_image.name}/digest",
-                reveal=True,
-            ),
         ],
-        additional_env_vars={
-            "KEYCLOAK_DOCKER_DIGEST": "((.:image_digest))",
+        env_vars_from_files={
+            "KEYCLOAK_DOCKER_DIGEST": f"{keycloak_registry_image.name}/digest",
         },
         topology="preview-gated",
         auto_deploy_stages=["CI"],
