@@ -67,6 +67,7 @@ for project in managed_projects:
 
     project_config = OLGCPProjectConfig(
         project_id=project_id,
+        project_number=project.get("project_number"),
         region=region,
         labels={
             "ou": project["business_unit"],

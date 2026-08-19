@@ -126,6 +126,70 @@ class TestAPIKeyRestrictions:
         )
 
 
+class TestAPIKeyProjectNumber:
+    """API keys are addressed by project NUMBER, and the id silently rotates them.
+
+    gcp.projects.ApiKey reads back `project` as the project number. Declaring
+    the id instead produces a permanent diff on a replacement-forcing field,
+    which for an API key means a new key string and a broken consumer. Observed
+    live against mitol01 on 2026-08-19: `~ project: "32631020496" => "mitol01"`
+    planned a replace of all three learn-ai keys.
+    """
+
+    def test_api_keys_without_project_number_rejected(self):
+        with pytest.raises(ValueError, match="declares api_keys but no project_number"):
+            OLGCPProjectConfig(
+                project_id="mitol01",
+                labels=valid_labels(),
+                api_keys=[
+                    OLGCPAPIKeyConfig(
+                        key_name="learn-ai-production",
+                        display_name="Learn AI Production",
+                        restrictions={
+                            "api_targets": [
+                                {"service": "generativelanguage.googleapis.com"}
+                            ]
+                        },
+                    )
+                ],
+            )
+
+    def test_no_api_keys_needs_no_project_number(self):
+        config = OLGCPProjectConfig(
+            project_id="mitol01",
+            labels=valid_labels(),
+            enabled_services=["iam.googleapis.com"],
+        )
+        assert config.project_number is None
+
+    @pulumi.runtime.test
+    def test_api_key_is_created_against_the_number(self):
+        component = OLGCPProject(
+            "test-number",
+            OLGCPProjectConfig(
+                project_id="mitol01",
+                project_number="32631020496",
+                labels=valid_labels(),
+                api_keys=[
+                    OLGCPAPIKeyConfig(
+                        key_name="learn-ai-production",
+                        display_name="Learn AI Production",
+                        restrictions={
+                            "api_targets": [
+                                {"service": "generativelanguage.googleapis.com"}
+                            ]
+                        },
+                    )
+                ],
+            ),
+        )
+
+        def check(project):
+            assert project == "32631020496"
+
+        return component.api_keys["learn-ai-production"].project.apply(check)
+
+
 class TestOLGCPProject:
     """Resource-level behaviour, checked through Pulumi mocks."""
 
@@ -135,6 +199,7 @@ class TestOLGCPProject:
             "test-gcp-project",
             OLGCPProjectConfig(
                 project_id="test-project",
+                project_number="123456789012",
                 labels=valid_labels(),
                 enabled_services=["youtube.googleapis.com", "drive.googleapis.com"],
                 service_accounts=[
@@ -224,6 +289,7 @@ class TestAdoption:
             f"test-adopt-{adopt}",
             OLGCPProjectConfig(
                 project_id="test-project",
+                project_number="123456789012",
                 labels=valid_labels(),
                 service_accounts=[
                     OLGCPServiceAccountConfig(

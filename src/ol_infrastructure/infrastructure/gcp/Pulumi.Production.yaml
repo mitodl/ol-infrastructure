@@ -2,6 +2,11 @@
 config:
   ol_gcp:projects:
   - project_id: mitol01
+    # Required because this project declares api_keys: the API Keys API
+    # identifies projects by NUMBER, so a key read back from GCP carries the
+    # number. Declaring the id instead makes every plan want to replace the
+    # key -- a new key string and a broken consumer.
+    project_number: '32631020496'
     business_unit: operations
     region: us-east1
       # Only the services with a proven consumer. mitol01 also has dataform,

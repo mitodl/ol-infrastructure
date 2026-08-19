@@ -150,6 +150,26 @@ class OLGCPProjectConfig(GCPBase):
     enabled_services: list[str] = Field(default_factory=list)
     service_accounts: list[OLGCPServiceAccountConfig] = Field(default_factory=list)
     api_keys: list[OLGCPAPIKeyConfig] = Field(default_factory=list)
+    # Required whenever api_keys are declared. The API Keys API identifies a
+    # project by NUMBER, so a key read back from GCP always carries the number
+    # in its `project` field. Declaring the id instead produces a permanent
+    # diff on a replacement-forcing field -- which for an API key means a new
+    # key string and a broken consumer.
+    project_number: str | None = None
+
+    @model_validator(mode="after")
+    def require_project_number_for_api_keys(self) -> "OLGCPProjectConfig":
+        if self.api_keys and not self.project_number:
+            msg = (
+                f"{self.project_id} declares api_keys but no project_number. "
+                "gcp.projects.ApiKey stores the project NUMBER, so omitting it "
+                "makes every plan want to replace the key -- issuing a new key "
+                "string and breaking whatever holds the old one. Find it with "
+                f"`gcloud projects describe {self.project_id} "
+                "--format='value(projectNumber)'`."
+            )
+            raise ValueError(msg)
+        return self
 
 
 class OLGCPProject(ComponentResource):
@@ -222,7 +242,8 @@ class OLGCPProject(ComponentResource):
         for api_key in config.api_keys:
             self.api_keys[api_key.key_name] = gcp.projects.ApiKey(
                 f"{name}-api-key-{api_key.key_name}",
-                project=config.project_id,
+                # The number, not the id -- see project_number on the config.
+                project=config.project_number,
                 display_name=api_key.display_name,
                 restrictions=gcp.projects.ApiKeyRestrictionsArgs(
                     **api_key.restrictions
