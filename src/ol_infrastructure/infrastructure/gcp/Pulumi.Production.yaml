@@ -12,6 +12,13 @@ config:
     - aiplatform.googleapis.com
     - generativelanguage.googleapis.com
     - googleads.googleapis.com
+      # These two are what the PROVIDER needs in order to read the resource
+      # types this stack manages, not what an application consumes. They must
+      # already be enabled before the first refresh can succeed -- a stack
+      # cannot enable the API it needs in order to look at itself. Enabled out
+      # of band during bootstrap, then declared here so they stay that way.
+    - iam.googleapis.com
+    - apikeys.googleapis.com
     service_accounts:
       # The stack's own automation identity, adopted so the federation wiring
       # is reviewable here instead of living as console clicks nobody can
@@ -24,15 +31,19 @@ config:
         # Which workload may exchange its identity for this account's token.
         # The provider's attribute condition already restricts this to the
         # production Concourse infra pool; this binding names the pool again.
+        # The import_id below is ONE space-delimited string of three segments
+        # (account / role / member) that YAML folds back together across the
+        # line break. Do not let an extra space into it.
       - role: roles/iam.workloadIdentityUser
         member: principalSet://iam.googleapis.com/projects/32631020496/locations/global/workloadIdentityPools/ol-infrastructure/attribute.concourse_env/production
         import_id: projects/mitol01/serviceAccounts/pulumi-gcp@mitol01.iam.gserviceaccount.com
           roles/iam.workloadIdentityUser principalSet://iam.googleapis.com/projects/32631020496/locations/global/workloadIdentityPools/ol-infrastructure/attribute.concourse_env/production
         # Who may impersonate this account to run a local preview. A GROUP,
-        # not individuals -- onboarding an engineer should be a membership
-        # change, not a Pulumi change. Uncomment with the real address.
-        # - role: roles/iam.serviceAccountTokenCreator
-        #   member: group:REPLACE-ME@mit.edu
+        # not individuals -- onboarding an engineer is a membership change
+        # rather than a Pulumi change. Note roles/owner does NOT confer this;
+        # verified 2026-08-19, a project Owner still 403s without it.
+      - role: roles/iam.serviceAccountTokenCreator
+        member: group:odl-devops@mit.edu
       # The tier a credential serves is carried in its own name and restrictions,
       # not in the stack it is declared from. See README.md -- splitting these
       # across CI/QA/Production stacks would buy naming, not isolation, because

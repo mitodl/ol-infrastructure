@@ -35,6 +35,42 @@ ceremony.
 If a second stack is ever warranted, split it by *blast radius* over a
 different set of GCP projects, not by tier over the same one.
 
+## Bootstrap: the APIs the provider itself needs
+
+`enabled_services` holds two different kinds of thing, and the difference
+matters when standing a project up.
+
+Most entries are APIs an *application* consumes — `youtube.googleapis.com`,
+`generativelanguage.googleapis.com`. Pulumi can enable those from a standing
+start.
+
+But the provider also needs APIs in order to **read** the resource types this
+stack manages: `iam.googleapis.com` to see service accounts,
+`apikeys.googleapis.com` to see API keys. Those have to be enabled *before* the
+first refresh, because a stack cannot enable the API it needs in order to look
+at itself. Refresh runs before create, so the plan never gets far enough to fix
+it.
+
+So the bootstrap is one out-of-band command per project:
+
+```bash
+gcloud services enable iam.googleapis.com apikeys.googleapis.com --project=<project>
+```
+
+and then the same services are declared in `enabled_services` so they stay
+enabled and the fact is recorded. Add to that list whenever a new managed
+resource type brings its own API.
+
+Note this is invisible from `gcloud`: `gcloud services api-keys list` succeeds
+against a project where `apikeys.googleapis.com` is not enabled, because the
+CLI bills the call elsewhere. Only the provider, which scopes the quota project
+to the target, sees the difference.
+
+`compute.googleapis.com` is deliberately **not** enabled. The provider logs
+`failed to get regions list` on every run as a result. That warning is
+cosmetic — nothing here creates a Compute resource — and enabling an unused API
+to silence a log line is the wrong trade.
+
 ## Configuration
 
 Everything is declared in stack config; `__main__.py` takes no per-project
@@ -144,8 +180,8 @@ grant below exists. Owner is not a superset here.
 #### Getting access
 
 `roles/iam.serviceAccountTokenCreator` on `pulumi-gcp@mitol01` is what makes
-the command above work. It is granted to a **group**, declared in
-`Pulumi.Production.yaml` under the `pulumi-gcp` account's `iam_members` —
+the command above work. It is granted to `group:odl-devops@mit.edu`, declared
+in `Pulumi.Production.yaml` under the `pulumi-gcp` account's `iam_members` —
 so onboarding an engineer is a group-membership change, not a Pulumi change,
 and no one needs to remember a `gcloud add-iam-policy-binding` incantation.
 
