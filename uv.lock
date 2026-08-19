@@ -1488,6 +1488,7 @@ dependencies = [
     { name = "pulumi-docker" },
     { name = "pulumi-eks" },
     { name = "pulumi-fastly" },
+    { name = "pulumi-gcp" },
     { name = "pulumi-github" },
     { name = "pulumi-keycloak" },
     { name = "pulumi-mailgun" },
@@ -1545,6 +1546,7 @@ requires-dist = [
     { name = "pulumi-docker", specifier = ">=5,<6" },
     { name = "pulumi-eks", specifier = ">=4,<5" },
     { name = "pulumi-fastly", specifier = ">=12,<13" },
+    { name = "pulumi-gcp", specifier = ">=9.34,<10" },
     { name = "pulumi-github", specifier = ">=6.0.0,<7" },
     { name = "pulumi-keycloak", specifier = ">=6.0.0,<7" },
     { name = "pulumi-mailgun", specifier = ">=3.0.0,<4" },
@@ -2025,6 +2027,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/24/f3/2abfc6bf78bb41c4206bab7a713320bb946ccd39c20a5a7cebcae81b48c3/pulumi_fastly-12.5.1.tar.gz", hash = "sha256:24ab018c773b86919403afc5dbffbcef23d529f5e03ee3e24efd7a06e5a86c7f", size = 253215, upload-time = "2026-08-08T04:06:24.652Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/80/84/f14ec2115f907901c1ca422ebbeef51bd5b2723a3c51b978bedff0de0266/pulumi_fastly-12.5.1-py3-none-any.whl", hash = "sha256:0e598ba5faa0aabf06866652dcc33a59b168ddbf72a983282c03d8186e8e6cb0", size = 384020, upload-time = "2026-08-08T04:06:22.977Z" },
+]
+
+[[package]]
+name = "pulumi-gcp"
+version = "9.34.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "parver" },
+    { name = "pulumi" },
+    { name = "semver" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/14/df/47aa9323ede7f640c249bc00d2d7f26824455a99d47e6f53a996f98a177e/pulumi_gcp-9.34.0.tar.gz", hash = "sha256:70f90bbadda429f502855e804b336ef6968e33b1da1fc7e1b755e43de46ee556", size = 11193176, upload-time = "2026-08-10T14:20:26.979Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e1/77/f73c061aff0638c383f6aa77fc5cdcbb4f5096a2c12db0dfaf09bdcab9e7/pulumi_gcp-9.34.0-py3-none-any.whl", hash = "sha256:65b5f753a1f69236d97ef77a9e9ee7f2ef52ad39ae4d3adf8a8c16fa8bfbe3e1", size = 13691790, upload-time = "2026-08-10T14:20:24.385Z" },
 ]
 
 [[package]]
