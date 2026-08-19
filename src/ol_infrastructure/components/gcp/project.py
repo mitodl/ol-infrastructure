@@ -8,11 +8,18 @@ both load-bearing and Pulumi-manageable:
 * **service accounts and their project role bindings** -- ``gcp.serviceaccount``
 * **API keys, with mandatory restrictions** -- ``gcp.projects.ApiKey``
 
-It deliberately does *not* create the project itself. Project creation needs an
-organization or folder parent plus a billing account, and where OL's projects
-are allowed to sit is still an open question with IS&T. Adopting the resources
-inside existing projects does not wait on that answer, so this component takes
-the project id as configuration and leaves the project alone.
+It deliberately does *not* create the project itself. ``mitol01``, the
+consolidation target, already exists; whether further ``mitol`` projects can be
+provisioned is an open question with IS&T. Either way this component takes the
+project id as configuration and leaves the project alone.
+
+Note what "adopt" can and cannot mean here. Service accounts and API keys
+**cannot be moved between GCP projects** -- there is no API for it. So
+``import_id`` only ever applies to a resource already resident in the target
+project. Consolidating one out of a legacy project means creating its
+replacement here, which yields a new service-account email or a new key string,
+and therefore requires every external grant to be re-issued and the consuming
+application to be redeployed. That work lives outside Pulumi.
 
 It also deliberately does not create service-account *keys*. Downloaded key
 material is what this whole migration exists to remove; a workload that needs
@@ -68,7 +75,7 @@ class OLGCPServiceAccountConfig(BaseModel):
     # dataset) belong on the resource, not here.
     project_roles: list[str] = Field(default_factory=list)
     # Set to the live resource id to adopt an existing account instead of
-    # creating one. See docs/plans/gcp-pulumi-import-strategy.md for the id
+    # creating one. See docs/plans/gcp-consolidation-into-mitol01.md for the id
     # format of each resource type.
     import_id: str | None = None
 

@@ -2,14 +2,13 @@
 
 Pulumi management of Google Cloud Platform projects, credentials and enabled
 APIs. This is the landing point for the work tracked in
-`docs/plans/gcp-pulumi-import-strategy.md`, which is where the *why* of every
+`docs/plans/gcp-consolidation-into-mitol01.md`, which is where the *why* of every
 convention below is argued out. The credential inventory those decisions rest
 on is `docs/plans/gcp-service-account-consumer-map.md`.
 
 ## Stack layout
 
-Three stacks — `CI`, `QA`, `Production` — each managing every GCP project whose
-credentials serve that tier.
+One stack, `Production`.
 
 ```bash
 cd src/ol_infrastructure/infrastructure/gcp/
@@ -17,25 +16,24 @@ pulumi stack select Production
 pulumi preview
 ```
 
-Not one stack per GCP project. The GCP project *is* already the environment
-boundary — `ocw-studio-production` and `ocw-studio-qa` are separate projects —
-so a stack-per-project layout would encode that boundary twice, and encode it
-wrongly: several legacy project names lie about their tier. `ocw-studio-qa`
-carries production YouTube publishing and the estate's largest granted quota,
-and `recaptcha-migrated-075600d5919` is machine-generated. The stack name
-states the tier the credentials actually serve; `project_id` states which GCP
-project happens to hold them today.
+`mitol01` is the consolidation target for the whole estate, so an
+environment-tiered layout would put three stacks on one GCP project. That buys
+naming, not isolation: every role the automation account needs
+(`apiKeysAdmin`, `serviceAccountAdmin`, `serviceUsageAdmin`) is project-scoped,
+so a `pulumi-gcp-ci@` holding `apiKeysAdmin` on `mitol01` can modify the
+production key regardless of which stack declares it.
 
-One GCP project can therefore appear in more than one stack — `mitol01` holds
-Learn AI keys for all three tiers. When it does, **`enabled_services` belongs
-to the `Production` stack only**: an enabled API is a property of the project,
-not of a tier, so declaring it in two stacks would put two Pulumi resources in
-conflict over one API.
+It also costs. Anything project-scoped — enabled services, org policy, project
+metadata — exists once per project, so each would need a "declare this in
+Production only" carve-out to stop two stacks fighting over one resource. One
+such rule is a footnote; one per resource type is a design.
 
-The stack boundary separates what is *declared*. It does not by itself separate
-what the deploying identity can *do* — all three stacks share one automation
-account unless `ol_gcp:impersonate_service_account` gives a stack its own. See
-"Credentials" below.
+The tier a credential serves is carried in its own name and restrictions —
+`learn-ai-qa` against `learn-ai-production` — which one stack expresses without
+ceremony.
+
+If a second stack is ever warranted, split it by *blast radius* over a
+different set of GCP projects, not by tier over the same one.
 
 ## Configuration
 
@@ -44,32 +42,39 @@ branches.
 
 ```yaml
 config:
-  # optional: per-stack automation identity, see Credentials
-  ol_gcp:impersonate_service_account: pulumi-gcp-qa@mitol01.iam.gserviceaccount.com
   ol_gcp:projects:
-  - project_id: ocw-studio-production
-    business_unit: open-courseware   # a BusinessUnit value
+  - project_id: mitol01
+    business_unit: operations   # a BusinessUnit value
     region: us-east1
     enabled_services:
     - drive.googleapis.com
     - youtube.googleapis.com
     service_accounts:
-    - account_id: ocw-studio-production
-      display_name: OCW Studio Production
+    # No import_id: created fresh in mitol01, because a service account
+    # cannot be moved between projects.
+    - account_id: ocw-studio
+      display_name: OCW Studio
       project_roles: []
-      import_id: projects/ocw-studio-production/serviceAccounts/ocw-studio-production@ocw-studio-production.iam.gserviceaccount.com
     api_keys:
-    - key_name: youtube-production
-      display_name: OCW Studio YouTube key
+    # import_id: already lives in mitol01, so it is adopted rather than made.
+    - key_name: learn-ai-production
+      display_name: Learn AI Production
       restrictions:
         api_targets:
-        - service: youtube.googleapis.com
+        - service: generativelanguage.googleapis.com
       import_id: projects/<project-number>/locations/global/keys/<key-name>
 ```
 
 `import_id` present means "adopt what is already there"; absent means "create
 it". Adopted resources are automatically marked `protect=True` — see
 `adoption_opts` in `components/gcp/project.py` for why.
+
+In practice `import_id` applies only to resources already resident in
+`mitol01`. Service accounts, API keys and reCAPTCHA keys **cannot be moved
+between GCP projects**, so consolidating one from a legacy project means
+creating its replacement here and cutting the consumer over — a new email or a
+new key string, every external grant re-issued by hand, and an application
+deploy. `docs/plans/gcp-consolidation-into-mitol01.md` covers that sequence.
 
 For an API key, the import id is the key's API resource `name` verbatim — read
 it straight off `gcloud services api-keys list --format='value(name)'`. It is
@@ -107,16 +112,12 @@ provider's attribute condition is `attribute.concourse_env == 'production'`, so
 only the production Concourse `infra` worker pool can complete the exchange —
 CI and QA are refused at the provider, not merely left unbound.
 
-### Per-stack identities
+### Overriding the identity
 
-All three stacks share `pulumi-gcp@` by default, which means the `CI` stack
-holds `projectIamAdmin` on production projects. To make the stack boundary a
-permission boundary, create one account per tier, grant each roles only on its
-own projects, and set `ol_gcp:impersonate_service_account` in that stack. The
-federated credential impersonates the base account, which then chains to the
-tier account — so the base account needs
-`roles/iam.serviceAccountTokenCreator` on each tier account, and no second
-credential document is needed.
+`ol_gcp:impersonate_service_account` chains a second impersonation on top of
+the federated credential, for the day a stack needs an account other than the
+one the credential document names. The base account must then hold
+`roles/iam.serviceAccountTokenCreator` on the target. Unset today.
 
 ### Running locally
 
@@ -141,10 +142,10 @@ such gap.
 
 ## What this does not manage
 
-- **The GCP projects themselves.** Creating a project needs an org/folder
-  parent and a billing account, and where OL's projects are allowed to sit is
-  still open with IS&T. Adopting the contents of existing projects does not
-  wait on that.
+- **The GCP projects themselves.** `mitol01` already exists, in folder
+  `551004127831` under the MIT org. Whether further `mitol` projects can be
+  provisioned, and against which cost object, is still open with IS&T —
+  consolidating into the project we have does not wait on that.
 - **Service-account keys.** Downloaded key material is the thing being removed.
   A workload that needs one gets federation instead; genuine exceptions are
   created by hand and recorded as such.
