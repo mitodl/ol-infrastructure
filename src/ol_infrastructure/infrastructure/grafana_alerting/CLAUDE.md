@@ -87,7 +87,7 @@ Rootly). That path is independent of Grafana and is managed in
 | `log_rules/base.py` | Loki datasource UIDs, two-stage pipeline helper, folder creation, delegates to sub-modules. |
 | `log_rules/apisix_oidc.py` | Per-host OIDC callback 500 rate (`/.apisix/redirect`) from the APISIX access log — a rate over callback *requests*, not over users. Two windows (fast regression / chronic condition) with a minimum-callback gate. Currently unlabelled → `oblivion` while calibrating. |
 | `log_rules/cert_manager.py` | cert-manager ACME issuer and DNS challenge alert rules. |
-| `log_rules/dagster_database.py` | Dagster's own rate of failed connections to its metadata database, counted from the retry line its Postgres wrapper logs. The client-side counterpart to `metric_rules/dagster_pgbouncer.py`: a client that cannot allocate a source port never becomes a connection PgBouncer counts, so the pool-side rules read healthy throughout. Neither is redundant with the other. |
+| `log_rules/dagster_database.py` | Dagster's own rate of failed connections to its metadata database, counted from the retry line its Postgres wrapper logs. Two windows (fast storm / chronic bleed), same shape as `apisix_oidc.py`. The client-side counterpart to `metric_rules/dagster_pgbouncer.py`: a client that cannot allocate a source port never becomes a connection PgBouncer counts, so the pool-side rules read healthy throughout. Neither is redundant with the other. |
 | `log_rules/edxapp.py` | edxapp application log alert rules (500 errors, Redis OOM, credential issues, forum timeouts, SAML). |
 | `log_rules/heroku.py` | Heroku application log alert rules (invalid AWS keys, OCW Studio, Keycloak). |
 | `log_rules/mit_learn.py` | MIT Learn and MITx Online 5xx error rate alert rules. |

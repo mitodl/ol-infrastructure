@@ -58,15 +58,34 @@ any particular psycopg2 error -- the generality is the point, not laziness about
 the filter. Resist narrowing it to the error string of whichever incident is
 freshest.
 
-Threshold, from 14 days of Loki
---------------------------------
-Quiet hours on data-production top out at 54 lines/hour (8, 8, 54, 21, 7 across
-the pre-incident samples), or ~9 per 10 minutes. Phase one ran 10,000-29,000
-lines/hour, ~2,700 per 10 minutes, continuously from 2026-08-09. 100 per 10
-minutes therefore sits an order of magnitude above the noisiest quiet hour and
-27x below the incident, on a signal whose two states are separated by ~500x. It
-also clears phase two's ~300 per 10 minutes by 3x, so that hour would have paged
-too -- correctly, since runs were still failing throughout it.
+Two windows, same shape as log_rules/apisix_oidc.py
+----------------------------------------------------
+  fast     100 lines per 10 minutes, confirmed 15m. An acute storm.
+  chronic   10 lines per 10 minutes, sustained 2h. A steady bleed.
+
+The fast rule shipped alone and that was a mistake, caught on 2026-08-19 by the
+QA re-size it was meant to verify. Its 100/10min came from Production's port
+exhaustion, where quiet hours topped out at 54 lines/hour (8, 8, 54, 21, 7 across
+the pre-incident samples, ~9 per 10 minutes) and the storm ran 10,000-29,000
+lines/hour, ~2,700 per 10 minutes -- a ~500x separation with an enormous gap in
+the middle. QA's failure lives in that gap: a continuous 22-147 per 10 minutes,
+every evaluation, for hours. When the pool re-size in #5516 cut it from ~120 to
+~22-74, the fast rule went INACTIVE while the daemon kept failing every single
+minute, and reported health. A rule that goes quiet on an ongoing failure is
+worse than no rule, because someone acts on the silence.
+
+So the chronic rule is not a lower threshold for the same thing, it is the other
+half of the signal. 10 per 10 minutes is above Production's noisiest quiet
+10-minute window (9) and below anything QA has produced while broken (min 22).
+Verified against both stacks the day it was written: over three hours QA breached
+at every evaluation point while Production returned no rows at all over six.
+
+for_=2h is what makes it a *chronic* rule rather than a twitchy one. Grafana
+requires the condition to hold at every evaluation across the whole period, so a
+single quiet 10-minute window resets it -- a pod roll, an RDS failover, a
+deploy-time blip all clear themselves without paging, while a bleed that never
+stops eventually fires. That is also why the fast rule is still worth keeping at
+a high threshold: a genuine storm should not wait two hours to page.
 
 Background: docs/plans/dagster-pgbouncer-observability.md.
 """
@@ -78,8 +97,11 @@ from pulumiverse_grafana import alerting
 
 # Lines per 10 minutes, summed across every pod in the namespace. Run workers and
 # the user-code servers contribute a handful each (1-20 per 10 minutes at their
-# noisiest) on top of the daemon's, which is why the gate is not simply > 0.
-_RETRY_LINES_PER_10M = 100
+# noisiest) on top of the daemon's, which is why neither gate is simply > 0.
+#
+# See the module docstring for why one threshold could not do both jobs.
+_FAST_LINES_PER_10M = 100
+_CHRONIC_LINES_PER_10M = 10
 
 # The string Dagster's retry_pg_connection_fn wrapper logs on every failed attempt
 # to reach the metadata database, whatever the underlying cause. Matching the
@@ -108,10 +130,52 @@ _DESCRIPTION = (
     " Dagster pod and connect to it there."
 )
 
-_SUMMARY = (
+_FAST_SUMMARY = (
     "Dagster in {{ $labels.cluster }} logged {{ $value }} failed database"
     " connections in 10 minutes"
 )
+
+_CHRONIC_SUMMARY = (
+    "Dagster in {{ $labels.cluster }} has been failing database connections"
+    " continuously for 2 hours ({{ $value }} in the last 10 minutes)"
+)
+
+# Appended to the shared description for the chronic rule only. The fast rule's
+# advice is all about finding an acute cause; this one's is about the opposite
+# failure -- something small enough to have been running unnoticed.
+_CHRONIC_EXTRA = (
+    " This rule fires on a low, unbroken rate rather than a spike, so the cause"
+    " is more likely a ceiling that is simply too small than anything that"
+    " broke: check the QueuePool sizes in dagster_instance.yaml"
+    " (dagster:event_log_pool_size and friends) against what the process"
+    " actually needs, and read the error on the retry line before assuming it"
+    " is the same failure as last time. A 'QueuePool limit of size N overflow M"
+    " reached' here means the client's own pool is the binding limit and no"
+    " amount of PgBouncer headroom will help."
+)
+
+_CHRONIC_DESCRIPTION = _DESCRIPTION + _CHRONIC_EXTRA
+
+
+_NON_PROD_CLUSTERS = ".*-(ci|qa)"
+_PROD_CLUSTERS = ".*-(production)"
+
+
+def _retry_count_expr(cluster_filter: str, threshold: int) -> str:
+    """Build a retry-line count expression for one cluster filter and threshold.
+
+    The window is 10 minutes for both rules. What separates fast from chronic is
+    the threshold and the ``for_`` holding it, not the window -- see the module
+    docstring.
+    """
+    return (
+        "sum by (cluster, namespace) (\n"
+        "  count_over_time(\n"
+        f'    {{namespace="dagster", cluster=~"{cluster_filter}"}}\n'
+        f'    |= "{_RETRY_LINE}" [10m]\n'
+        "  )\n"
+        f") > {threshold}"
+    )
 
 
 def create(
@@ -126,6 +190,7 @@ def create(
         folder_uid=folder_uid,
         interval_seconds=300,
         rules=[
+            # --- Fast: an acute storm ---
             alerting.RuleGroupRuleArgs(
                 name="DagsterDatabaseConnectionFailuresWarning",
                 condition="C",
@@ -134,17 +199,10 @@ def create(
                 exec_err_state="OK",
                 labels={"severity": "warning", "environment": "non-production"},
                 annotations={
-                    "summary": _SUMMARY,
+                    "summary": _FAST_SUMMARY,
                     "description": _DESCRIPTION,
                 },
-                datas=rd(
-                    "sum by (cluster, namespace) (\n"
-                    "  count_over_time(\n"
-                    '    {namespace="dagster", cluster=~".*-(ci|qa)"}\n'
-                    f'    |= "{_RETRY_LINE}" [10m]\n'
-                    "  )\n"
-                    f") > {_RETRY_LINES_PER_10M}"
-                ),
+                datas=rd(_retry_count_expr(_NON_PROD_CLUSTERS, _FAST_LINES_PER_10M)),
             ),
             alerting.RuleGroupRuleArgs(
                 name="DagsterDatabaseConnectionFailuresCritical",
@@ -154,17 +212,42 @@ def create(
                 exec_err_state="KeepLast",
                 labels={"severity": "critical", "environment": "production"},
                 annotations={
-                    "summary": _SUMMARY,
+                    "summary": _FAST_SUMMARY,
                     "description": _DESCRIPTION,
                 },
-                datas=rd(
-                    "sum by (cluster, namespace) (\n"
-                    "  count_over_time(\n"
-                    '    {namespace="dagster", cluster=~".*-(production)"}\n'
-                    f'    |= "{_RETRY_LINE}" [10m]\n'
-                    "  )\n"
-                    f") > {_RETRY_LINES_PER_10M}"
-                ),
+                datas=rd(_retry_count_expr(_PROD_CLUSTERS, _FAST_LINES_PER_10M)),
+            ),
+            # --- Chronic: a steady bleed the fast rule cannot see ---
+            # Deliberately overlapping: during a real storm both fire and the
+            # fast one gets there first. The chronic rule exists for the case
+            # the fast one structurally misses -- a rate too low to trip 100 but
+            # too persistent to be noise -- which is exactly how QA sat broken
+            # for hours while the fast rule read healthy on 2026-08-19.
+            alerting.RuleGroupRuleArgs(
+                name="DagsterDatabaseConnectionFailuresChronicWarning",
+                condition="C",
+                for_="2h",
+                no_data_state="OK",
+                exec_err_state="OK",
+                labels={"severity": "warning", "environment": "non-production"},
+                annotations={
+                    "summary": _CHRONIC_SUMMARY,
+                    "description": _CHRONIC_DESCRIPTION,
+                },
+                datas=rd(_retry_count_expr(_NON_PROD_CLUSTERS, _CHRONIC_LINES_PER_10M)),
+            ),
+            alerting.RuleGroupRuleArgs(
+                name="DagsterDatabaseConnectionFailuresChronicCritical",
+                condition="C",
+                for_="2h",
+                no_data_state="OK",
+                exec_err_state="KeepLast",
+                labels={"severity": "critical", "environment": "production"},
+                annotations={
+                    "summary": _CHRONIC_SUMMARY,
+                    "description": _CHRONIC_DESCRIPTION,
+                },
+                datas=rd(_retry_count_expr(_PROD_CLUSTERS, _CHRONIC_LINES_PER_10M)),
             ),
         ],
         opts=resource_opts,
