@@ -205,7 +205,10 @@ run_retries:
 # config, the same mechanism as run_coordinator's MAX_CONCURRENT_RUNS below --
 # not a literal, because the right ceiling depends on the environment's own
 # PgBouncer budget. Production sets 100+50, a 150-connection ceiling for this
-# storage alone; QA sets 60+30 for a 90-connection one; the fallback in
+# storage alone; QA sets 30+60 for a 90-connection one, weighted toward
+# overflow rather than pool_size because overflow churns while pool_size is
+# retained, and QA cannot afford the resting footprint (see Pulumi.QA.yaml);
+# the fallback in
 # __main__.py is the original 10+10 for any stack that has set neither.
 #
 # QA's own number is the cautionary tale for how these get chosen. It was left

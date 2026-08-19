@@ -31,43 +31,56 @@ config:
   # Revisit once the pgbouncer exporter has enough history to show what a run
   # worker really holds outside a deadlock.
   dagster:max_concurrent_runs: 20
-  # event_log_storage's QueuePool ceiling. QA was left on the 10+10 fallback
-  # when Production was sized on 2026-08-18, on the stated grounds that it had
-  # not shown the failure mode. It had, and still does: at 20:38Z the daemon was
-  # logging "QueuePool limit of size 10 overflow 10 reached, connection timed
-  # out" continuously -- 100-250 lines per 10 minutes, sustained over at least
-  # eight hours, with both user-code servers contributing as well. Same failure
-  # Production fixed, never fixed here.
+  # event_log_storage's QueuePool. QA was left on the 10+10 fallback when
+  # Production was sized on 2026-08-18, on the stated grounds that it had not
+  # shown the failure mode. It had: the daemon logged "QueuePool limit of size
+  # 10 overflow 10 reached, connection timed out" continuously, 100-250 lines
+  # per 10 minutes over 8+ hours, with both user-code servers contributing.
   #
-  # Raised twice. 20 -> 45 on 2026-08-18, which measurably helped and was still
-  # not enough: timeouts fell from 109-163 per 10 minutes to 22-74, continuous,
-  # never stopping. 45 -> 90 here.
+  # Raised 20 -> 45 on 2026-08-18, which measurably helped and was not enough --
+  # timeouts fell from 109-163 per 10 minutes to 22-74, continuous. This raises
+  # the ceiling again, 45 -> 90, but takes it entirely out of max_overflow and
+  # leaves pool_size where it was.
   #
-  # 90 knowingly exceeds the strict per-pod bound that produced 45. That bound
-  # -- from dagster_instance.yaml's event_log_storage comment -- assumes the
-  # daemon and both webserver replicas peg this ceiling on the same pgbouncer
-  # pod simultaneously, which caps the ceiling at 67: 3 x (67 + run storage 30 +
-  # schedule storage 30) = 381 of QA's 382. Two rounds of measurement say that
-  # bound is far too pessimistic to size against. Observed peak per pod across
-  # the 20 -> 45 raise went 183/182 -> 205/228 of 382, so the raise cost roughly
-  # 20-45 connections per pod rather than the 3x the bound predicts: webserver
-  # replicas do not in fact peg the event log pool, they serve UI reads. 90
-  # should land near 270 of 382 on the observed distribution.
+  # That split is the whole point, so do not "tidy" it back to a round 60+30.
+  # pool_size is RETAINED -- under pool_mode = session a connection QueuePool
+  # keeps is a backend pinned against RDS for as long as the process lives --
+  # while connections above pool_size are closed on return and churn like
+  # NullPool. 30+60 therefore buys the daemon the same 90-connection burst that
+  # 60+30 would, at exactly the resting footprint QA already has, which is the
+  # only version of 90 that does not make the situation below worse.
   #
-  # The bound is not discarded, just demoted to what it is -- an upper limit on
-  # a scenario that has never occurred. What replaces it as the safety mechanism
-  # is measurement: DagsterDatabaseConnectionFailuresChronic fires on a low,
-  # unbroken rate of exactly these failures (the fast rule missed QA entirely at
-  # 22-74 per 10 minutes, which is why the chronic one now exists), and
-  # DagsterPgBouncerConnectionHeadroom watches the cap itself. If this is still
-  # too small the chronic rule says so; if it is too large the headroom rule
-  # does. Check pgbouncer_databases_current_connections PER POD, not summed --
-  # QA's distribution has been skewed 221-vs-4 and the binding limit is
-  # whichever pod saturates first.
+  # The situation below: on 2026-08-19 QA's PgBouncer sat pinned at its full
+  # 764-connection aggregate cap (382 on each of 2 pods) for hours, sv_idle 0,
+  # up to 46 clients queued, maxwait peaking at 543s against a
+  # query_wait_timeout of 600. CloudWatch shows DatabaseConnections flat at 768
+  # across three consecutive hours -- the same plateau signature as the
+  # 2026-08-10 Production incident, bounded here by PgBouncer rather than RDS.
   #
-  # Production's equivalent need was 150, and QA runs the same code locations,
-  # so do not be surprised if this needs a third raise.
-  dagster:event_log_pool_size: 60
-  dagster:event_log_max_overflow: 30
+  # Be clear about what this change does and does not do. It does not fix that.
+  # 16 long-lived processes share this ConfigMap on QA -- 1 daemon, 2
+  # webservers, 13 code-location servers -- and each retains pool_size from
+  # event_log plus 15 each from run_storage and schedule_storage. The resting
+  # demand that implies already exceeds the 764 the pool can supply, which is
+  # why it is pinned with no idle servers. Raising the burst ceiling gives the
+  # daemon somewhere to go only once there is room to burst into.
+  #
+  # What would actually create that room, in rough order of cost:
+  #   - stop giving 13 code-location servers a daemon-sized event_log pool;
+  #     1 x 90 + 2 x 45 + 13 x 15 = 375 fits comfortably, but needs
+  #     per-process-type config that does not exist yet
+  #   - db.m7g.large -> db.m7g.xlarge: the only genuine capacity increase,
+  #     roughly 1660 real connections against today's measured 832
+  #   - pgbouncer_replica_count 2 -> 1: adds nothing (the cap is budget /
+  #     replica_count, so the aggregate is invariant) but removes the skew
+  #     that wastes it -- QA has measured 221-vs-4. Deliberately NOT done
+  #     here: max_surge is pinned to 0, so a single replica makes every
+  #     rollout a full connection outage.
+  #
+  # Watch DagsterDatabaseConnectionFailuresChronic and
+  # DagsterPgBouncerPodConnectionHeadroom, not the aggregate headroom rule --
+  # and read pgbouncer_databases_current_connections PER POD, never summed.
+  dagster:event_log_pool_size: 30
+  dagster:event_log_max_overflow: 60
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
