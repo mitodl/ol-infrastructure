@@ -22,9 +22,26 @@ itself via its ``type`` field:
     thing this project exists to get rid of.  Accepted because bootstrapping
     Workload Identity Federation requires an identity that predates it, but
     every use logs a warning naming the stack that still depends on one.
+
+Running locally
+---------------
+The federated credential describes how to exchange an *EC2 instance* identity
+for a Google token, so it only resolves on a Concourse worker -- a laptop has
+no instance metadata service and the exchange fails.  Set
+``OL_GCP_IMPERSONATE_SERVICE_ACCOUNT`` to the automation service account's
+email and the provider instead impersonates it using your own application
+default credentials (``gcloud auth application-default login``).  This needs
+``roles/iam.serviceAccountTokenCreator`` on that service account.
+
+Impersonating rather than simply running as yourself is the point: a local
+``pulumi preview`` then sees exactly the permissions Concourse has, so a
+missing role surfaces on your laptop instead of halfway through a pipeline
+run.  Most people with a reason to run this locally hold Owner on the target
+project, which would mask every such gap.
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +55,8 @@ DEFAULT_SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 
 WORKLOAD_IDENTITY = "external_account"
 SERVICE_ACCOUNT_KEY = "service_account"  # pragma: allowlist secret
+
+IMPERSONATION_ENV_VAR = "OL_GCP_IMPERSONATE_SERVICE_ACCOUNT"
 
 
 def read_gcp_credentials(
@@ -84,13 +103,30 @@ def gcp_provider(
         the provider's own fallback is the ``CLOUDSDK_CORE_PROJECT``/gcloud
         config value, which is whatever the operator last ran ``gcloud config
         set project`` with.
-    :param credentials: Credential JSON. Defaults to the SOPS-stored document.
+    :param credentials: Credential JSON. Defaults to the SOPS-stored document,
+        unless ``OL_GCP_IMPERSONATE_SERVICE_ACCOUNT`` selects the local
+        impersonation path -- see the module docstring. An explicit value here
+        always wins, so a caller that has already resolved a credential is
+        never silently redirected.
     :param region: Default region for regional resources.
     :param scopes: OAuth scopes. Defaults to ``cloud-platform``.
 
     :returns: A configured provider, to be passed to every GCP resource in the
         stack via ``ResourceOptions(provider=...)``.
     """
+    if credentials is None and (target := os.environ.get(IMPERSONATION_ENV_VAR)):
+        # No SOPS read at all on this path: impersonation authenticates with the
+        # operator's own application default credentials, so there is no
+        # credential document to decrypt and nothing gained by requiring KMS
+        # access just to run a preview.
+        return gcp.Provider(
+            name,
+            project=project,
+            impersonate_service_account=target,
+            region=region,
+            scopes=scopes or DEFAULT_SCOPES,
+            **provider_args,
+        )
     credential_document = credentials or read_gcp_credentials()
     document_type = credential_type(credential_document)
     if document_type == SERVICE_ACCOUNT_KEY:

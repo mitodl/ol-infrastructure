@@ -85,6 +85,34 @@ under the key `credentials`, and may be either shape:
   because standing up federation needs an identity that predates it. Every use
   logs a warning naming the stack that still depends on one.
 
+The live document is Workload Identity Federation against
+`projects/32631020496/.../workloadIdentityPools/ol-infrastructure/providers/concourse`
+in `mitol01`, impersonating `pulumi-gcp@mitol01.iam.gserviceaccount.com`. The
+provider's attribute condition is `attribute.concourse_env == 'production'`, so
+only the production Concourse `infra` worker pool can complete the exchange —
+CI and QA are refused at the provider, not merely left unbound.
+
+### Running locally
+
+The federated credential exchanges an *EC2 instance* identity for a Google
+token, so it only resolves on a Concourse worker. A laptop has no instance
+metadata service and the exchange fails. Impersonate instead:
+
+```bash
+gcloud auth application-default login
+export OL_GCP_IMPERSONATE_SERVICE_ACCOUNT=pulumi-gcp@mitol01.iam.gserviceaccount.com
+pulumi preview
+```
+
+This needs `roles/iam.serviceAccountTokenCreator` on that service account. It
+also skips the SOPS read entirely, so a preview does not require KMS access.
+
+Impersonating rather than running as yourself is the point. A local preview
+then sees exactly the permissions Concourse has, so a missing role surfaces on
+your laptop instead of halfway through a pipeline run — and anyone with a
+reason to run this locally holds Owner on `mitol01`, which would mask every
+such gap.
+
 ## What this does not manage
 
 - **The GCP projects themselves.** Creating a project needs an org/folder
