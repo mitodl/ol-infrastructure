@@ -36,7 +36,29 @@ compute_logs:
 # On the sizing: connections above pool_size are closed when returned rather
 # than retained, so overflow churns exactly like NullPool does. pool_size must
 # therefore cover a process's real concurrency or the churn this exists to stop
-# simply continues at a lower rate. The original 10-per-storage sizing was
+# simply continues at a lower rate.
+#
+# Which gives the house rule for splitting a given ceiling between the two:
+# prefer a SMALL GUARANTEED pool_size and a LARGE BURST max_overflow. The two
+# halves buy the same ceiling and cost completely different amounts at rest --
+# pool_size is retained, and under pool_mode = session a retained connection is
+# a backend pinned against RDS for the life of the process whether or not a
+# query is running, while overflow costs nothing idle. 30+60 and 60+30 both
+# ceiling at 90; the second reserves twice as many connections doing nothing,
+# multiplied by every process sharing this file (16 on QA: 1 daemon, 2
+# webservers, 13 code-location servers). That multiplier is the difference
+# between fitting in a connection budget and exhausting it.
+#
+# The floor matters as much as the preference, and the two failure modes
+# bracket you on both sides:
+#   pool_size too high -> idle reserved connections eat the shared database
+#     budget. QA, 2026-08-19: pinned at its full 764 aggregate cap, sv_idle 0,
+#     maxwait 543s against a 600s query_wait_timeout.
+#   pool_size too low  -> steady-state work runs through the churning overflow
+#     path, which is connect-per-use again: the NullPool behaviour described
+#     above, 415 server assignments/s and every ephemeral port in TIME_WAIT.
+# So: pool_size = measured steady state, max_overflow = peaks. Not "make
+# pool_size as small as possible". The original 10-per-storage sizing was
 # based on a snapshot of 13-21 connections held across all three storages, but
 # within an hour of shipping it the daemon was logging sustained
 # "QueuePool limit of size 10 overflow 10 reached" timeouts -- 1000+ in 41
@@ -204,8 +226,11 @@ run_retries:
 # from dagster:event_log_pool_size / dagster:event_log_max_overflow stack
 # config, the same mechanism as run_coordinator's MAX_CONCURRENT_RUNS below --
 # not a literal, because the right ceiling depends on the environment's own
-# PgBouncer budget. Production sets 100+50, a 150-connection ceiling for this
-# storage alone; QA sets 30+15 for a 45-connection one; the fallback in
+# PgBouncer budget. Production sets 50+100, a 150-connection ceiling for this
+# storage alone; QA sets 30+60 for a 90-connection one, weighted toward
+# overflow rather than pool_size because overflow churns while pool_size is
+# retained, and QA cannot afford the resting footprint (see Pulumi.QA.yaml);
+# the fallback in
 # __main__.py is the original 10+10 for any stack that has set neither.
 #
 # QA's own number is the cautionary tale for how these get chosen. It was left
@@ -219,7 +244,7 @@ run_retries:
 # Production's number: QA's per-pod cap is 382 against Production's 708, and
 # QA has already deadlocked its whole pool once from run-worker connections
 # alone (see the 2026-08-17 incident notes in __main__.py), so it cannot absorb
-# a 150-connection ceiling on top of that. Its 45 is derived against its own
+# a 150-connection ceiling on top of that. Its 90 is derived against its own
 # cap by the same arithmetic used for Production below.
 #
 # Production's number, checked against __main__.py's per-pod PgBouncer math
