@@ -2247,7 +2247,7 @@ dagster_max_concurrent_runs = dagster_config.get_int("max_concurrent_runs") or 1
 # event_log_storage's pool_size/max_overflow, same reasoning as
 # max_concurrent_runs above: sized against the environment's PgBouncer
 # per-pod cap, so it has to be a stack config value rather than a literal in
-# dagster_instance.yaml. Production sets 100+50 and QA 30+60, each derived
+# dagster_instance.yaml. Production sets 50+100 and QA 30+60, each derived
 # against its own cap (see the rationale in dagster_instance.yaml).
 #
 # The 10+10 fallback here is the pre-incident size. Treat a stack sitting on it

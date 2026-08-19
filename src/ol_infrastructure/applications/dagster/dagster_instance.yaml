@@ -226,7 +226,7 @@ run_retries:
 # from dagster:event_log_pool_size / dagster:event_log_max_overflow stack
 # config, the same mechanism as run_coordinator's MAX_CONCURRENT_RUNS below --
 # not a literal, because the right ceiling depends on the environment's own
-# PgBouncer budget. Production sets 100+50, a 150-connection ceiling for this
+# PgBouncer budget. Production sets 50+100, a 150-connection ceiling for this
 # storage alone; QA sets 30+60 for a 90-connection one, weighted toward
 # overflow rather than pool_size because overflow churns while pool_size is
 # retained, and QA cannot afford the resting footprint (see Pulumi.QA.yaml);
