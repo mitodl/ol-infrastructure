@@ -39,15 +39,19 @@ compute_logs:
 # simply continues at a lower rate.
 #
 # Which gives the house rule for splitting a given ceiling between the two:
-# prefer a SMALL GUARANTEED pool_size and a LARGE BURST max_overflow. The two
-# halves buy the same ceiling and cost completely different amounts at rest --
-# pool_size is retained, and under pool_mode = session a retained connection is
-# a backend pinned against RDS for the life of the process whether or not a
-# query is running, while overflow costs nothing idle. 30+60 and 60+30 both
-# ceiling at 90; the second reserves twice as many connections doing nothing,
+# prefer a SMALL GUARANTEED pool_size and a LARGE BURST max_overflow. This
+# mattered most under PgBouncer's pool_mode = session, where every retained
+# QueuePool connection pinned a live RDS backend for the life of the process
+# whether or not a query was running -- 30+60 and 60+30 both ceilinged at 90,
+# but the second reserved twice as many real backends doing nothing,
 # multiplied by every process sharing this file (16 on QA: 1 daemon, 2
-# webservers, 13 code-location servers). That multiplier is the difference
-# between fitting in a connection budget and exhausting it.
+# webservers, 13 code-location servers). pool_mode moved to transaction (see
+# __main__.py) specifically because that multiplier turned into a measured
+# 1.03:1 client:backend ratio; a retained QueuePool connection is now a
+# PgBouncer client socket, not a pinned backend, while idle. The preference
+# for a smaller pool_size still stands -- overflow connections still churn
+# open/close the way NullPool always did -- it just no longer trades off
+# against the shared RDS backend budget the way it did under session mode.
 #
 # The floor matters as much as the preference, and the two failure modes
 # bracket you on both sides:
@@ -79,15 +83,24 @@ compute_logs:
 # counts against the per-pod cap for as long as it holds it -- they just tend
 # to hold fewer at once than the daemon.
 #
-# Checking server_active/pgbouncer_pools_server_active_connections against
-# that budget undercounts: pool_mode is session (see __main__.py), so a
-# connection QueuePool returns to its own pool stays connected to RDS as an
-# idle-but-pinned backend rather than being released. What actually consumes
-# the per-pod cap is pgbouncer_databases_current_connections -- the same
-# metric DagsterPgBouncerConnectionHeadroom already alerts on
-# (grafana_alerting/metric_rules/dagster_pgbouncer.py) -- checked per pod, not
-# summed across replicas, since a client's connections land on whichever pod
-# kube-proxy routes them to and do not spread evenly by construction.
+# Under the old pool_mode = session, checking server_active/
+# pgbouncer_pools_server_active_connections against this budget undercounted:
+# a connection QueuePool returned to its own pool stayed connected to RDS as
+# an idle-but-pinned backend rather than being released, so real load only
+# showed up in pgbouncer_databases_current_connections (client connections) --
+# the same metric DagsterPgBouncerConnectionHeadroom already alerts on
+# (grafana_alerting/metric_rules/dagster_pgbouncer.py).
+#
+# Now that pool_mode is transaction (see __main__.py), that inversion is
+# gone: an idle QueuePool connection costs PgBouncer a client socket, not a
+# backend, so pgbouncer_pools_server_active_connections is back to meaning
+# real concurrent work and is the more informative signal for this file's
+# pool_size/max_overflow sizing. pgbouncer_databases_current_connections
+# still bounds the per-pod cap and is what the headroom alert measures, so it
+# remains the number that matters for max_db_connections -- check both, per
+# pod and not summed across replicas, since a client's connections land on
+# whichever pod kube-proxy routes them to and do not spread evenly by
+# construction.
 #
 # event_log_storage's pool_size/max_overflow are stack config values, not
 # literals, for the same reason max_concurrent_runs is: they have to be sized
