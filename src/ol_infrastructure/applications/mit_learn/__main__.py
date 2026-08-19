@@ -540,6 +540,19 @@ mitlearn_db_config = OLPostgresDBConfig(
 mitlearn_db_config.parameter_overrides.append(
     {"name": "password_encryption", "value": "md5"}
 )
+# A runaway celery task duplication bug (mitodl/mit-learn#3785) is flooding the
+# error log with full STATEMENT text for routine duplicate-key violations,
+# ballooning log volume from ~25KB/hr to 1-3GB/hr and burning CPU/IO on the
+# logging itself. Raising this stops the STATEMENT echo for ordinary ERROR
+# severity (the message/DETAIL lines still log); explicit "immediate" apply
+# method avoids the pending-reboot default for unlisted parameters.
+mitlearn_db_config.parameter_overrides.append(
+    {
+        "name": "log_min_error_statement",
+        "value": "panic",
+        "apply_method": "immediate",
+    }
+)
 
 mitlearn_db = OLAmazonDB(
     db_config=mitlearn_db_config,
