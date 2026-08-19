@@ -554,10 +554,11 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
             )
         vault.generic.Secret(
             "olapps-mitlearn-admin-client-vault-credentials",
-            # Nested under sso/mitlearn/ so the app's existing Vault policy
-            # ("secret-operations/sso/mitlearn/*") already grants read access.
-            # A sibling path such as sso/mitlearn-admin would not be matched.
-            path="secret-operations/sso/mitlearn/admin",
+            # Flat, like every other client entry under secret-operations/sso/
+            # (including the marimo/marimo-app pair). Note this is a sibling of
+            # sso/mitlearn rather than a child, so mitlearn_policy.hcl grants
+            # read on it explicitly — the sso/mitlearn/* glob does not match it.
+            path="secret-operations/sso/mitlearn-admin",
             data_json=Output.all(
                 url=olapps_mitlearn_admin_client.realm_id.apply(
                     lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
