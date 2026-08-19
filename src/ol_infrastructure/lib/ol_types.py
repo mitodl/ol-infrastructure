@@ -57,7 +57,14 @@ class Environment(StrEnum):
 
 @unique
 class Services(StrEnum):
-    """Canonical source of truth for defining apps."""
+    """The deployable unit a workload belongs to -- the `ol.mit.edu/service` label.
+
+    The operational axis: what you page about, what a Rootly service maps to,
+    what shares a namespace and a deploy. Deliberately NOT reconciled against
+    `Application`, which is a different axis -- see that enum's docstring. The
+    two overlap heavily by nature and drift between them is expected, not a
+    defect to fix.
+    """
 
     airbyte = "airbyte"
     superset = "superset"
@@ -76,8 +83,7 @@ class Services(StrEnum):
     notebooks = "notebooks"
     ol_analytics_api = "ol-analytics-api"
     opik = "opik"
-    open_edx = "open-edx"
-    learn_ai = ("learn-ai",)
+    learn_ai = "learn-ai"
     mit_learn = "mit-learn"
     mit_open = "open"
     mitx_edx = "mitx-edx"
@@ -102,6 +108,15 @@ class Services(StrEnum):
 
 @unique
 class Application(StrEnum):
+    """The codebase a workload runs -- the `ol.mit.edu/application` label.
+
+    The provenance axis: which repository built the image, which team's release
+    ships it. One `Application` can appear in several `Services` (an Open edX
+    codebase runs as separate residential, MITx Online and xPro services), and
+    one `Service` can compose more than one `Application`. Kept separate from
+    `Services` on purpose -- neither is derived from the other.
+    """
+
     airbyte = "airbyte"
     superset = "superset"
     celery_monitoring = "celery-monitoring"
@@ -141,10 +156,38 @@ class Application(StrEnum):
 
 @unique
 class Component(StrEnum):
+    """Functional role of a workload within its service.
+
+    The discriminator for paging decisions: a Celery worker and a Postgres
+    StatefulSet fail differently and should not share an alert tier.
+
+    Also the vocabulary for Rootly's `ol_component` routing key, which has two
+    producers -- this label, surfaced as `ol.mit.edu/component`, and
+    `metric_rules/synthetic_monitoring.py`'s `_Check` -- so both are typed
+    against this enum rather than agreeing by coincidence.
+
+    Note the two spellings are deliberate and not interchangeable: the
+    Kubernetes label is `ol.mit.edu/component`, while what reaches Rootly is
+    `ol_component`. Alert rules rename it at the boundary so a routing
+    condition never has to read `label_ol_mit_edu_component`, and so the key
+    cannot collide with a bare `component` set by a vendor integration.
+    """
+
+    api = "api"
+    beat = "beat"
+    cache = "cache"
     celery = "celery"
-    webapp = "webapp"
+    database = "database"
     frontend = "frontend"
+    gateway = "gateway"
+    ingress = "ingress"
     keycloak = "keycloak"
+    nextjs = "nextjs"
+    pgbouncer = "pgbouncer"
+    queue = "queue"
+    search = "search"
+    webapp = "webapp"
+    worker = "worker"
 
 
 @unique
@@ -206,7 +249,7 @@ class K8sGlobalLabels(BaseModel):
 class K8sAppLabels(K8sGlobalLabels):
     product: Product
     application: Application
-    component: Component | str | None = None
+    component: Component | None = None
     pod_security_group: str | None = None
     source_repository: str
     commit_sha: str | None = None

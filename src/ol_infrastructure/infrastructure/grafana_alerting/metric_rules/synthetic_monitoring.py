@@ -159,6 +159,7 @@ from dataclasses import dataclass
 from pulumi import ResourceOptions
 from pulumiverse_grafana import alerting
 
+from ol_infrastructure.lib.ol_types import Component
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 # The Synthetic Monitoring plugin's folder. Referenced, never created -- see the
@@ -184,7 +185,11 @@ class _Check:
     slow_rule_name: str
     job: str
     instance: str
-    component: str
+    # Typed against the K8s label enum, not `str`: this value and
+    # `ol.mit.edu/component` are the two producers of Rootly's `ol_component`
+    # routing key, and they agreed on `api`/`nextjs`/`webapp` by coincidence
+    # until this annotation made it a guarantee.
+    component: Component
     severity: str
     # Subject of the alert summaries, e.g. "MIT Learn Next.js origin".
     what: str
@@ -203,7 +208,7 @@ _CHECKS = [
         ),
         job="Learn NextJS Homepage (Bypass Fastly)",
         instance="https://next.learn.mit.edu/",
-        component="nextjs",
+        component=Component.nextjs,
         severity="warning",
         what="MIT Learn Next.js origin",
         context=(
@@ -226,7 +231,7 @@ _CHECKS = [
         slow_rule_name="Learn API Health Endpoint - Elevated Probe Failure Rate",
         job="Learn API Health Endpoint",
         instance="https://api.learn.mit.edu/learn/health",
-        component="api",
+        component=Component.api,
         severity="critical",
         what="MIT Learn API health endpoint",
         context=(
@@ -242,7 +247,7 @@ _CHECKS = [
         slow_rule_name="Learn Homepage - Elevated Probe Failure Rate",
         job="Learn Homepage",
         instance="https://learn.mit.edu/",
-        component="webapp",
+        component=Component.webapp,
         severity="critical",
         what="MIT Learn homepage",
         context=(

@@ -20,6 +20,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
 from ol_infrastructure.lib.ol_types import (
     Application,
     BusinessUnit,
+    Component,
     K8sAppLabels,
     Product,
     Services,
@@ -46,7 +47,7 @@ k8s_app_labels = K8sAppLabels(
     product=Product.mitlearn,
     service=Services.mit_learn,
     application=Application.mit_learn,
-    component="frontend",
+    component=Component.frontend,
     ou=BusinessUnit.mit_learn,
     source_repository="https://github.com/mitodl/mit-learn",
     stack=stack_info,
