@@ -205,7 +205,7 @@ run_retries:
 # config, the same mechanism as run_coordinator's MAX_CONCURRENT_RUNS below --
 # not a literal, because the right ceiling depends on the environment's own
 # PgBouncer budget. Production sets 100+50, a 150-connection ceiling for this
-# storage alone; QA sets 30+15 for a 45-connection one; the fallback in
+# storage alone; QA sets 60+30 for a 90-connection one; the fallback in
 # __main__.py is the original 10+10 for any stack that has set neither.
 #
 # QA's own number is the cautionary tale for how these get chosen. It was left
@@ -219,7 +219,7 @@ run_retries:
 # Production's number: QA's per-pod cap is 382 against Production's 708, and
 # QA has already deadlocked its whole pool once from run-worker connections
 # alone (see the 2026-08-17 incident notes in __main__.py), so it cannot absorb
-# a 150-connection ceiling on top of that. Its 45 is derived against its own
+# a 150-connection ceiling on top of that. Its 90 is derived against its own
 # cap by the same arithmetic used for Production below.
 #
 # Production's number, checked against __main__.py's per-pod PgBouncer math

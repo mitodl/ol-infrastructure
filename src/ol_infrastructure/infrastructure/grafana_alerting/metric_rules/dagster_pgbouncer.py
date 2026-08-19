@@ -110,6 +110,24 @@ _MAXWAIT_SECONDS = 5
 # Treat this rule as the leading indicator for one failure mode, not as coverage.
 _SERVER_ASSIGNMENTS_PER_SECOND = 50
 
+# The same ratio as _HEADROOM_RATIO, applied per pod instead of across the pool.
+#
+# Added 2026-08-19 after review pointed out that the aggregate rule cannot see
+# the failure it is named for. max_db_connections is derived as budget /
+# replica_count, so each pod has its own hard ceiling and the binding limit is
+# whichever pod saturates first -- but summing both sides before dividing hides
+# exactly that. One QA pod pinned at 382/382 while the other sits at 4 gives an
+# aggregate 386/764 = 51%, comfortably under 0.75, while half the pool is
+# refusing to open backends. Connections land wherever kube-proxy routes them
+# and do not spread evenly by construction: QA has measured 221 vs 4.
+#
+# Not hypothetical. On 2026-08-19 QA ran at 382/382 on BOTH pods for hours, with
+# up to 46 clients queued and maxwait peaking at 543s against a
+# query_wait_timeout of 600 -- a minute short of dropping queries outright. The
+# aggregate rule did fire, but only because both pods saturated together; the
+# single-hot-pod case it is blind to is the more common shape of this failure.
+_POD_HEADROOM_RATIO = 0.75
+
 
 def create(
     folder_uid: Input[str],
@@ -171,6 +189,54 @@ def create(
                     "sum by (cluster, namespace) "
                     '(pgbouncer_databases_max_connections{database="dagster", cluster=~".*-(production)"})'
                     f" > {_HEADROOM_RATIO}"
+                ),
+            ),
+            # --- Per-pod connection headroom ---
+            # The aggregate rules above answer "is the pool full"; these answer
+            # "is any single pod full", which is the question that actually
+            # matters. Each pod enforces its own max_db_connections, so a pod at
+            # its ceiling queues its clients no matter how idle its siblings
+            # are. Dividing before aggregating keeps each pod its own series.
+            #
+            # Both are kept rather than replacing the aggregate pair: the
+            # aggregate one is the right denominator for "should we buy more
+            # database", this one for "is anything being refused right now".
+            alerting.RuleGroupRuleArgs(
+                name="DagsterPgBouncerPodConnectionHeadroomWarning",
+                condition="C",
+                for_="15m",
+                no_data_state="OK",
+                exec_err_state="OK",
+                labels={"severity": "warning"},
+                annotations={
+                    "summary": "Dagster PgBouncer pod {{ $labels.pod }} in cluster {{ $labels.cluster }} is holding {{ $value }} of its own connection cap",
+                    "description": "A single PgBouncer pod in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has passed 75% of the max_db_connections it enforces on its own. Past that ceiling it queues clients rather than opening backends, regardless of how much headroom its sibling pods have -- max_db_connections is derived as budget / replica_count, so the binding limit is whichever pod saturates first, and connections land wherever kube-proxy routes them. Check DagsterPgBouncerClientsWaiting: with query_wait_timeout at 600s a saturated pod looks healthy for ten minutes before it starts failing queries. If this fires while the aggregate DagsterPgBouncerConnectionHeadroom stays quiet, the pool is skewed rather than undersized and the fix is distribution (or fewer, larger replicas), not more database.",
+                },
+                datas=rd(
+                    "max by (cluster, namespace, pod) ("
+                    'pgbouncer_databases_current_connections{database="dagster", cluster=~".*-(ci|qa)"}'
+                    " / "
+                    'pgbouncer_databases_max_connections{database="dagster", cluster=~".*-(ci|qa)"}'
+                    f") > {_POD_HEADROOM_RATIO}"
+                ),
+            ),
+            alerting.RuleGroupRuleArgs(
+                name="DagsterPgBouncerPodConnectionHeadroomCritical",
+                condition="C",
+                for_="15m",
+                no_data_state="OK",
+                exec_err_state="KeepLast",
+                labels={"severity": "critical"},
+                annotations={
+                    "summary": "Dagster PgBouncer pod {{ $labels.pod }} in cluster {{ $labels.cluster }} is holding {{ $value }} of its own connection cap",
+                    "description": "A single PgBouncer pod in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has passed 75% of the max_db_connections it enforces on its own. Past that ceiling it queues clients rather than opening backends, regardless of how much headroom its sibling pods have -- max_db_connections is derived as budget / replica_count, so the binding limit is whichever pod saturates first, and connections land wherever kube-proxy routes them. Check DagsterPgBouncerClientsWaiting: with query_wait_timeout at 600s a saturated pod looks healthy for ten minutes before it starts failing queries. If this fires while the aggregate DagsterPgBouncerConnectionHeadroom stays quiet, the pool is skewed rather than undersized and the fix is distribution (or fewer, larger replicas), not more database.",
+                },
+                datas=rd(
+                    "max by (cluster, namespace, pod) ("
+                    'pgbouncer_databases_current_connections{database="dagster", cluster=~".*-(production)"}'
+                    " / "
+                    'pgbouncer_databases_max_connections{database="dagster", cluster=~".*-(production)"}'
+                    f") > {_POD_HEADROOM_RATIO}"
                 ),
             ),
             # --- Clients queued behind the cap ---
