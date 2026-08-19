@@ -54,13 +54,21 @@ compute_logs:
 # against the shared RDS backend budget the way it did under session mode.
 #
 # The floor matters as much as the preference, and the two failure modes
-# bracket you on both sides:
-#   pool_size too high -> idle reserved connections eat the shared database
-#     budget. QA, 2026-08-19: pinned at its full 764 aggregate cap, sv_idle 0,
-#     maxwait 543s against a 600s query_wait_timeout.
+# bracket you on both sides. Both were observed under the old session mode,
+# so read "pool_size too high" as history rather than the live mechanism --
+# see the correction below for what it means now:
+#   pool_size too high -> under session mode, idle reserved connections ate
+#     the shared database budget directly. QA, 2026-08-19: pinned at its full
+#     764 aggregate cap, sv_idle 0, maxwait 543s against a 600s
+#     query_wait_timeout. Under transaction mode a large pool_size no longer
+#     costs backends while idle; it raises the ceiling on how many
+#     transactions this one process can have in flight at once, which is a
+#     concurrency-spike risk rather than a resting-cost one.
 #   pool_size too low  -> steady-state work runs through the churning overflow
 #     path, which is connect-per-use again: the NullPool behaviour described
 #     above, 415 server assignments/s and every ephemeral port in TIME_WAIT.
+#     This failure mode is unchanged by pool_mode -- overflow churns the same
+#     way regardless of what PgBouncer does with the backend on the other end.
 # So: pool_size = measured steady state, max_overflow = peaks. Not "make
 # pool_size as small as possible". The original 10-per-storage sizing was
 # based on a snapshot of 13-21 connections held across all three storages, but
@@ -78,10 +86,15 @@ compute_logs:
 # pool_size is a retention ceiling, not a preallocation: QueuePool opens
 # connections lazily, so the 97 processes that share this ConfigMap (daemon, 2
 # webservers, 14 code locations, up to max_concurrent_runs workers) only hold
-# what they actually used. Run workers are not exempt from the budget just
-# because they are short-lived -- a worker that opens a connection still
-# counts against the per-pod cap for as long as it holds it -- they just tend
-# to hold fewer at once than the daemon.
+# what they actually used. Run workers are not exempt from pool_size/
+# max_overflow bounding their own concurrency just because they are
+# short-lived -- but under transaction mode that no longer means a worker
+# "counts against the per-pod [backend] cap for as long as it holds" a
+# QueuePool connection open; it counts against the backend cap only while a
+# transaction on that connection is actually in flight, and against the
+# client-socket count (max_client_conn, sized with headroom to spare) the
+# rest of the time. Run workers still tend to hold fewer concurrent
+# transactions at once than the daemon.
 #
 # Under the old pool_mode = session, checking server_active/
 # pgbouncer_pools_server_active_connections against this budget undercounted:
