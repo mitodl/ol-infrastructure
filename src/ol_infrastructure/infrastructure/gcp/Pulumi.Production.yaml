@@ -12,6 +12,27 @@ config:
     - aiplatform.googleapis.com
     - generativelanguage.googleapis.com
     - googleads.googleapis.com
+    service_accounts:
+      # The stack's own automation identity, adopted so the federation wiring
+      # is reviewable here instead of living as console clicks nobody can
+      # reproduce. protect=True comes with the import: replacing this account
+      # would break every subsequent run.
+    - account_id: pulumi-gcp
+      display_name: Pulumi GCP provider
+      import_id: projects/mitol01/serviceAccounts/pulumi-gcp@mitol01.iam.gserviceaccount.com
+      iam_members:
+        # Which workload may exchange its identity for this account's token.
+        # The provider's attribute condition already restricts this to the
+        # production Concourse infra pool; this binding names the pool again.
+      - role: roles/iam.workloadIdentityUser
+        member: principalSet://iam.googleapis.com/projects/32631020496/locations/global/workloadIdentityPools/ol-infrastructure/attribute.concourse_env/production
+        import_id: projects/mitol01/serviceAccounts/pulumi-gcp@mitol01.iam.gserviceaccount.com
+          roles/iam.workloadIdentityUser principalSet://iam.googleapis.com/projects/32631020496/locations/global/workloadIdentityPools/ol-infrastructure/attribute.concourse_env/production
+        # Who may impersonate this account to run a local preview. A GROUP,
+        # not individuals -- onboarding an engineer should be a membership
+        # change, not a Pulumi change. Uncomment with the real address.
+        # - role: roles/iam.serviceAccountTokenCreator
+        #   member: group:REPLACE-ME@mit.edu
       # The tier a credential serves is carried in its own name and restrictions,
       # not in the stack it is declared from. See README.md -- splitting these
       # across CI/QA/Production stacks would buy naming, not isolation, because

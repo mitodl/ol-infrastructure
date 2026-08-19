@@ -131,14 +131,29 @@ export OL_GCP_IMPERSONATE_SERVICE_ACCOUNT=pulumi-gcp@mitol01.iam.gserviceaccount
 pulumi preview
 ```
 
-This needs `roles/iam.serviceAccountTokenCreator` on that service account. It
-also skips the SOPS read entirely, so a preview does not require KMS access.
+It also skips the SOPS read entirely, so a preview does not require KMS access.
 
 Impersonating rather than running as yourself is the point. A local preview
 then sees exactly the permissions Concourse has, so a missing role surfaces on
 your laptop instead of halfway through a pipeline run — and anyone with a
 reason to run this locally holds Owner on `mitol01`, which would mask every
-such gap.
+such gap. Confirmed empirically on 2026-08-19: `roles/owner` does **not**
+confer `iam.serviceAccounts.getAccessToken`, so impersonation 403s until the
+grant below exists. Owner is not a superset here.
+
+#### Getting access
+
+`roles/iam.serviceAccountTokenCreator` on `pulumi-gcp@mitol01` is what makes
+the command above work. It is granted to a **group**, declared in
+`Pulumi.Production.yaml` under the `pulumi-gcp` account's `iam_members` —
+so onboarding an engineer is a group-membership change, not a Pulumi change,
+and no one needs to remember a `gcloud add-iam-policy-binding` incantation.
+
+Both grants on that account are declared there: the `workloadIdentityUser`
+binding for the Concourse principal set, and the `serviceAccountTokenCreator`
+binding for people. Service-account-level IAM does not appear in the project's
+IAM policy, so if it is not written down here it exists only as a console click
+nobody can reproduce.
 
 ## What this does not manage
 

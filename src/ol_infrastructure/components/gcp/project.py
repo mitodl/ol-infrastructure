@@ -63,17 +63,41 @@ class APIKeyRestrictionType(StrEnum):
     server = "server_key_restrictions"
 
 
+class OLGCPServiceAccountIAMMemberConfig(BaseModel):
+    """A grant *on* a service account, rather than one held *by* it.
+
+    Two distinct things use this, and conflating them is easy:
+
+    * ``roles/iam.workloadIdentityUser`` for a ``principalSet://`` -- which
+      external workload may exchange its identity for this account's token.
+    * ``roles/iam.serviceAccountTokenCreator`` for a person or Google group --
+      who may impersonate this account from a laptop.
+
+    Both are service-account-level IAM, invisible in the project IAM policy,
+    and therefore easy to leave as undocumented console clicks.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    role: str
+    member: str
+    import_id: str | None = None
+
+
 class OLGCPServiceAccountConfig(BaseModel):
-    """A service account and the project-level roles bound to it."""
+    """A service account, the roles it holds, and the grants held on it."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     account_id: str
     display_name: str
     description: str = ""
-    # Project-level roles. Resource-level grants (a specific bucket, a specific
-    # dataset) belong on the resource, not here.
+    # Project-level roles this account HOLDS. Resource-level grants (a specific
+    # bucket, a specific dataset) belong on the resource, not here.
     project_roles: list[str] = Field(default_factory=list)
+    # Grants held ON this account -- impersonation and federation. See
+    # OLGCPServiceAccountIAMMemberConfig.
+    iam_members: list[OLGCPServiceAccountIAMMemberConfig] = Field(default_factory=list)
     # Set to the live resource id to adopt an existing account instead of
     # creating one. See docs/plans/gcp-consolidation-into-mitol01.md for the id
     # format of each resource type.
@@ -185,6 +209,15 @@ class OLGCPProject(ComponentResource):
                     ),
                     opts=child_opts,
                 )
+            for index, grant in enumerate(account.iam_members):
+                grant_slug = grant.role.rsplit("/", 1)[-1].replace(".", "-")
+                gcp.serviceaccount.IAMMember(
+                    f"{name}-{account.account_id}-{grant_slug}-{index}",
+                    service_account_id=service_account.name,
+                    role=grant.role,
+                    member=grant.member,
+                    opts=adoption_opts(child_opts, grant.import_id),
+                )
 
         for api_key in config.api_keys:
             self.api_keys[api_key.key_name] = gcp.projects.ApiKey(
@@ -226,5 +259,6 @@ __all__ = [
     "OLGCPProject",
     "OLGCPProjectConfig",
     "OLGCPServiceAccountConfig",
+    "OLGCPServiceAccountIAMMemberConfig",
     "adoption_opts",
 ]
