@@ -53,12 +53,14 @@ config:
     restrictions:
       api_targets:
       - service: youtube.googleapis.com
-    import_id: projects/<project-id-or-number>/locations/global/keys/<key-uid>
+    # <key-name> is the last segment of the key's API resource name, not its
+    # separate uid field. `gcloud services api-keys list --format=json`.
+    import_id: projects/<project-id-or-number>/locations/global/keys/<key-name>
 ```
 
 `import_id` present means "adopt what is already there"; absent means "create
 it". Adopted resources are automatically marked `protect=True` — see
-`_adoption_opts` in `components/gcp/project.py` for why.
+`adoption_opts` in `components/gcp/project.py` for why.
 
 `restrictions` is mandatory on every API key. The component refuses an
 unrestricted one rather than accepting the estate's current default of no

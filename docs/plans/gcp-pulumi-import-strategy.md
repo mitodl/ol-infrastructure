@@ -64,16 +64,22 @@ so the provider's own docs are the source).
 | `gcp.projects.Service` | `{{project_id}}/{{service}}` | `gcloud services list --enabled --project=P --format='value(config.name)'` |
 | `gcp.serviceaccount.Account` | `projects/{{project_id}}/serviceAccounts/{{email}}` | `gcloud iam service-accounts list --project=P --format='value(email)'` |
 | `gcp.projects.IAMMember` | `"{{project_id}} {{role}} {{member}}"` — **space-delimited** | `gcloud projects get-iam-policy P --format=json` |
-| `gcp.projects.ApiKey` | `projects/{{project}}/locations/global/keys/{{uid}}` | `gcloud services api-keys list --project=P --format='value(uid,displayName)'` |
+| `gcp.projects.ApiKey` | `projects/{{project}}/locations/global/keys/{{name}}` | `gcloud services api-keys list --project=P --format=json` — take `name` |
 | `gcp.recaptcha.EnterpriseKey` | `projects/{{project}}/keys/{{name}}` | `gcloud recaptcha keys list --project=P` |
 
 Two traps in that table:
 
 - The IAM member id is **space**-delimited, not slash-delimited like every
   other GCP import id. `"my-project roles/viewer user:foo@example.com"`.
-- The API key id's `{{uid}}` is the key's opaque uid, not its display name, and
-  `{{project}}` in the value Google returns is the project *number*. Both the
-  id and the number forms are accepted.
+- The API key id ends with the key's **`name`** — the last segment of its API
+  resource name, an RFC-1034 string matching
+  `[a-z]([a-z0-9-]{0,61}[a-z0-9])?`. Not its display name, and **not its
+  `uid`**, which is a separate output-only UUID4 field on the same resource.
+  The provider's own attribute reference settles it: `id` is
+  `projects/{{project}}/locations/global/keys/{{name}}`. Read `name` off
+  `--format=json` rather than assembling the id from parts, and note
+  `{{project}}` in what Google returns is the project *number* — both the id
+  and number forms are accepted.
 
 ## The mechanism: `import_`, not `pulumi import`
 

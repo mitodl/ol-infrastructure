@@ -316,6 +316,11 @@ class GCPBase(BaseModel):
     def merged_labels(self, *new_labels: dict[str, str]) -> dict[str, str]:
         """Return a dictionary of existing labels with the ones passed in.
 
+        The merged result is re-validated. Additions bypass the constructor, so
+        without this a caller could hand a child resource a label GCP will
+        reject -- an ``@`` in a value, an over-long key -- and only find out
+        when the provider refuses it mid-apply.
+
         :param *new_labels: One or more dictionaries of specific labels to be set
                             on a child resource.
 
@@ -323,7 +328,5 @@ class GCPBase(BaseModel):
         """
         label_dict = self.labels.copy()
         for labels in new_labels:
-            label_dict.update(
-                {key.lower(): value.lower() for key, value in labels.items()}
-            )
-        return label_dict
+            label_dict.update(labels)
+        return self.enforce_labels(label_dict)

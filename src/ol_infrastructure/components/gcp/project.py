@@ -43,10 +43,10 @@ from ol_infrastructure.lib.ol_types import GCPBase
 class APIKeyRestrictionType(StrEnum):
     """The restriction shapes an API key may carry.
 
-    ``api_targets`` is orthogonal to the other three -- it limits *which APIs*
-    a key may call, while the others limit *who* may call. A key needs at least
-    one of these; six keys in the legacy estate carry none at all, including
-    the only unrestricted key that is actually serving traffic.
+    ``api_targets`` is orthogonal to the other four -- it limits *which APIs*
+    a key may call, while android/browser/ios/server limit *who* may call. A
+    key needs at least one of the five; six keys in the legacy estate carry
+    none at all, including the only unrestricted key actually serving traffic.
     """
 
     android = "android_key_restrictions"
@@ -85,15 +85,19 @@ class OLGCPAPIKeyConfig(BaseModel):
 
     @model_validator(mode="after")
     def enforce_restrictions(self) -> "OLGCPAPIKeyConfig":
+        valid = {member.value for member in APIKeyRestrictionType}
+        # Every key is checked, not just the ones carrying a value. A misspelled
+        # key with an empty value would otherwise pass here and then fail much
+        # later, as an unexpected keyword to ApiKeyRestrictionsArgs during stack
+        # evaluation.
+        if unknown := set(self.restrictions) - valid:
+            msg = f"Unknown API key restriction(s) {sorted(unknown)}. Valid: {sorted(valid)}"  # noqa: E501
+            raise ValueError(msg)
         declared = {
             key
             for key, value in self.restrictions.items()
             if value not in (None, [], {})
         }
-        valid = {member.value for member in APIKeyRestrictionType}
-        if unknown := declared - valid:
-            msg = f"Unknown API key restriction(s) {sorted(unknown)}. Valid: {sorted(valid)}"  # noqa: E501
-            raise ValueError(msg)
         if not declared:
             msg = (
                 f"API key {self.key_name} declares no restrictions. An "
@@ -152,7 +156,7 @@ class OLGCPProject(ComponentResource):
             )
 
         for account in config.service_accounts:
-            account_opts = _adoption_opts(child_opts, account.import_id)
+            account_opts = adoption_opts(child_opts, account.import_id)
             service_account = gcp.serviceaccount.Account(
                 f"{name}-service-account-{account.account_id}",
                 project=config.project_id,
@@ -183,7 +187,7 @@ class OLGCPProject(ComponentResource):
                 restrictions=gcp.projects.ApiKeyRestrictionsArgs(
                     **api_key.restrictions
                 ),
-                opts=_adoption_opts(child_opts, api_key.import_id),
+                opts=adoption_opts(child_opts, api_key.import_id),
             )
 
         self.register_outputs(
@@ -194,7 +198,7 @@ class OLGCPProject(ComponentResource):
         )
 
 
-def _adoption_opts(opts: ResourceOptions, import_id: str | None) -> ResourceOptions:
+def adoption_opts(opts: ResourceOptions, import_id: str | None) -> ResourceOptions:
     """Add import and protection options for a resource being adopted.
 
     ``protect`` travels with ``import_`` on purpose. An adopted resource is one
@@ -215,4 +219,5 @@ __all__ = [
     "OLGCPProject",
     "OLGCPProjectConfig",
     "OLGCPServiceAccountConfig",
+    "adoption_opts",
 ]
