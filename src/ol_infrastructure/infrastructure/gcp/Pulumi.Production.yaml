@@ -1,0 +1,31 @@
+---
+config:
+  ol_gcp:projects:
+  - project_id: mitol01
+    business_unit: operations
+    region: us-east1
+    # Only the services with a proven consumer. mitol01 also has
+    # dataform, orgpolicy and storage-component enabled; those are left
+    # unmanaged deliberately rather than adopted for completeness, and
+    # disable_on_destroy=False means leaving them out turns nothing off.
+    enabled_services:
+    - aiplatform.googleapis.com
+    - generativelanguage.googleapis.com
+    - googleads.googleapis.com
+    api_keys:
+    - key_name: learn-ai-production
+      display_name: Learn AI Production
+      restrictions:
+        api_targets:
+        - service: generativelanguage.googleapis.com
+      import_id: projects/32631020496/locations/global/keys/ac4d9961-5294-4b21-85c9-e61e6e5d8a9d
+    # Tier not established. Created 2025-12-30, restricted to both AI APIs,
+    # no identified consumer yet. Parked in Production because an unknown
+    # tier is treated as the highest one until someone confirms otherwise.
+    - key_name: translations-experimentation
+      display_name: Translations Experimentation
+      restrictions:
+        api_targets:
+        - service: generativelanguage.googleapis.com
+        - service: aiplatform.googleapis.com
+      import_id: projects/32631020496/locations/global/keys/44e4eae4-247b-4c04-ae86-82b7bae0f933

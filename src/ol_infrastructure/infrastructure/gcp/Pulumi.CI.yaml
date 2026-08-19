@@ -1,0 +1,15 @@
+---
+config:
+  ol_gcp:projects:
+  - project_id: mitol01
+    business_unit: operations
+    region: us-east1
+    # See Pulumi.QA.yaml: enabled services for a project shared across tiers
+    # are owned by the Production stack.
+    api_keys:
+    - key_name: learn-ai-ci
+      display_name: Learn AI CI
+      restrictions:
+        api_targets:
+        - service: generativelanguage.googleapis.com
+      import_id: projects/32631020496/locations/global/keys/c221d64a-8015-43db-8e54-10c9d87f1dcd

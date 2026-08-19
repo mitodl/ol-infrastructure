@@ -8,26 +8,34 @@ on is `docs/plans/gcp-service-account-consumer-map.md`.
 
 ## Stack layout
 
-One stack per GCP project, named `<tenant>.<Environment>`:
-
-```
-ocw-studio.Production      -> project ocw-studio-production
-ocw-studio.QA              -> project ocw-studio-qa
-mit-learn.Production       -> project mit-open
-```
-
-The stack name states the intent; `gcp_project:project_id` states the literal
-GCP project the stack currently maps to. They differ today on purpose — the
-legacy estate's project names are not trustworthy (`ocw-studio-qa` carries
-production YouTube publishing and the estate's largest granted quota;
-`recaptcha-migrated-075600d5919` is machine-generated). Keeping both means the
-truth is written down in one file per stack rather than inferred from a name.
+Three stacks — `CI`, `QA`, `Production` — each managing every GCP project whose
+credentials serve that tier.
 
 ```bash
 cd src/ol_infrastructure/infrastructure/gcp/
-pulumi stack select ocw-studio.Production
+pulumi stack select Production
 pulumi preview
 ```
+
+Not one stack per GCP project. The GCP project *is* already the environment
+boundary — `ocw-studio-production` and `ocw-studio-qa` are separate projects —
+so a stack-per-project layout would encode that boundary twice, and encode it
+wrongly: several legacy project names lie about their tier. `ocw-studio-qa`
+carries production YouTube publishing and the estate's largest granted quota,
+and `recaptcha-migrated-075600d5919` is machine-generated. The stack name
+states the tier the credentials actually serve; `project_id` states which GCP
+project happens to hold them today.
+
+One GCP project can therefore appear in more than one stack — `mitol01` holds
+Learn AI keys for all three tiers. When it does, **`enabled_services` belongs
+to the `Production` stack only**: an enabled API is a property of the project,
+not of a tier, so declaring it in two stacks would put two Pulumi resources in
+conflict over one API.
+
+The stack boundary separates what is *declared*. It does not by itself separate
+what the deploying identity can *do* — all three stacks share one automation
+account unless `ol_gcp:impersonate_service_account` gives a stack its own. See
+"Credentials" below.
 
 ## Configuration
 
@@ -36,31 +44,38 @@ branches.
 
 ```yaml
 config:
-  gcp_project:project_id: ocw-studio-production
-  gcp_project:business_unit: open-courseware   # a BusinessUnit value
-  gcp_project:region: us-east1
-  gcp_project:enabled_services:
-  - drive.googleapis.com
-  - youtube.googleapis.com
-  gcp_project:service_accounts:
-  - account_id: ocw-studio-production
-    display_name: OCW Studio Production
-    project_roles: []
-    import_id: projects/ocw-studio-production/serviceAccounts/ocw-studio-production@ocw-studio-production.iam.gserviceaccount.com
-  gcp_project:api_keys:
-  - key_name: youtube-production
-    display_name: OCW Studio YouTube key
-    restrictions:
-      api_targets:
-      - service: youtube.googleapis.com
-    # <key-name> is the last segment of the key's API resource name, not its
-    # separate uid field. `gcloud services api-keys list --format=json`.
-    import_id: projects/<project-id-or-number>/locations/global/keys/<key-name>
+  # optional: per-stack automation identity, see Credentials
+  ol_gcp:impersonate_service_account: pulumi-gcp-qa@mitol01.iam.gserviceaccount.com
+  ol_gcp:projects:
+  - project_id: ocw-studio-production
+    business_unit: open-courseware   # a BusinessUnit value
+    region: us-east1
+    enabled_services:
+    - drive.googleapis.com
+    - youtube.googleapis.com
+    service_accounts:
+    - account_id: ocw-studio-production
+      display_name: OCW Studio Production
+      project_roles: []
+      import_id: projects/ocw-studio-production/serviceAccounts/ocw-studio-production@ocw-studio-production.iam.gserviceaccount.com
+    api_keys:
+    - key_name: youtube-production
+      display_name: OCW Studio YouTube key
+      restrictions:
+        api_targets:
+        - service: youtube.googleapis.com
+      import_id: projects/<project-number>/locations/global/keys/<key-name>
 ```
 
 `import_id` present means "adopt what is already there"; absent means "create
 it". Adopted resources are automatically marked `protect=True` — see
 `adoption_opts` in `components/gcp/project.py` for why.
+
+For an API key, the import id is the key's API resource `name` verbatim — read
+it straight off `gcloud services api-keys list --format='value(name)'`. It is
+*not* the `uid`, which is a separate output-only field that the CLI displays
+more prominently. For Google-generated keys the two happen to carry the same
+UUID, so reading the wrong one appears to work right up until it doesn't.
 
 `restrictions` is mandatory on every API key. The component refuses an
 unrestricted one rather than accepting the estate's current default of no
@@ -91,6 +106,17 @@ in `mitol01`, impersonating `pulumi-gcp@mitol01.iam.gserviceaccount.com`. The
 provider's attribute condition is `attribute.concourse_env == 'production'`, so
 only the production Concourse `infra` worker pool can complete the exchange —
 CI and QA are refused at the provider, not merely left unbound.
+
+### Per-stack identities
+
+All three stacks share `pulumi-gcp@` by default, which means the `CI` stack
+holds `projectIamAdmin` on production projects. To make the stack boundary a
+permission boundary, create one account per tier, grant each roles only on its
+own projects, and set `ol_gcp:impersonate_service_account` in that stack. The
+federated credential impersonates the base account, which then chains to the
+tier account — so the base account needs
+`roles/iam.serviceAccountTokenCreator` on each tier account, and no second
+credential document is needed.
 
 ### Running locally
 
