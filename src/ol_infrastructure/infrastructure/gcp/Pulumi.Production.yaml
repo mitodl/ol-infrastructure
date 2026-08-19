@@ -4,18 +4,18 @@ config:
   - project_id: mitol01
     business_unit: operations
     region: us-east1
-    # Only the services with a proven consumer. mitol01 also has dataform,
-    # orgpolicy and storage-component enabled; those are left unmanaged
-    # deliberately rather than adopted for completeness, and
-    # disable_on_destroy=False means leaving them out turns nothing off.
+      # Only the services with a proven consumer. mitol01 also has dataform,
+      # orgpolicy and storage-component enabled; those are left unmanaged
+      # deliberately rather than adopted for completeness, and
+      # disable_on_destroy=False means leaving them out turns nothing off.
     enabled_services:
     - aiplatform.googleapis.com
     - generativelanguage.googleapis.com
     - googleads.googleapis.com
-    # The tier a credential serves is carried in its own name and restrictions,
-    # not in the stack it is declared from. See README.md -- splitting these
-    # across CI/QA/Production stacks would buy naming, not isolation, because
-    # every role the automation account needs is project-scoped.
+      # The tier a credential serves is carried in its own name and restrictions,
+      # not in the stack it is declared from. See README.md -- splitting these
+      # across CI/QA/Production stacks would buy naming, not isolation, because
+      # every role the automation account needs is project-scoped.
     api_keys:
     - key_name: learn-ai-production
       display_name: Learn AI Production
@@ -35,7 +35,7 @@ config:
         api_targets:
         - service: generativelanguage.googleapis.com
       import_id: projects/32631020496/locations/global/keys/c221d64a-8015-43db-8e54-10c9d87f1dcd
-    # No identified consumer. Created 2025-12-30, restricted to both AI APIs.
+        # No identified consumer. Created 2025-12-30, restricted to both AI APIs.
     - key_name: translations-experimentation
       display_name: Translations Experimentation
       restrictions:
@@ -43,3 +43,5 @@ config:
         - service: generativelanguage.googleapis.com
         - service: aiplatform.googleapis.com
       import_id: projects/32631020496/locations/global/keys/44e4eae4-247b-4c04-ae86-82b7bae0f933
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwGRkMYEkiqtkOL1cUu3weJtAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMbjOKl/yNcSE3NH/OAgEQgDuLw4Tl0f+DTV6qFsA/BXRSwJsDLRiZRVUabJWffa9XDGRcXOzB+cIkBiVmb6jcZ+rc5y3brL6PU9RtfA==
