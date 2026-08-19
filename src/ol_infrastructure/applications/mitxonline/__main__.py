@@ -1003,10 +1003,12 @@ uai_b2c_redirect_vcl = "\n".join(
 
 # Course and program product pages redirect 1:1 to their MIT Learn counterparts.
 # Matches only the top-level /courses/{readable_id} and /programs/{readable_id}
-# routes (no sub-paths exist under them today - CourseProgramChildPage.serve()
-# 404s unconditionally, so certificate/flexible-pricing child pages are never
-# directly routable). Uses a distinct error code (603) from the UAI B2C
-# redirects (602) above so this is fully additive.
+# routes. Reachable child pages do exist under some of these (e.g. flexible-
+# pricing request forms), but this rule intentionally matches only a single
+# path segment after the prefix, leaving those untouched - not because they're
+# unreachable, but because redirecting them isn't in scope yet. Uses a distinct
+# error code (603) from the UAI B2C redirects (602) above so this is fully
+# additive.
 course_program_redirect_vcl = "\n".join(
     f'if (req.url.path ~ "^/{prefix}/([^/]+)/?$") {{\n'
     f'  set req.http.x-redir-location = "https://{learn_frontend_domain}/{prefix}/" re.group.1;\n'
