@@ -993,11 +993,12 @@ uai_b2c_redirects: dict[str, str] = {
     "/courses/course-v1:UAI_SOURCE+UAI.HAIM.1/": f"https://{learn_frontend_domain}/courses/course-v1:UAI_SOURCE+UAI.HAIM.1/",
 }
 uai_b2c_redirect_vcl = "\n".join(
-    f'if (req.url.path == "{path}") {{\n'
+    f'if (req.url.path == "{path}" || req.url.path == "{path_without_slash}") {{\n'
     f'  set req.http.x-redir-location = "{target}";\n'
     f"  error 602;\n"
     f"}}"
     for path, target in uai_b2c_redirects.items()
+    for path_without_slash in [path.removesuffix("/")]
 )
 
 # Course and program product pages redirect 1:1 to their MIT Learn counterparts.
