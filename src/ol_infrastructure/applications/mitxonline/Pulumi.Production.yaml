@@ -58,7 +58,7 @@ config:
     OPENEDX_STUDIO_API_BASE_URL: "https://studio.courses.learn.mit.edu"
     OPENTELEMETRY_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces"
     OPENTELEMETRY_SERVICE_NAME: "mitxonline-webapp"
-    OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=production,service.namespace=mitxonline,service.instance.id=$(KUBERNETES_POD_NAME)"
+    OTEL_RESOURCE_ATTRIBUTES: "service.namespace=mitxonline,service.instance.id=$(KUBERNETES_POD_NAME)"
     OTEL_TRACES_SAMPLER: "parentbased_traceidratio"
     OTEL_TRACES_SAMPLER_ARG: "0.25"
     OTEL_PROPAGATORS: "tracecontext,baggage"
