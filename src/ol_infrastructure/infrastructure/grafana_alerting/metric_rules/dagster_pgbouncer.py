@@ -108,6 +108,28 @@ _MAXWAIT_SECONDS = 5
 # only DagsterDatabaseConnectionFailures in log_rules/dagster_database.py spans
 # all of it, because it matches Dagster's retry wrapper rather than any one error.
 # Treat this rule as the leading indicator for one failure mode, not as coverage.
+#
+# INVALIDATED by the pool_mode session -> transaction switch (__main__.py).
+# Everything above was measured and reasoned about under session mode, where
+# server_assignments_total increments once per client connect and therefore
+# tracks client-side socket churn. Under transaction mode PgBouncer assigns a
+# backend per transaction, not per client session, and every storage here runs
+# AUTOCOMMIT -- so this counter now increments roughly once per query, and its
+# rate becomes query throughput, not connection churn. Dagster's steady-state
+# query rate was never measured against this threshold because it was never the
+# quantity being watched, so 50/s is not known to be safe and is likely to fire
+# on ordinary load rather than the reconnect-storm failure mode this rule was
+# built for.
+#
+# No severity label below: routes to `oblivion` in alertmanager.py's route
+# tree (same mechanism documented at length in apisix_edge.py), so the rule
+# keeps evaluating and recording into grafanacloud-alert-state-history with
+# zero paging risk while a real post-transaction-mode threshold gets derived
+# from that history. Promote by adding labels={"severity": ...} once it does.
+# The failure mode this rule exists to catch -- a Dagster storage regressing
+# to a non-pooling connection class and reconnecting per query -- is now also
+# guarded independently by dagster_instance.yaml's QueuePool requirement, so
+# there is no coverage gap while this is unlabelled.
 _SERVER_ASSIGNMENTS_PER_SECOND = 50
 
 # The same ratio as _HEADROOM_RATIO, applied per pod instead of across the pool.
@@ -160,7 +182,7 @@ def create(
                 labels={"severity": "warning"},
                 annotations={
                     "summary": "Dagster PgBouncer in cluster {{ $labels.cluster }} is holding {{ $value }} of its aggregate connection cap",
-                    "description": "PgBouncer's server connections across all replicas in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} have exceeded 75% of the aggregate max_db_connections cap. Past the cap, PgBouncer queues clients rather than opening more backends, and query_wait_timeout is 600, so a client that cannot be served within 10 minutes is disconnected and Dagster sees a connection error -- check DagsterPgBouncerClientsWaiting. Either demand has genuinely grown (raise pgbouncer_replica_count or the RDS instance class, which raises the derived cap with it) or something is holding sessions open: pool_mode is session, so a client that stays connected pins its backend for as long as it lives.",
+                    "description": "PgBouncer's server connections across all replicas in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} have exceeded 75% of the aggregate max_db_connections cap. Past the cap, PgBouncer queues clients rather than opening more backends, and query_wait_timeout is 600, so a client that cannot be served within 10 minutes is disconnected and Dagster sees a connection error -- check DagsterPgBouncerClientsWaiting. Either demand has genuinely grown (raise pgbouncer_replica_count or the RDS instance class, which raises the derived cap with it) or something is holding a transaction open far longer than the sub-millisecond baseline: pool_mode is transaction, so a backend is held only for the life of an in-flight transaction, not for as long as a client stays connected -- look for a stuck migration or a runaway query, not an idle client.",
                 },
                 datas=rd(
                     "sum by (cluster, namespace) "
@@ -180,7 +202,7 @@ def create(
                 labels={"severity": "critical"},
                 annotations={
                     "summary": "Dagster PgBouncer in cluster {{ $labels.cluster }} is holding {{ $value }} of its aggregate connection cap",
-                    "description": "PgBouncer's server connections across all replicas in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} have exceeded 75% of the aggregate max_db_connections cap. Past the cap, PgBouncer queues clients rather than opening more backends, and query_wait_timeout is 600, so a client that cannot be served within 10 minutes is disconnected and Dagster sees a connection error -- check DagsterPgBouncerClientsWaiting. Either demand has genuinely grown (raise pgbouncer_replica_count or the RDS instance class, which raises the derived cap with it) or something is holding sessions open: pool_mode is session, so a client that stays connected pins its backend for as long as it lives.",
+                    "description": "PgBouncer's server connections across all replicas in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} have exceeded 75% of the aggregate max_db_connections cap. Past the cap, PgBouncer queues clients rather than opening more backends, and query_wait_timeout is 600, so a client that cannot be served within 10 minutes is disconnected and Dagster sees a connection error -- check DagsterPgBouncerClientsWaiting. Either demand has genuinely grown (raise pgbouncer_replica_count or the RDS instance class, which raises the derived cap with it) or something is holding a transaction open far longer than the sub-millisecond baseline: pool_mode is transaction, so a backend is held only for the life of an in-flight transaction, not for as long as a client stays connected -- look for a stuck migration or a runaway query, not an idle client.",
                 },
                 datas=rd(
                     "sum by (cluster, namespace) "
@@ -289,26 +311,24 @@ def create(
                 ),
             ),
             # --- Client connection turnover ---
-            # The leading indicator for the client-side failure that
-            # log_rules/dagster_database.py alerts on after the fact. Sustained
-            # turnover at this level is the precondition for ephemeral port
-            # exhaustion in the client pod: every assignment counted here is a
-            # client connection the pool served and will shortly see closed into
-            # TIME_WAIT, and a pod has ~28,000 ports to spend against a single
-            # service address.
-            #
-            # It fires well before the client actually runs out, which is the
-            # point -- by the time the log rule fires, runs are already failing.
+            # Was the leading indicator for the client-side ephemeral-port
+            # exhaustion that log_rules/dagster_database.py alerts on after the
+            # fact. Unlabelled as of the pool_mode session -> transaction switch
+            # (__main__.py) -- see the long comment above _SERVER_ASSIGNMENTS_PER_SECOND
+            # for why server_assignments_total no longer approximates client
+            # connection churn under transaction mode, and routes to `oblivion`
+            # rather than paging until a real threshold is derived.
             alerting.RuleGroupRuleArgs(
                 name="DagsterPgBouncerConnectionChurnWarning",
                 condition="C",
                 for_="15m",
                 no_data_state="OK",
                 exec_err_state="OK",
-                labels={"severity": "warning"},
+                # No severity label: routes to `oblivion` while recalibrating.
+                labels={},
                 annotations={
-                    "summary": "Dagster PgBouncer in cluster {{ $labels.cluster }} is serving {{ $value }} new client connections per second",
-                    "description": "PgBouncer in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} is accepting new client connections fast enough that something is connecting per unit of work rather than holding a pool. This counts client connections served, not new PgBouncer-to-Postgres backends -- server_assignments_total is named for the backend it hands out, but an assignment reuses a pooled one, so do not read this as the pool opening connections against RDS. The pool itself will look healthy on every other rule in this group, because turnover and concurrency are independent and a connect-per-query client occupies one connection at a time. The cost lands on the client: a pod has roughly 28,000 ephemeral ports against a single service address, so sustained churn ends in psycopg2 'Cannot assign requested address' and failing runs, which is what DagsterDatabaseConnectionFailures reports once it is too late. Check that every Dagster storage in dagster_instance.yaml still uses a pooling connection class -- a non-pooling one reconnects on each use and produces exactly this.",
+                    "summary": "Dagster PgBouncer in cluster {{ $labels.cluster }} is recording {{ $value }} server assignments per second",
+                    "description": "server_assignments_total in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} is rising fast enough to have tripped the old session-mode client-churn threshold. Under pool_mode = transaction this counter increments roughly once per transaction rather than once per client connect, so this is currently uncalibrated and may just be query throughput -- do not page on it. Check pgbouncer_pools_client_active_connections / client_waiting_connections for the actual client-socket picture, and confirm every Dagster storage in dagster_instance.yaml still uses a pooling connection class before assuming a reconnect storm.",
                 },
                 datas=rd(
                     "sum by (cluster, namespace) "
@@ -323,10 +343,11 @@ def create(
                 for_="15m",
                 no_data_state="OK",
                 exec_err_state="KeepLast",
-                labels={"severity": "critical"},
+                # No severity label: routes to `oblivion` while recalibrating.
+                labels={},
                 annotations={
-                    "summary": "Dagster PgBouncer in cluster {{ $labels.cluster }} is serving {{ $value }} new client connections per second",
-                    "description": "PgBouncer in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} is accepting new client connections fast enough that something is connecting per unit of work rather than holding a pool. This counts client connections served, not new PgBouncer-to-Postgres backends -- server_assignments_total is named for the backend it hands out, but an assignment reuses a pooled one, so do not read this as the pool opening connections against RDS. The pool itself will look healthy on every other rule in this group, because turnover and concurrency are independent and a connect-per-query client occupies one connection at a time. The cost lands on the client: a pod has roughly 28,000 ephemeral ports against a single service address, so sustained churn ends in psycopg2 'Cannot assign requested address' and failing runs, which is what DagsterDatabaseConnectionFailures reports once it is too late. Check that every Dagster storage in dagster_instance.yaml still uses a pooling connection class -- a non-pooling one reconnects on each use and produces exactly this.",
+                    "summary": "Dagster PgBouncer in cluster {{ $labels.cluster }} is recording {{ $value }} server assignments per second",
+                    "description": "server_assignments_total in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} is rising fast enough to have tripped the old session-mode client-churn threshold. Under pool_mode = transaction this counter increments roughly once per transaction rather than once per client connect, so this is currently uncalibrated and may just be query throughput -- do not page on it. Check pgbouncer_pools_client_active_connections / client_waiting_connections for the actual client-socket picture, and confirm every Dagster storage in dagster_instance.yaml still uses a pooling connection class before assuming a reconnect storm.",
                 },
                 datas=rd(
                     "sum by (cluster, namespace) "

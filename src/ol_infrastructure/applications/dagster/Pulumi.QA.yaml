@@ -43,27 +43,44 @@ config:
   # leaves pool_size where it was.
   #
   # That split is the whole point, so do not "tidy" it back to a round 60+30.
-  # pool_size is RETAINED -- under pool_mode = session a connection QueuePool
-  # keeps is a backend pinned against RDS for as long as the process lives --
-  # while connections above pool_size are closed on return and churn like
-  # NullPool. 30+60 therefore buys the daemon the same 90-connection burst that
-  # 60+30 would, at exactly the resting footprint QA already has, which is the
-  # only version of 90 that does not make the situation below worse.
+  # pool_size is RETAINED -- at the time this was written, under pool_mode =
+  # session, a connection QueuePool keeps was a backend pinned against RDS for
+  # as long as the process lives -- while connections above pool_size are
+  # closed on return and churn like NullPool. 30+60 therefore bought the
+  # daemon the same 90-connection burst that 60+30 would, at exactly the
+  # resting footprint QA already had, which was the only version of 90 that
+  # did not make the situation below worse.
   #
-  # The situation below: on 2026-08-19 QA's PgBouncer sat pinned at its full
-  # 764-connection aggregate cap (382 on each of 2 pods) for hours, sv_idle 0,
-  # up to 46 clients queued, maxwait peaking at 543s against a
-  # query_wait_timeout of 600. CloudWatch shows DatabaseConnections flat at 768
-  # across three consecutive hours -- the same plateau signature as the
-  # 2026-08-10 Production incident, bounded here by PgBouncer rather than RDS.
+  # The situation below, as it stood under session mode: on 2026-08-19 QA's
+  # PgBouncer sat pinned at its full 764-connection aggregate cap (382 on each
+  # of 2 pods) for hours, sv_idle 0, up to 46 clients queued, maxwait peaking
+  # at 543s against a query_wait_timeout of 600. CloudWatch shows
+  # DatabaseConnections flat at 768 across three consecutive hours -- the same
+  # plateau signature as the 2026-08-10 Production incident, bounded here by
+  # PgBouncer rather than RDS.
   #
-  # Be clear about what this change does and does not do. It does not fix that.
-  # 16 long-lived processes share this ConfigMap on QA -- 1 daemon, 2
-  # webservers, 13 code-location servers -- and each retains pool_size from
-  # event_log plus 15 each from run_storage and schedule_storage. The resting
-  # demand that implies already exceeds the 764 the pool can supply, which is
-  # why it is pinned with no idle servers. Raising the burst ceiling gives the
-  # daemon somewhere to go only once there is room to burst into.
+  # Be clear about what this change did and did not do, under the pool_mode
+  # in effect when it was written. It did not fix that. 16 long-lived
+  # processes share this ConfigMap on QA -- 1 daemon, 2 webservers, 13
+  # code-location servers -- and under session mode each retained pool_size
+  # from event_log plus 15 each from run_storage and schedule_storage as
+  # pinned backends. The resting demand that implied already exceeded the 764
+  # the pool could supply, which is why it sat pinned with no idle servers.
+  # Raising the burst ceiling gave the daemon somewhere to go only once there
+  # was room to burst into.
+  #
+  # SUPERSEDED 2026-08-19: pool_mode moved from session to transaction (see
+  # dagster/__main__.py). The 30+60/90 split, and every number above it, is
+  # still the configured value and still bounds this process's concurrent
+  # transaction ceiling -- but under transaction mode an idle QueuePool
+  # connection no longer pins a backend, so the "resting demand already
+  # exceeds 764" framing above no longer describes current behavior: resting
+  # demand across all 16 processes is now close to zero backends, and 764 is
+  # consumed only by connections with a transaction actually in flight at a
+  # given instant. Revisit event_log_pool_size/max_overflow against real
+  # transaction-mode data before assuming 30+60 is still the right split --
+  # it was sized to avoid worsening session-mode pinning, a constraint that no
+  # longer applies.
   #
   # Who actually uses the event log, since "it is the daemon" is wrong and the
   # obvious fix follows from getting this right. The exhaustion log names the

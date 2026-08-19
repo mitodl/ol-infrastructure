@@ -715,7 +715,57 @@ pgbouncer_ini_template = dagster_db.db_instance.address.apply(
             "listen_addr = 0.0.0.0",
             "listen_port = 5432",
             "auth_type = any",
-            "pool_mode = session",
+            # Was session mode with no recorded rationale. Measured on QA,
+            # 2026-08-19 ~16:26Z: 782 client connections against 759 backends, a
+            # 1.03:1 ratio -- session mode was pinning one backend per client for
+            # the life of the client's connection, so PgBouncer was doing no
+            # multiplexing at all. It was a proxy with a connection limit, not a
+            # pool.
+            #
+            # The pinning is worse than "one client, one backend" here because
+            # Dagster's storages (event_log/run/schedule, see
+            # dagster_instance.yaml) each hold their own SQLAlchemy QueuePool of
+            # up to pool_size+max_overflow connections per process, and under
+            # session mode every one of those client-side pooled connections that
+            # QueuePool keeps idle-but-open stays pinned to a live RDS backend too
+            # -- 16 long-lived processes (1 daemon, 2 webservers, 13 code
+            # locations) times dozens of QueuePool connections each is most of
+            # the 1:1 ratio above, before a single run worker is counted.
+            #
+            # The standard objection -- that Dagster's Postgres event-log watcher
+            # needs LISTEN/NOTIFY, which transaction mode breaks -- does not
+            # apply to the pinned version. Checked in the deployed venv:
+            # dagster_postgres/event_log/event_log.py uses SqlPollingEventWatcher
+            # (polling, not LISTEN/NOTIFY) and ol_orchestrate's
+            # PooledPostgresEventLogStorage does not override watch(). store_event
+            # still emits NOTIFY for version-skew compatibility with old readers,
+            # but nothing LISTENs any more, and a bare NOTIFY is a single
+            # statement that is harmless inside a pooled transaction.
+            #
+            # Two things transaction mode needs from Dagster's side, both already
+            # true: isolation_level="AUTOCOMMIT" on every storage means each
+            # statement is its own transaction, so a backend is never held idle
+            # mid-transaction; and max_prepared_statements = 0 below means a
+            # driver that tried server-side prepared statements would fail loudly
+            # at prepare time rather than silently misbehave (psycopg2-binary,
+            # the pinned driver, does not use them by default, so this is a
+            # guard rail rather than a live constraint).
+            #
+            # Not yet addressed, tracked as follow-up rather than blocking this:
+            # PooledPostgresEventLogStorage.optimize_for_webserver() SETs
+            # statement_timeout on SQLAlchemy's "connect" event, which fires once
+            # per QueuePool connection rather than once per PgBouncer transaction
+            # -- in transaction mode that SET lands on whichever backend serves
+            # the first transaction and is silently absent from every other
+            # backend QueuePool's later checkouts get routed to, since
+            # server_reset_query is empty (see below).
+            #
+            # max_db_connections stays the pool's single binding ceiling
+            # regardless of pool_mode -- DagsterPgBouncerConnectionHeadroom
+            # alerts on server connections as a fraction of it, and that
+            # denominator relationship doesn't depend on how backends get
+            # reused, only on there being one number that bounds them.
+            "pool_mode = transaction",
             # Clients are cheap -- an accepted client that is waiting for a backend
             # costs a socket, not a connection to RDS -- and this number has to stay
             # well above max_db_connections or a saturated pool refuses clients
@@ -771,9 +821,22 @@ pgbouncer_ini_template = dagster_db.db_instance.address.apply(
             f"max_db_connections = {pgbouncer_max_db_connections}",
             "max_prepared_statements = 0",
             "server_connect_timeout = 15",
-            # Dagster uses NullPool with AUTOCOMMIT isolation - no session
-            # state is left between queries, so DISCARD ALL is unnecessary
-            # and adds latency + a race-condition window on each disconnect.
+            # Dagster's storages run with AUTOCOMMIT isolation (see
+            # dagster_instance.yaml) -- no multi-statement transaction is ever
+            # left open, so there is no leftover transaction state for DISCARD
+            # ALL to clean up, and skipping it avoids the latency and
+            # disconnect-race window it would otherwise add on every reset.
+            #
+            # This does NOT cover connect-time session state: the webserver's
+            # PooledPostgresEventLogStorage.optimize_for_webserver() SETs
+            # statement_timeout via a SQLAlchemy "connect" event, which under
+            # session mode landed once on a backend pinned to that client for
+            # good, but under transaction mode only applies to whichever
+            # backend served that QueuePool connection's first transaction --
+            # every later transaction on the same client socket can land on a
+            # different, unSET backend, and an empty reset query does nothing
+            # to fix that because there is nothing PgBouncer knows to reset.
+            # Tracked as follow-up rather than blocking this change.
             "server_reset_query =",
             # PgBouncer 1.25 defaults server_check_query to empty (disabled).
             # Re-enable it so PgBouncer verifies server connections are alive
