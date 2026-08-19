@@ -463,24 +463,33 @@ class OLApisixSharedPluginsConfig(BaseModel):
     # that enabling it on one application does not change the behaviour of the
     # other services that share this component.  Limits are enforced per APISIX
     # pod (node-local shared memory), so the effective ceiling scales with the
-    # gateway replica count; this is intended to throttle single-source floods,
-    # not to replace edge/volumetric protection.
+    # gateway replica count -- at 11 replicas a single IP spread across pods gets
+    # roughly 11x the per-pod rate before it is throttled.  This is intended to
+    # blunt single-source floods, not to replace edge/volumetric protection; a
+    # hard cluster-wide cap would mean limit-count with a redis policy, since
+    # limit-req and limit-conn have no shared backend.
     enable_rate_limiting: bool = False
     # Key used to bucket requests.  ``remote_addr`` resolves to the real client
     # IP because the gateway trusts Fastly's X-Forwarded-For (see trustedAddresses).
     rate_limit_key: str = "remote_addr"
     rate_limit_rejected_code: int = 429
-    # Thresholds are deliberately generous: large shared-NAT egress points (most
-    # notably the MIT campus network) collapse many legitimate users onto a single
-    # public IP, so a tight per-IP ceiling would throttle real traffic at peak.
-    # These values target single-source flood abuse, not normal aggregated load.
+    # Thresholds are ~10x the observed worst-case single browser IP.  Measured
+    # from 30d of APISIX access logs for api.learn.mit.edu: the busiest
+    # legitimate browser client sustained ~5 req/s (304 requests in its peak
+    # minute) and accumulated 16.9 request-seconds in that minute, i.e. a mean
+    # concurrency of ~0.3.  The headroom is deliberate rather than measured:
+    # the browser population is identified by header heuristics, so quieter
+    # clients are undercounted, and a large shared-NAT egress point could
+    # plausibly exceed a single user by an order of magnitude.  These values
+    # target single-source flood abuse, not normal aggregated load.
     # limit-req: leaky-bucket request rate (requests/second) plus burst slack.
-    rate_limit_requests_per_second: int = 300
-    rate_limit_burst: int = 150
-    # limit-conn: maximum concurrent in-flight requests plus burst slack.  A SPA
-    # behind shared NAT can hold many parallel XHRs open, so this stays high.
-    rate_limit_max_concurrent: int = 400
-    rate_limit_concurrent_burst: int = 200
+    rate_limit_requests_per_second: int = 50
+    rate_limit_burst: int = 25
+    # limit-conn: maximum concurrent in-flight requests plus burst slack.  Sized
+    # for an SPA page load multiplexed over HTTP/2 behind shared NAT, which can
+    # briefly hold far more requests open than the mean concurrency suggests.
+    rate_limit_max_concurrent: int = 100
+    rate_limit_concurrent_burst: int = 50
 
 
 class OLApisixSharedPlugins(ComponentResource):
