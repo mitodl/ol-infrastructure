@@ -54,9 +54,11 @@ return function(conf, ctx)
     core.log.warn("non-canonical origin scheme=", ngx.var.scheme,
                   " host=", raw_host, " redirecting to https://", host)
 
-    -- 308 rather than the 301 the shadowed `redirect` plugin would have sent:
-    -- it preserves the method and body, so an upgraded POST stays a POST
-    -- instead of being silently downgraded to a GET.
+    -- One status for every method. The shadowed `redirect` plugin picks per
+    -- method instead -- 301 for GET/HEAD, 308 for the rest (redirect.lua
+    -- 208-215) -- so both preserve a POST and this is a simplification, not a
+    -- behavioural fix. `status` is constrained in ../apisix.py to the codes
+    -- ngx.redirect accepts; anything else raises a Lua error here.
     return ngx.redirect("https://" .. host .. ngx.var.request_uri,
                         opts.status or 308)
 end

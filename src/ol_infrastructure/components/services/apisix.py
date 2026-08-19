@@ -26,6 +26,10 @@ CANONICAL_HTTPS_REDIRECT_LUA = (
     Path(__file__).parent.joinpath("files", "canonical_https_redirect.lua").read_text()
 )
 
+# The only statuses ngx.redirect accepts; anything else is a Lua error at
+# request time (ngx_http_lua_control.c:209-219).
+NGX_REDIRECT_STATUSES = (301, 302, 303, 307, 308)
+
 
 class OLApisixPluginConfig(BaseModel):
     """Configuration for a single APISIX plugin instance.
@@ -121,7 +125,7 @@ def oidc_gateway_pre_function_plugin(
     guard_max_age: int = 60,
     *,
     canonical_https_redirect: bool = True,
-    canonical_redirect_status: int = 308,
+    canonical_redirect_status: Literal[301, 302, 303, 307, 308] = 308,
 ) -> OLApisixPluginConfig:
     """Everything that has to happen before openid-connect sees the request.
 
@@ -217,13 +221,29 @@ def oidc_gateway_pre_function_plugin(
     :param canonical_https_redirect: Whether to send non-canonical origins to
         ``https://<bare host>`` before openid-connect runs.  ``False`` drops the
         function entirely, for a host that must keep answering on plain HTTP.
-    :param canonical_redirect_status: Status for that redirect.  308 preserves
-        the method and body; 301 is what APISIX's own ``redirect`` plugin would
-        have sent, at the cost of turning an upgraded POST into a GET.
+    :param canonical_redirect_status: Status for that redirect, uniform across
+        methods.  APISIX's own ``redirect`` plugin instead picks per method --
+        301 for GET/HEAD, 308 for everything else (``redirect.lua`` 208-215) --
+        so 308 here is a simplification rather than a behavioural fix: both
+        preserve a POST.  Restricted to the codes ``ngx.redirect`` accepts.
 
     :returns: A ``serverless-pre-function`` plugin config to attach to routes.
     :rtype: OLApisixPluginConfig
     """
+    # Checked rather than left to the annotation: the `Literal` above documents
+    # the contract but nothing enforces it at the call sites, since this repo's
+    # mypy hook runs without the project installed and resolves a cross-module
+    # import to Any.  APISIX will not catch it either -- the block this travels
+    # in is not part of serverless-pre-function's schema -- so an unchecked bad
+    # value would first surface as a 500 on live traffic.  Raising here moves
+    # that to `pulumi preview`.
+    if canonical_redirect_status not in NGX_REDIRECT_STATUSES:
+        msg = (
+            f"canonical_redirect_status must be one of {NGX_REDIRECT_STATUSES}, "
+            f"got {canonical_redirect_status}: ngx.redirect rejects anything else."
+        )
+        raise ValueError(msg)
+
     # Order matters and is load-bearing: serverless/init.lua stops at the first
     # function returning a code, so the origin has to be canonical before the
     # recovery function decides whether to redirect back into the login flow.

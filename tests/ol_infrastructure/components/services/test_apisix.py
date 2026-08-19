@@ -436,6 +436,24 @@ def test_canonical_redirect_status_reaches_the_config_block():
     assert config["canonical_https_redirect"]["status"] == 301
 
 
+@pytest.mark.parametrize("status", [301, 302, 303, 307, 308])
+def test_every_status_ngx_redirect_accepts_is_allowed(status):
+    config = oidc_gateway_pre_function_plugin(canonical_redirect_status=status).config
+
+    assert config["canonical_https_redirect"]["status"] == status
+
+
+@pytest.mark.parametrize("status", [200, 304, 305, 418, 500])
+def test_a_status_ngx_redirect_rejects_fails_at_preview(status):
+    """ngx.redirect raises a Lua error outside {301,302,303,307,308}, and the
+    config block carrying this is not in serverless-pre-function's schema, so
+    APISIX would not reject it either -- an unchecked value would first surface
+    as a 500 on live traffic.  This has to fail while the stack is being built.
+    """
+    with pytest.raises(ValueError, match=r"ngx\.redirect rejects anything else"):
+        oidc_gateway_pre_function_plugin(canonical_redirect_status=status)
+
+
 def test_canonical_redirect_can_be_disabled():
     """A host that must keep answering on plain HTTP drops the function without
     losing the error-callback recovery it necessarily shares a plugin with.
