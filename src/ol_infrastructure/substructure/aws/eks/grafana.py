@@ -373,6 +373,36 @@ def setup_grafana(
                                     },
                                 },
                             },
+                            # Traefik's tracing.otlp exporter (see traefik.py)
+                            # runs with traceVerbosity: detailed on the
+                            # websecure entrypoint, which spans every internal
+                            # middleware Traefik invokes per request --
+                            # including the "Metrics" middleware, which does
+                            # no request-handling work of its own -- it only
+                            # records Prometheus counters/histograms. That
+                            # made "Metrics" Traefik's single highest-volume
+                            # span, ahead of real GET/POST traffic, with no
+                            # server.address or other diagnostic value
+                            # (confirmed via Tempo:
+                            # entry_point is exclusively "websecure" on these
+                            # spans -- they are not the separate :9100
+                            # Prometheus-scrape entrypoint, which carries zero
+                            # trace volume).
+                            #
+                            # Traefik has no per-middleware trace toggle --
+                            # traceVerbosity is all-or-nothing for internal
+                            # middlewares -- so the span has to be dropped
+                            # downstream instead. Traefik's own Prometheus
+                            # metrics (what this middleware actually produces)
+                            # are unaffected; only the trace span is dropped.
+                            "filters": {
+                                "enabled": True,
+                                "traces": {
+                                    "span": [
+                                        'resource.attributes["service.name"] == "traefik" and name == "Metrics"',
+                                    ],
+                                },
+                            },
                         },
                     },
                 },
