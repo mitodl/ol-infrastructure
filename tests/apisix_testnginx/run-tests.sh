@@ -43,4 +43,4 @@ until etcdctl --endpoints=http://127.0.0.1:2379 endpoint health >/dev/null 2>&1 
 done
 
 cd "${APISIX_HOME}"
-exec prove -v "$@" t/oidc_error_callback_recovery.t
+exec prove -v "$@" t/oidc_error_callback_recovery.t t/canonical_https_redirect.t

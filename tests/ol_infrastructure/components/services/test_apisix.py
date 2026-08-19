@@ -52,7 +52,7 @@ from ol_infrastructure.components.services.apisix import (  # noqa: E402
     OLApisixSharedPluginsConfig,
     OLApisixUpstream,
     OLApisixUpstreamConfig,
-    oidc_error_callback_recovery_plugin,
+    oidc_gateway_pre_function_plugin,
     stale_session_cookie_cleanup_plugin,
 )
 
@@ -353,7 +353,7 @@ def test_cleanup_plugin_honours_a_custom_stale_name():
 
 def test_recovery_plugin_runs_in_rewrite_before_openid_connect():
     """openid-connect runs in rewrite; the access phase would be too late."""
-    plugin = oidc_error_callback_recovery_plugin()
+    plugin = oidc_gateway_pre_function_plugin()
 
     assert plugin.name == "serverless-pre-function"
     assert plugin.config["phase"] == "rewrite"
@@ -363,13 +363,13 @@ def test_recovery_plugin_defaults_to_the_only_error_production_emits():
     """access_denied means the user pressed Cancel -- restarting the flow there
     would bounce the browser between the gateway and Keycloak.
     """
-    options = oidc_error_callback_recovery_plugin().config["oidc_error_recovery"]
+    options = oidc_gateway_pre_function_plugin().config["oidc_error_recovery"]
 
     assert options["recoverable_errors"] == ["temporarily_unavailable"]
 
 
 def test_recovery_plugin_honours_a_custom_error_list():
-    options = oidc_error_callback_recovery_plugin(
+    options = oidc_gateway_pre_function_plugin(
         recoverable_errors=["temporarily_unavailable", "server_error"],
     ).config["oidc_error_recovery"]
 
@@ -380,7 +380,7 @@ def test_recovery_plugin_honours_an_explicit_empty_error_list():
     """An empty list means "recover nothing" -- the way to make the plugin a
     no-op without detaching it from every route on a shared config.
     """
-    options = oidc_error_callback_recovery_plugin(
+    options = oidc_gateway_pre_function_plugin(
         recoverable_errors=[],
     ).config["oidc_error_recovery"]
 
@@ -391,7 +391,7 @@ def test_recovery_plugin_passes_guard_settings_as_config():
     """Tunables travel on the plugin config and are read off ``conf`` in Lua,
     so nothing is interpolated into the shipped source.
     """
-    options = oidc_error_callback_recovery_plugin(
+    options = oidc_gateway_pre_function_plugin(
         guard_cookie_name="custom_guard",
         guard_max_age=90,
     ).config["oidc_error_recovery"]
@@ -400,18 +400,57 @@ def test_recovery_plugin_passes_guard_settings_as_config():
     assert options["guard_max_age"] == 90
 
 
-def test_recovery_plugin_ships_the_lua_file_verbatim():
-    """The function body is the checked-in .lua file, not a generated string --
-    no configuration is interpolated into it.
+def test_recovery_plugin_ships_the_lua_files_verbatim():
+    """The function bodies are the checked-in .lua files, not generated strings --
+    no configuration is interpolated into either.
     """
-    (source,) = oidc_error_callback_recovery_plugin(
+    sources = oidc_gateway_pre_function_plugin(
         guard_cookie_name="custom_guard",
         recoverable_errors=["server_error"],
+        canonical_redirect_status=301,
     ).config["functions"]
 
-    assert source == apisix_module.OIDC_ERROR_RECOVERY_LUA
-    assert "custom_guard" not in source
-    assert "server_error" not in source
+    assert sources == [
+        apisix_module.CANONICAL_HTTPS_REDIRECT_LUA,
+        apisix_module.OIDC_ERROR_RECOVERY_LUA,
+    ]
+    for source in sources:
+        assert "custom_guard" not in source
+        assert "server_error" not in source
+
+
+def test_canonical_redirect_runs_before_error_recovery():
+    """serverless/init.lua stops at the first function returning a code, so the
+    origin has to be canonical before the recovery function can redirect back
+    into a login flow -- otherwise recovery would target an http:// origin.
+    """
+    sources = oidc_gateway_pre_function_plugin().config["functions"]
+
+    assert "canonical_https_redirect" in sources[0]
+    assert "oidc_error_recovery" in sources[1]
+
+
+def test_canonical_redirect_status_reaches_the_config_block():
+    config = oidc_gateway_pre_function_plugin(canonical_redirect_status=301).config
+
+    assert config["canonical_https_redirect"]["status"] == 301
+
+
+def test_canonical_redirect_can_be_disabled():
+    """A host that must keep answering on plain HTTP drops the function without
+    losing the error-callback recovery it necessarily shares a plugin with.
+    """
+    config = oidc_gateway_pre_function_plugin(canonical_https_redirect=False).config
+
+    assert config["functions"] == [apisix_module.OIDC_ERROR_RECOVERY_LUA]
+
+
+def test_canonical_redirect_lua_reads_its_settings_off_conf():
+    """Guards the contract between the .lua file and the config block above."""
+    source = apisix_module.CANONICAL_HTTPS_REDIRECT_LUA
+
+    assert "conf.canonical_https_redirect" in source
+    assert "opts.status" in source
 
 
 def test_recovery_lua_reads_its_settings_off_conf():
@@ -573,7 +612,7 @@ def test_recovery_plugin_renders_into_the_v2_plugin_config():
     """
     plugins = shared_plugins(
         "test-shared-plugins-oidc-recovery-v2",
-        plugins=[oidc_error_callback_recovery_plugin()],
+        plugins=[oidc_gateway_pre_function_plugin()],
     )
 
     def check(spec):
@@ -602,7 +641,7 @@ def test_recovery_plugin_reaches_the_gateway_api_plugin_config():
     """
     plugins = shared_plugins(
         "test-shared-plugins-oidc-recovery-gateway-api",
-        plugins=[oidc_error_callback_recovery_plugin()],
+        plugins=[oidc_gateway_pre_function_plugin()],
     )
 
     def check(spec):

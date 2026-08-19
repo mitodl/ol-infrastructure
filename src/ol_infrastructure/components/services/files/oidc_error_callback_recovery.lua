@@ -15,7 +15,7 @@
 --   oidc_error_recovery.guard_cookie_name   loop-breaker cookie name
 --   oidc_error_recovery.guard_max_age       guard cookie lifetime, seconds
 --
--- See `oidc_error_callback_recovery_plugin` in ../apisix.py for why each branch
+-- See `oidc_gateway_pre_function_plugin` in ../apisix.py for why each branch
 -- is here, and t/oidc_error_callback_recovery.t for the behavioural tests.
 return function(conf, ctx)
     local uri = ngx.var.uri

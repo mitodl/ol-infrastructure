@@ -50,7 +50,7 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
-    oidc_error_callback_recovery_plugin,
+    oidc_gateway_pre_function_plugin,
     stale_session_cookie_cleanup_plugin,
 )
 from ol_infrastructure.components.services.cert_manager import (
@@ -803,8 +803,10 @@ mitxonline_shared_plugins = OLApisixSharedPlugins(
             # cleanup below, this is safe to attach here rather than per route
             # group: it derives its redirect target from the request URI and
             # its guard cookie is host-only, so neither depends on which parent
-            # domain a group's session cookie was scoped to.
-            oidc_error_callback_recovery_plugin(),
+            # domain a group's session cookie was scoped to.  Ditto the
+            # canonical-origin redirect it also carries, which is derived from
+            # the request's own host.
+            oidc_gateway_pre_function_plugin(),
         ],
     ),
 )
