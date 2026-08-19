@@ -250,7 +250,7 @@ def create_mitlearn_k8s_secrets(
             # Keycloak Admin API service account, provisioned by the keycloak
             # substructure stack (olapps.py, mitlearn-admin-client).
             "base_name": "secret-ops-keycloak-admin-learn",
-            "path": "sso/mitlearn/admin",
+            "path": "sso/mitlearn-admin",
             "templates": {
                 "MITOL_KEYCLOAK_ADMIN_CLIENT_ID": '{{ get .Secrets "client_id" }}',
                 "MITOL_KEYCLOAK_ADMIN_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',

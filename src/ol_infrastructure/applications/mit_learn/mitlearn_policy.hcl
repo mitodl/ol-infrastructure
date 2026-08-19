@@ -18,6 +18,11 @@ path "secret-operations/sso/mitlearn/*" {
 path "secret-operations/sso/mitlearn" {
   capabilities = ["read"]
 }
+# Sibling of sso/mitlearn, not a child, so the glob above does not cover it.
+# Holds the mitlearn-admin-client service account used for the Keycloak Admin API.
+path "secret-operations/sso/mitlearn-admin" {
+  capabilities = ["read"]
+}
 
 path "secret-operations/global/embedly" {
   capabilities = ["read"]
