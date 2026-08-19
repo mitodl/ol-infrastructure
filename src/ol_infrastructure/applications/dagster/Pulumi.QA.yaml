@@ -65,10 +65,30 @@ config:
   # why it is pinned with no idle servers. Raising the burst ceiling gives the
   # daemon somewhere to go only once there is room to burst into.
   #
+  # Who actually uses the event log, since "it is the daemon" is wrong and the
+  # obvious fix follows from getting this right. The exhaustion log names the
+  # pool's own dimensions, and the three storages differ (event_log 30+15, run
+  # and schedule 15+15), so it says which pool ran out. Over 6h on QA:
+  #     learning-resources code server   93
+  #     daemon                           52
+  #     edxorg code server                5
+  # Code servers do read and write the event log -- sensor and schedule
+  # evaluation runs in the user-code process, and asset sensors and automation
+  # conditions resolve asset state out of event log storage -- and the busiest
+  # location outweighs the daemon. Production shows the same shape. Two further
+  # results from the same query: nothing anywhere exhausts run or schedule
+  # storage (zero hits for "size 15 overflow 15"), so those two are correctly
+  # sized and not part of this; and only 2 of the 13 locations show any
+  # pressure at all.
+  #
   # What would actually create that room, in rough order of cost:
-  #   - stop giving 13 code-location servers a daemon-sized event_log pool;
-  #     1 x 90 + 2 x 45 + 13 x 15 = 375 fits comfortably, but needs
-  #     per-process-type config that does not exist yet
+  #   - size the event_log pool per process by measured usage rather than
+  #     giving all 16 the same number. NOT daemon-vs-code-location -- that
+  #     split starves learning-resources, which needs daemon-sized headroom in
+  #     its own right -- but busy-vs-idle: roughly daemon 90 +
+  #     learning-resources 90 + edxorg 45 + 2 webservers 45 + 11 quiet
+  #     locations 15 = ~480, well inside 764. Needs per-process-type config
+  #     that does not exist yet
   #   - db.m7g.large -> db.m7g.xlarge: the only genuine capacity increase,
   #     roughly 1660 real connections against today's measured 832
   #   - pgbouncer_replica_count 2 -> 1: adds nothing (the cap is budget /
