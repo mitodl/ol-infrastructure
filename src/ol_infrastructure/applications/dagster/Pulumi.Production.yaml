@@ -40,9 +40,19 @@ config:
   # automation_condition_evaluator load. See the full derivation, including
   # the per-pod PgBouncer math this is checked against, in
   # dagster_instance.yaml's event_log_storage comment. QA sets its own, smaller
-  # value (45, see Pulumi.QA.yaml): it turned out to have the same failure and
+  # value (90, see Pulumi.QA.yaml): it turned out to have the same failure and
   # to have been logging it continuously, but its per-pod cap is 382 against
   # this stack's 708 and a prior run-worker incident deadlocked its whole pool,
   # so it gets a sizing pass of its own rather than this number.
+  #
+  # KNOWN DIVERGENCE from the house rule in dagster_instance.yaml, which is to
+  # prefer a small guaranteed pool_size and a large burst max_overflow. 100+50
+  # is the opposite weighting: it reserves 100 connections per process at rest
+  # where 50+100 would ceiling identically at 150 and reserve half as many.
+  # Left alone deliberately rather than re-tuned speculatively -- this number
+  # was set during incident remediation, production is healthy on it, and its
+  # 4248-connection aggregate cap is not under the pressure QA's 764 is. When
+  # it is next touched, re-derive pool_size from measured steady-state
+  # concurrency and put the rest in overflow.
   dagster:event_log_pool_size: 100
   dagster:event_log_max_overflow: 50
