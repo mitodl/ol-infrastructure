@@ -26,8 +26,7 @@ def test_pod_identity_vars_come_first():
     env_vars = build_application_env_vars(
         {
             "OTEL_RESOURCE_ATTRIBUTES": (
-                "deployment.environment=production,"
-                "service.instance.id=$(KUBERNETES_POD_NAME)"
+                "service.namespace=learn,service.instance.id=$(KUBERNETES_POD_NAME)"
             ),
         }
     )
