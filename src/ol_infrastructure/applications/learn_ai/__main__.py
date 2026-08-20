@@ -30,6 +30,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_REDIS_PORT,
     DEFAULT_WSGI_PORT,
     ONE_MEGABYTE_BYTE,
+    STATIC_ASSET_MAX_AGE_SECONDS,
 )
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
@@ -809,12 +810,23 @@ learn_ai_app_k8s = OLApplicationK8s(
             application_module="main.asgi:application",
             nginx_config_filename="web.conf",  # learn_ai shares one nginx config for all server types
             enable_metrics=True,
+            # Serve /static/* from Granian's Rust layer instead of the sidecar
+            # (docs/plans/remove-nginx-sidecar.md, stage 4), matching the
+            # STATIC_ROOT/STATIC_URL precedent from ocw_studio/xpro. Only
+            # meaningful when the sidecar is actually dropped below, i.e. in
+            # the use_granian branch.
+            static_path_mounts=["/src/staticfiles"],
+            static_path_expires=STATIC_ASSET_MAX_AGE_SECONDS,
         )
         if learn_ai_config.get_bool("use_granian")
         else None,
         slack_channel=slack_channel,
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
-        import_nginx_config=True,
+        # The sidecar is only redundant once Granian is actually serving the
+        # app (static_path_mounts above); the use_granian=False branch still
+        # runs bare uvicorn with no static handling of its own, so it keeps
+        # the sidecar. See docs/plans/remove-nginx-sidecar.md.
+        import_nginx_config=not learn_ai_config.get_bool("use_granian"),
         # Nginx resources (defaults from component are fine)
         # App container resources
         resource_requests={"cpu": "100m", "memory": "1000Mi"},
@@ -1271,6 +1283,32 @@ learn_ai_https_apisix_route = OLApisixRoute(
             backend_service_name=learn_ai_app_k8s.application_lb_service_name,
             backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",
+        ),
+        # The sidecar answered this with a 204 (EFF Do Not Track convention
+        # for "no policy published"). "passauth" above would otherwise proxy
+        # it through to Django, which has no view for it -- kept as a mock so
+        # a crawled path doesn't burn a Granian blocking thread on a 404. See
+        # docs/plans/remove-nginx-sidecar.md.
+        OLApisixRouteConfig(
+            route_name="dnt-policy",
+            priority=10,
+            hosts=[learn_ai_api_domain],
+            paths=["/.well-known/dnt-policy.txt"],
+            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
+            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
+            backend_resolve_granularity="service",
+            plugins=[
+                OLApisixPluginConfig(
+                    name="mocking",
+                    secretRef=None,
+                    config={
+                        "response_status": 204,
+                        "response_example": "",
+                        "content_type": "text/plain",
+                        "with_mock_header": False,
+                    },
+                ),
+            ],
         ),
     ],
     opts=ResourceOptions(

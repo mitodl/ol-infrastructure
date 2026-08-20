@@ -20,8 +20,8 @@ precedent this plan generalizes.
 | ~~odl_video_service~~ | *nothing* | — | — | passthrough | 500M | 5 YouTube redirects |
 | ~~ocw_studio~~ | `/src/staticfiles` | — | yes | passthrough | 25M | |
 | ~~xpro~~ | `/src/staticfiles` | — | yes | passthrough | 25M | |
-| micromasters | `$uri`, `/src/staticfiles` | — | yes | passthrough | 25M | |
-| learn_ai | `$uri`, `/src/staticfiles` | — | — | *unset* | — | `proxy_buffering off` |
+| ~~micromasters~~ | `$uri`, `/src/staticfiles` | — | yes | passthrough | 25M | |
+| ~~learn_ai~~ | `$uri`, `/src/staticfiles` | — | — | *unset* | — | `proxy_buffering off` |
 | mitxonline | `$uri`, `/src/staticfiles` | — | yes | **`$scheme`** | 25M | |
 | mit_learn | `$uri`, `/src/staticfiles` | `/src/django_media` | — | **`$scheme`** | 25M | gzip on JSON |
 
@@ -97,11 +97,18 @@ ocw-studio image) exposes `--static-path-mount` (repeatable),
 4. **No CORS header on Granian-served static.** Confirmed: Granian sets no CORS
    header at all. Apps with a shared plugin config get one from APISix; the rest
    need an explicit `/static/*` route. Verify per app rather than assume.
-5. **Two-directory fallback unverified.** Five configs do
-   `try_files $uri $uri/ /staticfiles/$1`, i.e. `/src/<uri>` *then*
-   `/src/staticfiles/<uri>`. Whether two Granian mounts on the same route fall
-   through to the second on a miss is not documented and needs a live test.
-   *Still open — gates micromasters, learn_ai, mitxonline, mit_learn.*
+5. ~~**Two-directory fallback unverified.**~~ **Closed — no fallthrough, and it
+   doesn't matter.** Five configs do `try_files $uri $uri/ /staticfiles/$1`,
+   i.e. `/src/<uri>` *then* `/src/staticfiles/<uri>`. Read granian v2.7.4's
+   source directly: `_init_static_mounts` (`granian/server/common.py`)
+   requires one `--static-path-route` per `--static-path-mount`, so multiple
+   mounts on one shared route isn't even configurable, and
+   `match_static_file` (`src/files.rs`) returns on the first matching
+   mount's `NotFound` rather than trying the next one, so there is no
+   miss-and-fall-through primitive to reach for even with distinct routes.
+   Moot for every app that gates on it: the fallback's first tier only ever
+   mattered before `collectstatic` ran, and every K8s deployment here runs it
+   via an init container before the app container starts. See stage 4 below.
 
 `/.well-known/dnt-policy.txt → 204` needs one APISix route per app. Kept rather
 than dropped: it costs one `mocking` plugin and keeps a crawled path off the
@@ -258,12 +265,94 @@ container drops the nginx sidecar, picks up `--static-path-mount
 /src/staticfiles --static-path-expires 315360000`, and the Service/probe ports
 move 8071 → 8073, all consistent with the ocw_studio precedent.
 
+## Stage 4: micromasters, learn_ai
+
+Done — see the accompanying commit. This is the pair gated on gap 5, now closed.
+
+### Gap 5, resolved: no fallthrough, and it doesn't matter
+
+Cloned `granian` at v2.7.4 (the version pinned in these images) to read the
+static-serving implementation directly rather than continue treating this as
+untested. Two things settle it:
+
+- `granian/server/common.py::_init_static_mounts` requires
+  `len(paths) == len(routes)` whenever more than one `--static-path-mount` is
+  given, and raises `ConfigurationError('static_path')` otherwise. There is no
+  way to register two mounts against the same route at all — the CLI has no
+  notion of a priority-ordered list for one path. `GranianConfig.static_path_mounts`
+  as it exists today would crash the server outright if given two entries with
+  no matching `--static-path-route` per entry.
+- Even granting two mounts on two literal routes, `src/files.rs::match_static_file`
+  does not chain on a miss: for the first mount whose prefix matches the
+  request, a `NotFound` on that mount's directory returns immediately
+  (`return Some(Err(err.into()))`), before the loop ever reaches a second
+  entry. nginx's `try_files $uri $uri/ /staticfiles/$1 ...` semantics — try
+  one directory, fall back to another on 404 — have no Granian equivalent.
+
+So the two-directory fallback nginx did (`root /src`, first try `/src/static/<path>`,
+then `/src/staticfiles/<path>`) can't be reproduced. It doesn't need to be:
+both apps run `init_collectstatic=True`, which populates `/src/staticfiles`
+from an init container before the app container ever starts, so in this
+deployment the first tier (`/src/static/<path>`, the pre-collectstatic source
+tree) is dead code — it only mattered in the Heroku/local-dev path these nginx
+configs were written for (learn_ai's `web.conf` says as much in its own header
+comment), where nothing guaranteed collectstatic had run first. A single
+`static_path_mounts=["/src/staticfiles"]`, the same shape as ocw_studio/xpro,
+is behaviorally equivalent in production.
+
+- micromasters (`OLApisixRoute`, no shared plugin config, has `hash.txt`):
+  `static_path_mounts=["/src/staticfiles"]`,
+  `static_path_expires=STATIC_ASSET_MAX_AGE_SECONDS`, `import_nginx_config=False`.
+  Added `static-hash`, `static` (CORS), and `dnt-policy` routes, same shape as
+  xpro. The three explicit `probe_configs` (kept for the django-health-check
+  `Host` header override, #4874) move 8071 → 8073 by hand, since an app that
+  restates `probe_configs` opts out of the component's auto-derivation.
+  `backend_service_port` on all four routes moves from the `"http"` name to
+  the numeric `DEFAULT_WSGI_PORT`, matching the odl_video_service precedent
+  for the `ApisixRoute` CRD path (not required the way it is on
+  `OLApisixHTTPRoute` — `servicePort` here resolves a k8s Service's named port
+  correctly either way — but consistent and explicit is worth it once the
+  sidecar is gone).
+- learn_ai (`OLApisixRoute`, ASGI/websocket, `enable_defaults=True` shared
+  plugin config already supplying `cors`, no `hash.txt`): `GranianConfig` and
+  `import_nginx_config` are both gated on the existing `use_granian` Pulumi
+  config flag (`true` in every deployed stack today, but the `False` branch
+  still runs bare `uvicorn` with no static handling of its own and needs to
+  keep its sidecar). No new `/static/*` route needed — `/static/*` already
+  reaches the backend through the existing wildcard routes (`passauth`,
+  `reqauth`, `websocket`), which pick up Granian's built-in static handling
+  for free, and CORS on those routes already comes from the shared plugin
+  config, unaffected by nginx either way. Added one `dnt-policy` mock route,
+  on `learn_ai_https_apisix_route` only: that resource's `/*` wildcard is the
+  only route (of the two ApisixRoute resources this app has) that
+  `/.well-known/dnt-policy.txt` ever reached — the other resource's routes
+  all require an `/ai/` prefix, so that path already 404s at the gateway
+  before touching the backend and needs no new route.
+
+One implementation note for anyone editing an existing `OLApisixRoute`'s
+`route_configs`: the whole `http` list is one field on a single
+`ApisixRoute` CustomResource, and Pulumi diffs plain list fields positionally.
+Inserting new entries *before* existing ones shows every existing entry after
+the insertion point as a spurious rename/full-field-replace in the diff (the
+applied end state is still correct — priority in the CRD spec, not list
+order, governs precedence — but the diff is unreadable). Appending new routes
+after the existing ones keeps the diff to genuine additions plus whatever
+fields actually changed.
+
+`pulumi preview --stack CI --diff`: micromasters is 10 updates, 1 delete (the
+`nginx-config` ConfigMap), 114 unchanged; learn_ai is 9 updates, 1 delete, 101
+unchanged. Both webapp containers drop the nginx sidecar and pick up
+`--static-path-mount /src/staticfiles --static-path-expires 315360000`;
+Service and probe ports move 8071 → 8073 on both (by hand on micromasters,
+auto-derived on learn_ai, which passes no explicit `probe_configs`).
+
 ## Rollout order
 
 1. ~~**odl_video_service**~~ — done, PR #5281.
 2. ~~**ocw_studio**~~ — done, PR #5345.
-3. ~~**xpro**~~ — done, this commit.
-4. **micromasters, learn_ai** — two-directory static fallback; gated on gap 5.
+3. ~~**xpro**~~ — done, PR #5541.
+4. ~~**micromasters, learn_ai**~~ — done, this commit. Gap 5 (two-directory
+   static fallback) closed: Granian can't reproduce it and doesn't need to.
 5. **mit_learn, mitxonline** — highest traffic, and mit_learn additionally needs
    the `/media` route (gap 1) and the JSON gzip moved to the APISix `gzip` plugin.
 
