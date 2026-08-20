@@ -230,11 +230,16 @@ Unlike ocw_studio, this is **not** confirmed to carry live content. Checked
 the [mitxpro Dockerfile](https://github.com/mitodl/mitxpro/blob/master/Dockerfile),
 [`webpack.config.prod.js`](https://github.com/mitodl/mitxpro/blob/master/webpack.config.prod.js),
 and a full repo tree search for `hash` — none of them create a `hash.txt`
-anywhere in the image. So this route is most likely already a 404 in
-production today, before and after this change, and the APISix rule is kept
-purely for behavioral parity with the nginx block rather than because
-anything is known to depend on it. Flagged for the reviewer rather than
-asserted as verified.
+anywhere in the image except
+[`bin/pre_compile`](https://github.com/mitodl/mitxpro/blob/master/bin/pre_compile),
+which does `echo $SOURCE_VERSION >$BUILD_DIR/static/hash.txt`. That script is
+a Heroku buildpack hook (`bin/compile`-syntax, `$BUILD_DIR`/`$SOURCE_VERSION`
+are buildpack API variables) — nothing in the current Dockerfile or CI
+workflows invokes it, so it is legacy and not part of the Docker image build.
+The conclusion stands: this route is most likely already a 404 in production
+today, before and after this change, and the APISix rule is kept purely for
+behavioral parity with the nginx block rather than because anything is known
+to depend on it. Flagged for the reviewer rather than asserted as verified.
 
 - `import_nginx_config=False`; deleted `files/web.conf_granian` (the actually
   loaded config — `nginx_config_filename` defaults to that name — `files/web.conf`

@@ -652,13 +652,23 @@ if k8s_deploy:
         route_configs=[
             # nginx resolved this one against `root /src` with no `try_files`
             # fallback, i.e. /src/static/hash.txt -- the source tree, not the
-            # collectstatic output. Granian's static_path_mounts serves
-            # /src/staticfiles/hash.txt instead: same content (the Dockerfile
-            # stamps $GIT_REF into both), different file.
+            # collectstatic output. Granian's static_path_mounts would instead
+            # serve /src/staticfiles/hash.txt. `bin/pre_compile` (a Heroku
+            # buildpack hook, not called anywhere in the current Docker build)
+            # is the only thing in the app repo that ever wrote this file, so
+            # it is most likely already absent and this route already 404s in
+            # production today, unaffected by this change either way. Kept for
+            # behavioral parity with the nginx block regardless.
+            #
+            # Exact, not PathPrefix (the default): this targets one file, and
+            # a prefix match would let /static/hash.txt/anything win over the
+            # /static/* rule below on longest-prefix precedence and inherit
+            # this route's Cache-Control instead.
             OLApisixHTTPRouteConfig(
                 route_name="static-hash",
                 hosts=[app_domain],
                 paths=["/static/hash.txt"],
+                path_match_type="Exact",
                 backend_service_name=xpro_k8s_app.application_lb_service_name,
                 backend_service_port=xpro_k8s_app.application_lb_service_port,
                 backend_import_nginx_config=False,
