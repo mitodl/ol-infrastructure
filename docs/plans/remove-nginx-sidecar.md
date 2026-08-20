@@ -224,9 +224,17 @@ where the nginx source and the thing Granian now serves genuinely differ:
 xpro's `hash.txt` block had no `try_files`, so nginx resolved it against
 `root /src` to `/src/static/hash.txt` — the source tree, not the collectstatic
 output. Granian's `static_path_mounts` serves `/src/staticfiles/hash.txt`
-instead. Confirmed same content (the Dockerfile stamps `$GIT_REF` into both),
-different file — not re-verified beyond that here, same as the plan's original
-note.
+instead.
+
+Unlike ocw_studio, this is **not** confirmed to carry live content. Checked
+the [mitxpro Dockerfile](https://github.com/mitodl/mitxpro/blob/master/Dockerfile),
+[`webpack.config.prod.js`](https://github.com/mitodl/mitxpro/blob/master/webpack.config.prod.js),
+and a full repo tree search for `hash` — none of them create a `hash.txt`
+anywhere in the image. So this route is most likely already a 404 in
+production today, before and after this change, and the APISix rule is kept
+purely for behavioral parity with the nginx block rather than because
+anything is known to depend on it. Flagged for the reviewer rather than
+asserted as verified.
 
 - `import_nginx_config=False`; deleted `files/web.conf_granian` (the actually
   loaded config — `nginx_config_filename` defaults to that name — `files/web.conf`
