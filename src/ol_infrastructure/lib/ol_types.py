@@ -45,7 +45,12 @@ class BusinessUnit(StrEnum):
 
 @unique
 class Environment(StrEnum):
-    """Canonical reference for valid environment names."""
+    """The AWS network a resource lives in -- the `Environment` tag.
+
+    Names a VPC and the account-level grouping around it, not a deployment
+    stage: `applications-qa` and `applications-production` are both
+    `Environment.applications`. For the stage, see `DeploymentEnvironment`.
+    """
 
     applications = "applications"
     data = "data"
@@ -54,6 +59,32 @@ class Environment(StrEnum):
     mitx_staging = "mitx-staging"
     operations = "operations"
     xpro = "xpro"
+
+
+@unique
+class DeploymentEnvironment(StrEnum):
+    """Deployment stage of a workload -- the `ol.mit.edu/environment` label.
+
+    What a change is promoted through, and what alert routing reads to decide
+    whether a failure is allowed to page. Distinct from `Environment`, which
+    names a network.
+
+    Normally this is the stack's `env_suffix` and nothing needs to say it. The
+    field exists for the workload whose stage differs from its cluster's --
+    the `mitx-staging` deployments that run in `residential-production` -- which
+    otherwise inherits `production` from the cluster and pages as production.
+
+    `rc` is the release-candidate spelling of `qa` used by ODL Video and by the
+    Pingdom checks in `grafana_alerting/pingdom_checks.py`; it is a stage, not a
+    fourth environment.
+    """
+
+    ci = "ci"
+    dev = "dev"
+    production = "production"
+    qa = "qa"
+    rc = "rc"
+    staging = "staging"
 
 
 @unique
@@ -156,6 +187,20 @@ class Application(StrEnum):
 
 
 @unique
+class AlertTier(StrEnum):
+    """How far an alert about this workload is allowed to escalate.
+
+    The workload declares its own paging eligibility, so that an alert rule
+    does not have to encode which namespaces matter. Rootly reads the tier;
+    the rule only reports what broke.
+    """
+
+    page = "page"  # wake someone: user-facing or data-integrity impact
+    notify = "notify"  # business hours: degraded, self-healing, or redundant
+    ticket = "ticket"  # record only, never notifies
+
+
+@unique
 class Component(StrEnum):
     """Functional role of a workload within its service.
 
@@ -218,6 +263,16 @@ class K8sGlobalLabels(BaseModel):
     # like data platform e.g. airbyte
     service: Services
     stack: StackInfo
+    # Optional here and required on K8sAppLabels. Most workloads label with the
+    # base class, and one that cannot name its product or its alert tier cannot
+    # be rolled up or routed on -- which is the gap this whole hierarchy exists
+    # to close.
+    product: Product | None = None
+    application: Application | None = None
+    component: Component | None = None
+    alert_tier: AlertTier | None = None
+    # Overrides the stage derived from stack.env_suffix in model_dump.
+    environment: DeploymentEnvironment | None = None
 
     @staticmethod
     def _sanitize_label_value(value: str) -> str:
@@ -243,16 +298,21 @@ class K8sGlobalLabels(BaseModel):
                 value = self._sanitize_label_value(value)
             new_dict[f"ol.mit.edu/{key}"] = value
         new_dict["ol.mit.edu/stack"] = self._sanitize_label_value(self.stack.k8s_name)
-        new_dict["ol.mit.edu/environment"] = self.stack.env_suffix
+        new_dict["ol.mit.edu/environment"] = self.environment or self.stack.env_suffix
         return new_dict
 
 
 class K8sAppLabels(K8sGlobalLabels):
+    """Labels for a workload that is part of a deployed application.
+
+    Narrows the base class rather than extending it: product, application and
+    source_repository are required here.
+    """
+
     product: Product
     application: Application
-    component: Component | None = None
-    pod_security_group: str | None = None
     source_repository: str
+    pod_security_group: str | None = None
     commit_sha: str | None = None
     release_tag: str | None = None
 

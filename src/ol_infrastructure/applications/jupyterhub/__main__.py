@@ -24,7 +24,7 @@ from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
     BusinessUnit,
-    K8sGlobalLabels,
+    K8sAppLabels,
     Product,
     Services,
 )
@@ -60,7 +60,7 @@ aws_config = AWSBase(
 )
 
 # Kubernetes labels
-k8s_global_labels = K8sGlobalLabels(
+k8s_global_labels = K8sAppLabels(
     application=Application.jupyterhub,
     product=Product.mitlearn,
     service=Services.jupyterhub,
