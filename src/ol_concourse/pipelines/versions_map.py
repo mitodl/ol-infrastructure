@@ -136,6 +136,7 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
     "infrastructure/aws/s3_sites/": [],
     "infrastructure/aws/sftp_servers/": [],
     "infrastructure/consul/": [],
+    "infrastructure/gcp/": [],
     "infrastructure/grafana_alerting/": [],
     "infrastructure/grafana_cloud/": [],
     "infrastructure/mongodb_atlas/": [],

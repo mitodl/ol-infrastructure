@@ -154,6 +154,7 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     # userdata, so it is content-bearing here (unlike the provider-auth reads in
     # substructure/consul and applications/concourse via lib.consul).
     "infrastructure/consul/": ["pulumi/consul.*.yaml", "vector/"],
+    "infrastructure/gcp/": ["gcp/"],
     "infrastructure/grafana_alerting/": ["grafana_cloud/"],
     "infrastructure/grafana_cloud/": [],
     "infrastructure/mongodb_atlas/": [],

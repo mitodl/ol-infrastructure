@@ -1,0 +1,7 @@
+---
+name: ol-infrastructure-gcp
+runtime: python
+description: Management of Google Cloud Platform projects, credentials and enabled
+  APIs
+backend:
+  url: s3://mitol-pulumi-state/
