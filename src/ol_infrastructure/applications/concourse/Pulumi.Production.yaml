@@ -90,6 +90,7 @@ config:
     iam_policies:
     - base
     - ecr_push
+    - ocw_publish
     - operations
     - pulumi_state
     instance_type: m7a.xlarge

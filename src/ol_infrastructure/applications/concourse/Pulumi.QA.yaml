@@ -79,6 +79,7 @@ config:
     disk_size_gb: 200
     iam_policies:
     - base
+    - ocw_publish
     - operations
     - pulumi_state
     instance_type: burstable_medium
