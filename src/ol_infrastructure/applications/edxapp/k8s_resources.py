@@ -1952,6 +1952,7 @@ def create_k8s_resources(  # noqa: C901
     _autoscaling_resources = create_celery_autoscaling_resources(
         edxapp_cache=edxapp_cache,
         replicas_dict=replicas_dict,
+        cms_celery_memory_request=resources_dict["celery"]["cms"]["memory_request"],
         namespace=namespace,
         lms_celery_labels=lms_celery_labels,
         lms_high_mem_celery_labels=lms_high_mem_celery_labels,
