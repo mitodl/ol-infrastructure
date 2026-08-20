@@ -14,10 +14,9 @@ LEEK_VERSION = "0.7.7"
 MEILISEARCH_VERSION = "v1.53.1"
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
 OPEN_METADATA_VERSION = "1.13.3"
-OVS_VERSION = "v0.65.1-3-g2630021"
 # renovate: datasource=github-releases depName=traefik packageName=traefik/traefik
 TRAEFIK_VERSION = "3.7.11"
-TUTOR_PERMISSIONS_VERSION = "15.3.4"
+# renovate: datasource=docker depName=typesense packageName=typesense/typesense
 TYPESENSE_VERSION = "30.1"
 # renovate: datasource=github-releases depName=vault packageName=hashicorp/vault
 VAULT_VERSION = "2.0.4"
@@ -53,8 +52,6 @@ GATEWAY_API_VERSION = "v1.6.1"
 KARPENTER_CHART_VERSION = "1.14.0"
 # renovate: datasource=helm depName=keda packageName=keda registryUrl=https://kedacore.github.io/charts
 KEDA_CHART_VERSION = "2.17.1"
-# renovate: datasource=docker depName=kube-state-metrics packageName=registry-1.docker.io/bitnamicharts/kube-state-metrics
-KUBE_STATE_METRICS_CHART_VERSION = "5.1.0"
 # renovate: datasource=helm depName=kubewatch packageName=kubewatch registryUrl=https://robusta-charts.storage.googleapis.com
 KUBEWATCH_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=meilisearch packageName=meilisearch registryUrl=https://meilisearch.github.io/meilisearch-kubernetes
@@ -69,6 +66,11 @@ STARROCKS_CHART_VERSION = "1.11.7"
 STARROCKS_VERSION = "4.1.4"
 # renovate: datasource=github-releases depName=starrocks-vault-plugin packageName=mitodl/vault-plugin-database-starrocks
 VAULT_PLUGIN_STARROCKS_VERSION = "0.1.0"
+# Checksum of that release's `vault-plugin-database-starrocks` asset, which
+# files.download() verifies before Vault loads the plugin. No datasource can
+# derive an asset checksum from a tag, so this cannot carry a marker and must be
+# updated by hand in the same commit that moves the version above:
+#   curl -sL https://github.com/mitodl/vault-plugin-database-starrocks/releases/download/v${VERSION}/SHA256SUMS
 VAULT_PLUGIN_STARROCKS_SHA256 = "3a737897b3c37eb61cab0b6b2804bd711dde7d31b308cf325f88138c0a111955"  # pragma: allowlist secret
 # Altinity ClickHouse Operator — released as tag "release-X.Y.Z" on GitHub
 # renovate: datasource=github-releases depName=clickhouse-operator packageName=Altinity/clickhouse-operator
