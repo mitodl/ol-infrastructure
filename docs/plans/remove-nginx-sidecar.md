@@ -19,7 +19,7 @@ precedent this plan generalizes.
 |---|---|---|---|---|---|---|
 | ~~odl_video_service~~ | *nothing* | — | — | passthrough | 500M | 5 YouTube redirects |
 | ~~ocw_studio~~ | `/src/staticfiles` | — | yes | passthrough | 25M | |
-| xpro | `/src/staticfiles` | — | yes | passthrough | 25M | |
+| ~~xpro~~ | `/src/staticfiles` | — | yes | passthrough | 25M | |
 | micromasters | `$uri`, `/src/staticfiles` | — | yes | passthrough | 25M | |
 | learn_ai | `$uri`, `/src/staticfiles` | — | — | *unset* | — | `proxy_buffering off` |
 | mitxonline | `$uri`, `/src/staticfiles` | — | yes | **`$scheme`** | 25M | |
@@ -166,6 +166,25 @@ guarantee between them, so there is a short window where the route points at a
 port the Service does not yet expose. Watch for 502s during the apply rather
 than trying to engineer around it. This applies to every remaining app.
 
+### local-dev
+
+`local-dev/apps/odl-video-service/` (the only one of the seven with a Tilt
+setup at the time PR #5281 landed) still ran a hand-maintained nginx sidecar
+after that PR merged — its plain-YAML manifests are not generated from this
+Pulumi code, so nothing kept them in sync automatically. Brought into line
+here: `deployment.yaml` drops the `nginx` container and `nginx-conf` volume,
+the Granian command gains `--static-path-mount /src/staticfiles`, and the
+Service's `targetPort` now points at the app container's port directly. Its
+local nginx config also carried a `/static/` block, gzip, and a dnt-policy 204
+that the real prod sidecar never had for this app (OVS's static already came
+from `dj_static.Cling`, not nginx) — dropped rather than translated to
+ApisixRoute plugins, since matching prod behavior means not having them.
+`configmaps/nginx.yaml` deleted; `Tiltfile` no longer loads it.
+
+Each later stage should check its app's `local-dev/apps/<app>/` directory (if
+one exists — most of the seven don't have Tilt setups yet) and apply the same
+kind of change alongside the Pulumi change, not as a follow-up.
+
 ## Stage 2: ocw_studio
 
 Done — see the accompanying commit. The first of the seven sidecar apps where
@@ -197,18 +216,53 @@ updates, 1 delete (the `nginx-config` ConfigMap), 104 unchanged. The webapp
 container drops the nginx sidecar and picks up `--static-path-mount
 /src/staticfiles --static-path-expires 315360000`.
 
+## Stage 3: xpro
+
+Done — see the accompanying commit. Same shape as ocw_studio (single
+`/src/staticfiles` directory, no shared CORS plugin config), and the first app
+where the nginx source and the thing Granian now serves genuinely differ:
+xpro's `hash.txt` block had no `try_files`, so nginx resolved it against
+`root /src` to `/src/static/hash.txt` — the source tree, not the collectstatic
+output. Granian's `static_path_mounts` serves `/src/staticfiles/hash.txt`
+instead.
+
+Unlike ocw_studio, this is **not** confirmed to carry live content. Checked
+the [mitxpro Dockerfile](https://github.com/mitodl/mitxpro/blob/master/Dockerfile),
+[`webpack.config.prod.js`](https://github.com/mitodl/mitxpro/blob/master/webpack.config.prod.js),
+and a full repo tree search for `hash` — none of them create a `hash.txt`
+anywhere in the image except
+[`bin/pre_compile`](https://github.com/mitodl/mitxpro/blob/master/bin/pre_compile),
+which does `echo $SOURCE_VERSION >$BUILD_DIR/static/hash.txt`. That script is
+a Heroku buildpack hook (`bin/compile`-syntax, `$BUILD_DIR`/`$SOURCE_VERSION`
+are buildpack API variables) — nothing in the current Dockerfile or CI
+workflows invokes it, so it is legacy and not part of the Docker image build.
+The conclusion stands: this route is most likely already a 404 in production
+today, before and after this change, and the APISix rule is kept purely for
+behavioral parity with the nginx block rather than because anything is known
+to depend on it. Flagged for the reviewer rather than asserted as verified.
+
+- `import_nginx_config=False`; deleted `files/web.conf_granian` (the actually
+  loaded config — `nginx_config_filename` defaults to that name — `files/web.conf`
+  was already-dead uwsgi-era cruft predating this project and is left alone,
+  matching the ocw_studio precedent).
+- `static_path_mounts=["/src/staticfiles"]`, `static_path_expires=STATIC_ASSET_MAX_AGE_SECONDS`.
+- Four HTTPRoute rules (`static-hash`, `static`, `dnt-policy`, `passthrough`),
+  all naming `application_lb_service_port` and all with
+  `backend_import_nginx_config=False` per the named-port trap.
+
+`pulumi preview --stack CI --diff`: 3 creates (one `PluginConfig` per new
+route), 6 updates, 1 delete (the `nginx-config` ConfigMap), 144 unchanged
+(plus one incidental `Job` replace from using `XPRO_DOCKER_TAG=latest` for the
+preview instead of the pinned digest — not from this change). The webapp
+container drops the nginx sidecar, picks up `--static-path-mount
+/src/staticfiles --static-path-expires 315360000`, and the Service/probe ports
+move 8071 → 8073, all consistent with the ocw_studio precedent.
+
 ## Rollout order
 
 1. ~~**odl_video_service**~~ — done, PR #5281.
-2. ~~**ocw_studio**~~ — done, this commit.
-3. **xpro** — the other single-static-directory app, the same shape as
-   ocw_studio. Deliberately *not* bundled with it: PR #5344 is concurrently
-   changing xpro's Granian concurrency, and overlapping two live changes on one
-   app makes any regression ambiguous. Do it once #5344 has landed and settled.
-   Note xpro's `hash.txt` block has no `try_files`, so it resolves against
-   `root /src` to `/src/static/hash.txt` — the source dir, not the collectstatic
-   output. Granian will serve `/src/staticfiles/hash.txt` instead: same content,
-   different file.
+2. ~~**ocw_studio**~~ — done, PR #5345.
+3. ~~**xpro**~~ — done, this commit.
 4. **micromasters, learn_ai** — two-directory static fallback; gated on gap 5.
 5. **mit_learn, mitxonline** — highest traffic, and mit_learn additionally needs
    the `/media` route (gap 1) and the JSON gzip moved to the APISix `gzip` plugin.
