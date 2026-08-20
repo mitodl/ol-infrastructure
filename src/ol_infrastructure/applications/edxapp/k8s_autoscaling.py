@@ -19,6 +19,27 @@ from ol_infrastructure.lib.k8s_keda import (
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
+_MEMORY_UNIT_MULTIPLIERS = {"Ki": 2**10, "Mi": 2**20, "Gi": 2**30, "Ti": 2**40}
+
+
+def _memory_quantity_fraction_bytes(quantity: str, fraction: float) -> str:
+    """Convert a k8s memory quantity string (e.g. "4Gi") to a byte count at
+    the given fraction of it, as a plain decimal string.
+
+    Used to give a KEDA memory trigger an AverageValue target that is fixed
+    at deploy time from the declared memory_request, rather than a
+    Utilization target computed live against whatever a VPA has resized that
+    request to -- see the comment above the CMS celery ScaledObject for why
+    that distinction matters here.
+    """
+    for suffix, multiplier in _MEMORY_UNIT_MULTIPLIERS.items():
+        if quantity.endswith(suffix):
+            value = float(quantity[: -len(suffix)]) * multiplier
+            break
+    else:
+        value = float(quantity)  # already plain bytes
+    return str(int(value * fraction))
+
 
 def create_webapp_trigger_auth(
     env_name: str,
@@ -123,6 +144,7 @@ def build_cms_webapp_keda_config(
 def create_celery_autoscaling_resources(
     edxapp_cache: OLAmazonCache,
     replicas_dict: dict[str, Any],
+    cms_celery_memory_request: str,
     namespace: str,
     lms_celery_labels: dict[str, str],
     lms_high_mem_celery_labels: dict[str, str],
@@ -142,7 +164,10 @@ def create_celery_autoscaling_resources(
     (edx.lms.core.high_mem), and the CMS worker (edx.cms.core.default).
 
     Celery workers use Redis list length triggers (not Prometheus) so they
-    remain outside the OLApplicationK8s component.
+    remain outside the OLApplicationK8s component. CMS also carries an
+    additional memory trigger -- see the comment above the CMS ScaledObject
+    below for why queue depth alone missed a real slowdown, and why that
+    trigger targets an absolute AverageValue rather than Utilization.
 
     Returns:
         Dictionary containing created celery autoscaling resources.
@@ -280,6 +305,39 @@ def create_celery_autoscaling_resources(
     # edx.cms.core.default is a poor signal that the work is done -- and the git export
     # tasks that dominate these bursts run 30-113s each. Bleeding down also keeps warm
     # pods around for the next burst, which is what actually breaks the flapping cycle.
+    #
+    # Second trigger: memory. On 2026-08-19 a mitxonline production cms-celery
+    # replica's memory climbed from ~1.3Gi to ~3.5Gi (of a 4Gi request / 6Gi
+    # VPA-managed limit) over about 17 hours -- driven by a full-catalog search
+    # reindex sharing the worker with routine CMS tasks -- while course exports
+    # got steadily slower. The HPA's desired-replica count never left 1 the
+    # entire time: tasks were still being dequeued promptly, so
+    # edx.cms.core.default never crossed listLength=10. A queue-depth trigger
+    # can't see "the worker that already grabbed the task is now
+    # resource-starved and slow to finish it" -- it only sees an empty list.
+    #
+    # This uses metricType AverageValue against an absolute byte target
+    # (_memory_quantity_fraction_bytes(cms_celery_memory_request, 0.7)), not
+    # Utilization, deliberately: the CMS celery VPA a few resources down
+    # (k8s_resources.py, controlled_resources=["cpu", "memory"]) resizes this
+    # same container's memory request in place. A Utilization trigger's target
+    # is a percentage of that same live request, so every VPA resize would also
+    # move the HPA's threshold -- the two autoscalers fighting over one signal,
+    # the exact failure mode the webapp path avoids for cpu (see the VPA
+    # comment above _worker_vpa_min_allowed in k8s_resources.py). AverageValue
+    # is computed once from the config value at deploy time and does not move
+    # when the VPA resizes the live request, so it stays a stable, independent
+    # signal. 70% of the configured request gives a few hours of lead time at
+    # the observed climb rate, comfortably before the memory_limit ceiling --
+    # scaled automatically per stack since each stack configures its own
+    # memory_request (1-4Gi across the mitx/mitxonline/xpro/mitx-staging
+    # stacks). The HPA takes the max desired-replica count across all triggers,
+    # so this is additive to the redis trigger above, not a replacement --
+    # either signal firing scales the deployment up. Deliberately rolled out to
+    # every stack using this shared function, not gated to mitxonline
+    # production alone: the underlying gap (queue depth can't see a
+    # resource-starved worker) is structural to this ScaledObject shape, not
+    # specific to the incident that surfaced it.
     cms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
         f"ol-{stack_info.env_prefix}-edxapp-cms-celery-scaledobject-{stack_info.env_suffix}",
         api_version="keda.sh/v1alpha1",
@@ -325,7 +383,16 @@ def create_celery_autoscaling_resources(
                         "listLength": "10",
                         "enableTLS": "true",
                     },
-                }
+                },
+                {
+                    "type": "memory",
+                    "metricType": "AverageValue",
+                    "metadata": {
+                        "value": _memory_quantity_fraction_bytes(
+                            cms_celery_memory_request, 0.7
+                        ),
+                    },
+                },
             ],
         },
         opts=pulumi.ResourceOptions(depends_on=[cms_celery_deployment]),
