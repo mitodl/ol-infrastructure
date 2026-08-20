@@ -18,11 +18,12 @@ This README covers getting up and running, day-to-day usage, and troubleshooting
 5. [Directory Structure](#directory-structure)
 6. [Working with Apps](#working-with-apps)
 7. [Seeding Data](#seeding-data)
-8. [Configuration Reference](#configuration-reference)
-9. [Disk Management](#disk-management)
-10. [Teardown](#teardown)
-11. [Customization & Advanced Setup](#customization--advanced-setup)
-12. [Troubleshooting](#troubleshooting)
+8. [Open edX (tutor mode)](#open-edx-tutor-mode)
+9. [Configuration Reference](#configuration-reference)
+10. [Disk Management](#disk-management)
+11. [Teardown](#teardown)
+12. [Customization & Advanced Setup](#customization--advanced-setup)
+13. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -40,6 +41,9 @@ This environment runs the MIT Learn application stack as Kubernetes workloads in
 | Keycloak SSO | `https://sso.ol.mit.dev` | Identity provider (olapps realm) |
 | Mailpit | `https://mail.mit.dev` | Captured outbound email (web UI) |
 | Grafana | `https://grafana.mit.dev` | Logs from every service in the cluster (1-week retention) |
+| Open edX LMS | `https://lms.mit.dev` | Host-side Tutor instance (only when `openedx_mode` is `tutor`) |
+| Open edX Studio | `https://studio.mit.dev` | Course authoring for the same instance |
+| Open edX MFEs | `https://apps.lms.mit.dev/<name>` | Micro-frontends (`/authn`, `/learning`, `/authoring`, …) |
 
 All hostnames use a `.dev` TLD that mirrors production (`.edu` → `.dev`), so URLs, CSRF cookies, and OIDC redirect URIs behave identically to deployed environments.
 
@@ -66,6 +70,7 @@ Install these tools before running setup. The install commands shown are Homebre
 | Pulumi CLI | ≥ 3.x | `brew install pulumi` |
 | bash | ≥ 4 | `brew install bash` (stock macOS ships 3.2; the seeding and prune scripts use `mapfile`) |
 | uv | ≥ 0.9.3 | `brew install uv` |
+| Tutor | ≥ 19 | `uv tool install "tutor[full]"` — **only** when `openedx_mode` is `tutor`; see [Open edX (tutor mode)](#open-edx-tutor-mode) |
 
 > **Docker memory:** Allocate at least 12 GB to the Docker VM; 16 GB is comfortable for the full stack (Docker Desktop: Settings → Resources; OrbStack allocates dynamically; Docker Engine on Linux uses host RAM directly — nothing to allocate). Usage scales with how many apps you enable and whether they run from source or prebuilt images: with just mit-learn (from source) and mitxonline enabled, measured pod usage is ~13 GB, the Next.js dev server alone accounting for 3–4 GB. To see what's actually using memory: `kubectl top pods -A | sort -k4 -hr | head`.
 
@@ -170,6 +175,8 @@ ol-infrastructure/
     ├── certs/                   # mkcert output (gitignored)
     ├── infra/                   # Pulumi stacks: shared in-cluster infra (see EXTENDING.md)
     └── apps/<app>/              # Per-app k8s manifests + Tiltfile
+        │                        # (apps/openedx-tutor/ drives a host-side Tutor —
+        │                        #  see Open edX (tutor mode) below)
         └── configmaps/
             └── app-env.local.yaml   # (optional, gitignored) your env overrides — see
                                      # Local Configuration Overrides below
@@ -310,6 +317,219 @@ tilt trigger seed-mit-learn-fixtures
 
 ---
 
+## Open edX (tutor mode)
+
+Set `"openedx_mode": "tutor"` in `tilt_config.json` to run Open edX alongside the
+stack and point mitxonline at it. The default, `"qa"`, runs nothing and leaves
+mitxonline on the stub Open edX credentials in its `app-env.yaml`.
+
+Open edX is the one component that does **not** run in k3d. Tutor is a Docker
+Compose tool, so `tutor dev` runs on your machine and Tilt drives it from the
+`openedx` resource group; the cluster only holds a small nginx proxy and the
+APISIX routes that publish it:
+
+```
+browser ─┐
+         ├─> APISIX (TLS, *.mit.dev) ─> openedx-tutor-proxy (pod)
+pods   ──┘                                     │
+                                               v
+                                    host.k3d.internal:8000/8001
+                                               │
+                                     tutor dev (docker compose)
+```
+
+Because the core stack's CoreDNS override resolves every `*.mit.dev` name to
+APISIX, `https://lms.mit.dev` is the same URL from your browser and from inside
+a pod — which is what lets mitxonline call the LMS directly.
+
+`local-dev/apps/openedx/` is an unrelated, incomplete integration that builds
+Open edX from the `lehrer` repo. No mode uses it.
+
+### Prerequisite
+
+Tutor must be installed locally; `setup.sh` fails on it when `tilt_config.json`
+selects tutor mode:
+
+```bash
+uv tool install "tutor[full]"
+```
+
+If yours lives in a virtualenv, export `TUTOR_BIN=/path/to/venv/bin/tutor` — the
+setup script, the Tiltfile, and every tutor script honour it.
+
+An environment set up before Open edX existed in this stack is missing the four
+new hostnames (`lms`, `studio`, `preview.lms`, `apps.lms`) in `/etc/hosts` and
+the `*.lms.<root_domain>` SAN in its certificate. Re-run setup, then push the
+regenerated certificate into the cluster:
+
+```bash
+./local-dev/scripts/setup.sh
+tilt trigger local-infra-core
+```
+
+### What Tilt does
+
+| Resource | What it is |
+|----------|-----------|
+| `openedx-tutor-config` | Runs [`tutor-configure.sh`](scripts/tutor-configure.sh): repoints your tutor config, installs the `ol_local_dev` tutor plugin, writes the compose override |
+| `openedx-tutor` | Runs [`tutor-up.sh`](scripts/tutor-up.sh): `tutor dev launch` on first use, then `tutor dev start` in the foreground so LMS/CMS logs land in the Tilt UI |
+| `openedx-tutor-seed` | Runs [`tutor-seed-mitxonline.sh`](scripts/tutor-seed-mitxonline.sh): creates the OAuth2 applications and service-worker token mitxonline authenticates with |
+| `openedx-tutor-sso` | Runs [`tutor-seed-sso.sh`](scripts/tutor-seed-sso.sh): the two records that let Open edX log in through mitxonline. Only present when mitxonline is enabled |
+| `openedx-tutor-proxy` | The in-cluster nginx that APISIX routes to |
+
+Tilt owns the platform's lifecycle: stopping Tilt stops the compose project.
+
+> **First run is slow.** `tutor dev launch` builds the `openedx-dev` image if you
+> do not already have it (tens of minutes) and then runs every migration. The
+> launch is fingerprinted in `$(tutor config printroot)/.ol-local-dev-launched`,
+> so later runs go straight to `tutor dev start`. Force a re-init with
+> `OL_TUTOR_RELAUNCH=1 tilt trigger openedx-tutor`.
+
+### It uses your existing tutor root
+
+`tutor-configure.sh` edits the root that `tutor config printroot` reports — the
+same one your other Open edX work uses. It reuses your images and course data,
+and it **overwrites** these values:
+
+| Key | Set to |
+|-----|--------|
+| `LMS_HOST` | `lms.<root_domain>` |
+| `CMS_HOST` | `studio.<root_domain>` |
+| `PREVIEW_LMS_HOST` | `preview.lms.<root_domain>` |
+| `MFE_HOST` | `apps.lms.<root_domain>` |
+| `ENABLE_HTTPS` | `true` (APISIX terminates it) |
+| `ENABLE_WEB_PROXY` | `false` (host ports 80/443 belong to the k3d loadbalancer) |
+
+It also enables the `ol_local_dev` plugin, symlinked from
+`local-dev/apps/openedx-tutor/tutor/ol_local_dev.py`, which rewrites the dev
+settings' hardcoded `http://<host>:8000` URLs to the ingress URLs and makes
+Django trust APISIX's `X-Forwarded-Proto`. The script prints a warning when it
+repoints an `LMS_HOST` that was set to something else, and moves any
+pre-existing `env/dev/docker-compose.override.yml` aside to `.bak`.
+
+To hand the tutor root back to another project, re-point those values
+(`tutor config save --set LMS_HOST=...`) and `tutor plugins disable ol_local_dev`.
+
+### Logging in
+
+Open edX logs in through mitxonline, which logs in through Keycloak — so the
+`admin` / `student` / `prof` test users work, and the LMS creates its own
+account for whoever comes back from the chain:
+
+```
+lms.mit.dev  ->  /auth/login/ol-oauth2/
+             ->  mitxonline.mit.dev/oauth2/authorize/   (browser, public URL)
+             ->  sso.ol.mit.dev  (APISIX takes mitxonline's session to Keycloak)
+             ->  lms.mit.dev/auth/complete/ol-oauth2/
+             ->  code + account read over mitxonline-internal.mit.dev  (server)
+```
+
+`tutor-seed-sso.sh` creates the two records that flow needs — mitxonline's
+`edx-oauth-app` OAuth2 application and the LMS's `ol-oauth2`
+`OAuth2ProviderConfig` — and the `ol_local_dev` plugin registers the
+`ol-social-auth` backend. Two details are easy to get wrong by hand:
+
+- **The last two hops cannot use `https://mitxonline.mit.dev`.** The LMS
+  containers do not trust the mkcert CA, so the token exchange and the account
+  read go over plain HTTP to `mitxonline-internal.<root_domain>`, an
+  internal-only APISIX route (`apisix-routes-openedx.yaml` in the mitxonline
+  app directory) on a hostname that only resolves inside the tutor containers.
+  Browser-facing URLs stay public https.
+- **The provider row belongs to the Site whose domain is `LMS_HOST`.** Inside a
+  request, edx-platform resolves the current site from the `Host` header, not
+  from `SITE_ID` (which on a stock tutor install points at `example.com`). A
+  row on any other site is invisible to the login view and surfaces as *"Can't
+  fetch setting of a disabled backend/provider"* — which is also what you get
+  after repointing `LMS_HOST`, since the old hostname's row is orphaned. Re-run
+  the seed after any hostname change.
+
+Anonymous requests are pushed straight into that flow when
+`openedx-companion-auth` is installed. To get Open edX's own login page back
+(useful if mitxonline is not running — `/admin` is the only other way in):
+
+```bash
+tutor config save --set OL_LOCAL_DEV_FORCE_SSO=false
+```
+
+For a purely local account, independent of the chain:
+
+```bash
+tutor dev createuser --staff --superuser admin admin@example.com
+```
+
+### Signing out
+
+Signing out of Open edX signs you out of the whole stack. The LMS's logout page
+renders a hidden iframe per entry in `IDA_LOGOUT_URI_LIST`, and each app's
+`/logout` clears its own session and then hops into its APISIX `/logout/oidc`,
+which ends the Keycloak session:
+
+```
+lms.mit.dev/logout ─┬─> mitxonline.mit.dev/logout?no_redirect=1 ─> /logout/oidc ─┐
+                    ├─> studio.mit.dev/logout?no_redirect=1                      ├─> sso.ol.mit.dev
+                    └─> api.learn.mit.dev/logout?no_redirect=1 ─> /logout/oidc ──┘
+```
+
+Keycloak needs no entry of its own — it is the last stop of every chain, and the
+`?no_redirect=1` the LMS appends is what tells each app to go there instead of
+bouncing back to Open edX. The list is the same one production sets (see
+`IDA_LOGOUT_URI_LIST` in `src/ol_infrastructure/applications/edxapp/k8s_configmaps.py`),
+and it is **assigned** rather than appended: what devstack and tutor seed it
+with is a set of `localhost:181xx` services and a Studio runserver port that
+this stack does not serve.
+
+Entering the chain from elsewhere:
+
+- **mitxonline** — its `LOGOUT_REDIRECT_URL` points at `lms.mit.dev/logout`, so
+  signing out there runs the same fan-out (`OpenedxAndApiGatewayLogoutView`
+  documents the round trip).
+- **Studio** — its sign-out link (`FRONTEND_LOGOUT_URL`) points at the LMS for
+  the same reason. Studio cannot fan out itself: it resolves `logout.html`
+  through Mako rather than Django, so the page comes back with its template tags
+  unrendered and neither the iframes nor the redirect script exist. Its
+  `/logout` still ends the session, which is all the LMS asks of it.
+- **mit-learn** — signing out there ends its own session and Keycloak's, but not
+  Open edX's. Production behaves the same way; start from Open edX or mitxonline
+  for a full sign-out.
+
+`learn-ai` keeps its own APISIX session and is not in the list, matching
+production. Add `https://ai.learn.<root_domain>/logout` to the plugin if you
+want it included.
+
+### What is and is not wired
+
+Working: mitxonline reaches the LMS over `OPENEDX_API_BASE_URL` with a
+service-worker token and the two OAuth2 applications the seed creates, so
+service-to-service calls (course data, enrolments) work.
+
+SSO works: logging in to Open edX goes through mitxonline, which goes through
+Keycloak. See [Logging in](#logging-in) below.
+
+Micro-frontends work too, if `tutor-mfe` is enabled in your tutor root (it is by
+default). Each MFE gets its own tutor port in dev mode; APISIX publishes them
+all under `https://apps.lms.<root_domain>/<name>` — `/authn`, `/learning`,
+`/authoring` and the rest — and the `ol_local_dev` plugin rewrites Open edX's
+MFE settings to those URLs. Enabling an MFE that tutor-mfe added after this was
+written means listing its port in `apisix-routes.yaml`, `proxy.yaml`, and the
+plugin.
+
+Not wired:
+
+- **Keycloak client for Open edX.** None is needed and none is created: Open
+  edX authenticates against mitxonline, which is itself behind Keycloak, so the
+  realm is reached one hop down the chain — the same shape as production.
+- **Server-to-server HTTPS from Open edX.** The LMS containers can resolve the
+  stack's hostnames (the compose override maps them to the host gateway) but do
+  not trust the mkcert CA, so an outbound HTTPS call from Open edX into the
+  stack fails certificate verification. Nothing in tutor mode makes one today.
+- **HMR for a mounted MFE.** Routing an MFE through the ingress drops its port,
+  which is the origin its webpack dev server opens the hot-reload socket on.
+  The app loads and serves fine; live reload does not. Reach that one MFE at
+  `http://apps.lms.<root_domain>:<port>` directly if you need HMR.
+- **Email.** Open edX keeps using tutor's own SMTP container, not Mailpit.
+
+---
+
 ## Configuration Reference
 
 `tilt_config.json` is your copy of [`tilt_config.json.example`](../tilt_config.json.example) — the example file is the canonical starting point (its image tags move over time; this doc doesn't repeat them). Keys:
@@ -320,7 +540,8 @@ tilt trigger seed-mit-learn-fixtures
 | `prebuilt_tags` | see example file | `["app=tag"]` list of image tags used when the app repo is not checked out locally. |
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
 | `log_retention_period` | `168h` | How long Grafana/Loki keeps logs — see [Log retention](#log-retention). |
-| `per_app_databases`, `openedx_mode` | — | Declared but not wired to anything yet; setting them has no effect. |
+| `openedx_mode` | `qa` | `qa` runs without Open edX; `tutor` runs a locally installed Tutor and wires mitxonline to it — see [Open edX (tutor mode)](#open-edx-tutor-mode). |
+| `per_app_databases` | — | Declared but not wired to anything yet; setting it has no effect. |
 
 The rule of thumb for which config surface a knob belongs to: settings that change **which/how Tilt runs things** (apps, image tags) go in `tilt_config.json`; anything that sets an **env var or secret value inside a workload** (API keys, feature flags, endpoints) goes in a gitignored `app-env.local.yaml` override ConfigMap — see [Local Configuration Overrides](#local-configuration-overrides).
 
@@ -429,6 +650,11 @@ One registry case zot cannot reclaim on its own is a repo left with no manifest 
 ```
 
 > **Note:** The teardown script calls `pulumi destroy` automatically to clean up Pulumi-managed resources before deleting the cluster, so no orphaned resources are left behind.
+
+Teardown does not touch Open edX in tutor mode: the compose project and its
+MySQL/MongoDB volumes live in your tutor root, not in the cluster. Remove them
+yourself with `tutor dev dc down -v` (this deletes every course and account) —
+or leave them and the next `tilt up` reuses them.
 
 Pulumi state must never outlive the cluster: everything these stacks manage
 lives inside the cluster, but the state lives in this checkout, so state that
@@ -546,6 +772,42 @@ kubectl logs -n operations deploy/apisix-ingress-controller -f
 ```
 
 The ingress controller watches for `ApisixRoute` CRDs and syncs them to the APISIX data plane. A restart of the ingress controller pod often resolves sync issues.
+
+### `lms.mit.dev` returns 502 or times out
+
+Only applies in tutor mode. Work outwards from the platform itself:
+
+```bash
+# 1. Is tutor serving on the host port the proxy forwards to?
+curl -sf -H "Host: lms.mit.dev" http://127.0.0.1:8000/heartbeat
+
+# 2. Is the in-cluster proxy up, and can it still resolve the host?
+kubectl -n openedx get pods
+kubectl -n openedx logs deploy/openedx-tutor-proxy
+```
+
+If step 1 fails, the `openedx-tutor` resource in the Tilt UI has the reason.
+If step 1 succeeds and step 2 shows connection errors, the Docker host gateway
+address nginx resolved at startup has gone stale — recreating the k3d network
+(`teardown.sh` + `setup.sh`) does that. Re-resolve it with:
+
+```bash
+kubectl -n openedx rollout restart deploy/openedx-tutor-proxy
+```
+
+### Open edX redirects to `http://lms.mit.dev:8000`
+
+The `ol_local_dev` tutor plugin is not in effect: tutor's stock dev settings put
+the runserver port in every self-referential URL. Check it is installed and
+enabled, then re-render:
+
+```bash
+tutor plugins list | grep ol_local_dev
+tilt trigger openedx-tutor-config     # or: ./local-dev/scripts/tutor-configure.sh
+```
+
+`tutor dev start` picks up re-rendered settings on restart, so restart the
+`openedx-tutor` resource afterwards.
 
 ### Keycloak login loop / OIDC errors
 

@@ -1,0 +1,138 @@
+# Open edX via a locally installed Tutor ("openedx_mode": "tutor").
+#
+# Included from the root Tiltfile only in tutor mode. Unlike every other app in
+# this stack, Open edX does not run in k3d: `tutor dev` is a Docker Compose
+# project on the host, and Tilt drives it from here. The cluster side is just a
+# proxy Service plus APISIX routes, so the platform is reachable at
+# https://lms.<root_domain> / https://studio.<root_domain> from the browser and
+# — thanks to the coredns override in the core stack — from inside pods.
+#
+# Layout:
+#   proxy.yaml          in-cluster nginx forwarding to host.k3d.internal:8000/8001
+#   apisix-routes.yaml  TLS + routes for lms / preview / studio
+#   tutor/              tutor plugin symlinked into the developer's tutor root
+#
+# Prerequisite: tutor on PATH (or TUTOR_BIN pointing at it). setup.sh enforces
+# this too when tilt_config.json selects tutor mode.
+
+load("../../tiltlib.star", "k8s_yaml_local")
+
+root_domain = os.environ.get("LOCAL_DEV_ROOT_DOMAIN", "mit.dev")
+tutor_bin = os.environ.get("TUTOR_BIN", "tutor")
+
+# Absolute paths (and dir= below) so the scripts resolve the same way whether
+# Tilt runs them from this directory or from the root Tiltfile's.
+repo_root = config.main_dir
+scripts = repo_root + "/local-dev/scripts"
+
+# Actually invoke it. `command -v` is not enough: a wrapper on PATH can resolve
+# and still fail on every call — a `uv run tutor` shim outside its own project
+# recurses until uv aborts — and the resources below would then fail one by one
+# minutes into the run instead of here, before anything has been touched.
+tutor_probe = str(local(
+    "%s --version 2>&1 || true" % tutor_bin,
+    quiet=True, echo_off=True,
+)).strip()
+if not tutor_probe.startswith("tutor, version"):
+    fail(
+        ("openedx_mode is 'tutor' but '%s' is not a working tutor.\n" +
+         "  Install it with: uv tool install \"tutor[full]\"\n" +
+         "  Installed already, but this is the wrong entry point (a wrapper script,\n" +
+         "  or a copy in a virtualenv)? Name the real one and restart tilt:\n" +
+         "      export TUTOR_BIN=/path/to/venv/bin/tutor\n" +
+         "  Or set \"openedx_mode\": \"qa\" in tilt_config.json to run without Open edX.\n" +
+         "  What it said when run:\n    %s")
+        % (tutor_bin, tutor_probe)
+    )
+
+tutor_env = {
+    "LOCAL_DEV_ROOT_DOMAIN": root_domain,
+    "TUTOR_BIN": tutor_bin,
+}
+
+# Rewrites the developer's tutor config to this stack's hostnames, installs the
+# ol_local_dev plugin, and regenerates the compose override. Re-runs whenever
+# any of those inputs change, and `tutor dev start` picks the result up on the
+# next restart of the resource below.
+local_resource(
+    "openedx-tutor-config",
+    cmd=scripts + "/tutor-configure.sh",
+    dir=repo_root,
+    env=tutor_env,
+    deps=[
+        scripts + "/tutor-configure.sh",
+        repo_root + "/local-dev/apps/openedx-tutor/tutor/ol_local_dev.py",
+    ],
+    labels=["openedx"],
+)
+
+# `tutor dev launch` on first use, then `tutor dev start` in the foreground so
+# the platform's logs are the resource's logs. The readiness probe hits the
+# LMS directly on its published host port rather than through the ingress, so
+# it reports on tutor alone and does not wait on APISIX.
+local_resource(
+    "openedx-tutor",
+    serve_cmd=scripts + "/tutor-up.sh",
+    serve_dir=repo_root,
+    serve_env=tutor_env,
+    deps=[scripts + "/tutor-up.sh"],
+    resource_deps=["openedx-tutor-config"],
+    readiness_probe=probe(
+        period_secs=15,
+        initial_delay_secs=20,
+        timeout_secs=10,
+        # ~1 hour. A first launch builds the openedx-dev image and runs every
+        # migration; anything less marks a healthy platform as failed.
+        failure_threshold=240,
+        exec=exec_action(command=[
+            "curl", "-sf",
+            "-H", "Host: lms.%s" % root_domain,
+            "http://127.0.0.1:8000/heartbeat",
+        ]),
+    ),
+    labels=["openedx"],
+)
+
+# OAuth applications + service-worker token mitxonline authenticates with.
+# Idempotent, and cheap enough to run on every up rather than by hand: without
+# it the credentials in mitxonline's environment point at nothing.
+local_resource(
+    "openedx-tutor-seed",
+    cmd=scripts + "/tutor-seed-mitxonline.sh",
+    dir=repo_root,
+    env=tutor_env,
+    deps=[scripts + "/tutor-seed-mitxonline.sh"],
+    resource_deps=["openedx-tutor"],
+    labels=["openedx"],
+)
+
+# SSO: Open edX logs in through mitxonline, so this only runs when mitxonline
+# is part of the stack. Depends on its deployment as well as on tutor, since it
+# writes an OAuth2 application on that side.
+enabled_apps = os.environ.get("LOCAL_DEV_ENABLED_APPS", "").split(",")
+if "mitxonline" in enabled_apps:
+    local_resource(
+        "openedx-tutor-sso",
+        cmd=scripts + "/tutor-seed-sso.sh",
+        dir=repo_root,
+        env=tutor_env,
+        deps=[scripts + "/tutor-seed-sso.sh"],
+        resource_deps=["openedx-tutor", "mitxonline-webapp"],
+        labels=["openedx"],
+    )
+else:
+    print("openedx-tutor: mitxonline is not enabled, skipping SSO wiring " +
+          "(Open edX will use its own login page)")
+
+k8s_yaml_local([
+    "proxy.yaml",
+    "apisix-routes.yaml",
+])
+
+k8s_resource(
+    "openedx-tutor-proxy",
+    labels=["openedx"],
+    # The openedx namespace and its local-dev-tls secret come from the core
+    # stack (local-dev/infra/modules/{namespaces,tls}.py).
+    resource_deps=["local-infra-core"],
+)

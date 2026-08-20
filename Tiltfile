@@ -7,9 +7,7 @@
 # ---------------------------------------------------------------------------
 config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service")
 config.define_bool("per_app_databases", usage="Deploy isolated DB/Valkey per app namespace")
-# openedx_mode is declared but not yet wired: nothing branches on it, and
-# local-dev/apps/openedx/Tiltfile is not yet included by the APPS loop below.
-config.define_string("openedx_mode", usage="qa (default) or local (Tutor)")
+config.define_string("openedx_mode", usage="qa (default: no local Open edX) or tutor (locally installed Tutor)")
 config.define_string_list("prebuilt_tags", usage="Prebuilt image tag overrides per app, e.g. mit-learn=0.62.0 learn-ai=0.28.3")
 config.define_string("disk_keep_tags", usage="Newest tilt-built image tags kept per repo by the disk janitor (default: 3). Overrides LOCAL_DEV_DISK_KEEP_TAGS env var.")
 config.define_string("disk_buildcache_max_gb", usage="Docker build-cache size cap in GB (default: 10% of total disk; 0 disables). Overrides LOCAL_DEV_BUILDCACHE_MAX_GB env var.")
@@ -18,7 +16,21 @@ cfg = config.parse()
 
 enabled_apps = cfg.get("enabled_apps", ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"])
 per_app_databases = cfg.get("per_app_databases", False)
-openedx_mode = cfg.get("openedx_mode", "qa")
+
+# openedx_mode selects where Open edX comes from:
+#   qa    - no local Open edX; apps keep their stub credentials (default)
+#   tutor - a locally installed Tutor runs `tutor dev` on the host and is
+#           published through APISIX at lms.<root_domain> / studio.<root_domain>
+#           (local-dev/apps/openedx-tutor/Tiltfile).
+# Exported to the environment so included Tiltfiles (openedx-tutor, mitxonline)
+# can branch on it: config.parse() is only callable from this root Tiltfile.
+openedx_mode = cfg.get("openedx_mode", os.environ.get("LOCAL_DEV_OPENEDX_MODE", "qa"))
+if openedx_mode not in ("qa", "tutor"):
+    fail("openedx_mode must be 'qa' or 'tutor', got '%s'" % openedx_mode)
+os.putenv("LOCAL_DEV_OPENEDX_MODE", openedx_mode)
+# Same reason: the openedx-tutor Tiltfile only wires SSO when mitxonline — the
+# identity provider Open edX logs in through — is part of this run.
+os.putenv("LOCAL_DEV_ENABLED_APPS", ",".join(enabled_apps))
 
 # Every service hostname, CORS origin, APISIX route, and Keycloak redirect URI
 # derives from this value. local-dev/tiltlib.star reads the same environment
@@ -311,6 +323,16 @@ local_resource(
     labels=["infra"],
     resource_deps=["local-infra-apps"],
 )
+
+# ---------------------------------------------------------------------------
+# Open edX (tutor mode only)
+#
+# Included before the app loop so that mitxonline's openedx overlay ConfigMap
+# and the tutor resources land in the same `tilt up`. In qa mode nothing here
+# is applied and no tutor prerequisite is enforced.
+# ---------------------------------------------------------------------------
+if openedx_mode == "tutor":
+    include("./local-dev/apps/openedx-tutor/Tiltfile")
 
 # ---------------------------------------------------------------------------
 # Per-app deployment + manual seed resources

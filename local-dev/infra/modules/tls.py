@@ -13,6 +13,7 @@ import pulumi_kubernetes as k8s
 from pulumi import ResourceOptions
 
 from .helpers import read_file_b64
+from .namespaces import APP_NAMESPACES
 
 
 @dataclass
@@ -73,7 +74,7 @@ def create_tls_resources(
         "local-dev-tls-operations", "operations", namespaces["operations"]
     )
 
-    app_namespaces = ("mit-learn", "learn-ai", "mitxonline", "odl-video-service")
+    app_namespaces = APP_NAMESPACES
     app_tls_secrets = {
         ns: _tls_secret(f"local-dev-tls-{ns}", ns, namespaces[ns])
         for ns in app_namespaces

@@ -16,8 +16,8 @@ data:
 
   # The trailing "&" is deliberate: the view appends "?redirect_url=..." to this
   # value, and it keeps no_redirect parsing as exactly "1".
-  # If the openedx app is ever enabled here, change this to
-  # https://lms.mit.dev/logout to match how the deployed envs do it.
+  # Deployed envs point this at the LMS logout instead; see the commented-out
+  # entry in app-env-openedx.yaml for why tutor mode does not.
   LOGOUT_REDIRECT_URL: "https://mitxonline.mit.dev/logout?no_redirect=1&"
   MITX_ONLINE_DB_DISABLE_SSL: "True"
   MITX_ONLINE_USE_S3: "False"

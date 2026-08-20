@@ -5,7 +5,16 @@ from collections.abc import Callable
 import pulumi_kubernetes as k8s
 from pulumi import ResourceOptions
 
-APP_NAMESPACES = ("mit-learn", "learn-ai", "mitxonline", "odl-video-service")
+# "openedx" holds the proxy and APISIX routes for a host-side Tutor instance
+# (openedx_mode="tutor"). Created unconditionally: Pulumi does not see the
+# Tilt setting, and an unused namespace costs nothing.
+APP_NAMESPACES = (
+    "mit-learn",
+    "learn-ai",
+    "mitxonline",
+    "odl-video-service",
+    "openedx",
+)
 
 
 def create_namespaces(

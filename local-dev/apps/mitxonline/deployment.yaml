@@ -48,6 +48,11 @@ spec:
             name: mitxonline-env
         - secretRef:
             name: mitxonline-secrets
+        # Open edX wiring; applied only in tutor mode (openedx_mode), which is
+        # why it is optional. Overrides the stub OPENEDX_* values above.
+        - configMapRef:
+            name: mitxonline-env-openedx
+            optional: true
         # Gitignored per-developer overrides; must stay LAST so its keys win
         # over both sources above. See "Local Configuration Overrides" in
         # local-dev/README.md.
@@ -87,6 +92,11 @@ spec:
             name: mitxonline-env
         - secretRef:
             name: mitxonline-secrets
+        # Open edX wiring; applied only in tutor mode (openedx_mode), which is
+        # why it is optional. Overrides the stub OPENEDX_* values above.
+        - configMapRef:
+            name: mitxonline-env-openedx
+            optional: true
         # Gitignored per-developer overrides; must stay LAST so its keys win
         # over both sources above. See "Local Configuration Overrides" in
         # local-dev/README.md.
@@ -196,6 +206,11 @@ spec:
             name: mitxonline-env
         - secretRef:
             name: mitxonline-secrets
+        # Open edX wiring; applied only in tutor mode (openedx_mode), which is
+        # why it is optional. Overrides the stub OPENEDX_* values above.
+        - configMapRef:
+            name: mitxonline-env-openedx
+            optional: true
         # Gitignored per-developer overrides; must stay LAST so its keys win
         # over both sources above. See "Local Configuration Overrides" in
         # local-dev/README.md.
@@ -266,6 +281,11 @@ spec:
             name: mitxonline-env
         - secretRef:
             name: mitxonline-secrets
+        # Open edX wiring; applied only in tutor mode (openedx_mode), which is
+        # why it is optional. Overrides the stub OPENEDX_* values above.
+        - configMapRef:
+            name: mitxonline-env-openedx
+            optional: true
         # Gitignored per-developer overrides; must stay LAST so its keys win
         # over both sources above. See "Local Configuration Overrides" in
         # local-dev/README.md.

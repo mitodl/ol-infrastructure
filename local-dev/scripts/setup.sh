@@ -48,6 +48,12 @@ HOSTS=(
     "mail.${ROOT_DOMAIN}"
     # Grafana (logs from every local-dev service)
     "grafana.${ROOT_DOMAIN}"
+    # Open edX, served from a host-side Tutor instance in tutor mode. Added
+    # unconditionally so switching openedx_mode needs no re-run of setup.sh.
+    "lms.${ROOT_DOMAIN}"
+    "studio.${ROOT_DOMAIN}"
+    "preview.lms.${ROOT_DOMAIN}"
+    "apps.lms.${ROOT_DOMAIN}"
 )
 
 # k3d load balancer always listens on 127.0.0.1 for the exposed ports
@@ -65,6 +71,7 @@ MKCERT_DOMAINS=(
     "*.mitxonline.${ROOT_DOMAIN}"
     "*.ol.${ROOT_DOMAIN}"             # sso.ol.*
     "*.odl.${ROOT_DOMAIN}"            # video.odl.*
+    "*.lms.${ROOT_DOMAIN}"            # preview.lms.*
 )
 
 # Output cert files (mkcert names them from the first domain, replacing * with _)
@@ -242,6 +249,29 @@ need_cmd mkcert
 need_cmd pulumi
 need_cmd python3
 need_cmd uv
+
+# Tutor is only a prerequisite in tutor mode, so read the mode the same way the
+# Tiltfile does. Keep the default in sync with the Tiltfile's ("qa").
+OPENEDX_MODE="${LOCAL_DEV_OPENEDX_MODE:-$(python3 - "${REPO_ROOT}/tilt_config.json" <<'PYEOF'
+import json, sys
+
+try:
+    with open(sys.argv[1]) as f:
+        print(json.load(f).get("openedx_mode", "qa"))
+except (OSError, ValueError):
+    print("qa")
+PYEOF
+)}"
+if [[ "${OPENEDX_MODE}" == "tutor" ]]; then
+    if ! command -v "${TUTOR_BIN:-tutor}" &>/dev/null; then
+        err "\
+'${TUTOR_BIN:-tutor}' not found, but tilt_config.json sets openedx_mode to 'tutor'.
+    Install it with: uv tool install \"tutor[full]\"
+    Already in a virtualenv? export TUTOR_BIN=/path/to/venv/bin/tutor
+    Or set \"openedx_mode\": \"qa\" to run without a local Open edX."
+    fi
+    ok "Tutor found ($("${TUTOR_BIN:-tutor}" --version))"
+fi
 
 # Warn if Python 3.14+ is the active interpreter; Pulumi's asyncio runtime
 # has known breakages on 3.14 due to event-loop API changes.

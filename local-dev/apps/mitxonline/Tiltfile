@@ -36,13 +36,24 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         ],
     )
 
-k8s_yaml_local([
+manifests = [
     'configmaps/app-env.yaml',
     'configmaps/nginx.yaml',
     'secrets.yaml',
     'deployment.yaml',
     'apisix-routes.yaml',
-], local_overrides='configmaps/app-env.local.yaml')
+]
+
+# Point mitxonline at the local Open edX instead of its stub credentials. The
+# root Tiltfile exports the mode; applying the ConfigMap here (rather than from
+# the openedx-tutor Tiltfile) keeps it inside the same k8s_yaml_local call, so
+# it is covered by the config fingerprint that rolls the pods when it changes.
+if os.environ.get('LOCAL_DEV_OPENEDX_MODE', 'qa') == 'tutor':
+    manifests.append('configmaps/app-env-openedx.yaml')
+    # Plain-HTTP route the Open edX containers use for the SSO token exchange.
+    manifests.append('apisix-routes-openedx.yaml')
+
+k8s_yaml_local(manifests, local_overrides='configmaps/app-env.local.yaml')
 
 k8s_resource(
     DEPLOY_NAME,

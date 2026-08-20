@@ -1,0 +1,43 @@
+---
+# Server-side entrance for Open edX, applied only when openedx_mode is "tutor".
+#
+# Open edX runs on the host (see local-dev/apps/openedx-tutor/), so its SSO
+# login against mitxonline has two halves with different requirements:
+#
+#   browser  -> https://mitxonline.mit.dev/oauth2/authorize/   (the public route)
+#   LMS pod* -> http://mitxonline-internal.mit.dev/oauth2/token/, /api/users/me
+#
+# * not a pod: a container in the tutor compose project, which reaches the host
+#   gateway through the extra_hosts entries tutor-configure.sh writes.
+#
+# The second half cannot use the public URL: the LMS containers do not trust the
+# mkcert CA, so TLS verification of https://mitxonline.mit.dev fails. This route
+# answers the same app over plain HTTP on a hostname of its own — no
+# http_to_https redirect, no openid-connect plugin, since the caller
+# authenticates with OAuth2 client credentials and a bearer token rather than a
+# session. It mirrors how deployed environments give Open edX an internal
+# address (see OLApisixExternalUpstream users and the mitxonline QA config)
+# while keeping browser-facing URLs public.
+#
+# Reachable only from inside the Docker network and the cluster: the hostname is
+# absent from /etc/hosts, so a browser cannot resolve it.
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: mitxonline-openedx-internal-route
+  namespace: mitxonline
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: openedx-oauth
+    match:
+      hosts:
+      - "mitxonline-internal.mit.dev"
+      paths:
+      # Token exchange and, if a provider config asks for it, OIDC discovery.
+      - "/oauth2/*"
+      # The userinfo endpoint ol_social_auth reads (API_ROOT + api/users/me).
+      - "/api/users/me"
+    backends:
+    - serviceName: mitxonline-webapp
+      servicePort: 8010

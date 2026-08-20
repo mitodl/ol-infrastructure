@@ -1,0 +1,210 @@
+---
+# Reverse proxy from the cluster to the Tutor instance running on the host.
+#
+# `tutor dev` is a Docker Compose project on the developer's machine, not a
+# workload in k3d: it publishes the LMS on host port 8000, the CMS on 8001, and
+# one port per micro-frontend. Pods reach the host through `host.k3d.internal`,
+# the hostname k3d adds to CoreDNS (and every node's /etc/hosts) pointing at
+# the Docker host gateway.
+#
+# APISIX cannot target that hostname directly — an ApisixRoute backend has to be
+# a Kubernetes Service — so this Deployment is the Service that stands in for
+# the host. Its listener ports mirror tutor's own, which is what lets
+# apisix-routes.yaml map a public hostname/path straight to a tutor port.
+#
+# nginx resolves host.k3d.internal once at startup. The gateway address only
+# changes when the k3d Docker network is recreated (teardown.sh + setup.sh),
+# which recreates this pod too; if it ever goes stale, `kubectl rollout restart
+# deploy/openedx-tutor-proxy -n openedx` re-resolves it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openedx-tutor-proxy-conf
+  namespace: openedx
+data:
+  # Shared by every server block below. Not named *.conf: nginx auto-includes
+  # everything matching conf.d/*.conf as a top-level block.
+  proxy-headers.inc: |
+    proxy_http_version 1.1;
+    # Host is what Django sees: keep the public hostname APISIX matched on
+    # rather than substituting the upstream's.
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    # APISIX terminates TLS, so it sets this to "https"; Open edX reads it via
+    # SECURE_PROXY_SSL_HEADER (set by the ol_local_dev tutor plugin) to build
+    # https URLs and accept secure cookies.
+    proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $http_connection;
+    # Course assets and file uploads are large, and Studio imports are slow.
+    client_max_body_size 100m;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+
+  default.conf: |
+    # LMS — ./manage.py lms runserver, published on host port 8000.
+    server {
+        listen 8000;
+        server_name _;
+        location / {
+            proxy_pass http://host.k3d.internal:8000;
+            include /etc/nginx/conf.d/proxy-headers.inc;
+        }
+    }
+
+    # CMS (Studio) — published on host port 8001.
+    server {
+        listen 8001;
+        server_name _;
+        location / {
+            proxy_pass http://host.k3d.internal:8001;
+            include /etc/nginx/conf.d/proxy-headers.inc;
+        }
+    }
+
+    # Micro-frontends. tutor-mfe gives every MFE its own host port in dev mode:
+    # the prebuilt `mfe` container publishes one per unmounted app, and an app
+    # whose repo you have mounted gets its dev server on the same port instead.
+    # The port numbers are tutor-mfe's own (CORE_MFE_APPS in tutormfe/plugin.py)
+    # and apisix-routes.yaml maps https://apps.lms.<domain>/<name> to each one.
+    server {  # communications
+        listen 1984;
+        server_name _;
+        location / { proxy_pass http://host.k3d.internal:1984; include /etc/nginx/conf.d/proxy-headers.inc; }
+    }
+    server {  # ora-grading
+        listen 1993;
+        server_name _;
+        location / { proxy_pass http://host.k3d.internal:1993; include /etc/nginx/conf.d/proxy-headers.inc; }
+    }
+    server {  # gradebook
+        listen 1994;
+        server_name _;
+        location / { proxy_pass http://host.k3d.internal:1994; include /etc/nginx/conf.d/proxy-headers.inc; }
+    }
+    server {  # profile
+        listen 1995;
+        server_name _;
+        location / { proxy_pass http://host.k3d.internal:1995; include /etc/nginx/conf.d/proxy-headers.inc; }
+    }
+    server {  # learner-dashboard
+        listen 1996;
+        server_name _;
+        location / { proxy_pass http://host.k3d.internal:1996; include /etc/nginx/conf.d/proxy-headers.inc; }
+    }
+    server {  # account
+        listen 1997;
+        server_name _;
+        location / { proxy_pass http://host.k3d.internal:1997; include /etc/nginx/conf.d/proxy-headers.inc; }
+    }
+    server {  # authn
+        listen 1999;
+        server_name _;
+        location / { proxy_pass http://host.k3d.internal:1999; include /etc/nginx/conf.d/proxy-headers.inc; }
+    }
+    server {  # learning
+        listen 2000;
+        server_name _;
+        location / { proxy_pass http://host.k3d.internal:2000; include /etc/nginx/conf.d/proxy-headers.inc; }
+    }
+    server {  # authoring
+        listen 2001;
+        server_name _;
+        location / { proxy_pass http://host.k3d.internal:2001; include /etc/nginx/conf.d/proxy-headers.inc; }
+    }
+    server {  # discussions
+        listen 2002;
+        server_name _;
+        location / { proxy_pass http://host.k3d.internal:2002; include /etc/nginx/conf.d/proxy-headers.inc; }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openedx-tutor-proxy
+  namespace: openedx
+  labels:
+    app: openedx-tutor-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openedx-tutor-proxy
+  template:
+    metadata:
+      labels:
+        app: openedx-tutor-proxy
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.25-alpine
+        ports:
+        - containerPort: 8000
+          name: lms
+        - containerPort: 8001
+          name: cms
+        volumeMounts:
+        - name: proxy-conf
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: default.conf
+        - name: proxy-conf
+          mountPath: /etc/nginx/conf.d/proxy-headers.inc
+          subPath: proxy-headers.inc
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
+      volumes:
+      - name: proxy-conf
+        configMap:
+          name: openedx-tutor-proxy-conf
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openedx-tutor-proxy
+  namespace: openedx
+spec:
+  selector:
+    app: openedx-tutor-proxy
+  ports:
+  - name: lms
+    port: 8000
+    targetPort: 8000
+  - name: cms
+    port: 8001
+    targetPort: 8001
+  # One per MFE, named after it; apisix-routes.yaml references these by number.
+  - name: mfe-communications
+    port: 1984
+    targetPort: 1984
+  - name: mfe-ora-grading
+    port: 1993
+    targetPort: 1993
+  - name: mfe-gradebook
+    port: 1994
+    targetPort: 1994
+  - name: mfe-profile
+    port: 1995
+    targetPort: 1995
+  - name: mfe-learner-dash
+    port: 1996
+    targetPort: 1996
+  - name: mfe-account
+    port: 1997
+    targetPort: 1997
+  - name: mfe-authn
+    port: 1999
+    targetPort: 1999
+  - name: mfe-learning
+    port: 2000
+    targetPort: 2000
+  - name: mfe-authoring
+    port: 2001
+    targetPort: 2001
+  - name: mfe-discussions
+    port: 2002
+    targetPort: 2002

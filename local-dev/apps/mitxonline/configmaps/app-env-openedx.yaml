@@ -1,0 +1,62 @@
+---
+# mitxonline -> Open edX wiring. Applied only when openedx_mode is "tutor"
+# (see the include in local-dev/apps/mitxonline/Tiltfile); in qa mode the stub
+# credentials in app-env.yaml stay in force and the integration is inert.
+#
+# Loaded after mitxonline-env and mitxonline-secrets in the deployment's
+# envFrom list, so these values win over the stubs there, and before
+# mitxonline-env-local, so a developer's own overrides still win over these.
+#
+# The credentials are the *other* half of
+# local-dev/scripts/tutor-seed-mitxonline.sh, which creates the matching OAuth2
+# applications and access token inside the LMS. Change them in both places.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mitxonline-env-openedx
+  namespace: mitxonline
+data:
+  # Reachable from pods as well as the browser: the core stack's coredns
+  # override resolves every *.mit.dev name to the APISIX gateway, which routes
+  # these two hosts to the tutor instance on the developer's machine.
+  OPENEDX_API_BASE_URL: "https://lms.mit.dev"
+  OPENEDX_STUDIO_API_BASE_URL: "https://studio.mit.dev"
+  OPENEDX_BASE_REDIRECT_URL: "https://lms.mit.dev"
+
+  # Course links. The /learn/course/ prefix is the learning MFE's; tutor-mfe is
+  # not part of tutor mode, so with a plain `tutor dev` these resolve only once
+  # you enable that plugin yourself. Override in app-env.local.yaml with
+  # /courses/ + a /course suffix to link at the legacy courseware instead.
+  OPENEDX_COURSE_BASE_URL: "https://lms.mit.dev/learn/course/"
+  OPENEDX_COURSE_BASE_URL_SUFFIX: "/home"
+
+  # Authorization-code application; used for the per-learner tokens mitxonline
+  # exchanges once a user has linked their Open edX account.
+  OPENEDX_API_CLIENT_ID: "mitxonline-local-dev" # pragma: allowlist secret
+  OPENEDX_API_CLIENT_SECRET: "mitxonline-local-dev-secret" # pragma: allowlist secret
+
+  # Client-credentials application; used by the course-sync calls, which would
+  # otherwise fall back to the authorization-code client id and fail.
+  OPENEDX_COURSES_SERVICE_WORKER_CLIENT_ID: "mitxonline-courses-local-dev" # pragma: allowlist secret
+  OPENEDX_COURSES_SERVICE_WORKER_CLIENT_SECRET: "mitxonline-courses-local-dev-secret" # pragma: allowlist secret
+
+  # Staff account whose long-lived token mitxonline uses for service-to-service
+  # calls (course data, enrollments) that are not on behalf of a learner.
+  OPENEDX_SERVICE_WORKER_USERNAME: "mitxonline_service_worker"
+  OPENEDX_SERVICE_WORKER_API_TOKEN: "mitxonline-local-dev-service-worker-token" # pragma: allowlist secret
+
+  # SSO. ol-social-auth registers its backend in Open edX under the name
+  # "ol-oauth2" — not the mitxonline-oauth2 default in app-env.yaml — and every
+  # deployed environment sets both of these to match (see
+  # src/ol_infrastructure/applications/mitxonline/Pulumi.QA.yaml). The
+  # ol-oauth2 provider itself is created by tutor-seed-sso.sh.
+  OPENEDX_OAUTH_PROVIDER: "ol-oauth2"
+  OPENEDX_SOCIAL_LOGIN_PATH: "/auth/login/ol-oauth2/?auth_entry=login"
+
+  # Signing out of mitxonline goes through Open edX, which is what fans the
+  # logout out to every other app (its IDA_LOGOUT_URI_LIST iframes this URL
+  # back with ?no_redirect=1, and OpenedxAndApiGatewayLogoutView then hops to
+  # /logout/oidc to end the APISIX and Keycloak sessions). Same value shape as
+  # production, which points at the LMS: no query string, since the view
+  # appends ?redirect_url= itself.
+  LOGOUT_REDIRECT_URL: "https://lms.mit.dev/logout"
