@@ -325,16 +325,26 @@ WITAN_SEND_TIMEOUT = "60s"
 # routes during that propagation delay hits a socket nobody is serving.
 #
 # A preStop hook is what decouples them: the kubelet runs it BEFORE SIGTERM, so
-# the pod keeps serving normally for the whole propagation window and is
-# signalled only once APISIX has stopped sending it traffic. Ten seconds is
-# generous for a watch-driven path measured in low single-digit seconds; the
-# cost is ten seconds added to every rollout of a workload whose deploys are
-# already minutes long.
+# the pod goes on serving normally for the length of the sleep instead of losing
+# its listener the moment the delete lands.
+#
+# ★ WHAT THE HOOK DOES AND DOES NOT GUARANTEE. It buys propagation TIME; it does
+# not wait for propagation to FINISH. The kubelet sends SIGTERM once the ten
+# seconds are up whether or not APISIX has re-read its upstreams, so this makes
+# the race very unlikely rather than impossible. Ten seconds being generous
+# against a watch-driven path measured in low single-digit seconds is the whole
+# basis for the number — there is no acknowledgement to wait on, and Kubernetes
+# offers no hook that blocks until a gateway has caught up. Anything stronger
+# would need APISIX itself to report that it had stopped routing here, which it
+# does not. The cost is ten seconds added to every rollout of a workload whose
+# deploys are already minutes long.
 #
 # Native `sleep` action rather than `exec: sleep 10` on purpose: the container
 # runs a distroless-style image and `readOnlyRootFilesystem: true`, so relying
 # on a shell binary is a dependency on the base image that this does not need.
-# Requires Kubernetes >= 1.30 (GA); the clusters run 1.36.
+# Feature history (KEP-3960, read off the KEP rather than recalled): alpha
+# v1.29, beta v1.30, STABLE v1.34. The clusters run 1.36, so it is GA here —
+# but 1.30 is beta, not GA, which an earlier draft of this comment got wrong.
 WITAN_PRESTOP_DRAIN_SECONDS = 10
 
 # ── Shutdown budget, which MUST exceed the preStop drain + the request budget ─
@@ -839,12 +849,14 @@ def create_serving_tier(  # noqa: PLR0913
                                 failure_threshold=WITAN_STARTUP_FAILURE_THRESHOLD,
                                 timeout_seconds=WITAN_STARTUP_TIMEOUT_SECONDS,
                             ),
-                            # Keep serving until APISIX has stopped routing
-                            # here. See WITAN_PRESTOP_DRAIN_SECONDS: without
-                            # this, SIGTERM lands while the pod is still in the
-                            # data plane's upstream set and one read per rollout
-                            # came back a 502. This delays SIGTERM only; it does
-                            # not extend the drain that follows it.
+                            # Go on serving while APISIX removes this pod from
+                            # its upstream set. See WITAN_PRESTOP_DRAIN_SECONDS:
+                            # without it SIGTERM lands while the pod is still in
+                            # the data plane's upstream set, and one read in one
+                            # of six observed rollouts came back a 502. This
+                            # gives that propagation time rather than waiting
+                            # for it, and delays SIGTERM only — it does not
+                            # extend the drain that follows.
                             lifecycle=kubernetes.core.v1.LifecycleArgs(
                                 pre_stop=kubernetes.core.v1.LifecycleHandlerArgs(
                                     sleep=kubernetes.core.v1.SleepActionArgs(
