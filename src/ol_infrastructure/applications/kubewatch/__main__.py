@@ -21,7 +21,7 @@ from ol_infrastructure.lib.ol_types import (
     AWSBase,
     BusinessUnit,
     Environment,
-    K8sGlobalLabels,
+    K8sAppLabels,
     Product,
     Services,
 )
@@ -54,7 +54,7 @@ aws_config = AWSBase(
 
 kubewatch_namespace = "kubewatch"
 
-k8s_global_labels = K8sGlobalLabels(
+k8s_global_labels = K8sAppLabels(
     application=Application.kubewatch,
     product=Product.infrastructure,
     service=Services.kubewatch,
