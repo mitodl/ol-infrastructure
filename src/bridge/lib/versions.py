@@ -37,7 +37,7 @@ AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=aws-node-termination-handler packageName=aws-node-termination-handler registryUrl=https://aws.github.io/eks-charts
 AWS_NODE_TERMINATION_HANDLER_CHART_VERSION = "0.27.2"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager registryUrl=https://charts.jetstack.io
-CERT_MANAGER_CHART_VERSION = "v1.16.1"
+CERT_MANAGER_CHART_VERSION = "v1.21.1"
 # renovate: datasource=helm depName=dagster packageName=dagster registryUrl=https://dagster-io.github.io/helm
 DAGSTER_CHART_VERSION = "1.13.18"
 # renovate: datasource=aws-eks-addon depName=aws-ebs-csi-driver versioning=aws-eks-addon
