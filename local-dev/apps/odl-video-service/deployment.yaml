@@ -71,6 +71,12 @@ spec:
         - "8089"
         - --workers
         - "2"
+        # Matches production (PR #5281): serve /static/* from Granian's Rust
+        # layer instead of a sidecar. STATIC_ROOT is /src/staticfiles, the
+        # same emptyDir collectstatic populates, and STATIC_URL is the
+        # default /static route.
+        - --static-path-mount
+        - /src/staticfiles
         - odl_video.wsgi:application
         ports:
         - containerPort: 8089
@@ -104,27 +110,7 @@ spec:
         - name: combined-ca
           mountPath: /etc/ssl/local-dev
           readOnly: true
-      - name: nginx
-        image: nginx:1.25-alpine
-        ports:
-        - containerPort: 8088
-          name: http
-        volumeMounts:
-        - name: nginx-conf
-          mountPath: /etc/nginx/conf.d/default.conf
-          subPath: default.conf
-        - name: static-files
-          mountPath: /src/staticfiles
-        resources:
-          requests:
-            cpu: 50m
-            memory: 64Mi
-          limits:
-            memory: 128Mi
       volumes:
-      - name: nginx-conf
-        configMap:
-          name: odlvideo-nginx-conf
       - name: static-files
         emptyDir: {}
       - name: mkcert-root-ca
@@ -286,4 +272,4 @@ spec:
   ports:
   - name: http
     port: 8088
-    targetPort: http
+    targetPort: http-wsgi

@@ -25,6 +25,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
     ONE_MEGABYTE_BYTE,
+    STATIC_ASSET_MAX_AGE_SECONDS,
 )
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.xpro.k8s_secrets import (
@@ -33,6 +34,7 @@ from ol_infrastructure.applications.xpro.k8s_secrets import (
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.components.services.apisix import OLApisixPluginConfig
 from ol_infrastructure.components.services.apisix_gateway_api import (
     OLApisixHTTPRoute,
     OLApisixHTTPRouteConfig,
@@ -587,10 +589,26 @@ if k8s_deploy:
                 # worker, 8 blocking threads, 16 backpressure, runtime defaults).
                 blocking_threads_idle_timeout=120,
                 enable_metrics=True,
+                # Serve /static/* from Granian's Rust layer instead of the sidecar
+                # (docs/plans/remove-nginx-sidecar.md, stage 3). STATIC_ROOT
+                # resolves to /src/staticfiles, the same emptyDir the
+                # collectstatic init container populates, and STATIC_URL is
+                # Granian's default /static route.
+                static_path_mounts=["/src/staticfiles"],
+                # The sidecar served this directory with `expires max`; Granian
+                # would otherwise fall back to its own 1-day default.
+                static_path_expires=STATIC_ASSET_MAX_AGE_SECONDS,
             ),
             vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
             registry="dockerhub",
-            import_nginx_config=True,
+            # The sidecar's only real job was serving /static/*, which Granian
+            # now does directly. What is left of it -- a /nginx-health endpoint
+            # nothing probes (probes use django-health-check), an
+            # X-Forwarded-Proto re-forward of the header APISix already sets,
+            # and a 25M body cap APISix does not enforce anyway -- is either
+            # redundant or translated to the APISix routes below. See
+            # docs/plans/remove-nginx-sidecar.md.
+            import_nginx_config=False,
             init_migrations=True,
             init_collectstatic=True,
             pre_deploy_commands=[
@@ -620,15 +638,92 @@ if k8s_deploy:
         ),
     )
 
+    # The `location` blocks that used to live in the nginx sidecar. HTTPRoute has
+    # no priority field -- APISix resolves overlapping rules by longest matching
+    # path prefix -- so /static/hash.txt outranks /static, which outranks /*,
+    # the same ordering nginx applied.
+    #
+    # Every rule names the numeric application_lb_service_port rather than the
+    # "http" port name: this app is on the Gateway API route path, and the
+    # named-port trap in OLApisixHTTPRoute._resolve_backend_port hardcodes
+    # "http" to the nginx sidecar's port. See docs/plans/remove-nginx-sidecar.md.
     xpro_apisix_httproute = OLApisixHTTPRoute(
         f"xpro-apisix-httproute-{stack_info.env_suffix}",
         route_configs=[
+            # nginx resolved this one against `root /src` with no `try_files`
+            # fallback, i.e. /src/static/hash.txt -- the source tree, not the
+            # collectstatic output. Granian's static_path_mounts serves
+            # /src/staticfiles/hash.txt instead: same content (the Dockerfile
+            # stamps $GIT_REF into both), different file.
+            OLApisixHTTPRouteConfig(
+                route_name="static-hash",
+                hosts=[app_domain],
+                paths=["/static/hash.txt"],
+                backend_service_name=xpro_k8s_app.application_lb_service_name,
+                backend_service_port=xpro_k8s_app.application_lb_service_port,
+                backend_import_nginx_config=False,
+                plugins=[
+                    OLApisixPluginConfig(
+                        name="response-rewrite",
+                        secretRef=None,
+                        config={
+                            "headers": {"set": {"Cache-Control": "private, no-cache"}}
+                        },
+                    ),
+                ],
+            ),
+            # Granian serves static without a CORS header; the sidecar added a
+            # blanket one. xpro has no shared plugin config supplying `cors`, so
+            # without this the header would silently disappear.
+            OLApisixHTTPRouteConfig(
+                route_name="static",
+                hosts=[app_domain],
+                paths=["/static/*"],
+                backend_service_name=xpro_k8s_app.application_lb_service_name,
+                backend_service_port=xpro_k8s_app.application_lb_service_port,
+                backend_import_nginx_config=False,
+                plugins=[
+                    OLApisixPluginConfig(
+                        name="response-rewrite",
+                        secretRef=None,
+                        config={
+                            "headers": {"set": {"Access-Control-Allow-Origin": "*"}},
+                        },
+                    ),
+                ],
+            ),
+            # A 204 here is the EFF Do Not Track convention for "no policy
+            # published". Kept as a mock so crawlers requesting it are answered
+            # at the gateway rather than burning a Granian blocking thread on a
+            # Django 404.
+            OLApisixHTTPRouteConfig(
+                route_name="dnt-policy",
+                hosts=[app_domain],
+                paths=["/.well-known/dnt-policy.txt"],
+                path_match_type="Exact",
+                backend_service_name=xpro_k8s_app.application_lb_service_name,
+                backend_service_port=xpro_k8s_app.application_lb_service_port,
+                backend_import_nginx_config=False,
+                plugins=[
+                    OLApisixPluginConfig(
+                        name="mocking",
+                        secretRef=None,
+                        config={
+                            "response_status": 204,
+                            "response_example": "",
+                            "content_type": "text/plain",
+                            "with_mock_header": False,
+                        },
+                    ),
+                ],
+            ),
             OLApisixHTTPRouteConfig(
                 route_name="passthrough",
                 hosts=[app_domain],
                 paths=["/*"],
                 backend_service_name=xpro_k8s_app.application_lb_service_name,
-                backend_service_port=xpro_k8s_app.application_lb_service_port_name,
+                backend_service_port=xpro_k8s_app.application_lb_service_port,
+                backend_import_nginx_config=False,
                 plugins=[],
             ),
         ],
