@@ -262,7 +262,7 @@ WITAN_SEND_TIMEOUT = "60s"
 # ★ A GRACE PERIOD SHORTER THAN THE REQUEST BUDGET RECREATES THE EXACT DEFECT
 # THIS PR REMOVES, just with a different executioner. Kubernetes defaults to 30s:
 # it sends SIGTERM, waits, then SIGKILLs. A write measured at 33.6s under load
-# would be killed mid-commit during a `Recreate` rollout, an eviction, or a node
+# would be killed mid-commit during a rollout, an eviction, or a node
 # drain — the caller gets a severed connection and cannot tell whether the write
 # landed, which is the definition of the indeterminate write. Trading ToolHive's
 # 30s cut for the kubelet's 30s cut would have been no trade at all.
@@ -487,13 +487,53 @@ def create_serving_tier(  # noqa: PLR0913
             # (moving admission to the data tier or a shared lease), not a
             # replica-count edit. Do NOT add an HPA.
             replicas=1,
-            # Recreate, NOT the default RollingUpdate, for the same reason: a
-            # rolling update briefly runs two pods, which is exactly the
-            # two-gates state above. The old pod is torn down first. With one
-            # replica this is what the StatefulSet effectively did anyway, so it
-            # costs nothing new — a deploy is a brief serving outage either way,
-            # and the migration Job already gates the rollout.
-            strategy=kubernetes.apps.v1.DeploymentStrategyArgs(type="Recreate"),
+            # ── RollingUpdate, changed from Recreate on 2026-08-20 ───────────
+            # Recreate was chosen to avoid ever running two pods, on the
+            # grounds that two pods means two write gates. That reasoning is
+            # still correct for STEADY-STATE replicas, which is why `replicas`
+            # above stays at 1 and an HPA is still the wrong answer. It does
+            # not hold for a rollout, and the cost of applying it there was
+            # measured rather than assumed.
+            #
+            # WHAT RECREATE COST. Recreate tears the only pod down before the
+            # new one starts, so every deploy has a window with ZERO endpoints.
+            # Measured against CI on 2026-08-20 by restarting witan-server
+            # during a 16-writer burst: 8 of 8 readers degraded, and 5 writes
+            # committed server-side while their callers were told the write
+            # failed. Six writes landed; one caller found out. That is the
+            # indeterminate write this stack exists to remove, re-entering
+            # through the rollout door.
+            #
+            # WHY TWO GATES DOES NOT ACTUALLY HAPPEN HERE. uvicorn stops
+            # ACCEPTING on SIGTERM and only drains what it already holds,
+            # so the old pod's gate admits nothing new from that moment. This
+            # was confirmed in the same run, not reasoned from the docs: of the
+            # 21 handlers that completed after SIGTERM, every one had started
+            # before it (latest start 219ms ahead of the signal), and the drain
+            # ran 19.6s while 15 in-flight writes finished. The genuinely
+            # two-gates window is only from "new pod Ready" to "old pod
+            # signalled", i.e. controller reaction time, not the length of the
+            # drain.
+            #
+            # maxUnavailable=0 is the load-bearing half: it keeps a Ready
+            # endpoint at all times, which is what removes the outage. maxSurge=1
+            # is the minimum that allows that with a single replica.
+            #
+            # ★ THIS DOES NOT, ON ITS OWN, PROVE THE IN-FLIGHT WRITES ARE SAFE.
+            # It removes the no-endpoint window, so new connections and readers
+            # stop failing. Whether a request already in flight on the
+            # terminating pod can still return depends on whether the proxy
+            # keeps its established upstream connection after the endpoint
+            # leaves the EndpointSlice, which is NOT yet established. Re-run
+            # `witan.scripts.concurrency_probe` across a rollout and read the
+            # INDETERMINATE bucket before claiming that half.
+            strategy=kubernetes.apps.v1.DeploymentStrategyArgs(
+                type="RollingUpdate",
+                rolling_update=kubernetes.apps.v1.RollingUpdateDeploymentArgs(
+                    max_unavailable=0,
+                    max_surge=1,
+                ),
+            ),
             selector=kubernetes.meta.v1.LabelSelectorArgs(
                 match_labels={"app.kubernetes.io/name": WITAN_SERVICE_NAME}
             ),
