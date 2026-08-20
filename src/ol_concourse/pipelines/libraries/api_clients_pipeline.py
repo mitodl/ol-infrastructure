@@ -19,6 +19,7 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resources import git_repo, registry_image, ssh_git_repo
 
+from bridge.lib.versions import OPENAPI_GENERATOR_VERSION
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
 from ol_concourse.pipelines.libraries.configuration import PIPELINE_CONFIGS
 
@@ -56,7 +57,7 @@ def generate_api_client_pipeline(  # noqa: PLR0913
     # Define parameterized image tags
     python_image_tag = "3.12-slim"
     node_image_tag = "24-slim"
-    openapi_generator_tag = "v7.2.0"
+    openapi_generator_tag = OPENAPI_GENERATOR_VERSION
 
     # Define script names
     generate_script: str = "generate-inner.sh"
