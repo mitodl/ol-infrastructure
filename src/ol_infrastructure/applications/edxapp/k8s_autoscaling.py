@@ -343,8 +343,8 @@ def create_celery_autoscaling_resources(
                 },
                 {
                     "type": "memory",
+                    "metricType": "Utilization",
                     "metadata": {
-                        "type": "Utilization",
                         "value": "70",
                     },
                 },
