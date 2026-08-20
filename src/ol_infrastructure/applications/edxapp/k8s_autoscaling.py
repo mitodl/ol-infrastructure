@@ -142,7 +142,9 @@ def create_celery_autoscaling_resources(
     (edx.lms.core.high_mem), and the CMS worker (edx.cms.core.default).
 
     Celery workers use Redis list length triggers (not Prometheus) so they
-    remain outside the OLApplicationK8s component.
+    remain outside the OLApplicationK8s component. CMS also carries an
+    additional memory-utilization trigger -- see the comment above the CMS
+    ScaledObject below for why queue depth alone missed a real slowdown.
 
     Returns:
         Dictionary containing created celery autoscaling resources.
@@ -280,6 +282,19 @@ def create_celery_autoscaling_resources(
     # edx.cms.core.default is a poor signal that the work is done -- and the git export
     # tasks that dominate these bursts run 30-113s each. Bleeding down also keeps warm
     # pods around for the next burst, which is what actually breaks the flapping cycle.
+    #
+    # Second trigger: memory utilization. On 2026-08-19 the sole cms-celery replica's
+    # memory climbed from ~1.3Gi to ~3.5Gi (of a 4Gi request / 6Gi VPA-managed limit)
+    # over about 17 hours -- driven by a full-catalog search reindex sharing the
+    # worker with routine CMS tasks -- while course exports got steadily slower. The
+    # HPA's desired-replica count never left 1 the entire time: tasks were still being
+    # dequeued promptly, so edx.cms.core.default never crossed listLength=10. A
+    # queue-depth trigger can't see "the worker that already grabbed the task is now
+    # resource-starved and slow to finish it" -- it only sees an empty list. 70% of
+    # the 4Gi request (~2.8Gi) gives a few hours of lead time at that climb rate,
+    # comfortably before the 6Gi ceiling. The HPA takes the max desired-replica count
+    # across all triggers, so this is additive to the redis trigger above, not a
+    # replacement -- either signal firing scales the deployment up.
     cms_celery_scaledobject = kubernetes.apiextensions.CustomResource(
         f"ol-{stack_info.env_prefix}-edxapp-cms-celery-scaledobject-{stack_info.env_suffix}",
         api_version="keda.sh/v1alpha1",
@@ -325,7 +340,14 @@ def create_celery_autoscaling_resources(
                         "listLength": "10",
                         "enableTLS": "true",
                     },
-                }
+                },
+                {
+                    "type": "memory",
+                    "metadata": {
+                        "type": "Utilization",
+                        "value": "70",
+                    },
+                },
             ],
         },
         opts=pulumi.ResourceOptions(depends_on=[cms_celery_deployment]),
