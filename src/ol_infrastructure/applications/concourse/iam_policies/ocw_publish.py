@@ -27,6 +27,8 @@ publish_buckets = [
     f"ocw-content-live-{stack_info.env_suffix}",
     f"ocw-content-offline-draft-{stack_info.env_suffix}",
     f"ocw-content-offline-live-{stack_info.env_suffix}",
+    f"ocw-content-test-{stack_info.env_suffix}",
+    f"ocw-content-offline-test-{stack_info.env_suffix}",
 ]
 
 policy_definition = {
