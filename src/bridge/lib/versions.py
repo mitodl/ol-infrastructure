@@ -37,7 +37,7 @@ APISIX_CHART_VERSION = "2.16.1"
 AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=aws-node-termination-handler packageName=aws-node-termination-handler registryUrl=https://aws.github.io/eks-charts
 AWS_NODE_TERMINATION_HANDLER_CHART_VERSION = "0.27.2"
-# renovate: datasource=helm depName=cert-manager packageName=cert-manager
+# renovate: datasource=helm depName=cert-manager packageName=cert-manager registryUrl=https://charts.jetstack.io
 CERT_MANAGER_CHART_VERSION = "v1.16.1"
 # renovate: datasource=helm depName=dagster packageName=dagster registryUrl=https://dagster-io.github.io/helm
 DAGSTER_CHART_VERSION = "1.13.18"
@@ -51,7 +51,7 @@ EXTERNAL_DNS_CHART_VERSION = "1.21.1"
 GATEWAY_API_VERSION = "v1.6.1"
 # renovate: datasource=docker depName=karpenter packageName=public.ecr.aws/karpenter/karpenter
 KARPENTER_CHART_VERSION = "1.14.0"
-# renoavate: datasource=helm depName=keda registryUrl=https://kedacore.github.io/charts packageName=keda
+# renovate: datasource=helm depName=keda packageName=keda registryUrl=https://kedacore.github.io/charts
 KEDA_CHART_VERSION = "2.17.1"
 # renovate: datasource=docker depName=kube-state-metrics packageName=registry-1.docker.io/bitnamicharts/kube-state-metrics
 KUBE_STATE_METRICS_CHART_VERSION = "5.1.0"
@@ -93,9 +93,10 @@ KEYCLOAK_OPERATOR_CRD_VERSION = "26.7.2"
 JUPYTERHUB_CHART_VERSION = "4.4.1"
 # renovate: datasource=github-releases depName=marimo-operator packageName=marimo-team/marimo-operator
 MARIMO_OPERATOR_VERSION = "v0.3.0"
-# renovate: datasource=docker depName=marimo-jupyterlab packageName=ghcr.io/mitodl/marimo-jupyterlab
 # TODO(tmacey): pin to a versioned tag once ghcr.io/mitodl/marimo-jupyterlab publishes one.  # noqa: FIX002
-# Renovate is configured above to bump this automatically on the first tagged release.
+# The custom manager's regex requires the marker to sit on the line directly
+# above the assignment, so any explanation has to go above the marker.
+# renovate: datasource=docker depName=marimo-jupyterlab packageName=ghcr.io/mitodl/marimo-jupyterlab
 MARIMO_JUPYTERLAB_VERSION = "latest"
 # renovate: datasource=helm depName=k8s-monitoring packageName=k8s-monitoring registryUrl=https://grafana.github.io/helm-charts
 GRAFANA_K8S_MONITORING_CHART_VERSION = "4.4.0"
@@ -105,9 +106,9 @@ NVIDIA_DCGM_EXPORTER_CHART_VERSION = "4.8.3"
 NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION = "0.20.0"
 # renovate: datasource=docker depName=pgbouncer packageName=ghcr.io/cloudnative-pg/pgbouncer
 PGBOUNCER_VERSION = "1.25.2"
-# renovate: datasource=docker depName=pgbouncer-exporter packageName=quay.io/prometheuscommunity/pgbouncer-exporter
 # Keep at >= v0.12.1: earlier releases report the reserve_pool metric incorrectly
 # against PgBouncer >= 1.24, which is the version PGBOUNCER_VERSION pins.
+# renovate: datasource=docker depName=pgbouncer-exporter packageName=quay.io/prometheuscommunity/pgbouncer-exporter
 PGBOUNCER_EXPORTER_VERSION = "v0.12.1"
 # renovate: datasource=docker depName=sql-exporter packageName=burningalchemist/sql_exporter
 SQL_EXPORTER_VERSION = "0.24.6"
