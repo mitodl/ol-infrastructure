@@ -52,6 +52,7 @@ from ol_infrastructure.components.services.apisix import (  # noqa: E402
     OLApisixSharedPluginsConfig,
     OLApisixUpstream,
     OLApisixUpstreamConfig,
+    oidc_error_callback_recovery_plugin,
     stale_session_cookie_cleanup_plugin,
 )
 
@@ -347,6 +348,82 @@ def test_cleanup_plugin_honours_a_custom_stale_name():
     assert 'name == "mitlearn_apisix_session"' in lua
 
 
+# ─── OIDC error callback recovery ──────────────────────────────────────────────
+
+
+def test_recovery_plugin_runs_in_rewrite_before_openid_connect():
+    """openid-connect runs in rewrite; the access phase would be too late."""
+    plugin = oidc_error_callback_recovery_plugin()
+
+    assert plugin.name == "serverless-pre-function"
+    assert plugin.config["phase"] == "rewrite"
+
+
+def test_recovery_plugin_defaults_to_the_only_error_production_emits():
+    """access_denied means the user pressed Cancel -- restarting the flow there
+    would bounce the browser between the gateway and Keycloak.
+    """
+    options = oidc_error_callback_recovery_plugin().config["oidc_error_recovery"]
+
+    assert options["recoverable_errors"] == ["temporarily_unavailable"]
+
+
+def test_recovery_plugin_honours_a_custom_error_list():
+    options = oidc_error_callback_recovery_plugin(
+        recoverable_errors=["temporarily_unavailable", "server_error"],
+    ).config["oidc_error_recovery"]
+
+    assert options["recoverable_errors"] == ["temporarily_unavailable", "server_error"]
+
+
+def test_recovery_plugin_honours_an_explicit_empty_error_list():
+    """An empty list means "recover nothing" -- the way to make the plugin a
+    no-op without detaching it from every route on a shared config.
+    """
+    options = oidc_error_callback_recovery_plugin(
+        recoverable_errors=[],
+    ).config["oidc_error_recovery"]
+
+    assert options["recoverable_errors"] == []
+
+
+def test_recovery_plugin_passes_guard_settings_as_config():
+    """Tunables travel on the plugin config and are read off ``conf`` in Lua,
+    so nothing is interpolated into the shipped source.
+    """
+    options = oidc_error_callback_recovery_plugin(
+        guard_cookie_name="custom_guard",
+        guard_max_age=90,
+    ).config["oidc_error_recovery"]
+
+    assert options["guard_cookie_name"] == "custom_guard"
+    assert options["guard_max_age"] == 90
+
+
+def test_recovery_plugin_ships_the_lua_file_verbatim():
+    """The function body is the checked-in .lua file, not a generated string --
+    no configuration is interpolated into it.
+    """
+    (source,) = oidc_error_callback_recovery_plugin(
+        guard_cookie_name="custom_guard",
+        recoverable_errors=["server_error"],
+    ).config["functions"]
+
+    assert source == apisix_module.OIDC_ERROR_RECOVERY_LUA
+    assert "custom_guard" not in source
+    assert "server_error" not in source
+
+
+def test_recovery_lua_reads_its_settings_off_conf():
+    """Guards the contract between the .lua file and the config block above."""
+    source = apisix_module.OIDC_ERROR_RECOVERY_LUA
+
+    assert "conf.oidc_error_recovery" in source
+    assert "opts.recoverable_errors" in source
+    assert "opts.guard_cookie_name" in source
+    assert "opts.guard_max_age" in source
+
+
 # ─── Shared plugin defaults ────────────────────────────────────────────────────
 
 
@@ -485,6 +562,53 @@ def test_gzip_reaches_the_gateway_api_plugin_config():
         assert gzip is not None
         # v1alpha1 accepts only name and config -- ``enable`` is v2-only.
         assert set(gzip) == {"name", "config"}
+
+    return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_recovery_plugin_renders_into_the_v2_plugin_config():
+    """The applications attach this to a host's shared plugin config rather
+    than per route, so it has to survive that normalisation.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-oidc-recovery-v2",
+        plugins=[oidc_error_callback_recovery_plugin()],
+    )
+
+    def check(spec):
+        recovery = plugin_named(spec["plugins"], "serverless-pre-function")
+        assert recovery is not None
+        assert recovery["config"]["phase"] == "rewrite"
+        # The settings block is not part of serverless-pre-function's schema.
+        # It reaches the gateway because the CRD marks config
+        # x-kubernetes-preserve-unknown-fields, the controller holds it as raw
+        # apiextensionsv1.JSON, ADC as map[string]any, and APISIX's serverless
+        # schema does not set additionalProperties.  If a future version
+        # tightens any of those, this is the assertion that should fail first.
+        assert recovery["config"]["oidc_error_recovery"] == {
+            "recoverable_errors": ["temporarily_unavailable"],
+            "guard_cookie_name": "apisix_oidc_recovery",
+            "guard_max_age": 60,
+        }
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_recovery_plugin_reaches_the_gateway_api_plugin_config():
+    """v1alpha1 drops secretRef, which this plugin sets to None -- a shape the
+    other shared plugins do not exercise.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-oidc-recovery-gateway-api",
+        plugins=[oidc_error_callback_recovery_plugin()],
+    )
+
+    def check(spec):
+        recovery = plugin_named(spec["plugins"], "serverless-pre-function")
+        assert recovery is not None
+        assert set(recovery) == {"name", "config"}
 
     return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
 

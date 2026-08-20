@@ -1,6 +1,7 @@
 # ruff: noqa: E501
 """APISIX ingress controller components for Kubernetes."""
 
+from pathlib import Path
 from typing import Any, Literal
 
 import pulumi_kubernetes as kubernetes
@@ -13,6 +14,14 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SStaticSecretConfig,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+
+# Read once at import: the file is shipped verbatim as the serverless function
+# body, with configuration passed separately on the plugin config.
+OIDC_ERROR_RECOVERY_LUA = (
+    Path(__file__)
+    .parent.joinpath("files", "oidc_error_callback_recovery.lua")
+    .read_text()
+)
 
 
 class OLApisixPluginConfig(BaseModel):
@@ -100,6 +109,96 @@ end"""
         # openid-connect plugin has set the cookies it *does* own so that
         # add_header appends to them rather than being overwritten.
         config={"phase": "header_filter", "functions": [cleanup_function]},
+    )
+
+
+def oidc_error_callback_recovery_plugin(
+    recoverable_errors: list[str] | None = None,
+    guard_cookie_name: str = "apisix_oidc_recovery",
+    guard_max_age: int = 60,
+) -> OLApisixPluginConfig:
+    """Restart the login flow when the IdP redirects back with a recoverable error.
+
+    An authorization request whose Keycloak authentication session has expired
+    -- the user left the login tab open, or followed a stale bookmark -- comes
+    back to the callback with ``error=temporarily_unavailable`` and no ``code``.
+    Keycloak's intent there is that the client start over; it even marks the
+    event ``restart_after_timeout="true"``.  ``lua-resty-openidc`` instead
+    treats any ``error`` parameter as fatal and hands the openid-connect plugin
+    a failure, which APISIX serves as a 21KB HTTP 500.  The user sees a
+    stack-trace page where they expected a login form, and nothing retries.
+
+    This is measured, not hypothetical: 614 such callbacks a day across
+    api.learn.mit.edu, mitxonline.mit.edu and nb.learn.mit.edu, from 530
+    distinct client addresses, 181 of which never reached a successful callback
+    in the same 24 hours.  It is the only one of the three causes of callback
+    500s that actually blocks anybody -- see ``log_rules/apisix_oidc.py``.
+
+    Running before openid-connect, this turns that dead end back into a login
+    page.  The redirect target is derived from the callback URI rather than
+    configured: APISIX's callback always sits at ``<login prefix>/.apisix/
+    redirect``, and the route serving it is by construction the one with
+    ``unauth_action="auth"``, so redirecting to the parent path re-enters the
+    authorization flow that just failed and lands the user wherever that route
+    normally sends them.  That keeps this attachable to a host's shared plugin
+    config with no per-application wiring.
+
+    Only errors the IdP considers transient are recovered.  ``access_denied``
+    (the user pressed "Cancel") or ``invalid_request`` (a real
+    misconfiguration) must keep failing loudly -- bouncing those back into
+    ``/login`` would spin the browser between the gateway and Keycloak.
+
+    Recovery is attempted at most once per ``guard_max_age`` seconds per
+    browser, tracked by a short-lived guard cookie.  If the retry hits the same
+    error, the second callback falls through to the plugin's 500 instead of
+    looping: a persistently broken IdP should surface as an error, not as an
+    infinite redirect.
+
+    The Lua itself lives in ``files/oidc_error_callback_recovery.lua`` and is
+    shipped verbatim -- nothing is interpolated into it.  Tunables travel as an
+    ``oidc_error_recovery`` block on the plugin config, which the function reads
+    off ``conf``: ``serverless/init.lua`` invokes each function as
+    ``func(conf, ctx)``, and its schema does not set ``additionalProperties``,
+    so extra keys validate.  Keeping it a real ``.lua`` file means it is
+    syntax-highlighted, reviewable, and testable under APISIX's own test-nginx
+    harness (``t/oidc_error_callback_recovery.t``).
+
+    :param recoverable_errors: OAuth 2.0 ``error`` codes to restart the flow
+        for.  Defaults to ``temporarily_unavailable``, which is 100% of what
+        production emits today.  An explicit empty list makes the plugin a
+        no-op, for turning it off without detaching it from every route that
+        references a shared plugin config.
+    :param guard_cookie_name: Name of the loop-breaker cookie.
+    :param guard_max_age: Seconds the guard cookie lives, bounding how often one
+        browser can be sent back through login.
+
+    :returns: A ``serverless-pre-function`` plugin config to attach to routes.
+    :rtype: OLApisixPluginConfig
+    """
+    return OLApisixPluginConfig(
+        name="serverless-pre-function",
+        secretRef=None,
+        # rewrite rather than the plugin's default access phase: openid-connect
+        # also runs in rewrite, and serverless-pre-function's priority (10000)
+        # outranks it (2599), so this gets to inspect the callback and bail out
+        # before the plugin turns the error parameter into a 500.  In the access
+        # phase it would run after openid-connect had already failed.
+        config={
+            "phase": "rewrite",
+            "functions": [OIDC_ERROR_RECOVERY_LUA],
+            "oidc_error_recovery": {
+                # `is None`, not `or`: an explicit empty list means "recover
+                # nothing", and `or` would quietly turn that back into the
+                # default.
+                "recoverable_errors": (
+                    ["temporarily_unavailable"]
+                    if recoverable_errors is None
+                    else recoverable_errors
+                ),
+                "guard_cookie_name": guard_cookie_name,
+                "guard_max_age": guard_max_age,
+            },
+        },
     )
 
 
