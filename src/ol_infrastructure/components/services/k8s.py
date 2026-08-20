@@ -371,6 +371,23 @@ class GranianConfig(BaseModel):
             "static path mounts simultaneously."
         ),
     )
+    static_path_routes: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Route to serve each static_path_mounts entry under, paired positionally "
+            "(index N here maps to index N there) into '--static-path-route <route>' "
+            "flags. Leave empty for a single mount to take Granian's default of "
+            "'/static'. Required -- and validated below -- as soon as "
+            "static_path_mounts has more than one entry: Granian pairs mounts to "
+            "routes positionally and refuses to start rather than falling back to a "
+            "shared route (granian/server/common.py::_init_static_mounts, verified "
+            "at v2.7.4). There is also no cross-mount fallthrough on a miss within a "
+            "route -- src/files.rs::match_static_file returns on the first matching "
+            "mount's NotFound rather than trying a second one -- so two mounts can "
+            "only serve two genuinely distinct routes, never one route with a "
+            "priority-ordered fallback the way nginx's try_files could."
+        ),
+    )
     static_path_expires: NonNegativeInt | None = Field(
         default=None,
         description=(
@@ -397,6 +414,32 @@ class GranianConfig(BaseModel):
             )
             raise ValueError(msg)
         return v
+
+    @model_validator(mode="after")
+    def validate_static_path_routes(self) -> "GranianConfig":
+        """Fail at synth time, not container startup, on a mount/route mismatch.
+
+        Mirrors granian's own check (``_init_static_mounts``) so a misconfiguration
+        shows up in ``pulumi preview`` instead of a CrashLoopBackOff.
+        """
+        mounts, routes = len(self.static_path_mounts), len(self.static_path_routes)
+        if routes and routes != mounts:
+            msg = (
+                f"granian_config.static_path_routes has {routes} entries but "
+                f"static_path_mounts has {mounts}; Granian pairs them positionally "
+                "and requires equal lengths whenever static_path_routes is set."
+            )
+            raise ValueError(msg)
+        if mounts > 1 and not routes:
+            msg = (
+                f"granian_config.static_path_mounts has {mounts} entries but "
+                "static_path_routes is empty. Granian requires one explicit "
+                "--static-path-route per mount as soon as there is more than one; "
+                "with none given it raises ConfigurationError('static_path') at "
+                "startup rather than sharing a default route across them."
+            )
+            raise ValueError(msg)
+        return self
 
     @model_validator(mode="after")
     def resolve_concurrency(self) -> "GranianConfig":
@@ -468,6 +511,8 @@ class GranianConfig(BaseModel):
                 "--metrics-port",
                 str(self.metrics_port),
             ]
+        for route in self.static_path_routes:
+            args += ["--static-path-route", route]
         for path in self.static_path_mounts:
             args += ["--static-path-mount", path]
         if self.static_path_expires is not None:

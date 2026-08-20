@@ -113,17 +113,16 @@ def test_granian_config_single_static_path_mount():
     assert args.count("--static-path-mount") == 1
 
 
-def test_granian_config_multiple_static_path_mounts():
-    gc = GranianConfig(
-        application_module="myapp.wsgi:application",
-        static_path_mounts=["/static", "/media"],
-    )
-    args = gc.build_args()
-    assert args.count("--static-path-mount") == 2
-    indices = [i for i, a in enumerate(args) if a == "--static-path-mount"]
-    values = [args[i + 1] for i in indices]
-    assert "/static" in values
-    assert "/media" in values
+def test_granian_config_multiple_static_path_mounts_without_routes_raises():
+    """Granian requires one --static-path-route per mount once there's more than
+    one, or it raises ConfigurationError('static_path') at container startup
+    rather than sharing a default route. Catch it at synth time instead.
+    """
+    with pytest.raises(ValidationError):
+        GranianConfig(
+            application_module="myapp.wsgi:application",
+            static_path_mounts=["/static", "/media"],
+        )
 
 
 def test_granian_config_static_path_mounts_before_log_level():
@@ -135,6 +134,55 @@ def test_granian_config_static_path_mounts_before_log_level():
     mount_idx = args.index("--static-path-mount")
     log_idx = args.index("--log-level")
     assert mount_idx < log_idx
+
+
+# ─── GranianConfig.static_path_routes ─────────────────────────────────────────
+
+
+def test_granian_config_no_static_path_routes():
+    gc = GranianConfig(application_module="myapp.wsgi:application")
+    assert "--static-path-route" not in gc.build_args()
+
+
+def test_granian_config_multiple_static_path_mounts_with_routes():
+    """Two mounts serving two genuinely distinct routes -- the shape gap 1 in
+    docs/plans/remove-nginx-sidecar.md needed for mit_learn's /media/* --
+    not a priority-ordered fallback within one route (Granian has none, see
+    the static_path_routes field docstring).
+    """
+    gc = GranianConfig(
+        application_module="myapp.wsgi:application",
+        static_path_mounts=["/src/staticfiles", "/src/django_media"],
+        static_path_routes=["/static", "/media"],
+    )
+    args = gc.build_args()
+    assert args.count("--static-path-mount") == 2
+    assert args.count("--static-path-route") == 2
+    mount_indices = [i for i, a in enumerate(args) if a == "--static-path-mount"]
+    route_indices = [i for i, a in enumerate(args) if a == "--static-path-route"]
+    mounts = [args[i + 1] for i in mount_indices]
+    routes = [args[i + 1] for i in route_indices]
+    assert mounts == ["/src/staticfiles", "/src/django_media"]
+    assert routes == ["/static", "/media"]
+
+
+def test_granian_config_static_path_routes_length_mismatch_raises():
+    with pytest.raises(ValidationError):
+        GranianConfig(
+            application_module="myapp.wsgi:application",
+            static_path_mounts=["/src/staticfiles", "/src/django_media"],
+            static_path_routes=["/static"],
+        )
+
+
+def test_granian_config_static_path_routes_before_log_level():
+    gc = GranianConfig(
+        application_module="myapp.wsgi:application",
+        static_path_mounts=["/a", "/b"],
+        static_path_routes=["/static", "/media"],
+    )
+    args = gc.build_args()
+    assert args.index("--static-path-route") < args.index("--log-level")
 
 
 # ─── GranianConfig.static_path_expires ────────────────────────────────────────
