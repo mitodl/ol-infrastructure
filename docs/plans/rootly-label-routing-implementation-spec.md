@@ -420,6 +420,7 @@ Same commit: `component: Component | None` (dropping `| str`), and retype
 coincidence (§0.7).
 
 **Commit B — add `alert_tier`, and move the roll-up fields into the base class.**
+Landed 2026-08-20, with two corrections to the sketch below.
 
 ```python
 @unique
@@ -436,16 +437,16 @@ class K8sGlobalLabels(BaseModel):
     service: Services
     stack: StackInfo
     # Moved down from K8sAppLabels: a base-class-labeled resource must still be
-    # rollable-up to a product, and 26 of the 40 label call sites use this class.
+    # rollable-up to a product, and 26 of the 39 label call sites use this class.
     product: Product | None = None
     application: Application | None = None
-    component: Component | str | None = None
+    component: Component | None = None
     alert_tier: AlertTier | None = None
     # Overrides the value derived from stack.env_suffix in model_dump. A workload
     # whose logical environment differs from its cluster's -- mitx-staging-* in
     # residential-production -- must be able to say so; today it silently inherits
     # the cluster's answer and is treated as production. See analysis section 5.4.
-    environment: Environment | str | None = None
+    environment: DeploymentEnvironment | None = None
 ```
 
 `model_dump` changes one line: `ol.mit.edu/environment` becomes
@@ -455,6 +456,41 @@ all four new fields default to `None` and `exclude_none=True` already drops them
 `K8sAppLabels` keeps `pod_security_group`, `source_repository`, `commit_sha`,
 `release_tag` and re-declares `product`, `application` and `source_repository` as
 required, so it stays the stricter contract it is today.
+
+**Correction 1: `environment` cannot be typed `Environment`.** That enum's members
+are `applications`, `data`, `mitx`, `mitxonline`, `mitx-staging`, `operations`,
+`xpro` — it names the VPC a resource lives in. The label it would be overriding is
+`stack.env_suffix`, whose values are `ci`, `qa`, `production`, `dev`, plus the `rc`
+spelling ODL Video and the Pingdom checks use for QA. Typing the override against
+`Environment` would have made the field unable to express any value the label
+actually takes. A separate `DeploymentEnvironment` enum carries the stage, and both
+enums now carry a docstring saying which axis they are.
+
+**Correction 2: the `| str` escape hatches stay closed.** Commit A removed
+`Component | str`; re-adding it here would undo that in the same phase.
+
+**What honoring the fields cost, which the sketch does not mention.** Four call
+sites — Airbyte, Dagster, JupyterHub, Kubewatch — were already passing `product`
+and `application` to `K8sGlobalLabels`, where pydantic discarded them. `mypy` had
+been reporting all four as `Unexpected keyword argument` against a 624-error
+baseline, so nothing surfaced them. All four also pass `source_repository`, so all
+four met `K8sAppLabels`' full contract and were switched to it.
+
+Making those values take effect adds labels to rendered resources, and two of them
+landed in selectors. Dagster spread the whole rendered label dict into
+`spec.selector.matchLabels` on the pgbouncer and sql-exporter Deployments and into
+`spec.selector` on their Services. A Deployment selector is immutable, so every
+future label addition — including the `alert_tier` and `component` backfill in §3.3
+— would have demanded a delete-and-recreate of the Deployment that fronts every
+database connection the data platform makes. A Service selector is mutable but has
+to agree with the pod labels, and nothing orders the Service patch after the
+Deployment finishes rolling; in between, the Service has no endpoints. Both are now
+frozen to the four keys the live selectors already carry.
+
+**Before the §3.3 backfill touches any workload, check it the same way:** a label
+set that is about to grow must not be the source of a selector. `pulumi preview`
+finds these — the Service selector above did not appear in any grep for
+`matchLabels`, only in the preview diff.
 
 ### 3.2 Enum hygiene, same phase
 
@@ -473,16 +509,35 @@ required, so it stays the stricter contract it is today.
 
 ### 3.3 Coverage backfill (the long pole)
 
-Order by blast radius, not by count:
+Order by blast radius, not by count. Re-measured 2026-08-20 against pod-template
+labels — the ones `kube_pod_labels` reads, not the workload's `metadata.labels`:
 
-1. **`operations-production`** — 59 workloads, 57 unlabeled. APISIX, cert-manager and
-   the shared ingress live here; these are the widest-blast-radius workloads in the
-   estate and the worst-covered. Tier `page`, `component` = `gateway`/`ingress`.
-2. **`data-production`** — 91 workloads, 87 unlabeled. Mostly Dagster and pipeline
-   workloads; tier `ticket` or `notify`. High count, low paging stake.
-3. **`applications-production`** — 61 of 112 unlabeled. Highest paging stake per
-   workload; the 51 already labeled need `alert_tier` and `component` added, not
-   labels from scratch.
+| cluster | workloads | `service` | `component` | `alert_tier` |
+| --- | --- | --- | --- | --- |
+| `operations-production` | 66 | 7 (10%) | 0 (0%) | 0 |
+| `data-production` | 93 | 15 (16%) | 1 (1%) | 0 |
+| `applications-production` | 113 | 53 (46%) | 46 (40%) | 0 |
+| `residential-production` | 71 | 24 (33%) | 18 (25%) | 0 |
+
+1. **`operations-production`** — the widest-blast-radius workloads in the estate and
+   the worst-covered: APISIX, cert-manager and the shared ingress. Tier `page`,
+   `component` = `gateway`/`ingress`. Note that `Services` has no member for any of
+   them, so this backfill starts by extending that enum, not by labeling.
+2. **`data-production`** — mostly Dagster and pipeline workloads; tier `ticket` or
+   `notify`. High count, low paging stake.
+3. **`applications-production`** and **`residential-production`** — highest paging
+   stake per workload. The 71 already carrying `component` need `alert_tier` added,
+   not labels from scratch.
+
+`alert_tier` is at zero everywhere, by construction: the field landed 2026-08-20 and
+nothing sets it yet. That is the number §3.5's gate is measured against, and the
+reason Phase 3 stays blocked — at today's coverage a `group_left` rewrite would
+silence most of EKS alerting rather than re-tier it.
+
+Constructing a label object is not the same as labeling anything. Kubewatch builds a
+full `K8sAppLabels` and then never passes it to a resource; `pulumi preview` on that
+stack reports zero changes. The §3.4 gate is written against rendered resources for
+exactly this reason.
 
 Also backfill CI/QA clusters, which the analysis explicitly did not measure. Coverage
 there does not affect paging (CI/QA alerts go Slack-only per §8.1) but an unlabeled QA
