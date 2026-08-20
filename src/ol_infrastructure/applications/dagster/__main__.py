@@ -139,16 +139,21 @@ k8s_global_labels = K8sAppLabels(
     stack=stack_info,
 )
 
-# spec.selector.matchLabels is immutable, so a selector derived from the ol.mit.edu
-# label set makes every future label addition a delete-and-recreate of the workload
-# carrying it. That set is explicitly still growing -- alert_tier and component are
-# being added across the estate so alert routing can read a workload's paging
-# eligibility off the workload -- and one of the two Deployments selecting on it here
-# fronts every database connection the data platform makes.
+# Selector labels for pgbouncer and sql-exporter, deliberately narrower than the
+# labels those resources carry. The ol.mit.edu set is still growing -- alert_tier
+# and component are being added across the estate so alert routing can read a
+# workload's paging eligibility off the workload -- and a selector derived from it
+# breaks in two ways as it grows.
 #
-# Frozen to the four keys the live selectors already carry, so adding a label is a
-# metadata patch and nothing more. Do not add to this tuple: a selector may only be
-# widened by replacing the Deployment.
+# A Deployment's spec.selector is immutable, so every added label becomes a
+# delete-and-recreate of the workload carrying it. A Service's selector is mutable
+# but must agree with the pod labels, and Pulumi has no reason to patch the Service
+# after the Deployment finishes rolling -- for the window in between, a widened
+# selector matches no pods and the Service has no endpoints. pgbouncer fronts every
+# database connection the data platform makes.
+#
+# Frozen to the four keys the live selectors already carry. Do not add to this
+# tuple: a Deployment selector can only be widened by replacing the Deployment.
 DAGSTER_SELECTOR_LABEL_KEYS = (
     "ol.mit.edu/ou",
     "ol.mit.edu/service",
@@ -1190,7 +1195,7 @@ pgbouncer_service = kubernetes.core.v1.Service(
         type="ClusterIP",
         selector={
             "component": "pgbouncer",
-            **k8s_global_labels.model_dump(),
+            **dagster_selector_labels,
         },
         ports=[
             kubernetes.core.v1.ServicePortArgs(
@@ -1859,7 +1864,7 @@ sql_exporter_service = kubernetes.core.v1.Service(
         type="ClusterIP",
         selector={
             "component": "sql-exporter",
-            **k8s_global_labels.model_dump(),
+            **dagster_selector_labels,
         },
         ports=[
             kubernetes.core.v1.ServicePortArgs(
