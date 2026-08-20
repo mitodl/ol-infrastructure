@@ -927,6 +927,7 @@ mitxonline_apisix_route_direct = OLApisixRoute(
             priority=20,
             hosts=[api_domain, frontend_domain],
             paths=["/static/hash.txt"],
+            shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
             backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
             plugins=[
@@ -1040,6 +1041,7 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
             priority=20,
             hosts=[learn_api_domain],
             paths=[f"/{api_path_prefix}/static/hash.txt"],
+            shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             plugins=[
                 proxy_rewrite_plugin_config,
                 OLApisixPluginConfig(
