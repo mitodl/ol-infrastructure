@@ -5,7 +5,8 @@ How to add a new app to the stack or change the shared in-cluster infrastructure
 ## Table of Contents
 
 1. [Adding a New App](#adding-a-new-app)
-2. [Modifying Shared Infrastructure](#modifying-shared-infrastructure)
+2. [Adding Test Courseware](#adding-test-courseware)
+3. [Modifying Shared Infrastructure](#modifying-shared-infrastructure)
 
 ## Adding a New App
 
@@ -73,6 +74,40 @@ In `Tiltfile`, add an entry to the `APPS` list:
 ### 6. Add hosts and DNS
 
 In `setup.sh`, add the hostname to `HOSTS` and ensure it's covered by a `MKCERT_DOMAINS` wildcard. Re-run `setup.sh` to update `/etc/hosts` and regenerate the cert.
+
+## Adding Test Courseware
+
+Courses and programs come from a single file, `local-dev/data/courseware-seed.json`. Add
+an entry there and re-trigger the seed:
+
+```bash
+tilt trigger seed-courseware
+```
+
+No code changes are needed — both sides of the seed read that file, which is the whole
+point: a course run only works end to end if mitxonline's `courseware_id` and the Open
+edX course key are identical, and deriving both from one entry makes them impossible to
+get out of step.
+
+Three rules the seed cannot paper over:
+
+- **A course `readable_id` must be `course-v1:ORG+NUMBER` — exactly one `+`.** The seed
+  derives the run id as `<readable_id>+<run_tag>`, and mitxonline's `COURSE_KEY_PATTERN`
+  requires exactly two. `ORG` and `NUMBER` also become the Open edX org and course
+  number, so keep them free of spaces.
+- **A program `readable_id` must start with `program`** (`program-v1:ORG+NAME` by
+  convention).
+- **No backslashes or `"""` anywhere in the file.** It is embedded in the seed's Python
+  payloads as a raw triple-quoted string; the script refuses to run rather than let
+  either produce a syntax error far from its cause.
+
+`"price": null` makes a run audit-only — no `Product`, so it cannot be purchased.
+`"finaid": true` adds financial-assistance tiers and a request form.
+
+The seed itself is [`scripts/seed-courseware.sh`](scripts/seed-courseware.sh), which
+orchestrates two Python payloads under `scripts/seed-courseware/`. Those run inside the
+*apps'* Django processes (piped into `manage.py shell`), not this repo's, so they import
+mitxonline and edx-platform models — nothing there is importable locally.
 
 ## Modifying Shared Infrastructure
 

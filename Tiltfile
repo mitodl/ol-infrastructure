@@ -220,7 +220,10 @@ APPS = [
             {
                 "label": "seed-mitxonline-income-thresholds",
                 "description": "Load country income thresholds for financial assistance",
-                "cmd": "python manage.py load_country_income_thresholds flexiblepricing/fixtures/country_income_threshold_data.json",
+                # The CSV, not flexiblepricing/fixtures/*.json: the command
+                # parses a CSV with a header row and raises
+                # CountryIncomeThresholdException on the Django-fixture JSON.
+                "cmd": "python manage.py load_country_income_thresholds flexiblepricing/data/country_income_thresholds.csv",
             },
         ],
     },
@@ -366,3 +369,41 @@ for app in [a for a in APPS if a["name"] in enabled_apps]:
             trigger_mode=TRIGGER_MODE_MANUAL,
             auto_init=False,
         )
+
+# ---------------------------------------------------------------------------
+# Test courseware (mitxonline + Open edX)
+#
+# The one seed that spans both systems, so it cannot go in the APPS registry
+# above: that generator only knows how to `kubectl exec` into a single pod,
+# while this creates the courses in tutor's Studio as well. Registered here
+# rather than in local-dev/apps/openedx-tutor/Tiltfile because it has to work in
+# qa mode too, where that Tiltfile is never included — and openedx_mode is only
+# readable from this root Tiltfile.
+#
+# Manual, unlike the other openedx-tutor resources: creating courses is slow,
+# and a developer who has been editing courseware by hand should choose when it
+# reasserts itself.
+# ---------------------------------------------------------------------------
+if "mitxonline" in enabled_apps:
+    local_resource(
+        "seed-courseware",
+        cmd="{script} --openedx {mode}".format(
+            script="{}/local-dev/scripts/seed-courseware.sh".format(config.main_dir),
+            mode=("tutor" if openedx_mode == "tutor" else "none"),
+        ),
+        env={"LOCAL_DEV_ROOT_DOMAIN": root_domain},
+        deps=[
+            "./local-dev/scripts/seed-courseware.sh",
+            "./local-dev/scripts/seed-courseware",
+            "./local-dev/data/courseware-seed.json",
+        ],
+        # In tutor mode the Studio calls authenticate as the service worker that
+        # openedx-tutor-seed creates, so that has to have run first.
+        resource_deps=(
+            ["mitxonline-webapp"] +
+            (["openedx-tutor-seed"] if openedx_mode == "tutor" else [])
+        ),
+        labels=["seed"],
+        trigger_mode=TRIGGER_MODE_MANUAL,
+        auto_init=False,
+    )

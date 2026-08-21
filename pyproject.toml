@@ -242,6 +242,10 @@ inline-quotes = "double"
   "C90",
   "INP001",
 ]
+# Seed payloads piped into another app's `manage.py shell`: module-level script
+# bodies, prints as their only output channel, and imports that resolve only
+# inside that app's process.
+"local-dev/scripts/seed-courseware/*.py" = ["T201", "INP001"]
 "tests/**" = ["S101", "PLR2004", "RUF059", "S106", "SLF001", "ERA001"]
 "test_*.py" = ["S101"]
 "src/ol_infrastructure/substructure/vault/pki/__main__.py" = ["E501"]

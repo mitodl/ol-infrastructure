@@ -313,7 +313,58 @@ tilt trigger seed-mit-learn-fixtures
 | mitxonline | `seed-mitxonline-instance` | Full instance setup (superuser, courses, products) |
 | mitxonline | `seed-mitxonline-course-data` | Populate test course data |
 | mitxonline | `seed-mitxonline-income-thresholds` | Load country income thresholds |
+| mitxonline + Open edX | `seed-courseware` | Test programs, courses, runs, CMS pages, products, discount and financial assistance — on **both** sides (see below) |
 | odl-video-service | `seed-ovs-presets` | Create encoding presets (requires real AWS creds) |
+
+### Test courseware
+
+`seed-courseware` is the one seed that spans two systems. Everything else runs a
+management command inside a single pod; this one creates the courses in tutor's Studio
+*and* the matching records in mitxonline, so a run has real courseware behind it and
+`sync_courserun` agrees on both sides.
+
+```bash
+tilt trigger seed-courseware
+
+# or directly — re-running is a no-op, not an error
+./local-dev/scripts/seed-courseware.sh
+./local-dev/scripts/seed-courseware.sh --openedx none   # mitxonline only (qa mode)
+```
+
+What it creates, all from [`local-dev/data/courseware-seed.json`](data/courseware-seed.json):
+
+| Where | What |
+|-------|------|
+| Open edX Studio | An empty course shell per entry, one run each. No OLX content — the courseware pages are blank |
+| Open edX LMS | `audit` and `verified` enrollment modes per run. Without the `verified` mode, mitxonline's upgrade enrollment 400s |
+| mitxonline | `Program`, `Course` and `CourseRun` records whose `courseware_id`s match the Studio courses exactly |
+| mitxonline | Published Wagtail `CoursePage` / `ProgramPage` / `CertificatePage` with placeholder copy, so the catalog and detail pages render |
+| mitxonline | A `Product` per paid run, created inside a django-reversion revision (checkout reads `Line.product_version`, so a product without one breaks the basket) |
+| mitxonline | The `LOCALDEV100` discount, and financial-assistance tiers plus a request form for each entry flagged `"finaid": true` |
+
+**Where to find it.** The catalog is at `https://mitxonline.mit.dev/catalog/`. Detail
+pages are addressed by `readable_id`, not by the Wagtail slug — the index pages route on
+it — so a seeded course is at
+`https://mitxonline.mit.dev/courses/course-v1:MITxLocal+LocalDev100/` and the program at
+`https://mitxonline.mit.dev/programs/program-v1:MITxLocal+LocalDev/`. In Studio the same
+runs are at `https://studio.mit.dev`.
+
+**Completing a purchase.** local-dev has no working payment gateway — the CyberSource
+keys in [`apps/mitxonline/secrets.yaml`](apps/mitxonline/secrets.yaml) are placeholders.
+Apply the **`LOCALDEV100`** code at checkout: mitxonline short-circuits a zero-total
+basket straight into order fulfilment, so the whole flow completes without CyberSource.
+(Real sandbox credentials go in `configmaps/app-env.local.yaml` — see [Local
+Configuration Overrides](#local-configuration-overrides).)
+
+**Financial assistance** also needs the income thresholds, which are a separate seed:
+`tilt trigger seed-mitxonline-income-thresholds`. The currency exchange rates the
+request is priced against are seeded by `seed-courseware` itself, because the real
+source (`update_exchange_rates`) needs an `OPEN_EXCHANGE_RATES_APP_ID` and internet
+access.
+
+To add or change courses, edit `local-dev/data/courseware-seed.json` and re-trigger the
+resource — see [EXTENDING.md](EXTENDING.md#adding-test-courseware) for the `readable_id`
+rules.
 
 ---
 
@@ -376,6 +427,7 @@ tilt trigger local-infra-core
 | `openedx-tutor-seed` | Runs [`tutor-seed-mitxonline.sh`](scripts/tutor-seed-mitxonline.sh): creates the OAuth2 applications and service-worker token mitxonline authenticates with |
 | `openedx-tutor-sso` | Runs [`tutor-seed-sso.sh`](scripts/tutor-seed-sso.sh): the two records that let Open edX log in through mitxonline. Only present when mitxonline is enabled |
 | `openedx-tutor-proxy` | The in-cluster nginx that APISIX routes to |
+| `seed-courseware` | Runs [`seed-courseware.sh`](scripts/seed-courseware.sh): test courses and programs in Studio *and* mitxonline. **Manual trigger** — see [Test courseware](#test-courseware) |
 
 Tilt owns the platform's lifecycle: stopping Tilt stops the compose project.
 
@@ -504,6 +556,12 @@ service-to-service calls (course data, enrolments) work.
 
 SSO works: logging in to Open edX goes through mitxonline, which goes through
 Keycloak. See [Logging in](#logging-in) below.
+
+Courseware is not created for you, but one trigger away on both sides at once:
+`tilt trigger seed-courseware` (see [Test courseware](#test-courseware)). The course
+shells it makes in Studio are empty — enrollment, checkout and `sync_courserun` work,
+but there is nothing to actually study. `tutor dev do importdemocourse` gets you a
+course with real content, under its own `course-v1:OpenedX+DemoX+DemoCourse` id.
 
 Micro-frontends work too, if `tutor-mfe` is enabled in your tutor root (it is by
 default). Each MFE gets its own tutor port in dev mode; APISIX publishes them

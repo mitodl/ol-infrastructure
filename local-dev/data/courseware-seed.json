@@ -1,0 +1,79 @@
+{
+  "_comment": [
+    "Test courseware for the local-dev stack, created on both sides by",
+    "local-dev/scripts/seed-courseware.sh (Tilt resource: seed-courseware).",
+    "",
+    "readable_id rules -- get these wrong and the seed fails in confusing ways:",
+    "  course readable_id must be 'course-v1:ORG+NUMBER' -- exactly ONE '+'.",
+    "  The run id the seed derives is '<readable_id>+<run_tag>', and mitxonline's",
+    "  COURSE_KEY_PATTERN (courses/constants.py) requires exactly TWO '+' there.",
+    "  ORG and NUMBER also become the Open edX org/number, so keep them free of",
+    "  spaces and of the characters Open edX rejects in a course key.",
+    "  program readable_id must start with 'program' (create_courseware's check).",
+    "",
+    "Dates are deliberately absent: the seed computes them relative to now so a",
+    "seeded run is always enrollable (start -7d, enrollment_start -14d, end and",
+    "enrollment_end +180d). See CourseRunQuerySet.get_enrollable_filter().",
+    "",
+    "price: null means audit-only -- no Product, so the run cannot be purchased.",
+    "finaid: true adds financial-assistance tiers and a request form. On a course",
+    "  that belongs to a program, prefer setting it on the program instead --",
+    "  that is where mitxonline expects the request to be made."
+  ],
+
+  "discount": {
+    "code": "LOCALDEV100",
+    "amount": 100,
+    "discount_type": "percent-off"
+  },
+
+  "programs": [
+    {
+      "readable_id": "program-v1:MITxLocal+LocalDev",
+      "title": "Local Dev Program",
+      "departments": ["Local Dev"],
+      "required": ["course-v1:MITxLocal+LocalDev100"],
+      "electives": [
+        "course-v1:MITxLocal+LocalDev200",
+        "course-v1:MITxLocal+LocalDev300"
+      ],
+      "min_electives": 1,
+      "finaid": true
+    }
+  ],
+
+  "courses": [
+    {
+      "readable_id": "course-v1:MITxLocal+LocalDev100",
+      "title": "Local Dev Course 100 (required, paid)",
+      "departments": ["Local Dev"],
+      "run_tag": "R1",
+      "price": "999.00",
+      "finaid": false
+    },
+    {
+      "readable_id": "course-v1:MITxLocal+LocalDev200",
+      "title": "Local Dev Course 200 (elective, paid)",
+      "departments": ["Local Dev"],
+      "run_tag": "R1",
+      "price": "499.00",
+      "finaid": false
+    },
+    {
+      "readable_id": "course-v1:MITxLocal+LocalDev300",
+      "title": "Local Dev Course 300 (elective, audit only)",
+      "departments": ["Local Dev"],
+      "run_tag": "R1",
+      "price": null,
+      "finaid": false
+    },
+    {
+      "readable_id": "course-v1:MITxLocal+LocalDev400",
+      "title": "Local Dev Course 400 (standalone, paid)",
+      "departments": ["Local Dev", "Local Dev Electives"],
+      "run_tag": "R1",
+      "price": "1499.00",
+      "finaid": true
+    }
+  ]
+}
