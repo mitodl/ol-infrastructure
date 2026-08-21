@@ -46,6 +46,9 @@ from ol_infrastructure.lib.github_helper import (
     GITHUB_API,
     get_installation_token,
 )
+from ol_infrastructure.saas.github.repositories.rulesets import (
+    REQUIRED_CHECKS_RULESET_NAME,
+)
 from ol_infrastructure.saas.github.tiers import TIER_PROPERTY_NAME
 
 app = cyclopts.App(help="Inventory the mitodl GitHub org for the Pulumi import.")
@@ -261,6 +264,65 @@ def _count(client: httpx.Client, path: str) -> int | None:
     return len(payload)
 
 
+def _required_checks(
+    client: httpx.Client,
+    name: str,
+    protection: Any,
+    rulesets: list[dict[str, Any]],
+) -> tuple[list[str], list[str]]:
+    """Split a repo's required check contexts into (ours, everyone else's).
+
+    THIS EXISTS BECAUSE `crawl` REBUILDS EVERY YAML FROM SCRATCH. A key the crawl does
+    not derive from live state is not preserved, it is deleted -- so a hand-added
+    `required_status_checks` survives exactly until the next `crawl`, after which the
+    ruleset it described is gone from the fleet data and Pulumi wants to remove the
+    resource. Reading the value back out of GitHub is what closes that loop and keeps
+    "one crawl produces both the code and the state" true for this field.
+
+    THE SPLIT IS THE WHOLE POINT, not tidiness. `lehrer` and `ol-analytics-api` already
+    require checks through rulesets somebody built by hand. Returning those as
+    `required_status_checks` would have rulesets.py declare a SECOND ruleset beside the
+    working one -- two overlapping sets of required contexts on the same branch. They
+    come back in the second list, land under `_required_status_checks_live`, and satisfy
+    SEC-03 without generating a resource.
+
+    Ours is identified by ruleset NAME (`REQUIRED_CHECKS_RULESET_NAME`), which is the
+    only stable handle: the id is assigned by GitHub at creation and differs per repo.
+
+    `source_type` filtering is required. `/repos/{repo}/rulesets` includes inherited ORG
+    rulesets by default, so without it every repo would appear to carry whatever the org
+    baseline requires.
+
+    Classic branch protection contexts are always foreign. Pulumi declares no
+    BranchProtection anywhere (see repository.py), so anything there predates it.
+    """
+    ours: list[str] = []
+    foreign: list[str] = []
+    if protection:
+        foreign.extend(
+            (protection.get("required_status_checks") or {}).get("contexts", []) or []
+        )
+    for listed in rulesets:
+        if listed.get("source_type") != "Repository":
+            continue
+        detail = _maybe(client, f"/repos/{ORG}/{name}/rulesets/{listed['id']}")
+        if not detail:
+            continue
+        contexts = [
+            check["context"]
+            for rule in detail.get("rules") or []
+            if rule.get("type") == "required_status_checks"
+            for check in (rule.get("parameters") or {}).get(
+                "required_status_checks", []
+            )
+        ]
+        if detail.get("name") == REQUIRED_CHECKS_RULESET_NAME:
+            ours.extend(contexts)
+        else:
+            foreign.extend(contexts)
+    return sorted(set(ours)), sorted(set(foreign))
+
+
 def _push_restrictions(
     protection: dict[str, Any] | None,
 ) -> dict[str, list[str]] | None:
@@ -342,11 +404,9 @@ def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
             _maybe(client, f"/repos/{ORG}/{name}/environments?per_page=30") or {}
         )
 
-        required_checks: list[str] = []
-        if protection:
-            required_checks = (protection.get("required_status_checks") or {}).get(
-                "contexts", []
-            )
+        required_checks, foreign_required_checks = _required_checks(
+            client, name, protection, rulesets
+        )
         push_restrictions = _push_restrictions(protection)
 
         return {
@@ -392,6 +452,7 @@ def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
                 (protection or {}).get("enforce_admins", {}).get("enabled")
             ),
             "required_status_checks": required_checks,
+            "foreign_required_status_checks": foreign_required_checks,
             "ruleset_count": len(rulesets),
             "rulesets": [
                 {
@@ -737,7 +798,10 @@ def _findings(
             r["name"] for r in live if _blocked_by_push_restriction(r)
         ],
         "SEC-03 no required status checks": [
-            r["name"] for r in live if not r["required_status_checks"]
+            r["name"]
+            for r in live
+            if not r["required_status_checks"]
+            and not r["foreign_required_status_checks"]
         ],
         "SEC-04 secret scanning or push protection off": [
             r["name"]
@@ -1159,6 +1223,13 @@ def crawl(
                 "branch_protection_enforce_admins"
             ]
         doc["_ruleset_count"] = repo["ruleset_count"]
+        # Checks a repo requires through protection Pulumi does NOT manage -- its own
+        # ruleset, or classic branch protection. Inventory rather than configuration:
+        # declaring these under `required_status_checks` would make rulesets.py build a
+        # SECOND ruleset next to the one already doing the job. SEC-03 reads both keys
+        # so the repos that solved this themselves do not read as findings.
+        if repo["foreign_required_status_checks"]:
+            doc["_required_status_checks_live"] = repo["foreign_required_status_checks"]
         if repo.get("direct_collaborators"):
             doc["_direct_collaborators"] = repo["direct_collaborators"]
 

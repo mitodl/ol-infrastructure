@@ -125,6 +125,12 @@ _DEFAULT_BRANCH_ONLY = github.RepositoryRulesetConditionsArgs(
     ),
 )
 
+#: The name GitHub shows for the ruleset this module creates. Shared with
+#: `bin/github-org-inventory`, which uses it to tell the checks WE require from the
+#: ones a repo required for itself before Pulumi got there -- the two round-trip into
+#: different YAML keys. A literal in both places would drift.
+REQUIRED_CHECKS_RULESET_NAME = "required-status-checks"
+
 #: A check name ending in `(...)`: GitHub's rendering of one cell of a job matrix.
 #: Matching it is not a correctness check -- these names are perfectly valid contexts
 #: and requiring them works today. It exists so that requiring one is a decision
@@ -148,13 +154,20 @@ def _check(
     )
 
 
-def build(repo: dict[str, Any]) -> None:
+def build(repo: dict[str, Any], repository: github.Repository) -> None:
     """Emit the required-status-checks ruleset for one repo, if it declares any.
 
     Absent `required_status_checks` means no resource at all rather than an empty
     ruleset. An empty `required_checks` list is a ruleset that requires nothing, which
     reads in the GitHub UI as protection that exists and enforces nothing -- the same
     confusion SEC-03 is about.
+
+    `repository` IS REQUIRED EVEN THOUGH THE RULESET TAKES A NAME STRING. `repository=`
+    is a plain `str`, not an `Output`, so Pulumi infers no dependency from it and is
+    free to create the ruleset before the repo exists. Every one of the three repos in
+    the first wave is already in state, so the ordering is invisible today and would
+    first fail on whichever new repo declared checks next. Same reasoning, and the same
+    fix, as `BranchDefault` and `TeamRepository` in repository.py.
     """
     contexts = repo.get("required_status_checks")
     if not contexts:
@@ -163,7 +176,7 @@ def build(repo: dict[str, Any]) -> None:
     name = repo["name"]
     github.RepositoryRuleset(
         f"mitodl-repo-required-status-checks-{name}",
-        name="required-status-checks",
+        name=REQUIRED_CHECKS_RULESET_NAME,
         repository=name,
         target="branch",
         enforcement="active",
@@ -181,5 +194,5 @@ def build(repo: dict[str, Any]) -> None:
                 strict_required_status_checks_policy=False,
             ),
         ),
-        opts=ResourceOptions(protect=True),
+        opts=ResourceOptions(protect=True, depends_on=[repository]),
     )

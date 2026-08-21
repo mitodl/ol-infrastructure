@@ -41,5 +41,4 @@ if batch:
     pulumi.log.info(f"batch filter active: {len(fleet)} of the fleet")
 
 for repo in fleet:
-    repository.build(repo)
-    rulesets.build(repo)
+    rulesets.build(repo, repository.build(repo))
