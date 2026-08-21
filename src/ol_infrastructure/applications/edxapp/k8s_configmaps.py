@@ -8,7 +8,6 @@ customization while reducing duplication across the 4 EDX deployments.
 
 import textwrap
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 import pulumi_kubernetes as kubernetes
@@ -438,7 +437,6 @@ class EdxappConfigMaps:
     cms_interpolated: kubernetes.core.v1.ConfigMap
     lms_general: kubernetes.core.v1.ConfigMap
     lms_interpolated: kubernetes.core.v1.ConfigMap
-    uwsgi_ini: kubernetes.core.v1.ConfigMap
     waffle_flags_yaml: kubernetes.core.v1.ConfigMap
     ssh_known_hosts: kubernetes.core.v1.ConfigMap
     settings_override: kubernetes.core.v1.ConfigMap
@@ -449,7 +447,6 @@ class EdxappConfigMaps:
     cms_interpolated_config_name: str
     lms_general_config_name: str
     lms_interpolated_config_name: str
-    uwsgi_ini_config_name: str
     waffle_flags_yaml_config_name: str
     ssh_known_hosts_config_name: str
     settings_override_config_name: str
@@ -809,19 +806,6 @@ def create_k8s_configmaps(  # noqa: PLR0915
         opts=ResourceOptions(delete_before_replace=True),
     )
 
-    # UWsgi configuration (unchanged, read from file)
-    uwsgi_ini_config_name = "uwsgi-ini"
-
-    uwsgi_ini_config_map = kubernetes.core.v1.ConfigMap(
-        f"ol-{stack_info.env_prefix}-edxapp-uwsgi-ini-config-{stack_info.env_suffix}",
-        metadata={
-            "name": uwsgi_ini_config_name,
-            "namespace": namespace,
-            "labels": k8s_global_labels,
-        },
-        data={"uwsgi.ini": Path("files/edxapp/uwsgi.ini").read_text()},
-    )
-
     # Waffle flags configuration (unchanged, built from config)
     waffle_flags_yaml_config_name = "waffle-flags-yaml"
     waffle_list = edxapp_config.get_object("waffle_flags", default=[])
@@ -922,7 +906,6 @@ def create_k8s_configmaps(  # noqa: PLR0915
         cms_interpolated=cms_interpolated_config_map,
         lms_general=lms_general_config_map,
         lms_interpolated=lms_interpolated_config_map,
-        uwsgi_ini=uwsgi_ini_config_map,
         waffle_flags_yaml=waffle_flags_yaml_config_map,
         ssh_known_hosts=ssh_known_hosts_config_map,
         settings_override=settings_override_config_map,
@@ -932,7 +915,6 @@ def create_k8s_configmaps(  # noqa: PLR0915
         cms_interpolated_config_name=cms_interpolated_config_name,
         lms_general_config_name=lms_general_config_name,
         lms_interpolated_config_name=lms_interpolated_config_name,
-        uwsgi_ini_config_name=uwsgi_ini_config_name,
         waffle_flags_yaml_config_name=waffle_flags_yaml_config_name,
         ssh_known_hosts_config_name=ssh_known_hosts_config_name,
         settings_override_config_name=settings_override_config_name,
