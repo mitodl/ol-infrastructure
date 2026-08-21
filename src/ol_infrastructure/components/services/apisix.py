@@ -15,13 +15,20 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
-# Read once at import: the file is shipped verbatim as the serverless function
-# body, with configuration passed separately on the plugin config.
+# Read once at import: the files are shipped verbatim as serverless function
+# bodies, with configuration passed separately on the plugin config.
 OIDC_ERROR_RECOVERY_LUA = (
     Path(__file__)
     .parent.joinpath("files", "oidc_error_callback_recovery.lua")
     .read_text()
 )
+CANONICAL_HTTPS_REDIRECT_LUA = (
+    Path(__file__).parent.joinpath("files", "canonical_https_redirect.lua").read_text()
+)
+
+# The only statuses ngx.redirect accepts; anything else is a Lua error at
+# request time (ngx_http_lua_control.c:209-219).
+NGX_REDIRECT_STATUSES = (301, 302, 303, 307, 308)
 
 
 class OLApisixPluginConfig(BaseModel):
@@ -112,21 +119,60 @@ end"""
     )
 
 
-def oidc_error_callback_recovery_plugin(
+def oidc_gateway_pre_function_plugin(
     recoverable_errors: list[str] | None = None,
     guard_cookie_name: str = "apisix_oidc_recovery",
     guard_max_age: int = 60,
+    *,
+    canonical_https_redirect: bool = True,
+    canonical_redirect_status: Literal[301, 302, 303, 307, 308] = 308,
 ) -> OLApisixPluginConfig:
-    """Restart the login flow when the IdP redirects back with a recoverable error.
+    """Everything that has to happen before openid-connect sees the request.
 
-    An authorization request whose Keycloak authentication session has expired
-    -- the user left the login tab open, or followed a stale bookmark -- comes
-    back to the callback with ``error=temporarily_unavailable`` and no ``code``.
+    APISIX keys a plugin config by plugin name, so a route can carry exactly ONE
+    ``serverless-pre-function``.  Both of the fixes below have to run ahead of
+    openid-connect (priority 2599), and ``serverless-pre-function`` (priority
+    10000) is the only hook that gets there, so they are necessarily one plugin
+    rather than two.  ``serverless/init.lua`` runs ``functions`` in array order
+    and stops at the first one returning a code or body, which is exactly the
+    sequencing wanted here: normalise the origin first, and only then look at
+    whether this is a failed callback.
+
+    **Canonical origin** (``canonical_https_redirect.lua``).  The shared-plugin
+    defaults already include APISIX's ``redirect`` plugin with ``http_to_https``,
+    but its priority is below openid-connect's, so on an OIDC route it is dead
+    code -- openid-connect has already answered.  The consequences are measured,
+    not hypothetical.  APISIX derives only a relative redirect_uri and
+    lua-resty-openidc 1.8.0 (the version APISIX 3.17 pins) makes it absolute from
+    ``ngx.var.scheme`` and ``ngx.var.http_host``, so a plain-HTTP request sends
+    Keycloak ``http://...`` and a request carrying ``Host: <host>:443`` sends
+    ``https://<host>:443/...``.  Keycloak registers bare-host https URIs only and
+    rejects both with ``error="invalid_redirect_uri"``; the login dies at the
+    authorization endpoint, before any callback exists for the recovery function
+    below to rescue.  Worse than the failed logins: because the upgrade never
+    runs, APISIX answers plain-HTTP requests with an OIDC session cookie over
+    cleartext and without the ``Secure`` attribute.
+
+    Redirecting is what fixes this, not header-setting.  lua-resty-openidc does
+    prefer ``Forwarded`` / ``X-Forwarded-Proto`` / ``X-Forwarded-Host`` over those
+    ngx vars, but on this deployment none of the three reaches it -- sending each
+    against production leaves the redirect_uri unchanged -- so pinning them would
+    be a no-op dressed up as a fix.
+
+    Note this leaves port 80 answering with a redirect rather than closing it.
+    That is only safe because every ACME ClusterIssuer on the cluster solves via
+    dns01/Route53; an issuer switched to http-01 would need its challenge path
+    carved out of the redirect.
+
+    **Error-callback recovery** (``oidc_error_callback_recovery.lua``).  An
+    authorization request whose Keycloak authentication session has expired --
+    the user left the login tab open, or followed a stale bookmark -- comes back
+    to the callback with ``error=temporarily_unavailable`` and no ``code``.
     Keycloak's intent there is that the client start over; it even marks the
-    event ``restart_after_timeout="true"``.  ``lua-resty-openidc`` instead
-    treats any ``error`` parameter as fatal and hands the openid-connect plugin
-    a failure, which APISIX serves as a 21KB HTTP 500.  The user sees a
-    stack-trace page where they expected a login form, and nothing retries.
+    event ``restart_after_timeout="true"``.  ``lua-resty-openidc`` instead treats
+    any ``error`` parameter as fatal and hands the openid-connect plugin a
+    failure, which APISIX serves as a 21KB HTTP 500.  The user sees a stack-trace
+    page where they expected a login form, and nothing retries.
 
     This is measured, not hypothetical: 614 such callbacks a day across
     api.learn.mit.edu, mitxonline.mit.edu and nb.learn.mit.edu, from 530
@@ -154,14 +200,15 @@ def oidc_error_callback_recovery_plugin(
     looping: a persistently broken IdP should surface as an error, not as an
     infinite redirect.
 
-    The Lua itself lives in ``files/oidc_error_callback_recovery.lua`` and is
-    shipped verbatim -- nothing is interpolated into it.  Tunables travel as an
-    ``oidc_error_recovery`` block on the plugin config, which the function reads
-    off ``conf``: ``serverless/init.lua`` invokes each function as
+    Both functions live in ``files/`` and are shipped verbatim -- nothing is
+    interpolated into them.  Tunables travel as ``oidc_error_recovery`` and
+    ``canonical_https_redirect`` blocks on the plugin config, which the functions
+    read off ``conf``: ``serverless/init.lua`` invokes each as
     ``func(conf, ctx)``, and its schema does not set ``additionalProperties``,
-    so extra keys validate.  Keeping it a real ``.lua`` file means it is
+    so extra keys validate.  Keeping them real ``.lua`` files means they are
     syntax-highlighted, reviewable, and testable under APISIX's own test-nginx
-    harness (``t/oidc_error_callback_recovery.t``).
+    harness (``t/oidc_error_callback_recovery.t``,
+    ``t/canonical_https_redirect.t``).
 
     :param recoverable_errors: OAuth 2.0 ``error`` codes to restart the flow
         for.  Defaults to ``temporarily_unavailable``, which is 100% of what
@@ -171,21 +218,51 @@ def oidc_error_callback_recovery_plugin(
     :param guard_cookie_name: Name of the loop-breaker cookie.
     :param guard_max_age: Seconds the guard cookie lives, bounding how often one
         browser can be sent back through login.
+    :param canonical_https_redirect: Whether to send non-canonical origins to
+        ``https://<bare host>`` before openid-connect runs.  ``False`` drops the
+        function entirely, for a host that must keep answering on plain HTTP.
+    :param canonical_redirect_status: Status for that redirect, uniform across
+        methods.  APISIX's own ``redirect`` plugin instead picks per method --
+        301 for GET/HEAD, 308 for everything else (``redirect.lua`` 208-215) --
+        so 308 here is a simplification rather than a behavioural fix: both
+        preserve a POST.  Restricted to the codes ``ngx.redirect`` accepts.
 
     :returns: A ``serverless-pre-function`` plugin config to attach to routes.
     :rtype: OLApisixPluginConfig
     """
+    # Checked rather than left to the annotation: the `Literal` above documents
+    # the contract but nothing enforces it at the call sites, since this repo's
+    # mypy hook runs without the project installed and resolves a cross-module
+    # import to Any.  APISIX will not catch it either -- the block this travels
+    # in is not part of serverless-pre-function's schema -- so an unchecked bad
+    # value would first surface as a 500 on live traffic.  Raising here moves
+    # that to `pulumi preview`.
+    if canonical_redirect_status not in NGX_REDIRECT_STATUSES:
+        msg = (
+            f"canonical_redirect_status must be one of {NGX_REDIRECT_STATUSES}, "
+            f"got {canonical_redirect_status}: ngx.redirect rejects anything else."
+        )
+        raise ValueError(msg)
+
+    # Order matters and is load-bearing: serverless/init.lua stops at the first
+    # function returning a code, so the origin has to be canonical before the
+    # recovery function decides whether to redirect back into the login flow.
+    functions = [OIDC_ERROR_RECOVERY_LUA]
+    if canonical_https_redirect:
+        functions.insert(0, CANONICAL_HTTPS_REDIRECT_LUA)
     return OLApisixPluginConfig(
         name="serverless-pre-function",
         secretRef=None,
         # rewrite rather than the plugin's default access phase: openid-connect
         # also runs in rewrite, and serverless-pre-function's priority (10000)
-        # outranks it (2599), so this gets to inspect the callback and bail out
-        # before the plugin turns the error parameter into a 500.  In the access
-        # phase it would run after openid-connect had already failed.
+        # outranks it (2599), so this gets to normalise the origin and inspect
+        # the callback before the plugin reads either.  In the access phase it
+        # would run after openid-connect had already built its redirect_uri and
+        # failed.
         config={
             "phase": "rewrite",
-            "functions": [OIDC_ERROR_RECOVERY_LUA],
+            "functions": functions,
+            "canonical_https_redirect": {"status": canonical_redirect_status},
             "oidc_error_recovery": {
                 # `is None`, not `or`: an explicit empty list means "recover
                 # nothing", and `or` would quietly turn that back into the

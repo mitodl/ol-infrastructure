@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
 from ol_infrastructure.components.services.apisix import (
-    oidc_error_callback_recovery_plugin,
+    oidc_gateway_pre_function_plugin,
 )
 
 # Must track the APISIX shipped by the chart pinned in bridge.lib.versions
@@ -90,7 +90,14 @@ def apisix_routes() -> dict[str, Any]:
     what the gateway itself does before proxying, and a request that reaches the
     upstream is one the plugin correctly declined to intercept.
     """
-    recovery = oidc_error_callback_recovery_plugin()
+    # APISIX listens on plain HTTP here, so the canonical-origin function would
+    # upgrade every request before the recovery function ever ran -- which is
+    # the production behaviour, and is asserted directly on the routes below.
+    # The recovery routes therefore switch it off so they exercise the callback
+    # handling in isolation, exactly as they did before the two were fused into
+    # the single serverless-pre-function APISIX allows per plugin config.
+    recovery = oidc_gateway_pre_function_plugin(canonical_https_redirect=False)
+    full = oidc_gateway_pre_function_plugin()
     dead_upstream = {"type": "roundrobin", "nodes": {"127.0.0.1:1": 1}}
     return {
         "routes": [
@@ -105,6 +112,15 @@ def apisix_routes() -> dict[str, Any]:
                 "uri": "/learn/login/*",
                 "upstream": dead_upstream,
                 "plugins": {recovery.name: recovery.config},
+            },
+            # Not a catch-all: `_wait_until_ready` polls `/` and follows
+            # redirects, so a `/*` route carrying this plugin would send the
+            # readiness probe at an https origin that does not exist here.
+            {
+                "id": "canonical-origin",
+                "uri": "/origin/*",
+                "upstream": dead_upstream,
+                "plugins": {full.name: full.config},
             },
         ]
     }
@@ -207,3 +223,27 @@ def callback(apisix):
         return response.status, dict(response.headers)
 
     return _callback
+
+
+@pytest.fixture
+def origin_request(apisix):
+    """Request a canonical-origin route and return (status, headers).
+
+    Sends an explicit Host so the port-stripping and scheme-upgrade branches can
+    be driven independently of the container's own listen address.
+    """
+
+    def _origin_request(
+        path: str = "/origin/",
+        host: str = "nb.learn.mit.edu",
+    ) -> tuple[int, dict[str, str]]:
+        response = urllib3.PoolManager(retries=False).request(
+            "GET",
+            f"{apisix}{path}",
+            headers={"Host": host},
+            redirect=False,
+            timeout=10.0,
+        )
+        return response.status, dict(response.headers)
+
+    return _origin_request
