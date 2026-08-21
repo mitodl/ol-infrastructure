@@ -417,11 +417,6 @@ def create_k8s_resources(  # noqa: C901
             sub_path="known_hosts",
             read_only=True,
         ),
-        kubernetes.core.v1.VolumeMountArgs(
-            name=configmaps.uwsgi_ini_config_name,
-            mount_path="/openedx/edx-platform/uwsgi.ini",
-            sub_path="uwsgi.ini",
-        ),
         # Settings entrypoint that DJANGO_SETTINGS_MODULE points at instead of
         # <service>.envs.production -- see the comment on the settings_override
         # ConfigMap in k8s_configmaps.py. Mounted at both service paths because the
@@ -722,12 +717,6 @@ def create_k8s_resources(  # noqa: C901
                 empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
             ),
             kubernetes.core.v1.VolumeArgs(
-                name=configmaps.uwsgi_ini_config_name,
-                config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
-                    name=configmaps.uwsgi_ini_config_name
-                ),
-            ),
-            kubernetes.core.v1.VolumeArgs(
                 name=configmaps.waffle_flags_yaml_config_name,
                 config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
                     name=configmaps.waffle_flags_yaml_config_name,
@@ -778,7 +767,6 @@ def create_k8s_resources(  # noqa: C901
             application_config={
                 "SERVICE_VARIANT": "lms",
                 "DJANGO_SETTINGS_MODULE": "lms.envs.mitol.production",
-                "UWSGI_WORKERS": "2",
             },
             application_lb_service_name=lms_webapp_deployment_name,
             application_lb_service_port_name="http",
@@ -1058,12 +1046,6 @@ def create_k8s_resources(  # noqa: C901
                 empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(),
             ),
             kubernetes.core.v1.VolumeArgs(
-                name=configmaps.uwsgi_ini_config_name,
-                config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
-                    name=configmaps.uwsgi_ini_config_name
-                ),
-            ),
-            kubernetes.core.v1.VolumeArgs(
                 name=configmaps.waffle_flags_yaml_config_name,
                 config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
                     name=configmaps.waffle_flags_yaml_config_name,
@@ -1110,7 +1092,6 @@ def create_k8s_resources(  # noqa: C901
             application_config={
                 "SERVICE_VARIANT": "cms",
                 "DJANGO_SETTINGS_MODULE": "cms.envs.mitol.production",
-                "UWSGI_WORKERS": "2",
             },
             application_lb_service_name=cms_webapp_deployment_name,
             application_lb_service_port_name="http",
@@ -1266,13 +1247,7 @@ def create_k8s_resources(  # noqa: C901
     # as hand-rolled deployments and are scaled via external KEDA ScaledObjects.
     ############################################
 
-    # Common volume mounts for celery containers (no uwsgi.ini needed).
-    # Filter by name rather than slicing to be robust against list reordering.
-    celery_volume_mounts = [
-        vm
-        for vm in common_extra_volume_mounts
-        if vm.name != configmaps.uwsgi_ini_config_name
-    ]
+    celery_volume_mounts = common_extra_volume_mounts
 
     # Selector labels must match the existing Deployment's spec.selector (immutable).
     # The old SGP label (pod-security-group) is kept in the selector; the new
