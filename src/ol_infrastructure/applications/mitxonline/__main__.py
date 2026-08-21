@@ -31,6 +31,7 @@ from bridge.lib.constants import (
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
+    STATIC_ASSET_MAX_AGE_SECONDS,
 )
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.mitxonline.k8s_secrets import (
@@ -648,12 +649,23 @@ mitxonline_k8s_app = OLApplicationK8s(
             # Pinned to the VPA ceiling rather than the component's default
             # limit-derived calculation. See the note above.
             workers_max_rss=mitxonline_granian_workers_max_rss,
+            # Serve /static/* from Granian's Rust layer instead of the sidecar
+            # (docs/plans/remove-nginx-sidecar.md, stage 5), same shape as
+            # ocw_studio/xpro. STATIC_ROOT is /src/staticfiles, the same
+            # emptyDir the collectstatic init container populates, and
+            # STATIC_URL is Granian's default /static route.
+            static_path_mounts=["/src/staticfiles"],
+            static_path_expires=STATIC_ASSET_MAX_AGE_SECONDS,
         )
         if mitxonline_config.get_bool("use_granian")
         else None,
         slack_channel=slack_channel,
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
-        import_nginx_config=True,
+        # The sidecar is only redundant once Granian is actually serving the
+        # app (static_path_mounts above); the use_granian=False branch still
+        # runs true uwsgi with no static handling of its own, so it keeps the
+        # sidecar. See docs/plans/remove-nginx-sidecar.md.
+        import_nginx_config=not mitxonline_config.get_bool("use_granian"),
         import_nginx_config_path="files/web.conf_uwsgi",
         import_uwsgi_config=True,
         init_migrations=False,
@@ -904,6 +916,52 @@ mitxonline_apisix_route_direct = OLApisixRoute(
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
             backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
         ),
+        # The `location` blocks that used to live in the nginx sidecar
+        # (docs/plans/remove-nginx-sidecar.md, stage 5). nginx resolved
+        # hash.txt against `root /src` with a `try_files` fallback to
+        # /staticfiles, i.e. /src/static/hash.txt first; Granian's
+        # static_path_mounts instead serves /src/staticfiles/hash.txt --
+        # same content only if something copies it there.
+        OLApisixRouteConfig(
+            route_name="static-hash",
+            priority=20,
+            hosts=[api_domain, frontend_domain],
+            paths=["/static/hash.txt"],
+            shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
+            backend_service_name=mitxonline_k8s_app.application_lb_service_name,
+            backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="response-rewrite",
+                    secretRef=None,
+                    config={"headers": {"set": {"Cache-Control": "private, no-cache"}}},
+                ),
+            ],
+        ),
+        # The sidecar answered this with a 204 (EFF Do Not Track convention
+        # for "no policy published"). "passauth" above would otherwise proxy
+        # it through to Django, which has no view for it -- kept as a mock so
+        # a crawled path doesn't burn a Granian blocking thread on a 404.
+        OLApisixRouteConfig(
+            route_name="dnt-policy",
+            priority=10,
+            hosts=[api_domain, frontend_domain],
+            paths=["/.well-known/dnt-policy.txt"],
+            backend_service_name=mitxonline_k8s_app.application_lb_service_name,
+            backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="mocking",
+                    secretRef=None,
+                    config={
+                        "response_status": 204,
+                        "response_example": "",
+                        "content_type": "text/plain",
+                        "with_mock_header": False,
+                    },
+                ),
+            ],
+        ),
     ],
     opts=ResourceOptions(
         delete_before_replace=True,
@@ -967,6 +1025,31 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
                 prefixed_stale_session_cleanup,
             ],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
+            backend_service_name=mitxonline_k8s_app.application_lb_service_name,
+            backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
+        ),
+        # Static assets requested through this prefix (frontend references
+        # like /{api_path_prefix}/static/...) rewrite through "passauth" the
+        # same way, so hash.txt needs the same override here. No dnt-policy
+        # counterpart: /.well-known/dnt-policy.txt is a root-relative
+        # convention no client ever requests under a path prefix, so unlike
+        # hash.txt it was never reachable through this resource even with the
+        # sidecar -- same reasoning as mit_learn's /learn/*-prefixed
+        # resource. See docs/plans/remove-nginx-sidecar.md.
+        OLApisixRouteConfig(
+            route_name="static-hash",
+            priority=20,
+            hosts=[learn_api_domain],
+            paths=[f"/{api_path_prefix}/static/hash.txt"],
+            shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                OLApisixPluginConfig(
+                    name="response-rewrite",
+                    secretRef=None,
+                    config={"headers": {"set": {"Cache-Control": "private, no-cache"}}},
+                ),
+            ],
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
             backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
         ),
