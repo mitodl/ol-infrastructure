@@ -38,6 +38,7 @@ QDRANT_CLOUD = "ol-infrastructure-qdrant-cloud"
 GRAFANA_CLOUD = "ol-infrastructure-grafana-cloud"
 GRAFANA_ALERTING = "ol-infrastructure-grafana-alerting"
 SENTRY = "ol-infrastructure-sentry"
+GCP = "ol-infrastructure-gcp"
 SFTP = "ol-infrastructure-aws-sftp"
 S3_SITES = "ol-infrastructure-aws-s3"
 GEMINI_API = "ol-infrastructure-gemini-api"
@@ -150,6 +151,7 @@ LEGACY_STACK_REF_PREFIXES: dict[str, str] = {
     QDRANT_CLOUD: "infrastructure.qdrant_cloud",
     GRAFANA_CLOUD: "infrastructure.grafana_cloud",
     SENTRY: "infrastructure.sentry",
+    GCP: "infrastructure.gcp",
     SFTP: "infrastructure.aws.sftp_servers",
     S3_SITES: "infrastructure.aws.s3_sites",
     # substructure/

@@ -9,6 +9,7 @@ place code in the right one before writing anything.
 |-----------|---------|----------------------|
 | `applications/<app>/` | Per-app Pulumi stacks (Pulumi.yaml entrypoints) | New or existing application infrastructure |
 | `components/aws/` | Reusable AWS Pulumi ComponentResources | Any AWS resource group used in 2+ places |
+| `components/gcp/` | Reusable GCP Pulumi ComponentResources | Any GCP resource group used in 2+ places |
 | `components/services/` | Reusable third-party service components (k8s operators, Vault, etc.) | Same as above but for non-AWS services |
 | `components/applications/` | App-level reusable components | App patterns shared across stacks |
 | `infrastructure/aws/<service>/` | Shared AWS platform infrastructure (VPCs, EKS clusters, IAM, KMS, DNS) | Platform-level resources not tied to a single app |
@@ -63,6 +64,8 @@ class MyComponent(pulumi.ComponentResource):
 
 - `ol_infrastructure.lib.pulumi_helper.parse_stack()` → `StackInfo` (stack name, environment)
 - `ol_infrastructure.lib.ol_types.AWSBase` → Pydantic base for all AWS configs
+- `ol_infrastructure.lib.ol_types.GCPBase` → Pydantic base for GCP configs (labels, not tags)
+- `ol_infrastructure.lib.gcp.provider.gcp_provider()` → the only way a stack gets a GCP provider
 - `ol_infrastructure.lib.ol_types.BusinessUnit` → enum for OU tags; apply to all resources
 - `ol_infrastructure.lib.aws.iam_helper.lint_iam_policy()` → validate IAM policy docs before use
 - `bridge.lib.magic_numbers` → canonical port/size constants; don't hardcode these values

@@ -198,6 +198,7 @@ if __name__ == "__main__":
         "data_warehouse",
         "digital-credentials",
         "fastly-redirector",
+        "gcp",
         "github-organization",
         "github-repositories",
         "grafana-alerting",

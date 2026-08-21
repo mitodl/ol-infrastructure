@@ -69,7 +69,6 @@ from ol_infrastructure.lib.ol_types import (
     AWSBase,
     BusinessUnit,
     K8sAppLabels,
-    K8sGlobalLabels,
     Product,
     Services,
 )
@@ -348,13 +347,7 @@ def create_k8s_resources(  # noqa: C901
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=f"{env_name}-openedx-data-pvc",
             namespace=namespace,
-            labels=K8sGlobalLabels(
-                service=Services.edxapp,
-                application=stack_info.env_prefix,
-                ou=ou,
-                stack=stack_info,
-                source_repository="https://github.com/openedx/openedx-platform",
-            ).model_dump(),
+            labels=k8s_global_labels,
         ),
         spec=kubernetes.core.v1.PersistentVolumeClaimSpecArgs(
             access_modes=["ReadWriteMany"],
@@ -1952,6 +1945,7 @@ def create_k8s_resources(  # noqa: C901
     _autoscaling_resources = create_celery_autoscaling_resources(
         edxapp_cache=edxapp_cache,
         replicas_dict=replicas_dict,
+        cms_celery_memory_request=resources_dict["celery"]["cms"]["memory_request"],
         namespace=namespace,
         lms_celery_labels=lms_celery_labels,
         lms_high_mem_celery_labels=lms_high_mem_celery_labels,

@@ -355,6 +355,19 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_name="ol-application-fastly-redirector",
         refresh_stack=False,
     ),
+    "gcp": SimplePulumiParams(
+        app_name="gcp",
+        pulumi_project_path="infrastructure/gcp/",
+        pulumi_project_name="ol-infrastructure-gcp",
+        # One stack: mitol01 is the consolidation target for the whole estate,
+        # and the tier a credential serves is carried in its own name rather
+        # than in a stack boundary. See infrastructure/gcp/README.md.
+        stages=["Production"],
+        # Gated rather than deploy-chained. Every resource here is a live
+        # credential with consumers outside GCP, and adopted ones are
+        # protected precisely so a surprising diff stops rather than applies.
+        topology="preview-gated",
+    ),
     "github-organization": SimplePulumiParams(
         app_name="github-organization",
         pulumi_project_path="saas/github/organization/",

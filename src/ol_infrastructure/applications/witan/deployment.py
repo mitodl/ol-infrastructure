@@ -288,7 +288,81 @@ WITAN_SEND_TIMEOUT = "60s"
 # `uvicorn_config={"timeout_graceful_shutdown": ...}` through `mcp.run()`;
 # tracked in agent-kit. Until it does, the grace period below buys the pod time
 # that uvicorn declines to use.
-WITAN_TERMINATION_GRACE_SECONDS = WITAN_REQUEST_TIMEOUT_SECONDS + 30
+# ── preStop drain, which closes the LAST no-endpoint gap ─────────────────────
+# ★ maxUnavailable=0 removed the window where NO pod was Ready. It did not
+# remove the window where APISIX still routes to a pod that has already stopped
+# accepting, and that window produced a real failed read.
+#
+# MEASURED, not reasoned. Rolling witan-server mid-storm against CI on
+# 2026-08-20 left one of eight readers degraded. The client reported a bare
+# JSON-RPC -32603, which invited the wrong explanation (per-pod MCP session
+# state). It was not: the deployed connection is stateless (witan ADR-0006),
+# there was no `task_get` error in either pod's log, and Sentry captured
+# nothing. The APISIX access log had the answer — a single
+#     host=witan.ci.ol.mit.edu status=502 upstream_status=502
+#     upstream_connect_time=0.000 upstream_header_time=-
+# at 12:36:48, the same second the old pod logged "Waiting for connections to
+# close". APISIX connected to the terminating pod and never got a response
+# header. The MCP client surfaces that gateway 502 as -32603
+# (`mcp/client/streamable_http.py`: any non-2xx that is not a 404 becomes
+# INTERNAL_ERROR / "Server returned an error response"), which is why it looked
+# like a server-side internal error and left no server-side trace.
+#
+# ★ IT IS RARE, NOT PER-ROLLOUT. One occurrence in six RollingUpdate rollouts
+# observed so far: it appeared in the first one, and a subsequent 5-run sweep
+# under identical load put 1,735 requests through APISIX with zero non-200s.
+# That is a reason to state the rate honestly, not a reason to leave it: the
+# failure is one unlucky request being told a write or read failed when the
+# deployment was healthy, which is the indeterminate outcome this stack exists
+# to remove. The hook removes the window rather than lowering its odds, and a
+# rare defect that only appears during a deploy is exactly the kind that gets
+# misattributed for months.
+#
+# WHY IT HAPPENS. Pod deletion fans out to two consumers that do not
+# synchronise: the kubelet (SIGTERM) and the endpoints controller (EndpointSlice
+# removal, then the APISIX ingress controller, then the APISIX data plane).
+# uvicorn stops accepting the instant SIGTERM lands, so every request APISIX
+# routes during that propagation delay hits a socket nobody is serving.
+#
+# A preStop hook is what decouples them: the kubelet runs it BEFORE SIGTERM, so
+# the pod goes on serving normally for the length of the sleep instead of losing
+# its listener the moment the delete lands.
+#
+# ★ WHAT THE HOOK DOES AND DOES NOT GUARANTEE. It buys propagation TIME; it does
+# not wait for propagation to FINISH. The kubelet sends SIGTERM once the ten
+# seconds are up whether or not APISIX has re-read its upstreams, so this makes
+# the race very unlikely rather than impossible. Ten seconds being generous
+# against a watch-driven path measured in low single-digit seconds is the whole
+# basis for the number — there is no acknowledgement to wait on, and Kubernetes
+# offers no hook that blocks until a gateway has caught up. Anything stronger
+# would need APISIX itself to report that it had stopped routing here, which it
+# does not. The cost is ten seconds added to every rollout of a workload whose
+# deploys are already minutes long.
+#
+# Native `sleep` action rather than `exec: sleep 10` on purpose: the container
+# runs a distroless-style image and `readOnlyRootFilesystem: true`, so relying
+# on a shell binary is a dependency on the base image that this does not need.
+# Feature history (KEP-3960, read off the KEP rather than recalled): alpha
+# v1.29, beta v1.30, STABLE v1.34. The clusters run 1.36, so it is GA here —
+# but 1.30 is beta, not GA, which an earlier draft of this comment got wrong.
+WITAN_PRESTOP_DRAIN_SECONDS = 10
+
+# ── Shutdown budget, which MUST exceed the preStop drain + the request budget ─
+# The drain is added rather than absorbed. The kubelet's grace period is the
+# budget for EVERYTHING after the delete: preStop first, and only then SIGTERM
+# and uvicorn's own graceful shutdown (120s — agent-kit's
+# DEFAULT_SHUTDOWN_GRACE_SECONDS, deliberately matched to the request budget).
+#
+# Absorbing the 10s into the existing 150s would NOT have shortened a write:
+# uvicorn would still get its full 120s, since 150 - 10 = 140 > 120. What it
+# would have eaten is the MARGIN, from 30s down to 20s — the slack that covers
+# uvicorn noticing SIGTERM and finishing a call already at the far end of the
+# budget. Adding instead of absorbing keeps that margin at the value the ladder
+# was reasoned about with, and keeps the invariant readable as
+# `grace > drain + budget` rather than as arithmetic a later reader has to redo.
+WITAN_TERMINATION_GRACE_SECONDS = (
+    WITAN_PRESTOP_DRAIN_SECONDS + WITAN_REQUEST_TIMEOUT_SECONDS + 30
+)
 
 # Mount path (inside the container) for the actor-tokens Secret volume.
 ACTOR_TOKENS_MOUNT_PATH = "/etc/witan/actor-tokens"  # pragma: allowlist secret
@@ -519,14 +593,20 @@ def create_serving_tier(  # noqa: PLR0913
             # endpoint at all times, which is what removes the outage. maxSurge=1
             # is the minimum that allows that with a single replica.
             #
-            # ★ THIS DOES NOT, ON ITS OWN, PROVE THE IN-FLIGHT WRITES ARE SAFE.
-            # It removes the no-endpoint window, so new connections and readers
-            # stop failing. Whether a request already in flight on the
-            # terminating pod can still return depends on whether the proxy
-            # keeps its established upstream connection after the endpoint
-            # leaves the EndpointSlice, which is NOT yet established. Re-run
-            # `witan.scripts.concurrency_probe` across a rollout and read the
-            # INDETERMINATE bucket before claiming that half.
+            # ★ THE IN-FLIGHT HALF IS NOW MEASURED, and it holds. The open
+            # question above — whether a request already on the terminating pod
+            # still returns once the endpoint leaves the EndpointSlice — was
+            # answered by re-running `witan.scripts.concurrency_probe` across a
+            # rollout, which is what that paragraph asked for. See the sweep
+            # recorded on tk-a-witan-server-rollout-hands-writers-an-error-fo-62cd3d.
+            # The whole 16-writer storm was served by the OLD pod during its
+            # drain, client and server agreed exactly on which writes landed,
+            # and the INDETERMINATE bucket stayed empty.
+            #
+            # What that sweep also found is that maxUnavailable=0 is not the
+            # last gap: it guarantees a Ready endpoint, not that APISIX has
+            # STOPPED USING the terminating one. See WITAN_PRESTOP_DRAIN_SECONDS
+            # for the 502 that came through that gap and the hook that closes it.
             strategy=kubernetes.apps.v1.DeploymentStrategyArgs(
                 type="RollingUpdate",
                 rolling_update=kubernetes.apps.v1.RollingUpdateDeploymentArgs(
@@ -768,6 +848,21 @@ def create_serving_tier(  # noqa: PLR0913
                                 period_seconds=WITAN_STARTUP_PERIOD_SECONDS,
                                 failure_threshold=WITAN_STARTUP_FAILURE_THRESHOLD,
                                 timeout_seconds=WITAN_STARTUP_TIMEOUT_SECONDS,
+                            ),
+                            # Go on serving while APISIX removes this pod from
+                            # its upstream set. See WITAN_PRESTOP_DRAIN_SECONDS:
+                            # without it SIGTERM lands while the pod is still in
+                            # the data plane's upstream set, and one read in one
+                            # of six observed rollouts came back a 502. This
+                            # gives that propagation time rather than waiting
+                            # for it, and delays SIGTERM only — it does not
+                            # extend the drain that follows.
+                            lifecycle=kubernetes.core.v1.LifecycleArgs(
+                                pre_stop=kubernetes.core.v1.LifecycleHandlerArgs(
+                                    sleep=kubernetes.core.v1.SleepActionArgs(
+                                        seconds=WITAN_PRESTOP_DRAIN_SECONDS,
+                                    ),
+                                ),
                             ),
                             readiness_probe=kubernetes.core.v1.ProbeArgs(
                                 http_get=kubernetes.core.v1.HTTPGetActionArgs(

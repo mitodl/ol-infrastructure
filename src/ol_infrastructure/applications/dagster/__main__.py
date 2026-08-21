@@ -74,7 +74,7 @@ from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
     BusinessUnit,
-    K8sGlobalLabels,
+    K8sAppLabels,
     Product,
     Services,
 )
@@ -130,7 +130,7 @@ aws_config = AWSBase(
 )
 
 # Kubernetes labels
-k8s_global_labels = K8sGlobalLabels(
+k8s_global_labels = K8sAppLabels(
     application=Application.dagster,
     product=Product.data,
     service=Services.dagster,
@@ -138,6 +138,33 @@ k8s_global_labels = K8sGlobalLabels(
     ou=BusinessUnit.data,
     stack=stack_info,
 )
+
+# Selector labels for pgbouncer and sql-exporter, deliberately narrower than the
+# labels those resources carry. The ol.mit.edu set is still growing -- alert_tier
+# and component are being added across the estate so alert routing can read a
+# workload's paging eligibility off the workload -- and a selector derived from it
+# breaks in two ways as it grows.
+#
+# A Deployment's spec.selector is immutable, so every added label becomes a
+# delete-and-recreate of the workload carrying it. A Service's selector is mutable
+# but must agree with the pod labels, and Pulumi has no reason to patch the Service
+# after the Deployment finishes rolling -- for the window in between, a widened
+# selector matches no pods and the Service has no endpoints. pgbouncer fronts every
+# database connection the data platform makes.
+#
+# Frozen to the four keys the live selectors already carry. Do not add to this
+# tuple: a Deployment selector can only be widened by replacing the Deployment.
+DAGSTER_SELECTOR_LABEL_KEYS = (
+    "ol.mit.edu/ou",
+    "ol.mit.edu/service",
+    "ol.mit.edu/stack",
+    "ol.mit.edu/environment",
+)
+dagster_selector_labels = {
+    key: value
+    for key, value in k8s_global_labels.model_dump().items()
+    if key in DAGSTER_SELECTOR_LABEL_KEYS
+}
 
 aws_account = get_caller_identity()
 dagster_namespace = "dagster"
@@ -974,7 +1001,7 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
         selector=kubernetes.meta.v1.LabelSelectorArgs(
             match_labels={
                 "component": "pgbouncer",
-                **k8s_global_labels.model_dump(),
+                **dagster_selector_labels,
             },
         ),
         template=kubernetes.core.v1.PodTemplateSpecArgs(
@@ -1168,7 +1195,7 @@ pgbouncer_service = kubernetes.core.v1.Service(
         type="ClusterIP",
         selector={
             "component": "pgbouncer",
-            **k8s_global_labels.model_dump(),
+            **dagster_selector_labels,
         },
         ports=[
             kubernetes.core.v1.ServicePortArgs(
@@ -1224,7 +1251,7 @@ pgbouncer_service_monitor = kubernetes.apiextensions.CustomResource(
         "selector": {
             "matchLabels": {
                 "component": "pgbouncer",
-                **k8s_global_labels.model_dump(),
+                **dagster_selector_labels,
             },
         },
         "namespaceSelector": {"matchNames": [dagster_namespace]},
@@ -1696,7 +1723,7 @@ sql_exporter_deployment = kubernetes.apps.v1.Deployment(
         selector=kubernetes.meta.v1.LabelSelectorArgs(
             match_labels={
                 "component": "sql-exporter",
-                **k8s_global_labels.model_dump(),
+                **dagster_selector_labels,
             },
         ),
         template=kubernetes.core.v1.PodTemplateSpecArgs(
@@ -1837,7 +1864,7 @@ sql_exporter_service = kubernetes.core.v1.Service(
         type="ClusterIP",
         selector={
             "component": "sql-exporter",
-            **k8s_global_labels.model_dump(),
+            **dagster_selector_labels,
         },
         ports=[
             kubernetes.core.v1.ServicePortArgs(
@@ -1871,7 +1898,7 @@ sql_exporter_service_monitor = kubernetes.apiextensions.CustomResource(
         "selector": {
             "matchLabels": {
                 "component": "sql-exporter",
-                **k8s_global_labels.model_dump(),
+                **dagster_selector_labels,
             },
         },
         "namespaceSelector": {"matchNames": [dagster_namespace]},

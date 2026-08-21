@@ -19,8 +19,8 @@ OPENAPI_GENERATOR_VERSION = "v7.2.0"
 OVS_VERSION = "v0.65.1-3-g2630021"
 # renovate: datasource=github-releases depName=traefik packageName=traefik/traefik
 TRAEFIK_VERSION = "3.7.11"
-TUTOR_PERMISSIONS_VERSION = "15.3.4"
-TYPESENSE_VERSION = "30.1"
+# renovate: datasource=docker depName=typesense packageName=typesense/typesense
+TYPESENSE_VERSION = "30.2"
 # renovate: datasource=github-releases depName=vault packageName=hashicorp/vault
 VAULT_VERSION = "2.0.4"
 # renovate: datasource=docker depName=vector packageName=timberio/vector
@@ -39,8 +39,8 @@ APISIX_CHART_VERSION = "2.16.1"
 AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=aws-node-termination-handler packageName=aws-node-termination-handler registryUrl=https://aws.github.io/eks-charts
 AWS_NODE_TERMINATION_HANDLER_CHART_VERSION = "0.27.2"
-# renovate: datasource=helm depName=cert-manager packageName=cert-manager
-CERT_MANAGER_CHART_VERSION = "v1.16.1"
+# renovate: datasource=helm depName=cert-manager packageName=cert-manager registryUrl=https://charts.jetstack.io
+CERT_MANAGER_CHART_VERSION = "v1.21.1"
 # renovate: datasource=helm depName=dagster packageName=dagster registryUrl=https://dagster-io.github.io/helm
 DAGSTER_CHART_VERSION = "1.13.18"
 # renovate: datasource=aws-eks-addon depName=aws-ebs-csi-driver versioning=aws-eks-addon
@@ -53,16 +53,14 @@ EXTERNAL_DNS_CHART_VERSION = "1.21.1"
 GATEWAY_API_VERSION = "v1.6.1"
 # renovate: datasource=docker depName=karpenter packageName=public.ecr.aws/karpenter/karpenter
 KARPENTER_CHART_VERSION = "1.14.0"
-# renoavate: datasource=helm depName=keda registryUrl=https://kedacore.github.io/charts packageName=keda
-KEDA_CHART_VERSION = "2.17.1"
-# renovate: datasource=docker depName=kube-state-metrics packageName=registry-1.docker.io/bitnamicharts/kube-state-metrics
-KUBE_STATE_METRICS_CHART_VERSION = "5.1.0"
+# renovate: datasource=helm depName=keda packageName=keda registryUrl=https://kedacore.github.io/charts
+KEDA_CHART_VERSION = "2.20.2"
 # renovate: datasource=helm depName=kubewatch packageName=kubewatch registryUrl=https://robusta-charts.storage.googleapis.com
 KUBEWATCH_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=meilisearch packageName=meilisearch registryUrl=https://meilisearch.github.io/meilisearch-kubernetes
 MEILISEARCH_CHART_VERSION = "0.38.0"
 # renovate: datasource=helm depName=opik packageName=opik registryUrl=https://comet-ml.github.io/opik
-OPIK_CHART_VERSION = "2.2.33"
+OPIK_CHART_VERSION = "2.2.35"
 # renovate: datasource=helm depName=operator packageName=operator registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
 STARROCKS_OPERATOR_CHART_VERSION = "1.11.7"
 # renovate: datasource=helm depName=operator packageName=starrocks registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
@@ -71,6 +69,11 @@ STARROCKS_CHART_VERSION = "1.11.7"
 STARROCKS_VERSION = "4.1.4"
 # renovate: datasource=github-releases depName=starrocks-vault-plugin packageName=mitodl/vault-plugin-database-starrocks
 VAULT_PLUGIN_STARROCKS_VERSION = "0.1.0"
+# Checksum of that release's `vault-plugin-database-starrocks` asset, which
+# files.download() verifies before Vault loads the plugin. No datasource can
+# derive an asset checksum from a tag, so this cannot carry a marker and must be
+# updated by hand in the same commit that moves the version above:
+#   curl -sL https://github.com/mitodl/vault-plugin-database-starrocks/releases/download/v${VERSION}/SHA256SUMS
 VAULT_PLUGIN_STARROCKS_SHA256 = "3a737897b3c37eb61cab0b6b2804bd711dde7d31b308cf325f88138c0a111955"  # pragma: allowlist secret
 # Altinity ClickHouse Operator — released as tag "release-X.Y.Z" on GitHub
 # renovate: datasource=github-releases depName=clickhouse-operator packageName=Altinity/clickhouse-operator
@@ -95,9 +98,10 @@ KEYCLOAK_OPERATOR_CRD_VERSION = "26.7.2"
 JUPYTERHUB_CHART_VERSION = "4.4.1"
 # renovate: datasource=github-releases depName=marimo-operator packageName=marimo-team/marimo-operator
 MARIMO_OPERATOR_VERSION = "v0.3.0"
-# renovate: datasource=docker depName=marimo-jupyterlab packageName=ghcr.io/mitodl/marimo-jupyterlab
 # TODO(tmacey): pin to a versioned tag once ghcr.io/mitodl/marimo-jupyterlab publishes one.  # noqa: FIX002
-# Renovate is configured above to bump this automatically on the first tagged release.
+# The custom manager's regex requires the marker to sit on the line directly
+# above the assignment, so any explanation has to go above the marker.
+# renovate: datasource=docker depName=marimo-jupyterlab packageName=ghcr.io/mitodl/marimo-jupyterlab
 MARIMO_JUPYTERLAB_VERSION = "latest"
 # renovate: datasource=helm depName=k8s-monitoring packageName=k8s-monitoring registryUrl=https://grafana.github.io/helm-charts
 GRAFANA_K8S_MONITORING_CHART_VERSION = "4.4.0"
@@ -107,9 +111,9 @@ NVIDIA_DCGM_EXPORTER_CHART_VERSION = "4.8.3"
 NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION = "0.20.0"
 # renovate: datasource=docker depName=pgbouncer packageName=ghcr.io/cloudnative-pg/pgbouncer
 PGBOUNCER_VERSION = "1.25.2"
-# renovate: datasource=docker depName=pgbouncer-exporter packageName=quay.io/prometheuscommunity/pgbouncer-exporter
 # Keep at >= v0.12.1: earlier releases report the reserve_pool metric incorrectly
 # against PgBouncer >= 1.24, which is the version PGBOUNCER_VERSION pins.
+# renovate: datasource=docker depName=pgbouncer-exporter packageName=quay.io/prometheuscommunity/pgbouncer-exporter
 PGBOUNCER_EXPORTER_VERSION = "v0.12.1"
 # renovate: datasource=docker depName=sql-exporter packageName=burningalchemist/sql_exporter
 SQL_EXPORTER_VERSION = "0.24.6"

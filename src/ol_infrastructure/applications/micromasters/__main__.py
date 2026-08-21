@@ -27,16 +27,18 @@ from pulumi_aws import ec2, iam, route53, s3
 
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
-    DEFAULT_NGINX_PORT,
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
+    DEFAULT_WSGI_PORT,
     ONE_MEGABYTE_BYTE,
+    STATIC_ASSET_MAX_AGE_SECONDS,
 )
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.apisix import (
+    OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
 )
@@ -863,9 +865,31 @@ micromasters_k8s_app = OLApplicationK8s(
             # blocking threads, 16 backpressure, runtime defaults).
             blocking_threads_idle_timeout=120,
             enable_metrics=True,
+            # Serve /static/* from Granian's Rust layer instead of the sidecar
+            # (docs/plans/remove-nginx-sidecar.md, stage 4). STATIC_ROOT is
+            # /src/staticfiles, the same emptyDir the collectstatic init
+            # container populates, and STATIC_URL is Granian's default /static
+            # route. The sidecar's try_files also fell back to the source tree
+            # ($uri against root /src) before /staticfiles, but Granian's
+            # static_path_mounts requires one --static-path-route per mount and
+            # does not chain multiple mounts on a miss (verified against
+            # granian/server/common.py::_init_static_mounts and
+            # src/files.rs::match_static_file at v2.7.4), so that tier can't be
+            # reproduced. It only ever mattered before collectstatic ran, which
+            # the init container always does here first.
+            static_path_mounts=["/src/staticfiles"],
+            # The sidecar served this directory with `expires max`; Granian
+            # would otherwise fall back to its own 1-day default.
+            static_path_expires=STATIC_ASSET_MAX_AGE_SECONDS,
         ),
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
-        import_nginx_config=True,
+        # The sidecar's only real job was serving /static/*, which Granian now
+        # does directly. What is left of it -- a /nginx-health endpoint nothing
+        # probes (probes use django-health-check), an X-Forwarded-Proto
+        # re-forward of the header APISix already sets, and a 25M body cap
+        # APISix does not enforce anyway -- is either redundant or translated
+        # to the APISix routes below. See docs/plans/remove-nginx-sidecar.md.
+        import_nginx_config=False,
         init_migrations=False,
         init_collectstatic=True,
         resource_requests={"cpu": "250m", "memory": "2000Mi"},
@@ -926,7 +950,7 @@ micromasters_k8s_app = OLApplicationK8s(
             # See default_probe_configs in components/services/k8s.py.
             "liveness_probe": kubernetes.core.v1.ProbeArgs(
                 tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(
-                    port=DEFAULT_NGINX_PORT,
+                    port=DEFAULT_WSGI_PORT,
                 ),
                 initial_delay_seconds=30,
                 period_seconds=30,
@@ -936,7 +960,7 @@ micromasters_k8s_app = OLApplicationK8s(
             "readiness_probe": kubernetes.core.v1.ProbeArgs(
                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
                     path="/health/readiness/",
-                    port=DEFAULT_NGINX_PORT,
+                    port=DEFAULT_WSGI_PORT,
                     http_headers=[
                         kubernetes.core.v1.HTTPHeaderArgs(
                             name="Host",
@@ -952,7 +976,7 @@ micromasters_k8s_app = OLApplicationK8s(
             "startup_probe": kubernetes.core.v1.ProbeArgs(
                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
                     path="/health/startup/",
-                    port=DEFAULT_NGINX_PORT,
+                    port=DEFAULT_WSGI_PORT,
                     http_headers=[
                         kubernetes.core.v1.HTTPHeaderArgs(
                             name="Host",
@@ -999,8 +1023,75 @@ micromasters_apisix_httproute = OLApisixRoute(
             hosts=[backend_domain, *fastly_domains],
             paths=["/*"],
             backend_service_name=micromasters_k8s_app.application_lb_service_name,
-            backend_service_port=micromasters_k8s_app.application_lb_service_port_name,
+            backend_service_port=DEFAULT_WSGI_PORT,
             plugins=[],
+        ),
+        # The `location` blocks that used to live in the nginx sidecar.
+        # ApisixRoute resolves overlapping rules by explicit priority, not
+        # longest-prefix, so these outrank "passthrough" (priority 0) above.
+        # nginx resolved this against `root /src` with no fallback, i.e.
+        # /src/static/hash.txt -- the source tree, not the collectstatic
+        # output -- so Granian's static_path_mounts would instead serve
+        # /src/staticfiles/hash.txt: same content only if something copies it
+        # there. Kept for behavioral parity with the nginx block regardless.
+        OLApisixRouteConfig(
+            route_name="static-hash",
+            priority=20,
+            hosts=[backend_domain, *fastly_domains],
+            paths=["/static/hash.txt"],
+            backend_service_name=micromasters_k8s_app.application_lb_service_name,
+            backend_service_port=DEFAULT_WSGI_PORT,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="response-rewrite",
+                    secretRef=None,
+                    config={"headers": {"set": {"Cache-Control": "private, no-cache"}}},
+                ),
+            ],
+        ),
+        # Granian serves static without a CORS header; the sidecar added a
+        # blanket one. micromasters has no shared plugin config supplying
+        # `cors`, so without this the header would silently disappear.
+        OLApisixRouteConfig(
+            route_name="static",
+            priority=10,
+            hosts=[backend_domain, *fastly_domains],
+            paths=["/static/*"],
+            backend_service_name=micromasters_k8s_app.application_lb_service_name,
+            backend_service_port=DEFAULT_WSGI_PORT,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="response-rewrite",
+                    secretRef=None,
+                    config={
+                        "headers": {"set": {"Access-Control-Allow-Origin": "*"}},
+                    },
+                ),
+            ],
+        ),
+        # A 204 here is the EFF Do Not Track convention for "no policy
+        # published". Kept as a mock so crawlers requesting it are answered
+        # at the gateway rather than burning a Granian blocking thread on a
+        # Django 404.
+        OLApisixRouteConfig(
+            route_name="dnt-policy",
+            priority=10,
+            hosts=[backend_domain, *fastly_domains],
+            paths=["/.well-known/dnt-policy.txt"],
+            backend_service_name=micromasters_k8s_app.application_lb_service_name,
+            backend_service_port=DEFAULT_WSGI_PORT,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="mocking",
+                    secretRef=None,
+                    config={
+                        "response_status": 204,
+                        "response_example": "",
+                        "content_type": "text/plain",
+                        "with_mock_header": False,
+                    },
+                ),
+            ],
         ),
     ],
     k8s_namespace=micromasters_namespace,

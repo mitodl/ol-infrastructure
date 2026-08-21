@@ -1,4 +1,5 @@
 from enum import StrEnum, unique
+from re import compile as re_compile
 
 from pydantic import BaseModel, field_validator
 
@@ -44,7 +45,12 @@ class BusinessUnit(StrEnum):
 
 @unique
 class Environment(StrEnum):
-    """Canonical reference for valid environment names."""
+    """The AWS network a resource lives in -- the `Environment` tag.
+
+    Names a VPC and the account-level grouping around it, not a deployment
+    stage: `applications-qa` and `applications-production` are both
+    `Environment.applications`. For the stage, see `DeploymentEnvironment`.
+    """
 
     applications = "applications"
     data = "data"
@@ -53,6 +59,32 @@ class Environment(StrEnum):
     mitx_staging = "mitx-staging"
     operations = "operations"
     xpro = "xpro"
+
+
+@unique
+class DeploymentEnvironment(StrEnum):
+    """Deployment stage of a workload -- the `ol.mit.edu/environment` label.
+
+    What a change is promoted through, and what alert routing reads to decide
+    whether a failure is allowed to page. Distinct from `Environment`, which
+    names a network.
+
+    Normally this is the stack's `env_suffix` and nothing needs to say it. The
+    field exists for the workload whose stage differs from its cluster's --
+    the `mitx-staging` deployments that run in `residential-production` -- which
+    otherwise inherits `production` from the cluster and pages as production.
+
+    `rc` is the release-candidate spelling of `qa` used by ODL Video and by the
+    Pingdom checks in `grafana_alerting/pingdom_checks.py`; it is a stage, not a
+    fourth environment.
+    """
+
+    ci = "ci"
+    dev = "dev"
+    production = "production"
+    qa = "qa"
+    rc = "rc"
+    staging = "staging"
 
 
 @unique
@@ -155,6 +187,20 @@ class Application(StrEnum):
 
 
 @unique
+class AlertTier(StrEnum):
+    """How far an alert about this workload is allowed to escalate.
+
+    The workload declares its own paging eligibility, so that an alert rule
+    does not have to encode which namespaces matter. Rootly reads the tier;
+    the rule only reports what broke.
+    """
+
+    page = "page"  # wake someone: user-facing or data-integrity impact
+    notify = "notify"  # business hours: degraded, self-healing, or redundant
+    ticket = "ticket"  # record only, never notifies
+
+
+@unique
 class Component(StrEnum):
     """Functional role of a workload within its service.
 
@@ -217,6 +263,16 @@ class K8sGlobalLabels(BaseModel):
     # like data platform e.g. airbyte
     service: Services
     stack: StackInfo
+    # Optional here and required on K8sAppLabels. Most workloads label with the
+    # base class, and one that cannot name its product or its alert tier cannot
+    # be rolled up or routed on -- which is the gap this whole hierarchy exists
+    # to close.
+    product: Product | None = None
+    application: Application | None = None
+    component: Component | None = None
+    alert_tier: AlertTier | None = None
+    # Overrides the stage derived from stack.env_suffix in model_dump.
+    environment: DeploymentEnvironment | None = None
 
     @staticmethod
     def _sanitize_label_value(value: str) -> str:
@@ -242,16 +298,21 @@ class K8sGlobalLabels(BaseModel):
                 value = self._sanitize_label_value(value)
             new_dict[f"ol.mit.edu/{key}"] = value
         new_dict["ol.mit.edu/stack"] = self._sanitize_label_value(self.stack.k8s_name)
-        new_dict["ol.mit.edu/environment"] = self.stack.env_suffix
+        new_dict["ol.mit.edu/environment"] = self.environment or self.stack.env_suffix
         return new_dict
 
 
 class K8sAppLabels(K8sGlobalLabels):
+    """Labels for a workload that is part of a deployed application.
+
+    Narrows the base class rather than extending it: product, application and
+    source_repository are required here.
+    """
+
     product: Product
     application: Application
-    component: Component | None = None
-    pod_security_group: str | None = None
     source_repository: str
+    pod_security_group: str | None = None
     commit_sha: str | None = None
     release_tag: str | None = None
 
@@ -307,3 +368,68 @@ class AWSBase(BaseModel):
         for tags in new_tags:
             tag_dict.update(tags)
         return tag_dict
+
+
+GCP_LABEL_KEY_PATTERN = re_compile(r"^[a-z][a-z0-9_-]{0,62}$")
+GCP_LABEL_VALUE_PATTERN = re_compile(r"^[a-z0-9_-]{0,63}$")
+REQUIRED_LABELS = {"ou", "environment"}
+
+
+class GCPBase(BaseModel):
+    """Base class for configuration objects passed to GCP component resources.
+
+    The GCP analogue of :class:`AWSBase`. GCP labels are the equivalent of AWS
+    tags, but the accepted character set is far narrower: keys and values are
+    limited to lowercase letters, digits, ``-`` and ``_``, at most 63
+    characters, and a key must start with a letter. ``OU``/``Environment``
+    therefore become ``ou``/``environment`` here, and both keys and values are
+    lowercased before validation so callers can keep passing ``BusinessUnit``
+    members and ``StackInfo.name`` unchanged.
+    """
+
+    project_id: str
+    labels: dict[str, str]
+    region: str = "us-east1"
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.labels.update({"pulumi_managed": "true"})
+
+    @field_validator("labels")
+    @classmethod
+    def enforce_labels(cls, labels: dict[str, str]) -> dict[str, str]:
+        normalized = {key.lower(): value.lower() for key, value in labels.items()}
+        if not REQUIRED_LABELS.issubset(normalized.keys()):
+            msg = f"Not all required labels have been specified. Missing labels: {REQUIRED_LABELS.difference(normalized.keys())}"  # noqa: E501
+            raise ValueError(msg)
+        try:
+            BusinessUnit(normalized["ou"])
+        except ValueError as exc:
+            msg = "The ou label specified is not a valid business unit"
+            raise ValueError(msg) from exc
+        for key, value in normalized.items():
+            if not GCP_LABEL_KEY_PATTERN.match(key):
+                msg = f"{key} is not a valid GCP label key"
+                raise ValueError(msg)
+            if not GCP_LABEL_VALUE_PATTERN.match(value):
+                msg = f"{value} is not a valid GCP label value for key {key}"
+                raise ValueError(msg)
+        return normalized
+
+    def merged_labels(self, *new_labels: dict[str, str]) -> dict[str, str]:
+        """Return a dictionary of existing labels with the ones passed in.
+
+        The merged result is re-validated. Additions bypass the constructor, so
+        without this a caller could hand a child resource a label GCP will
+        reject -- an ``@`` in a value, an over-long key -- and only find out
+        when the provider refuses it mid-apply.
+
+        :param *new_labels: One or more dictionaries of specific labels to be set
+                            on a child resource.
+
+        :returns: Merged dictionary of base labels and specific labels.
+        """
+        label_dict = self.labels.copy()
+        for labels in new_labels:
+            label_dict.update(labels)
+        return self.enforce_labels(label_dict)

@@ -27,7 +27,6 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
 
 k8s_yaml_local([
     'configmaps/app-env.yaml',
-    'configmaps/nginx.yaml',
     'secrets.yaml',
     'deployment.yaml',
     'apisix-routes.yaml',
