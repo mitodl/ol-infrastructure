@@ -277,7 +277,11 @@ local_resource(
     "local-infra-apps",
     cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c '{wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi up --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir)),
     dir="./local-dev/infra/apps_infra",
-    deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py", "./local-dev/scripts/wait-for-keycloak-admin.sh"],
+    # The stack config is a dep alongside the program: adding a client also adds
+    # a `*_client_secret` to it, and without it here Tilt fires on the .py edit
+    # alone and fails with "Missing required configuration variable", then never
+    # re-runs when the value lands.
+    deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py", "./local-dev/infra/apps_infra/Pulumi.local-dev.apps-infra.Dev.yaml", "./local-dev/scripts/wait-for-keycloak-admin.sh"],
     labels=["infra"],
     resource_deps=["local-infra-core"],
 )

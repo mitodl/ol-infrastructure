@@ -30,6 +30,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     keycloak_url: str,
     k8s_provider: k8s.Provider,
     mitlearn_client_secret: Output,
+    mitlearn_account_client_secret: Output,
     learn_ai_client_secret: Output,
     mitxonline_client_secret: Output,
     unified_ecommerce_client_secret: Output,
@@ -144,7 +145,14 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     for alias, default in [
         ("CONFIGURE_TOTP", False),
         ("VERIFY_EMAIL", verify_email),
-        # UPDATE_EMAIL was removed in Keycloak 26 — omit to avoid validation error.
+        # UPDATE_EMAIL is gated behind Keycloak's `update-email` preview feature,
+        # which the mitodl/keycloak image bakes in at build time (see
+        # Dockerfile.hosted in ol-keycloak). Declaring it here keeps the action
+        # enabled for MIT Learn's application-initiated update-email flow -- an
+        # AIA request for an action the realm has disabled comes back as
+        # kc_action_status=error. If the provider rejects this alias as unknown,
+        # the image lost the feature flag rather than the action being obsolete.
+        ("UPDATE_EMAIL", False),
         ("UPDATE_PASSWORD", False),
     ]:
         keycloak.RequiredAction(
@@ -492,6 +500,50 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         "ol-mitlearn-oidc",
         mitlearn_client,
         mitlearn_client_secret,
+    )
+
+    # --- MIT Learn account actions ---
+    # Separate from ol-mitlearn-client (which APISIX uses for the session)
+    # because its only job is Keycloak's application-initiated actions — update
+    # email / update password. Django sends the user here with `kc_action`,
+    # Keycloak returns them to the callback below, and Django exchanges the code
+    # server-side to read the updated email, since the gateway's cached userinfo
+    # still holds the old one.
+    mitlearn_account_client = keycloak.openid.Client(
+        "olapps-mitlearn-account-client",
+        name="ol-mitlearn-account-client",
+        realm_id=realm.realm,
+        client_id="ol-mitlearn-account-client",
+        client_secret=mitlearn_account_client_secret,
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        service_accounts_enabled=False,
+        # Trailing "*" so Keycloak's exact-match check still passes once Django
+        # appends ?next=...&kc_action=... — mirrors the production mitxonline
+        # entry in substructure/keycloak/Pulumi.Production.yaml.
+        valid_redirect_uris=[
+            f"https://api.learn.{root_domain}/account/action/complete*",
+        ],
+        opts=kc_opts.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    keycloak.openid.ClientDefaultScopes(
+        "olapps-mitlearn-account-default-scopes",
+        realm_id=realm.realm,
+        client_id=mitlearn_account_client.id,
+        default_scopes=DEFAULT_SCOPES,
+        opts=kc_opts,
+    )
+    # Not consumed by an APISIX secretRef (Django reads these from
+    # mitlearn-secrets); created for parity with the other clients and as the
+    # place to read the live credentials back.
+    _make_oidc_secret(
+        "oidc-secret-mitlearn-account",
+        "mit-learn",
+        "ol-mitlearn-account-oidc",
+        mitlearn_account_client,
+        mitlearn_account_client_secret,
     )
 
     # --- MITx Online ---
