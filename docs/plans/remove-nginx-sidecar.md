@@ -23,7 +23,7 @@ precedent this plan generalizes.
 | ~~micromasters~~ | `$uri`, `/src/staticfiles` | — | yes | passthrough | 25M | |
 | ~~learn_ai~~ | `$uri`, `/src/staticfiles` | — | — | *unset* | — | `proxy_buffering off` |
 | ~~mitxonline~~ | `$uri`, `/src/staticfiles` | — | yes | **`$scheme`** | 25M | |
-| ~~mit_learn~~ | `$uri`, `/src/staticfiles` | `/src/django_media` | — | **`$scheme`** | 25M | gzip on JSON |
+| ~~mit_learn~~ | `$uri`, `/src/staticfiles` | `/src/django_media` (dead -- dir absent from the image, see stage 5) | — | **`$scheme`** | 25M | gzip on JSON |
 
 Common to all but odl_video_service: `expires max` and
 `add_header Access-Control-Allow-Origin *` on `/static/*`.
@@ -81,12 +81,19 @@ ocw-studio image) exposes `--static-path-mount` (repeatable),
 `--static-path-route` (repeatable, default `/static`) and
 `--static-path-expires` (default `86400`). Concretely:
 
-1. ~~**No `static_path_routes`.**~~ **Closed.** mit_learn serves `/media/*` from
-   `/src/django_media`; that needed a second route/mount pair.
-   `GranianConfig.static_path_routes` now emits one `--static-path-route` per
+1. ~~**No `static_path_routes`.**~~ **Closed on the component side, but the
+   motivating case turned out not to exist.**
+   `GranianConfig.static_path_routes` emits one `--static-path-route` per
    entry, paired positionally with `static_path_mounts` (mirrors Granian's own
    `_init_static_mounts`, which requires equal lengths and refuses to start
-   otherwise -- see stage 5).
+   otherwise -- see stage 5). It was added because mit_learn appeared to serve
+   `/media/*` from `/src/django_media`, which would have needed a second
+   route/mount pair -- but that directory does not exist in the image and the
+   nginx block was dead config, so stage 5's follow-up put mit_learn back on a
+   single mount (see "mit_learn's `/media` mount was dead config" below). The
+   field stays -- it is correct and unit-tested -- but has no consumer today,
+   and a future second mount should confirm the directory actually exists in
+   the image first.
 2. ~~**No `static_path_expires`.**~~ **Closed.** `GranianConfig.static_path_expires`
    emits the flag; `STATIC_ASSET_MAX_AGE_SECONDS` (315360000) in
    `bridge/lib/magic_numbers.py` is what nginx's `expires max` resolves to.
@@ -368,9 +375,11 @@ neither app overrides. So `web.conf_granian` (the file this stage's
 production; `web.conf_uwsgi` stays, since it's still the config the dormant
 `False` branch would load.
 
-- **mit_learn**: `GranianConfig` gains `static_path_mounts=["/src/staticfiles",
-  "/src/django_media"]` paired with `static_path_routes=["/static", "/media"]`
-  (gap 1, closed) and `static_path_expires`. `import_nginx_config` gates on
+- **mit_learn**: `GranianConfig` gains `static_path_mounts=["/src/staticfiles"]`
+  and `static_path_expires`. (As merged this was a two-mount config paired with
+  `static_path_routes=["/static", "/media"]`; the `/media` pair was reverted
+  immediately after -- see "mit_learn's `/media` mount was dead config" below.)
+  `import_nginx_config` gates on
   `not use_granian`, matching learn_ai. Both `OLApisixRoute` resources
   (`_no_prefix` on `/*`, prefixed on `/learn/*`) already reach `/static/*` and
   `/media/*` through their existing `passauth`/`reqauth` wildcard routes, which
@@ -396,6 +405,29 @@ production; `web.conf_uwsgi` stays, since it's still the config the dormant
   inheriting a temporary Production regression from an unrelated rollout
   gate. No-op in CI/QA, where the per-stack default already resolved to
   `True` -- confirmed via `pulumi preview` diff isolation (see below).
+
+#### mit_learn's `/media` mount was dead config
+
+Stage 5 as merged translated mit_learn's nginx `location ~* /media/(.*$)` block
+into a second Granian mount at `/src/django_media`. That directory does not
+exist in the `mitodl/mit-learn-app` image, and nginx never cared: `try_files
+$uri $uri/ /django_media/$1 /django_media/$1/ =404` against a missing root just
+404s, so the block had been dead for as long as it had been there. Granian
+instead validates every `--static-path-mount` at startup and refuses to boot on
+a missing one, so every `mitlearn-app` pod crashlooped with `Invalid value for
+'--static-path-mount': Directory '/src/django_media' does not exist.` once QA
+rolled to the sidecar-free Deployment.
+
+The mount was dead for two independent reasons: mit-learn's `MEDIA_ROOT` is
+`/var/media/` with uploads in S3 (`AWS_STORAGE_BUCKET_NAME` /
+`AWS_S3_PREFIX=media`), and mit_learn's own Fastly VCL already routes `^/media`
+to S3 at the edge, so those requests never reach the cluster at all.
+
+The general lesson for this kind of translation: an nginx `location` block with
+a `try_files ... =404` tail is not evidence that its root exists. nginx fails
+soft per-request where Granian fails hard at startup, so a directory has to be
+confirmed present in the image -- not just present in the config being
+translated.
 
 - **mitxonline**: `GranianConfig` gains `static_path_mounts=["/src/staticfiles"]`
   and `static_path_expires` -- single mount, same shape as ocw_studio/xpro.
@@ -454,9 +486,12 @@ inferring from the diff text.
 3. ~~**xpro**~~ — done, PR #5541.
 4. ~~**micromasters, learn_ai**~~ — done, PR #5549. Gap 5 (two-directory
    static fallback) closed: Granian can't reproduce it and doesn't need to.
-5. ~~**mit_learn, mitxonline**~~ — done, this commit. Gap 1 (`/media` route)
-   closed via `static_path_routes`; JSON gzip moved to the APISix `gzip`
-   plugin. All seven apps are now sidecar-free -- this plan is complete.
+5. ~~**mit_learn, mitxonline**~~ — done, PR #5550, with a follow-up fix in
+   PR #5565. Gap 1 (`/media` route) closed via `static_path_routes`, but the
+   `/media` mount it was built for turned out to be dead nginx config and was
+   reverted -- mit_learn ships a single `/src/staticfiles` mount. JSON gzip
+   moved to the APISix `gzip` plugin. All seven apps are now sidecar-free --
+   this plan is complete.
 
 ## Out of scope
 
