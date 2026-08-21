@@ -55,7 +55,7 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
-    oidc_error_callback_recovery_plugin,
+    oidc_gateway_pre_function_plugin,
     stale_session_cookie_cleanup_plugin,
 )
 from ol_infrastructure.components.services.cert_manager import (
@@ -1355,8 +1355,11 @@ learn_external_service_shared_plugins = OLApisixSharedPlugins(
             # openid-connect plugin serves each one a 500.  Both route groups
             # on this host need it, and the plugin derives its redirect target
             # from the request URI, so the /login and /learn/login prefixes are
-            # handled from this one attachment.
-            oidc_error_callback_recovery_plugin(),
+            # handled from this one attachment.  The same attachment also
+            # canonicalises the origin: `curl http://api.learn.mit.edu/login`
+            # currently sends Keycloak an http:// redirect_uri, and answers with
+            # an OIDC session cookie over cleartext.
+            oidc_gateway_pre_function_plugin(),
         ],
     ),
 )

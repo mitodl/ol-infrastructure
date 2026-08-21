@@ -9,7 +9,7 @@ A 302 means the plugin intercepted.  Any other status means it declined and the
 request went on to the dead upstream, which in production is where the
 openid-connect plugin takes over.
 
-See ``oidc_error_callback_recovery_plugin`` in
+See ``oidc_gateway_pre_function_plugin`` in
 src/ol_infrastructure/components/services/apisix.py.
 """
 

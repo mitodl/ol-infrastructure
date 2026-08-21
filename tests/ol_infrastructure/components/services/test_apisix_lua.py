@@ -17,7 +17,7 @@ from __future__ import annotations
 import lupa
 
 from ol_infrastructure.components.services.apisix import (
-    oidc_error_callback_recovery_plugin,
+    oidc_gateway_pre_function_plugin,
 )
 
 # Stubs the generated function's whole world: the two ngx.var reads, the
@@ -57,15 +57,27 @@ class Harness:
     """Runs the shipped Lua against a stubbed ngx/apisix.core.
 
     Both the function source and the ``conf`` table come from
-    ``oidc_error_callback_recovery_plugin``, so these exercise the same plugin
+    ``oidc_gateway_pre_function_plugin``, so these exercise the same plugin
     config the gateway is handed rather than a hand-built approximation.
     """
 
+    # The builder fuses both pre-openid-connect functions into the one
+    # serverless-pre-function APISIX allows per plugin config, so subclasses
+    # select theirs by the conf block it reads.  Indexing by position would
+    # silently test the wrong function if the order changed.
+    FUNCTION_MARKER = "oidc_error_recovery"
+    EXTRA_LUA = ""
+
     def __init__(self, **plugin_kwargs):
         self.lua = lupa.LuaRuntime(unpack_returned_tuples=True)
-        self.lua.execute(LUA_STUBS)
-        plugin_config = oidc_error_callback_recovery_plugin(**plugin_kwargs).config
-        (source,) = plugin_config["functions"]
+        # One chunk, not two: `captured` is a chunk-local upvalue that the
+        # ngx.redirect stub closes over, so a runner defined in a separate
+        # execute() would assign to a fresh global and capture nothing.
+        self.lua.execute(LUA_STUBS + self.EXTRA_LUA)
+        plugin_config = oidc_gateway_pre_function_plugin(**plugin_kwargs).config
+        (source,) = [
+            fn for fn in plugin_config["functions"] if self.FUNCTION_MARKER in fn
+        ]
         self.fn = self.lua.execute(source)
         self.conf = self._to_lua(plugin_config)
 
@@ -249,3 +261,117 @@ def test_custom_guard_lifetime_reaches_the_cookie():
     )
 
     assert "Max-Age=90;" in set_cookie
+
+
+class OriginHarness(Harness):
+    """Runs the canonical-origin function against a stubbed ngx.
+
+    Unlike the recovery function this one reads only ``ngx.var`` -- scheme,
+    host, http_host, request_uri -- so it gets its own runner rather than
+    overloading ``run`` with parameters the other cases never use.
+    """
+
+    FUNCTION_MARKER = "canonical_https_redirect"
+    EXTRA_LUA = """
+    function run_origin(fn, conf, scheme, host, http_host, request_uri)
+        captured = {args = {}, headers = {}, redirect = nil}
+        ngx.var.scheme = scheme
+        ngx.var.host = host
+        ngx.var.http_host = http_host
+        ngx.var.request_uri = request_uri
+        fn(conf, {var = ngx.var})
+        local redirect = captured.redirect
+        return redirect and redirect.uri or nil, redirect and redirect.code or nil
+    end
+    """
+
+    #: ``http_host`` defaults to mirroring ``host``; pass ``None`` explicitly for
+    #: the HTTP/1.0 case where the request carries no Host header at all.
+    MIRROR_HOST = object()
+
+    def request(
+        self, scheme="https", host="learn.mit.edu", http_host=MIRROR_HOST, uri="/"
+    ):
+        return self.lua.globals().run_origin(
+            self.fn,
+            self.conf,
+            scheme,
+            host,
+            host if http_host is self.MIRROR_HOST else http_host,
+            uri,
+        )
+
+
+def test_plain_http_is_upgraded_before_openid_connect_sees_it():
+    """The measured failure: this is what sends Keycloak an http:// redirect_uri
+    and answers with an OIDC session cookie over cleartext.
+    """
+    uri, status = OriginHarness().request(
+        scheme="http", host="nb.learn.mit.edu", uri="/hub/login"
+    )
+
+    assert (uri, status) == ("https://nb.learn.mit.edu/hub/login", 308)
+
+
+def test_explicit_port_in_host_is_stripped():
+    """`Host: nb.learn.mit.edu:443` yields https://nb.learn.mit.edu:443/... which
+    Keycloak rejects against its bare-host registration.  Reproduced live.
+    """
+    uri, status = OriginHarness().request(
+        host="nb.learn.mit.edu", http_host="nb.learn.mit.edu:443"
+    )
+
+    assert (uri, status) == ("https://nb.learn.mit.edu/", 308)
+
+
+def test_canonical_request_is_left_alone():
+    """The overwhelming majority of traffic: must cost nothing and not redirect."""
+    assert OriginHarness().request(uri="/search?q=x") == (None, None)
+
+
+def test_query_string_survives_the_upgrade():
+    """request_uri, not uri: dropping the query would break every OIDC callback
+    that arrives over plain HTTP, which is precisely the traffic being fixed.
+    """
+    uri, _ = OriginHarness().request(
+        scheme="http",
+        host="api.learn.mit.edu",
+        uri="/login/.apisix/redirect?code=a&state=b",
+    )
+
+    assert uri == "https://api.learn.mit.edu/login/.apisix/redirect?code=a&state=b"
+
+
+def test_missing_host_header_is_left_to_openid_connect():
+    """HTTP/1.0 with no Host: $host would be the server_name, so redirecting
+    would invent an origin.  lua-resty-openidc already 400s this case.
+    """
+    assert OriginHarness().request(scheme="http", http_host=None) == (None, None)
+
+
+def test_redirect_status_is_configurable():
+    uri, status = OriginHarness(canonical_redirect_status=301).request(scheme="http")
+
+    assert (uri, status) == ("https://learn.mit.edu/", 301)
+
+
+def test_disabling_the_redirect_drops_the_function_entirely():
+    """A host that must keep answering on plain HTTP turns this off without
+    losing the error-callback recovery it shares a plugin with.
+    """
+    config = oidc_gateway_pre_function_plugin(canonical_https_redirect=False).config
+
+    assert not [fn for fn in config["functions"] if "canonical_https_redirect" in fn]
+    assert len(config["functions"]) == 1
+
+
+def test_origin_normalisation_runs_before_error_recovery():
+    """serverless/init.lua stops at the first function returning a code, so a
+    plain-HTTP error callback must be upgraded rather than recovered -- the
+    recovery redirect would otherwise send the browser back to an http:// login.
+    """
+    config = oidc_gateway_pre_function_plugin().config
+    sources = config["functions"]
+
+    assert "canonical_https_redirect" in sources[0]
+    assert "oidc_error_recovery" in sources[1]
