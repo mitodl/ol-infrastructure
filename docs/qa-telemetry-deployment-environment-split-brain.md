@@ -3,10 +3,12 @@
 `resource.deployment.environment` on QA spans (Tempo `grafanacloud-mitolqa-traces`) returns two
 values depending on whether the emitting service uses `mitol-django-observability`:
 
-- `rc` -- mitxonline-webapp, learn-ai-webapp, learn-webapp (mit_learn, mitxonline, xpro all set
+- `rc` -- mitxonline-webapp, learn-ai-webapp, learn-webapp (mit_learn, mitxonline, learn_ai all set
   `MITOL_ENVIRONMENT`/`MITX_ONLINE_ENVIRONMENT` to `"rc"` for the QA stack, a historical naming
   convention that also drives the Sentry `environment` tag and the app's S3 storage bucket name --
-  see `src/ol_infrastructure/applications/mit_learn/__main__.py:1159`).
+  see `src/ol_infrastructure/applications/mit_learn/__main__.py:1159` and
+  `src/ol_infrastructure/applications/learn_ai/Pulumi.QA.yaml:40`). xpro is not part of this split --
+  it sets its own `MITXPRO_ENVIRONMENT` and isn't among the three `rc` services observed in Tempo.
 - `qa` -- apisix, traefik, learn-nextjs, and the toolhive-swe services (these set
   `deployment.environment` directly from `stack_info.env_suffix`, which is `"qa"` for the QA
   stack).
