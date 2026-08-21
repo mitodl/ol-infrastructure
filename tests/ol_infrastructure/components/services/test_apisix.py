@@ -386,11 +386,11 @@ def stack_env(env_suffix: str):
 
 
 @pulumi.runtime.test
-def test_gzip_is_attached_outside_production():
+def test_gzip_is_attached_by_default():
     """APISIX loads the gzip plugin cluster-wide, but a plugin does nothing
     until a route or plugin config references it -- for a long time this one
     referenced it nowhere and every shared-gateway response went out
-    uncompressed. Non-production environments soak the fix first.
+    uncompressed. Attaching it is the default now.
     """
     with stack_env("qa"):
         plugins = shared_plugins("test-shared-plugins-gzip-qa")
@@ -404,33 +404,35 @@ def test_gzip_is_attached_outside_production():
 
 
 @pulumi.runtime.test
-def test_gzip_is_absent_in_production_by_default():
-    """Production stays off until the non-production soak says otherwise. The
-    risk is not correctness -- APISIX loads gzip everywhere -- it is CPU on a
-    gateway whose HPA scales on CPU, which only shows up at production volume.
+def test_gzip_is_attached_in_production():
+    """Production was gated behind a non-production soak because the risk was
+    never correctness -- APISIX loads gzip everywhere -- but CPU on a gateway
+    whose HPA scales on CPU. The soak plus a measurement against real peak
+    egress retired that gate, so Production is no longer a special case.
     """
     with stack_env("production"):
         plugins = shared_plugins("test-shared-plugins-gzip-production")
 
     def check(spec):
-        assert plugin_named(spec["plugins"], "gzip") is None
+        assert plugin_named(spec["plugins"], "gzip") is not None
 
     return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
 
 
 @pulumi.runtime.test
-def test_gzip_can_be_forced_on_in_production():
-    """An application that has done its own measurement can go early without
-    waiting for the fleet-wide default to flip.
+def test_gzip_can_be_forced_off_in_production():
+    """The opt-out has to reach Production, since that is where an application
+    that streams incrementally under a compressible content type would actually
+    be hurt by the compression buffers.
     """
     with stack_env("production"):
         plugins = shared_plugins(
-            "test-shared-plugins-gzip-production-override",
-            enable_gzip=True,
+            "test-shared-plugins-gzip-production-opt-out",
+            enable_gzip=False,
         )
 
     def check(spec):
-        assert plugin_named(spec["plugins"], "gzip") is not None
+        assert plugin_named(spec["plugins"], "gzip") is None
 
     return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
 
