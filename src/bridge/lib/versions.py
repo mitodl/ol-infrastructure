@@ -51,7 +51,7 @@ GATEWAY_API_VERSION = "v1.6.1"
 # renovate: datasource=docker depName=karpenter packageName=public.ecr.aws/karpenter/karpenter
 KARPENTER_CHART_VERSION = "1.14.0"
 # renovate: datasource=helm depName=keda packageName=keda registryUrl=https://kedacore.github.io/charts
-KEDA_CHART_VERSION = "2.17.1"
+KEDA_CHART_VERSION = "2.20.2"
 # renovate: datasource=helm depName=kubewatch packageName=kubewatch registryUrl=https://robusta-charts.storage.googleapis.com
 KUBEWATCH_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=meilisearch packageName=meilisearch registryUrl=https://meilisearch.github.io/meilisearch-kubernetes
