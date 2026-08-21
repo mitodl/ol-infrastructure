@@ -7,7 +7,7 @@ from typing import Any, cast
 import pulumi_kubernetes as kubernetes
 import pulumi_vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions, export
-from pulumi_aws import iam
+from pulumi_aws import ec2, iam
 
 from bridge.lib.versions import STARROCKS_CHART_VERSION, STARROCKS_VERSION
 from ol_infrastructure.components.applications.eks import (
@@ -71,6 +71,14 @@ starrocks_data_storage_class = stateful_workload_storage["storage_class"]
 
 kms_stack = make_stack_reference(projects.KMS, stack_info.name)
 s3_kms_key = kms_stack.require_output("kms_s3_data_analytics_key")
+
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
+data_vpc = network_stack.require_output("data_vpc")
+vault_stack = make_stack_reference(
+    projects.VAULT_SERVER, f"operations.{stack_info.name}"
+)
+mit_learn_stack = make_stack_reference(projects.MIT_LEARN, stack_info.name)
+concourse_stack = make_stack_reference(projects.CONCOURSE, stack_info.name)
 
 starrocks_env = f"data-{stack_info.env_suffix}"
 aws_config = AWSBase(tags={"OU": "data", "Environment": starrocks_env})
@@ -985,8 +993,36 @@ starrocks_apisix_httproute = OLApisixHTTPRoute(
 
 # Internal NLB exposing the StarRocks FE MySQL port (9030) to the data VPC so that
 # Vault — running on EC2 in the operations VPC, which is peered with the data VPC —
-# can reach StarRocks to manage dynamic database credentials.
+# can reach StarRocks to manage dynamic database credentials. Also admits MIT
+# Learn's application pods (applications VPC) and Concourse workers (operations
+# VPC, which run the Vault DB-role SQL setup Command resources in
+# substructure/starrocks) as explicit sources — supplying this SG via the LBC
+# annotation below means it becomes the sole authority on the NLB's ingress, so
+# every legitimate caller must be listed here.
 FE_MYSQL_PORT = 9030
+fe_mysql_nlb_security_group = ec2.SecurityGroup(
+    f"starrocks-{stack_info.env_suffix}-fe-mysql-nlb-security-group",
+    name=f"starrocks-{stack_info.env_suffix}-fe-mysql-nlb",
+    description="Access control for the StarRocks FE MySQL protocol NLB",
+    vpc_id=data_vpc["id"],
+    ingress=[
+        ec2.SecurityGroupIngressArgs(
+            security_groups=[
+                vault_stack.require_output("vault_server")["security_group"],
+                mit_learn_stack.require_output("mit_learn")["app_security_group_id"],
+                concourse_stack.require_output("worker_security_group"),
+            ],
+            protocol="tcp",
+            from_port=FE_MYSQL_PORT,
+            to_port=FE_MYSQL_PORT,
+            description=(
+                "Allow Vault, MIT Learn application pods, and Concourse workers "
+                "to reach the StarRocks FE MySQL protocol port."
+            ),
+        ),
+    ],
+    tags=aws_config.tags,
+)
 fe_mysql_nlb_service = kubernetes.core.v1.Service(
     f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-fe-mysql-nlb",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -998,6 +1034,9 @@ fe_mysql_nlb_service = kubernetes.core.v1.Service(
             "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
             "service.beta.kubernetes.io/aws-load-balancer-scheme": "internal",
             "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled": "true",  # noqa: E501
+            "service.beta.kubernetes.io/aws-load-balancer-security-groups": (
+                fe_mysql_nlb_security_group.id
+            ),
         },
     ),
     spec=kubernetes.core.v1.ServiceSpecArgs(
