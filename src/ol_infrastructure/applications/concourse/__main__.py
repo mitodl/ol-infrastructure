@@ -408,6 +408,7 @@ concourse_worker_security_group = ec2.SecurityGroup(
     egress=default_egress_args,
     vpc_id=ops_vpc_id,
 )
+export("worker_security_group", concourse_worker_security_group.id)
 
 # Create web node security group
 concourse_web_security_group = ec2.SecurityGroup(
