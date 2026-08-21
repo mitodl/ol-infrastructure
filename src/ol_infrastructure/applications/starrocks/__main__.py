@@ -1021,6 +1021,20 @@ fe_mysql_nlb_security_group = ec2.SecurityGroup(
             ),
         ),
     ],
+    # Pulumi (via the Terraform-bridged AWS provider) strips AWS's default
+    # allow-all egress rule for any aws.ec2.SecurityGroup that specifies its
+    # own rules — an explicit egress rule is required or the NLB can't reach
+    # the StarRocks pod targets (target-type "ip") for forwarding or health
+    # checks, even though ingress is otherwise correctly scoped.
+    egress=[
+        ec2.SecurityGroupEgressArgs(
+            cidr_blocks=data_vpc["k8s_pod_subnet_cidrs"].apply(lambda cidrs: [*cidrs]),
+            protocol="tcp",
+            from_port=FE_MYSQL_PORT,
+            to_port=FE_MYSQL_PORT,
+            description="Allow the NLB to forward to StarRocks FE pod targets.",
+        ),
+    ],
     tags=aws_config.tags,
 )
 fe_mysql_nlb_service = kubernetes.core.v1.Service(
