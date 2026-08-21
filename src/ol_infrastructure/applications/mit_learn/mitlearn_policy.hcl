@@ -12,6 +12,13 @@ path "postgres-mitlearn/creds/app/*" {
   capabilities = ["read"]
 }
 
+path "azure-openai/creds/ol-mitlearn-openai" {
+  capabilities = ["read"]
+}
+path "azure-openai/creds/ol-mitlearn-openai/*" {
+  capabilities = ["read"]
+}
+
 path "secret-operations/sso/mitlearn/*" {
   capabilities = ["read"]
 }
@@ -67,12 +74,18 @@ path "secret-xpro/hubspot" {
 path "sys/leases/renew" {
   capabilities = ["update"]
   allowed_parameters = {
-    lease_id = ["postgres-mitlearn/creds/app/*"]
+    lease_id = [
+      "postgres-mitlearn/creds/app/*",
+      "azure-openai/creds/ol-mitlearn-openai/*",
+    ]
   }
 }
 path "sys/leases/revoke" {
   capabilities = ["update"]
   allowed_parameters = {
-    lease_id = ["postgres-mitlearn/creds/app/*"]
+    lease_id = [
+      "postgres-mitlearn/creds/app/*",
+      "azure-openai/creds/ol-mitlearn-openai/*",
+    ]
   }
 }

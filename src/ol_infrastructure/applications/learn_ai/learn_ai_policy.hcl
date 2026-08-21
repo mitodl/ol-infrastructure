@@ -5,6 +5,13 @@ path "postgres-learn-ai/creds/app" {
   capabilities = ["read"]
 }
 
+path "azure-openai/creds/ol-learn-ai-openai" {
+  capabilities = ["read"]
+}
+path "azure-openai/creds/ol-learn-ai-openai/*" {
+  capabilities = ["read"]
+}
+
 path "secret-operations/sso/learn-ai" {
   capabilities = ["read"]
 }
@@ -28,13 +35,19 @@ path "secret-learn-ai" {
 path "sys/leases/renew" {
   capabilities = ["update"]
   allowed_parameters = {
-    lease_id = ["postgres-learn-ai/creds/app/*"]
+    lease_id = [
+      "postgres-learn-ai/creds/app/*",
+      "azure-openai/creds/ol-learn-ai-openai/*",
+    ]
   }
 }
 path "sys/leases/revoke" {
   capabilities = ["update"]
   allowed_parameters = {
-    lease_id = ["postgres-learn-ai/creds/app/*"]
+    lease_id = [
+      "postgres-learn-ai/creds/app/*",
+      "azure-openai/creds/ol-learn-ai-openai/*",
+    ]
   }
 }
 

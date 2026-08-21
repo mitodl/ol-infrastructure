@@ -73,21 +73,27 @@ New standalone Pulumi project. Layout mirrors `src/ol_infrastructure/infrastruct
 `Pulumi.yaml` (name `ol-infrastructure-azure-openai`, backend `s3://mitol-pulumi-state/`),
 `Pulumi.{CI,QA,Production}.yaml`, `__init__.py`, `__main__.py`, `README.md`.
 
-Provisions, per environment:
+Provisions, per environment (layout decided in Q5 — one account per app consumer):
 
-- `azure_native.resources.ResourceGroup` — `ol-openai-{env}`
-- `azure_native.cognitiveservices.Account` — `kind="OpenAI"`, `sku="S0"`,
-  `custom_sub_domain_name` set (required for AAD token auth — without it only key auth works),
-  `public_network_access="Enabled"`, `disable_local_auth` left **false** for now (additive
-  migration; key auth stays available)
-- `azure_native.cognitiveservices.Deployment` per model — see §7 open question Q4
+- `azure_native.resources.ResourceGroup` — `ol-openai-{env}`, one per environment
+- `azure_native.cognitiveservices.Account` — **one per app consumer**, named
+  `ol-openai-{consumer}-{env}` for `consumer in {mitlearn, learn-ai, mitxonline}`.
+  `kind="OpenAI"`, `sku="S0"`, `custom_sub_domain_name` set (required for AAD token auth —
+  without it only key auth works), `public_network_access="Enabled"`, `disable_local_auth`
+  left **false** for now (additive migration; key auth stays available)
+- `azure_native.cognitiveservices.Deployment` — `gpt-4o`, `gpt-4o-mini`, `gpt-5.2` (Q4) on
+  each account. Capacity is allocated per deployment and per environment: Production gets the
+  bulk, CI/QA the minimum that still exercises the path, because all 27 deployments draw from
+  one shared regional TPM pool (Q1/Q5).
 - `azuread.Application` + `ServicePrincipal` + `ApplicationPassword` for the Vault root SP,
-  requesting Microsoft Graph `Application.ReadWrite.OwnedBy` (app permission)
+  **one per environment**, requesting Microsoft Graph `Application.ReadWrite.OwnedBy` (app
+  permission)
 - `azure_native.authorization.RoleAssignment` — Vault root SP → `User Access Administrator`,
-  `scope = resource_group.id` (**not** subscription scope)
+  `scope = resource_group.id` (**not** subscription scope), so one grant covers all three of
+  that environment's accounts
 
 Stack outputs (consumed by the substructure project via `StackReference`):
-`resource_group_id`, `cognitive_account_id`, `cognitive_account_endpoint`,
+`resource_group_id`, `cognitive_accounts` (a map of consumer → `{id, endpoint}`),
 `model_deployments`, `vault_root_sp_client_id`, `vault_root_sp_tenant_id`,
 `vault_root_sp_subscription_id`, `vault_root_sp_client_secret` (wrapped in
 `pulumi.Output.secret(...)`).
@@ -132,9 +138,12 @@ New project, sibling to `secrets`/`pki`/`static_mounts`. `Pulumi.yaml` name
 `__main__.py`:
 - `StackReference("…/ol-infrastructure-azure-openai/{env}")`
 - instantiate `OLVaultAzureSecretsEngine` at mount `azure-openai` with three roles:
-  `ol-mitlearn-openai`, `ol-learn-ai-openai`, `ol-mitxonline-openai`, each
-  `azure_roles=[{role_name: "Cognitive Services OpenAI User", scope: cognitive_account_id}]`
-- export `azure_openai_mount_path`, `cognitive_account_endpoint`, `model_deployments`
+  `ol-mitlearn-openai`, `ol-learn-ai-openai`, `ol-mitxonline-openai`. Each role is scoped to
+  **its own consumer's** account, not to the resource group:
+  `azure_roles=[{role_name: "Cognitive Services OpenAI User", scope: cognitive_accounts[consumer].id}]`.
+  That scoping is what stops one app's dynamic credentials from reaching another app's endpoint.
+- export `azure_openai_mount_path`, `cognitive_account_endpoints` (consumer → endpoint),
+  `model_deployments`
 
 ## 5. Per-app wiring (additive)
 
@@ -162,7 +171,7 @@ rotation restarts the app, matching the db-creds secret.
 `AI_DEFAULT_*_MODEL` values (`openai/gpt-4o-mini`, `openai/gpt-4o` in all three stack
 YAMLs) are **not** changed in this pass.
 
-### 5.3 edxapp / mitxonline — blocked on a contract decision
+### 5.3 edxapp / mitxonline — revised 2026-08-10 after reading the plugin source
 
 **Finding that changes the plan:** edxapp does not deep-merge its config sources. The init
 container runs `cat /openedx/config-sources/*/*.yaml > /openedx/config/lms.env.yml`
@@ -177,19 +186,46 @@ last-one-wins, silently clobbering the deepl/openai/gemini/mistral providers.
 
 Therefore the Azure creds for edxapp **must** be delivered as new, distinct top-level settings
 in their own file. Existing numbers are `10-general`, `11-xqueue`, `12-forum`,
-`13-canvas-syllabus-token`, `14-translations-providers`, `15-meilisearch`, `16-typesense`, so
-use **`17-azure-openai-secrets.yaml`**:
+`13-canvas-syllabus-token`, `14-translations-providers`, `15-meilisearch`, `16-typesense`, and
+— **correcting the earlier draft of this spec, which claimed 17 was free** —
+`17-webhook-tokens`. The Azure file is therefore **`18-azure-openai-secrets.yaml`**:
 
 ```yaml
 AZURE_OPENAI_CLIENT_ID: ...
 AZURE_OPENAI_CLIENT_SECRET: ...
-AZURE_OPENAI_ENDPOINT: ...
 AZURE_OPENAI_TENANT_ID: ...
+AZURE_OPENAI_ENDPOINT: ...
+AZURE_OPENAI_API_VERSION: ...
+AZURE_OPENAI_DEFAULT_DEPLOYMENT: ...
 ```
 
-and the edx-extensions plugin must read them from there. **That setting-name contract has to
-be agreed with the plugin authors before this piece is implemented** (Q3 below). The mit-learn
-and learn-ai pieces have no such dependency and can ship first.
+Flat `SCREAMING_SNAKE` top-level keys match the convention every other config source in this
+directory already follows (`COMMENTS_SERVICE_KEY`, `MEILISEARCH_MASTER_KEY`,
+`TYPESENSE_API_KEY`, `CERTIFICATE_WEBHOOK_ACCESS_TOKEN`), and they avoid the duplicate-key
+clobbering described above because no other file emits them.
+
+**Finding: delivering these settings is necessary but not sufficient.** The translations
+plugins read provider credentials from exactly one place —
+`settings.TRANSLATIONS_PROVIDERS[provider_name]["api_key"]`, in
+`ol_openedx_course_translations/utils/course_translations.py:64-76` — and dispatch to one of
+three hardcoded classes (`OpenAIProvider`, `GeminiProvider`, `MistralProvider` in
+`providers/llm_providers.py`). There is no code path that reads flat `OPENAI_*` settings, and
+no Azure provider exists. So the plugin work is not "point an existing setting at Azure"; it is:
+
+1. a new `AzureOpenAIProvider(LLMProvider)` — the base class builds LiteLLM model strings as
+   `f"openai/{model}"` / `f"gemini/{model}"`, so Azure needs `f"azure/{deployment_name}"`;
+2. `_call_llm` passes only `api_key=`, but Azure AD auth needs `api_base`, `api_version`, and a
+   **bearer token**, not a key. Vault issues a `client_id`/`client_secret` pair, so the plugin
+   must exchange those for a token (`azure-identity`'s `ClientSecretCredential`) and pass it as
+   LiteLLM's `azure_ad_token`. This exchange is the real work and belongs in the plugin;
+3. `apply_common_settings` (`settings/common.py:39`) composes the `TRANSLATIONS_PROVIDERS`
+   dict — that is where the flat `AZURE_OPENAI_*` settings get folded into an `"azure"` entry,
+   which sidesteps the concatenation problem entirely because the merge happens in Python at
+   Django settings load rather than in YAML.
+
+This repo delivers items the plugin needs (the settings in `18-azure-openai-secrets.yaml`);
+items 1-3 are `mitodl/edx-extensions` work and remain out of scope per §9. The mit-learn and
+learn-ai pieces have no such dependency and should ship first.
 
 Mechanically: a new mitxonline-only `builder.create_dynamic(...)` call in
 `src/ol_infrastructure/applications/edxapp/k8s_secrets.py`, a new field on the `EdxappSecrets` dataclass next to
@@ -214,30 +250,55 @@ Policy grants go in `src/ol_infrastructure/applications/edxapp/edxapp_mitxonline
    KMS/Vault-transit keys as every other `src/bridge/secrets/pulumi/*` file, so no new
    credential plumbing is expected, but confirm during the first CI run.
 
-## 7. Open questions (must be answered before implementation starts)
+## 7. Open questions — answered 2026-08-10 except Q1
 
-- **Q1 — Subscription & tenant.** Which Azure subscription and tenant? Is
+- **Q1 — Subscription & tenant. STILL OPEN.** Which Azure subscription and tenant? Is
   `Microsoft.CognitiveServices` registered on it, and is the subscription approved for Azure
-  OpenAI? Is there regional TPM quota for the models in §7/Q4? A subscription without quota
-  will fail at `Deployment` creation, not at plan time.
-- **Q2 — Admin consent.** Who on the team has (or can get) tenant Global Admin to grant
-  `Application.ReadWrite.OwnedBy` consent? Without it, every step through §4.2 applies cleanly
-  and then `vault read azure-openai/creds/...` fails. This is the single most likely thing to
-  stall the project.
-- **Q3 — edxapp setting names.** What top-level settings will the edx-extensions plugin read
-  (see §5.3)? Needed before the edxapp piece can be written.
-- **Q4 — Model deployments.** The plan says `gpt-4o` / `gpt-4o-mini` (learn-ai's current
-  defaults). But edxapp's translations config already specifies `gpt-5.2` for OpenAI
-  (`src/ol_infrastructure/applications/edxapp/k8s_secrets.py:404`). Confirm the deployment list — deploying only 4o-family models makes
-  Azure unusable as a drop-in for edxapp translations.
-- **Q5 — Environment scope.** One Azure OpenAI account per environment (CI/QA/Production), as
-  the plan assumes? That is 3 accounts and 3 admin-consent grants. Alternative: one Production
-  account with per-env resource groups and roles. Recommend per-env for blast-radius isolation
-  despite the extra consent grants.
-- **Q6 — Lease TTL.** Azure AD service-principal creation is eventually consistent; freshly
-  minted credentials are typically unusable for 10-60s. Recommend `ttl="24h"` / `max_ttl="48h"`
-  (not minutes) so rotation is infrequent, plus app-side retry on 401. Confirm this is
-  acceptable versus the security posture the team wants.
+  OpenAI? Is there regional TPM quota for the models in Q4? A subscription without quota
+  will fail at `Deployment` creation, not at plan time. This blocks *deployment*, not the code:
+  credentials are read from SOPS at run time, so both Pulumi projects can be written and
+  reviewed first. See the note under Q5 — the account layout divides one regional TPM pool 27
+  ways, so the quota answer needs to be a number, not a yes.
+- **Q2 — Admin consent. ANSWERED: Tobias Macey holds tenant Global Admin and will grant
+  consent directly.** No IS&T ticket needed. The three `az ad app permission admin-consent`
+  invocations (one per environment) become a documented post-deploy step in the project
+  README rather than a scheduling risk. This removes what was the project's largest stall risk.
+- **Q3 — edxapp setting names. ANSWERED by reading the plugin source, with a finding that
+  changes §5.3.** See §5.3 as revised. Two corrections came out of it: the config-source
+  number `17-` is already taken by `17-webhook-tokens-secrets.yaml`, so the Azure file is
+  `18-azure-openai-secrets.yaml`; and the translations plugin has no code path that reads flat
+  `OPENAI_*` settings at all, so delivering the credentials is necessary but not sufficient.
+- **Q4 — Model deployments. ANSWERED: `gpt-4o`, `gpt-4o-mini`, and `gpt-5.2`.** Covers
+  learn-ai's current defaults and edxapp's translations model in one deployment set, so Azure
+  is a drop-in for both consumers. All three need regional TPM quota (folds into Q1).
+- **Q5 — Environment scope. ANSWERED: the account boundary follows the app consumer, and
+  Production is separated from pre-production.** Concretely: one resource group per
+  environment, holding one Cognitive Services account per consumer.
+
+  ```
+  ol-openai-production/  ol-openai-{mitlearn,learn-ai,mitxonline}-production
+  ol-openai-qa/          ol-openai-{mitlearn,learn-ai,mitxonline}-qa
+  ol-openai-ci/          ol-openai-{mitlearn,learn-ai,mitxonline}-ci
+  ```
+
+  One Vault root SP per environment, scoped to that environment's resource group — so three
+  consent grants, not nine. Each Vault role is scoped to its own consumer's account, so
+  mit-learn's dynamic credentials cannot reach learn-ai's endpoint.
+
+  Two facts drove this over the alternatives. First, Azure Monitor's Cognitive Services
+  metrics are dimensioned by model deployment name but carry **no stable caller dimension** —
+  and Vault mints a fresh service principal every lease, so per-consumer attribution by
+  calling identity is unworkable by construction. Attribution has to come from the resource.
+  Second, TPM quota is allocated per subscription per region per model and is *shared* across
+  accounts, so splitting into more accounts does not buy throughput isolation; per-deployment
+  capacity allocation does, and that works in any layout.
+
+  Consequence to watch: 9 accounts × 3 models = 27 deployments dividing one regional pool.
+  Allocate capacity heavily to Production and minimally to CI/QA.
+- **Q6 — Lease TTL. ANSWERED: `ttl="24h"` / `max_ttl="48h"`,** the component defaults. Azure AD
+  service-principal creation is eventually consistent and fresh credentials are typically
+  unusable for 10-60s, so rotation is deliberately infrequent. App-side retry on 401 is still
+  required and remains the app repos' responsibility (§9).
 
 ## 8. Verification plan
 

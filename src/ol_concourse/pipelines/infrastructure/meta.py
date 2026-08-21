@@ -42,6 +42,10 @@ PIPELINE_CONFIGS: list[tuple[str, str]] = [
         "src/ol_concourse/pipelines/infrastructure/aws/pipeline.py",
     ),
     (
+        "pulumi-azure",
+        "src/ol_concourse/pipelines/infrastructure/azure/pipeline.py",
+    ),
+    (
         "packer-pulumi-concourse",
         "src/ol_concourse/pipelines/infrastructure/concourse/pipeline.py",
     ),

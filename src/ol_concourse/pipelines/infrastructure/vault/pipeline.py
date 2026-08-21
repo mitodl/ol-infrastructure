@@ -32,6 +32,11 @@ VAULT_SUBSTRUCTURE_PROJECTS = (
     "encryption_mounts",
     "secrets",
     "setup",
+    # Depends on the ol-infrastructure-azure-openai stack for the account IDs and the
+    # root service principal it configures the engine with. That project is deployed
+    # by its own pipeline (src/ol_concourse/pipelines/infrastructure/azure/), so this
+    # chain will fail until that one has run for the same environment.
+    "azure",
 )
 
 vault_release = hashicorp_release(Identifier("vault-release"), "vault")

@@ -9,7 +9,7 @@ application by fetching data from various Vault secret backends (static KV and d
 from typing import Any, Literal
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Output, ResourceOptions
+from pulumi import Config, Output, ResourceOptions
 from pulumi_vault import Mount
 
 from bridge.lib.magic_numbers import DEFAULT_REDIS_PORT
@@ -20,6 +20,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
@@ -85,6 +86,7 @@ def _create_dynamic_secret(
     path: str,
     templates: dict[str, str | Output[str]],
     vaultauth: str,
+    restart_targets: list[OLVaultRestartTarget] | None = None,
     opts: ResourceOptions | None = None,
 ) -> tuple[str, OLVaultK8SSecret]:
     """
@@ -99,6 +101,10 @@ def _create_dynamic_secret(
         path: Path within the Vault mount to generate credentials (e.g., creds/role).
         templates: Dictionary defining how Vault data maps to Kubernetes secret keys.
         vaultauth: Name of the Vault Kubernetes auth backend role.
+        restart_targets: Workloads to roll when Vault replaces the credential.
+            Pods read these values into their environment once at start, so
+            anything consuming the secret keeps using the expired lease's
+            credentials until it restarts.
         opts: Optional Pulumi resource options.
 
     Returns:
@@ -117,6 +123,7 @@ def _create_dynamic_secret(
             path=path,
             excludes=[".*"],
             exclude_raw=True,
+            restart_targets=restart_targets,
             templates=templates,
             vaultauth=vaultauth,
         ),
@@ -355,7 +362,46 @@ def create_mitlearn_k8s_secrets(
     secret_names.append(database_url_secret_name)
     secret_resources.append(database_url_secret)
 
-    # 7. A normal, k8s secret for redis credentials
+    # 7. Dynamic Azure AD credentials for Azure OpenAI from the 'azure-openai' backend.
+    # Vault mints a service principal scoped to mit-learn's own Cognitive Services
+    # account. Additive: OPENAI_API_KEY is untouched and both stay available.
+    #
+    # Gated on mitlearn:azure_openai_tenant_id so this deploys as a no-op until the
+    # substructure/vault/azure mount exists in the environment. Reading a role from a
+    # mount Vault does not have fails the VaultDynamicSecret, so the switch has to be
+    # per-environment rather than at merge time.
+    if Config("mitlearn").get("azure_openai_tenant_id"):
+        azure_openai_secret_name, azure_openai_secret = _create_dynamic_secret(
+            stack_info=stack_info,
+            secret_base_name="azure-openai-secrets",  # pragma: allowlist secret  # noqa: S106
+            namespace=mitlearn_namespace,
+            labels=k8s_global_labels,
+            mount="azure-openai",
+            path="creds/ol-mitlearn-openai",
+            # Every workload receiving this secret through envFrom has to roll
+            # when Vault replaces it, otherwise running pods keep the expired
+            # lease's client id and secret in their environment. Names verified
+            # against the deployments in the mitlearn namespace.
+            restart_targets=[
+                OLVaultRestartTarget(kind="Deployment", name=name)
+                for name in (
+                    "mitlearn-app",
+                    "mitlearn-default-celery-worker",
+                    "mitlearn-edx-content-celery-worker",
+                    "mitlearn-embeddings-celery-worker",
+                    "mitlearn-celery-beat",
+                )
+            ],
+            templates={
+                "AZURE_OPENAI_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+                "AZURE_OPENAI_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+        )
+        secret_names.append(azure_openai_secret_name)
+        secret_resources.append(azure_openai_secret)
+
+    # 8. A normal, k8s secret for redis credentials
     # Vault is not needed for these.
     redis_creds_secret_name = "redis-creds"  # noqa: S105  # pragma: allowlist secret
     redis_creds = kubernetes.core.v1.Secret(
