@@ -609,6 +609,19 @@ class OLApplicationK8sConfig(BaseModel):
     application_image_digest: str | None = None
     application_cmd_array: list[str] | None = None
     application_arg_array: list[str] | None = None
+    command_prefix: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Argv prepended to the resolved application command -- the granian "
+            "invocation when granian_config is set, or application_cmd_array "
+            "otherwise. Empty by default, so existing callers are unaffected. "
+            "For wrapping the process with the opentelemetry-instrument "
+            "auto-instrumentation agent: command_prefix=['opentelemetry-instrument']. "
+            "The image must actually have that console script installed "
+            "(e.g. via the opentelemetry-distro package) or the container "
+            "will crash-loop on a missing executable."
+        ),
+    )
     deployment_notifications: bool = False
     slack_channel: str | None = None  # Slack channel for deployment notifications
     vault_k8s_resource_auth_name: str
@@ -1222,6 +1235,12 @@ class OLApplicationK8s(ComponentResource):
             effective_nginx_config_path = ol_app_k8s_config.import_nginx_config_path
             effective_cmd_array = ol_app_k8s_config.application_cmd_array
             effective_arg_array = ol_app_k8s_config.application_arg_array
+
+        if ol_app_k8s_config.command_prefix and effective_cmd_array is not None:
+            effective_cmd_array = [
+                *ol_app_k8s_config.command_prefix,
+                *effective_cmd_array,
+            ]
 
         # Config/secret content folded into a rolling-restart annotation on the
         # webapp/celery/beat pod templates. Kubernetes only restarts pods when their

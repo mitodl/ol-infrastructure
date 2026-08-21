@@ -767,6 +767,7 @@ def create_k8s_resources(  # noqa: C901
             application_config={
                 "SERVICE_VARIANT": "lms",
                 "DJANGO_SETTINGS_MODULE": "lms.envs.mitol.production",
+                "OTEL_SERVICE_NAME": f"{env_name}-edxapp-lms",
             },
             application_lb_service_name=lms_webapp_deployment_name,
             application_lb_service_port_name="http",
@@ -786,6 +787,11 @@ def create_k8s_resources(  # noqa: C901
             import_uwsgi_config=False,
             init_migrations=False,
             init_collectstatic=False,
+            # Requires opentelemetry-instrument (from opentelemetry-distro) to be
+            # installed in the image -- see mitodl/lehrer#177. Do not deploy this
+            # ahead of that PR's image, or granian fails to start (missing
+            # executable).
+            command_prefix=["opentelemetry-instrument"],
             granian_config=GranianConfig(
                 application_module="lms.wsgi:application",
                 port=8000,
@@ -1092,6 +1098,7 @@ def create_k8s_resources(  # noqa: C901
             application_config={
                 "SERVICE_VARIANT": "cms",
                 "DJANGO_SETTINGS_MODULE": "cms.envs.mitol.production",
+                "OTEL_SERVICE_NAME": f"{env_name}-edxapp-cms",
             },
             application_lb_service_name=cms_webapp_deployment_name,
             application_lb_service_port_name="http",
@@ -1111,6 +1118,11 @@ def create_k8s_resources(  # noqa: C901
             import_uwsgi_config=False,
             init_migrations=False,
             init_collectstatic=False,
+            # Requires opentelemetry-instrument (from opentelemetry-distro) to be
+            # installed in the image -- see mitodl/lehrer#177. Do not deploy this
+            # ahead of that PR's image, or granian fails to start (missing
+            # executable).
+            command_prefix=["opentelemetry-instrument"],
             granian_config=GranianConfig(
                 application_module="cms.wsgi:application",
                 port=8000,
@@ -1331,7 +1343,7 @@ def create_k8s_resources(  # noqa: C901
                             image=cached_image_uri(
                                 f"mitodl/edxapp@{EDXAPP_DOCKER_IMAGE_DIGEST}"
                             ),
-                            command=["celery"],
+                            command=["opentelemetry-instrument", "celery"],
                             args=[
                                 "--app=lms.celery",
                                 "worker",
@@ -1356,6 +1368,10 @@ def create_k8s_resources(  # noqa: C901
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="DJANGO_SETTINGS_MODULE",
                                     value="lms.envs.mitol.production",
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="OTEL_SERVICE_NAME",
+                                    value=f"{env_name}-edxapp-lms-celery",
                                 ),
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
@@ -1510,7 +1526,7 @@ def create_k8s_resources(  # noqa: C901
                             image=cached_image_uri(
                                 f"mitodl/edxapp@{EDXAPP_DOCKER_IMAGE_DIGEST}"
                             ),
-                            command=["celery"],
+                            command=["opentelemetry-instrument", "celery"],
                             args=[
                                 "--app=lms.celery",
                                 "worker",
@@ -1533,6 +1549,10 @@ def create_k8s_resources(  # noqa: C901
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="DJANGO_SETTINGS_MODULE",
                                     value="lms.envs.mitol.production",
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="OTEL_SERVICE_NAME",
+                                    value=f"{env_name}-edxapp-lms-high-mem-celery",
                                 ),
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
@@ -1648,7 +1668,7 @@ def create_k8s_resources(  # noqa: C901
                             image=cached_image_uri(
                                 f"mitodl/edxapp@{EDXAPP_DOCKER_IMAGE_DIGEST}"
                             ),
-                            command=["celery"],
+                            command=["opentelemetry-instrument", "celery"],
                             args=[
                                 "--app=lms.celery",
                                 "beat",
@@ -1662,6 +1682,10 @@ def create_k8s_resources(  # noqa: C901
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="DJANGO_SETTINGS_MODULE",
                                     value="lms.envs.mitol.production",
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="OTEL_SERVICE_NAME",
+                                    value=f"{env_name}-edxapp-lms-beat",
                                 ),
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
@@ -1763,7 +1787,7 @@ def create_k8s_resources(  # noqa: C901
                             image=cached_image_uri(
                                 f"mitodl/edxapp@{EDXAPP_DOCKER_IMAGE_DIGEST}"
                             ),
-                            command=["python"],
+                            command=["opentelemetry-instrument", "python"],
                             args=["process_scheduled_emails.py"],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
@@ -1772,6 +1796,10 @@ def create_k8s_resources(  # noqa: C901
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="DJANGO_SETTINGS_MODULE",
                                     value="lms.envs.mitol.production",
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="OTEL_SERVICE_NAME",
+                                    value=f"{env_name}-edxapp-lms-process-scheduled-emails",
                                 ),
                             ],
                             volume_mounts=celery_volume_mounts,
@@ -1866,7 +1894,7 @@ def create_k8s_resources(  # noqa: C901
                             image=cached_image_uri(
                                 f"mitodl/edxapp@{EDXAPP_DOCKER_IMAGE_DIGEST}"
                             ),
-                            command=["celery"],
+                            command=["opentelemetry-instrument", "celery"],
                             args=[
                                 "--app=cms.celery",
                                 "worker",
@@ -1887,6 +1915,10 @@ def create_k8s_resources(  # noqa: C901
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="DJANGO_SETTINGS_MODULE",
                                     value="cms.envs.mitol.production",
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="OTEL_SERVICE_NAME",
+                                    value=f"{env_name}-edxapp-cms-celery",
                                 ),
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
