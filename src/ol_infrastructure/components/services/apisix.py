@@ -5,7 +5,14 @@ from typing import Any, Literal
 
 import pulumi_kubernetes as kubernetes
 from pulumi import ComponentResource, Output, ResourceOptions
-from pydantic import BaseModel, Field, NonNegativeInt, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    NonNegativeInt,
+    PositiveInt,
+    field_validator,
+    model_validator,
+)
 
 from bridge.lib.constants import DEFAULT_OIDC_SESSION_COOKIE_NAME
 from ol_infrastructure.components.services.vault import (
@@ -109,7 +116,7 @@ class OLApisixRouteConfig(BaseModel):
     route_name: str
     priority: int = 0
     shared_plugin_config_name: str | None = None
-    plugins: list[Any] = []
+    plugins: list[OLApisixPluginConfig | dict[str, Any]] = []
     hosts: list[str] = []
     paths: list[str] = []
     # Optional ApisixRoute ``match.exprs`` entries for matching on headers,
@@ -140,7 +147,9 @@ class OLApisixRouteConfig(BaseModel):
 
     @field_validator("plugins")
     @classmethod
-    def ensure_request_id_plugin(cls, v: list[Any]) -> list[Any]:
+    def ensure_request_id_plugin(
+        cls, v: list[OLApisixPluginConfig | dict[str, Any]]
+    ) -> list[OLApisixPluginConfig | dict[str, Any]]:
         """
         Ensure that the request-id plugin is always added to the plugins list
         """
@@ -461,18 +470,19 @@ class OLApisixSharedPluginsConfig(BaseModel):
     plugins: list[dict[str, Any] | OLApisixPluginConfig] = []
     # Per-client-IP rate limiting as a DDoS backstop.  Opt-in (default off) so
     # that enabling it on one application does not change the behaviour of the
-    # other services that share this component.  Limits are enforced per APISIX
-    # pod (node-local shared memory), so the effective ceiling scales with the
-    # gateway replica count -- at 11 replicas a single IP spread across pods gets
-    # roughly 11x the per-pod rate before it is throttled.  This is intended to
-    # blunt single-source floods, not to replace edge/volumetric protection; a
-    # hard cluster-wide cap would mean limit-count with a redis policy, since
-    # limit-req and limit-conn have no shared backend.
+    # other services that share this component.  Both plugins default to their
+    # local (node-local shared memory) policy here, so the effective ceiling
+    # scales with the gateway replica count -- at 11 replicas a single IP
+    # spread across pods gets roughly 11x the per-pod rate before it is
+    # throttled.  This is intended to blunt single-source floods, not to
+    # replace edge/volumetric protection; a cluster-wide cap is available via
+    # each plugin's ``policy: redis``/``redis-cluster`` option (or
+    # limit-count), just not configured by this component today.
     enable_rate_limiting: bool = False
     # Key used to bucket requests.  ``remote_addr`` resolves to the real client
     # IP because the gateway trusts Fastly's X-Forwarded-For (see trustedAddresses).
     rate_limit_key: str = "remote_addr"
-    rate_limit_rejected_code: int = 429
+    rate_limit_rejected_code: int = Field(default=429, ge=200, le=599)
     # Thresholds are ~10x the observed worst-case single browser IP.  Measured
     # from 30d of APISIX access logs for api.learn.mit.edu: the busiest
     # legitimate browser client sustained ~5 req/s (304 requests in its peak
@@ -483,13 +493,13 @@ class OLApisixSharedPluginsConfig(BaseModel):
     # plausibly exceed a single user by an order of magnitude.  These values
     # target single-source flood abuse, not normal aggregated load.
     # limit-req: leaky-bucket request rate (requests/second) plus burst slack.
-    rate_limit_requests_per_second: int = 50
-    rate_limit_burst: int = 25
+    rate_limit_requests_per_second: PositiveInt = 50
+    rate_limit_burst: NonNegativeInt = 25
     # limit-conn: maximum concurrent in-flight requests plus burst slack.  Sized
     # for an SPA page load multiplexed over HTTP/2 behind shared NAT, which can
     # briefly hold far more requests open than the mean concurrency suggests.
-    rate_limit_max_concurrent: int = 100
-    rate_limit_concurrent_burst: int = 50
+    rate_limit_max_concurrent: PositiveInt = 100
+    rate_limit_concurrent_burst: NonNegativeInt = 50
 
 
 class OLApisixSharedPlugins(ComponentResource):

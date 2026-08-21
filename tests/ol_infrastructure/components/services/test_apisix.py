@@ -528,3 +528,127 @@ def test_gzip_compression_level_stays_cheap():
         assert config["vary"] is True
 
     return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+# ─── Rate limiting ──────────────────────────────────────────────────────────────
+
+
+@pulumi.runtime.test
+def test_rate_limiting_is_absent_by_default():
+    """enable_rate_limiting defaults to off so that turning it on for one
+    application does not change behaviour for other services sharing this
+    component.
+    """
+    plugins = shared_plugins("test-shared-plugins-ratelimit-default")
+
+    def check(spec):
+        assert plugin_named(spec["plugins"], "limit-conn") is None
+        assert plugin_named(spec["plugins"], "limit-req") is None
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_rate_limiting_emits_both_plugins_on_apisix_pluginconfig():
+    """Opting in attaches both limit-conn (concurrency) and limit-req
+    (request rate) to the legacy v2 ApisixPluginConfig CRD.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-ratelimit-v2", enable_rate_limiting=True
+    )
+
+    def check(spec):
+        assert plugin_named(spec["plugins"], "limit-conn") is not None
+        assert plugin_named(spec["plugins"], "limit-req") is not None
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_rate_limiting_emits_both_plugins_on_gateway_api_pluginconfig():
+    """The v1alpha1 PluginConfig is rendered by a separate comprehension, so
+    Gateway API HTTPRoutes need their own assertion rather than inheriting
+    the v2 one -- same contract as gzip.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-ratelimit-v1alpha1", enable_rate_limiting=True
+    )
+
+    def check(spec):
+        assert plugin_named(spec["plugins"], "limit-conn") is not None
+        assert plugin_named(spec["plugins"], "limit-req") is not None
+
+    return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_rate_limiting_custom_thresholds_propagate():
+    """Custom thresholds reach the rendered plugin config rather than the
+    defaults silently winning.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-ratelimit-custom",
+        enable_rate_limiting=True,
+        rate_limit_key="consumer_name",
+        rate_limit_rejected_code=503,
+        rate_limit_requests_per_second=10,
+        rate_limit_burst=5,
+        rate_limit_max_concurrent=20,
+        rate_limit_concurrent_burst=10,
+    )
+
+    def check(spec):
+        limit_conn = plugin_named(spec["plugins"], "limit-conn")["config"]
+        assert limit_conn["conn"] == 20
+        assert limit_conn["burst"] == 10
+        assert limit_conn["key"] == "consumer_name"
+        assert limit_conn["rejected_code"] == 503
+
+        limit_req = plugin_named(spec["plugins"], "limit-req")["config"]
+        assert limit_req["rate"] == 10
+        assert limit_req["burst"] == 5
+        assert limit_req["key"] == "consumer_name"
+        assert limit_req["rejected_code"] == 503
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+def test_rate_limit_rejected_code_rejects_out_of_range():
+    with pytest.raises(ValidationError):
+        OLApisixSharedPluginsConfig(
+            application_name="myapp",
+            k8s_namespace="myapp-ns",
+            rate_limit_rejected_code=100,
+        )
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "rate_limit_requests_per_second",
+        "rate_limit_max_concurrent",
+    ],
+)
+def test_rate_limit_positive_fields_reject_non_positive(field):
+    with pytest.raises(ValidationError):
+        OLApisixSharedPluginsConfig(
+            application_name="myapp",
+            k8s_namespace="myapp-ns",
+            **{field: 0},
+        )
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "rate_limit_burst",
+        "rate_limit_concurrent_burst",
+    ],
+)
+def test_rate_limit_burst_fields_reject_negative(field):
+    with pytest.raises(ValidationError):
+        OLApisixSharedPluginsConfig(
+            application_name="myapp",
+            k8s_namespace="myapp-ns",
+            **{field: -1},
+        )
