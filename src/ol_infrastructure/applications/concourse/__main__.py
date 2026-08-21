@@ -408,6 +408,11 @@ concourse_worker_security_group = ec2.SecurityGroup(
     egress=default_egress_args,
     vpc_id=ops_vpc_id,
 )
+# Exported so other stacks' local.Command resources (e.g.
+# substructure/starrocks's SQL setup, which runs on this Concourse instance's
+# workers per src/ol_concourse/pipelines/infrastructure/simple_pulumi/meta.py)
+# can admit these workers into security groups gating VPC-internal endpoints.
+export("concourse_worker_security_group_id", concourse_worker_security_group.id)
 
 # Create web node security group
 concourse_web_security_group = ec2.SecurityGroup(
