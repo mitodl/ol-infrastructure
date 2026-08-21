@@ -76,6 +76,7 @@ config:
     disk_size_gb: 100
     iam_policies:
     - base
+    - ocw_publish
     - operations
     - pulumi_state
     instance_type: t3a.medium
