@@ -1,0 +1,196 @@
+#!/usr/bin/env python3
+"""Find out which check names a repo actually produces, before requiring any of them.
+
+SEC-03's fix (`required_status_checks` in
+src/ol_infrastructure/saas/github/repositories/rulesets.py) has no dry run: the Team plan
+has no `evaluate` enforcement mode, so a ruleset naming a context that does not exist
+blocks every PR on that repo from the moment it applies, and the only symptom is a PR
+stuck on "Expected -- Waiting for status to be reported". This tool is the substitute for
+the dry run. It samples merged PRs and reports how often each check name appeared.
+
+The rule for reading the output: a name belongs in `required_status_checks` only if it
+appeared on EVERY sampled PR. Anything below that is a check some PR did not produce --
+a path-filtered workflow, an advisory bot, a job behind an `if:` -- and requiring it
+blocks that kind of PR forever.
+
+    uv run bin/github-required-checks sample mit-learn
+    uv run bin/github-required-checks sample mit-learn mitxonline --prs 20
+    uv run bin/github-required-checks drift
+
+`sample` reads the last N merged PRs. `drift` re-samples every repo whose YAML already
+declares `required_status_checks` and fails if a declared context has stopped appearing
+-- which is how a matrix shard count changing in another repo gets noticed before it
+wedges anyone (see the `_MATRIX_SHARD` note in rulesets.py).
+
+Both go through the `gh` CLI rather than the App installation the crawl uses: check runs
+are readable with the ordinary token every engineer already has, and needing the sops key
+to answer "what does CI call this job" would stop people running it.
+"""
+
+import json
+import subprocess
+import sys
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Annotated, Any
+
+import cyclopts
+import yaml
+
+REPOS_DIR = (
+    Path(__file__).resolve().parent.parent
+    / "src/ol_infrastructure/saas/github/repositories/data/repos"
+)
+ORG = "mitodl"
+DEFAULT_SAMPLE = 20
+
+app = cyclopts.App(
+    name="github-required-checks",
+    help="Sample the check names a repo's merged PRs actually produce.",
+)
+
+
+def _gh(*args: str) -> Any:
+    """One `gh api`/`gh pr` call, JSON out.
+
+    Failures return an empty result rather than raising. A commit whose check-runs
+    endpoint 404s (the PR's head was force-pushed away, the branch was deleted and
+    garbage-collected) is a sample we cannot read, not a reason to abandon the run --
+    and `_sample` reports the number of PRs actually read, so a short sample is visible
+    rather than silently treated as complete.
+    """
+    result = subprocess.run(  # noqa: S603
+        ["gh", *args],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    return json.loads(result.stdout or "null")
+
+
+def _checks_on(repo: str, sha: str) -> set[str]:
+    """Every check name on one commit, from both APIs GitHub reports them through.
+
+    Check runs and legacy commit statuses are separate endpoints, and
+    `required_status_checks` contexts match against both -- `GitGuardian Security
+    Checks` arrives as one and `test` as the other. Reading only check-runs would make
+    a perfectly requirable context look absent.
+    """
+    names: set[str] = set()
+    runs = _gh("api", f"repos/{ORG}/{repo}/commits/{sha}/check-runs?per_page=100")
+    for run in (runs or {}).get("check_runs", []):
+        names.add(run["name"])
+    status = _gh("api", f"repos/{ORG}/{repo}/commits/{sha}/status")
+    for entry in (status or {}).get("statuses", []):
+        names.add(entry["context"])
+    return names
+
+
+def _sample(repo: str, prs: int) -> tuple[int, Counter[str]]:
+    """Return (PRs actually read, name -> how many of them produced it)."""
+    merged = _gh(
+        "pr",
+        "list",
+        "-R",
+        f"{ORG}/{repo}",
+        "--state",
+        "merged",
+        "--limit",
+        str(prs),
+        "--json",
+        "number,headRefOid",
+    )
+    if not merged:
+        return 0, Counter()
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        per_pr = list(pool.map(lambda pr: _checks_on(repo, pr["headRefOid"]), merged))
+    counts: Counter[str] = Counter()
+    for names in per_pr:
+        counts.update(names)
+    return len(per_pr), counts
+
+
+def _declared() -> dict[str, list[str]]:
+    """Every repo whose YAML declares `required_status_checks`."""
+    declared: dict[str, list[str]] = {}
+    for path in sorted(REPOS_DIR.glob("*.yaml")):
+        data = yaml.safe_load(path.read_text())
+        contexts = data.get("required_status_checks")
+        if contexts:
+            declared[data["name"]] = contexts
+    return declared
+
+
+@app.command
+def sample(
+    repos: Annotated[
+        list[str], cyclopts.Parameter(help="Repo names, without the org.")
+    ],
+    prs: Annotated[
+        int, cyclopts.Parameter(help="How many merged PRs to read.")
+    ] = DEFAULT_SAMPLE,
+) -> None:
+    """Report how many of the last N merged PRs produced each check name."""
+    for repo in repos:
+        read, counts = _sample(repo, prs)
+        print(f"\n## {repo}  ({read} merged PRs read)")
+        if not read:
+            print(
+                "  no merged PRs -- nothing to require, and nothing to verify against"
+            )
+            continue
+        for name, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
+            mark = "SAFE  " if count == read else "unsafe"
+            print(f"  {mark} {count}/{read}  {name}")
+        print(
+            "\n  Only SAFE names may be required. Anything below 100% is a check some "
+            "PR\n  did not produce; requiring it blocks that kind of PR forever."
+        )
+
+
+@app.command
+def drift(
+    prs: Annotated[
+        int, cyclopts.Parameter(help="How many merged PRs to read per repo.")
+    ] = DEFAULT_SAMPLE,
+) -> None:
+    """Re-verify every declared context against live check runs. Exits non-zero on drift.
+
+    Meant for CI or a periodic run. The failure it catches is the one nobody would
+    connect to this repo: a job renamed or a matrix resized in an application repo
+    leaves a context required here that will never be produced again, and every PR on
+    that repo blocks until somebody edits the YAML.
+    """
+    declared = _declared()
+    if not declared:
+        print("no repo declares required_status_checks")
+        return
+    bad = False
+    for repo, contexts in declared.items():
+        read, counts = _sample(repo, prs)
+        if not read:
+            print(f"{repo}: SKIPPED -- no merged PRs to verify against")
+            continue
+        stale = sorted(c for c in contexts if counts.get(c, 0) < read)
+        if stale:
+            bad = True
+            for context in stale:
+                print(
+                    f"{repo}: {context!r} required but produced by only "
+                    f"{counts.get(context, 0)}/{read} merged PRs"
+                )
+        else:
+            print(f"{repo}: {len(contexts)} contexts, all on {read}/{read} PRs")
+    if bad:
+        print(
+            "\nA required context that no longer appears blocks every PR on that repo. "
+            "Fix the\nworkflow or drop the context from the repo's YAML."
+        )
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    app()
