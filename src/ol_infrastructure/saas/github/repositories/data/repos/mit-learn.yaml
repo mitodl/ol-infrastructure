@@ -22,6 +22,13 @@ has_projects: true
 merge_commit_message: PR_TITLE
 merge_commit_title: MERGE_MESSAGE
 name: mit-learn
+required_status_checks:
+- build-nextjs-container
+- build-storybook
+- javascript-tests
+- openapi-generated-client-check-v0
+- openapi-generated-client-check-v1
+- python-tests
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
