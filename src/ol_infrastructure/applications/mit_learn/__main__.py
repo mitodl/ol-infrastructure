@@ -1591,18 +1591,21 @@ mitlearn_k8s_app = OLApplicationK8s(
             # overhaul touches mit_learn until its review task.
             # See docs/plans/granian-configuration-overhaul.md
             runtime_threads=2,
-            # Serve /static/* and /media/* from Granian's Rust layer instead of
-            # the sidecar (docs/plans/remove-nginx-sidecar.md, stage 5). Two
-            # mounts require one --static-path-route each -- Granian pairs them
-            # positionally and refuses to start otherwise -- so this also closes
-            # gap 1 (GranianConfig had no way to express a second route). The
-            # nginx sidecar's other tier ($uri against root /src, before
-            # /staticfiles) can't be reproduced -- Granian has no cross-mount
-            # fallthrough on a miss, see static_path_routes's docstring -- but
-            # it never mattered here either: init_collectstatic=True always
-            # populates /src/staticfiles before the app container starts.
-            static_path_mounts=["/src/staticfiles", "/src/django_media"],
-            static_path_routes=["/static", "/media"],
+            # Serve /static/* from Granian's Rust layer instead of the sidecar
+            # (docs/plans/remove-nginx-sidecar.md, stage 5). No /media mount:
+            # the sidecar's /media/ location pointed at /src/django_media, a
+            # directory that does not exist in the image (MEDIA_ROOT is
+            # /var/media/ and uploads actually live in S3 under
+            # AWS_STORAGE_BUCKET_NAME), so nginx's try_files just 404'd there.
+            # Granian instead validates every mount at startup and refuses to
+            # boot on a missing one, so carrying the dead route over
+            # crashlooped the container. The sidecar's other tier ($uri against
+            # root /src, before /staticfiles) can't be reproduced either --
+            # Granian has no cross-mount fallthrough on a miss, see
+            # static_path_routes's docstring -- but it never mattered here:
+            # init_collectstatic=True always populates /src/staticfiles before
+            # the app container starts.
+            static_path_mounts=["/src/staticfiles"],
             static_path_expires=STATIC_ASSET_MAX_AGE_SECONDS,
         )
         if mitlearn_config.get_bool("use_granian")
