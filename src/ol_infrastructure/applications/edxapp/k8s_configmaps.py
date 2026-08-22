@@ -221,9 +221,6 @@ def _build_interpolated_config_dict(
         "SESSION_COOKIE_DOMAIN": f".{domains['lms'].split('.', 1)[-1]}",
         "UNIVERSITY_EMAIL": edxapp_config.require("sender_email_address"),
         "OPENEDX_TELEMETRY": ["edx_django_utils.monitoring.OpenTelemetryBackend"],
-        "OTEL_EXPORTER_OTLP_ENDPOINT": "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318",
-        "OTEL_SERVICE_NAME": env_name + "-edxapp",
-        "OTEL_LOG_LEVEL": "info",
         "ECOMMERCE_PUBLIC_URL_ROOT": domains["lms"],
         "ENABLE_MFE_CONFIG_API": True,
         "FRONTEND_SITE_CONFIG": {
