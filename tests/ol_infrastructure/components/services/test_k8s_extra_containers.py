@@ -1051,7 +1051,7 @@ def test_pod_monitor_selector_excludes_security_group_labels():
 
 @pulumi.runtime.test
 def test_command_prefix_absent_by_default_for_granian_app():
-    """Without command_prefix the Granian app container command starts with 'granian'."""
+    """Without command_prefix the Granian command starts with 'granian'."""
     app = OLApplicationK8s(
         _base_config(
             application_name="unprefixed",
