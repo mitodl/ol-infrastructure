@@ -31,6 +31,7 @@ from bridge.lib.constants import (
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
+    STATIC_ASSET_MAX_AGE_SECONDS,
 )
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.mitxonline.k8s_secrets import (
@@ -648,12 +649,23 @@ mitxonline_k8s_app = OLApplicationK8s(
             # Pinned to the VPA ceiling rather than the component's default
             # limit-derived calculation. See the note above.
             workers_max_rss=mitxonline_granian_workers_max_rss,
+            # Serve /static/* from Granian's Rust layer instead of the sidecar
+            # (docs/plans/remove-nginx-sidecar.md, stage 5), same shape as
+            # ocw_studio/xpro. STATIC_ROOT is /src/staticfiles, the same
+            # emptyDir the collectstatic init container populates, and
+            # STATIC_URL is Granian's default /static route.
+            static_path_mounts=["/src/staticfiles"],
+            static_path_expires=STATIC_ASSET_MAX_AGE_SECONDS,
         )
         if mitxonline_config.get_bool("use_granian")
         else None,
         slack_channel=slack_channel,
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
-        import_nginx_config=True,
+        # The sidecar is only redundant once Granian is actually serving the
+        # app (static_path_mounts above); the use_granian=False branch still
+        # runs true uwsgi with no static handling of its own, so it keeps the
+        # sidecar. See docs/plans/remove-nginx-sidecar.md.
+        import_nginx_config=not mitxonline_config.get_bool("use_granian"),
         import_nginx_config_path="files/web.conf_uwsgi",
         import_uwsgi_config=True,
         init_migrations=False,
@@ -904,6 +916,52 @@ mitxonline_apisix_route_direct = OLApisixRoute(
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
             backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
         ),
+        # The `location` blocks that used to live in the nginx sidecar
+        # (docs/plans/remove-nginx-sidecar.md, stage 5). nginx resolved
+        # hash.txt against `root /src` with a `try_files` fallback to
+        # /staticfiles, i.e. /src/static/hash.txt first; Granian's
+        # static_path_mounts instead serves /src/staticfiles/hash.txt --
+        # same content only if something copies it there.
+        OLApisixRouteConfig(
+            route_name="static-hash",
+            priority=20,
+            hosts=[api_domain, frontend_domain],
+            paths=["/static/hash.txt"],
+            shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
+            backend_service_name=mitxonline_k8s_app.application_lb_service_name,
+            backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="response-rewrite",
+                    secretRef=None,
+                    config={"headers": {"set": {"Cache-Control": "private, no-cache"}}},
+                ),
+            ],
+        ),
+        # The sidecar answered this with a 204 (EFF Do Not Track convention
+        # for "no policy published"). "passauth" above would otherwise proxy
+        # it through to Django, which has no view for it -- kept as a mock so
+        # a crawled path doesn't burn a Granian blocking thread on a 404.
+        OLApisixRouteConfig(
+            route_name="dnt-policy",
+            priority=10,
+            hosts=[api_domain, frontend_domain],
+            paths=["/.well-known/dnt-policy.txt"],
+            backend_service_name=mitxonline_k8s_app.application_lb_service_name,
+            backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="mocking",
+                    secretRef=None,
+                    config={
+                        "response_status": 204,
+                        "response_example": "",
+                        "content_type": "text/plain",
+                        "with_mock_header": False,
+                    },
+                ),
+            ],
+        ),
     ],
     opts=ResourceOptions(
         delete_before_replace=True,
@@ -970,6 +1028,31 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
             backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
         ),
+        # Static assets requested through this prefix (frontend references
+        # like /{api_path_prefix}/static/...) rewrite through "passauth" the
+        # same way, so hash.txt needs the same override here. No dnt-policy
+        # counterpart: /.well-known/dnt-policy.txt is a root-relative
+        # convention no client ever requests under a path prefix, so unlike
+        # hash.txt it was never reachable through this resource even with the
+        # sidecar -- same reasoning as mit_learn's /learn/*-prefixed
+        # resource. See docs/plans/remove-nginx-sidecar.md.
+        OLApisixRouteConfig(
+            route_name="static-hash",
+            priority=20,
+            hosts=[learn_api_domain],
+            paths=[f"/{api_path_prefix}/static/hash.txt"],
+            shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                OLApisixPluginConfig(
+                    name="response-rewrite",
+                    secretRef=None,
+                    config={"headers": {"set": {"Cache-Control": "private, no-cache"}}},
+                ),
+            ],
+            backend_service_name=mitxonline_k8s_app.application_lb_service_name,
+            backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
+        ),
     ],
     opts=ResourceOptions(
         delete_before_replace=True,
@@ -993,11 +1076,28 @@ uai_b2c_redirects: dict[str, str] = {
     "/courses/course-v1:UAI_SOURCE+UAI.HAIM.1/": f"https://{learn_frontend_domain}/courses/course-v1:UAI_SOURCE+UAI.HAIM.1/",
 }
 uai_b2c_redirect_vcl = "\n".join(
-    f'if (req.url.path == "{path}") {{\n'
+    f'if (req.url.path == "{path}" || req.url.path == "{path_without_slash}") {{\n'
     f'  set req.http.x-redir-location = "{target}";\n'
     f"  error 602;\n"
     f"}}"
     for path, target in uai_b2c_redirects.items()
+    for path_without_slash in [path.removesuffix("/")]
+)
+
+# Course and program product pages redirect 1:1 to their MIT Learn counterparts.
+# Matches only the top-level /courses/{readable_id} and /programs/{readable_id}
+# routes. Reachable child pages do exist under some of these (e.g. flexible-
+# pricing request forms), but this rule intentionally matches only a single
+# path segment after the prefix, leaving those untouched - not because they're
+# unreachable, but because redirecting them isn't in scope yet. Uses a distinct
+# error code (603) from the UAI B2C redirects (602) above so this is fully
+# additive.
+course_program_redirect_vcl = "\n".join(
+    f'if (req.url.path ~ "^/{prefix}/([^/]+)/?$") {{\n'
+    f'  set req.http.x-redir-location = "https://{learn_frontend_domain}/{prefix}/" re.group.1;\n'
+    f"  error 603;\n"
+    f"}}"
+    for prefix in ("courses", "programs")
 )
 
 gzip_settings: dict[str, set[str]] = {"extensions": set(), "content_types": set()}
@@ -1093,6 +1193,15 @@ mitxonline_service = fastly.ServiceVcl(
             type="recv",
         ),
         fastly.ServiceVclSnippetArgs(
+            content=course_program_redirect_vcl,
+            name="Redirect course and program pages to MIT Learn",
+            # Runs after the UAI B2C redirects (priority 100) so that their
+            # exact-match overrides (e.g. program-v1:UAI+B2C.1 -> /courses/p/...)
+            # take precedence over this generic 1:1 redirect.
+            priority=150,
+            type="recv",
+        ),
+        fastly.ServiceVclSnippetArgs(
             content=textwrap.dedent("""\
             if (obj.status == 602) {
               set obj.status = 301;
@@ -1108,6 +1217,25 @@ mitxonline_service = fastly.ServiceVcl(
               return(deliver);
             }"""),
             name="Handle UAI B2C external redirects",
+            type="error",
+        ),
+        fastly.ServiceVclSnippetArgs(
+            content=textwrap.dedent("""\
+            if (obj.status == 603) {
+              set obj.status = 301;
+              set obj.response = "Moved Permanently";
+              set obj.http.Location = req.http.x-redir-location;
+              set obj.http.Cache-Control = "no-store";
+              if (req.url.qs != "") {
+                if (obj.http.Location !~ "\\?") {
+                  set obj.http.Location = obj.http.Location "?" req.url.qs;
+                } else {
+                  set obj.http.Location = obj.http.Location "&" req.url.qs;
+                }
+              }
+              return(deliver);
+            }"""),
+            name="Handle course/program redirects to MIT Learn",
             type="error",
         ),
         fastly.ServiceVclSnippetArgs(

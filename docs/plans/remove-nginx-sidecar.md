@@ -22,8 +22,8 @@ precedent this plan generalizes.
 | ~~xpro~~ | `/src/staticfiles` | — | yes | passthrough | 25M | |
 | ~~micromasters~~ | `$uri`, `/src/staticfiles` | — | yes | passthrough | 25M | |
 | ~~learn_ai~~ | `$uri`, `/src/staticfiles` | — | — | *unset* | — | `proxy_buffering off` |
-| mitxonline | `$uri`, `/src/staticfiles` | — | yes | **`$scheme`** | 25M | |
-| mit_learn | `$uri`, `/src/staticfiles` | `/src/django_media` | — | **`$scheme`** | 25M | gzip on JSON |
+| ~~mitxonline~~ | `$uri`, `/src/staticfiles` | — | yes | **`$scheme`** | 25M | |
+| ~~mit_learn~~ | `$uri`, `/src/staticfiles` | `/src/django_media` (dead -- dir absent from the image, see stage 5) | — | **`$scheme`** | 25M | gzip on JSON |
 
 Common to all but odl_video_service: `expires max` and
 `add_header Access-Control-Allow-Origin *` on `/static/*`.
@@ -81,9 +81,19 @@ ocw-studio image) exposes `--static-path-mount` (repeatable),
 `--static-path-route` (repeatable, default `/static`) and
 `--static-path-expires` (default `86400`). Concretely:
 
-1. **No `static_path_routes`.** mit_learn serves `/media/*` from
-   `/src/django_media`; that needs a second route/mount pair. *Still open —
-   nothing before mit_learn needs it.*
+1. ~~**No `static_path_routes`.**~~ **Closed on the component side, but the
+   motivating case turned out not to exist.**
+   `GranianConfig.static_path_routes` emits one `--static-path-route` per
+   entry, paired positionally with `static_path_mounts` (mirrors Granian's own
+   `_init_static_mounts`, which requires equal lengths and refuses to start
+   otherwise -- see stage 5). It was added because mit_learn appeared to serve
+   `/media/*` from `/src/django_media`, which would have needed a second
+   route/mount pair -- but that directory does not exist in the image and the
+   nginx block was dead config, so stage 5's follow-up put mit_learn back on a
+   single mount (see "mit_learn's `/media` mount was dead config" below). The
+   field stays -- it is correct and unit-tested -- but has no consumer today,
+   and a future second mount should confirm the directory actually exists in
+   the image first.
 2. ~~**No `static_path_expires`.**~~ **Closed.** `GranianConfig.static_path_expires`
    emits the flag; `STATIC_ASSET_MAX_AGE_SECONDS` (315360000) in
    `bridge/lib/magic_numbers.py` is what nginx's `expires max` resolves to.
@@ -346,15 +356,142 @@ unchanged. Both webapp containers drop the nginx sidecar and pick up
 Service and probe ports move 8071 → 8073 on both (by hand on micromasters,
 auto-derived on learn_ai, which passes no explicit `probe_configs`).
 
+## Stage 5: mit_learn, mitxonline (final)
+
+Done — see the accompanying commit. Both apps run behind the same `use_granian`
+Pulumi config flag pattern as learn_ai (`true` in every deployed stack today,
+`false` still running bare `uwsgi`/true-uwsgi with no static handling of its
+own and keeping its sidecar), and both are on the `OLApisixRoute` CRD path, not
+Gateway API HTTPRoute, so the named-port trap doesn't apply here either.
+
+One thing worth naming since it wasn't obvious from `import_nginx_config_path`
+alone: both apps pass `import_nginx_config_path="files/web.conf_uwsgi"`
+unconditionally, which looks like the active config, but it is only consulted
+in the `granian_config is None` branch (`OLApplicationK8s.__init__`). Whenever
+`granian_config` is set -- true in every deployed stack -- the component uses
+`gc.nginx_config_filename` instead, which defaults to `"web.conf_granian"` and
+neither app overrides. So `web.conf_granian` (the file this stage's
+`import_nginx_config=False` makes dead) was the one actually live in
+production; `web.conf_uwsgi` stays, since it's still the config the dormant
+`False` branch would load.
+
+- **mit_learn**: `GranianConfig` gains `static_path_mounts=["/src/staticfiles"]`
+  and `static_path_expires`. (As merged this was a two-mount config paired with
+  `static_path_routes=["/static", "/media"]`; the `/media` pair was reverted
+  immediately after -- see "mit_learn's `/media` mount was dead config" below.)
+  `import_nginx_config` gates on
+  `not use_granian`, matching learn_ai. Both `OLApisixRoute` resources
+  (`_no_prefix` on `/*`, prefixed on `/learn/*`) already reach `/static/*` and
+  `/media/*` through their existing `passauth`/`reqauth` wildcard routes, which
+  attach `learn_external_service_shared_plugins` -- `enable_defaults=True`
+  already supplies a default `cors` plugin, so no new CORS route was needed
+  (unlike micromasters/xpro, which had no shared plugin config). Added one
+  `dnt-policy` route, on the `_no_prefix` resource only: the prefixed
+  resource's `/learn/*` requirement meant `/.well-known/dnt-policy.txt` never
+  reached the sidecar through it either.
+
+  JSON gzip (gap: "moving JSON gzip to the APISix gzip plugin"): a separate,
+  already-merged initiative had added `OLApisixSharedPluginsConfig.enable_gzip`
+  (broader content-type coverage, tuned buffers) specifically to replace this
+  kind of per-app nginx `gzip` block, but defaults it to on everywhere except
+  Production pending a soak test of the CPU cost on the gateway's HPA.
+  mit_learn's shared plugin config didn't override that default. Simply
+  dropping the sidecar would have silently lost Production's JSON compression
+  (nginx's own gzip block ran unconditionally in every stack, Production
+  included) until that separate soak-test gate flips independently of this
+  PR. Decided with the user: set `enable_gzip=True` explicitly on mit_learn's
+  shared plugin config now, to preserve exact parity with the sidecar's
+  behavior across every stack as part of this migration, rather than
+  inheriting a temporary Production regression from an unrelated rollout
+  gate. No-op in CI/QA, where the per-stack default already resolved to
+  `True` -- confirmed via `pulumi preview` diff isolation (see below).
+
+#### mit_learn's `/media` mount was dead config
+
+Stage 5 as merged translated mit_learn's nginx `location ~* /media/(.*$)` block
+into a second Granian mount at `/src/django_media`. That directory does not
+exist in the `mitodl/mit-learn-app` image, and nginx never cared: `try_files
+$uri $uri/ /django_media/$1 /django_media/$1/ =404` against a missing root just
+404s, so the block had been dead for as long as it had been there. Granian
+instead validates every `--static-path-mount` at startup and refuses to boot on
+a missing one, so every `mitlearn-app` pod crashlooped with `Invalid value for
+'--static-path-mount': Directory '/src/django_media' does not exist.` once QA
+rolled to the sidecar-free Deployment.
+
+The mount was dead for two independent reasons: mit-learn's `MEDIA_ROOT` is
+`/var/media/` with uploads in S3 (`AWS_STORAGE_BUCKET_NAME` /
+`AWS_S3_PREFIX=media`), and mit_learn's own Fastly VCL already routes `^/media`
+to S3 at the edge, so those requests never reach the cluster at all.
+
+The general lesson for this kind of translation: an nginx `location` block with
+a `try_files ... =404` tail is not evidence that its root exists. nginx fails
+soft per-request where Granian fails hard at startup, so a directory has to be
+confirmed present in the image -- not just present in the config being
+translated.
+
+- **mitxonline**: `GranianConfig` gains `static_path_mounts=["/src/staticfiles"]`
+  and `static_path_expires` -- single mount, same shape as ocw_studio/xpro.
+  `import_nginx_config` gates on `not use_granian`. Both `OLApisixRoute`
+  resources (`_direct` on `/*`, `_prefix` on `/{api_path_prefix}/*`) already
+  get CORS from `mitxonline_shared_plugins` (`enable_defaults=True`), so only
+  `static-hash` (both resources -- `/static/hash.txt` is reachable through
+  both the unprefixed and the prefixed wildcard) and `dnt-policy` (`_direct`
+  only, same "prefix requirement makes it unreachable through `_prefix`"
+  reasoning as mit_learn) were added.
+
+### Verifying against a CI stack with unrelated pre-existing drift
+
+`pulumi preview --stack CI` for both apps showed substantial changes that
+predate this branch entirely -- a stale `ApisixPluginConfig` still holding an
+old `oidc_error_recovery`/`serverless-pre-function` plugin the shared-plugins
+component no longer emits, since-renamed Fastly-header-matching routes
+(`fastly-passauth` → `passauth`, etc.), and a since-removed `browser-passauth`
+route -- none of which exist anywhere in current source. Confirmed this is
+pre-existing CI/git drift, not something introduced here, by running the same
+preview against each app's `git stash`ed (unmodified) tree: identical drift
+appears with zero code changes. Isolated this migration's actual effect by
+diffing the resource-level change lines between the stashed-tree preview and
+the with-changes preview for each app:
+
+- micromasters/mit_learn/mitxonline all only add exactly the resources this
+  migration touches on top of that baseline -- the `nginx-config` ConfigMap
+  delete, the Service port update, and (mitxonline only, since mit_learn's
+  ApisixRoute was already diffing due to the pre-existing drift) the
+  ApisixRoute update for the new routes.
+- mit_learn: 13 updates, 4 deletes vs. a 12-update, 3-delete baseline (net:
+  +1 update folded into the already-diffing ApisixRoute, +1 delete for
+  `nginx-config`).
+- mitxonline: 10 updates, 1 delete vs. a 7-update, 0-delete baseline (net: +3,
+  matching the three genuinely new resource-level changes above).
+
+Both webapp containers drop the nginx sidecar and pick up the expected
+`--static-path-mount`/`--static-path-route`/`--static-path-expires` args;
+Service and probe ports move 8071 → 8073 on both. The rendered container-list
+diff also shows what looks like a container being renamed (`nginx` →
+`mitlearn-app`/`mitxonline-app`) with a `volumeMounts` entry that appears to
+rename from `nginx-config` to `uwsgi-config` -- this is the same positional
+list-diffing artifact noted for `OLApisixRoute` in stage 4, here on the
+Deployment's `containers` list: removing the nginx container (previously
+index 0) collapses the previously-index-1 app container into index 0, and
+that app container already unconditionally mounted `uwsgi-config` at
+`/tmp/uwsgi.ini` (`import_uwsgi_config=True`, inert whenever Granian is
+actually running) before this change. Confirmed by reading
+`OLApplicationK8s`'s container-list construction directly rather than
+inferring from the diff text.
+
 ## Rollout order
 
 1. ~~**odl_video_service**~~ — done, PR #5281.
 2. ~~**ocw_studio**~~ — done, PR #5345.
 3. ~~**xpro**~~ — done, PR #5541.
-4. ~~**micromasters, learn_ai**~~ — done, this commit. Gap 5 (two-directory
+4. ~~**micromasters, learn_ai**~~ — done, PR #5549. Gap 5 (two-directory
    static fallback) closed: Granian can't reproduce it and doesn't need to.
-5. **mit_learn, mitxonline** — highest traffic, and mit_learn additionally needs
-   the `/media` route (gap 1) and the JSON gzip moved to the APISix `gzip` plugin.
+5. ~~**mit_learn, mitxonline**~~ — done, PR #5550, with a follow-up fix in
+   PR #5565. Gap 1 (`/media` route) closed via `static_path_routes`, but the
+   `/media` mount it was built for turned out to be dead nginx config and was
+   reverted -- mit_learn ships a single `/src/staticfiles` mount. JSON gzip
+   moved to the APISix `gzip` plugin. All seven apps are now sidecar-free --
+   this plan is complete.
 
 ## Out of scope
 

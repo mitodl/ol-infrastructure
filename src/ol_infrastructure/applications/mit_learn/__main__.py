@@ -31,6 +31,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
     ONE_MEGABYTE_BYTE,
+    STATIC_ASSET_MAX_AGE_SECONDS,
 )
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.mit_learn.k8s_autoscaling import (
@@ -1324,6 +1325,14 @@ learn_external_service_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=learn_namespace,
         k8s_labels=application_labels,
         enable_defaults=True,
+        # Explicit override, not the component's per-stack default (on
+        # everywhere except Production pending a separate soak test): the
+        # nginx sidecar this stage removes gzipped JSON responses
+        # unconditionally in every stack including Production
+        # (docs/plans/remove-nginx-sidecar.md, stage 5), so leaving Production
+        # on the default would silently drop that compression there. Revisit
+        # once the other initiative's soak test clears Production generally.
+        enable_gzip=True,
         plugins=[
             # Everyone currently logged in is holding a session cookie under
             # lua-resty-session's old default name, which the renamed plugins
@@ -1582,11 +1591,31 @@ mitlearn_k8s_app = OLApplicationK8s(
             # overhaul touches mit_learn until its review task.
             # See docs/plans/granian-configuration-overhaul.md
             runtime_threads=2,
+            # Serve /static/* from Granian's Rust layer instead of the sidecar
+            # (docs/plans/remove-nginx-sidecar.md, stage 5). No /media mount:
+            # the sidecar's /media/ location pointed at /src/django_media, a
+            # directory that does not exist in the image (MEDIA_ROOT is
+            # /var/media/ and uploads actually live in S3 under
+            # AWS_STORAGE_BUCKET_NAME), so nginx's try_files just 404'd there.
+            # Granian instead validates every mount at startup and refuses to
+            # boot on a missing one, so carrying the dead route over
+            # crashlooped the container. The sidecar's other tier ($uri against
+            # root /src, before /staticfiles) can't be reproduced either --
+            # Granian has no cross-mount fallthrough on a miss, see
+            # static_path_routes's docstring -- but it never mattered here:
+            # init_collectstatic=True always populates /src/staticfiles before
+            # the app container starts.
+            static_path_mounts=["/src/staticfiles"],
+            static_path_expires=STATIC_ASSET_MAX_AGE_SECONDS,
         )
         if mitlearn_config.get_bool("use_granian")
         else None,
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
-        import_nginx_config=True,  # Assuming Django app needs nginx
+        # The sidecar is only redundant once Granian is actually serving the
+        # app (static_path_mounts above); the use_granian=False branch still
+        # runs bare uwsgi with no static handling of its own, so it keeps the
+        # sidecar. See docs/plans/remove-nginx-sidecar.md.
+        import_nginx_config=not mitlearn_config.get_bool("use_granian"),
         import_nginx_config_path="files/web.conf_uwsgi",
         import_uwsgi_config=True,
         init_migrations=False,
@@ -1767,6 +1796,34 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             backend_service_name=mitlearn_k8s_app.application_lb_service_name,
             backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
         ),
+        # The sidecar answered this with a 204 (EFF Do Not Track convention
+        # for "no policy published"). "passauth" above would otherwise proxy
+        # it through to Django, which has no view for it -- kept as a mock so
+        # a crawled path doesn't burn a Granian blocking thread on a 404. Only
+        # needed here, not on the /learn/* prefixed resource below: that one
+        # requires the /learn/ prefix on every path, so this URL never reached
+        # the backend through it even with the sidecar. See
+        # docs/plans/remove-nginx-sidecar.md.
+        OLApisixRouteConfig(
+            route_name="dnt-policy",
+            priority=10,
+            hosts=[mitlearn_api_domain],
+            paths=["/.well-known/dnt-policy.txt"],
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="mocking",
+                    secretRef=None,
+                    config={
+                        "response_status": 204,
+                        "response_example": "",
+                        "content_type": "text/plain",
+                        "with_mock_header": False,
+                    },
+                ),
+            ],
+        ),
     ],
     opts=ResourceOptions(
         delete_before_replace=True,
@@ -1895,5 +1952,6 @@ export(
         "vault_iam_role": Output.all(
             mitlearn_vault_iam_role.backend, mitlearn_vault_iam_role.name
         ).apply(lambda role: f"{role[0]}/roles/{role[1]}"),
+        "app_security_group_id": mitlearn_app_security_group.id,
     },
 )

@@ -132,7 +132,6 @@ raw_env_vars = {
     "GTM_AUTH": nextjs_config.get("gtm_auth") or "",
     "GTM_PREVIEW": nextjs_config.get("gtm_preview") or "",
     "GTM_COOKIES_WIN": nextjs_config.get("gtm_cookies_win") or "",
-    "NEXT_CACHE_S_MAXAGE_SECONDS": nextjs_config.get("cache_s_maxage_seconds") or "",
     # Env vars available on client and server
     # Optional: ol-analytics-api has no CI deployment (see
     # applications/ol_analytics_api/__main__.py), so this is left unset there.
@@ -141,6 +140,12 @@ raw_env_vars = {
     "NEXT_PUBLIC_ANALYTICS_API_BASE_URL": nextjs_config.get("analytics_api_base_url")
     or "",
     "NEXT_PUBLIC_APPZI_URL": nextjs_config.require("appzi_url"),
+    # CDN TTL for HTML pages. Read on both the server (Cache-Control s-maxage)
+    # and the client (React Query staleTime) -- see getCacheSMaxageSeconds in
+    # mit-learn's frontends/main/src/common/config.ts -- so it must carry the
+    # NEXT_PUBLIC_ prefix to reach the browser.
+    "NEXT_PUBLIC_CACHE_S_MAXAGE_SECONDS": nextjs_config.get("cache_s_maxage_seconds")
+    or "",
     "NEXT_PUBLIC_CSRF_COOKIE_NAME": nextjs_config.require("csrf_cookie_name"),
     "NEXT_PUBLIC_EMBEDLY_KEY": nextjs_config.require("embedly_key"),
     "NEXT_PUBLIC_LEARN_AI_CSRF_COOKIE_NAME": f"learn_ai_{stack_info.env_suffix}_csrftoken".replace(  # noqa: E501
