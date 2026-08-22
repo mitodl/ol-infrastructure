@@ -85,6 +85,16 @@ config:
   edxapp:backend_lms_domain: courses-backend-staging.qa.mitx.mit.edu
   edxapp:backend_studio_domain: studio-backend-staging.qa.mitx.mit.edu
   edxapp:backend_preview_domain: preview-staging.qa.mitx.mit.edu
+  # Stage 3 LMS defaults, following mitx's canary. Trivially loaded (~0.15 rps
+  # over 1-2 pods per pat-size-granian-blocking-threads-from-busy-thread-c-3a8b48),
+  # so no measurement wait is needed here. See
+  # docs/plans/granian-configuration-overhaul.md.
+  edxapp:k8s_granian:
+    lms:
+      workers: 1
+      runtime_threads: 1
+      blocking_threads: 8
+      backpressure: 16
   edxapp:k8s_replicas:
     webapp:
       cms:
