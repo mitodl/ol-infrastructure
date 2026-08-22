@@ -96,6 +96,25 @@ HIGH_MEM_CELERY_TERMINATION_GRACE_PERIOD_SECONDS = 4 * 60 * 60
 # would if reused here.
 DEFAULT_CELERY_TERMINATION_GRACE_PERIOD_SECONDS = 10 * 60
 
+# opentelemetry-instrument SDK configuration shared across every edxapp workload
+# (LMS, CMS, all celery-family deployments).  These are process-environment
+# variables consumed by the auto-instrumentation agent *before* Django loads any
+# YAML config, so they must live in the container env, not in a Django settings
+# file.
+#
+# Only the HTTP OTLP exporter is installed in the image (mitodl/lehrer#177);
+# the SDK default "otlp" resolves to the gRPC exporter which is absent.
+# Metrics/logs aren't part of this rollout but an unresolvable exporter aborts
+# the entire SDK initialisation (traces included), so both are explicitly
+# disabled.  OTEL_SERVICE_NAME is set per-workload below.
+_OTEL_SDK_ENV: dict[str, str] = {
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318",
+    "OTEL_TRACES_EXPORTER": "otlp_proto_http",
+    "OTEL_METRICS_EXPORTER": "none",
+    "OTEL_LOGS_EXPORTER": "none",
+    "OTEL_LOG_LEVEL": "info",
+}
+
 
 def create_k8s_resources(  # noqa: C901
     aws_config: AWSBase,
@@ -768,6 +787,7 @@ def create_k8s_resources(  # noqa: C901
                 "SERVICE_VARIANT": "lms",
                 "DJANGO_SETTINGS_MODULE": "lms.envs.mitol.production",
                 "OTEL_SERVICE_NAME": f"{env_name}-edxapp-lms",
+                **_OTEL_SDK_ENV,
             },
             application_lb_service_name=lms_webapp_deployment_name,
             application_lb_service_port_name="http",
@@ -1099,6 +1119,7 @@ def create_k8s_resources(  # noqa: C901
                 "SERVICE_VARIANT": "cms",
                 "DJANGO_SETTINGS_MODULE": "cms.envs.mitol.production",
                 "OTEL_SERVICE_NAME": f"{env_name}-edxapp-cms",
+                **_OTEL_SDK_ENV,
             },
             application_lb_service_name=cms_webapp_deployment_name,
             application_lb_service_port_name="http",
@@ -1373,6 +1394,10 @@ def create_k8s_resources(  # noqa: C901
                                     name="OTEL_SERVICE_NAME",
                                     value=f"{env_name}-edxapp-lms-celery",
                                 ),
+                                *[
+                                    kubernetes.core.v1.EnvVarArgs(name=k, value=v)
+                                    for k, v in _OTEL_SDK_ENV.items()
+                                ],
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={
@@ -1554,6 +1579,10 @@ def create_k8s_resources(  # noqa: C901
                                     name="OTEL_SERVICE_NAME",
                                     value=f"{env_name}-edxapp-lms-high-mem-celery",
                                 ),
+                                *[
+                                    kubernetes.core.v1.EnvVarArgs(name=k, value=v)
+                                    for k, v in _OTEL_SDK_ENV.items()
+                                ],
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={
@@ -1687,6 +1716,10 @@ def create_k8s_resources(  # noqa: C901
                                     name="OTEL_SERVICE_NAME",
                                     value=f"{env_name}-edxapp-lms-beat",
                                 ),
+                                *[
+                                    kubernetes.core.v1.EnvVarArgs(name=k, value=v)
+                                    for k, v in _OTEL_SDK_ENV.items()
+                                ],
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={"cpu": "100m", "memory": "512Mi"},
@@ -1801,6 +1834,10 @@ def create_k8s_resources(  # noqa: C901
                                     name="OTEL_SERVICE_NAME",
                                     value=f"{env_name}-edxapp-lms-process-scheduled-emails",
                                 ),
+                                *[
+                                    kubernetes.core.v1.EnvVarArgs(name=k, value=v)
+                                    for k, v in _OTEL_SDK_ENV.items()
+                                ],
                             ],
                             volume_mounts=celery_volume_mounts,
                         ),
@@ -1920,6 +1957,10 @@ def create_k8s_resources(  # noqa: C901
                                     name="OTEL_SERVICE_NAME",
                                     value=f"{env_name}-edxapp-cms-celery",
                                 ),
+                                *[
+                                    kubernetes.core.v1.EnvVarArgs(name=k, value=v)
+                                    for k, v in _OTEL_SDK_ENV.items()
+                                ],
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={

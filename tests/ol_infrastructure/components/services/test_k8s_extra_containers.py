@@ -1044,3 +1044,61 @@ def test_pod_monitor_selector_excludes_security_group_labels():
         }
 
     return app.webapp_pod_monitor.spec.apply(check)
+
+
+# ─── command_prefix ────────────────────────────────────────────────────────────
+
+
+@pulumi.runtime.test
+def test_command_prefix_absent_by_default_for_granian_app():
+    """Without command_prefix the Granian app container command starts with 'granian'."""
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="unprefixed",
+            granian_config=GranianConfig(application_module="myapp.wsgi:application"),
+        )
+    )
+
+    def check(containers):
+        container = _app_container(containers, "unprefixed")
+        assert container["command"] == ["granian"]
+
+    return app.application_deployment.spec.template.spec.containers.apply(check)
+
+
+@pulumi.runtime.test
+def test_command_prefix_prepended_for_granian_app():
+    """command_prefix is prepended to the granian command."""
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="otel-granian",
+            granian_config=GranianConfig(application_module="myapp.wsgi:application"),
+            command_prefix=["opentelemetry-instrument"],
+        )
+    )
+
+    def check(containers):
+        container = _app_container(containers, "otel-granian")
+        assert container["command"][0] == "opentelemetry-instrument"
+        assert container["command"][1] == "granian"
+
+    return app.application_deployment.spec.template.spec.containers.apply(check)
+
+
+@pulumi.runtime.test
+def test_command_prefix_prepended_for_explicit_command():
+    """command_prefix is prepended to an explicit application_cmd_array."""
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="otel-explicit",
+            application_cmd_array=["celery"],
+            application_arg_array=["worker"],
+            command_prefix=["opentelemetry-instrument"],
+        )
+    )
+
+    def check(containers):
+        container = _app_container(containers, "otel-explicit")
+        assert container["command"] == ["opentelemetry-instrument", "celery"]
+
+    return app.application_deployment.spec.template.spec.containers.apply(check)

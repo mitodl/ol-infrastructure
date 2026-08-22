@@ -221,26 +221,6 @@ def _build_interpolated_config_dict(
         "SESSION_COOKIE_DOMAIN": f".{domains['lms'].split('.', 1)[-1]}",
         "UNIVERSITY_EMAIL": edxapp_config.require("sender_email_address"),
         "OPENEDX_TELEMETRY": ["edx_django_utils.monitoring.OpenTelemetryBackend"],
-        "OTEL_EXPORTER_OTLP_ENDPOINT": "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318",
-        # OTEL_SERVICE_NAME is set per-workload (lms/cms/celery/beat/...) in
-        # k8s_resources.py instead of here -- one shared value here would collapse
-        # every workload's spans into a single service name in Tempo.
-        #
-        # Only the HTTP OTLP exporter is installed in the image (see
-        # mitodl/lehrer#177); the SDK's default OTEL_TRACES_EXPORTER/
-        # OTEL_METRICS_EXPORTER/OTEL_LOGS_EXPORTER value is "otlp", which resolves
-        # to a gRPC exporter that isn't installed. Traces resolving to a missing
-        # exporter fails silently (opentelemetry-instrument swallows the exception
-        # by default) -- explicit here rather than relying on the default.
-        "OTEL_TRACES_EXPORTER": "otlp_proto_http",
-        # Metrics/logs aren't part of this rollout yet, but a *missing* metrics/logs
-        # exporter still aborts the whole SDK configuration (traces included) unless
-        # explicitly disabled -- confirmed against the installed opentelemetry-sdk:
-        # _initialize_components resolves traces/metrics/logs exporters together and
-        # raises on the first one it can't find.
-        "OTEL_METRICS_EXPORTER": "none",
-        "OTEL_LOGS_EXPORTER": "none",
-        "OTEL_LOG_LEVEL": "info",
         "ECOMMERCE_PUBLIC_URL_ROOT": domains["lms"],
         "ENABLE_MFE_CONFIG_API": True,
         "FRONTEND_SITE_CONFIG": {
