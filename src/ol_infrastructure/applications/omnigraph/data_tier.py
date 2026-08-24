@@ -585,7 +585,7 @@ def create_data_tier(  # noqa: PLR0913
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
                     service_account_name=OMNIGRAPH_SERVICE_ACCOUNT_NAME,
-                    # An explicit cap, not the Kubernetes 30s default this
+                    # An explicit value, not the Kubernetes 30s default this
                     # Deployment left implicit until now.
                     # tk-halve-the-omnigraph-server-restart-outage-it-bur-13b26a
                     # was filed 2026-08-03 against a measured ~52-61s restart
@@ -593,7 +593,7 @@ def create_data_tier(  # noqa: PLR0913
                     # dead time — no graceful-shutdown log line, the
                     # signature of a container SIGKILLed at the grace-period
                     # deadline having done nothing in between. Re-measured
-                    # live against CI on 2026-08-24 before adding this: the
+                    # live against CI on 2026-08-24 before touching this: the
                     # image now logs `shutdown signal received` on SIGTERM
                     # and the pod is fully deleted within the same second —
                     # `kubectl get events`, `Killing` and the replacement
@@ -602,19 +602,28 @@ def create_data_tier(  # noqa: PLR0913
                     # startupProbe's own tuned budget below), not shutdown.
                     # Whatever upstream change did this — plausibly riding
                     # the `edge` tag, per this stack's existing pin — the 30s
-                    # of dead time this task describes no longer reproduces.
+                    # of dead time this task describes no longer reproduces
+                    # in the typical case.
                     #
-                    # Set anyway, as a cap rather than a fix: this pins the
-                    # WORST case (a future regression, a wedged shutdown) to
-                    # a few seconds above the now-typical ~1s exit, rather
-                    # than leaving a full, unbounded 30s of blast radius on
-                    # the table for something that currently costs nothing.
-                    # 15s is comfortably above every observed exit with
-                    # headroom for actual graceful-shutdown work (metrics
-                    # flush, connection drain) to complete under normal load,
-                    # and still a firm ~50% reduction from the default if
-                    # shutdown is ever slow again.
-                    termination_grace_period_seconds=15,
+                    # NOT lowered below 30 despite that, on review: this pod
+                    # already admits writes it expects to take up to the
+                    # tool-call deadline below, not just an instant — see the
+                    # per-actor admission-cap sizing above, MEASURED
+                    # 2026-08-12: n=4 concurrent single-row writes wall
+                    # 15.54s, comfortably admitted as "lands inside the
+                    # deadline". A cap below that would let a routine
+                    # restart SIGKILL a write the server had already decided
+                    # was safe to admit — trading a bounded, expected outage
+                    # for the exact indeterminate-outcome risk
+                    # tk-a-502-from-the-deployed-witan-does-not-mean-the--f76dcb
+                    # describes, on every restart rather than only under
+                    # genuine overload. 30 is the tool call's own hard
+                    # deadline (three hardcoded ToolHive constants, same
+                    # comment block) — the client has already given up and
+                    # treated the call as failed by the time the server
+                    # would still be waiting, so there is nothing to gain by
+                    # going higher, and real risk in going lower.
+                    termination_grace_period_seconds=30,
                     containers=[
                         kubernetes.core.v1.ContainerArgs(
                             name="omnigraph-server",
