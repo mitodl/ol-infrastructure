@@ -403,10 +403,11 @@ Three implementation findings worth keeping, all from testing rather than readin
     falls between them. The stated limitation, in the metric's own `help`: a run created
     just before the window and starting just inside it isn't counted.
 
-  `SQL_EXPORTER_RUN_WINDOW = 20000` (2.7x headroom over the busiest observed 6h of
-  creations), `SQL_EXPORTER_TICK_WINDOW = 40000` with a 1h lookback — larger cap, shorter
-  lookback, because the daemon evaluates every sensor on a ~30s cadence whether or not it
-  yields a run.
+  `SQL_EXPORTER_RUN_WINDOW = 20000` (2.7x headroom over the busiest 6h in 30 days),
+  `SQL_EXPORTER_TICK_WINDOW = 8000` with a 1h lookback — shorter lookback because the
+  daemon evaluates every sensor on a ~30s cadence whether or not it yields a run, and
+  12x headroom over the measured peak tick rate of 651/hour. Both are sized against the
+  peak, never the quiet week; see *The id caps are sized against the peak* below.
 
   `dagster_id_window_span_seconds{relation}` reports whether those remaining id caps are
   truncating: span well above the lookback means the time predicate binds; span at or
@@ -531,12 +532,71 @@ measured on 2026-08-18, still inside the tail, and is wrong too.
 Steady state is **~520–670 runs/day**, corroborated independently by the exporter's own
 6h `SUCCESS` counts (137–222, i.e. ~550–890/day). A 17x collapse from the figure the
 windows were sized against. Nothing is broken by this — `dagster_id_window_span_seconds`
-reports the `runs` cap now spanning 6.8 days and `job_ticks` 3.6 days against lookbacks of
-6h and 1h, so both caps are non-binding by a wide margin and the time predicates are doing
-all the work. Stated as ratios rather than lumped together, because they are not the same
-number: the `runs` cap overshoots its lookback by ~27x (6.8 days against 6h) and the
-`job_ticks` cap by ~85x (3.6 days against 1h). Both cost a wider scan and nothing else. Re-sizing them, and setting alert thresholds, both want a week of
-post-storm series rather than another figure measured on top of an incident.
+reports both caps non-binding by a wide margin, so the time predicates are doing all the
+work.
+
+Measured **before** the re-size below, with `SQL_EXPORTER_TICK_WINDOW` still at 40000, and
+stated as two ratios rather than one averaged number because they are not the same
+overshoot:
+
+| cap | span | lookback | ratio |
+|---|---|---|---|
+| `runs`, 20000 ids | 6.8 days | 6h | ~27x |
+| `job_ticks`, 40000 ids | 3.6 days | 1h | ~85x |
+
+Both cost a wider scan and nothing else. What follows re-sizes the second of them, so those
+figures are the pre-resize state: post-deploy the `job_ticks` span settles around 12h on
+Production and 17h on QA, and the `runs` row is unchanged.
+
+#### The id caps are sized against the peak
+
+Re-sizing them from the quiet week, which is what this correction seemed to call for, is
+the wrong move and was rejected. An id cap's failure mode is *silent truncation*, and it
+can only truncate under load, so a cap tuned to steady state is guaranteed to bind exactly
+when the metric it guards is worth reading. Over-provisioning costs a wider index scan and
+nothing else. The two directions are not symmetric and should not be traded off as though
+they were.
+
+The full 30-day series — `sum(increase(kube_job_status_succeeded{namespace="dagster"}[6h]))`
+at 6h resolution, 2026-07-25 to 2026-08-24 — puts numbers on it:
+
+| | runs per 6h |
+|---|---|
+| quiet, both before the storm and since | 96–230 |
+| storm, sustained | 1200–3500 |
+| storm, peak | **7416** |
+
+A 50x swing on the same workload. `SQL_EXPORTER_RUN_WINDOW` stays at **20000**, 2.7x over
+that peak. Cutting it to the ~2000 a quiet week suggests would have truncated **30 of the
+42 six-hour buckets** in that stretch, and `dagster_run_wait_to_start_seconds` is a
+queue-depth metric — a storm is the only time anyone reads it.
+
+`SQL_EXPORTER_TICK_WINDOW` is the one that genuinely overshoots, and it overshoots against
+its own peak rather than against a quiet week, so the rule above does not protect it. Ticks
+are cadence-bound, not demand-bound: tick rate tracks how many sensors exist, not how much
+work they find. Measured hourly from `dagster_recent_job_ticks` since #5495: on Production
+230–651, stepping to a flat 605–651 at 2026-08-22 21:29Z when the sensor set changed; on QA
+a flat 455–462 since 2026-08-19. Peak 651/hour against a 1h lookback made 40000 a 61x cap. Cut to **8000**, which is
+12x the higher of the two environments, and still holds the span above the lookback if the
+sensor set grows eightfold.
+
+One measurement trap worth recording, since it nearly set this cap too low in the other
+direction: `max_over_time(sum(dagster_recent_job_ticks{cluster="data-qa"})[7d])` returns
+**12983**, which would have argued against 8000. Those samples predate the #5495 rollout to
+QA, when the query had no lookback at all and the metric was a whole-table count rather
+than an hourly rate. Any `dagster_recent_*` series from before #5495 landed on a given
+cluster measures a different thing under the same name.
+
+#### The storm started four days earlier than recorded
+
+Third correction from the same series: run creation steps from ~120 to ~2136 per 6h in the
+bucket covering **2026-08-07 17:12Z–23:12Z**, not on 2026-08-11, and has fallen back to
+~112 by the bucket ending 2026-08-18 11:12Z — consistent with the 03:30Z end already on
+record. The end date on record is right; the start was taken from when the symptom was
+noticed rather than when the rate moved. Any window opened on 08-11 to avoid
+the storm still contains three days of it — which matters most for
+`tk-set-alert-thresholds-on-the-new-dagster-sql-expo-0063d0`, where a contaminated
+baseline becomes a threshold.
 
 
 ### 4. OpenTelemetry auto-instrumentation — the "why", not the "what"
