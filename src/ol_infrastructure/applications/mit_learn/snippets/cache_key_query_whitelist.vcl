@@ -14,10 +14,15 @@
  * seeing their original query string).
  *
  * See https://github.com/mitodl/hq/issues/12925 for the traffic analysis
- * and the whitelist's provenance -- 28 of these 38 names come from
+ * and the whitelist's provenance -- 28 of these 40 names come from
  * @mitodl/course-search-utils's resourceSearchValidators in the
  * mit-learn frontend repo, not from anything here, so a version bump
- * there can change the real list with no diff in this file.
+ * there can change the real list with no diff in this file. `syllabus`
+ * and `syllabus_only` are not from that package either -- they're
+ * LearningResourceDrawer's own params (RESOURCE_DRAWER_PARAMS in
+ * frontends/main/src/common/urls.ts), read during the drawer's
+ * force-dynamic SSR to pick which of three distinct HTML variants to
+ * render, so they need the same cache-key protection as `resource`.
  */
 declare local var.cache_key_url STRING;
 set var.cache_key_url = req.url;
@@ -86,6 +91,10 @@ if (req.url.path !~ "^/_next/") {
     "yearly_decay_percent" +
     querystring.filtersep() +
     "resource" +
+    querystring.filtersep() +
+    "syllabus" +
+    querystring.filtersep() +
+    "syllabus_only" +
     querystring.filtersep() +
     "page" +
     querystring.filtersep() +
