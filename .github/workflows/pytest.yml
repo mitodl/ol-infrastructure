@@ -33,3 +33,46 @@ jobs:
 
     - name: Run tests
       run: uv run pytest
+
+  # ONE required status check standing for this whole workflow.
+  #
+  # Today this wraps a single job, so it changes nothing on its own. It exists for the
+  # second job: GitHub's required status checks take an exact list of context names,
+  # with no wildcards and no "all checks must pass" option, so a job added here is not
+  # required until somebody separately edits the ruleset in
+  # src/ol_infrastructure/saas/github/repositories/data/repos/ol-infrastructure.yaml.
+  # Until they do, the new CI runs and cannot block a merge -- which is audit rule
+  # DX-03, and the reason this repo's own SEC-03 work exists.
+  #
+  # Requiring `ci-gate` keeps the list of what must pass in the same file as the jobs it
+  # names. `Run zizmor` is not here: it lives in actions-static-analysis.yml, and
+  # `needs` cannot cross workflows. It is also path-filtered, so it must never be
+  # required directly -- a workflow that does not trigger reports nothing at all and
+  # would leave every unrelated PR pending forever.
+  ci-gate:
+    needs: [test]
+    # Without this the gate is skipped when a dependency fails, and a skipped required
+    # check leaves the PR pending rather than failing it.
+    if: always()
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+    - name: Evaluate CI result
+      env:
+        NEEDS: ${{ toJSON(needs) }}
+      run: |
+        set -euo pipefail
+        echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+        # Read from `needs` rather than naming each job again: adding a job to the list
+        # above is then the only edit, which is the entire point of this job. `skipped`
+        # passes so that a job legitimately gated behind an `if:` does not wedge the
+        # branch; `failure` and `cancelled` do not.
+        failed=$(echo "$NEEDS" | jq -r '
+          to_entries[]
+          | select(.value.result != "success" and .value.result != "skipped")
+          | .key')
+        if [ -n "$failed" ]; then
+          echo "::error::CI did not succeed: $(echo "$failed" | paste -sd, -)"
+          exit 1
+        fi
+        echo "All CI jobs succeeded."
