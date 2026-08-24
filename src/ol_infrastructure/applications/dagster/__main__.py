@@ -1322,10 +1322,11 @@ pgbouncer_service_monitor = kubernetes.apiextensions.CustomResource(
 #      08-21   616    08-24   528
 #
 #    ~520-670 runs/day, a 17x collapse from the 11.6k/day the caps were sized
-#    against. The caps are correspondingly over-provisioned -- span currently 6.8
-#    days on runs and 3.6 days on job_ticks against lookbacks of 6h and 1h, so
-#    neither binds and both time predicates do all the work. Costs a wider scan and
-#    nothing else. Re-size from a quiet week, not from another incident.
+#    against. The caps are correspondingly over-provisioned, by different factors:
+#    span is currently 6.8 days on runs against a 6h lookback (~27x) and 3.6 days
+#    on job_ticks against a 1h lookback (~85x). Neither binds, so both time
+#    predicates do all the work; the cost is a wider scan and nothing else.
+#    Re-size from a quiet week, not from another incident.
 #
 #    Adding a lookback fixed
 #    the span but introduced a subtler fault: id is CREATION order, and the

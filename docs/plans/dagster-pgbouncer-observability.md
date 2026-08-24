@@ -533,8 +533,9 @@ Steady state is **~520–670 runs/day**, corroborated independently by the expor
 windows were sized against. Nothing is broken by this — `dagster_id_window_span_seconds`
 reports the `runs` cap now spanning 6.8 days and `job_ticks` 3.6 days against lookbacks of
 6h and 1h, so both caps are non-binding by a wide margin and the time predicates are doing
-all the work. The caps are simply over-provisioned by roughly 30x, which costs a scan and
-nothing else. Re-sizing them, and setting alert thresholds, both want a week of
+all the work. Stated as ratios rather than lumped together, because they are not the same
+number: the `runs` cap overshoots its lookback by ~27x (6.8 days against 6h) and the
+`job_ticks` cap by ~85x (3.6 days against 1h). Both cost a wider scan and nothing else. Re-sizing them, and setting alert thresholds, both want a week of
 post-storm series rather than another figure measured on top of an incident.
 
 
