@@ -51,8 +51,8 @@ jobs:
   # would leave every unrelated PR pending forever.
   ci-gate:
     needs: [test]
-    # Without this the gate is skipped when a dependency fails, and a skipped required
-    # check leaves the PR pending rather than failing it.
+    # Without this the gate is skipped when a dependency fails, and GitHub treats a
+    # skipped required job as successful, allowing the PR to merge despite the failure.
     if: always()
     runs-on: ubuntu-latest
     permissions: {}
