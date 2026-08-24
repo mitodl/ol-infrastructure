@@ -103,8 +103,13 @@ happen before it ships rather than after.
    The entry has to reach `actor-tokens` and then omnigraph-server before it
    authenticates anywhere — the server hashes its token map once at boot and
    never re-reads it. With token sync **on** (every environment, as of
-   2026-08-05) the hourly CronJob merges service-tokens into actor-tokens; force
-   it rather than waiting:
+   2026-08-05), the stack's own bootstrap Job now folds the service-tokens map
+   into its re-run trigger (`token_sync.py::create_token_sync`,
+   `tk-close-the-witan-service-token-deploy-order-windo-91b403`), so adding an
+   actor here re-runs the merge as part of THIS `pulumi up` — no manual force
+   step needed. If you are on a checkout predating that fix, or want to
+   confirm the merge landed without waiting on the deploy log, force it
+   directly:
 
    ```bash
    kubectl -n omnigraph create job witan-token-sync-manual --from=cronjob/witan-token-sync
@@ -112,14 +117,24 @@ happen before it ships rather than after.
    ```
 
    The `actor-tokens` VaultStaticSecret carries
-   `rolloutRestartTargets: [omnigraph-server]`, so the server restarts itself
-   once the map changes and re-renders `witan-service` with a member. Expect a
-   brief data-tier outage — single replica, `strategy=Recreate`.
+   `rolloutRestartTargets: [omnigraph-server]`, and its own spec now also
+   changes on every service-tokens fingerprint change (same task), so the
+   Vault Secrets Operator has something to react to immediately rather than
+   only its 15-minute `refresh_after` poll. The bootstrap Job's merge is
+   confirmed to land before `pulumi up` reports success; the VSO's own
+   render-and-restart is not something Pulumi waits on directly, so treat
+   "the omnigraph stack deployed" as "very likely done, worth confirming"
+   rather than "definitely done" — see Verifying below.
 
 3. **Deploy the witan stack.** It picks up `service_token_provisioned` and moves
    the `witan-code-token` Secret from `witan/ci-token` to `witan/service-token`.
    The MCPServer spec is unchanged: the credential already had its own Secret
-   precisely so this move would be a one-line path change.
+   precisely so this move would be a one-line path change. This Secret also
+   now carries a `rolloutRestartTargets: [witan-server]` and the same
+   service-tokens fingerprint annotation as step 2, for the same reason —
+   without it, the running `witan-server` pod (which reads this credential
+   once into a `WITAN_CODE_TOKEN` env var, not a re-statted file) would keep
+   presenting whatever token it started with.
 
 ## Verifying
 
@@ -205,8 +220,29 @@ the tier — `code_indexed_repos` returning repos rather than nothing.
 ## Rotating
 
 Same as minting: change both keys to a new value, deploy the omnigraph stack,
-force the sync job, then deploy witan. Because the two keys are checked against
-each other, a half-rotation fails the deploy rather than reaching the cluster.
+then deploy witan. Because the two keys are checked against each other, a
+half-rotation fails the deploy rather than reaching the cluster.
+
+Rotation is the harder case, and worth calling out specifically: unlike
+minting, `witan-code-token`'s Vault *path* does not change on rotation (it
+already points at `witan/service-token`), so there is no CR spec edit to
+carry the update for free the way the mint's path swap does. Both
+`actor-tokens` (omnigraph stack) and `witan-code-token` (witan stack) now
+carry a service-tokens content-fingerprint annotation for exactly this
+reason (`tk-close-the-witan-service-token-deploy-order-windo-91b403`) — a
+rotated value changes the fingerprint, which changes each Secret CR's own
+spec, which is what gives the Vault Secrets Operator something to act on
+immediately instead of only its `refresh_after` poll (15m for
+`actor-tokens`, 1h for `witan-code-token`). Both Secrets also now carry a
+`rolloutRestartTargets` entry, so once the VSO renders the new value each
+Deployment restarts on it rather than a running pod silently keeping the old
+token in memory.
+
+None of that is something `pulumi up` blocks on directly, though — the VSO's
+own convergence happens outside Pulumi's await. Verify the same way as
+Verifying above (`render-policy-groups`, or an end-to-end
+`code_indexed_repos` call) rather than trusting a clean `pulumi up` alone,
+especially soon after a rotation.
 
 ## Related
 
