@@ -258,15 +258,16 @@ every graph, and the storage format actually moved — to one version, the same
 across all of them. A format that did not change means either the two images
 share one, so the outage bought nothing, or the wrong `migrate_from_image`.
 
-The Job stops after verification. It does **not** cut over: that is
-`pulumi config set omnigraph:storage_prefix`, which needs Pulumi credentials a
-workload has no business holding, and writing the ConfigMap instead would make
-it a second writer of a path Pulumi owns. On success it prints the exact
-cutover command, and emits the verdict — per-graph, per-table before/after
-counts plus the old and new formats — **to its logs** as well as to
-`/tmp/migration-verdict.json`. Read it from the logs: the file lives on an
-`emptyDir` that goes with the container, and neither `kubectl exec` nor
-`kubectl cp` reaches a completed pod.
+The Job stops after verification. It does **not** cut over: that needs Pulumi
+credentials a workload has no business holding, and writing the ConfigMap
+instead would make it a second writer of a path Pulumi owns. On success it
+prints the exact cutover commands — all four: `storage_prefix` and
+`internal_schema_version` set together, `migrate_from_image` and
+`migrate_to_prefix` cleared together, matching step 5 below — and emits the
+verdict — per-graph, per-table before/after counts plus the old and new
+formats — **to its logs** as well as to `/tmp/migration-verdict.json`. Read it
+from the logs: the file lives on an `emptyDir` that goes with the container,
+and neither `kubectl exec` nor `kubectl cp` reaches a completed pod.
 
 ```shell
 kubectl -n omnigraph logs job/omnigraph-migrate-fmt6 | sed -n '/migration verdict:/,$p'
@@ -606,6 +607,30 @@ image actually being deployed or the live store's own
 committed config values, not a substitute for `check_format_moved`'s
 verdict above or for following this runbook's ordering.
 
+**Took the automated path?** Clear the migration knobs in this SAME config
+change, not later at step 7:
+
+```shell
+pulumi config rm omnigraph:migrate_from_image --stack <CI|QA|Production>
+pulumi config rm omnigraph:migrate_to_prefix --stack <CI|QA|Production>
+```
+
+Not optional, and not just tidiness: `__main__.py`'s
+`if MIGRATE_TO_PREFIX == STORAGE_PREFIX` guard refuses the preview outright
+once `storage_prefix` above is set to the same value the Job's
+`migrate_to_prefix` is still armed with — "the cluster is already serving
+the root this migration would rebuild into." Its own error message says to
+clear both together; this is that advice. `migrate_storage_format.py`'s
+own success output prints all four commands as one block for exactly this
+reason. Clearing `migrate_from_image` also un-suspends the `optimize` and
+`cleanup` CronJobs in this same `pulumi up`, earlier than step 7 describes
+below — safe, since suspension was never gated on step 6's verification,
+only on `migrate_from_image` being set.
+
+(The manual procedure never sets these two knobs at all, so this step does
+not apply if you did not take the automated path — `pulumi config rm` on an
+already-unset key is a no-op either way.)
+
 A malformed `storage_prefix` value fails the preview rather than deploying:
 wrapping slashes and anything outside a single `[A-Za-z0-9._-]` segment are
 rejected, which includes an unsubstituted `fmt<N>`. That check lives here
@@ -686,8 +711,18 @@ is a stray identity with write access to the bucket:
 kubectl -n omnigraph delete pod omnigraph-migrate-old omnigraph-migrate-new --ignore-not-found
 ```
 
-**Resume the maintenance sweeps.** Clearing the migration config does both —
-it removes the Job and un-suspends `optimize`/`cleanup` in one `pulumi up`:
+**Confirm the maintenance sweeps resumed.** If you took the automated path
+and cleared `migrate_from_image`/`migrate_to_prefix` at step 5 as instructed
+there, this already happened — check rather than repeat:
+
+```shell
+kubectl -n omnigraph get cronjob    # SUSPEND must read False for both
+```
+
+If either still reads `True` — the automated-path clearing at step 5 was
+skipped, or this is the manual path, where nothing suspended them in the
+first place but they are worth confirming regardless — clear the migration
+config now, which removes the Job and un-suspends both in one `pulumi up`:
 
 ```shell
 pulumi config rm omnigraph:migrate_from_image --stack <CI|QA|Production>
