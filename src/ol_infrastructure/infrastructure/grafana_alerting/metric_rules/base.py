@@ -57,6 +57,13 @@ Sub-modules
                  Pairs with log_rules/dagster_database.py, which covers the
                  client side of the same relationship -- nothing here can see a
                  client that fails before it becomes a connection.
+  dagster_control_plane
+               — New in 2026-08. What that pool exists to serve: daemon
+                 heartbeat staleness, stuck queued runs, run failure share, and
+                 sensor/schedule tick failures, off the SQL exporter added in
+                 #5476. Thresholds measured against five post-storm days on
+                 data-production rather than chosen; see the module docstring
+                 for why that window and not a plain "last 7 days".
   synthetic_monitoring
                — Imported 2026-08 from three hand-made UI rules. Unlike the
                  others it takes no folder_uid: its rules live in the Synthetic
@@ -79,6 +86,7 @@ from pulumiverse_grafana.oss.folder import Folder
 
 from ol_infrastructure.infrastructure.grafana_alerting.metric_rules import (
     apisix_edge,
+    dagster_control_plane,
     dagster_pgbouncer,
     eks_general,
     linux_host,
@@ -185,6 +193,7 @@ def create(resource_opts: ResourceOptions) -> None:
     linux_host.create(alerts_folder.uid, rd, resource_opts)
     apisix_edge.create(alerts_folder.uid, rd, resource_opts)
     dagster_pgbouncer.create(alerts_folder.uid, rd, resource_opts)
+    dagster_control_plane.create(alerts_folder.uid, rd, resource_opts)
     witan.create(alerts_folder.uid, rd, resource_opts)
     # No folder_uid: these rules live in the Synthetic Monitoring plugin's own
     # folder rather than the one created above. See the module docstring.
