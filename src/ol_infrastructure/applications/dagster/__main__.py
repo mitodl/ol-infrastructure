@@ -2090,8 +2090,8 @@ code_locations: list[dict[str, str | int]] = [
         "port": 4007,
     },
     {
-        "name": "student_risk_probability",
-        "module": "student_risk_probability.definitions",
+        "name": "ml",
+        "module": "ml.definitions",
         "port": 4008,
     },
 ]

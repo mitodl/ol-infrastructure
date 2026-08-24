@@ -44,8 +44,8 @@ def build_dagster_docker_pipeline() -> Pipeline:
         {"name": "openedx", "module": "openedx.definitions"},
         {"name": "b2b_organization", "module": "b2b_organization.definitions"},
         {
-            "name": "student_risk_probability",
-            "module": "student_risk_probability.definitions",
+            "name": "ml",
+            "module": "ml.definitions",
         },
         {"name": "k8s", "module": None},  # dagster-k8s base image
     ]
