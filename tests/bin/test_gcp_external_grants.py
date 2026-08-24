@@ -334,3 +334,71 @@ def test_vault_spec_must_name_a_path_under_a_mount(grants, monkeypatch):
     monkeypatch.setenv("VAULT_ADDR", "https://vault.example")
     with pytest.raises(grants.ProbeError):
         grants._load_vault("secret-xpro")
+
+
+def test_render_datasets_truncates_wide_projects(grants):
+    """One project with hundreds of datasets must not swamp the table."""
+    many = [f"ds_{n}" for n in range(grants.DATASET_PREVIEW + 5)]
+    rendered = grants._render_datasets(many)
+    assert "ds_0" in rendered
+    assert "(+5 more)" in rendered
+    assert f"ds_{grants.DATASET_PREVIEW + 4}" not in rendered
+
+
+def test_render_datasets_distinguishes_empty_from_absent(grants):
+    """An explicit 'none visible' is a finding; a blank cell reads as 'not asked'."""
+    assert grants._render_datasets([]) == "none visible"
+
+
+def test_markdown_carries_the_dataset_column(grants):
+    rows = grants._markdown_rows(
+        [
+            {
+                "credential": "sa@x",
+                "grants": [_grant(datasets=["events", "courses"])],
+                "errors": {},
+            }
+        ]
+    )
+    assert "Datasets" in rows.splitlines()[0]
+    assert "events, courses" in rows
+
+
+def test_markdown_row_width_is_constant(grants):
+    """A short row silently shifts every later column when pasted."""
+    rows = grants._markdown_rows(
+        [
+            {"credential": "a", "grants": [_grant(datasets=[])], "errors": {}},
+            {"credential": "b", "grants": [], "errors": {"load": "boom"}},
+            {"credential": "c", "grants": [], "errors": {}},
+        ]
+    )
+    widths = {line.count("|") for line in rows.splitlines()}
+    assert len(widths) == 1, f"ragged markdown table: {widths}"
+
+
+def test_dataset_enumeration_failure_is_not_fatal(grants, monkeypatch):
+    """A project we can list but not enumerate is still a real grant."""
+
+    def boom(*_args, **_kwargs):
+        message = "403"
+        raise grants.ProbeError(message)
+
+    monkeypatch.setattr(grants, "_get", boom)
+    assert grants._datasets_in("token", "some-project") == []
+
+
+def test_dataset_enumeration_paginates(grants, monkeypatch):
+    pages = [
+        {
+            "datasets": [{"datasetReference": {"datasetId": "one"}}],
+            "nextPageToken": "n",
+        },
+        {"datasets": [{"datasetReference": {"datasetId": "two"}}]},
+    ]
+
+    def fake_get(*_args, **kwargs):
+        return pages[1] if kwargs.get("pageToken") else pages[0]
+
+    monkeypatch.setattr(grants, "_get", fake_get)
+    assert grants._datasets_in("token", "p") == ["one", "two"]

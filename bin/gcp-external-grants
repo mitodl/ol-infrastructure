@@ -72,6 +72,7 @@ Background: docs/plans/gcp-service-account-consumer-map.md
             docs/plans/gcp-external-grant-register.md
 """
 
+import functools
 import json
 import os
 import subprocess
@@ -424,8 +425,14 @@ def _ownership_for_run(
     return model
 
 
-def _gcloud_accounts() -> list[str]:
-    """Every account gcloud holds credentials for, active or not."""
+@functools.cache
+def _gcloud_accounts() -> tuple[str, ...]:
+    """Every account gcloud holds credentials for, active or not.
+
+    Cached: this is consulted once per project while resolving parentage, and
+    re-shelling `gcloud auth list` for each one made a 13-project run spend most
+    of its wall clock in subprocess startup.
+    """
     result = subprocess.run(
         ["gcloud", "auth", "list", "--format=value(account)"],  # noqa: S607
         capture_output=True,
@@ -433,8 +440,8 @@ def _gcloud_accounts() -> list[str]:
         check=False,
     )
     if result.returncode != 0:
-        return []
-    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        return ()
+    return tuple(line.strip() for line in result.stdout.splitlines() if line.strip())
 
 
 def _projects_for_account(account: str | None) -> set[str]:
@@ -597,11 +604,46 @@ def _probe_bigquery(token: str, owner: Ownership) -> list[dict[str, Any]]:
                         else (parent or "none (standalone legacy project)")
                     ),
                     "third_party": third_party,
+                    "datasets": _datasets_in(token, project_id),
                 }
             )
         page = payload.get("nextPageToken")
         if not page:
             return grants
+
+
+def _datasets_in(token: str, project_id: str) -> list[str]:
+    """Dataset ids the credential can see inside one project.
+
+    Project-level enumeration alone cannot answer "what were we actually granted".
+    A credential appears against a project whether it holds one dataset there or
+    all of them, and for a third party's project that difference is the whole
+    negotiation: re-issuing one dataset grant is a different conversation from
+    re-issuing project-wide access.
+
+    `all=true` includes hidden datasets. Failures return [] rather than raising --
+    a project we can list but not enumerate is still a real grant worth reporting.
+    """
+    ids: list[str] = []
+    page: str | None = None
+    while True:
+        try:
+            payload = _get(
+                f"https://bigquery.googleapis.com/bigquery/v2/projects/{project_id}/datasets",
+                token,
+                all=True,
+                maxResults=200,
+                **({"pageToken": page} if page else {}),
+            )
+        except (ProbeError, requests.RequestException):
+            return ids
+        ids.extend(
+            entry.get("datasetReference", {}).get("datasetId", "")
+            for entry in payload.get("datasets", [])
+        )
+        page = payload.get("nextPageToken")
+        if not page:
+            return [i for i in ids if i]
 
 
 def _probe_youtube(token: str, owner: Ownership) -> list[dict[str, Any]]:  # noqa: ARG001
@@ -695,6 +737,13 @@ ESTATE: tuple[dict[str, str], ...] = (
         "vault": "secret-data/pipelines/google-service-account",
     },
     {
+        # Found via dagster_server_policy.hcl, not via any inventory pass. If MIT
+        # Institutional Research issued this from THEIR project, it is a credential
+        # OL cannot re-create for itself -- the sharpest kind of external grant.
+        "label": "institutional-research BigQuery SA -- owner not yet established",
+        "vault": "secret-operations/institutional-research-bigquery-service-account",
+    },
+    {
         "label": "ol-eng-library-platform@ -- Heroku only, not in Vault",
         "heroku": "ol-eng-library:GOOGLE_APPLICATION_JSON",
     },
@@ -702,8 +751,19 @@ ESTATE: tuple[dict[str, str], ...] = (
 
 MARKDOWN_HEADER = (
     "| Credential | Product | Resource id | Resource name | Access | Grantor "
-    "| Third party? |\n|---|---|---|---|---|---|---|"
+    "| Third party? | Datasets |\n|---|---|---|---|---|---|---|---|"
 )
+
+DATASET_PREVIEW = 12
+
+
+def _render_datasets(datasets: list[str]) -> str:
+    """Name the datasets, truncating so one wide project cannot swamp a table."""
+    if not datasets:
+        return "none visible"
+    shown = ", ".join(datasets[:DATASET_PREVIEW])
+    remainder = len(datasets) - DATASET_PREVIEW
+    return f"{shown} (+{remainder} more)" if remainder > 0 else shown
 
 
 def _markdown_rows(results: list[dict[str, Any]]) -> str:
@@ -720,6 +780,11 @@ def _markdown_rows(results: list[dict[str, Any]]) -> str:
                 grant["access"],
                 grant["granted_by"],
                 third_party_label[grant["third_party"]],
+                (
+                    _render_datasets(grant["datasets"])
+                    if grant.get("datasets") is not None
+                    else ""
+                ),
             ]
             lines.append("| " + " | ".join(str(cell) for cell in cells) + " |")
         # A credential that produced nothing must still occupy a row. Pasting a
@@ -734,7 +799,7 @@ def _markdown_rows(results: list[dict[str, Any]]) -> str:
             )
             lines.append(
                 f"| {result['credential']} | **NOT ENUMERATED** | | "
-                f"{reason} | | | unknown |"
+                f"{reason} | | | unknown | |"
             )
     return "\n".join(lines)
 
@@ -755,6 +820,11 @@ def _print_report(results: list[dict[str, Any]]) -> None:
             print(f"    name    {grant['resource_name']}")
             print(f"    access  {grant['access']}")
             print(f"    grantor {grant['granted_by']}{flag}")
+            if grant.get("parent"):
+                print(f"    parent  {grant['parent']}")
+            datasets = grant.get("datasets")
+            if datasets is not None:
+                print(f"    datasets ({len(datasets)}) {_render_datasets(datasets)}")
         for probe, error in result["errors"].items():
             print(f"  [{probe}] {error}")
 
