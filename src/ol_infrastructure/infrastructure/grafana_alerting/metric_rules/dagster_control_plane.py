@@ -166,8 +166,23 @@ _TICK_FAILURES = 5
 # admits. While the span is comfortably above the lookback, the time predicate is
 # what bounds the metric and it covers the period it claims to. If the span falls
 # to the lookback, the cap is binding instead and the metric quietly starts
-# reporting less than its name says -- a monitoring failure that looks like good
-# news, since a truncated window reports fewer failures and fewer ticks.
+# reporting less than its name says.
+#
+# It covers exactly two metrics, and neither of them is the one instinct reaches
+# for. relation="runs" guards dagster_run_wait_to_start_seconds alone -- the only
+# run metric still taking an id cap, because there is no index on start_time to
+# drive it off event time. Truncation there shrinks the creation cohort the
+# percentiles are computed over, so p50/p95/max stop describing the full lookback.
+# relation="job_ticks" guards dagster_recent_job_ticks, where truncation drops
+# ticks out of the window and every status count including FAILURE reads low --
+# so DagsterJobTickFailures above quietly under-reports, which looks like good
+# news.
+#
+# What it does NOT cover: dagster_recent_runs and dagster_recent_retried_runs
+# take no id cap at all, having been moved to a range scan of idx_run_range on
+# update_timestamp. DagsterRunFailureRate is therefore unaffected by this rule
+# firing, which is worth knowing while responding to it. Assuming otherwise is
+# the same mistake an earlier revision of the gauge itself made, one level up.
 #
 # Currently non-binding by a wide margin: runs spans 7.10 days against a 6h
 # lookback (28x) and job_ticks 12.66 hours against 1h (12.7x), the latter
@@ -404,7 +419,7 @@ def create(
                 labels={"severity": "warning"},
                 annotations={
                     "summary": "The Dagster SQL exporter's {{ $labels.relation }} id window has narrowed to {{ $value }}s",
-                    "description": "dagster_id_window_span_seconds for {{ $labels.relation }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has fallen to within 2x its own lookback, so the id cap rather than the time predicate is now what bounds the metrics built on it. Those metrics keep reporting and start under-counting, which reads as an improvement: fewer failures, fewer ticks. Raise SQL_EXPORTER_RUN_WINDOW or SQL_EXPORTER_TICK_WINDOW in the dagster stack's __main__.py to restore the margin. For reference the spans were 7.10 days for runs against a 6h lookback and 12.66 hours for job_ticks against 1h when these thresholds were set. Note the lookback values are duplicated in dagster_control_plane.py because they live in the collector's SQL and are not exported; changing one means changing both.",
+                    "description": "dagster_id_window_span_seconds for {{ $labels.relation }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has fallen to within 2x its own lookback, so the id cap rather than the time predicate is now what bounds the one metric it guards. Check which relation fired: runs guards dagster_run_wait_to_start_seconds alone, where truncation shrinks the creation cohort so its p50/p95/max stop describing the full 6 hours; job_ticks guards dagster_recent_job_ticks, where truncation drops ticks out of the window so every status count including FAILURE reads low and DagsterJobTickFailures quietly under-reports. Neither covers dagster_recent_runs or dagster_recent_retried_runs -- those take no id cap at all, so DagsterRunFailureRate is unaffected either way. Raise SQL_EXPORTER_RUN_WINDOW or SQL_EXPORTER_TICK_WINDOW in the dagster stack's __main__.py to restore the margin. For reference the spans were 7.10 days for runs against a 6h lookback and 12.66 hours for job_ticks against 1h when these thresholds were set. Note the lookback values are duplicated in dagster_control_plane.py because they live in the collector's SQL and are not exported; changing one means changing both.",
                 },
                 datas=rd(
                     "min by (cluster, namespace, relation) "
