@@ -434,7 +434,9 @@ policy_definition = {
                 "iam:DetachRolePolicy",
                 "iam:DetachUserPolicy",
                 "iam:RemoveUserFromGroup",
+                "iam:TagPolicy",
                 "iam:TagRole",
+                "iam:UntagPolicy",
                 "iam:UntagRole",
                 "iam:UpdateAssumeRolePolicy",
                 "iam:UpdateRoleDescription",
@@ -446,6 +448,10 @@ policy_definition = {
                 "arn:aws:iam::*:policy/ol-applications/*",
                 "arn:aws:iam::*:policy/ol-data/*",
                 "arn:aws:iam::*:policy/ol-infrastructure/*",
+                # substructure/open_metadata/__main__.py provisions its
+                # ingestion policy under this path rather than
+                # ol-infrastructure/*.
+                "arn:aws:iam::*:policy/ol-substructure/*",
                 "arn:aws:iam::*:instance-profile/ol-applications/*",
                 "arn:aws:iam::*:instance-profile/ol-infrastructure/*",
                 "arn:aws:iam::*:user/ol-applications/*",

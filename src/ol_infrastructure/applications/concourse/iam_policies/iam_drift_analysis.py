@@ -25,9 +25,15 @@ policy_definition = {
         {
             "Effect": "Allow",
             "Action": [
-                "access-analyzer:GetFindingV2",
+                # bin/analyze-pulumi-iam-usage calls the V2 finding APIs
+                # (get_finding_v2/list_findings_v2), but AWS authorizes both
+                # against the original (non-"V2") action names -- confirmed by
+                # a live AccessDeniedException naming "access-analyzer:
+                # ListFindings" for a ListFindingsV2 call, and by AWS's action
+                # reference, which has no *FindingV2 action at all.
+                "access-analyzer:GetFinding",
                 "access-analyzer:GetGeneratedPolicy",
-                "access-analyzer:ListFindingsV2",
+                "access-analyzer:ListFindings",
                 "access-analyzer:StartPolicyGeneration",
             ],
             "Resource": "*",

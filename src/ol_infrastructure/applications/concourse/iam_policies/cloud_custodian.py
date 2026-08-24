@@ -36,11 +36,8 @@ policy_definition = {
             # Cloud Custodian's `unused` filter on aws.security-group decides
             # whether a group is referenced by scanning the services that can
             # hold one -- see SGUsage.get_scanners() in c7n/resources/vpc.py,
-            # which includes a "codebuild" scanner. The other scanners (ENIs,
-            # SG cross-references, Lambda, launch configs, ECS/CloudWatch
-            # Events rules) are already covered by this policy and by
-            # iam_policies/infra.py; CodeBuild was not, so
-            # tag-packer-sg-for-cleanup and perform-packer-sg-cleanup both
+            # which includes a "codebuild" scanner. CodeBuild wasn't granted,
+            # so tag-packer-sg-for-cleanup and perform-packer-sg-cleanup both
             # died on AccessDeniedException once the infra worker's
             # AdministratorAccess was detached.
             #
@@ -56,6 +53,18 @@ policy_definition = {
             "Action": [
                 "codebuild:BatchGetProjects",
                 "codebuild:ListProjects",
+            ],
+            "Resource": "*",
+        },
+        {
+            # Same SGUsage.get_scanners() also runs an SG-cross-reference
+            # scanner (peered VPCs referencing a group from another account),
+            # which calls DescribeSecurityGroupReferences per security group
+            # -- also missing, confirmed by a live AccessDeniedException on
+            # the same find-packer-sgs policy once CodeBuild above was fixed.
+            "Effect": "Allow",
+            "Action": [
+                "ec2:DescribeSecurityGroupReferences",
             ],
             "Resource": "*",
         },
