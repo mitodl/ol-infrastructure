@@ -56,20 +56,34 @@ only has something to say when a pod starts. Closing the remaining window needs
 an authenticated synthetic probe that asserts ``council`` is queryable; that is
 tracked separately and is not something an alert rule can do.
 
-WitanGraphOptimizeStale: a nightly job in the 15-day bucket
--------------------------------------------------------------
+WitanDailyMaintenanceStale: the daily bucket eks_general.py does not have
+---------------------------------------------------------------------------
 eks_general.py's staleness rules come in two buckets, fast (6h) and slow (15d),
 because PromQL cannot parse a cron expression to derive a per-job threshold.
-omnigraph-optimize runs NIGHTLY and sits in the slow bucket, so compaction can
-stop for two weeks before anything says so. That matters more than the bucket
-name suggests: every commit adds Lance fragments, reads degrade by roughly 21x
-on an uncompacted store, and the degradation is gradual and silent rather than
-a failure anyone would notice. 36 hours is one missed run plus half a day.
+Neither fits a DAILY job: 6h fires every day, and 15d lets one stop for two
+weeks. 36 hours is one missed run plus half a day. Two members, both daily:
 
-This overlaps ScheduledJobStaleSlow* on the same CronJob rather than replacing
-it, deliberately -- the 15-day rule is still the correct backstop for the other
-jobs in its bucket, and editing its membership would change alerting for
-cms-edxapp-reindex-courses too.
+  omnigraph-optimize   20 3 * * *   nightly Lance compaction. Sits in the slow
+    bucket today, so it can stop for two weeks while nothing fails: every
+    commit adds fragments, reads degrade by roughly 21x on an uncompacted
+    store, and the degradation is gradual and silent. This overlaps
+    ScheduledJobStaleSlow* rather than replacing it, deliberately -- that rule
+    is still the right backstop for the other jobs in its bucket, and editing
+    its membership would change alerting for cms-edxapp-reindex-courses too.
+
+  witan-view-reaper    50 4 * * *   ADR-0006's stale-view reaper, "the only
+    process ever entitled to delete a WIP view". In no bucket at all: it was
+    deployed on 2026-08-24 (#5573) and is live in CI and QA with Production
+    promotion still in flight. If it stops, nothing else bounds code-graph
+    branch sprawl, and the sprawl is invisible -- which is the closest
+    practical signal to the "code-graph branch count/growth over time" the
+    shared-service observability ask named. Confirmed present in the QA Mimir
+    tenant with schedule `50 4 * * *` before adding it here.
+
+Its `> 0` guard means the rule stays silent for a CronJob that has not yet had
+a first success, which is exactly the state witan-view-reaper is in as this
+ships. That case is WitanScheduledJobNeverSucceeded's, and its 10-day age gate
+correctly keeps it quiet for a CronJob created today.
 
 WitanScheduledJobNeverSucceeded: the gap eks_general.py documents
 ------------------------------------------------------------------
@@ -100,8 +114,10 @@ indistinguishable from one that is broken:
                                    returns exactly witan-break-glass, which
                                    proves the ``unless`` join, the age gate and
                                    the label matching all work.
-  WitanGraphOptimizeStale          returned 47,483s against its 129,600s
-                                   threshold (last success 13.2h earlier).
+  WitanDailyMaintenanceStale       returned 47,818s for omnigraph-optimize
+                                   against its 129,600s threshold when the
+                                   threshold was dropped to 1 (last success
+                                   13.3h earlier).
   WitanToolCallErrorRate           see the baseline figures above.
 """
 
@@ -121,7 +137,13 @@ _PROD_CLUSTERS = ".*-(production)"
 _ERROR_RATIO_THRESHOLD = 0.5
 
 # One missed nightly run plus half a day.
-_OPTIMIZE_STALE_SECONDS = 129600
+_DAILY_STALE_SECONDS = 129600
+
+# Every daily-cadence maintenance CronJob across the witan and omnigraph
+# namespaces. Validate a new entry against its `schedule` label on
+# kube_cronjob_info before adding it, the same discipline eks_general.py's
+# bucket membership asks for.
+_DAILY_MAINTENANCE_CRONJOBS = "omnigraph-optimize|witan-view-reaper"
 
 # Longer than the longest cadence in these namespaces (weekly), so a newly
 # created CronJob is not reported before it could plausibly have succeeded.
@@ -148,20 +170,25 @@ _ERROR_RATE_DESCRIPTION = (
     " of them. All of them means the graph; one of them means that tool."
 )
 
-_OPTIMIZE_STALE_SUMMARY = (
-    "omnigraph-optimize has not compacted in {{ $labels.cluster }} for over 36 hours"
+_DAILY_STALE_SUMMARY = (
+    "Daily maintenance job {{ $labels.cronjob }} has not succeeded in"
+    " {{ $labels.cluster }} for over 36 hours"
 )
 
-_OPTIMIZE_STALE_DESCRIPTION = (
-    "The nightly Lance compaction for the omnigraph store in cluster"
-    " {{ $labels.cluster }} has not completed successfully for over 36 hours."
-    " Nothing fails outright: every commit adds fragments, reads degrade by"
-    " roughly 21x on an uncompacted store, and the store keeps serving while it"
-    " gets slower. eks_general.py's ScheduledJobStaleSlow* also covers this"
-    " CronJob but at 15 days, which is the wrong window for a nightly job."
-    " `kubectl -n omnigraph get jobs -l app=omnigraph-optimize`; the sweep is"
-    " per-graph and continues past a failure, so its final log lines name"
-    " exactly which graphs did not compact."
+_DAILY_STALE_DESCRIPTION = (
+    "The daily maintenance CronJob {{ $labels.cronjob }} in namespace"
+    " {{ $labels.namespace }}, cluster {{ $labels.cluster }}, has not completed"
+    " successfully for over 36 hours. Neither of these jobs fails loudly when it"
+    " stops -- that is why they need a window sized to their cadence rather than"
+    " eks_general.py's 15-day slow bucket."
+    " omnigraph-optimize is Lance compaction: every commit adds fragments, reads"
+    " degrade by roughly 21x on an uncompacted store, and the store keeps serving"
+    " while it gets slower. Its sweep is per-graph and continues past a failure,"
+    " so its final log lines name exactly which graphs did not compact."
+    " witan-view-reaper is the only process entitled to delete a stale WIP"
+    " code-graph view (ADR-0006); if it stops, nothing bounds branch sprawl and"
+    " nothing else reports it. Start with `kubectl -n {{ $labels.namespace }} get"
+    " jobs` and read the most recent run for this CronJob."
 )
 
 _NEVER_SUCCEEDED_SUMMARY = (
@@ -205,8 +232,8 @@ def _error_ratio_expr(cluster_filter: str) -> str:
     )
 
 
-def _optimize_stale_expr(cluster_filter: str) -> str:
-    """Age of omnigraph-optimize's last success, per cluster.
+def _daily_stale_expr(cluster_filter: str) -> str:
+    """Age of each daily maintenance CronJob's last success, per cluster.
 
     The ``> 0`` guard inside the parentheses is the same one eks_general.py's
     staleness rules carry: kube-state-metrics reports 0 until a CronJob's first
@@ -217,8 +244,9 @@ def _optimize_stale_expr(cluster_filter: str) -> str:
     return (
         "max by (cluster, namespace, cronjob) (time() - "
         "(kube_cronjob_status_last_successful_time"
-        f'{{cluster=~"{cluster_filter}", cronjob="omnigraph-optimize"}} > 0)) '
-        f"> {_OPTIMIZE_STALE_SECONDS}"
+        f'{{cluster=~"{cluster_filter}", '
+        f'cronjob=~"{_DAILY_MAINTENANCE_CRONJOBS}"}} > 0)) '
+        f"> {_DAILY_STALE_SECONDS}"
     )
 
 
@@ -284,32 +312,32 @@ def create(
                 },
                 datas=rd(_error_ratio_expr(_PROD_CLUSTERS)),
             ),
-            # --- Nightly compaction stopped ---
+            # --- Daily maintenance stopped ---
             alerting.RuleGroupRuleArgs(
-                name="WitanGraphOptimizeStaleWarning",
+                name="WitanDailyMaintenanceStaleWarning",
                 condition="C",
                 for_="30m",
                 no_data_state="OK",
                 exec_err_state="OK",
                 labels={"severity": "warning", "environment": "non-production"},
                 annotations={
-                    "summary": _OPTIMIZE_STALE_SUMMARY,
-                    "description": _OPTIMIZE_STALE_DESCRIPTION,
+                    "summary": _DAILY_STALE_SUMMARY,
+                    "description": _DAILY_STALE_DESCRIPTION,
                 },
-                datas=rd(_optimize_stale_expr(_NON_PROD_CLUSTERS)),
+                datas=rd(_daily_stale_expr(_NON_PROD_CLUSTERS)),
             ),
             alerting.RuleGroupRuleArgs(
-                name="WitanGraphOptimizeStaleCritical",
+                name="WitanDailyMaintenanceStaleCritical",
                 condition="C",
                 for_="30m",
                 no_data_state="OK",
                 exec_err_state="KeepLast",
                 labels={"severity": "critical", "environment": "production"},
                 annotations={
-                    "summary": _OPTIMIZE_STALE_SUMMARY,
-                    "description": _OPTIMIZE_STALE_DESCRIPTION,
+                    "summary": _DAILY_STALE_SUMMARY,
+                    "description": _DAILY_STALE_DESCRIPTION,
                 },
-                datas=rd(_optimize_stale_expr(_PROD_CLUSTERS)),
+                datas=rd(_daily_stale_expr(_PROD_CLUSTERS)),
             ),
             # --- Never succeeded at all ---
             alerting.RuleGroupRuleArgs(
