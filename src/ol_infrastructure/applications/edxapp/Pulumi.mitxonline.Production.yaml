@@ -121,9 +121,20 @@ config:
       lms_high_mem:
         max: 3
         min: 1
+      # Floor of 3, not 1, because of the 2026-08-19 memory-starvation incident:
+      # a lone worker's RSS climbed 1.3Gi -> 3.5Gi over ~17h under a full-catalog
+      # reindex while course exports slowed, and the redis queue-depth trigger
+      # never saw it (tasks were dequeued promptly, so edx.cms.core.default stayed
+      # under listLength=10). Raised live by kubectl patch on 2026-08-20; codified
+      # here so Pulumi co-owns .spec.minReplicaCount instead of fighting that
+      # field manager for it. Spreading the load over three long-lived workers
+      # keeps any one of them from being the sole path for every task while it
+      # degrades. The memory trigger on this ScaledObject (k8s_autoscaling.py) is
+      # the structural fix for the same incident; revisit this floor only after
+      # that trigger has proven itself in production.
       cms:
         max: 20
-        min: 1
+        min: 3
   edxapp:k8s_resources:
     webapp:
       lms:
