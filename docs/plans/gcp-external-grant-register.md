@@ -42,9 +42,11 @@ genuinely cannot answer, listed under "What still needs a human" below.
 ## Tooling
 
 ```
+bin/gcp-external-grants probe-all --markdown            # every credential; see below
 bin/gcp-external-grants scopes                          # what each probe asks, and why
 bin/gcp-external-grants probe --key-file sa.json
-bin/gcp-external-grants probe --vault PATH:FIELD --json
+bin/gcp-external-grants probe --vault MOUNT/PATH[:FIELD] --json
+bin/gcp-external-grants probe --heroku APP:VAR --json
 bin/gcp-external-grants probe --gcloud                  # the active human identity
 ```
 
@@ -118,33 +120,44 @@ version is not uniform** — three shapes occur, and the tool handles all three:
 | Dagster `edxorg`/`legacy_openedx` | `secret-data` | v1 | `pipelines/edx/org/gcp-oauth-client` | *(whole body is the key)* |
 | `ol-eng-library-platform@` | — | — | **not in Vault** | Heroku `GOOGLE_APPLICATION_JSON` |
 
-Run in this order — highest value first:
+### The whole run, in one command
+
+`probe-all` carries the table above as a manifest, so it takes no arguments. It
+walks the credentials in the order listed, reports progress on stderr and the
+findings on stdout, and **never skips a credential silently** — one that fails to
+load gets a `NOT ENUMERATED` row carrying the reason, because a row that is simply
+absent reads downstream as "asked, found nothing".
 
 ```sh
 export VAULT_ADDR=https://vault-production.odl.mit.edu
 
-# 1. ol-data-platform-qa@ -- the edx.org third-party BigQuery grants.
+# Findings table rows, ready to paste into this document.
+bin/gcp-external-grants probe-all --markdown | tee /tmp/grants-production.md
+
+# Or keep the raw output for the record.
+bin/gcp-external-grants probe-all --json > /tmp/grants-production.json
+```
+
+**Run it a second time against QA**, or you will not have probed
+`ocw-studio-rc@` at all:
+
+```sh
+VAULT_ADDR=https://vault-qa.odl.mit.edu \
+  bin/gcp-external-grants probe-all --markdown --skip-heroku
+```
+
+`--skip-heroku` on the second run because `ol-eng-library-platform@` is a single
+credential reached through Heroku, not a per-environment one — probing it twice
+gains nothing. The Heroku step needs the `heroku` CLI logged in; without it that
+one credential reports a load failure and the other four still run.
+
+Individual credentials can still be probed directly when you only need one:
+
+```sh
 bin/gcp-external-grants probe \
   --vault secret-data/pipelines/edx/org/gcp-oauth-client --json
-
-# 2. xpro-coupon-requests-productio@ -- coupon/refund/deferral sheets + Drive folder.
 bin/gcp-external-grants probe \
-  --vault secret-xpro/google-sheets:service_account_creds --json
-
-# 3+4. ocw-studio-production@ and ocw-studio-rc@.
-#      Same Vault path in both cases; which SA you get depends on which Vault
-#      cluster you are pointed at (production vs QA), NOT on the path.
-bin/gcp-external-grants probe \
-  --vault secret-ocw-studio/collected:google.drive_service_json --json
-
-# 5. ol-data-platform-production@ -- the Canvas sheet, and its unidentified second source.
-bin/gcp-external-grants probe \
-  --vault secret-data/pipelines/google-service-account --json
-
-# 6. ol-eng-library-platform@ -- not in Vault; pull from Heroku, probe, then delete.
-heroku config:get GOOGLE_APPLICATION_JSON -a ol-eng-library > /tmp/eng-library-sa.json
-bin/gcp-external-grants probe --key-file /tmp/eng-library-sa.json --json
-shred -u /tmp/eng-library-sa.json
+  --heroku ol-eng-library:GOOGLE_APPLICATION_JSON --json
 ```
 
 Three traps in the above, each of which cost time to find:

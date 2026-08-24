@@ -182,13 +182,47 @@ def _load_vault(spec: str) -> dict[str, Any]:
     if not subpath:
         message = f"--vault expects MOUNT/PATH[:FIELD], got {spec!r}"
         raise ProbeError(message)
+    address = os.environ.get("VAULT_ADDR")
+    if not address:
+        message = (
+            "VAULT_ADDR is not set -- e.g. "
+            "export VAULT_ADDR=https://vault-production.odl.mit.edu"
+        )
+        raise ProbeError(message)
     token = (
         os.environ.get("VAULT_TOKEN")
         or Path.home().joinpath(".vault-token").read_text().strip()
     )
-    client = hvac.Client(url=os.environ["VAULT_ADDR"], token=token)
+    client = hvac.Client(url=address, token=token)
     data = _read_vault_secret(client, mount, subpath)
     return _normalise_private_key(_extract_key(data, field))
+
+
+def _load_heroku(spec: str) -> dict[str, Any]:
+    """Read a service-account key out of a Heroku config var.
+
+    Needed because `ol-eng-library-platform@` -- the estate's busiest Drive
+    credential -- is not in Vault at all. It reaches its three Heroku apps as a
+    `GOOGLE_APPLICATION_JSON` config var and lives nowhere else.
+    """
+    app_name, _, variable = spec.partition(":")
+    if not app_name or not variable:
+        message = f"--heroku expects APP:VAR, got {spec!r}"
+        raise ProbeError(message)
+    result = subprocess.run(  # noqa: S603
+        ["heroku", "config:get", variable, "-a", app_name],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        message = f"heroku config:get failed: {result.stderr.strip()[:160]}"
+        raise ProbeError(message)
+    raw = result.stdout.strip()
+    if not raw:
+        message = f"{variable} is empty or unset on {app_name}"
+        raise ProbeError(message)
+    return json.loads(raw)
 
 
 def _gcloud_token() -> tuple[str, str]:
@@ -509,6 +543,71 @@ def _probe_one(key: dict[str, Any], owned: set[str]) -> dict[str, Any]:
     return result
 
 
+# The credentials this estate actually holds, in the order worth running them.
+# Kept here rather than in the register so `probe-all` needs no arguments and no
+# copy-paste; the register explains what each one is expected to reveal.
+ESTATE: tuple[dict[str, str], ...] = (
+    {
+        "label": "ol-data-platform-qa@ -- edx.org third-party BigQuery grants",
+        "vault": "secret-data/pipelines/edx/org/gcp-oauth-client",
+    },
+    {
+        "label": "xpro-coupon-requests-* -- coupon/refund/deferral sheets",
+        "vault": "secret-xpro/google-sheets:service_account_creds",
+    },
+    {
+        "label": "ocw-studio -- prod or rc, WHICHEVER THIS VAULT SERVES",
+        "vault": "secret-ocw-studio/collected:google.drive_service_json",
+    },
+    {
+        "label": "ol-data-platform-production@ -- Canvas sheet + unidentified source",
+        "vault": "secret-data/pipelines/google-service-account",
+    },
+    {
+        "label": "ol-eng-library-platform@ -- Heroku only, not in Vault",
+        "heroku": "ol-eng-library:GOOGLE_APPLICATION_JSON",
+    },
+)
+
+MARKDOWN_HEADER = (
+    "| Credential | Product | Resource id | Resource name | Access | Grantor "
+    "| Third party? |\n|---|---|---|---|---|---|---|"
+)
+
+
+def _markdown_rows(results: list[dict[str, Any]]) -> str:
+    """Render findings as the register's Findings table, ready to paste."""
+    third_party_label = {True: "**YES**", False: "no", None: "unknown"}
+    lines = [MARKDOWN_HEADER]
+    for result in results:
+        for grant in sorted(result["grants"], key=lambda g: g["product"]):
+            cells = [
+                result["credential"],
+                grant["product"],
+                f"`{grant['resource_id']}`",
+                grant["resource_name"] or "",
+                grant["access"],
+                grant["granted_by"],
+                third_party_label[grant["third_party"]],
+            ]
+            lines.append("| " + " | ".join(str(cell) for cell in cells) + " |")
+        # A credential that produced nothing must still occupy a row. Pasting a
+        # table where it is simply absent turns "not asked" into "asked, found
+        # nothing" -- the exact conflation this whole exercise exists to avoid.
+        if not result["grants"]:
+            reason = (
+                "; ".join(
+                    f"{probe}: {error}" for probe, error in result["errors"].items()
+                )
+                or "no grants found"
+            )
+            lines.append(
+                f"| {result['credential']} | **NOT ENUMERATED** | | "
+                f"{reason} | | | unknown |"
+            )
+    return "\n".join(lines)
+
+
 def _print_report(results: list[dict[str, Any]]) -> None:
     for result in results:
         print(f"\n=== {result['credential']}  (project {result['project'] or '?'})")
@@ -538,7 +637,11 @@ def probe(
     ] = None,
     vault: Annotated[
         list[str] | None,
-        cyclopts.Parameter(help="Vault source(s) as PATH:FIELD."),
+        cyclopts.Parameter(help="Vault source(s) as MOUNT/PATH[:FIELD]."),
+    ] = None,
+    heroku: Annotated[
+        list[str] | None,
+        cyclopts.Parameter(help="Heroku config-var source(s) as APP:VAR."),
     ] = None,
     gcloud: Annotated[
         bool,
@@ -549,6 +652,10 @@ def probe(
     as_json: Annotated[
         bool, cyclopts.Parameter(name=["--json"], help="Emit JSON instead of text.")
     ] = False,
+    markdown: Annotated[
+        bool,
+        cyclopts.Parameter(help="Emit the register's Findings table rows."),
+    ] = False,
 ) -> None:
     """Enumerate external product grants for each supplied credential."""
     keys: list[dict[str, Any]] = [_load_key_file(path) for path in key_file or []]
@@ -556,13 +663,18 @@ def probe(
     for spec in vault or []:
         try:
             keys.append(_load_vault(spec))
-        except (ProbeError, KeyError, OSError) as error:
+        except (ProbeError, KeyError, OSError, json.JSONDecodeError) as error:
             failures.append({"credential": spec, "errors": {"vault": str(error)}})
+    for spec in heroku or []:
+        try:
+            keys.append(_load_heroku(spec))
+        except (ProbeError, OSError, json.JSONDecodeError) as error:
+            failures.append({"credential": spec, "errors": {"heroku": str(error)}})
     if gcloud:
         keys.append({"_gcloud": True})
     if not keys and not failures:
         print(
-            "nothing to probe: pass --key-file, --vault and/or --gcloud",
+            "nothing to probe: pass --key-file, --vault, --heroku and/or --gcloud",
             file=sys.stderr,
         )
         raise SystemExit(2)
@@ -571,10 +683,89 @@ def probe(
     results = [_probe_one(key, owned) for key in keys] + [
         {"grants": [], "project": "", **failure} for failure in failures
     ]
+    _emit(results, as_json=as_json, markdown=markdown)
+
+
+def _emit(results: list[dict[str, Any]], *, as_json: bool, markdown: bool) -> None:
     if as_json:
         print(json.dumps(results, indent=2, sort_keys=True))
+    elif markdown:
+        print(_markdown_rows(results))
     else:
         _print_report(results)
+
+
+@app.command(name="probe-all")
+def probe_all(
+    *,
+    as_json: Annotated[
+        bool, cyclopts.Parameter(name=["--json"], help="Emit JSON instead of text.")
+    ] = False,
+    markdown: Annotated[
+        bool,
+        cyclopts.Parameter(help="Emit the register's Findings table rows."),
+    ] = False,
+    skip_heroku: Annotated[
+        bool,
+        cyclopts.Parameter(help="Skip the Heroku-sourced credential."),
+    ] = False,
+) -> None:
+    """Probe every known credential in the estate, in priority order.
+
+    One caveat this cannot solve for you: `ocw-studio-production@` and
+    `ocw-studio-rc@` share a single Vault path, and which one you get depends
+    entirely on which Vault cluster VAULT_ADDR points at. Run this twice, once
+    per cluster, or you will probe the same credential twice and read it as
+    agreement. The header below prints the cluster actually used, and results
+    are labelled by the `client_email` that answered rather than by the name
+    the manifest guessed.
+    """
+    vault_addr = os.environ.get("VAULT_ADDR", "(VAULT_ADDR unset)")
+    print(f"# Vault: {vault_addr}", file=sys.stderr)
+    print(f"# {len(ESTATE)} credentials queued\n", file=sys.stderr)
+
+    owned = _owned_projects()
+    if not owned:
+        print(
+            "# WARNING: `gcloud projects list` returned nothing. Third-party\n"
+            "# classification will report 'unknown' rather than guessing.\n",
+            file=sys.stderr,
+        )
+
+    results: list[dict[str, Any]] = []
+    for index, entry in enumerate(ESTATE, start=1):
+        label = entry["label"]
+        if "heroku" in entry and skip_heroku:
+            print(f"[{index}/{len(ESTATE)}] SKIPPED {label}", file=sys.stderr)
+            continue
+        print(f"[{index}/{len(ESTATE)}] {label}", file=sys.stderr)
+        try:
+            key = (
+                _load_heroku(entry["heroku"])
+                if "heroku" in entry
+                else _load_vault(entry["vault"])
+            )
+        except (ProbeError, KeyError, OSError, json.JSONDecodeError) as error:
+            # A credential that cannot be loaded is reported, never skipped
+            # silently -- a missing row here reads as "no grants" downstream.
+            results.append(
+                {
+                    "credential": label,
+                    "project": "",
+                    "grants": [],
+                    "errors": {"load": str(error)},
+                }
+            )
+            print(f"      load failed: {error}", file=sys.stderr)
+            continue
+        result = _probe_one(key, owned)
+        results.append(result)
+        print(
+            f"      {result['credential']}: {len(result['grants'])} grant(s)",
+            file=sys.stderr,
+        )
+
+    _emit(results, as_json=as_json, markdown=markdown)
 
 
 @app.command

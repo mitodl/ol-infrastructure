@@ -128,3 +128,99 @@ def test_capability_summary_ranks_access(grants):
     assert grants._capability_summary({"canEdit": True}) == "writer"
     assert grants._capability_summary({"canComment": True}) == "commenter"
     assert grants._capability_summary({}) == "reader"
+
+
+def _grant(**overrides):
+    base = {
+        "product": "BigQuery",
+        "resource_id": "some-project",
+        "resource_name": "Some Project",
+        "access": "project-level BigQuery access",
+        "granted_by": "project IAM",
+        "third_party": False,
+    }
+    return base | overrides
+
+
+def test_markdown_renders_a_row_per_grant(grants):
+    rows = grants._markdown_rows(
+        [{"credential": "sa@x", "grants": [_grant()], "errors": {}}]
+    )
+    assert "| sa@x | BigQuery | `some-project` |" in rows
+    assert rows.startswith(grants.MARKDOWN_HEADER)
+
+
+def test_markdown_marks_third_party_and_unknown_distinctly(grants):
+    rows = grants._markdown_rows(
+        [
+            {
+                "credential": "sa@x",
+                "grants": [
+                    _grant(resource_id="theirs", third_party=True),
+                    _grant(resource_id="dunno", third_party=None),
+                ],
+                "errors": {},
+            }
+        ]
+    )
+    assert "| **YES** |" in rows
+    assert "| unknown |" in rows
+
+
+def test_a_credential_that_failed_still_gets_a_row(grants):
+    """The whole point: a missing row reads as "asked, found nothing"."""
+    rows = grants._markdown_rows(
+        [
+            {
+                "credential": "ol-data-platform-qa@",
+                "grants": [],
+                "errors": {"load": "VAULT_ADDR is not set"},
+            }
+        ]
+    )
+    assert "**NOT ENUMERATED**" in rows
+    assert "VAULT_ADDR is not set" in rows
+
+
+def test_a_credential_with_no_grants_is_not_silently_dropped(grants):
+    rows = grants._markdown_rows(
+        [{"credential": "sa@quiet", "grants": [], "errors": {}}]
+    )
+    assert "sa@quiet" in rows
+    assert "**NOT ENUMERATED**" in rows
+
+
+def test_estate_manifest_entries_are_well_formed(grants):
+    """probe-all takes no arguments, so a typo here is silent until it runs."""
+    assert grants.ESTATE
+    for entry in grants.ESTATE:
+        assert entry["label"]
+        assert ("vault" in entry) ^ ("heroku" in entry)
+        if "heroku" in entry:
+            app_name, _, variable = entry["heroku"].partition(":")
+            assert app_name
+            assert variable
+        else:
+            mount, _, subpath = entry["vault"].partition("/")
+            assert mount
+            assert subpath
+
+
+def test_heroku_spec_must_name_an_app_and_a_var(grants):
+    with pytest.raises(grants.ProbeError):
+        grants._load_heroku("ol-eng-library")
+
+
+def test_vault_spec_must_name_a_path_under_a_mount(grants, monkeypatch):
+    monkeypatch.setenv("VAULT_ADDR", "https://vault.example")
+    with pytest.raises(grants.ProbeError):
+        grants._load_vault("secret-xpro")
+
+
+def test_missing_vault_addr_is_reported_actionably(grants, monkeypatch):
+    """A bare KeyError('VAULT_ADDR') tells the operator nothing to do."""
+    monkeypatch.delenv("VAULT_ADDR", raising=False)
+    with pytest.raises(grants.ProbeError) as caught:
+        grants._load_vault("secret-xpro/google-sheets:x")
+    assert "VAULT_ADDR" in str(caught.value)
+    assert "export" in str(caught.value)
