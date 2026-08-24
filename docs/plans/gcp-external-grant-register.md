@@ -188,10 +188,66 @@ Two of these have a specific question attached that the probe should settle:
 
 ## Findings
 
-*(empty — populate from probe output)*
+First production run, 2026-08-24, against `vault-production`. **Partial** — see
+"What this run did not cover" below before treating any absence as an answer.
 
 | Credential | Product | Resource id | Resource name | Access | Grantor | Third party? |
 |---|---|---|---|---|---|---|
+| `ol-data-platform-production@` | BigQuery | `mitx-residential-pipeline-main` | mitx-residential-pipeline-main | project-level | not visible to either OL gcloud account | **likely** |
+| `ol-data-platform-production@` | BigQuery | `mitir-mitx-surveys` | MITIR MITx Surveys | project-level | not visible to either OL gcloud account | **likely** |
+| `ol-data-platform-production@` | BigQuery | `mitx-pipeline-main-dc29` | mitx-pipeline-main | project-level | project IAM | no |
+| `xpro-coupon-requests-productio@` | Drive (folder) | `12FeE1rh0iGQqsIQMvuKiEs07qpZNX541` | xPRO Enrollments | content-manager/writer | **`pdpinch@gmail.com`** | **YES** |
+| `ocw-studio-production@` | Drive (Shared Drive) | `0AIZerpz9jimTUk9PVA` | OCW Content | organizer | Shared Drive organizer | no |
+| `ocw-studio-production@` | Drive (Shared Drive) | `0AErNBMZMmOz3Uk9PVA` | **OL Engineering (ARCHIVED)** | organizer | Shared Drive organizer | no |
+
+### What this run settled
+
+- **The Shared Drive collision is resolved.** `0AErNBMZMmOz3Uk9PVA` is **"OL
+  Engineering (ARCHIVED)"**. The consumer map labels it "ol-eng-library" under
+  `ol-eng-library-platform@` and "Pulumi.QA" under `ocw-studio-rc@`
+  (`gcp-service-account-consumer-map.md:64`, `:68`). **Both labels are wrong**, and
+  the drive is *archived* while a production credential holds **organizer** on it.
+  Note it answered under `ocw-studio-production@`, not `-rc@`.
+- **A production credential depends on a personal Gmail account.** The xPro
+  enrollments folder is owned by `pdpinch@gmail.com`. `xpro-coupon-requests-productio@`
+  holds content-manager/writer on it by that person's grant. If that account lapses
+  or is cleaned up, the grant goes with it — and re-issuing after consolidation
+  requires them personally. This is a live single point of failure, not just a
+  migration cost.
+- **Two genuinely external BigQuery grants**, neither visible to any OL gcloud
+  identity: `mitx-residential-pipeline-main` and `mitir-mitx-surveys` (MIT
+  Institutional Research). Re-issuing these needs their owners.
+
+### What this run did NOT cover
+
+- **`ol-data-platform-qa@` was never probed.** Both
+  `secret-data/pipelines/edx/org/gcp-oauth-client` and
+  `secret-data/pipelines/google-service-account` returned
+  `ol-data-platform-production@`, so the manifest's first two entries hit one
+  identity and its rows appeared twice. **The edx.org BigQuery/GCS grants — the
+  highest-value item in this whole exercise — remain unenumerated.** Resolve where
+  `ol-data-platform-qa@`'s key actually lives before rerunning. `probe-all` now
+  warns when two sources resolve to one identity.
+- **`ocw-studio-rc@` was not probed**; the run only touched `vault-production`.
+- **`ol-eng-library-platform@` produced no rows** — the Heroku step needs the
+  `heroku` CLI logged in.
+- **No Analytics or YouTube grants appeared for any credential.** Not yet
+  meaningful: those probes return 403 when the credential holds nothing *and* when
+  the scope is refused, and the two are not distinguished in this output.
+
+### Correction to the tool, forced by this run
+
+The three BigQuery rows were first reported **third party**, including
+`mitx-pipeline-main-dc29`, which OL owns and which this project has a completed
+access task for. Cause: ownership was derived from `gcloud projects list` for the
+*active* account only. As `tmacey@mit.edu` that returns just `mitol-engineering`
+and `mitol01`, so the entire legacy estate classified as external — the exact error
+the runtime-derivation was introduced to prevent, reintroduced in a form that
+changes answer with whatever `gcloud config set account` was last run.
+
+Now unioned across every credentialed gcloud account via `--account` (22 projects
+across two identities here), with the basis printed on every run and
+`--owned-project` to pin anything gcloud cannot see.
 
 ### Known before probing
 

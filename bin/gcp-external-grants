@@ -315,26 +315,58 @@ def _is_third_party_email(address: str, owned: set[str]) -> bool | None:
     )
 
 
-def _owned_projects() -> set[str]:
-    """Every project the active gcloud identity can list.
-
-    Derived rather than hardcoded on purpose. A hardcoded name list silently
-    mislabels any project it has not been taught about, and mislabelling an
-    OL-owned project as third-party is the expensive direction of that error --
-    it invents a negotiation that does not need to happen.
-
-    Returns an empty set when gcloud is unavailable, which makes third-party
-    classification report `None` (unknown) rather than guess.
-    """
+def _gcloud_accounts() -> list[str]:
+    """Every account gcloud holds credentials for, active or not."""
     result = subprocess.run(
-        ["gcloud", "projects", "list", "--format=value(projectId)"],  # noqa: S607
+        ["gcloud", "auth", "list", "--format=value(account)"],  # noqa: S607
         capture_output=True,
         text=True,
         check=False,
     )
     if result.returncode != 0:
+        return []
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def _projects_for_account(account: str | None) -> set[str]:
+    command = ["gcloud", "projects", "list", "--format=value(projectId)"]
+    if account:
+        command.append(f"--account={account}")
+    result = subprocess.run(command, capture_output=True, text=True, check=False)  # noqa: S603
+    if result.returncode != 0:
         return set()
     return {line.strip() for line in result.stdout.splitlines() if line.strip()}
+
+
+def _owned_projects(extra: tuple[str, ...] = ()) -> tuple[set[str], list[str]]:
+    """Every project OL can see, unioned across ALL credentialed gcloud accounts.
+
+    Deriving this from the *active* account alone was a bug, and a quiet one:
+    OL's estate spans two identities, and `gcloud projects list` as
+    tmacey@mit.edu returns only mitol-engineering and mitol01. Every legacy
+    project -- the whole population this migration is about -- then classified
+    as third party, inventing negotiations that do not need to happen. The
+    answer changed with whatever `gcloud config set account` was last run,
+    which is unrelated to the credential being probed.
+
+    So union across every account gcloud holds credentials for, using
+    `--account` rather than switching the active one, and return the accounts
+    consulted so the caller can show what the classification actually rests on.
+
+    An empty set makes third-party classification report `None` (unknown)
+    rather than guess.
+    """
+    accounts = _gcloud_accounts()
+    projects: set[str] = set(extra)
+    consulted: list[str] = []
+    for account in accounts:
+        found = _projects_for_account(account)
+        if found:
+            consulted.append(f"{account} ({len(found)})")
+            projects |= found
+    if not accounts:
+        projects |= _projects_for_account(None)
+    return projects, consulted
 
 
 def _capability_summary(capabilities: dict[str, bool]) -> str:
@@ -656,6 +688,12 @@ def probe(
         bool,
         cyclopts.Parameter(help="Emit the register's Findings table rows."),
     ] = False,
+    owned_project: Annotated[
+        list[str] | None,
+        cyclopts.Parameter(
+            help="Extra project id(s) to treat as OL-owned, beyond what gcloud lists."
+        ),
+    ] = None,
 ) -> None:
     """Enumerate external product grants for each supplied credential."""
     keys: list[dict[str, Any]] = [_load_key_file(path) for path in key_file or []]
@@ -679,11 +717,38 @@ def probe(
         )
         raise SystemExit(2)
 
-    owned = _owned_projects()
+    owned, consulted = _owned_projects(tuple(owned_project or ()))
+    _print_ownership_basis(owned, consulted)
     results = [_probe_one(key, owned) for key in keys] + [
         {"grants": [], "project": "", **failure} for failure in failures
     ]
     _emit(results, as_json=as_json, markdown=markdown)
+
+
+def _print_ownership_basis(owned: set[str], consulted: list[str]) -> None:
+    """Show what third-party classification rests on, every run.
+
+    Printed rather than assumed because this is the input most likely to be
+    silently wrong: it depends on which accounts gcloud is logged in to, not on
+    the credential being probed.
+    """
+    if not owned:
+        print(
+            "# WARNING: no owned projects resolved -- `gcloud projects list`\n"
+            "# returned nothing for any credentialed account. Third-party\n"
+            "# classification will report 'unknown' rather than guessing.",
+            file=sys.stderr,
+        )
+        return
+    print(
+        f"# Ownership basis: {len(owned)} projects from {', '.join(consulted) or 'gcloud'}",
+        file=sys.stderr,
+    )
+    print(
+        "# A project absent from that set is reported THIRD PARTY. If OL owns one\n"
+        "# gcloud cannot see, pass --owned-project <id> or the row will be wrong.",
+        file=sys.stderr,
+    )
 
 
 def _emit(results: list[dict[str, Any]], *, as_json: bool, markdown: bool) -> None:
@@ -709,6 +774,12 @@ def probe_all(
         bool,
         cyclopts.Parameter(help="Skip the Heroku-sourced credential."),
     ] = False,
+    owned_project: Annotated[
+        list[str] | None,
+        cyclopts.Parameter(
+            help="Extra project id(s) to treat as OL-owned, beyond what gcloud lists."
+        ),
+    ] = None,
 ) -> None:
     """Probe every known credential in the estate, in priority order.
 
@@ -724,13 +795,9 @@ def probe_all(
     print(f"# Vault: {vault_addr}", file=sys.stderr)
     print(f"# {len(ESTATE)} credentials queued\n", file=sys.stderr)
 
-    owned = _owned_projects()
-    if not owned:
-        print(
-            "# WARNING: `gcloud projects list` returned nothing. Third-party\n"
-            "# classification will report 'unknown' rather than guessing.\n",
-            file=sys.stderr,
-        )
+    owned, consulted = _owned_projects(tuple(owned_project or ()))
+    _print_ownership_basis(owned, consulted)
+    print("", file=sys.stderr)
 
     results: list[dict[str, Any]] = []
     for index, entry in enumerate(ESTATE, start=1):
@@ -759,13 +826,48 @@ def probe_all(
             print(f"      load failed: {error}", file=sys.stderr)
             continue
         result = _probe_one(key, owned)
+        result["source_label"] = label
         results.append(result)
         print(
             f"      {result['credential']}: {len(result['grants'])} grant(s)",
             file=sys.stderr,
         )
 
+    _warn_on_duplicate_identities(results)
     _emit(results, as_json=as_json, markdown=markdown)
+
+
+def _warn_on_duplicate_identities(results: list[dict[str, Any]]) -> None:
+    """Flag two manifest entries that resolved to the same service account.
+
+    This is not cosmetic. If two sources yield one identity, some credential in
+    the manifest was never probed at all, and its grants are missing from the
+    output while every row present looks healthy. Observed for real: both
+    `secret-data/pipelines/edx/org/gcp-oauth-client` and
+    `secret-data/pipelines/google-service-account` returned
+    `ol-data-platform-production@`, so `ol-data-platform-qa@` -- the credential
+    holding the edx.org BigQuery grants -- went unprobed and the duplicated rows
+    read as corroboration.
+    """
+    seen: dict[str, list[str]] = {}
+    for result in results:
+        identity = result.get("credential", "")
+        if result.get("grants") or not result.get("errors"):
+            seen.setdefault(identity, []).append(result.get("source_label", identity))
+    for identity, labels in seen.items():
+        if len(labels) > 1:
+            print(
+                f"\n# WARNING: {len(labels)} sources resolved to {identity}:",
+                file=sys.stderr,
+            )
+            for label in labels:
+                print(f"#   - {label}", file=sys.stderr)
+            print(
+                "# Its rows are duplicated below, and whichever credential the\n"
+                "# other source was meant to reach was NOT probed. Do not read\n"
+                "# the repeated rows as agreement.",
+                file=sys.stderr,
+            )
 
 
 @app.command

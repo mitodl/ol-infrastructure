@@ -217,6 +217,69 @@ def test_vault_spec_must_name_a_path_under_a_mount(grants, monkeypatch):
         grants._load_vault("secret-xpro")
 
 
+def test_owned_projects_unions_every_credentialed_account(grants, monkeypatch):
+    """The estate spans two identities; using only the active one misclassified it.
+
+    As tmacey@mit.edu, `gcloud projects list` returns just mitol-engineering and
+    mitol01, so every legacy project read as third party -- including
+    mitx-pipeline-main-dc29, which OL owns.
+    """
+    per_account = {
+        "tmacey@mit.edu": {"mitol01", "mitol-engineering"},
+        "mitx.devops@gmail.com": {"mitx-pipeline-main-dc29", "mit-open"},
+    }
+    monkeypatch.setattr(grants, "_gcloud_accounts", lambda: list(per_account))
+    monkeypatch.setattr(
+        grants, "_projects_for_account", lambda account: per_account[account]
+    )
+    owned, consulted = grants._owned_projects()
+    assert "mitx-pipeline-main-dc29" in owned
+    assert "mitol01" in owned
+    assert len(consulted) == 2
+
+
+def test_owned_projects_accepts_an_explicit_override(grants, monkeypatch):
+    """For a project gcloud cannot see at all, the operator must be able to say so."""
+    monkeypatch.setattr(grants, "_gcloud_accounts", list)
+    monkeypatch.setattr(grants, "_projects_for_account", lambda _account: set())
+    owned, _ = grants._owned_projects(("some-invisible-project",))
+    assert "some-invisible-project" in owned
+
+
+def test_duplicate_identities_are_warned_about(grants, capsys):
+    """Two sources yielding one identity means another was never probed."""
+    grants._warn_on_duplicate_identities(
+        [
+            {
+                "credential": "sa@x",
+                "grants": [_grant()],
+                "errors": {},
+                "source_label": "edx/org path",
+            },
+            {
+                "credential": "sa@x",
+                "grants": [_grant()],
+                "errors": {},
+                "source_label": "google-service-account path",
+            },
+        ]
+    )
+    captured = capsys.readouterr().err
+    assert "2 sources resolved to sa@x" in captured
+    assert "NOT probed" in captured
+    assert "edx/org path" in captured
+
+
+def test_distinct_identities_produce_no_warning(grants, capsys):
+    grants._warn_on_duplicate_identities(
+        [
+            {"credential": "sa@x", "grants": [_grant()], "errors": {}},
+            {"credential": "sa@y", "grants": [_grant()], "errors": {}},
+        ]
+    )
+    assert "WARNING" not in capsys.readouterr().err
+
+
 def test_missing_vault_addr_is_reported_actionably(grants, monkeypatch):
     """A bare KeyError('VAULT_ADDR') tells the operator nothing to do."""
     monkeypatch.delenv("VAULT_ADDR", raising=False)
