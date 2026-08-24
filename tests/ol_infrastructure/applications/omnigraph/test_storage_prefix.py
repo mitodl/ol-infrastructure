@@ -14,6 +14,7 @@ import pytest
 
 from ol_infrastructure.applications.omnigraph.storage import (
     storage_uri_for,
+    validate_internal_schema_version,
     validate_migration_target_prefix,
     validate_storage_prefix,
 )
@@ -126,3 +127,32 @@ def test_migration_target_still_rejects_what_the_looser_check_does() -> None:
         validate_migration_target_prefix("/fmt6")
     with pytest.raises(ValueError, match="single path segment"):
         validate_migration_target_prefix("fmt<N>")
+
+
+def test_internal_schema_version_unset_bucket_root_is_fine() -> None:
+    """Pre-first-migration steady state: nothing to check either value against."""
+    validate_internal_schema_version("", None)
+
+
+def test_internal_schema_version_matching_fmt_n_passes() -> None:
+    validate_internal_schema_version("fmt6", 6)
+
+
+@pytest.mark.parametrize("prefix", ["fmt6", "fmt10"])
+def test_internal_schema_version_missing_against_fmt_n_prefix_fails(
+    prefix: str,
+) -> None:
+    with pytest.raises(ValueError, match="internal_schema_version is unset"):
+        validate_internal_schema_version(prefix, None)
+
+
+def test_internal_schema_version_mismatched_against_fmt_n_prefix_fails() -> None:
+    with pytest.raises(ValueError, match="They must agree"):
+        validate_internal_schema_version("fmt6", 7)
+
+
+@pytest.mark.parametrize("prefix", ["", "migration-2026-08", "v2.1"])
+def test_internal_schema_version_set_without_fmt_n_prefix_fails(prefix: str) -> None:
+    """Nothing to cross-check it against outside the fmt<N> convention."""
+    with pytest.raises(ValueError, match="nothing to check it against"):
+        validate_internal_schema_version(prefix, 6)

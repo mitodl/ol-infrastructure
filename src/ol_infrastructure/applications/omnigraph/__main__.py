@@ -72,6 +72,7 @@ from ol_infrastructure.applications.omnigraph.maintenance import (
     DEFAULT_OPTIMIZE_SCHEDULE,
 )
 from ol_infrastructure.applications.omnigraph.storage import (
+    validate_internal_schema_version,
     validate_migration_target_prefix,
     validate_storage_prefix,
 )
@@ -145,6 +146,17 @@ MANAGED_REPOS: list[str] = omnigraph_config.get_object("managed_repos") or []
 # — it just builds the graphs somewhere nobody looks. See the runbook's
 # "cluster validate does not catch an empty storage:" note.
 STORAGE_PREFIX: str = validate_storage_prefix(omnigraph_config.get("storage_prefix"))
+
+# Cross-checked against STORAGE_PREFIX below — see
+# validate_internal_schema_version's docstring for exactly what this does and
+# does not catch. Required once storage_prefix follows the fmt<N> convention
+# a migrated environment's served prefix uses; every environment does today
+# (fmt6, see the runbook), so this fails preview immediately if unset rather
+# than only on the NEXT migration that forgets to set it.
+INTERNAL_SCHEMA_VERSION: int | None = omnigraph_config.get_int(
+    "internal_schema_version"
+)
+validate_internal_schema_version(STORAGE_PREFIX, INTERNAL_SCHEMA_VERSION)
 
 # The image to migrate FROM — the one currently deployed, whose binary can
 # still read the old root. Set only while a storage-format migration is being
