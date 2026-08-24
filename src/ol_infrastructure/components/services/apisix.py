@@ -441,14 +441,15 @@ class OLApisixSharedPluginsConfig(BaseModel):
     # references a plugin APISIX has not loaded is rejected, so the route-level
     # attachment must be gated to match the cluster-level plugin enablement.
     enable_opentelemetry: bool = True
-    # Attach the gzip response-compression plugin.  ``None`` (the default)
-    # resolves from the stack: on everywhere except Production.  Compression is
-    # cheap to validate for correctness, but its real cost is CPU on a gateway
-    # whose HPA scales on CPU, and that only shows up under production traffic
-    # volume -- so Production stays off until the non-production soak says
-    # otherwise, at which point this default becomes the single line to flip.
-    # Pass True or False to override for one application ahead of that.
-    enable_gzip: bool | None = None
+    # Attach the gzip response-compression plugin.  On by default everywhere:
+    # the plugin was loaded cluster-wide but referenced by no route for a long
+    # time, so every shared-gateway response went out uncompressed.  Production
+    # was gated behind a non-production soak until the CPU cost could be
+    # measured; at 1.8 MB/s peak gateway egress, comp_level 1 costs a few
+    # hundredths of a core, so the gate is gone.  Pass False to opt out an
+    # application whose responses stream incrementally under a compressible
+    # content type -- gzip buffering would delay their first byte.
+    enable_gzip: bool = True
     k8s_labels: dict[str, str] = {}
     k8s_namespace: str
     # Either raw CRD dicts or OLApisixPluginConfig objects; the component
@@ -533,8 +534,8 @@ class OLApisixSharedPlugins(ComponentResource):
         # behind the 2026-07-21 gateway OOM (see the proxy_buffering block in
         # apisix_official.py).
         #
-        # Kept out of __default_plugins because it is rolled out
-        # non-production-first -- see ``enable_gzip`` on the config class.
+        # Kept out of __default_plugins so an application can opt out on its
+        # own -- see ``enable_gzip`` on the config class.
         #
         # ``types`` deliberately lists only text-shaped payloads.  Formats that
         # are already compressed (images, video, woff/woff2, archives) would
@@ -618,14 +619,10 @@ class OLApisixSharedPlugins(ComponentResource):
         ):
             plugins.append(__opentelemetry_plugin)
 
-        # Unset means "resolve from the stack": every non-Production environment
-        # soaks compression first.  Unlike the opentelemetry gate above this is
-        # not a correctness constraint -- APISIX loads gzip everywhere -- it is
-        # a deliberate rollout order, so a caller may override it either way.
-        enable_gzip = plugin_config.enable_gzip
-        if enable_gzip is None:
-            enable_gzip = parse_stack().env_suffix.lower() != "production"
-        if enable_gzip:
+        # No stack gate, unlike the opentelemetry check above: APISIX loads gzip
+        # in every environment, so this is a per-application choice rather than a
+        # correctness constraint.
+        if plugin_config.enable_gzip:
             plugins.append(__gzip_plugin)
 
         self.resource_name = (
