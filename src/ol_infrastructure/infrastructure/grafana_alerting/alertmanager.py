@@ -112,7 +112,7 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
         name="slack-devops-warnings-warning",
         slacks=[
             alerting.ContactPointSlackArgs(
-                url=grafana_secrets["slack_notifications_ocw_misc_api_url"],
+                url=grafana_secrets["slack_notifications_devops_warnings"],
                 recipient="#devops-warnings",
                 color="warning",
                 icon_emoji=":goose_warning:",
@@ -129,7 +129,7 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
         name="slack-devops-warnings-critical",
         slacks=[
             alerting.ContactPointSlackArgs(
-                url=grafana_secrets["slack_notifications_ocw_misc_api_url"],
+                url=grafana_secrets["slack_notifications_devops_warnings"],
                 recipient="#devops-warnings",
                 color="danger",
                 title=':alert: [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{- end }}] - {{ .CommonLabels.alertname }}',
