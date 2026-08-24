@@ -119,6 +119,10 @@ from ol_infrastructure.applications.witan.deployment import (
 )
 from ol_infrastructure.applications.witan.ingress import create_ingress_resources
 from ol_infrastructure.applications.witan.migrations import create_migration_job
+from ol_infrastructure.applications.witan.view_reaper import (
+    DEFAULT_REAP_VIEWS_SCHEDULE,
+    create_view_reaper,
+)
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
@@ -276,6 +280,13 @@ WITAN_OIDC_AUDIENCE = witan_config.get("oidc_audience") or "witan"
 # for why the interval is what bounds staleness of the shared view.
 WITAN_CI_INDEX_SCHEDULE = (
     witan_config.get("ci_index_schedule") or DEFAULT_INDEX_SCHEDULE
+)
+
+# How often the stale-view reaper sweeps every code graph for idle branch
+# views to delete. Per-stack for the same reason the indexer's schedule is —
+# see view_reaper.py.
+WITAN_REAP_VIEWS_SCHEDULE = (
+    witan_config.get("reap_views_schedule") or DEFAULT_REAP_VIEWS_SCHEDULE
 )
 
 # Client-side write admission, applied inside the MCP tier before a write is
@@ -1010,8 +1021,30 @@ witan_ci_indexer = create_ci_indexer(
     github_app_secret=github_app_secret,
 )
 
+#########################################
+#   Stale code-graph view reaper (CronJob)
+#########################################
+# The only process ever entitled to delete a WIP branch view (agent-kit
+# ADR-0006 D3/D5) — see view_reaper.py for why this is a separate job from
+# the indexer above rather than a second mode of it. Not gated on
+# managed_repos: it discovers what to sweep from the server's own graph
+# registry.
+witan_view_reaper = create_view_reaper(
+    stack_info=stack_info,
+    namespace=NAMESPACE,
+    k8s_global_labels=k8s_global_labels,
+    witan_image=witan_image,
+    omnigraph_server_addr=omnigraph_server_addr,
+    schedule=WITAN_REAP_VIEWS_SCHEDULE,
+    witan_ci_token_secret_name=WITAN_CI_TOKEN_SECRET_NAME,
+    witan_ci_token_secret_key=WITAN_CI_TOKEN_SECRET_KEY,
+    witan_ci_token_secret=witan_ci_token_secret,
+    service_version=witan_service_version,
+)
+
 export("namespace", NAMESPACE)
 export("ci_indexer_schedule", WITAN_CI_INDEX_SCHEDULE if witan_ci_indexer else None)
+export("view_reaper_schedule", WITAN_REAP_VIEWS_SCHEDULE)
 # Renamed from `vmcp_domain`/`vmcp_oidc_issuer` — there is no vMCP any more, and
 # an output named for a resource this stack no longer creates is a trap for the
 # next reader. `mcp_group_name` is dropped outright for the same reason. No
