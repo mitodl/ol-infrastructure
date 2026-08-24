@@ -48,7 +48,21 @@ SERVICE_WORKER_EMAIL="mitxonline-service-worker@${ROOT_DOMAIN}"
 MITXONLINE_NS="mitxonline"
 MITXONLINE_DEPLOY="mitxonline-webapp"
 
+MITLEARN_NS="mit-learn"
+MITLEARN_DEPLOY="mitlearn-webapp"
+# backpopulate_mitxonline_data hands the ETL to Celery and blocks on the
+# result, so the worker matters as much as the web pod. local-dev runs with
+# CELERY_TASK_ALWAYS_EAGER=False, and get_mitxonline_data is an unrouted task,
+# so it lands on the default queue.
+MITLEARN_WORKER_DEPLOY="mitlearn-worker-default"
+# The ETL walks every mitxonline course, not just the seeded ones, so give it
+# considerably longer than any other step here.
+MITLEARN_INGEST_TIMEOUT="600"
+
 OPENEDX_MODE="tutor"
+# auto: ingest into MIT Learn if the deployment is there, skip with a warning
+# if it is not (a `--enabled_apps mitxonline` stack has no mit-learn).
+LEARN_MODE="auto"
 
 log()  { echo "▶ $*"; }
 ok()   { echo "  ✓ $*"; }
@@ -57,11 +71,14 @@ err()  { echo "  ✗ $*" >&2; exit 1; }
 
 usage() {
     cat <<'USAGE'
-Usage: seed-courseware.sh [--openedx tutor|none] [--data <path>]
+Usage: seed-courseware.sh [--openedx tutor|none] [--learn auto|yes|no] [--data <path>]
 
   --openedx tutor  create the courses in the local tutor instance (default)
   --openedx none   mitxonline only; use in openedx_mode "qa", where there is
                    no local Open edX to create them in
+  --learn auto     ingest into MIT Learn when mit-learn is deployed (default)
+  --learn yes      always ingest; fail if mit-learn is not deployed
+  --learn no       skip the MIT Learn ingestion entirely
   --data <path>    seed file to read (default: local-dev/data/courseware-seed.json)
 USAGE
 }
@@ -70,6 +87,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --openedx)
             OPENEDX_MODE="$2"
+            shift 2
+            ;;
+        --learn)
+            LEARN_MODE="$2"
             shift 2
             ;;
         --data)
@@ -90,6 +111,11 @@ done
 case "${OPENEDX_MODE}" in
     tutor|none) ;;
     *) err "--openedx must be 'tutor' or 'none', got '${OPENEDX_MODE}'" ;;
+esac
+
+case "${LEARN_MODE}" in
+    auto|yes|no) ;;
+    *) err "--learn must be 'auto', 'yes' or 'no', got '${LEARN_MODE}'" ;;
 esac
 
 [[ -f "${DATA_FILE}" ]] || err "seed file not found: ${DATA_FILE}"
@@ -127,6 +153,21 @@ fi
 
 kubectl get deploy "${MITXONLINE_DEPLOY}" -n "${MITXONLINE_NS}" &>/dev/null \
     || err "deployment ${MITXONLINE_DEPLOY} not found in ${MITXONLINE_NS}. Is the stack up?"
+
+# Resolved here, with the other preflight checks, so "mit-learn is not part of
+# this stack" is reported before anything is written rather than as a surprise
+# at the end of a long seed.
+if [[ "${LEARN_MODE}" != "no" ]]; then
+    if kubectl get deploy "${MITLEARN_DEPLOY}" -n "${MITLEARN_NS}" &>/dev/null; then
+        LEARN_MODE="yes"
+    elif [[ "${LEARN_MODE}" == "yes" ]]; then
+        err "deployment ${MITLEARN_DEPLOY} not found in ${MITLEARN_NS}. Enable mit-learn, or pass --learn no."
+    else
+        warn "mit-learn is not deployed; skipping the MIT Learn ingestion."
+        warn "The courses will exist in mitxonline but not in Learn's search or catalog."
+        LEARN_MODE="no"
+    fi
+fi
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "${TMP_DIR}"' EXIT
@@ -220,6 +261,37 @@ mitxonline_exec() {
     fi
 }
 
+wait_for_mitlearn() {
+    kubectl rollout status -n "${MITLEARN_NS}" "deploy/${MITLEARN_DEPLOY}" \
+        --timeout=180s
+}
+
+# mitlearn_exec <stdin-file-or-empty> <command...>
+# Same shape as mitxonline_exec, including the -c app: the mit-learn web pod
+# also runs an nginx sidecar (apps/mit-learn/deployment.yaml).
+mitlearn_exec() {
+    local stdin_file="$1"
+    shift
+
+    local -a kexec=(
+        kubectl exec -n "${MITLEARN_NS}" "deploy/${MITLEARN_DEPLOY}" -c app
+    )
+    if [[ -n "${stdin_file}" ]]; then
+        kexec+=(-i)
+    fi
+    kexec+=(--)
+
+    if [[ -n "${stdin_file}" ]]; then
+        "${kexec[@]}" "$@" < "${stdin_file}" && return 0
+        wait_for_mitlearn
+        "${kexec[@]}" "$@" < "${stdin_file}"
+    else
+        "${kexec[@]}" "$@" </dev/null && return 0
+        wait_for_mitlearn
+        "${kexec[@]}" "$@" </dev/null
+    fi
+}
+
 # Composes a `manage.py shell` payload: the seed file as a Python string
 # literal, then the payload itself. Django's shell execs piped stdin, which
 # sidesteps the argv size and quoting limits of `shell -c`.
@@ -233,6 +305,19 @@ build_payload() {
         printf '"""\n'
         cat "${payload}"
     } > "${out}"
+}
+
+# The first course in the seed file, used for the end-of-run pointers and the
+# post-seed verifications. Prints nothing and returns non-zero if the file
+# cannot be read, so every caller can treat it as best-effort.
+first_course_id() {
+    python3 -c '
+import json
+import sys
+
+with open(sys.argv[1]) as handle:
+    print(json.load(handle)["courses"][0]["readable_id"])
+' "${DATA_FILE}" 2>/dev/null
 }
 
 # ---------------------------------------------------------------------------
@@ -431,6 +516,134 @@ PY
 }
 
 # ---------------------------------------------------------------------------
+# Phase 6 -- MIT Learn: ingest what was just created
+#
+# mit-learn does not read mitxonline's database; it pulls the catalog over HTTP
+# from MITX_ONLINE_COURSES_API_URL / MITX_ONLINE_PROGRAMS_API_URL (both pointed
+# at https://mitxonline.<root_domain> in apps/mit-learn/configmaps/app-env.yaml).
+# So this has to run *after* the mitxonline phase, and re-running it is how a
+# seed edit reaches Learn.
+#
+# Worth knowing when this fails: https://learn.<root_domain>/courses/<readable_id>
+# does NOT depend on any of this. That page is rendered from mitxonline's own
+# Wagtail pages and v2 courses APIs, proxied through api.learn.<root_domain>.
+# What ingestion buys is presence in Learn's search, catalog, channels and
+# resource drawer.
+# ---------------------------------------------------------------------------
+ingest_into_learn() {
+    log "Ingesting the seeded courseware into MIT Learn"
+
+    # The webapp's bootstrap init container already loads these, so this is
+    # normally a no-op -- but it is cheap, and without the mitxonline row in
+    # LearningResourcePlatform the ETL's loader drops every course on the floor
+    # without raising.
+    if mitlearn_exec "" python manage.py loaddata \
+        platforms schools departments offered_by >/dev/null; then
+        ok "platform/department fixtures present"
+    else
+        warn "could not load the mit-learn fixtures; ingestion will probably find nothing"
+    fi
+
+    # backpopulate_mitxonline_data blocks on the Celery result, so with no
+    # worker it hangs rather than fails. Prove the worker is up first, and cap
+    # the command anyway -- an unbounded hang here would wedge the Tilt resource.
+    if ! kubectl rollout status -n "${MITLEARN_NS}" \
+        "deploy/${MITLEARN_WORKER_DEPLOY}" --timeout=180s; then
+        warn "${MITLEARN_WORKER_DEPLOY} is not ready; skipping the MIT Learn ingestion."
+        warn "Start it, then re-run this script or trigger seed-mit-learn-mitxonline."
+        return 0
+    fi
+
+    # Not mitlearn_exec: that retries, and a retry of a run that timed out would
+    # just spend the timeout again on a task already in flight.
+    if timeout "${MITLEARN_INGEST_TIMEOUT}" \
+        kubectl exec -n "${MITLEARN_NS}" "deploy/${MITLEARN_DEPLOY}" -c app -- \
+        python manage.py backpopulate_mitxonline_data </dev/null; then
+        ok "backpopulate_mitxonline_data finished"
+    else
+        # The pod-side command keeps running after a timeout kills our kubectl,
+        # so this is a warning: the ETL may still land shortly after we return.
+        warn "backpopulate_mitxonline_data did not finish cleanly"
+        warn "(the task runs in ${MITLEARN_WORKER_DEPLOY}, not the web pod -- check its logs)"
+        return 0
+    fi
+
+    ensure_learn_search_index
+    verify_learn_ingestion
+}
+
+# Creates the OpenSearch indexes if this stack has never had them.
+#
+# Indexing itself is not a step here: mit-learn indexes on upsert through its
+# SearchIndexPlugin hook, so the ETL above already pushed the seeded courses.
+# But it pushes them into an index that has to exist first, and on a fresh
+# stack nothing has created one -- seed-mit-learn-opensearch is manual and
+# rarely remembered. Without it Learn's search endpoint 404s while the resource
+# API happily returns the course, which is a confusing place to land.
+#
+# Only when absent: `recreate_index --all` rebuilds from scratch, and a
+# developer with a populated index should choose when that happens. It is also
+# fire-and-forget (the reindex runs as a Celery job), so this returns long
+# before search is actually warm.
+ensure_learn_search_index() {
+    cat > "${TMP_DIR}/check-index.py" <<'CHECK_PY'
+import sys
+
+from learning_resources_search.connection import get_conn, get_default_alias_name
+
+sys.exit(0 if get_conn().indices.exists(get_default_alias_name("course")) else 1)
+CHECK_PY
+
+    if mitlearn_exec "${TMP_DIR}/check-index.py" python manage.py shell >/dev/null 2>&1; then
+        ok "MIT Learn search index already exists"
+        return 0
+    fi
+
+    log "No MIT Learn search index yet; creating one"
+    if mitlearn_exec "" python manage.py recreate_index --all; then
+        ok "reindex job started (it finishes in ${MITLEARN_WORKER_DEPLOY}, not here)"
+    else
+        warn "could not start the reindex. The courses are ingested and reachable"
+        warn "through the API, but Learn's search will stay empty until"
+        warn "seed-mit-learn-opensearch has run."
+    fi
+}
+
+# Confirms the first seeded course reached MIT Learn as a *published* resource.
+# Unpublished is the interesting failure: the ETL writes the row either way, and
+# only published resources are visible through the API, search or catalog.
+verify_learn_ingestion() {
+    local course_id
+    course_id=$(first_course_id) || return 0
+    [[ -n "${course_id}" ]] || return 0
+
+    cat > "${TMP_DIR}/verify-learn.py" <<VERIFY_PY
+import sys
+
+from learning_resources.models import LearningResource
+
+readable_id = "${course_id}"
+resource = LearningResource.objects.filter(readable_id=readable_id).first()
+
+if resource is None:
+    sys.exit(f"    {readable_id} did not reach MIT Learn at all")
+if not resource.published:
+    sys.exit(
+        f"    {readable_id} was ingested but is unpublished -- mit-learn wants the"
+        " course page live, include_in_learn_catalog set, and an enrollable run"
+    )
+print(f"  ✓ {readable_id} published in MIT Learn: {resource.url}")
+VERIFY_PY
+
+    if mitlearn_exec "${TMP_DIR}/verify-learn.py" python manage.py shell; then
+        return 0
+    fi
+    warn "the seeded course is not a published MIT Learn resource yet."
+    warn "It will still render at https://learn.${ROOT_DOMAIN}/courses/${course_id}"
+    warn "(that page reads mitxonline directly), but it will not appear in search."
+}
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 log "Seeding test courseware from ${DATA_FILE}"
@@ -450,16 +663,24 @@ if [[ "${OPENEDX_MODE}" == "tutor" ]]; then
     verify_sync
 fi
 
+if [[ "${LEARN_MODE}" == "yes" ]]; then
+    ingest_into_learn
+fi
+
 log "Done. Catalog: https://mitxonline.${ROOT_DOMAIN}/catalog/"
 # The detail pages are addressed by readable_id, not by the page slug — the
 # index pages route on it — so print one rather than leaving it to be guessed.
-FIRST_COURSE=$(python3 -c '
-import json
-import sys
-
-with open(sys.argv[1]) as handle:
-    print(json.load(handle)["courses"][0]["readable_id"])
-' "${DATA_FILE}" 2>/dev/null || true)
-[[ -n "${FIRST_COURSE}" ]] \
-    && log "A course page: https://mitxonline.${ROOT_DOMAIN}/courses/${FIRST_COURSE}/"
+FIRST_COURSE=$(first_course_id || true)
+if [[ -n "${FIRST_COURSE}" ]]; then
+    log "A course page: https://mitxonline.${ROOT_DOMAIN}/courses/${FIRST_COURSE}/"
+    # No trailing slash: Learn's route is /courses/[readable_id], and the
+    # readable_id itself is the last segment.
+    log "The same course on Learn: https://learn.${ROOT_DOMAIN}/courses/${FIRST_COURSE}"
+fi
+if [[ "${LEARN_MODE}" == "yes" ]]; then
+    # Filtered by platform rather than by a query string: it stays right however
+    # the seed file is edited, and mitxonline is the only platform this stack
+    # ingests from.
+    log "In Learn search: https://learn.${ROOT_DOMAIN}/search?platform=mitxonline"
+fi
 log "Checkout without a payment gateway: apply the LOCALDEV100 discount code."

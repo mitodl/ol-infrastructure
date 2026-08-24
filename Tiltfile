@@ -371,14 +371,15 @@ for app in [a for a in APPS if a["name"] in enabled_apps]:
         )
 
 # ---------------------------------------------------------------------------
-# Test courseware (mitxonline + Open edX)
+# Test courseware (mitxonline + Open edX + MIT Learn)
 #
-# The one seed that spans both systems, so it cannot go in the APPS registry
+# The one seed that spans three systems, so it cannot go in the APPS registry
 # above: that generator only knows how to `kubectl exec` into a single pod,
-# while this creates the courses in tutor's Studio as well. Registered here
-# rather than in local-dev/apps/openedx-tutor/Tiltfile because it has to work in
-# qa mode too, where that Tiltfile is never included — and openedx_mode is only
-# readable from this root Tiltfile.
+# while this creates the courses in tutor's Studio and then has mit-learn
+# ingest them. Registered here rather than in
+# local-dev/apps/openedx-tutor/Tiltfile because it has to work in qa mode too,
+# where that Tiltfile is never included — and openedx_mode and enabled_apps are
+# only readable from this root Tiltfile.
 #
 # Manual, unlike the other openedx-tutor resources: creating courses is slow,
 # and a developer who has been editing courseware by hand should choose when it
@@ -387,9 +388,14 @@ for app in [a for a in APPS if a["name"] in enabled_apps]:
 if "mitxonline" in enabled_apps:
     local_resource(
         "seed-courseware",
-        cmd="{script} --openedx {mode}".format(
+        # --learn is passed explicitly rather than left on the script's "auto"
+        # default: enabled_apps is the authoritative answer here, and probing
+        # for the deployment would also say yes to a mit-learn left running
+        # from a previous `tilt up` with a different app list.
+        cmd="{script} --openedx {mode} --learn {learn}".format(
             script="{}/local-dev/scripts/seed-courseware.sh".format(config.main_dir),
             mode=("tutor" if openedx_mode == "tutor" else "none"),
+            learn=("yes" if "mit-learn" in enabled_apps else "no"),
         ),
         env={"LOCAL_DEV_ROOT_DOMAIN": root_domain},
         deps=[
@@ -398,10 +404,13 @@ if "mitxonline" in enabled_apps:
             "./local-dev/data/courseware-seed.json",
         ],
         # In tutor mode the Studio calls authenticate as the service worker that
-        # openedx-tutor-seed creates, so that has to have run first.
+        # openedx-tutor-seed creates, so that has to have run first. The
+        # mit-learn worker is a dependency in its own right: the ingestion
+        # command hands the ETL to Celery and blocks on the result.
         resource_deps=(
             ["mitxonline-webapp"] +
-            (["openedx-tutor-seed"] if openedx_mode == "tutor" else [])
+            (["openedx-tutor-seed"] if openedx_mode == "tutor" else []) +
+            (["mitlearn-webapp", "mitlearn-worker-default"] if "mit-learn" in enabled_apps else [])
         ),
         labels=["seed"],
         trigger_mode=TRIGGER_MODE_MANUAL,

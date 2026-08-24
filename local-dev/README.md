@@ -313,15 +313,15 @@ tilt trigger seed-mit-learn-fixtures
 | mitxonline | `seed-mitxonline-instance` | Full instance setup (superuser, courses, products) |
 | mitxonline | `seed-mitxonline-course-data` | Populate test course data |
 | mitxonline | `seed-mitxonline-income-thresholds` | Load country income thresholds |
-| mitxonline + Open edX | `seed-courseware` | Test programs, courses, runs, CMS pages, products, discount and financial assistance — on **both** sides (see below) |
+| mitxonline + Open edX + mit-learn | `seed-courseware` | Test programs, courses, runs, CMS pages, products, discount and financial assistance — across **all three** (see below) |
 | odl-video-service | `seed-ovs-presets` | Create encoding presets (requires real AWS creds) |
 
 ### Test courseware
 
-`seed-courseware` is the one seed that spans two systems. Everything else runs a
+`seed-courseware` is the one seed that spans three systems. Everything else runs a
 management command inside a single pod; this one creates the courses in tutor's Studio
-*and* the matching records in mitxonline, so a run has real courseware behind it and
-`sync_courserun` agrees on both sides.
+*and* the matching records in mitxonline — so a run has real courseware behind it and
+`sync_courserun` agrees on both sides — and then has mit-learn ingest them.
 
 ```bash
 tilt trigger seed-courseware
@@ -329,6 +329,7 @@ tilt trigger seed-courseware
 # or directly — re-running is a no-op, not an error
 ./local-dev/scripts/seed-courseware.sh
 ./local-dev/scripts/seed-courseware.sh --openedx none   # mitxonline only (qa mode)
+./local-dev/scripts/seed-courseware.sh --learn no       # skip the MIT Learn ingestion
 ```
 
 What it creates, all from [`local-dev/data/courseware-seed.json`](data/courseware-seed.json):
@@ -341,6 +342,8 @@ What it creates, all from [`local-dev/data/courseware-seed.json`](data/coursewar
 | mitxonline | Published Wagtail `CoursePage` / `ProgramPage` / `CertificatePage` with placeholder copy, so the catalog and detail pages render |
 | mitxonline | A `Product` per paid run, created inside a django-reversion revision (checkout reads `Line.product_version`, so a product without one breaks the basket) |
 | mitxonline | The `LOCALDEV100` discount, and financial-assistance tiers plus a request form for each entry flagged `"finaid": true` |
+| mit-learn | A published `LearningResource` per course and program, pulled from mitxonline's catalog API by `backpopulate_mitxonline_data`. Indexing into OpenSearch rides the upsert hook, so there is no separate `update_index` step |
+| mit-learn | The OpenSearch indexes, **only if this stack has never had them** — an index the upsert hook can write into. An existing index is left alone; `tilt trigger seed-mit-learn-opensearch` is still how you rebuild one on purpose |
 
 **Where to find it.** The catalog is at `https://mitxonline.mit.dev/catalog/`. Detail
 pages are addressed by `readable_id`, not by the Wagtail slug — the index pages route on
@@ -348,6 +351,38 @@ it — so a seeded course is at
 `https://mitxonline.mit.dev/courses/course-v1:MITxLocal+LocalDev100/` and the program at
 `https://mitxonline.mit.dev/programs/program-v1:MITxLocal+LocalDev/`. In Studio the same
 runs are at `https://studio.mit.dev`.
+
+On MIT Learn the same course is at
+`https://learn.mit.dev/courses/course-v1:MITxLocal+LocalDev100` (no trailing slash — the
+`readable_id` is the last path segment), and everything the seed ingested is listed at
+`https://learn.mit.dev/search?platform=mitxonline`.
+
+**Those two Learn URLs fail for different reasons, which is worth knowing before you go
+looking.** The detail page is rendered from *mitxonline's* own APIs — the Wagtail pages
+endpoint and `/api/v2/courses/`, proxied through `api.learn.mit.dev/mitxonline` — so it
+works with no ingestion at all, and a 404 there means the Wagtail page or the `live`
+course is missing on the mitxonline side. Search, the catalog, channels and the resource
+drawer are the parts that need ingestion. A course that ingested but stayed unpublished
+is the common case there: mit-learn only publishes a course whose page is `live`, whose
+`include_in_learn_catalog` is set, and which has an enrollable run.
+
+Because mit-learn pulls the catalog over HTTP rather than reading mitxonline's database,
+the ingestion is not a one-off: edit the seed file and it needs to run again, which
+`tilt trigger seed-courseware` does. `tilt trigger seed-mit-learn-mitxonline` runs just
+that step.
+
+One local-dev-only knob makes keyword search usable at this scale:
+`DEFAULT_SEARCH_MINIMUM_SCORE_CUTOFF` is `0` in
+[`apps/mit-learn/configmaps/app-env.yaml`](apps/mit-learn/configmaps/app-env.yaml). Its
+default of `5` is tuned for a production-sized corpus; against an index holding a handful
+of documents nothing scores that high, so every keyword search comes back empty even
+though the resources are plainly there when you search with no query.
+
+**mitxonline's own links point at Learn.** The catalog cards and the `page_url` in
+mitxonline's API are built from `MIT_LEARN_BASE_URL`, set to `https://learn.mit.dev` in
+[`apps/mitxonline/configmaps/app-env.yaml`](apps/mitxonline/configmaps/app-env.yaml).
+Left unset it defaults to production `learn.mit.edu`, because mitxonline derives it from
+`ENVIRONMENT` and has no mapping for `local`.
 
 **Completing a purchase.** local-dev has no working payment gateway — the CyberSource
 keys in [`apps/mitxonline/secrets.yaml`](apps/mitxonline/secrets.yaml) are placeholders.
@@ -427,7 +462,7 @@ tilt trigger local-infra-core
 | `openedx-tutor-seed` | Runs [`tutor-seed-mitxonline.sh`](scripts/tutor-seed-mitxonline.sh): creates the OAuth2 applications and service-worker token mitxonline authenticates with |
 | `openedx-tutor-sso` | Runs [`tutor-seed-sso.sh`](scripts/tutor-seed-sso.sh): the two records that let Open edX log in through mitxonline. Only present when mitxonline is enabled |
 | `openedx-tutor-proxy` | The in-cluster nginx that APISIX routes to |
-| `seed-courseware` | Runs [`seed-courseware.sh`](scripts/seed-courseware.sh): test courses and programs in Studio *and* mitxonline. **Manual trigger** — see [Test courseware](#test-courseware) |
+| `seed-courseware` | Runs [`seed-courseware.sh`](scripts/seed-courseware.sh): test courses and programs in Studio *and* mitxonline, then ingests them into mit-learn. **Manual trigger** — see [Test courseware](#test-courseware) |
 
 Tilt owns the platform's lifecycle: stopping Tilt stops the compose project.
 
@@ -557,7 +592,7 @@ service-to-service calls (course data, enrolments) work.
 SSO works: logging in to Open edX goes through mitxonline, which goes through
 Keycloak. See [Logging in](#logging-in) below.
 
-Courseware is not created for you, but one trigger away on both sides at once:
+Courseware is not created for you, but one trigger away on every side at once:
 `tilt trigger seed-courseware` (see [Test courseware](#test-courseware)). The course
 shells it makes in Studio are empty — enrollment, checkout and `sync_courserun` work,
 but there is nothing to actually study. `tutor dev do importdemocourse` gets you a

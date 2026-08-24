@@ -9,6 +9,16 @@ data:
   MITX_ONLINE_BASE_URL: "https://mitxonline.mit.dev"
   MITXONLINE_DOCKER_BASE_URL: "https://mitxonline.mit.dev"
 
+  # Every "on MIT Learn" link mitxonline emits is built from this
+  # (main/utils.py get_learn_product_url): the catalog cards, the v2 courses
+  # API's page.page_url, the featured-product tiles. Its default is derived
+  # from ENVIRONMENT through ENV_TO_LEARN_HOSTNAME_MAP, which has no "local"
+  # entry, so leaving it unset points every course link at production
+  # learn.mit.edu. MIT_LEARN_DASHBOARD_URL / _TERMS_URL / _PRIVACY_URL /
+  # _HONOR_CODE_URL and the B2B enrollment-code URL all default off this value
+  # at settings import, so setting the base alone is enough.
+  MIT_LEARN_BASE_URL: "https://learn.mit.dev"
+
   # Redirect target for a first-time login (GatewayLoginView sends users whose
   # profile has completed_onboarding=False here); defaults to a legacy
   # mitxonline.odl.local:8013 host, which doesn't resolve in this stack.

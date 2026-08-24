@@ -104,10 +104,22 @@ Three rules the seed cannot paper over:
 `"price": null` makes a run audit-only — no `Product`, so it cannot be purchased.
 `"finaid": true` adds financial-assistance tiers and a request form.
 
+Re-triggering matters for MIT Learn in a way it does not for the other two sides.
+mit-learn does not read mitxonline's database; it pulls the catalog over HTTP and copies
+it, so a new or edited entry is invisible there until the seed's ingestion phase runs
+again. That phase is what makes a course show up in Learn's search, catalog, channels
+and resource drawer — the `learn.mit.dev/courses/<readable_id>` page itself is rendered
+straight from mitxonline's APIs and never needed it. mit-learn only publishes a course
+whose CMS page is live, whose `include_in_learn_catalog` is set (the seed sets it on
+every page it creates) and which has an enrollable run; fail any of those and the course
+is ingested but stays invisible.
+
 The seed itself is [`scripts/seed-courseware.sh`](scripts/seed-courseware.sh), which
 orchestrates two Python payloads under `scripts/seed-courseware/`. Those run inside the
 *apps'* Django processes (piped into `manage.py shell`), not this repo's, so they import
-mitxonline and edx-platform models — nothing there is importable locally.
+mitxonline and edx-platform models — nothing there is importable locally. Its
+`--openedx none` and `--learn no` flags drop the Open edX and MIT Learn phases for a
+stack that is not running them.
 
 ## Modifying Shared Infrastructure
 
