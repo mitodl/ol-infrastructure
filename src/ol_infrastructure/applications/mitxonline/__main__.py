@@ -1172,7 +1172,7 @@ mitxonline_service = fastly.ServiceVcl(
               }
               return(deliver);
             }"""),
-            name="Handle course/program redirects to MIT Learn",
+            name="Handle course and program redirects to MIT Learn",
             type="error",
         ),
         fastly.ServiceVclSnippetArgs(
