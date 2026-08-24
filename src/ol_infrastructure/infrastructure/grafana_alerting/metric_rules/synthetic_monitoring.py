@@ -1,4 +1,4 @@
-"""Grafana Synthetic Monitoring probe-failure alert rules for MIT Learn.
+"""Grafana Synthetic Monitoring alert rules for MIT Learn.
 
 Three hand-made rules lived in the Synthetic Monitoring folder since April-June
 2026, created through the UI and unmanaged. Imported here 2026-08-13 after the
@@ -6,11 +6,19 @@ NextJS one paged twice in an hour for a single failed probe. They are grouped in
 one module because they are the same rule three times over, differing only in
 which endpoint they probe.
 
+Each check now carries three rules: two on availability (`probe_success`, a
+cliff window and a creep window) and one on latency (`probe_all_duration_*`,
+added 2026-08-24). The first two answer "is it up", the third "is it fast" --
+see "Reclaiming the latency signal" below for why the latter needed adding
+when the plugin already ships a rule for it.
+
 Not to be confused with the `sm-*` rules in the same folder
 (ProbeFailedExecutionsTooHigh, HTTPRequestDurationTooHighAvg,
 TLSTargetCertificateCloseToExpiring). Those are generated and owned by the
 grafana-synthetic-monitoring-app plugin. Leave them alone -- Pulumi does not
-manage them and adopting them would fight the plugin.
+manage them and adopting them would fight the plugin. The latency rules added
+here deliberately sit *alongside* HTTPRequestDurationTooHighAvg rather than
+replacing it; see "Why a new rule rather than adopting the plugin's" below.
 
 Folder, and why this is production-only
 ---------------------------------------
@@ -125,6 +133,65 @@ rather than by intent: `1 - 0.8` evaluates to 0.19999999999999996, so a `> 0.2`
 meaning "more than one failure" happens to work only by accident of rounding.
 Sitting in the gap makes the boundary explicit and unambiguous.
 
+Reclaiming the latency signal
+----------------------------
+The plugin's own `HTTPRequestDurationTooHighAvg [5m]` measures how *slowly*
+these three endpoints answer, which nothing else here covers -- the probe
+rules above are availability only. It carries no `severity`, so every firing
+lands in alertmanager.py's `oblivion`: evaluated, recorded, delivered nowhere.
+Measured over the 14 days to 2026-08-24 it is the single loudest
+Grafana-native rule in the estate at 333 Alerting transitions, ~24/day, and
+none of them reached a human.
+
+It is loud because `for` is `0s`. One 5-minute average crossing the threshold
+fires immediately, so the rule reports every transient blip. Per instance:
+
+  next.learn.mit.edu      287 firings, threshold 1000 ms, 7.94% of the window
+                          above it, mean crossing ~5.6 min
+  api.learn.mit.edu       39 firings,  threshold 3000 ms, 0.60% above,
+                          mean crossing ~3.1 min
+  learn.mit.edu           7 firings,   threshold 500 ms,  0.17% above,
+                          mean crossing ~5.0 min
+
+A 10-minute `for` is placed above every one of those mean crossing durations.
+Re-measured against the same 14 days it takes api.learn.mit.edu and
+learn.mit.edu to zero firings outright, and cuts next.learn.mit.edu's duty
+cycle from 7.94% to 1.46% -- about 5 hours, which is sustained origin slowness
+rather than blips, and the part actually worth looking at.
+
+Why a new rule rather than adopting the plugin's
+------------------------------------------------
+The plugin rule stays exactly where it is, untouched and still in `oblivion`.
+Adopting it was considered and rejected: its threshold does not live in the
+rule at all but in `sm_alerts_threshold_http_request_duration_too_high_avg`, a
+metric the plugin publishes from per-check config in the Synthetic Monitoring
+UI. Pulumi would own `for` and the labels while the number that decides when
+the rule fires stayed outside IaC -- the same "Pulumi owns an empty shell"
+shape this project has now hit three separate times (the Sentry issue alerts,
+the CI/QA Rootly route rules' `enabled` flag, the drifted `Low Urgency`
+escalation path). Pinning the thresholds in `_Check.latency_ms` instead puts
+them in code review and in `git log`, at the cost of not tracking edits made
+in the SM UI -- which is the intended direction, not a regression.
+
+That leaves the plugin's rule duplicating the signal, which is harmless: it
+delivers nowhere by construction and remains the plugin's own view of its own
+checks. Deleting it would be a change to plugin-owned state for no gain.
+
+Routed to Slack, not Rootly, and not because they are unproven
+--------------------------------------------------------------
+These carry `channel=devops-warnings` for the same reason
+metric_rules/apisix_edge.py does: in alertmanager.py's route tree `warning`
+and `critical` both terminate at the `rootly` contact point, so a bare
+`severity` would page. docs/plans/grafana-alerting-remediation-spec.md W5a
+specifies `severity: warning` and notes it is non-paging "once W2b lands" --
+W2b has not landed (alertmanager.py's two severity routes are still identical),
+so applying that literally today would deliver straight to the on-call.
+`channel` sits above both severity routes and terminates before either.
+
+Promote by dropping `channel` from `latency_labels`, once W2b makes `warning`
+mean something. `instance` is already in NotificationPolicy.group_bies, so
+each probed URL keeps its own notification thread either way.
+
 no_data_state
 -------------
 "OK", per the convention in base.py. It is load-bearing here rather than
@@ -171,6 +238,17 @@ _SM_FOLDER_UID = "grafana-synthetic-monitoring-app"
 _FAST_WINDOW, _FAST_RATIO, _FAST_FOR = "5m", "0.3", "5m"
 _SLOW_WINDOW, _SLOW_RATIO, _SLOW_FOR = "1h", "0.04", "30m"
 
+# Latency rules. The window matches the plugin rule these reclaim; `for_` is the
+# whole point of them -- see "Reclaiming the latency signal" in the docstring.
+_LATENCY_WINDOW, _LATENCY_FOR = "5m", "10m"
+
+# Route the latency rules to the #devops-warnings Slack channel rather than
+# Rootly, exactly as metric_rules/apisix_edge.py does and for the same reason:
+# in alertmanager.py's route tree `warning` and `critical` both terminate at the
+# `rootly` contact point, so a bare `severity` would page. The `channel` branch
+# sits above both severity routes and terminates before either is reached.
+_SLACK_CHANNEL = "devops-warnings"
+
 
 @dataclass(frozen=True)
 class _Check:
@@ -191,6 +269,12 @@ class _Check:
     # until this annotation made it a guarantee.
     component: Component
     severity: str
+    # Average request duration, in ms, above which the latency rule fires.
+    # Captured from the plugin's own per-check thresholds
+    # (`sm_alerts_threshold_http_request_duration_too_high_avg{period="5m"}`)
+    # as they stood on 2026-08-24, then pinned here rather than read from that
+    # metric -- see "Reclaiming the latency signal" in the module docstring.
+    latency_ms: int
     # Subject of the alert summaries, e.g. "MIT Learn Next.js origin".
     what: str
     # Triage guidance appended to both descriptions.
@@ -210,6 +294,7 @@ _CHECKS = [
         instance="https://next.learn.mit.edu/",
         component=Component.nextjs,
         severity="warning",
+        latency_ms=1000,
         what="MIT Learn Next.js origin",
         context=(
             "This check bypasses Fastly and hits the Next.js origin directly, so it "
@@ -233,6 +318,7 @@ _CHECKS = [
         instance="https://api.learn.mit.edu/learn/health",
         component=Component.api,
         severity="critical",
+        latency_ms=3000,
         what="MIT Learn API health endpoint",
         context=(
             "This is the API's own health endpoint, so sustained failure means the "
@@ -249,6 +335,7 @@ _CHECKS = [
         instance="https://learn.mit.edu/",
         component=Component.webapp,
         severity="critical",
+        latency_ms=500,
         what="MIT Learn homepage",
         context=(
             "This is the public homepage through Fastly, so failures here are "
@@ -274,10 +361,40 @@ def _failure_ratio_expr(job: str, instance: str, window: str, threshold: str) ->
     )
 
 
+def _latency_expr(job: str, instance: str, window: str, threshold_ms: int) -> str:
+    """Build the average-request-duration expression for one check.
+
+    Same ratio-of-rates the plugin's own HTTPRequestDurationTooHighAvg uses,
+    minus its `sm_check_info` join (that exists to decorate the alert with
+    check metadata; the labels this rule needs are already on the series) and
+    minus its threshold metric, which is pinned in `_Check.latency_ms` instead.
+
+    The threshold is on the right, so the value carried through is the duration
+    in ms -- positive whenever the rule should fire and rising as the endpoint
+    gets slower, which is what base.py's `> 0` threshold stage needs.
+
+    `sum by (instance, job)` aggregates the probe locations together, matching
+    the plugin rule, so one slow region does not fire on its own. Note this
+    drops the `probe` label, unlike the failure-ratio rules above, which read
+    the raw series and keep it -- so these annotations must not reference
+    `{{ $labels.probe }}`.
+    """
+    selector = f'{{job="{job}", instance="{instance}"}}'
+    return (
+        f"("
+        f"sum by (instance, job) (rate(probe_all_duration_seconds_sum"
+        f"{selector}[{window}]))"
+        f" / "
+        f"sum by (instance, job) (rate(probe_all_duration_seconds_count"
+        f"{selector}[{window}]))"
+        f") * 1000 > {threshold_ms}"
+    )
+
+
 def _rules(
     check: _Check, rd: Callable[[str], list[alerting.RuleGroupRuleDataArgs]]
 ) -> list[alerting.RuleGroupRuleArgs]:
-    """Build the fast (cliff) and slow (creep) rules for one check."""
+    """Build the fast (cliff), slow (creep) and latency rules for one check."""
     # `ol_component`, not a bare `component`: this key is what Rootly's Grafana
     # Production Service Route matches on to reach the per-component services,
     # and `component` is generic enough that a vendor integration or a future
@@ -288,6 +405,14 @@ def _rules(
     # The slow rules deliberately carry no `severity` -- see "The slow rules
     # ship unrouted" in the module docstring.
     fast_labels = base_labels | {"severity": check.severity}
+    # The latency rules DO carry `severity`, but pair it with `channel` so they
+    # land in Slack rather than Rootly -- `channel` terminates above both
+    # severity routes. `warning` regardless of the check's own severity: it
+    # only picks the Slack formatting here, and slow is not the same as down.
+    latency_labels = base_labels | {
+        "severity": "warning",
+        "channel": _SLACK_CHANNEL,
+    }
     return [
         alerting.RuleGroupRuleArgs(
             # Pinned so the imported rule keeps its identity: alert state
@@ -337,6 +462,35 @@ def _rules(
             datas=rd(
                 _failure_ratio_expr(
                     check.job, check.instance, _SLOW_WINDOW, _SLOW_RATIO
+                )
+            ),
+        ),
+        alerting.RuleGroupRuleArgs(
+            name=f"{check.job} - Elevated Request Latency",
+            condition="C",
+            for_=_LATENCY_FOR,
+            no_data_state="OK",
+            # "OK", not "KeepLast": this is a Slack-routed warning-tier rule,
+            # so going quiet through a datasource blip is the cheaper mistake.
+            # The paired "Check Failed" rules keep their "Error" state.
+            exec_err_state="OK",
+            labels=latency_labels,
+            annotations={
+                "summary": f"{check.what} is responding slowly",
+                "description": (
+                    f"Average request duration against "
+                    f"{{{{ $labels.instance }}}}, averaged across all probe "
+                    f"locations, has stayed above {check.latency_ms} ms for "
+                    f"{_LATENCY_FOR}. "
+                    f"This measures how slowly the endpoint answers, not "
+                    f"whether it answers at all -- the paired 'Check Failed' "
+                    f"and 'Elevated Probe Failure Rate' rules cover "
+                    f"availability. {check.context}"
+                ),
+            },
+            datas=rd(
+                _latency_expr(
+                    check.job, check.instance, _LATENCY_WINDOW, check.latency_ms
                 )
             ),
         ),
