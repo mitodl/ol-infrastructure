@@ -1322,14 +1322,48 @@ pgbouncer_service_monitor = kubernetes.apiextensions.CustomResource(
 #      08-21   616    08-24   528
 #
 #    ~520-670 runs/day, a 17x collapse from the 11.6k/day the caps were sized
-#    against. The caps are correspondingly over-provisioned, by different factors:
-#    span is currently 6.8 days on runs against a 6h lookback (~27x) and 3.6 days
-#    on job_ticks against a 1h lookback (~85x). Neither binds, so both time
-#    predicates do all the work; the cost is a wider scan and nothing else.
-#    Re-size from a quiet week, not from another incident.
+#    against.
 #
-#    Adding a lookback fixed
-#    the span but introduced a subtler fault: id is CREATION order, and the
+#    SIZING RULE, settled 2026-08-24: an id cap is sized against the PEAK, never
+#    against a quiet week. Its failure mode is silent truncation, and it can only
+#    truncate under load, so a cap tuned to steady state is guaranteed to bind
+#    exactly when the metric it guards is worth reading. Over-provisioning costs a
+#    wider index scan and nothing else. The two directions are not symmetric and
+#    should not be traded off as though they were.
+#
+#    That rule is what settles the two caps, and it settles them differently. The
+#    full 30-day series, sum(increase(kube_job_status_succeeded{namespace=
+#    "dagster"}[6h])) at 6h resolution, 2026-07-25 to 2026-08-24:
+#
+#      quiet          96-230 runs per 6h, both before the storm and since
+#      storm          1200-3500 per 6h sustained, peaking at 7416
+#
+#    So the peak is 7416 runs per 6h and the quiet floor is ~150 -- a 50x swing on
+#    the same workload, which is the whole argument for sizing off the top of it.
+#    RUN_WINDOW stays 20000 (2.7x over that peak). Cutting it to the ~2000 that a
+#    quiet week suggests would have truncated every 6h bucket from 2026-08-08 to
+#    2026-08-18 but two, and dagster_run_wait_to_start_seconds is a queue-depth
+#    metric: a storm is the only time anyone reads it.
+#
+#    TICK_WINDOW is the one that genuinely overshoots, and it overshoots against
+#    its own peak rather than against a quiet week, so the rule does not protect
+#    it. Ticks are cadence-bound, not demand-bound -- the daemon evaluates every
+#    sensor on a ~30s schedule whether or not it yields a run -- so tick rate
+#    tracks how many sensors exist, not how much work they find. Measured hourly
+#    from dagster_recent_job_ticks since #5495: 230-651, stepping to a flat
+#    605-651 on 2026-08-22 when the sensor set changed. Peak 651/hour against a 1h
+#    lookback made 40000 a 61x cap. 8000 is 12x, and still holds the invariant if
+#    the tick rate octuples.
+#
+#    A third correction while re-reading the series: the storm did not start on
+#    2026-08-11. Run creation steps from ~120 to ~2136 per 6h in the bucket
+#    covering 2026-08-07 16:53Z-22:53Z, four days before the window on record, and
+#    stays elevated until 2026-08-18 ~04:00Z. The end date is right; the start was
+#    taken from when the symptom was noticed. Any window opened on 08-11 to avoid
+#    the storm still contains three days of it.
+#
+#    Adding a lookback fixed the span but introduced a subtler fault: id is
+#    CREATION order, and the
 #    completion-time metrics filter on update_timestamp, so any run created before
 #    the cap but finishing inside the lookback was silently dropped -- long-running
 #    and long-queued runs first, which are the ones most worth counting.
@@ -1363,16 +1397,19 @@ pgbouncer_service_monitor = kubernetes.apiextensions.CustomResource(
 # 1ms and watching every query come back 57014.
 # Applies only to the creation-ordered run metric (wait-to-start) and the span
 # gauge. The completion-time run metrics range-scan idx_run_range instead and take
-# no id cap at all -- see the note on dagster_recent_runs. 20000 was sized against
-# a busiest-observed 6h of ~7416 creations for 2.7x headroom; post-storm a 6h holds
-# ~150-250 runs, so the real headroom is ~80-130x. See the correction above.
+# no id cap at all -- see the note on dagster_recent_runs. Sized against the
+# busiest 6h in 30 days, ~7416 creations, for 2.7x headroom. Quiet weeks hold
+# ~150-250 per 6h, which makes this look like ~100x headroom and is not the number
+# to size against -- see SIZING RULE above.
 SQL_EXPORTER_RUN_WINDOW = 20000
 # Ticks accrue far faster than runs -- the daemon evaluates every sensor on a ~30s
-# cadence whether or not it yields a run -- so the same id count buys a much shorter
-# span. Sized larger against a shorter lookback for that reason; the span metric
-# will say whether 40000 is enough, since unlike the run rate this one has not been
-# measured directly.
-SQL_EXPORTER_TICK_WINDOW = 40000
+# cadence whether or not it yields a run -- so the same id count buys a much
+# shorter span, and this gets a shorter lookback to match. The rate is now
+# measured rather than assumed: 651 ticks/hour at Production's peak and a flat
+# 459 on QA, against a 1h lookback. 8000 is 12x the higher of the two, and holds
+# the span above the lookback even if the sensor set grows eightfold. Was 40000,
+# a 61x cap sized before the rate was known.
+SQL_EXPORTER_TICK_WINDOW = 8000
 # Runs get 6h: long enough that a failure rate is built from thousands of runs at
 # peak and hundreds when quiet, short enough that a sustained problem moves it
 # within the hour. Ticks get 1h, because a sensor that starts erroring is an acute
