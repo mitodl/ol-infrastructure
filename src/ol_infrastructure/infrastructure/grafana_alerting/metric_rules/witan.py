@@ -104,21 +104,39 @@ chance to run.
 
 Verification
 --------------
-Every expression here was evaluated against the production Mimir tenant on
-2026-08-24 before being committed, and each was also shown to be able to FIRE
-rather than only to be quiet -- an expression that returns nothing is
-indistinguishable from one that is broken:
+★ CHECK THE VALUE, NOT THE ROW SET. base.py's pipeline ends in a threshold on
+``last(A) > 0``, so an expression that returns rows carrying 0 never fires. A
+filtering comparison in PromQL (``x == 0``, ``x > 5``) returns the matching
+series with its ORIGINAL value, and ``and``/``unless`` propagate the LEFT-hand
+side's -- so the last thing on the left has to be something positive. That trap
+is documented on ``DeploymentUnavailable*`` in eks_general.py and
+``DagsterPgBouncerExporterDown`` in dagster_pgbouncer.py, and the first revision
+of this module walked into it anyway with ``_never_succeeded_expr``. Querying
+the datasource and seeing rows come back is not sufficient evidence; read the
+number.
 
-  WitanScheduledJobNeverSucceeded  returns nothing as committed; relaxing the
-                                   ``spec_suspend == 0`` filter to ``>= 0``
-                                   returns exactly witan-break-glass, which
-                                   proves the ``unless`` join, the age gate and
-                                   the label matching all work.
+Every expression here was evaluated against the production Mimir tenant on
+2026-08-24, and each was shown to be able to FIRE -- to return a row whose
+VALUE is greater than zero -- rather than only to be quiet:
+
+  WitanScheduledJobNeverSucceeded  returns nothing as committed. Dropping the
+                                   ``unless`` returns the four unsuspended
+                                   CronJobs at 1,625,182-1,649,167 (their ages
+                                   in seconds); relaxing ``spec_suspend == 0``
+                                   to ``>= 0`` returns witan-break-glass at
+                                   1,628,376. Under the broken first revision
+                                   the same two probes returned 0 and 1 -- the
+                                   1 being break-glass's suspend value, not
+                                   evidence of anything.
   WitanDailyMaintenanceStale       returned 47,818s for omnigraph-optimize
                                    against its 129,600s threshold when the
                                    threshold was dropped to 1 (last success
-                                   13.3h earlier).
-  WitanToolCallErrorRate           see the baseline figures above.
+                                   13.3h earlier), on both the Production and
+                                   QA tenants.
+  WitanToolCallErrorRate           the ratio itself is the value, so anything
+                                   past the 0.5 threshold is positive by
+                                   construction. See the baseline figures
+                                   above.
 """
 
 from collections.abc import Callable
@@ -251,25 +269,51 @@ def _daily_stale_expr(cluster_filter: str) -> str:
 
 
 def _never_succeeded_expr(cluster_filter: str) -> str:
-    """Unsuspended CronJobs older than the age gate with no recorded success."""
+    """Unsuspended CronJobs older than the age gate with no recorded success.
+
+    ★ THE AGE TERM IS ON THE LEFT BECAUSE THE VALUE IS WHAT FIRES, NOT THE
+    ROW. base.py's pipeline ends in a threshold on ``last(A) > 0``, and a
+    filtering comparison in PromQL returns the matching series carrying its
+    ORIGINAL value -- so ``kube_cronjob_spec_suspend == 0`` yields a row whose
+    value is 0, and 0 > 0 never fires. ``and``/``unless`` both propagate the
+    LEFT-hand side's value, so leading with the age (a large positive number of
+    seconds) is what makes the rule able to fire at all. This is the same
+    ordering, for the same reason, as ``DeploymentUnavailable*`` in
+    eks_general.py and ``DagsterPgBouncerExporterDown`` in
+    dagster_pgbouncer.py.
+
+    An earlier revision led with the suspend filter and could never have fired.
+    It survived a verification pass because that pass checked only whether the
+    expression returned ROWS: relaxing ``== 0`` to ``>= 0`` returned
+    witan-break-glass, which looked like proof, but break-glass is SUSPENDED
+    and so carries a source value of 1 -- the one input in the namespace that
+    happens to satisfy the threshold. Caught in review by both
+    copilot-pull-request-reviewer and sentry independently. Checking an
+    expression against the query API proves the row set; it does not prove the
+    value, and only the value reaches stage C.
+
+    The value that now propagates is the CronJob's age in seconds, which is
+    also what ``{{ $value }}`` renders in the annotation -- more useful than
+    the constant this would otherwise carry.
+    """
     selector = f'cluster=~"{cluster_filter}", namespace=~"{_WITAN_NAMESPACES}"'
     return (
         "(\n"
         "  (\n"
+        "    time() - max by (cluster, namespace, cronjob) (\n"
+        f"      kube_cronjob_created{{{selector}}}\n"
+        f"    ) > {_NEVER_SUCCEEDED_MIN_AGE_SECONDS}\n"
+        "  )\n"
+        "  and on (cluster, namespace, cronjob) (\n"
         "    max by (cluster, namespace, cronjob) (\n"
         f"      kube_cronjob_spec_suspend{{{selector}}}\n"
         "    ) == 0\n"
         "  )\n"
-        "  unless on (cluster, namespace, cronjob)\n"
-        "    max by (cluster, namespace, cronjob) (\n"
-        f"      kube_cronjob_status_last_successful_time{{{selector}}}\n"
-        "    )\n"
         ")\n"
-        "and on (cluster, namespace, cronjob) (\n"
-        "  time() - max by (cluster, namespace, cronjob) (\n"
-        f"    kube_cronjob_created{{{selector}}}\n"
-        f"  ) > {_NEVER_SUCCEEDED_MIN_AGE_SECONDS}\n"
-        ")"
+        "unless on (cluster, namespace, cronjob)\n"
+        "  max by (cluster, namespace, cronjob) (\n"
+        f"    kube_cronjob_status_last_successful_time{{{selector}}}\n"
+        "  )"
     )
 
 
