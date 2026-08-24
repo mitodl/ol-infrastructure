@@ -423,6 +423,7 @@ policy_definition = {
                 "transfer:DescribeServer",
                 "transfer:DescribeUser",
                 "transfer:UpdateServer",
+                "transfer:UpdateUser",
             ],
             "Resource": "*",
         },
