@@ -444,10 +444,12 @@ def create_token_sync(  # noqa: PLR0913
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
                     labels=pod_template.metadata.labels,
-                    # Re-runs the bootstrap when the script or the Keycloak
-                    # target changes. Membership changes deliberately do NOT
-                    # roll this — that is the CronJob's job, and a deploy is not
-                    # where onboarding should happen.
+                    # Re-runs the bootstrap when the script, the Keycloak
+                    # target, or the service-tokens map changes (the last via
+                    # service_tokens_fingerprint — see that parameter's
+                    # docstring). Keycloak HUMAN membership changes
+                    # deliberately do NOT roll this — that is the CronJob's
+                    # job, and a deploy is not where onboarding should happen.
                     annotations={"ol.mit.edu/config-hash": bootstrap_hash},
                 ),
                 spec=pod_template.spec,

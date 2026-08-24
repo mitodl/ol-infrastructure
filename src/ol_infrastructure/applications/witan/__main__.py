@@ -130,6 +130,7 @@ from ol_infrastructure.components.applications.eks import (
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -227,6 +228,19 @@ admin_token_provisioned = bool(
 service_token_provisioned = bool(
     optional_stack_output_value(
         omnigraph_stack, "service_token_provisioned", default=False
+    )
+)
+# A content fingerprint of the omnigraph stack's service-tokens map (sha256,
+# not the tokens themselves — see that stack's _actor_tokens_fingerprint).
+# Threaded into witan_code_token_secret below to force its own Secret CR to
+# change whenever svc-witan's token is minted or rotated: on minting, `path`
+# itself already changes and would carry the update regardless, but on a
+# rotation-in-place the Vault path doesn't change, so without this the CR's
+# spec is byte-identical and the VSO has nothing but its refresh_after poll
+# to notice the new value.
+service_tokens_fingerprint = str(
+    optional_stack_output_value(
+        omnigraph_stack, "service_tokens_fingerprint", default=""
     )
 )
 
@@ -611,6 +625,25 @@ witan_code_token_secret = OLVaultK8SSecret(
             )
         },
         refresh_after="1h",
+        # Unlike witan's own copy of actor-tokens (below), this credential is
+        # consumed as a plain env var (WITAN_CODE_TOKEN, deployment.py) — a
+        # process reads its env once at start, so nothing here re-stats and
+        # hot-reloads it the way ActorTokenResolver does. Without a restart
+        # target a rotated token would sync into the K8s Secret but the
+        # already-running pod would keep presenting the old value
+        # indefinitely, 401ing every graph_list call once omnigraph-server
+        # picks up the new one.
+        restart_targets=[
+            OLVaultRestartTarget(kind="Deployment", name=WITAN_SERVICE_NAME)
+        ],
+        # Forces this CR's spec to change whenever svc-witan's token is
+        # minted or rotated — see service_tokens_fingerprint above. On
+        # minting this is redundant (path itself changes), but on
+        # rotation-in-place it is the only thing that gives the VSO
+        # anything to react to before its 1h refresh_after poll.
+        dest_secret_annotations={
+            "ol.mit.edu/service-tokens-fingerprint": service_tokens_fingerprint
+        },
         vaultauth=witan_auth_binding.vault_k8s_resources.auth_name,
     ),
     opts=ResourceOptions(

@@ -558,6 +558,31 @@ else:
     _witan_admin_token = None
     _witan_service_token = None
 
+# A content fingerprint of the service-tokens map, independent of which of the
+# two writers below is active. Not secret — sha256 of the map's own JSON
+# encoding, not the tokens' plaintext — so it is safe to use as a plain
+# resource annotation and to export.
+#
+# Every consumer that needs to react to a service-account being minted or
+# rotated, rather than merely to a matching CR spec Pulumi happens to already
+# be diffing, threads THIS through as a forced-update trigger:
+#   - create_token_sync's service_tokens_fingerprint (below), so the
+#     bootstrap Job re-runs the actor-tokens merge inside this `pulumi up`;
+#   - actor_tokens_secret's dest_secret_annotations (below), because writing
+#     to the Vault path does not by itself change anything Pulumi is tracking
+#     on that VaultStaticSecret CR — the CR's own spec is otherwise static —
+#     so without this the K8s API sees no update at all and the Vault
+#     Secrets Operator falls back to its refresh_after poll (up to 15m)
+#     rather than reconciling promptly;
+#   - the exported `service_tokens_fingerprint`, which the witan stack folds
+#     into its own copy of this token's Secret for the same reason on
+#     rotation specifically — see that stack's witan_code_token_secret. On
+#     first minting, `path` itself changes there and would carry the update
+#     regardless; only rotation-in-place needs the fingerprint.
+_actor_tokens_fingerprint = hashlib.sha256(
+    json.dumps(_actor_tokens_map, sort_keys=True).encode()
+).hexdigest()
+
 # The non-human actors, on their own Vault path. This is always written, in
 # every environment, and is the *input* the token-sync job merges Keycloak's
 # per-user entries into — see WHO WRITES actor-tokens below.
@@ -679,18 +704,14 @@ omnigraph_auth_binding = OLEKSAuthBinding(
 ##############################################
 token_sync = None
 if _TOKEN_SYNC_ENABLED:
-    # Feeds the bootstrap Job's own re-run trigger (token_sync.py) so that
-    # adding a service account (e.g. `witan/service-token`) forces the
-    # actor-tokens merge to run in THIS `pulumi up`, rather than leaving it to
-    # the next hourly CronJob tick — see
-    # tk-close-the-witan-service-token-deploy-order-windo-91b403. Without
-    # this, `service_token_provisioned` below flips true (and the witan stack
-    # repoints `witan-code-token`) before the server has ever heard of the new
-    # actor. sort_keys makes the fingerprint depend only on the map's content,
-    # not Python dict insertion order.
-    _actor_tokens_fingerprint = hashlib.sha256(
-        json.dumps(_actor_tokens_map, sort_keys=True).encode()
-    ).hexdigest()
+    # _actor_tokens_fingerprint (module level, above) feeds the bootstrap
+    # Job's own re-run trigger (token_sync.py) so that adding a service
+    # account (e.g. `witan/service-token`) forces the actor-tokens merge to
+    # run in THIS `pulumi up`, rather than leaving it to the next hourly
+    # CronJob tick — see tk-close-the-witan-service-token-deploy-order-windo-91b403.
+    # Without this, `service_token_provisioned` below flips true (and the
+    # witan stack repoints `witan-code-token`) before the server has ever
+    # heard of the new actor.
     token_sync = create_token_sync(
         stack_info=stack_info,
         namespace=NAMESPACE,
@@ -769,6 +790,21 @@ actor_tokens_secret = OLVaultK8SSecret(
         restart_targets=[
             OLVaultRestartTarget(kind="Deployment", name=OMNIGRAPH_SERVER_SERVICE_NAME)
         ],
+        # Forces a real update to this CR's spec (destination.annotations,
+        # not bare metadata) whenever the service-tokens map's content
+        # changes — bumping the object's generation the same way any other
+        # spec edit would. Without this, a Vault write alone leaves the CR's
+        # OWN spec byte-identical, so Pulumi issues no API call at all for it
+        # and the VSO has nothing to react to except its refresh_after poll
+        # (worst case 15m, per the comment above). This does not make
+        # `pulumi up` itself block until the VSO has finished rendering the
+        # Secret and rolling the Deployment — that would need the VSO's own
+        # status condition, which this CR's generic apply does not await —
+        # but it does mean the reconcile starts immediately rather than
+        # possibly not for up to 15 more minutes.
+        dest_secret_annotations={
+            "ol.mit.edu/service-tokens-fingerprint": _actor_tokens_fingerprint
+        },
         vaultauth=omnigraph_auth_binding.vault_k8s_resources.auth_name,
     ),
     opts=ResourceOptions(
@@ -908,3 +944,8 @@ export("admin_token_provisioned", _witan_admin_token is not None)
 # (the checks above are hard requirements), so the flag exists for exactly one
 # case: an environment with no SOPS file at all, which provisions neither.
 export("service_token_provisioned", _witan_service_token is not None)
+# Read by the witan stack to force its own witan-code-token Secret CR to
+# change alongside a service-token mint or rotation — see
+# _actor_tokens_fingerprint above and witan_code_token_secret in the witan
+# stack. A content hash, not the token itself, so it is safe to export.
+export("service_tokens_fingerprint", _actor_tokens_fingerprint)
