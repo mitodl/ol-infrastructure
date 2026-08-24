@@ -532,11 +532,21 @@ measured on 2026-08-18, still inside the tail, and is wrong too.
 Steady state is **~520–670 runs/day**, corroborated independently by the exporter's own
 6h `SUCCESS` counts (137–222, i.e. ~550–890/day). A 17x collapse from the figure the
 windows were sized against. Nothing is broken by this — `dagster_id_window_span_seconds`
-reports the `runs` cap now spanning 6.8 days and `job_ticks` 3.6 days against lookbacks of
-6h and 1h, so both caps are non-binding by a wide margin and the time predicates are doing
-all the work. Stated as ratios rather than lumped together, because they are not the same
-number: the `runs` cap overshoots its lookback by ~27x (6.8 days against 6h) and the
-`job_ticks` cap by ~85x (3.6 days against 1h). Both cost a wider scan and nothing else.
+reports both caps non-binding by a wide margin, so the time predicates are doing all the
+work.
+
+Measured **before** the re-size below, with `SQL_EXPORTER_TICK_WINDOW` still at 40000, and
+stated as two ratios rather than one averaged number because they are not the same
+overshoot:
+
+| cap | span | lookback | ratio |
+|---|---|---|---|
+| `runs`, 20000 ids | 6.8 days | 6h | ~27x |
+| `job_ticks`, 40000 ids | 3.6 days | 1h | ~85x |
+
+Both cost a wider scan and nothing else. What follows re-sizes the second of them, so those
+figures are the pre-resize state: post-deploy the `job_ticks` span settles around 12h on
+Production and 17h on QA, and the `runs` row is unchanged.
 
 #### The id caps are sized against the peak
 
