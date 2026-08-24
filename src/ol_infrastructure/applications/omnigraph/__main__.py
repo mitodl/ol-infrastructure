@@ -45,6 +45,7 @@ Follow-up work this stack does NOT cover (tracked separately):
       build time — this Pulumi program has no access to agent-kit's tree.
 """
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -678,6 +679,18 @@ omnigraph_auth_binding = OLEKSAuthBinding(
 ##############################################
 token_sync = None
 if _TOKEN_SYNC_ENABLED:
+    # Feeds the bootstrap Job's own re-run trigger (token_sync.py) so that
+    # adding a service account (e.g. `witan/service-token`) forces the
+    # actor-tokens merge to run in THIS `pulumi up`, rather than leaving it to
+    # the next hourly CronJob tick — see
+    # tk-close-the-witan-service-token-deploy-order-windo-91b403. Without
+    # this, `service_token_provisioned` below flips true (and the witan stack
+    # repoints `witan-code-token`) before the server has ever heard of the new
+    # actor. sort_keys makes the fingerprint depend only on the map's content,
+    # not Python dict insertion order.
+    _actor_tokens_fingerprint = hashlib.sha256(
+        json.dumps(_actor_tokens_map, sort_keys=True).encode()
+    ).hexdigest()
     token_sync = create_token_sync(
         stack_info=stack_info,
         namespace=NAMESPACE,
@@ -690,6 +703,7 @@ if _TOKEN_SYNC_ENABLED:
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
         vault_auth_name=omnigraph_auth_binding.vault_k8s_resources.auth_name,
         schedule=TOKEN_SYNC_SCHEDULE,
+        service_tokens_fingerprint=_actor_tokens_fingerprint,
         # The job reads the service map on every run and refuses to write an
         # actor map without it, so the Vault write has to land first.
         depends_on=[

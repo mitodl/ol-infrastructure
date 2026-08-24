@@ -238,6 +238,7 @@ def create_token_sync(  # noqa: PLR0913
     vault_auth_endpoint: str | Output[str],
     vault_auth_name: str,
     schedule: str,
+    service_tokens_fingerprint: str,
     depends_on: list[Resource],
 ) -> WitanTokenSync:
     """Provision the identity, credentials, schedule and bootstrap run.
@@ -246,6 +247,22 @@ def create_token_sync(  # noqa: PLR0913
     actor-tokens VSO sync behind — see ``__main__.py``, which threads it in so
     that a brand-new environment has a written actor-tokens path before
     anything tries to render it.
+
+    ``service_tokens_fingerprint`` is folded into the bootstrap run's own
+    trigger for the same reason: without it, adding a service account (e.g.
+    ``witan/service-token``) to an environment that already has a Keycloak
+    client provisioned does not, on its own, change the script body or the
+    Keycloak target — the only two things the hash used to depend on — so the
+    bootstrap Job would sit unchanged and this run's ``actor-tokens`` merge
+    would wait for the next hourly tick. The caller that exports
+    ``service_token_provisioned``, by contrast, flips true the moment the new
+    token is written to the service-tokens map, one Pulumi program earlier and
+    with no such wait — see
+    ``tk-close-the-witan-service-token-deploy-order-windo-91b403``. Threading
+    the map's own content into this hash makes the bootstrap run — and
+    therefore the live ``actor-tokens`` merge — land inside the SAME
+    ``pulumi up`` that adds the account, closing the window before the witan
+    stack ever reads the flag.
     """
     script_body = (Path(__file__).parent / "scripts" / SCRIPT_FILENAME).read_text()
 
@@ -402,8 +419,15 @@ def create_token_sync(  # noqa: PLR0913
     # the result — would come up against nothing. Pulumi waits for a Job to
     # succeed, so this also makes a broken Keycloak credential fail the deploy
     # loudly instead of producing a CronJob that silently errors every hour.
+    #
+    # ``service_tokens_fingerprint`` matters just as much as the script/target
+    # inputs above: it is what makes a NEW service account re-run this Job in
+    # the same ``pulumi up`` that adds it, rather than leaving the live
+    # actor-tokens map stale until the next hourly tick — see the parameter's
+    # docstring above.
     bootstrap_hash = hashlib.sha256(
-        f"{script_body}\n{keycloak_url}\n{keycloak_realm}".encode()
+        f"{script_body}\n{keycloak_url}\n{keycloak_realm}\n"
+        f"{service_tokens_fingerprint}".encode()
     ).hexdigest()
     bootstrap_job = kubernetes.batch.v1.Job(
         f"witan-token-sync-bootstrap-{stack_info.env_suffix}",

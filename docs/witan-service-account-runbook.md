@@ -103,8 +103,13 @@ happen before it ships rather than after.
    The entry has to reach `actor-tokens` and then omnigraph-server before it
    authenticates anywhere — the server hashes its token map once at boot and
    never re-reads it. With token sync **on** (every environment, as of
-   2026-08-05) the hourly CronJob merges service-tokens into actor-tokens; force
-   it rather than waiting:
+   2026-08-05), the stack's own bootstrap Job now folds the service-tokens map
+   into its re-run trigger (`token_sync.py::create_token_sync`,
+   `tk-close-the-witan-service-token-deploy-order-windo-91b403`), so adding an
+   actor here re-runs the merge as part of THIS `pulumi up` — no manual force
+   step needed. If you are on a checkout predating that fix, or want to
+   confirm the merge landed without waiting on the deploy log, force it
+   directly:
 
    ```bash
    kubectl -n omnigraph create job witan-token-sync-manual --from=cronjob/witan-token-sync
@@ -114,7 +119,9 @@ happen before it ships rather than after.
    The `actor-tokens` VaultStaticSecret carries
    `rolloutRestartTargets: [omnigraph-server]`, so the server restarts itself
    once the map changes and re-renders `witan-service` with a member. Expect a
-   brief data-tier outage — single replica, `strategy=Recreate`.
+   brief data-tier outage — single replica, `strategy=Recreate`. The bootstrap
+   Job runs, and this restart happens, before the omnigraph stack's `pulumi up`
+   reports success.
 
 3. **Deploy the witan stack.** It picks up `service_token_provisioned` and moves
    the `witan-code-token` Secret from `witan/ci-token` to `witan/service-token`.
@@ -205,8 +212,11 @@ the tier — `code_indexed_repos` returning repos rather than nothing.
 ## Rotating
 
 Same as minting: change both keys to a new value, deploy the omnigraph stack,
-force the sync job, then deploy witan. Because the two keys are checked against
-each other, a half-rotation fails the deploy rather than reaching the cluster.
+then deploy witan. The bootstrap Job's re-run trigger includes the
+service-tokens map's content, so a rotated value re-runs the merge in the
+same `pulumi up` as minting does — no separate force-sync step. Because the
+two keys are checked against each other, a half-rotation fails the deploy
+rather than reaching the cluster.
 
 ## Related
 
