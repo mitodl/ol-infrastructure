@@ -482,8 +482,8 @@ def analyze(
     trail_arn: str = DEFAULT_TRAIL_ARN,
     lookback_days: int = DEFAULT_LOOKBACK_DAYS,
     region: str = "us-east-1",
-    poll_interval_seconds: int = 15,
-    timeout_seconds: int = 300,
+    poll_interval_seconds: int = 20,
+    timeout_seconds: int = 900,
     skip_cloudtrail: bool = False,
 ) -> None:
     """Report actions used-but-ungranted and granted-but-unused for a role.
@@ -558,8 +558,8 @@ def propose(
     trail_arn: str = DEFAULT_TRAIL_ARN,
     lookback_days: int = DEFAULT_LOOKBACK_DAYS,
     region: str = "us-east-1",
-    poll_interval_seconds: int = 15,
-    timeout_seconds: int = 300,
+    poll_interval_seconds: int = 20,
+    timeout_seconds: int = 900,
     skip_cloudtrail: bool = False,
 ) -> None:
     """Rewrite the target policy module and drift report to match observed usage.
