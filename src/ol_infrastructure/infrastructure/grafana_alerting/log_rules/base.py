@@ -54,6 +54,11 @@ Sub-modules
   heroku       — Source: grafana-alerts/loki-rules/heroku-logs.yaml
   mit_learn    — Source: grafana-alerts/loki-rules/mit-learn.yaml
   vault        — Source: grafana-alerts/loki-rules/vault.yaml
+  witan        — Cedar denial rate, and the opened-graph count on
+                 omnigraph-server's boot line. Not a migration; written
+                 2026-08-24. Both parse with `decolorize` first, because
+                 omnigraph writes ANSI escapes between a field name and
+                 its value and a line filter silently matches nothing.
 """
 
 import json
@@ -70,6 +75,7 @@ from ol_infrastructure.infrastructure.grafana_alerting.log_rules import (
     heroku,
     mit_learn,
     vault,
+    witan,
 )
 
 # Every Grafana Cloud stack provisions its own Loki datasource with this same
@@ -177,3 +183,4 @@ def create(resource_opts: ResourceOptions) -> None:
     heroku.create(log_alerts_folder.uid, rd, resource_opts)
     mit_learn.create(log_alerts_folder.uid, rd, resource_opts)
     vault.create(log_alerts_folder.uid, rd, resource_opts)
+    witan.create(log_alerts_folder.uid, rd, resource_opts)
