@@ -340,10 +340,20 @@ kubectl -n omnigraph wait --for=delete pod \
 ```
 
 Wait on the **pod being gone**, not on `rollout status`. The deployment
-reconciles to zero long before the old server finishes terminating —
-`omnigraph-server` uses the full SIGTERM grace period — and until that process
-exits it is still a writer against the old root. `rollout status` reports the
-Deployment converged and would let you proceed with the server still up.
+reconciles to zero long before the old server finishes terminating, and
+until that process exits it is still a writer against the old root.
+`rollout status` reports the Deployment converged and would let you proceed
+with the server still up.
+
+(Live-verified 2026-08-24, against CI: the image now logs `shutdown signal
+received` on SIGTERM and the pod is typically gone within ~1s — a change
+from when this note was written, when it took the full
+`terminationGracePeriodSeconds` — see
+`tk-halve-the-omnigraph-server-restart-outage-it-bur-13b26a`. `--timeout
+120s` is generous rather than tuned to that number on purpose: the cap this
+stack now sets is 15s, but this step should not depend on shutdown staying
+fast. Keep waiting for the pod's actual deletion regardless of how quick it
+usually is.)
 
 Nothing may write to the old root from here until the migration completes or
 rolls back. `optimize`/`cleanup` write directly to the store, bypassing the

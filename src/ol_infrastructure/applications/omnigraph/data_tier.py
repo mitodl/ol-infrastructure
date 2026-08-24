@@ -585,6 +585,36 @@ def create_data_tier(  # noqa: PLR0913
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
                     service_account_name=OMNIGRAPH_SERVICE_ACCOUNT_NAME,
+                    # An explicit cap, not the Kubernetes 30s default this
+                    # Deployment left implicit until now.
+                    # tk-halve-the-omnigraph-server-restart-outage-it-bur-13b26a
+                    # was filed 2026-08-03 against a measured ~52-61s restart
+                    # outage, ~30s of which was believed to be pure SIGTERM
+                    # dead time — no graceful-shutdown log line, the
+                    # signature of a container SIGKILLed at the grace-period
+                    # deadline having done nothing in between. Re-measured
+                    # live against CI on 2026-08-24 before adding this: the
+                    # image now logs `shutdown signal received` on SIGTERM
+                    # and the pod is fully deleted within the same second —
+                    # `kubectl get events`, `Killing` and the replacement
+                    # pod's `Scheduled` both timestamped 17:38:32. Total
+                    # outage that run was ~26s, essentially all boot (the
+                    # startupProbe's own tuned budget below), not shutdown.
+                    # Whatever upstream change did this — plausibly riding
+                    # the `edge` tag, per this stack's existing pin — the 30s
+                    # of dead time this task describes no longer reproduces.
+                    #
+                    # Set anyway, as a cap rather than a fix: this pins the
+                    # WORST case (a future regression, a wedged shutdown) to
+                    # a few seconds above the now-typical ~1s exit, rather
+                    # than leaving a full, unbounded 30s of blast radius on
+                    # the table for something that currently costs nothing.
+                    # 15s is comfortably above every observed exit with
+                    # headroom for actual graceful-shutdown work (metrics
+                    # flush, connection drain) to complete under normal load,
+                    # and still a firm ~50% reduction from the default if
+                    # shutdown is ever slow again.
+                    termination_grace_period_seconds=15,
                     containers=[
                         kubernetes.core.v1.ContainerArgs(
                             name="omnigraph-server",
