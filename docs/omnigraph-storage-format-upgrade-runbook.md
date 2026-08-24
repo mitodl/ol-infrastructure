@@ -586,18 +586,31 @@ and is the safe choice — `overwrite` is destructive and buys nothing here.
 
 ### 5. Repoint the cluster and deploy the new image
 
-Set the prefix — the same one `$NEW_ROOT` names, without the `s3://<bucket>/`:
+Set the prefix — the same one `$NEW_ROOT` names, without the `s3://<bucket>/`
+— **and** `internal_schema_version` alongside it, to the same digits:
 
 ```shell
 cd src/ol_infrastructure/applications/omnigraph
 pulumi config set omnigraph:storage_prefix fmt5 --stack <CI|QA|Production>
+pulumi config set omnigraph:internal_schema_version 5 --stack <CI|QA|Production>
 ```
 
-A malformed value fails the preview rather than deploying: wrapping slashes and
-anything outside a single `[A-Za-z0-9._-]` segment are rejected, which includes
-an unsubstituted `fmt<N>`. That check lives here because it cannot live
-downstream — `cluster validate` accepts any storage string, empty ones
-included.
+Both are required, both a `pulumi preview` fails loudly on if missing or if
+they disagree (`storage.py::validate_internal_schema_version`) — a leftover
+`internal_schema_version` from the LAST migration, forgotten while
+`storage_prefix` moves to this one, is exactly the drift this exists to
+catch before it reaches the cluster as a crash-looping server rather than a
+preview failure. **This check does not verify either value against the
+image actually being deployed or the live store's own
+`internal_schema_version`** — it is a self-consistency check between two
+committed config values, not a substitute for `check_format_moved`'s
+verdict above or for following this runbook's ordering.
+
+A malformed `storage_prefix` value fails the preview rather than deploying:
+wrapping slashes and anything outside a single `[A-Za-z0-9._-]` segment are
+rejected, which includes an unsubstituted `fmt<N>`. That check lives here
+because it cannot live downstream — `cluster validate` accepts any storage
+string, empty ones included.
 
 Confirm the generated config before applying:
 
@@ -701,7 +714,13 @@ After step 5:
 
 ```shell
 pulumi config rm omnigraph:storage_prefix --stack <CI|QA|Production>
+pulumi config rm omnigraph:internal_schema_version --stack <CI|QA|Production>
 ```
+
+Both, not just the first: `validate_internal_schema_version` requires
+`internal_schema_version` to be unset whenever `storage_prefix` is (or does
+not follow `fmt<N>`), so leaving it behind fails the very preview this
+rollback is trying to run.
 
 then redeploy with `OMNIGRAPH_DOCKER_SHA` pinned to the **old** image digest.
 Confirm with the same `pulumi preview --diff` check that `storage:` is back to
