@@ -1540,6 +1540,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pyinfra" },
+    { name = "pyjwt", extra = ["crypto"] },
     { name = "requests" },
     { name = "requests-aws4auth" },
 ]
@@ -1598,6 +1599,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2,<3" },
     { name = "pydantic-settings", specifier = ">=2.0.1,<3" },
     { name = "pyinfra", specifier = "~=3.0" },
+    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.9,<3" },
     { name = "requests", specifier = ">=2.32,<3" },
     { name = "requests-aws4auth", specifier = ">=1.3.1" },
 ]
