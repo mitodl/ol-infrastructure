@@ -292,6 +292,7 @@ policy_definition = {
                 "iam:ListAttachedRolePolicies",
                 "iam:ListEntitiesForPolicy",
                 "iam:ListGroupsForUser",
+                "iam:ListPolicyTags",
                 "iam:ListPolicyVersions",
                 "iam:ListRolePolicies",
                 "iam:ListRoles",
