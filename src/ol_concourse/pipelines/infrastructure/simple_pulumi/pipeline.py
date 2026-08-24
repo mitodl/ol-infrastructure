@@ -565,6 +565,11 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="aws-sftp",
         pulumi_project_path="infrastructure/aws/sftp_servers/",
         pulumi_project_name="ol-infrastructure-aws-sftp",
+        # No CI stack exists for this project (`pulumi stack ls` shows only
+        # QA and Production) -- a single-partner SFTP integration that's
+        # barely changed in a year never needed one. The default CI stage
+        # was failing every run with StackNotFoundError.
+        stages=["QA", "Production"],
     ),
     "b2b-partners-storage": SimplePulumiParams(
         app_name="b2b-partners-storage",
