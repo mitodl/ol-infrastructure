@@ -61,6 +61,14 @@ Sub-modules
                — Imported 2026-08 from three hand-made UI rules. Unlike the
                  others it takes no folder_uid: its rules live in the Synthetic
                  Monitoring plugin's folder, not the one created here.
+  witan        — New in 2026-08. The shared witan MCP service: the share of tool
+                 calls that fail (the only continuous signal for a quarantined
+                 `council` graph, since neither health endpoint can see one),
+                 the nightly omnigraph compaction, and CronJobs that have never
+                 succeeded at all -- the gap eks_general.py's staleness rules
+                 document and deliberately leave open. Pairs with
+                 log_rules/witan.py, which catches the same quarantine at boot
+                 without needing traffic.
 """
 
 import json
@@ -75,6 +83,7 @@ from ol_infrastructure.infrastructure.grafana_alerting.metric_rules import (
     eks_general,
     linux_host,
     synthetic_monitoring,
+    witan,
 )
 
 # Every Grafana Cloud stack provisions its own Mimir datasource with this same
@@ -176,6 +185,7 @@ def create(resource_opts: ResourceOptions) -> None:
     linux_host.create(alerts_folder.uid, rd, resource_opts)
     apisix_edge.create(alerts_folder.uid, rd, resource_opts)
     dagster_pgbouncer.create(alerts_folder.uid, rd, resource_opts)
+    witan.create(alerts_folder.uid, rd, resource_opts)
     # No folder_uid: these rules live in the Synthetic Monitoring plugin's own
     # folder rather than the one created above. See the module docstring.
     synthetic_monitoring.create(rd, resource_opts)

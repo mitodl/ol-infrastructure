@@ -544,6 +544,15 @@ def create(
             #   0/5 * * * *  cron-deploy-pipelines, cron-reindex   -> fast
             #   17 * * * *   witan-token-sync                      -> fast
             #   20 3 * * *   omnigraph-optimize                    -> slow
+            #
+            # omnigraph-optimize is NIGHTLY and the slow bucket is 15 days, so
+            # compaction can stop for two weeks before this says anything.
+            # metric_rules/witan.py carries a 36h rule for that CronJob
+            # specifically, deliberately overlapping this one rather than
+            # editing the membership here -- moving it out would change
+            # alerting for cms-edxapp-reindex-courses too. If a third bucket is
+            # ever added for daily jobs, fold that rule into it and delete it
+            # there.
             #   20 4 * * 0   omnigraph-cleanup                     -> slow
             #   30 7 * * 0   cms-edxapp-reindex-courses            -> slow
             #
