@@ -290,29 +290,138 @@ def _get(url: str, token: str, **params: Any) -> dict[str, Any]:
     return response.json()
 
 
-def _is_third_party_email(address: str, owned: set[str]) -> bool | None:
-    """Report whether a Drive share came from outside OL.
+UNKNOWN_PARENT = "?"
 
-    A service-account address cannot be judged by its domain: EVERY project's
-    service accounts live under `*.iam.gserviceaccount.com`, including a third
-    party's. The project id is embedded in the address, so classify those the
-    same way BigQuery projects are classified -- against the set of projects we
-    can actually see. Human addresses fall back to the domain.
 
-    Returns None when ownership cannot be determined, so an unknown never reads
-    as a confident answer in either direction.
+def _project_parent(project_id: str, cache: dict[str, str]) -> str:
+    """Resolve the project's parent: `folder/<id>`, `organization/<id>` or `""`.
+
+    Returns UNKNOWN_PARENT when the project cannot be described at all, which
+    is itself strong evidence: a project no OL identity can even read metadata
+    for is not one OL administers.
     """
-    lowered = address.lower().strip()
-    _, _, domain = lowered.partition("@")
-    if not domain:
-        return None
-    if domain.endswith(".iam.gserviceaccount.com"):
-        project = domain.removesuffix(".iam.gserviceaccount.com")
-        return None if not owned else project not in owned
-    return not any(
-        domain == owned_domain or domain.endswith(f".{owned_domain}")
-        for owned_domain in OWNED_DOMAINS
-    )
+    if project_id in cache:
+        return cache[project_id]
+    parent = UNKNOWN_PARENT
+    for account in [*_gcloud_accounts(), None]:
+        command = [
+            "gcloud",
+            "projects",
+            "describe",
+            project_id,
+            "--format=value(parent.type,parent.id)",
+        ]
+        if account:
+            command.append(f"--account={account}")
+        result = subprocess.run(command, capture_output=True, text=True, check=False)  # noqa: S603
+        if result.returncode == 0:
+            fields = result.stdout.strip().split("\t")
+            parent = (
+                f"{fields[0]}/{fields[1]}"
+                if len(fields) == 2 and fields[0] and fields[1]
+                else ""
+            )
+            break
+    cache[project_id] = parent
+    return parent
+
+
+class Ownership:
+    """Decides whether a resource belongs to OL, from the project HIERARCHY.
+
+    The obvious signal -- "is it in `gcloud projects list`?" -- is wrong, and
+    wrong in the direction that matters. That call returns every project the
+    identity can SEE, which includes third-party projects OL has been granted
+    into. Those grants are the exact thing this tool exists to find, so keying
+    ownership on visibility launders them into "internal" and drops them from
+    the migration plan. Observed for real: `mitx-pipeline-main-dc29` sits in a
+    folder no OL account can even describe, yet appears in `projects list`
+    because a viewer grant was issued to us -- the grant, showing up as proof
+    of ownership.
+
+    Parentage does not have that failure mode. A project is OL's when it sits
+    where OL's projects sit: the same folder/org as the credential being
+    probed, or standalone in the legacy gmail estate (no parent at all, which
+    is what every legacy project looks like).
+
+    The owned parents are derived from the credential under test rather than
+    from ambient gcloud state, so the verdict does not move when someone runs
+    `gcloud config set account`.
+    """
+
+    def __init__(self, owned_parents: set[str], extra_projects: set[str]) -> None:
+        """Hold the parents treated as OL's, plus explicitly-pinned projects."""
+        self.owned_parents = owned_parents
+        self.extra_projects = extra_projects
+        self._cache: dict[str, str] = {}
+
+    def parent_of(self, project_id: str) -> str:
+        """Return the project's parent, cached across probes."""
+        return _project_parent(project_id, self._cache)
+
+    def classify_project(self, project_id: str) -> bool | None:
+        """Report True when third party, False when OL's, None when undecidable."""
+        if project_id in self.extra_projects:
+            return False
+        parent = self.parent_of(project_id)
+        if parent == UNKNOWN_PARENT:
+            # Not describable by any OL identity. We hold a grant into it and
+            # nothing more, which is the definition of an external grant.
+            return True
+        if not self.owned_parents:
+            return None
+        return parent not in self.owned_parents
+
+    def classify_email(self, address: str) -> bool | None:
+        """Classify a Drive share's grantor.
+
+        A service-account address cannot be judged by its domain: EVERY
+        project's service accounts live under `*.iam.gserviceaccount.com`,
+        a third party's included. The project id is embedded in the address,
+        so route those through the same hierarchy check. Human addresses fall
+        back to the domain.
+        """
+        lowered = address.lower().strip()
+        _, _, domain = lowered.partition("@")
+        if not domain:
+            return None
+        if domain.endswith(".iam.gserviceaccount.com"):
+            return self.classify_project(
+                domain.removesuffix(".iam.gserviceaccount.com")
+            )
+        return not any(
+            domain == owned_domain or domain.endswith(f".{owned_domain}")
+            for owned_domain in OWNED_DOMAINS
+        )
+
+
+def _ownership_for_run(
+    keys: list[dict[str, Any]],
+    extra_parents: tuple[str, ...],
+    extra_projects: tuple[str, ...],
+) -> Ownership:
+    """Build one ownership model from every credential in this run.
+
+    Unioned across the run, not per credential, because OL's estate legitimately
+    spans two hierarchies: the legacy gmail projects (no parent at all) and the
+    MIT org folder the migration targets. Judging a legacy credential against
+    only its own hierarchy would report `mitol01` -- OL's own destination -- as
+    a third party. Seeding from the credentials actually being probed keeps that
+    correct without hardcoding a folder id, which is the stale-list failure this
+    design already fell into once.
+    """
+    cache: dict[str, str] = {}
+    owned_parents = set(extra_parents)
+    for key in keys:
+        home = key.get("project_id", "")
+        if not home:
+            continue
+        parent = _project_parent(home, cache)
+        if parent != UNKNOWN_PARENT:
+            owned_parents.add(parent)
+    model = Ownership(owned_parents, set(extra_projects))
+    model._cache = cache  # noqa: SLF001
+    return model
 
 
 def _gcloud_accounts() -> list[str]:
@@ -338,37 +447,6 @@ def _projects_for_account(account: str | None) -> set[str]:
     return {line.strip() for line in result.stdout.splitlines() if line.strip()}
 
 
-def _owned_projects(extra: tuple[str, ...] = ()) -> tuple[set[str], list[str]]:
-    """Every project OL can see, unioned across ALL credentialed gcloud accounts.
-
-    Deriving this from the *active* account alone was a bug, and a quiet one:
-    OL's estate spans two identities, and `gcloud projects list` as
-    tmacey@mit.edu returns only mitol-engineering and mitol01. Every legacy
-    project -- the whole population this migration is about -- then classified
-    as third party, inventing negotiations that do not need to happen. The
-    answer changed with whatever `gcloud config set account` was last run,
-    which is unrelated to the credential being probed.
-
-    So union across every account gcloud holds credentials for, using
-    `--account` rather than switching the active one, and return the accounts
-    consulted so the caller can show what the classification actually rests on.
-
-    An empty set makes third-party classification report `None` (unknown)
-    rather than guess.
-    """
-    accounts = _gcloud_accounts()
-    projects: set[str] = set(extra)
-    consulted: list[str] = []
-    for account in accounts:
-        found = _projects_for_account(account)
-        if found:
-            consulted.append(f"{account} ({len(found)})")
-            projects |= found
-    if not accounts:
-        projects |= _projects_for_account(None)
-    return projects, consulted
-
-
 def _capability_summary(capabilities: dict[str, bool]) -> str:
     """Effective access, read from capabilities rather than permissions.list."""
     if capabilities.get("canManageMembers") or capabilities.get("canDeleteDrive"):
@@ -382,8 +460,9 @@ def _capability_summary(capabilities: dict[str, bool]) -> str:
     return "reader"
 
 
-def _probe_shared_drives(token: str, owned: set[str]) -> list[dict[str, Any]]:  # noqa: ARG001
-    grants: list[dict[str, Any]] = []
+def _shared_drives(token: str) -> list[dict[str, Any]]:
+    """Every Shared Drive the credential is a member of."""
+    drives: list[dict[str, Any]] = []
     page: str | None = None
     while True:
         payload = _get(
@@ -393,23 +472,28 @@ def _probe_shared_drives(token: str, owned: set[str]) -> list[dict[str, Any]]:  
             fields="nextPageToken,drives(id,name,capabilities)",
             **({"pageToken": page} if page else {}),
         )
-        grants.extend(
-            {
-                "product": "Drive (Shared Drive)",
-                "resource_id": drive["id"],
-                "resource_name": drive.get("name", ""),
-                "access": _capability_summary(drive.get("capabilities", {})),
-                "granted_by": "Shared Drive organizer",
-                "third_party": False,
-            }
-            for drive in payload.get("drives", [])
-        )
+        drives.extend(payload.get("drives", []))
         page = payload.get("nextPageToken")
         if not page:
-            return grants
+            return drives
 
 
-def _probe_shared_files(token: str, owned: set[str]) -> list[dict[str, Any]]:
+def _probe_shared_drives(token: str, owner: Ownership) -> list[dict[str, Any]]:  # noqa: ARG001
+    return [
+        {
+            "product": "Drive (Shared Drive)",
+            "resource_id": drive["id"],
+            "resource_name": drive.get("name", ""),
+            "access": _capability_summary(drive.get("capabilities", {})),
+            "granted_by": "Shared Drive organizer",
+            "third_party": False,
+        }
+        for drive in _shared_drives(token)
+    ]
+
+
+def _probe_shared_files(token: str, owner: Ownership) -> list[dict[str, Any]]:
+    drive_names = {d["id"]: d.get("name", d["id"]) for d in _shared_drives(token)}
     grants: list[dict[str, Any]] = []
     page: str | None = None
     while True:
@@ -428,17 +512,26 @@ def _probe_shared_files(token: str, owned: set[str]) -> list[dict[str, Any]]:
         )
         for item in payload.get("files", []):
             owners = [o.get("emailAddress", "") for o in item.get("owners", [])]
-            owner = owners[0] if owners else ""
+            grantor = owners[0] if owners else ""
+            drive_id = item.get("driveId", "")
+            if grantor:
+                granted_by, third_party = grantor, owner.classify_email(grantor)
+            elif drive_id:
+                # Files inside a Shared Drive carry NO `owners` -- the drive owns
+                # them. Reporting that as "unknown owner" buried real answers in
+                # noise; the drive is the grantor, and one we can name.
+                granted_by = f"Shared Drive {drive_names.get(drive_id, drive_id)}"
+                third_party = False if drive_id in drive_names else None
+            else:
+                granted_by, third_party = "unknown owner", None
             grants.append(
                 {
                     "product": "Drive/Sheets (direct share)",
                     "resource_id": item["id"],
                     "resource_name": f"{item.get('name', '')} [{item['mimeType']}]",
                     "access": _capability_summary(item.get("capabilities", {})),
-                    "granted_by": owner or "unknown owner",
-                    "third_party": (
-                        _is_third_party_email(owner, owned) if owner else None
-                    ),
+                    "granted_by": granted_by,
+                    "third_party": third_party,
                 }
             )
         page = payload.get("nextPageToken")
@@ -446,7 +539,7 @@ def _probe_shared_files(token: str, owned: set[str]) -> list[dict[str, Any]]:
             return grants
 
 
-def _probe_analytics(token: str, owned: set[str]) -> list[dict[str, Any]]:  # noqa: ARG001
+def _probe_analytics(token: str, owner: Ownership) -> list[dict[str, Any]]:  # noqa: ARG001
     payload = _get(
         "https://analyticsadmin.googleapis.com/v1beta/accountSummaries",
         token,
@@ -468,7 +561,7 @@ def _probe_analytics(token: str, owned: set[str]) -> list[dict[str, Any]]:  # no
     ]
 
 
-def _probe_bigquery(token: str, owned: set[str]) -> list[dict[str, Any]]:
+def _probe_bigquery(token: str, owner: Ownership) -> list[dict[str, Any]]:
     """Every project the credential holds BigQuery access in, ours or not.
 
     This is the probe that earns the tool: a third party's grant into their own
@@ -485,7 +578,8 @@ def _probe_bigquery(token: str, owned: set[str]) -> list[dict[str, Any]]:
         )
         for project in payload.get("projects", []):
             project_id = project.get("id", "")
-            third_party = None if not owned else project_id not in owned
+            third_party = owner.classify_project(project_id)
+            parent = owner.parent_of(project_id)
             grants.append(
                 {
                     "product": "BigQuery",
@@ -495,8 +589,13 @@ def _probe_bigquery(token: str, owned: set[str]) -> list[dict[str, Any]]:
                     "granted_by": {
                         True: "THIRD PARTY -- re-issue needs their cooperation",
                         False: "project IAM",
-                        None: "unknown -- gcloud could not list owned projects",
+                        None: "unknown -- could not resolve project parentage",
                     }[third_party],
+                    "parent": (
+                        "not describable by any OL identity"
+                        if parent == UNKNOWN_PARENT
+                        else (parent or "none (standalone legacy project)")
+                    ),
                     "third_party": third_party,
                 }
             )
@@ -505,7 +604,7 @@ def _probe_bigquery(token: str, owned: set[str]) -> list[dict[str, Any]]:
             return grants
 
 
-def _probe_youtube(token: str, owned: set[str]) -> list[dict[str, Any]]:  # noqa: ARG001
+def _probe_youtube(token: str, owner: Ownership) -> list[dict[str, Any]]:  # noqa: ARG001
     payload = _get(
         "https://www.googleapis.com/youtube/v3/channels",
         token,
@@ -525,10 +624,10 @@ def _probe_youtube(token: str, owned: set[str]) -> list[dict[str, Any]]:  # noqa
     ]
 
 
-Probe = Callable[[str, set[str]], list[dict[str, Any]]]
+Probe = Callable[[str, Ownership], list[dict[str, Any]]]
 
-# `owned` is passed to every probe for one signature, though only the BigQuery
-# probe consults it -- it is the only product whose resources are GCP projects.
+# `owner` is passed to every probe for one signature; the Drive and BigQuery
+# probes consult it, the rest ignore it.
 PROBES: dict[str, Probe] = {
     "shared_drives": _probe_shared_drives,
     "shared_files": _probe_shared_files,
@@ -538,7 +637,7 @@ PROBES: dict[str, Probe] = {
 }
 
 
-def _probe_one(key: dict[str, Any], owned: set[str]) -> dict[str, Any]:
+def _probe_one(key: dict[str, Any], owner: Ownership) -> dict[str, Any]:
     result: dict[str, Any] = {
         "credential": key.get("client_email", "(unknown)"),
         "project": key.get("project_id", ""),
@@ -565,7 +664,7 @@ def _probe_one(key: dict[str, Any], owned: set[str]) -> dict[str, Any]:
             return result
     for name, probe in PROBES.items():
         try:
-            result["grants"].extend(probe(token, owned))
+            result["grants"].extend(probe(token, owner))
         except ProbeError as error:
             # A denied probe is itself information: it says this credential holds
             # nothing in that product, or was never scoped for it.
@@ -688,11 +787,15 @@ def probe(
         bool,
         cyclopts.Parameter(help="Emit the register's Findings table rows."),
     ] = False,
-    owned_project: Annotated[
+    owned_parent: Annotated[
         list[str] | None,
         cyclopts.Parameter(
-            help="Extra project id(s) to treat as OL-owned, beyond what gcloud lists."
+            help="Extra parent(s) to treat as OL's, e.g. folder/551004127831."
         ),
+    ] = None,
+    owned_project: Annotated[
+        list[str] | None,
+        cyclopts.Parameter(help="Project id(s) to force-classify as OL-owned."),
     ] = None,
 ) -> None:
     """Enumerate external product grants for each supplied credential."""
@@ -717,38 +820,14 @@ def probe(
         )
         raise SystemExit(2)
 
-    owned, consulted = _owned_projects(tuple(owned_project or ()))
-    _print_ownership_basis(owned, consulted)
-    results = [_probe_one(key, owned) for key in keys] + [
+    owner = _ownership_for_run(
+        keys, tuple(owned_parent or ()), tuple(owned_project or ())
+    )
+    _print_ownership_basis(owner)
+    results = [_probe_one(key, owner) for key in keys] + [
         {"grants": [], "project": "", **failure} for failure in failures
     ]
     _emit(results, as_json=as_json, markdown=markdown)
-
-
-def _print_ownership_basis(owned: set[str], consulted: list[str]) -> None:
-    """Show what third-party classification rests on, every run.
-
-    Printed rather than assumed because this is the input most likely to be
-    silently wrong: it depends on which accounts gcloud is logged in to, not on
-    the credential being probed.
-    """
-    if not owned:
-        print(
-            "# WARNING: no owned projects resolved -- `gcloud projects list`\n"
-            "# returned nothing for any credentialed account. Third-party\n"
-            "# classification will report 'unknown' rather than guessing.",
-            file=sys.stderr,
-        )
-        return
-    print(
-        f"# Ownership basis: {len(owned)} projects from {', '.join(consulted) or 'gcloud'}",
-        file=sys.stderr,
-    )
-    print(
-        "# A project absent from that set is reported THIRD PARTY. If OL owns one\n"
-        "# gcloud cannot see, pass --owned-project <id> or the row will be wrong.",
-        file=sys.stderr,
-    )
 
 
 def _emit(results: list[dict[str, Any]], *, as_json: bool, markdown: bool) -> None:
@@ -758,6 +837,29 @@ def _emit(results: list[dict[str, Any]], *, as_json: bool, markdown: bool) -> No
         print(_markdown_rows(results))
     else:
         _print_report(results)
+
+
+def _print_ownership_basis(owner: Ownership) -> None:
+    """Show what third-party classification rests on, every run.
+
+    Printed because this is the input most likely to be quietly wrong, and a
+    wrong verdict here is invisible in the table itself.
+    """
+    rendered = (
+        ", ".join(
+            parent or "none (standalone legacy project)"
+            for parent in sorted(owner.owned_parents)
+        )
+        or "NONE RESOLVED -- every project will report 'unknown'"
+    )
+    print(f"\n# OL-owned means project parent in [{rendered}]", file=sys.stderr)
+    print(
+        "# Judged by project PARENT, not by `gcloud projects list` -- that call\n"
+        "# includes third-party projects OL merely holds a grant into, which is\n"
+        "# exactly the population this tool exists to find. Pin exceptions with\n"
+        "# --owned-parent <folder/ID> or --owned-project <id>.\n",
+        file=sys.stderr,
+    )
 
 
 @app.command(name="probe-all")
@@ -774,11 +876,15 @@ def probe_all(
         bool,
         cyclopts.Parameter(help="Skip the Heroku-sourced credential."),
     ] = False,
-    owned_project: Annotated[
+    owned_parent: Annotated[
         list[str] | None,
         cyclopts.Parameter(
-            help="Extra project id(s) to treat as OL-owned, beyond what gcloud lists."
+            help="Extra parent(s) to treat as OL's, e.g. folder/551004127831."
         ),
+    ] = None,
+    owned_project: Annotated[
+        list[str] | None,
+        cyclopts.Parameter(help="Project id(s) to force-classify as OL-owned."),
     ] = None,
 ) -> None:
     """Probe every known credential in the estate, in priority order.
@@ -795,10 +901,7 @@ def probe_all(
     print(f"# Vault: {vault_addr}", file=sys.stderr)
     print(f"# {len(ESTATE)} credentials queued\n", file=sys.stderr)
 
-    owned, consulted = _owned_projects(tuple(owned_project or ()))
-    _print_ownership_basis(owned, consulted)
-    print("", file=sys.stderr)
-
+    loaded: list[tuple[str, dict[str, Any]]] = []
     results: list[dict[str, Any]] = []
     for index, entry in enumerate(ESTATE, start=1):
         label = entry["label"]
@@ -825,7 +928,19 @@ def probe_all(
             )
             print(f"      load failed: {error}", file=sys.stderr)
             continue
-        result = _probe_one(key, owned)
+        loaded.append((label, key))
+
+    # Ownership is built from every credential in the run, so a legacy-estate
+    # credential and a mitol01 one do not each judge the other as third party.
+    owner = _ownership_for_run(
+        [key for _, key in loaded],
+        tuple(owned_parent or ()),
+        tuple(owned_project or ()),
+    )
+    _print_ownership_basis(owner)
+
+    for label, key in loaded:
+        result = _probe_one(key, owner)
         result["source_label"] = label
         results.append(result)
         print(

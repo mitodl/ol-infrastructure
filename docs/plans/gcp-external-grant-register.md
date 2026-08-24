@@ -1,6 +1,7 @@
 # GCP external-grant register
 
-Status: method established and tooled; per-credential enumeration not yet run.
+Status: tooled; production and QA clusters probed 2026-08-24. Incomplete — the
+edx.org grants and `ol-eng-library-platform@` are still outstanding.
 Opened 2026-08-24 for task
 `tk-enumerate-external-google-product-grants-per-cre-070a83` (p0).
 
@@ -73,10 +74,7 @@ where the answer matters most; **unconfirmed** — do not repeat it as fact.)
 
 The BigQuery probe is the one that earns the tool. `bigquery.projects.list` returns
 projects the *caller* can reach, so a third party's grant into their own project —
-otherwise discoverable only by asking them — shows up directly. Third-party
-classification is derived at runtime from `gcloud projects list` rather than a
-hardcoded name list, because mislabelling an OL-owned project as third-party
-invents a negotiation that does not need to happen.
+otherwise discoverable only by asking them — shows up directly.
 
 ### Verification performed, 2026-08-24
 
@@ -88,22 +86,33 @@ which is the expected and correct result for a gcloud-minted token: gcloud issue
 `cloud-platform` scope only.
 
 Credential loading and grant classification are covered by
-`tests/bin/test_gcp_external_grants.py` (11 tests), which pins all three secret
-shapes, the escaped-PEM case, and the ownership rules below.
+`tests/bin/test_gcp_external_grants.py` (26 tests), which pin all three secret
+shapes, the escaped-PEM case, and every branch of the ownership rules below.
 
-**The service-account path has not yet been exercised against a real key.** Until
-one of the runs below is done, treat the Drive/Analytics/YouTube probes as designed
-and tested but unproven against live Google APIs.
+The service-account path has since been exercised against real keys in both the
+production and QA Vault clusters — see Findings.
 
-### One classification rule worth knowing before reading output
+### The classification rule, and why it is not the obvious one
 
-A service-account address cannot be judged by its domain. **Every** project's
-service accounts live under `*.iam.gserviceaccount.com` — a third party's as much
-as ours — so the project id embedded in the address is checked against
-`gcloud projects list` instead. Where ownership cannot be determined (gcloud
-unavailable, or an address with no domain) the tool reports *unknown* rather than
-guessing. Guessing "OL-owned" would silently drop a third-party grant from the
-migration plan, which is the expensive direction of that error.
+**Ownership is judged by the project's PARENT, never by whether it appears in
+`gcloud projects list`.** That call returns every project an identity can *see*,
+which includes third-party projects OL has merely been **granted into** — the exact
+population this tool exists to find. Keying on visibility launders those grants
+into "internal" and drops them from the migration plan. This was not hypothetical:
+see "Two corrections to the tool" below.
+
+A project is OL's when its parent matches one the credentials under test live in:
+no parent at all (every legacy gmail-estate project), or the MIT org folder the
+migration targets. A project that cannot be described by any OL identity is third
+party — OL does not administer what it cannot read metadata for.
+
+The same rule covers service-account grantors, which cannot be judged by domain:
+**every** project's service accounts live under `*.iam.gserviceaccount.com`, a
+third party's included, so the project id embedded in the address is routed through
+the parent check. Human addresses fall back to the domain.
+
+Where ownership cannot be determined the tool reports *unknown* rather than
+guessing, and every run prints the parent set it used.
 
 ## What to run, per credential
 
@@ -193,12 +202,22 @@ First production run, 2026-08-24, against `vault-production`. **Partial** — se
 
 | Credential | Product | Resource id | Resource name | Access | Grantor | Third party? |
 |---|---|---|---|---|---|---|
-| `ol-data-platform-production@` | BigQuery | `mitx-residential-pipeline-main` | mitx-residential-pipeline-main | project-level | not visible to either OL gcloud account | **likely** |
-| `ol-data-platform-production@` | BigQuery | `mitir-mitx-surveys` | MITIR MITx Surveys | project-level | not visible to either OL gcloud account | **likely** |
-| `ol-data-platform-production@` | BigQuery | `mitx-pipeline-main-dc29` | mitx-pipeline-main | project-level | project IAM | no |
+| `ol-data-platform-production@` | BigQuery | `mitx-residential-pipeline-main` | mitx-residential-pipeline-main | project-level | not describable by any OL identity | **YES** |
+| `ol-data-platform-production@` | BigQuery | `mitir-mitx-surveys` | MITIR MITx Surveys | project-level | not describable by any OL identity | **YES** |
+| `ol-data-platform-production@` | BigQuery | `mitx-pipeline-main-dc29` | mitx-pipeline-main | project-level | `folder/249626760288` | **YES** (corrected) |
 | `xpro-coupon-requests-productio@` | Drive (folder) | `12FeE1rh0iGQqsIQMvuKiEs07qpZNX541` | xPRO Enrollments | content-manager/writer | **`pdpinch@gmail.com`** | **YES** |
 | `ocw-studio-production@` | Drive (Shared Drive) | `0AIZerpz9jimTUk9PVA` | OCW Content | organizer | Shared Drive organizer | no |
 | `ocw-studio-production@` | Drive (Shared Drive) | `0AErNBMZMmOz3Uk9PVA` | **OL Engineering (ARCHIVED)** | organizer | Shared Drive organizer | no |
+| `ol-data-platform-qa@` | BigQuery | `mitx-residential-pipeline-main` | mitx-residential-pipeline-main | project-level | not describable by any OL identity | **YES** |
+| `ol-data-platform-qa@` | BigQuery | `mitir-mitx-surveys` | MITIR MITx Surveys | project-level | not describable by any OL identity | **YES** |
+| `ol-data-platform-qa@` | BigQuery | `mitx-pipeline-main-dc29` | mitx-pipeline-main | project-level | `folder/249626760288` | **YES** |
+| `xpro-coupon-requests-testing@` | Drive (Shared Drive) | `0ADY3FaGtq2jvUk9PVA` | Open Learning Engineering | content-manager/writer | Shared Drive organizer | no |
+| `xpro-coupon-requests-testing@` | Drive (folder) | `1FNLXfLSC4IATz8zKIjitx0GAxeow0NCO` | Sheets API Testing | content-manager/writer | `gwsidebottommit@gmail.com` | **YES** |
+| `xpro-coupon-requests-testing@` | Drive (presentation) | `1G5qxWqEx-PPcnypXes12YDCUl_4Qe8GkU3LRrBVtJ1k` | Compliance and Refusal Tech Talk | reader | `ptylkin@gmail.com` | **YES** |
+| `xpro-coupon-requests-testing@` | Drive (presentation) | `1X8gRX0QNQbPmJtkdS31CjursZVxS7kd9bg57wSfX4XQ` | Frontend tooling | reader | `christopher.chudzicki@gmail.com` | **YES** |
+| `xpro-coupon-requests-testing@` | Sheets | (13 "Enrollment Codes …" sheets + "(RC) Enrollment Code Requests") | | content-manager/writer | Shared Drive resident | no |
+| `ocw-studio-rc@` | Drive (Shared Drive) | `0AErNBMZMmOz3Uk9PVA` | OL Engineering (ARCHIVED) | organizer | Shared Drive organizer | no |
+| `ocw-studio-rc@` | Drive (folder) | `1H4HCvbmY7v5YZFeqSlbCI1TFC5MXTMY4` | OCW Studio RC Website Uploads | content-manager/writer | Shared Drive resident | no |
 
 ### What this run settled
 
@@ -235,19 +254,84 @@ First production run, 2026-08-24, against `vault-production`. **Partial** — se
   meaningful: those probes return 403 when the credential holds nothing *and* when
   the scope is refused, and the two are not distinguished in this output.
 
-### Correction to the tool, forced by this run
+### QA-cluster run, 2026-08-24
 
-The three BigQuery rows were first reported **third party**, including
-`mitx-pipeline-main-dc29`, which OL owns and which this project has a completed
-access task for. Cause: ownership was derived from `gcloud projects list` for the
-*active* account only. As `tmacey@mit.edu` that returns just `mitol-engineering`
-and `mitol01`, so the entire legacy estate classified as external — the exact error
-the runtime-derivation was introduced to prevent, reintroduced in a form that
-changes answer with whatever `gcloud config set account` was last run.
+Run against `vault-qa`, which is what reaches `ol-data-platform-qa@`,
+`xpro-coupon-requests-testing@` and `ocw-studio-rc@`.
 
-Now unioned across every credentialed gcloud account via `--account` (22 projects
-across two identities here), with the basis printed on every run and
-`--owned-project` to pin anything gcloud cannot see.
+**`ol-data-platform-qa@` holds exactly the same three BigQuery projects as
+`ol-data-platform-production@`**: `mitx-residential-pipeline-main`,
+`mitx-pipeline-main-dc29`, `mitir-mitx-surveys`. Two consequences:
+
+1. **No edx.org-owned dataset appeared for either credential.** The consumer map
+   attributes 48,258 BigQuery calls/30d to "edx.org-owned BigQuery datasets / GCS
+   bucket". The three projects found are all `mitx-*`/`mitir-*` pipeline projects.
+   Either the map's "edx.org" attribution is imprecise and these *are* the datasets
+   (the `-pipeline-main` naming is edX's own convention), or a dataset-level grant
+   exists that project-level enumeration does not reach. **Unresolved** — do not
+   record the edx.org grants as enumerated on the strength of this.
+2. **`ocw-studio-rc@` also holds organizer on `0AErNBMZMmOz3Uk9PVA`**
+   ("OL Engineering (ARCHIVED)"), same as `ocw-studio-production@`. It does *not*
+   hold "OCW Content" — that is production-only, so the prod/rc split is real.
+
+**`xpro-coupon-requests-testing@` has accumulated 16 grants, several accidental.**
+Beyond the expected Shared Drive "Open Learning Engineering" and the enrollment-code
+sheets, it holds:
+
+| Resource | Access | Owner |
+|---|---|---|
+| "Compliance and Refusal Tech Talk" (presentation) | reader | `ptylkin@gmail.com` |
+| "Frontend tooling" (presentation) | reader | `christopher.chudzicki@gmail.com` |
+| "Sheets API Testing" (folder) | content-manager/writer | `gwsidebottommit@gmail.com` |
+
+Two slide decks shared with a **service account** are almost certainly misdirected
+shares — someone typed the SA address into a share dialog. Harmless individually,
+but they show the SA address circulating as if it were a person's, and each is a
+grant that has to be considered at migration time. Note all three owners are
+personal Gmail accounts, consistent with the estate-wide pattern.
+
+### Two corrections to the tool, both forced by these runs
+
+**1. Visibility is not ownership — the first fix made this worse.**
+
+The production run reported `mitx-pipeline-main-dc29` third party. That was
+*correct*, and an intermediate "fix" wrongly overrode it. The reasoning chain:
+
+- Ownership was first derived from `gcloud projects list` for the *active* account.
+  As `tmacey@mit.edu` that returns only `mitol-engineering` and `mitol01`, so the
+  entire legacy estate classified as external.
+- The obvious repair — union across all credentialed accounts — reclassified
+  `mitx-pipeline-main-dc29` as OL-owned. **Also wrong, and worse.**
+  `gcloud projects list` returns every project an identity can *see*, which
+  includes third-party projects OL has been **granted into**. Those grants are the
+  population this tool exists to find, so keying ownership on visibility launders
+  them into "internal" and drops them from the migration plan. The grant shows up
+  as proof of ownership.
+- Confirmed directly: `mitx-pipeline-main-dc29` sits in `folder/249626760288`,
+  which `mitx.devops@gmail.com` cannot even describe. It appears in `projects list`
+  solely because of the viewer grant recorded in
+  `tk-grant-mitx-devops-gmail-com-viewer-access-to-mit-0caa08`.
+
+Ownership is now judged by **project parent**, which has no such failure mode:
+
+| Project | Parent | Verdict |
+|---|---|---|
+| `ocw-studio-production` | *none* | OL's — every legacy project looks like this |
+| `mitol01` | `folder/551004127831` | OL's — the migration target |
+| `mitx-pipeline-main-dc29` | `folder/249626760288` | third party |
+| `mitir-mitx-surveys` | not describable | third party |
+
+The owned-parent set is seeded from the credentials **being probed**, unioned
+across the run, so it does not move with `gcloud config set account` and a
+legacy-estate credential does not judge `mitol01` external. `--owned-parent
+folder/<id>` and `--owned-project <id>` pin anything else.
+
+**2. Shared-Drive-resident files reported "unknown owner".**
+
+Files inside a Shared Drive carry no `owners` field — the drive owns them. That
+rendered a dozen enrollment-code sheets as "unknown owner / unknown", burying the
+genuinely unknown rows in noise. The probe now resolves `driveId` against the
+drives the credential is a member of and names the drive as grantor.
 
 ### Known before probing
 
