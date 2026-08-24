@@ -132,7 +132,9 @@ def _generate_policy_from_cloudtrail(
     poll_interval_seconds: int,
     timeout_seconds: int,
 ) -> set[str]:
-    end_time = datetime.now(UTC) - timedelta(minutes=1)
+    # IAM Access Analyzer rejects timestamps with sub-second precision, which
+    # botocore's default datetime serialization includes.
+    end_time = (datetime.now(UTC) - timedelta(minutes=1)).replace(microsecond=0)
     start_time = end_time - timedelta(days=lookback_days)
     job_id = client.start_policy_generation(
         policyGenerationDetails={"principalArn": role_arn},

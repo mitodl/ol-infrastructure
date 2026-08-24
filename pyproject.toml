@@ -50,6 +50,7 @@ dependencies = [
   "ol-concourse>=0.16,<0.17",
   "pulumiverse-grafana>=2.0.0,<3",
   "pulumiverse-sentry==0.0.9",
+  "pyjwt[crypto]>=2.9,<3",
 ]
 
 [project.urls]
