@@ -1,0 +1,595 @@
+#!/usr/bin/env python3
+"""Enumerate the external Google-product grants held by a GCP credential.
+
+Why this exists: a GCP service account, API key or reCAPTCHA key CANNOT be moved
+between projects -- no API exists for it. Consolidating a credential therefore
+means creating a *replacement*, which yields a new service-account email or a new
+key string, and every grant that named the old identity has to be re-issued by
+hand. So no credential can be re-homed until its external grants are known.
+
+The received wisdom -- recorded in the consumer map and in the task that gates
+this work -- was that these grants cannot be enumerated programmatically, only
+walked product-by-product in each product's admin UI. That is half right. No
+*GCP* API can find them, because the grants do not live in GCP: they live in
+Drive, Sheets, Analytics, BigQuery and YouTube. But each of those products has an
+API that answers "what can I see?" when you ask it AS THE CREDENTIAL ITSELF.
+That inverts the problem from "audit every product" to "mint one token per
+credential and ask five questions".
+
+What it asks, per credential:
+
+  drive.drives.list        -- Shared Drives the credential is a member of
+  drive.files.list         -- individual files/folders shared with it, including
+                              items resident in Shared Drives it can reach
+  analyticsadmin           -- GA4 account/property summaries it can read
+  bigquery.projects.list   -- EVERY project it holds BigQuery access in,
+                              including projects owned by third parties. This is
+                              the one that finds grants nobody on this side
+                              issued and nobody on this side can re-issue.
+  youtube.channels.list    -- channels the credential is authorised against
+                              (meaningful for OAuth clients; usually empty for a
+                              bare service account)
+
+Effective access is read from each item's `capabilities`, not from
+`permissions.list`. `capabilities` comes back inline with the listing, so it
+costs no extra call per item, and it reports what this credential can actually
+do -- including access inherited from a folder or arriving via a group, which a
+permission entry naming the credential would not show. (`permissions.list` is
+also believed to require more than reader on the item, which would make it fail
+exactly where the answer matters most, but that has not been confirmed here.)
+
+CAVEATS, which decide how the output may be used:
+
+  * ABSENCE IS NOT PROOF. A grant made to a Google *group* the credential belongs
+    to, or one revoked-then-restored, can be missed. Read an empty result as
+    "nothing found", never as "nothing exists" -- the same error that key-age
+    triage made on this estate twice.
+  * GCS IS NOT COVERED. There is no cross-project "list buckets I can read" API.
+    A bucket grant is invisible here and has to be confirmed against the
+    consumer's own configuration.
+  * QUOTA IS NOT A GRANT. A granted quota increase attaches to the PROJECT and
+    does not follow a consumer anywhere. It will never appear in this output and
+    must not be conflated with the grants that do. See `gcp-credential-usage
+    quota`.
+
+Read-only: every call this makes is a GET. It never prints, logs or writes
+credential material -- only the `client_email` the credential already publishes.
+
+Usage:
+    bin/gcp-external-grants probe --key-file sa.json
+    bin/gcp-external-grants probe --vault secret-xpro/google-sheets:service_account_creds
+    bin/gcp-external-grants probe --vault secret-data/pipelines/google-service-account
+    bin/gcp-external-grants scopes          # what each probe needs, and why
+
+Vault: reads VAULT_ADDR and VAULT_TOKEN (or ~/.vault-token) via hvac. KV v1 and
+v2 mounts are both handled without being told which is which -- this estate runs
+both. `--vault MOUNT/PATH:FIELD` takes the SA JSON from one field (dotted for a
+nested one, e.g. `...:google.drive_service_json`); `--vault MOUNT/PATH` with no
+field treats the whole secret body as the SA JSON, which is how the Dagster
+credentials are stored.
+
+Background: docs/plans/gcp-service-account-consumer-map.md
+            docs/plans/gcp-external-grant-register.md
+"""
+
+import json
+import os
+import subprocess
+import sys
+import time
+from collections.abc import Callable
+from pathlib import Path
+from typing import Annotated, Any
+
+import cyclopts
+import hvac
+import jwt
+import requests
+
+app = cyclopts.App(
+    help="Enumerate the external Google-product grants held by a GCP credential."
+)
+
+TOKEN_URL = "https://oauth2.googleapis.com/token"  # noqa: S105
+JWT_BEARER = "urn:ietf:params:oauth:grant-type:jwt-bearer"
+TIMEOUT = 60
+
+# Every scope here is read-only. Widening this list widens what a leaked token
+# from this tool could do, so keep it minimal and keep it readonly.
+SCOPES = (
+    "https://www.googleapis.com/auth/drive.readonly",
+    "https://www.googleapis.com/auth/analytics.readonly",
+    "https://www.googleapis.com/auth/cloud-platform.read-only",
+    "https://www.googleapis.com/auth/youtube.readonly",
+)
+
+# Email domains OL controls, matched on the domain and its subdomains. A share
+# from outside them is a grant we cannot re-issue on our own timeline -- the
+# distinction the migration plan turns on. Service-account addresses are NOT
+# covered by this: see _is_third_party_email.
+OWNED_DOMAINS = ("mit.edu",)
+
+
+class ProbeError(Exception):
+    """A probe could not run. Reported per-probe; never aborts the whole run."""
+
+
+def _load_key_file(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text())
+
+
+def _read_vault_secret(
+    client: "hvac.Client", mount: str, subpath: str
+) -> dict[str, Any]:
+    """Read a KV secret without being told which KV version the mount is.
+
+    This estate runs both: `secret-ocw-studio` is v2 while `secret-xpro` and
+    `secret-data` are v1. Requiring the caller to know which is which is a
+    footgun for a tool whose whole point is to be pointed at arbitrary
+    credentials, so try v2 and fall back.
+    """
+    try:
+        return client.secrets.kv.v2.read_secret_version(
+            path=subpath, mount_point=mount, raise_on_deleted_version=False
+        )["data"]["data"]
+    except (hvac.exceptions.VaultError, KeyError):
+        return client.secrets.kv.v1.read_secret(path=subpath, mount_point=mount)["data"]
+
+
+def _extract_key(data: dict[str, Any], field: str) -> dict[str, Any]:
+    """Pull the service-account JSON out of a secret body.
+
+    Three shapes occur in this estate and all three have to work:
+
+      no field      the whole secret body IS the SA JSON, one Vault field per
+                    JSON key (Dagster `canvas`, and the edxorg credential,
+                    which additionally spells `auth_uri`/`client_x509_cert_url`
+                    as `url`/`cert_url` -- harmless here, since signing needs
+                    only `client_email` and `private_key`)
+      "field"       one field holding the JSON as a string (xPro)
+      "a.b"         a nested object (OCW Studio: `google` -> `drive_service_json`)
+    """
+    if not field:
+        return data
+    value: Any = data
+    for part in field.split("."):
+        if not isinstance(value, dict) or part not in value:
+            available = ", ".join(sorted(value)) if isinstance(value, dict) else "?"
+            message = f"no {part!r} in secret (has: {available})"
+            raise ProbeError(message)
+        value = value[part]
+    return json.loads(value) if isinstance(value, str) else value
+
+
+def _normalise_private_key(key: dict[str, Any]) -> dict[str, Any]:
+    """Un-escape a PEM stored with literal backslash-n.
+
+    At least the Dagster `canvas` credential is stored that way -- its consumer
+    does the same replace before handing it to google-auth. Left as-is, the PEM
+    does not parse and the failure surfaces as an opaque signing error rather
+    than as "this secret is escaped".
+    """
+    private = key.get("private_key")
+    if isinstance(private, str) and "\\n" in private:
+        return {**key, "private_key": private.replace("\\n", "\n")}
+    return key
+
+
+def _load_vault(spec: str) -> dict[str, Any]:
+    """Load a service-account key from Vault. Spec is PATH or PATH:FIELD."""
+    path, _, field = spec.partition(":")
+    mount, _, subpath = path.partition("/")
+    if not subpath:
+        message = f"--vault expects MOUNT/PATH[:FIELD], got {spec!r}"
+        raise ProbeError(message)
+    token = (
+        os.environ.get("VAULT_TOKEN")
+        or Path.home().joinpath(".vault-token").read_text().strip()
+    )
+    client = hvac.Client(url=os.environ["VAULT_ADDR"], token=token)
+    data = _read_vault_secret(client, mount, subpath)
+    return _normalise_private_key(_extract_key(data, field))
+
+
+def _gcloud_token() -> tuple[str, str]:
+    """Token for the active gcloud identity, for probing a human's own grants.
+
+    Only the BigQuery probe is meaningful here: gcloud mints cloud-platform
+    scope, so the Drive/Analytics/YouTube probes will report 403 regardless of
+    what the human can actually see. That is a scope limit, not an answer.
+    """
+    token = subprocess.run(
+        ["gcloud", "auth", "print-access-token"],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    identity = subprocess.run(
+        ["gcloud", "config", "get-value", "account"],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.strip()
+    return token, identity or "(active gcloud account)"
+
+
+def _access_token(key: dict[str, Any]) -> str:
+    """Exchange a service-account key for an access token via the JWT bearer flow."""
+    now = int(time.time())
+    assertion = jwt.encode(
+        {
+            "iss": key["client_email"],
+            "scope": " ".join(SCOPES),
+            "aud": TOKEN_URL,
+            "iat": now,
+            "exp": now + 3600,
+        },
+        key["private_key"],
+        algorithm="RS256",
+    )
+    response = requests.post(
+        TOKEN_URL,
+        data={"grant_type": JWT_BEARER, "assertion": assertion},
+        timeout=TIMEOUT,
+    )
+    if not response.ok:
+        # Google echoes the assertion back in some errors; report status only.
+        message = f"token exchange failed: HTTP {response.status_code}"
+        raise ProbeError(message)
+    return response.json()["access_token"]
+
+
+def _get(url: str, token: str, **params: Any) -> dict[str, Any]:
+    response = requests.get(
+        url,
+        headers={"Authorization": f"Bearer {token}"},
+        params=params,
+        timeout=TIMEOUT,
+    )
+    if not response.ok:
+        detail = response.json().get("error", {}) if response.content else {}
+        message = (
+            f"HTTP {response.status_code}: "
+            f"{detail.get('message', response.reason)[:160]}"
+        )
+        raise ProbeError(message)
+    return response.json()
+
+
+def _is_third_party_email(address: str, owned: set[str]) -> bool | None:
+    """Report whether a Drive share came from outside OL.
+
+    A service-account address cannot be judged by its domain: EVERY project's
+    service accounts live under `*.iam.gserviceaccount.com`, including a third
+    party's. The project id is embedded in the address, so classify those the
+    same way BigQuery projects are classified -- against the set of projects we
+    can actually see. Human addresses fall back to the domain.
+
+    Returns None when ownership cannot be determined, so an unknown never reads
+    as a confident answer in either direction.
+    """
+    lowered = address.lower().strip()
+    _, _, domain = lowered.partition("@")
+    if not domain:
+        return None
+    if domain.endswith(".iam.gserviceaccount.com"):
+        project = domain.removesuffix(".iam.gserviceaccount.com")
+        return None if not owned else project not in owned
+    return not any(
+        domain == owned_domain or domain.endswith(f".{owned_domain}")
+        for owned_domain in OWNED_DOMAINS
+    )
+
+
+def _owned_projects() -> set[str]:
+    """Every project the active gcloud identity can list.
+
+    Derived rather than hardcoded on purpose. A hardcoded name list silently
+    mislabels any project it has not been taught about, and mislabelling an
+    OL-owned project as third-party is the expensive direction of that error --
+    it invents a negotiation that does not need to happen.
+
+    Returns an empty set when gcloud is unavailable, which makes third-party
+    classification report `None` (unknown) rather than guess.
+    """
+    result = subprocess.run(
+        ["gcloud", "projects", "list", "--format=value(projectId)"],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return set()
+    return {line.strip() for line in result.stdout.splitlines() if line.strip()}
+
+
+def _capability_summary(capabilities: dict[str, bool]) -> str:
+    """Effective access, read from capabilities rather than permissions.list."""
+    if capabilities.get("canManageMembers") or capabilities.get("canDeleteDrive"):
+        return "organizer"
+    if capabilities.get("canDelete") or capabilities.get("canRename"):
+        return "content-manager/writer"
+    if capabilities.get("canEdit"):
+        return "writer"
+    if capabilities.get("canComment"):
+        return "commenter"
+    return "reader"
+
+
+def _probe_shared_drives(token: str, owned: set[str]) -> list[dict[str, Any]]:  # noqa: ARG001
+    grants: list[dict[str, Any]] = []
+    page: str | None = None
+    while True:
+        payload = _get(
+            "https://www.googleapis.com/drive/v3/drives",
+            token,
+            pageSize=100,
+            fields="nextPageToken,drives(id,name,capabilities)",
+            **({"pageToken": page} if page else {}),
+        )
+        grants.extend(
+            {
+                "product": "Drive (Shared Drive)",
+                "resource_id": drive["id"],
+                "resource_name": drive.get("name", ""),
+                "access": _capability_summary(drive.get("capabilities", {})),
+                "granted_by": "Shared Drive organizer",
+                "third_party": False,
+            }
+            for drive in payload.get("drives", [])
+        )
+        page = payload.get("nextPageToken")
+        if not page:
+            return grants
+
+
+def _probe_shared_files(token: str, owned: set[str]) -> list[dict[str, Any]]:
+    grants: list[dict[str, Any]] = []
+    page: str | None = None
+    while True:
+        payload = _get(
+            "https://www.googleapis.com/drive/v3/files",
+            token,
+            q="sharedWithMe",
+            pageSize=100,
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True,
+            fields=(
+                "nextPageToken,"
+                "files(id,name,mimeType,driveId,capabilities,owners(emailAddress))"
+            ),
+            **({"pageToken": page} if page else {}),
+        )
+        for item in payload.get("files", []):
+            owners = [o.get("emailAddress", "") for o in item.get("owners", [])]
+            owner = owners[0] if owners else ""
+            grants.append(
+                {
+                    "product": "Drive/Sheets (direct share)",
+                    "resource_id": item["id"],
+                    "resource_name": f"{item.get('name', '')} [{item['mimeType']}]",
+                    "access": _capability_summary(item.get("capabilities", {})),
+                    "granted_by": owner or "unknown owner",
+                    "third_party": (
+                        _is_third_party_email(owner, owned) if owner else None
+                    ),
+                }
+            )
+        page = payload.get("nextPageToken")
+        if not page:
+            return grants
+
+
+def _probe_analytics(token: str, owned: set[str]) -> list[dict[str, Any]]:  # noqa: ARG001
+    payload = _get(
+        "https://analyticsadmin.googleapis.com/v1beta/accountSummaries",
+        token,
+        pageSize=200,
+    )
+    return [
+        {
+            "product": "Google Analytics (GA4)",
+            "resource_id": prop.get("property", ""),
+            "resource_name": (
+                f"{summary.get('displayName', '')} / {prop.get('displayName', '')}"
+            ),
+            "access": "read (level not exposed by accountSummaries)",
+            "granted_by": "GA account administrator",
+            "third_party": False,
+        }
+        for summary in payload.get("accountSummaries", [])
+        for prop in summary.get("propertySummaries", [])
+    ]
+
+
+def _probe_bigquery(token: str, owned: set[str]) -> list[dict[str, Any]]:
+    """Every project the credential holds BigQuery access in, ours or not.
+
+    This is the probe that earns the tool: a third party's grant into their own
+    project is otherwise discoverable only by asking them.
+    """
+    grants: list[dict[str, Any]] = []
+    page: str | None = None
+    while True:
+        payload = _get(
+            "https://bigquery.googleapis.com/bigquery/v2/projects",
+            token,
+            maxResults=100,
+            **({"pageToken": page} if page else {}),
+        )
+        for project in payload.get("projects", []):
+            project_id = project.get("id", "")
+            third_party = None if not owned else project_id not in owned
+            grants.append(
+                {
+                    "product": "BigQuery",
+                    "resource_id": project_id,
+                    "resource_name": project.get("friendlyName", ""),
+                    "access": "project-level BigQuery access",
+                    "granted_by": {
+                        True: "THIRD PARTY -- re-issue needs their cooperation",
+                        False: "project IAM",
+                        None: "unknown -- gcloud could not list owned projects",
+                    }[third_party],
+                    "third_party": third_party,
+                }
+            )
+        page = payload.get("nextPageToken")
+        if not page:
+            return grants
+
+
+def _probe_youtube(token: str, owned: set[str]) -> list[dict[str, Any]]:  # noqa: ARG001
+    payload = _get(
+        "https://www.googleapis.com/youtube/v3/channels",
+        token,
+        part="id,snippet",
+        mine="true",
+    )
+    return [
+        {
+            "product": "YouTube",
+            "resource_id": item.get("id", ""),
+            "resource_name": item.get("snippet", {}).get("title", ""),
+            "access": "channel owner/manager",
+            "granted_by": "YouTube channel owner",
+            "third_party": False,
+        }
+        for item in payload.get("items", [])
+    ]
+
+
+Probe = Callable[[str, set[str]], list[dict[str, Any]]]
+
+# `owned` is passed to every probe for one signature, though only the BigQuery
+# probe consults it -- it is the only product whose resources are GCP projects.
+PROBES: dict[str, Probe] = {
+    "shared_drives": _probe_shared_drives,
+    "shared_files": _probe_shared_files,
+    "analytics": _probe_analytics,
+    "bigquery": _probe_bigquery,
+    "youtube": _probe_youtube,
+}
+
+
+def _probe_one(key: dict[str, Any], owned: set[str]) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "credential": key.get("client_email", "(unknown)"),
+        "project": key.get("project_id", ""),
+        "grants": [],
+        "errors": {},
+    }
+    if key.get("_gcloud"):
+        token, result["credential"] = _gcloud_token()
+    else:
+        try:
+            token = _access_token(key)
+        except ProbeError as error:
+            result["errors"]["token"] = str(error)
+            return result
+        except KeyError as error:
+            # Most often the field holds an OAuth client, not a service-account
+            # key. Those have no private key to sign an assertion with, and no
+            # API can enumerate them -- say so rather than reporting a bare
+            # missing-key name.
+            result["errors"]["token"] = (
+                f"missing {error} -- not a service-account key. Generic OAuth "
+                f"clients cannot be probed; walk them in the Console."
+            )
+            return result
+    for name, probe in PROBES.items():
+        try:
+            result["grants"].extend(probe(token, owned))
+        except ProbeError as error:
+            # A denied probe is itself information: it says this credential holds
+            # nothing in that product, or was never scoped for it.
+            result["errors"][name] = str(error)
+        except requests.RequestException as error:
+            result["errors"][name] = f"transport: {type(error).__name__}"
+    return result
+
+
+def _print_report(results: list[dict[str, Any]]) -> None:
+    for result in results:
+        print(f"\n=== {result['credential']}  (project {result['project'] or '?'})")
+        if not result["grants"]:
+            print("  no grants found -- NOT proof that none exist; see caveats")
+        for grant in sorted(result["grants"], key=lambda g: g["product"]):
+            flag = {
+                True: "  <== THIRD PARTY",
+                False: "",
+                None: "  <== ownership unknown",
+            }[grant["third_party"]]
+            print(f"  {grant['product']}")
+            print(f"    id      {grant['resource_id']}")
+            print(f"    name    {grant['resource_name']}")
+            print(f"    access  {grant['access']}")
+            print(f"    grantor {grant['granted_by']}{flag}")
+        for probe, error in result["errors"].items():
+            print(f"  [{probe}] {error}")
+
+
+@app.command
+def probe(
+    *,
+    key_file: Annotated[
+        list[Path] | None,
+        cyclopts.Parameter(help="Service-account JSON key file(s) to probe."),
+    ] = None,
+    vault: Annotated[
+        list[str] | None,
+        cyclopts.Parameter(help="Vault source(s) as PATH:FIELD."),
+    ] = None,
+    gcloud: Annotated[
+        bool,
+        cyclopts.Parameter(
+            help="Also probe the active gcloud identity (BigQuery only; see docs)."
+        ),
+    ] = False,
+    as_json: Annotated[
+        bool, cyclopts.Parameter(name=["--json"], help="Emit JSON instead of text.")
+    ] = False,
+) -> None:
+    """Enumerate external product grants for each supplied credential."""
+    keys: list[dict[str, Any]] = [_load_key_file(path) for path in key_file or []]
+    failures: list[dict[str, Any]] = []
+    for spec in vault or []:
+        try:
+            keys.append(_load_vault(spec))
+        except (ProbeError, KeyError, OSError) as error:
+            failures.append({"credential": spec, "errors": {"vault": str(error)}})
+    if gcloud:
+        keys.append({"_gcloud": True})
+    if not keys and not failures:
+        print(
+            "nothing to probe: pass --key-file, --vault and/or --gcloud",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+
+    owned = _owned_projects()
+    results = [_probe_one(key, owned) for key in keys] + [
+        {"grants": [], "project": "", **failure} for failure in failures
+    ]
+    if as_json:
+        print(json.dumps(results, indent=2, sort_keys=True))
+    else:
+        _print_report(results)
+
+
+@app.command
+def scopes() -> None:
+    """Explain which scope each probe needs, and what an error from it means."""
+    print(__doc__)
+    print("Scopes requested (all read-only):")
+    for scope in SCOPES:
+        print(f"  {scope}")
+    print(
+        "\nA 403 from a probe usually means the credential holds nothing in that\n"
+        "product, not that the tool is misconfigured. A 401 means the token\n"
+        "exchange succeeded but the scope was refused -- check org policy."
+    )
+
+
+if __name__ == "__main__":
+    app()
