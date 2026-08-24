@@ -98,15 +98,12 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
 
     # devops-warnings Slack — non-paging visibility for cluster-wide capacity
     # signals that aren't any one team's concern (e.g. HPAAtMaxReplicas*,
-    # which fires for every CI/QA/production workload). Reuses the OCW misc
-    # webhook/token above rather than a new secret -- ContactPointSlackArgs'
-    # `recipient` picks the channel independently of `url`, and this Slack
-    # app is already invited to #devops-warnings (it posts there today via
-    # Rootly's separate `CI/QA Slack Notifications` escalation policy).
+    # which fires for every CI/QA/production workload). Uses its own
+    # `slack_notifications_devops_warnings` secret (a per-stack required key
+    # in the grafana-alerting secrets file; see CLAUDE.md § Secrets reference).
     # Deliberately a distinct pair of contact points, not a shared one with
-    # ocw-misc: routing here is decided per-rule by the `channel` label
-    # (see the policy branch below), and giving each destination its own
-    # contact point keeps that mapping obvious from resource names alone.
+    # ocw-misc: each destination has its own contact point to keep the
+    # resource-name→channel mapping obvious from resource names alone.
     alerting.ContactPoint(
         "slack-devops-warnings-warning",
         name="slack-devops-warnings-warning",

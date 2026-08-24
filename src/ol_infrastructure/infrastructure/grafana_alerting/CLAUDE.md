@@ -454,6 +454,7 @@ grafana_url: https://<stack>.grafana.net
 grafana_api_token: <service-account-token>
 rootly_bearer_token: <rootly-webhook-bearer-token>
 slack_notifications_ocw_misc_api_url: <slack-webhook-url>
+slack_notifications_devops_warnings: <slack-webhook-url>  # required; used by devops-warnings contact points
 
 # Production only (Pingdom checks run from production stack only):
 pingdom_api_token: <pingdom-api-token>
