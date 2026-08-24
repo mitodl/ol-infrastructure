@@ -447,6 +447,13 @@ policy_definition = {
                 "iam:DeleteUser",
                 "iam:DetachRolePolicy",
                 "iam:DetachUserPolicy",
+                # Read path for the AWS provider's policy refresh, not a
+                # companion permission TagPolicy itself needs -- confirmed via
+                # a live AccessDeniedException on ListPolicyTags while
+                # updating mitpress-sftp-iam-policy, distinct from (and not
+                # evidence for) the ListPolicyTags-for-TagPolicy claim already
+                # verified false elsewhere for this same statement.
+                "iam:ListPolicyTags",
                 "iam:RemoveUserFromGroup",
                 "iam:TagPolicy",
                 "iam:TagRole",
