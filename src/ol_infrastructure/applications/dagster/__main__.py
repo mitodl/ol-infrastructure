@@ -1341,26 +1341,28 @@ pgbouncer_service_monitor = kubernetes.apiextensions.CustomResource(
 #    So the peak is 7416 runs per 6h and the quiet floor is ~150 -- a 50x swing on
 #    the same workload, which is the whole argument for sizing off the top of it.
 #    RUN_WINDOW stays 20000 (2.7x over that peak). Cutting it to the ~2000 that a
-#    quiet week suggests would have truncated every 6h bucket from 2026-08-08 to
-#    2026-08-18 but two, and dagster_run_wait_to_start_seconds is a queue-depth
-#    metric: a storm is the only time anyone reads it.
+#    quiet week suggests would have truncated 30 of the 42 six-hour buckets in
+#    that stretch, and dagster_run_wait_to_start_seconds is a queue-depth metric:
+#    a storm is the only time anyone reads it.
 #
 #    TICK_WINDOW is the one that genuinely overshoots, and it overshoots against
 #    its own peak rather than against a quiet week, so the rule does not protect
 #    it. Ticks are cadence-bound, not demand-bound -- the daemon evaluates every
 #    sensor on a ~30s schedule whether or not it yields a run -- so tick rate
 #    tracks how many sensors exist, not how much work they find. Measured hourly
-#    from dagster_recent_job_ticks since #5495: 230-651, stepping to a flat
-#    605-651 on 2026-08-22 when the sensor set changed. Peak 651/hour against a 1h
-#    lookback made 40000 a 61x cap. 8000 is 12x, and still holds the invariant if
-#    the tick rate octuples.
+#    from dagster_recent_job_ticks since #5495: Production 230-651, stepping to a
+#    flat 605-651 at 2026-08-22 21:29Z when the sensor set changed; QA a flat
+#    455-462 since 2026-08-19. Peak 651/hour against a 1h lookback made 40000 a
+#    61x cap. 8000 is 12x, and still holds the invariant if the tick rate
+#    octuples.
 #
 #    A third correction while re-reading the series: the storm did not start on
 #    2026-08-11. Run creation steps from ~120 to ~2136 per 6h in the bucket
-#    covering 2026-08-07 16:53Z-22:53Z, four days before the window on record, and
-#    stays elevated until 2026-08-18 ~04:00Z. The end date is right; the start was
-#    taken from when the symptom was noticed. Any window opened on 08-11 to avoid
-#    the storm still contains three days of it.
+#    covering 2026-08-07 17:12Z-23:12Z, four days before the window on record, and
+#    falls back to ~112 by the bucket ending 2026-08-18 11:12Z, consistent with
+#    the 03:30Z end already on record. The end date is right; the start was taken
+#    from when the symptom was noticed. Any window opened on 08-11 to avoid the
+#    storm still contains three days of it.
 #
 #    Adding a lookback fixed the span but introduced a subtler fault: id is
 #    CREATION order, and the

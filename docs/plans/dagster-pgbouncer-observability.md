@@ -557,16 +557,16 @@ at 6h resolution, 2026-07-25 to 2026-08-24 — puts numbers on it:
 | storm, peak | **7416** |
 
 A 50x swing on the same workload. `SQL_EXPORTER_RUN_WINDOW` stays at **20000**, 2.7x over
-that peak. Cutting it to the ~2000 a quiet week suggests would have truncated every 6h
-bucket from 2026-08-08 to 2026-08-18 but two, and `dagster_run_wait_to_start_seconds` is a
+that peak. Cutting it to the ~2000 a quiet week suggests would have truncated **30 of the
+42 six-hour buckets** in that stretch, and `dagster_run_wait_to_start_seconds` is a
 queue-depth metric — a storm is the only time anyone reads it.
 
 `SQL_EXPORTER_TICK_WINDOW` is the one that genuinely overshoots, and it overshoots against
 its own peak rather than against a quiet week, so the rule above does not protect it. Ticks
 are cadence-bound, not demand-bound: tick rate tracks how many sensors exist, not how much
 work they find. Measured hourly from `dagster_recent_job_ticks` since #5495: on Production
-230–651, stepping to a flat 605–651 on 2026-08-22 when the sensor set changed; on QA a flat
-455–462. Peak 651/hour against a 1h lookback made 40000 a 61x cap. Cut to **8000**, which is
+230–651, stepping to a flat 605–651 at 2026-08-22 21:29Z when the sensor set changed; on QA
+a flat 455–462 since 2026-08-19. Peak 651/hour against a 1h lookback made 40000 a 61x cap. Cut to **8000**, which is
 12x the higher of the two environments, and still holds the span above the lookback if the
 sensor set grows eightfold.
 
@@ -580,9 +580,10 @@ cluster measures a different thing under the same name.
 #### The storm started four days earlier than recorded
 
 Third correction from the same series: run creation steps from ~120 to ~2136 per 6h in the
-bucket covering **2026-08-07 16:53Z–22:53Z**, not on 2026-08-11, and stays elevated until
-2026-08-18 ~04:00Z. The end date on record is right; the start was taken from when the
-symptom was noticed rather than when the rate moved. Any window opened on 08-11 to avoid
+bucket covering **2026-08-07 17:12Z–23:12Z**, not on 2026-08-11, and has fallen back to
+~112 by the bucket ending 2026-08-18 11:12Z — consistent with the 03:30Z end already on
+record. The end date on record is right; the start was taken from when the symptom was
+noticed rather than when the rate moved. Any window opened on 08-11 to avoid
 the storm still contains three days of it — which matters most for
 `tk-set-alert-thresholds-on-the-new-dagster-sql-expo-0063d0`, where a contaminated
 baseline becomes a threshold.
