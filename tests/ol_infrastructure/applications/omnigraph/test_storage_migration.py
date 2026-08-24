@@ -197,6 +197,28 @@ def test_row_counts_are_parsed_per_table() -> None:
     assert migrate.SNAPSHOT_SCHEMA_RE.search(snapshot).group(1) == "6"
 
 
+def test_cutover_instructions_set_both_paired_config_values() -> None:
+    """omnigraph:internal_schema_version is required alongside storage_prefix
+    (ol-infrastructure's storage.py::validate_internal_schema_version) — the
+    printed cutover command has to set both, or the very next `pulumi
+    preview` following it fails.
+    """
+    instructions = migrate.cutover_instructions("fmt6", 6)
+    assert "pulumi config set omnigraph:storage_prefix fmt6 " in instructions
+    assert "pulumi config set omnigraph:internal_schema_version 6 " in instructions
+
+
+def test_cutover_instructions_clear_the_migration_knobs() -> None:
+    """Clearing migrate_from_image/migrate_to_prefix in the SAME config
+    change as the cutover is what __main__.py's own
+    `if MIGRATE_TO_PREFIX == STORAGE_PREFIX` guard requires — its error
+    message says so, and this is that advice followed.
+    """
+    instructions = migrate.cutover_instructions("fmt6", 6)
+    assert "pulumi config rm omnigraph:migrate_from_image " in instructions
+    assert "pulumi config rm omnigraph:migrate_to_prefix " in instructions
+
+
 def _export(tmp_path: Path, nodes: int, edges: int = 0) -> Path:
     """Build an export shaped like omnigraph's: node records, then edge records."""
     path = tmp_path / "graph.jsonl"

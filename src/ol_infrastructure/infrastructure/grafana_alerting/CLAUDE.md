@@ -83,7 +83,7 @@ Rootly). That path is independent of Grafana and is managed in
 | `metric_rules/apisix_edge.py` | Per-host 5xx rate at the APISIX edge (`apisix_http_status`). Two windows (fast cliff / slow creep) with a minimum-traffic gate. Currently unlabelled → `oblivion` while calibrating. |
 | `metric_rules/dagster_pgbouncer.py` | Dagster's PgBouncer pool (`pgbouncer_*`, from the exporter sidecar added in #5426). Aggregate connections against the derived `max_db_connections` cap, clients queued behind it, connection turnover, and exporter health. The denominator is read from `pgbouncer_databases_max_connections` rather than hardcoded, because the cap differs per environment. Everything here is pool-side; the client side lives in `log_rules/dagster_database.py`. |
 | `metric_rules/witan.py` | The shared witan MCP service. The share of MCP tool calls that fail (`witan_tool_calls_total`) is the only *continuous* signal for a quarantined `council` graph — omnigraph skips a graph it cannot open, so the pod stays Ready and `/healthz` returns 200 while every request 404s, and neither health endpoint can be made deeper without converting backend slowness into frontend death. Also holds a 36h staleness rule for the *nightly* omnigraph-optimize (`eks_general.py`'s slow bucket puts it at 15 days) and the never-succeeded-at-all CronJob case that `eks_general.py` documents as a gap, scoped to the witan/omnigraph namespaces so it does not page for the pre-existing open-metadata pair. |
-| `metric_rules/synthetic_monitoring.py` | MIT Learn probe-failure rules (`probe_success`) for the Next.js origin, the API health endpoint, and the homepage. Imported from hand-made UI rules; lives in the Synthetic Monitoring **plugin's** folder, so it takes no `folder_uid`. |
+| `metric_rules/synthetic_monitoring.py` | MIT Learn probe rules for the Next.js origin, the API health endpoint, and the homepage: two availability windows (`probe_success`) plus a latency rule (`probe_all_duration_*`) per check. Imported from hand-made UI rules; lives in the Synthetic Monitoring **plugin's** folder, so it takes no `folder_uid`. The latency rules sit alongside the plugin's own `HTTPRequestDurationTooHighAvg` rather than adopting it — its threshold lives in SM UI config, not in the rule. |
 | `log_rules/` | Package. Grafana-managed alert rule groups for log queries. Migrated from `grafana-alerts/loki-rules/`. |
 | `log_rules/base.py` | Loki datasource UIDs, two-stage pipeline helper, folder creation, delegates to sub-modules. |
 | `log_rules/apisix_oidc.py` | Per-host OIDC callback 500 rate (`/.apisix/redirect`) from the APISIX access log — a rate over callback *requests*, not over users. Two windows (fast regression / chronic condition) with a minimum-callback gate. Currently unlabelled → `oblivion` while calibrating. |
@@ -426,8 +426,12 @@ the list exists to prevent. `matched_host` was added there for
 
 The same mechanism silently swallows rules that lost their label *by accident*:
 `HTTPRequestDurationTooHighAvg` fired 1,168 times in 30 days into `oblivion`
-before anyone noticed. When adding a rule, be explicit about which of the two
-you mean.
+before anyone noticed (still 333 times in the 14 days to 2026-08-24). When
+adding a rule, be explicit about which of the two you mean.
+
+That rule is plugin-owned and stays in `oblivion` deliberately — the latency
+signal it carries is now covered by the `- Elevated Request Latency` rules in
+`metric_rules/synthetic_monitoring.py`, which reach `#devops-warnings`.
 
 **Route 3 swallows by *name*, not just by missing label.** `alertname =~ Kube.*`
 sits above the severity routes and carries `continue_=False`, so any rule whose

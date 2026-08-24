@@ -265,11 +265,23 @@ def _wildcard_statement_index(statements: list[dict[str, Any]]) -> int:
 
 def _action_list_span(
     lines: list[str], statement_index: int
-) -> tuple[int, str, list[str]]:
+) -> tuple[int, int, str, list[str], list[tuple[int, int]]]:
     """Locate the ``"Action": [`` entries of the nth statement in a module source.
 
-    Returns ``(start, indent, entries)`` where ``start`` is the line index of the
-    first entry, so the block occupies ``lines[start:start + len(entries)]``.
+    Several policy modules document individual grants with a comment on the
+    line(s) directly above them (e.g. pulumi_infra.py's glue:GetTags and
+    s3:ListBucket) -- comment and blank lines are preserved verbatim rather
+    than treated as the end of the list, so this doesn't truncate `entries`
+    (and therefore falsely flag a match against `policy_definition` as
+    mismatched) the moment it meets the first one.
+
+    Returns ``(start, end, indent, entries, entry_spans)``: ``lines[start:end]``
+    is the full block (entries plus any interspersed comments/blanks);
+    ``entries`` is the parsed action strings in source order; ``entry_spans[i]``
+    is the inclusive ``(block_start, line_idx)`` range for ``entries[i]`` --
+    its own line plus any comment/blank lines immediately above it that belong
+    to no earlier entry, so a comment always stays paired with the action
+    beneath it if a new action is inserted nearby.
     """
     opens = [i for i, line in enumerate(lines) if _ACTION_LIST_OPEN.match(line)]
     if statement_index >= len(opens):
@@ -281,16 +293,27 @@ def _action_list_span(
     start = opens[statement_index] + 1
     indent = ""
     entries: list[str] = []
-    for line in lines[start:]:
+    entry_spans: list[tuple[int, int]] = []
+    block_start = start
+    end = start
+    for i, line in enumerate(lines[start:], start=start):
         matched = _ACTION_LINE.match(line)
-        if matched is None:
-            break
-        indent = indent or matched["indent"]
-        entries.append(matched["action"])
+        if matched is not None:
+            indent = indent or matched["indent"]
+            entries.append(matched["action"])
+            entry_spans.append((block_start, i))
+            block_start = i + 1
+            end = i + 1
+            continue
+        stripped = line.strip()
+        if stripped == "" or stripped.startswith("#"):
+            end = i + 1
+            continue
+        break
     if not entries:
         msg = f"Statement {statement_index} has no literal action entries to extend"
         raise SystemExit(msg)
-    return start, indent, entries
+    return start, end, indent, entries, entry_spans
 
 
 def _add_actions_to_module(
@@ -301,7 +324,9 @@ def _add_actions_to_module(
 ) -> None:
     """Insert actions into a policy module's nth statement, in alphabetical order."""
     lines = module_path.read_text().splitlines(keepends=True)
-    start, indent, existing = _action_list_span(lines, statement_index)
+    start, end, indent, existing, entry_spans = _action_list_span(
+        lines, statement_index
+    )
     # The imported statement is the source of truth for what the policy grants;
     # if the source lines don't reproduce it exactly then this statement is
     # built by something other than string literals and a textual edit would
@@ -316,16 +341,25 @@ def _add_actions_to_module(
     # Insert before the first entry that sorts after the new action, rather than
     # re-sorting the whole list: these lists are only near-sorted (a few
     # hand-appended entries sit out of order), and rewriting them would bury the
-    # one line that matters in a few hundred lines of reshuffling.
-    merged = list(existing)
-    for action in sorted(additions):
-        position = next(
-            (index for index, entry in enumerate(merged) if entry > action), len(merged)
-        )
-        merged.insert(position, action)
-    lines[start : start + len(existing)] = [
-        f'{indent}"{action}",\n' for action in merged
-    ]
+    # one line that matters in a few hundred lines of reshuffling. Original
+    # lines (entries and any comments/blanks attached to them) are copied
+    # through untouched; a new action is spliced in right before the comment
+    # block of the first existing entry that sorts after it, if any.
+    additions_sorted = sorted(additions)
+    add_idx = 0
+    new_lines: list[str] = []
+    for action, (block_start, line_idx) in zip(existing, entry_spans, strict=True):
+        while add_idx < len(additions_sorted) and additions_sorted[add_idx] < action:
+            new_lines.append(f'{indent}"{additions_sorted[add_idx]}",\n')
+            add_idx += 1
+        new_lines.extend(lines[block_start : line_idx + 1])
+    while add_idx < len(additions_sorted):
+        new_lines.append(f'{indent}"{additions_sorted[add_idx]}",\n')
+        add_idx += 1
+    # Trailing comment/blank lines after the last entry, if any.
+    new_lines.extend(lines[entry_spans[-1][1] + 1 : end])
+
+    lines[start:end] = new_lines
     module_path.write_text("".join(lines))
 
 

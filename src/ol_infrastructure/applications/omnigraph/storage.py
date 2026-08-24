@@ -20,6 +20,11 @@ _PREFIX_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 # preview` rather than a Job.
 _MIGRATION_PREFIX_RE = re.compile(r"fmt[0-9]+")
 
+# Same shape as _MIGRATION_PREFIX_RE, but capturing — used to pull the digits
+# back out of a served `storage_prefix` that already follows the convention,
+# for validate_internal_schema_version below.
+_PREFIX_SCHEMA_RE = re.compile(r"fmt(?P<version>[0-9]+)")
+
 
 def validate_storage_prefix(prefix: str | None) -> str:
     """Normalize and check ``omnigraph:storage_prefix``; return "" when unset.
@@ -88,6 +93,78 @@ def validate_migration_target_prefix(prefix: str | None) -> str:
         )
         raise ValueError(msg)
     return cleaned
+
+
+def validate_internal_schema_version(
+    storage_prefix: str, internal_schema_version: int | None
+) -> None:
+    """Cross-check ``omnigraph:internal_schema_version`` against ``storage_prefix``.
+
+    Neither value derives the other — auto-deriving one from the other was
+    considered and rejected, same as the migration cutover itself:
+    ``storage_prefix`` is the switch a human flips only after a rebuild is
+    verified, not something to recompute on every deploy. This is a pure
+    cross-check between two independently-set config values that a real
+    migration touches together, so a slip in one without the other is caught
+    here — at ``pulumi preview`` — rather than downstream, where it is
+    silent: the server just refuses the store and crashloops.
+
+    Deliberately narrower than it sounds, and worth stating precisely: this
+    does NOT verify either value against the image actually being deployed,
+    or against the live store's own ``internal_schema_version``
+    (``omnigraph snapshot``). ol-infrastructure has no access to agent-kit's
+    version -> internal-schema mapping, and the deploying image is addressed
+    only by digest (``OMNIGRAPH_DOCKER_SHA``), never a semver string that
+    could be looked up. What this closes is the narrower, still-real gap of
+    a human editing one of a *committed* pair of config values without the
+    other — the exact category of mistake the CI incident behind this check
+    was (``storage_prefix`` reverted while the deployed image could only
+    read the new format). See
+    tk-derive-the-s3-storage-prefix-from-the-binary-s-i-bc3385 for the wider
+    gap this leaves open.
+
+    Raises ``ValueError`` when ``storage_prefix`` follows the ``fmt<N>``
+    convention a migrated environment's served prefix uses and
+    ``internal_schema_version`` is unset or disagrees with N, or when
+    ``internal_schema_version`` is set against a ``storage_prefix`` that does
+    not follow that convention (bucket root, or a non-standard prefix) — in
+    that case there is no digit to check it against.
+    """
+    match = _PREFIX_SCHEMA_RE.fullmatch(storage_prefix)
+    if match is None:
+        if internal_schema_version is not None:
+            msg = (
+                f"omnigraph:internal_schema_version is set to "
+                f"{internal_schema_version} but omnigraph:storage_prefix "
+                f"{storage_prefix!r} does not follow the fmt<N> convention a "
+                "migrated environment's served prefix uses, so there is "
+                "nothing to check it against. Unset "
+                "internal_schema_version, or set storage_prefix to fmt<N> "
+                "if a migration to this schema already landed."
+            )
+            raise ValueError(msg)
+        return
+    prefix_version = int(match.group("version"))
+    if internal_schema_version is None:
+        msg = (
+            f"omnigraph:storage_prefix is {storage_prefix!r}, which declares "
+            f"internal-schema {prefix_version}, but "
+            "omnigraph:internal_schema_version is unset. Set it to "
+            f"{prefix_version} to record that this environment's committed "
+            "config agrees with itself about which schema it serves — see "
+            "docs/omnigraph-storage-format-upgrade-runbook.md."
+        )
+        raise ValueError(msg)
+    if internal_schema_version != prefix_version:
+        msg = (
+            f"omnigraph:storage_prefix {storage_prefix!r} declares "
+            f"internal-schema {prefix_version}, but "
+            f"omnigraph:internal_schema_version is {internal_schema_version}. "
+            "They must agree — this is exactly the kind of drift that "
+            "otherwise reaches the cluster as a crash-looping server rather "
+            "than a preview failure."
+        )
+        raise ValueError(msg)
 
 
 def storage_uri_for(bucket: str, prefix: str) -> str:

@@ -42,5 +42,8 @@ config:
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
   omnigraph:storage_prefix: fmt6
+  # Cross-checked against storage_prefix at preview time — see the CI
+  # config's comment on this same key for why.
+  omnigraph:internal_schema_version: 6
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgHdah3681q3jIoMB6EquY0xAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMQkBOIyzkj00xRzZ9AgEQgDvOaikBeNnKV3FG4ZgMGvt3MOO4WsufLhs1b/FFH28hvQEuaZnfrQ1oLOS4NHXINUEJweVvuqaQUVj9gg==

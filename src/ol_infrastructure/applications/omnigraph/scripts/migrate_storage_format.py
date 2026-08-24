@@ -164,6 +164,33 @@ def snapshot_schema_version(binary: str, store: str) -> int:
     return int(match.group(1))
 
 
+def cutover_instructions(new_prefix: str, schema_version: int) -> str:
+    """Render the exact config commands that finish a verified cutover.
+
+    Four commands, not one, and all four matter:
+
+    - ``storage_prefix`` and ``internal_schema_version`` are a required pair
+      — ol-infrastructure's ``storage.py::validate_internal_schema_version``
+      fails ``pulumi preview`` if either is missing or they disagree.
+    - Clearing ``migrate_from_image``/``migrate_to_prefix`` in the SAME
+      config change, rather than a later cleanup step, is what
+      ``__main__.py``'s own ``if MIGRATE_TO_PREFIX == STORAGE_PREFIX`` guard
+      requires: setting ``storage_prefix`` to the value this migration just
+      rebuilt into, while that value is still armed as ``migrate_to_prefix``,
+      is exactly the "cluster already serving the root this migration would
+      rebuild into" case that guard refuses. Its own error message says to
+      clear both — this is that advice, followed.
+    """
+    return (
+        f"pulumi config set omnigraph:storage_prefix {new_prefix} "
+        "--stack <CI|QA|Production>\n"
+        f"pulumi config set omnigraph:internal_schema_version {schema_version} "
+        "--stack <CI|QA|Production>\n"
+        "pulumi config rm omnigraph:migrate_from_image --stack <CI|QA|Production>\n"
+        "pulumi config rm omnigraph:migrate_to_prefix --stack <CI|QA|Production>"
+    )
+
+
 def bucket_of(root: str) -> str:
     """Return the bucket name from an ``s3://<bucket>/...`` root."""
     return root.removeprefix("s3://").split("/", 1)[0]
@@ -570,14 +597,17 @@ def main() -> int:
         )
         return 1
 
+    # Guaranteed uniform by check_format_moved above — format_problems would
+    # already have returned 1 otherwise — so any one graph's value speaks for
+    # all of them.
+    verified_schema_version = next(iter(new_formats.values()))
     LOG.info(
         "All %d graph(s) rebuilt and verified at %s. NOT DONE YET — the "
-        "cluster still serves the OLD root. To cut over: pulumi config set "
-        "omnigraph:storage_prefix %s --stack <CI|QA|Production>, then deploy "
+        "cluster still serves the OLD root. To cut over:\n%s\nThen deploy "
         "the new image, verify, and soak before retiring the old root.",
         len(graphs),
         new_root,
-        new_root.rsplit("/", 1)[-1],
+        cutover_instructions(new_root.rsplit("/", 1)[-1], verified_schema_version),
     )
     return 0
 
