@@ -139,9 +139,10 @@ The plugin's own `HTTPRequestDurationTooHighAvg [5m]` measures how *slowly*
 these three endpoints answer, which nothing else here covers -- the probe
 rules above are availability only. It carries no `severity`, so every firing
 lands in alertmanager.py's `oblivion`: evaluated, recorded, delivered nowhere.
-Measured over the 14 days to 2026-08-24 it is the single loudest
-Grafana-native rule in the estate at 333 Alerting transitions, ~24/day, and
-none of them reached a human.
+Measured over the 14 days to 2026-08-24 it is the loudest rule in the estate
+outside the Adaptive Traces ML set at 333 Alerting transitions, ~24/day (the
+next loudest are APISIXEdge5xxRateFast at 194 and PodOOMKilledCritical at
+144), and none of them reached a human.
 
 It is loud because `for` is `0s`. One 5-minute average crossing the threshold
 fires immediately, so the rule reports every transient blip. Per instance:
