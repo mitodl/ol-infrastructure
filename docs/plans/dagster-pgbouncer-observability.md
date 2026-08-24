@@ -374,6 +374,11 @@ Three implementation findings worth keeping, all from testing rather than readin
   covered anywhere from ~10 hours to ~6 days depending on when you looked, and
   `dagster_recent_runs` reported a six-day trailing count while calling itself recent.
 
+  Those seven days are now known to be the retry storm below, so every figure in that
+  paragraph is inflated: steady state is ~520–670 runs/day, not ~3.4k. It does not change
+  what #5495 did — the id cap was over-provisioned then and is more over-provisioned now —
+  but it does mean the sizing has never been derived from a quiet week.
+
   Adding a lookback fixed the span and introduced a subtler fault, caught in review: `id`
   is **creation** order, and the completion-time metrics filter on `update_timestamp`. Any
   run created before the cap but finishing inside the lookback was silently dropped —
@@ -448,6 +453,91 @@ set, and the kube-state-metrics label allowlist in §5 answers a near-enough ver
 the same question for free. Revisit if the two ever disagree — they measure different
 things (Dagster run status vs. run-worker Job exit) and a systematic gap between them
 would itself be worth knowing about.
+
+#### What the first scrape found: a 95% failure rate the cluster had been calling healthy
+
+The gap the paragraph above says "would itself be worth knowing about" opened on the very
+first scrape, 2026-08-18 16:39Z, before the time bound in #5495 had shipped:
+
+```
+dagster_recent_runs{status="FAILURE"}   18973
+dagster_recent_runs{status="SUCCESS"}    1023
+dagster_recent_retried_runs             14680
+dagster_recent_job_ticks{tick_type="SENSOR",status="FAILURE"}  1020
+```
+
+Meanwhile `increase(kube_job_status_failed{namespace="dagster"}[7d])` was ~21. Both were
+right. A Dagster run that fails cleanly — an op raises, the failure is recorded — still
+lets the run worker exit 0, so the k8s Job counts as SUCCEEDED. `kube_job_status_failed`
+sees infrastructure failures (OOM, eviction, crash) and is blind to application ones. That
+is the entire blind spot this exporter was built to close, and it closed it immediately.
+
+**The failures were real.** Confirmed independently in Loki, which does not go through the
+exporter and did not exist to serve it. Counting `RUN_FAILURE` lines on `data-production`:
+
+| Window (UTC, `count_over_time[6h]`) | Failed runs |
+|---|---|
+| 08-08 00:00 → 08-11 12:00 | 2–350 per 6h (one 3,659 spike in the 08-07 18:00 bucket) |
+| 08-11 12:00 → 18:00 | 8,739 — burst begins |
+| 08-12 18:00 → 08-13 00:00 | 27,861 — peak |
+| sustained 08-11 → 08-18 | 8k–28k per 6h |
+| 08-18 03:30 onward | 0–40 per 6h |
+
+Every one of them is the same asset: step `extract_edxorg_courserun_metadata` in the
+`edxorg` code location, failing `__ASSET_JOB`, each line carrying a distinct run id.
+
+**The first suspect was wrong, and wrong in an instructive way.** `learning-resources`
+held 211 of the 221 Jobs in the namespace, an order of magnitude more than any other
+location, which looked like a job failing and relaunching in a loop. It was volume, not
+failure. Job count is a proxy for neither.
+
+**Root cause, and it is already fixed.** `upstream_or_code_changes()` in
+`ol_orchestrate.lib.automation_policies` ORed in a bare `execution_failed()`. That term is
+*level*-triggered: a partition that can never succeed reads true on every sensor tick
+forever, and `run_retries.max_retries = 3` multiplied each re-request by four. A code
+deploy is what starts it — `dagster-edxorg:dcce1f1b` rolled 2026-08-11T13:03Z, inside the
+six-hour bucket the burst begins in — because a changed code version re-requests every
+partition; the asset then fails, and the level-triggered term never lets it stop.
+ol-data-platform #2564 changed the term to `.newly_true()`, which spends one failure on
+one re-request. `dagster-edxorg:12bc637e` rolled 2026-08-17T21:36Z.
+
+**The tail confirms the mechanism.** The burst does not stop at the 21:36Z deploy; it
+drains over the following five hours — 706 failures in the 02:00Z half-hour, 467 at 02:30,
+208 at 03:00, 0 at 03:30. That is exactly what #2564's own deploy note predicts:
+`NewlyTrueCondition` diffs against a cursor that does not exist on its first evaluation,
+so every already-failed partition reads as newly true once. One final wave, four retries
+each, then silence.
+
+**Current state, 2026-08-24**, all three of the affected metrics back to a normal shape:
+
+| Metric | During the storm | Now |
+|---|---|---|
+| failure share of terminal runs | ~95% | 5–15% per 6h (7–28 failures against 137–222 successes) |
+| `dagster_recent_retried_runs` | 14,680 of 20,000 (73%) | 6–21 per 6h |
+| sensor ticks in `FAILURE` | 1,020 | 0–1 per hour |
+
+**Every run-rate figure this project has carried was measured inside the storm.** The
+~53k/day of the original design was wrong; the ~3.4k/day that replaced it in #5495 was
+measured on 2026-08-18, still inside the tail, and is wrong too.
+`increase(kube_job_status_succeeded{namespace="dagster"}[24h])` per day since:
+
+```
+08-17  9179     08-21   616
+08-18  3552     08-22   564
+08-19  1012     08-23   521
+08-20   674     08-24   528
+```
+
+Steady state is **~520–670 runs/day**, corroborated independently by the exporter's own
+6h `SUCCESS` counts (137–222, i.e. ~550–890/day). A 17x collapse from the figure the
+windows were sized against. Nothing is broken by this — `dagster_id_window_span_seconds`
+reports the `runs` cap now spanning 6.8 days and `job_ticks` 3.6 days against lookbacks of
+6h and 1h, so both caps are non-binding by a wide margin and the time predicates are doing
+all the work. Stated as ratios rather than lumped together, because they are not the same
+number: the `runs` cap overshoots its lookback by ~27x (6.8 days against 6h) and the
+`job_ticks` cap by ~85x (3.6 days against 1h). Both cost a wider scan and nothing else. Re-sizing them, and setting alert thresholds, both want a week of
+post-storm series rather than another figure measured on top of an incident.
+
 
 ### 4. OpenTelemetry auto-instrumentation — the "why", not the "what"
 

@@ -1310,7 +1310,25 @@ pgbouncer_service_monitor = kubernetes.apiextensions.CustomResource(
 #
 #    A 14x swing, so a fixed 20000-id window covered anything from ~10 hours to
 #    ~6 days depending on when you looked, and `dagster_recent_runs` reported a
-#    six-day trailing count while calling itself recent. Adding a lookback fixed
+#    six-day trailing count while calling itself recent.
+#
+#    CORRECTION, 2026-08-24: those seven days were an ol-data-platform retry storm
+#    (a level-triggered execution_failed() re-requesting a permanently failing
+#    edxorg partition on every tick, fixed by ol-data-platform #2564), so every
+#    figure above is inflated. Steady state measured over the six clean days since:
+#
+#      08-19  1012    08-22   564
+#      08-20   674    08-23   521
+#      08-21   616    08-24   528
+#
+#    ~520-670 runs/day, a 17x collapse from the 11.6k/day the caps were sized
+#    against. The caps are correspondingly over-provisioned, by different factors:
+#    span is currently 6.8 days on runs against a 6h lookback (~27x) and 3.6 days
+#    on job_ticks against a 1h lookback (~85x). Neither binds, so both time
+#    predicates do all the work; the cost is a wider scan and nothing else.
+#    Re-size from a quiet week, not from another incident.
+#
+#    Adding a lookback fixed
 #    the span but introduced a subtler fault: id is CREATION order, and the
 #    completion-time metrics filter on update_timestamp, so any run created before
 #    the cap but finishing inside the lookback was silently dropped -- long-running
@@ -1345,8 +1363,9 @@ pgbouncer_service_monitor = kubernetes.apiextensions.CustomResource(
 # 1ms and watching every query come back 57014.
 # Applies only to the creation-ordered run metric (wait-to-start) and the span
 # gauge. The completion-time run metrics range-scan idx_run_range instead and take
-# no id cap at all -- see the note on dagster_recent_runs. 20000 against a
-# busiest-observed 6h of ~7416 creations is 2.7x headroom.
+# no id cap at all -- see the note on dagster_recent_runs. 20000 was sized against
+# a busiest-observed 6h of ~7416 creations for 2.7x headroom; post-storm a 6h holds
+# ~150-250 runs, so the real headroom is ~80-130x. See the correction above.
 SQL_EXPORTER_RUN_WINDOW = 20000
 # Ticks accrue far faster than runs -- the daemon evaluates every sensor on a ~30s
 # cadence whether or not it yields a run -- so the same id count buys a much shorter
