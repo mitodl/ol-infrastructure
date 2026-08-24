@@ -280,14 +280,27 @@ probe calls — worth filtering out of any future reading, as the consumer map
 already notes for the gcloud CLI's public OAuth client.)
 
 **A credential nobody had inventoried.** `dagster_server_policy.hcl:125` grants
-read on `secret-operations/institutional-research-bigquery-service-account`. That
+read on `secret-operations/institutional-research-bigquery-service-account`. It
 appears in no inventory pass and no consumer-map row, and its name matches the
-`mitir-mitx-surveys` project. **If MIT Institutional Research issued it from their
-own project, it is a credential OL cannot re-create for itself** — the sharpest
-kind of external grant, and one that consolidation cannot simply replace. It is now
-in `probe-all`'s manifest. Note the policy granting it is *Dagster's*, while the
-BigQuery traffic is attributed to Airbyte; the relationship between the two is
-**not yet established**.
+`mitir-mitx-surveys` project. It is now in `probe-all`'s manifest.
+
+**Open Learning owns this service account** (confirmed by the project owner,
+2026-08-24). An earlier draft of this section speculated that Institutional
+Research might have issued it from their own project, which would have made it
+un-re-creatable; that is **not** the case, and the speculation is corrected here
+rather than left to propagate. Consolidation can create a replacement SA in
+`mitol01` like any other, and where the replacement needs reach into IR-held data,
+that is an access grant OL can ask for.
+
+What that leaves is a **lead-time dependency, not a blocker**: the new SA's grants
+must be requested and issued before the old credential is retired, because the
+grants name the identity and the identity changes. Sequence it like the YouTube
+quota — ask early, cut over after.
+
+Note the policy granting this secret is *Dagster's*, while the BigQuery traffic is
+attributed to Airbyte. That relationship is **still not established**, and it is the
+open question here: either Dagster holds a credential it does not use, or there is
+a second BigQuery consumer nobody has mapped.
 
 ### Dataset-level enumeration
 

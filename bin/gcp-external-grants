@@ -737,10 +737,10 @@ ESTATE: tuple[dict[str, str], ...] = (
         "vault": "secret-data/pipelines/google-service-account",
     },
     {
-        # Found via dagster_server_policy.hcl, not via any inventory pass. If MIT
-        # Institutional Research issued this from THEIR project, it is a credential
-        # OL cannot re-create for itself -- the sharpest kind of external grant.
-        "label": "institutional-research BigQuery SA -- owner not yet established",
+        # Found via dagster_server_policy.hcl, not via any inventory pass. OL owns
+        # it, so a replacement can be created in mitol01 like any other; what it
+        # needs is the IR-held data grants re-issued to the new identity first.
+        "label": "institutional-research BigQuery SA (OL-owned)",
         "vault": "secret-operations/institutional-research-bigquery-service-account",
     },
     {
