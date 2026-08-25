@@ -1381,6 +1381,7 @@ def create_k8s_resources(  # noqa: C901
                                 "--exclude-queues=edx.cms.core.default",
                                 "--concurrency=2",
                                 "--prefetch-multiplier=1",
+                                "--disable-prefetch",
                             ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
@@ -1566,6 +1567,7 @@ def create_k8s_resources(  # noqa: C901
                                 "--exclude-queues=edx.cms.core.default",
                                 "--concurrency=1",
                                 "--prefetch-multiplier=1",
+                                "--disable-prefetch",
                             ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
@@ -1944,6 +1946,7 @@ def create_k8s_resources(  # noqa: C901
                                 "--exclude-queues=edx.lms.core.default,edx.lms.core.high,edx.lms.core.high_mem",
                                 "--prefetch-multiplier=1",
                                 "--concurrency=2",
+                                "--disable-prefetch",
                             ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
