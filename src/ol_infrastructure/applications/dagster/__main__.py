@@ -732,9 +732,13 @@ dagster_db_secret = OLVaultK8SSecret(
 # show it: instantaneous load spreads evenly (1-18 active per pod), so fewer/larger
 # replicas is a live option rather than an urgent fix.
 #
-# Left alone here deliberately. This pass changes min_pool_size, and changing the
-# multiplier in the same breath would make the result unattributable -- which is the
-# failure mode the whole exercise exists to stop repeating.
+# Production took that option on 2026-08-25, 6 -> 4, and it is the first replica count
+# on this stack derived from measurement rather than assumed. The binding constraint
+# turned out to be max_client_conn rather than backends: maxSurge is 0 below, so a
+# rollout runs on N-1 pods, and the peak client-socket count has to fit in
+# (N-1) x max_client_conn. Backend demand does not bind at any plausible N -- six days
+# of post-transaction-mode samples peaked at 13 concurrent in-flight backends across
+# the whole fleet. Full derivation in Pulumi.Production.yaml.
 pgbouncer_replica_count = dagster_config.get_int("pgbouncer_replica_count") or 2
 
 # Cap the connections PgBouncer can open against RDS, in aggregate across every replica.
