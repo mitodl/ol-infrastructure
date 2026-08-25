@@ -123,10 +123,21 @@ def build_kubewatch_pipeline() -> PipelineFragment:
     webhook_handler_fragment = build_kubewatch_webhook_handler_pipeline()
     webhook_handler_code = webhook_handler_fragment.resources[-1]
 
-    # Create dependencies for each kubewatch job to wait for webhook handler
+    # Create dependencies for each kubewatch job to wait for webhook handler.
+    # preview-gated expands each gated stage into a preview/deploy pair, so
+    # webhook_handler_fragment.jobs is no longer one job per environment --
+    # look up each stage's *deploy* job by name rather than by position.
     custom_dependencies = {}
-    for idx, _env in enumerate(("CI", "QA", "Production")):
-        webhook_handler_job = webhook_handler_fragment.jobs[idx]
+    for idx, env in enumerate(("CI", "QA", "Production")):
+        deploy_job_name = (
+            "deploy-ol-infrastructure-kubewatch-webhook-handler"
+            f"-applications-{env.lower()}"
+        )
+        webhook_handler_job = next(
+            job
+            for job in webhook_handler_fragment.jobs
+            if str(job.name) == deploy_job_name
+        )
         custom_dependencies[idx] = [
             GetStep(
                 get=webhook_handler_code.name,
