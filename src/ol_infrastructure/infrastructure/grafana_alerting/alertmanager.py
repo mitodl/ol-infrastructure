@@ -3,18 +3,16 @@
 Translates grafana-alerts/alertmanager.yaml into Pulumi-managed resources.
 
 Routing logic (mirrors the original alertmanager.yaml route tree):
-  1. Alerts labelled channel=notifications-ocw-misc go to dedicated Slack
-     channels by severity; anything else with that channel label is silenced.
-  2. Alerts labelled channel=devops-warnings go to a separate pair of Slack
-     channels by severity, same pattern as (1) -- for alerts that aren't any
-     one team's concern (e.g. cluster-wide capacity signals).
-  3. Alerts whose name matches Kube.* are silenced (built-in k8s noise).
-  4. Pod(OOMKilled|CrashLooping)(Warning|Critical) → Rootly, but grouped at
+  1. Alerts labelled channel=devops-warnings go to a separate pair of Slack
+     channels by severity -- for alerts that aren't any one team's concern
+     (e.g. cluster-wide capacity signals).
+  2. Alerts whose name matches Kube.* are silenced (built-in k8s noise).
+  3. Pod(OOMKilled|CrashLooping)(Warning|Critical) → Rootly, but grouped at
      the namespace level (not pod/container) with a longer group_interval,
      to stop a churning workload from minting one alert per pod name.
-  5. All remaining warning-severity alerts → Rootly.
-  6. All remaining critical-severity alerts → Rootly.
-  7. Everything else → oblivion (default receiver, acts as a drop sink).
+  4. All remaining warning-severity alerts → Rootly.
+  5. All remaining critical-severity alerts → Rootly.
+  6. Everything else → oblivion (default receiver, acts as a drop sink).
 """
 
 from typing import Any
@@ -61,49 +59,9 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
         opts=resource_opts,
     )
 
-    # OCW misc Slack — warning severity (yellow goose emoji, "warning" colour).
-    alerting.ContactPoint(
-        "slack-notifications-ocw-misc-warning",
-        name="slack-notifications-ocw-misc-warning",
-        slacks=[
-            alerting.ContactPointSlackArgs(
-                url=grafana_secrets["slack_notifications_ocw_misc_api_url"],
-                recipient="#notifications-ocw-misc",
-                color="warning",
-                icon_emoji=":goose_warning:",
-                title=':goose_warning: [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{- end }}] - {{ .CommonLabels.alertname }}',
-                text="{{ range .Alerts }}\n  {{- if .Annotations.message }}\n      Message - {{ .Annotations.message }}\n  {{- end }}\n  {{- if .Annotations.description }}\n      Description - {{ .Annotations.description }}\n  {{- end }}\n  {{- if .Annotations.summary }}\n      Summary - {{ .Annotations.summary }}\n  {{- end }}\n{{- end }}",
-                disable_resolve_message=False,
-            )
-        ],
-        opts=resource_opts,
-    )
-
-    # OCW misc Slack — critical severity (red alert emoji, "danger" colour).
-    alerting.ContactPoint(
-        "slack-notifications-ocw-misc-critical",
-        name="slack-notifications-ocw-misc-critical",
-        slacks=[
-            alerting.ContactPointSlackArgs(
-                url=grafana_secrets["slack_notifications_ocw_misc_api_url"],
-                recipient="#notifications-ocw-misc",
-                color="danger",
-                title=':alert: [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{- end }}] - {{ .CommonLabels.alertname }}',
-                text="{{ range .Alerts }}\n  {{- if .Annotations.message }}\n      {{ .Annotations.message }}\n  {{- end }}\n  {{- if .Annotations.description }}\n      {{ .Annotations.description }}\n  {{- end }}\n{{- end }}",
-                disable_resolve_message=False,
-            )
-        ],
-        opts=resource_opts,
-    )
-
     # devops-warnings Slack — non-paging visibility for cluster-wide capacity
     # signals that aren't any one team's concern (e.g. HPAAtMaxReplicas*,
-    # which fires for every CI/QA/production workload). Uses its own
-    # `slack_notifications_devops_warnings` secret (a per-stack required key
-    # in the grafana-alerting secrets file; see CLAUDE.md § Secrets reference).
-    # Deliberately a distinct pair of contact points, not a shared one with
-    # ocw-misc: each destination has its own contact point to keep the
-    # resource-name→channel mapping obvious from resource names alone.
+    # which fires for every CI/QA/production workload).
     alerting.ContactPoint(
         "slack-devops-warnings-warning",
         name="slack-devops-warnings-warning",
@@ -204,50 +162,9 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
         group_interval="5m",
         repeat_interval="4h",
         policies=[
-            # OCW misc: route warning/critical to the dedicated Slack channel;
-            # anything else tagged with this channel label is silenced by the
-            # parent "oblivion" receiver so it never reaches Rootly.
-            alerting.NotificationPolicyPolicyArgs(
-                matchers=[
-                    alerting.NotificationPolicyPolicyMatcherArgs(
-                        label="channel",
-                        match="=",
-                        value="notifications-ocw-misc",
-                    )
-                ],
-                contact_point="oblivion",
-                continue_=False,
-                policies=[
-                    alerting.NotificationPolicyPolicyPolicyArgs(
-                        matchers=[
-                            alerting.NotificationPolicyPolicyPolicyMatcherArgs(
-                                label="severity",
-                                match="=",
-                                value="warning",
-                            )
-                        ],
-                        contact_point="slack-notifications-ocw-misc-warning",
-                        continue_=False,
-                    ),
-                    alerting.NotificationPolicyPolicyPolicyArgs(
-                        matchers=[
-                            alerting.NotificationPolicyPolicyPolicyMatcherArgs(
-                                label="severity",
-                                match="=",
-                                value="critical",
-                            )
-                        ],
-                        contact_point="slack-notifications-ocw-misc-critical",
-                        continue_=False,
-                    ),
-                ],
-            ),
-            # devops-warnings: same pattern as OCW misc above, for alerts that
-            # aren't any one team's concern (e.g. HPAAtMaxReplicas* in
-            # metric_rules/eks_general.py, which fires for every workload
-            # cluster-wide). Kept as its own top-level branch rather than
-            # folded into the OCW misc one above, so the `channel` label
-            # value always names its actual destination.
+            # devops-warnings: for alerts that aren't any one team's concern
+            # (e.g. HPAAtMaxReplicas* in metric_rules/eks_general.py, which
+            # fires for every workload cluster-wide).
             alerting.NotificationPolicyPolicyArgs(
                 matchers=[
                     alerting.NotificationPolicyPolicyMatcherArgs(
