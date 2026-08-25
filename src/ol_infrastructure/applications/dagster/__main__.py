@@ -2634,6 +2634,33 @@ dagster_helm_values = {
                 "name": "DAGSTER_CODE_SERVER_TIMEOUT_SECONDS",
                 "value": "120",
             },
+            {
+                # A run status sensor processes at most this many runs per tick,
+                # and run_failure_notification_sensor sets
+                # monitor_all_code_locations=True, which pins its *fetch* limit
+                # to the same number (dagster
+                # _core/definitions/run_status_sensor_definition.py,
+                # _get_run_status_sensor_fetch_limit). At the default 30s tick
+                # the stock value of 5 is a ceiling of 5 * 2880 = 14,400 runs
+                # per day for every code location combined.
+                #
+                # Production failures arrived at ~12,000/day through August
+                # 2026 -- 84% of that ceiling -- so the sensor had no headroom
+                # to recover from a backlog and did not. On 2026-08-25 it was
+                # reporting runs that had executed on 2026-08-13: a twelve day
+                # lag, which made every Sentry timestamp a report time rather
+                # than a failure time and left issues looking live long after
+                # the underlying defect was fixed.
+                #
+                # 25 gives ~72,000/day, roughly 6x the observed failure rate, so
+                # a burst is absorbed rather than queued. Deliberately not
+                # higher: each processed run costs the daemon an event log read,
+                # and Sentry ingest scales with this number during a runaway
+                # (the Slack path is already rate limited per fingerprint,
+                # Sentry is not).
+                "name": "DAGSTER_RUN_STATUS_SENSOR_PROCESS_LIMIT",
+                "value": "25",
+            },
             {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
         ],
         "envSecrets": [
