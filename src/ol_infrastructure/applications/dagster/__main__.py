@@ -434,17 +434,62 @@ dagster_db_security_group = ec2.SecurityGroup(
 
 # Keep existing RDS database (Dagster metadata storage)
 rds_defaults = defaults(stack_info)["rds"]
-# This stack opts out of all three of the house RDS monitoring defaults
-# (monitoring_profile_name="production", enhanced_monitoring_interval=60,
-# performance_insights_enabled=True). Two of those opt-outs are still deliberate; the
-# third was not, and is why the 2026-08-10 connection exhaustion could not be attributed
-# to anything after the fact.
+# This stack used to opt out of all three of the house RDS monitoring defaults
+# (monitoring_profile_name, enhanced_monitoring_interval=60,
+# performance_insights_enabled=True). Only the Enhanced Monitoring opt-out is left; see
+# below for why it stays.
 #
-# The CloudWatch alarm profile stays disabled for now, but only pending a threshold
-# review -- it creates the standard production alarm set against SNS and none of those
-# thresholds have been checked against this instance. That is worth doing deliberately
-# rather than as a side effect of enabling Performance Insights.
-rds_defaults["monitoring_profile_name"] = "disabled"
+# The CloudWatch alarm profile is back on the house default, which resolves per
+# environment in lib/stack_defaults.py -- "production" here, "qa" on QA, "ci" (actions
+# disabled) on CI. 19 live production databases already carry it and this one did not,
+# so until now the Dagster metadata DB had no host-level alarms at all. (21 alarm sets
+# exist; two of them, bootcamps-db-applications-production and devlake-db-production,
+# have no matching RDS instance and sit in INSUFFICIENT_DATA -- alarms that outlived
+# their databases, tracked separately.)
+#
+# The threshold review this was waiting on is done, against 30 days spanning both the
+# ol-data-platform retry storm and the 2026-08-10 exhaustion. Enabling it is worth
+# doing with clear eyes, because most of the profile does nothing on this instance --
+# five of the six alarms never fire across that window, including at its worst moments:
+#
+#   CPUUtilization    >90% for 6 consecutive 5-min periods. Peak 5-min average 97.1%
+#                     on 08-11, but the longest consecutive run above 90% is 3. No fire.
+#   WriteLatency      >100ms for 6 consecutive. Only 5 breaching datapoints in the
+#                     worst 10-hour window, never 6 in a row. No fire.
+#   ReadLatency       >20ms for 2 consecutive. One datapoint at 27.5ms; the next
+#                     highest is 15.7ms. Missed by a single datapoint -- the tightest
+#                     of the six, and the one most likely to start firing if read
+#                     latency degrades at all.
+#   FreeStorageSpace  <5 GB. Minimum over 30 days is 37.6 GB. A genuine last-resort
+#                     backstop rather than dead weight, but note storage autoscaling
+#                     (max_allocated_storage 1000) is the real protection: this can
+#                     only fire once autoscaling has hit that ceiling.
+#   EBSIOBalance%     <75%. Pinned at exactly 99, min == max across 720 hourly
+#                     samples. It is a burst-bucket metric and all 74 RDS instances in
+#                     us-east-1 are gp3, which has no burst bucket -- so this alarm
+#                     cannot fire here or on any of the 19 peers carrying it. Left in
+#                     place only because the profile is all-or-nothing; removing it is
+#                     an org-wide change, tracked separately.
+#   DiskQueueDepth    >10 for 2 consecutive. The one that works, and the reason this
+#                     is on: 84 of 120 5-min datapoints breached during 2026-08-08/09,
+#                     roughly 40 hours ahead of the connection exhaustion.
+#
+# DiskQueueDepth is also the noisy one, and that is accepted rather than overlooked. In
+# the current healthy regime it breaches on isolated ~hourly IO spikes, with one
+# adjacent pair in the five days sampled -- so expect it to fire and self-clear around
+# once a week. That matches a peer: the same alarm on ol-mitlearn-db-production logged
+# 10 state transitions in 30 days, while on edxapp-db-mitx-production it logged none.
+# Sizing it per instance needs a threshold-override hook that OLPostgresDBConfig does
+# not have; the profile is chosen wholesale by name.
+#
+# Alarms do auto-resolve. OLCloudWatchAlarmSimpleRDS sets ok_actions=alarm_actions
+# (components/aws/cloudwatch.py:212), so the ALARM->OK transition reaches the same SNS
+# topic and Rootly closes the incident. An earlier draft of this comment claimed
+# otherwise and was wrong.
+#
+# Not covered by the profile at all: FreeableMemory, which has no alarm in any house
+# profile. Observed floor here is 29.8 GB of 64 GB, so nothing urgent.
+#
 # Enhanced Monitoring stays off. Unlike Performance Insights it is not free -- the OS
 # metric stream bills as CloudWatch Logs ingestion at a 60s interval -- and it answers a
 # question we are not asking. The gap here was never host-level CPU/disk; it was which
