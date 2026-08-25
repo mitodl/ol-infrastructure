@@ -309,20 +309,34 @@ def test_a_credential_with_no_grants_is_not_silently_dropped(grants):
     assert "**NOT ENUMERATED**" in rows
 
 
+SOURCE_KINDS = ("vault", "heroku", "sops")
+
+
 def test_estate_manifest_entries_are_well_formed(grants):
     """probe-all takes no arguments, so a typo here is silent until it runs."""
     assert grants.ESTATE
     for entry in grants.ESTATE:
         assert entry["label"]
-        assert ("vault" in entry) ^ ("heroku" in entry)
-        if "heroku" in entry:
-            app_name, _, variable = entry["heroku"].partition(":")
-            assert app_name
-            assert variable
-        else:
-            mount, _, subpath = entry["vault"].partition("/")
-            assert mount
-            assert subpath
+        kinds = [kind for kind in SOURCE_KINDS if kind in entry]
+        assert len(kinds) == 1, f"{entry['label']}: expected one source, got {kinds}"
+        left, sep, right = entry[kinds[0]].rpartition(
+            ":" if kinds[0] != "vault" else "/"
+        )
+        assert sep
+        assert left
+        assert right
+
+
+def test_every_manifest_source_kind_is_loadable(grants):
+    """A manifest entry naming a source probe-all cannot dispatch is dead weight."""
+    loaders = {
+        "vault": grants._load_vault,
+        "heroku": grants._load_heroku,
+        "sops": grants._load_sops,
+    }
+    assert set(SOURCE_KINDS) == set(loaders)
+    for entry in grants.ESTATE:
+        assert any(kind in entry for kind in loaders)
 
 
 def test_heroku_spec_must_name_an_app_and_a_var(grants):

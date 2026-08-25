@@ -1,7 +1,8 @@
 # GCP external-grant register
 
 Status: tooled; production and QA clusters probed 2026-08-24. Incomplete — the
-edx.org grants and `ol-eng-library-platform@` are still outstanding.
+three Airbyte SOPS credentials and `ol-eng-library-platform@` are outstanding.
+The "edx.org grants" question is closed: the counterparty is IRx, not edx.org.
 Opened 2026-08-24 for task
 `tk-enumerate-external-google-product-grants-per-cre-070a83` (p0).
 
@@ -48,6 +49,7 @@ bin/gcp-external-grants scopes                          # what each probe asks, 
 bin/gcp-external-grants probe --key-file sa.json
 bin/gcp-external-grants probe --vault MOUNT/PATH[:FIELD] --json
 bin/gcp-external-grants probe --heroku APP:VAR --json
+bin/gcp-external-grants probe --sops FILE:FIELD --json
 bin/gcp-external-grants probe --gcloud                  # the active human identity
 ```
 
@@ -128,6 +130,7 @@ version is not uniform** — three shapes occur, and the tool handles all three:
 | Dagster `canvas` | `secret-data` | v1 | `pipelines/google-service-account` | *(whole body is the key)* |
 | Dagster `edxorg`/`legacy_openedx` | `secret-data` | v1 | `pipelines/edx/org/gcp-oauth-client` | *(whole body is the key)* |
 | `ol-eng-library-platform@` | — | — | **not in Vault** | Heroku `GOOGLE_APPLICATION_JSON` |
+| Airbyte (3 SAs) | — | — | **not in Vault** | SOPS `src/bridge/secrets/airbyte/data.production.yaml` |
 
 ### The whole run, in one command
 
@@ -256,6 +259,20 @@ credential has *two* distinct consumers, and only one was recorded:
 | Dagster `edxorg` | GCS | bucket `simeon-mitx-pipeline-main`, prefix `COLD/` |
 | Airbyte | BigQuery | project-level access; datasets per the probe |
 
+**All three BigQuery projects are IRx's** (MIT Institutional Research), confirmed
+by the project owner 2026-08-25: `mitx-pipeline-main-dc29`,
+`mitx-residential-pipeline-main` and `mitir-mitx-surveys`. That collapses what
+looked like three unknown counterparties into **one, and an internal MIT one**.
+The tool still marks them third party, which is correct in its own terms — they
+sit outside OL's project hierarchy, so grants naming a replacement SA must be
+re-issued — but "third party" should be read as "another MIT department we can
+ask", not "an external organisation with no relationship to us".
+
+Corroborated in-repo: `lakehouse/definitions.py:243-244` declares Airbyte asset
+groups `irx_bigquery__s3_data_lake` and `irx_bigquery_email_opt_in__s3_data_lake`
+on a 24-hour production interval — IRx BigQuery syncing into the S3 data lake,
+which is exactly the traffic measured.
+
 **The GCS bucket is not edx.org's.** `edxorg_archive.py:74` and `:539` name it
 `simeon-mitx-pipeline-main` — the MITx "simeon" pipeline, matching BigQuery project
 `mitx-pipeline-main-dc29`. The *data* originates at edx.org: the asset description
@@ -301,6 +318,33 @@ Note the policy granting this secret is *Dagster's*, while the BigQuery traffic 
 attributed to Airbyte. That relationship is **still not established**, and it is the
 open question here: either Dagster holds a credential it does not use, or there is
 a second BigQuery consumer nobody has mapped.
+
+### An entire credential family that no inventory pass covered
+
+`src/bridge/secrets/airbyte/data.production.yaml` holds **three Google service
+accounts**, none of which appears in the consumer map, the credential inventory,
+or any earlier triage:
+
+| SOPS field | Consumer |
+|---|---|
+| `google_service_account_json` | Airbyte's own source credential |
+| `emeritus_google_service_account_json` | Emeritus BigQuery → S3 |
+| `global_alumni_google_service_account_json` | Global Alumni BigQuery → S3 |
+
+They were missed because **every prior pass looked in Vault**, and these are in
+SOPS. `data.qa.yaml` carries only `google_service_account_json`; `data.ci.yaml`
+should be checked too.
+
+Two of them matter more than the count suggests. **Emeritus and Global Alumni are
+external commercial partners, not MIT departments.** If those service accounts were
+issued from the partners' own GCP projects, they are credentials OL genuinely
+cannot re-create — the situation wrongly attributed to the IRx credential earlier
+in this document, now looked for in the right place. Their traffic is also
+invisible to every GCP-side signal we have, because `bin/gcp-credential-usage`
+reads per-project monitoring and those projects are not ours.
+
+Probing them settles it: `client_email` names the owning project. All three are now
+in `probe-all`'s manifest, reached through a new `--sops FILE:FIELD` source.
 
 ### Dataset-level enumeration
 

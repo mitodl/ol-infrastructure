@@ -226,6 +226,29 @@ def _load_heroku(spec: str) -> dict[str, Any]:
     return json.loads(raw)
 
 
+def _load_sops(spec: str) -> dict[str, Any]:
+    """Read a service-account key out of a SOPS-encrypted file.
+
+    Airbyte's source credentials live here rather than in Vault
+    (`src/bridge/secrets/airbyte/data.*.yaml`), which is why no Vault-centric
+    inventory pass found them.
+    """
+    path, _, field = spec.partition(":")
+    if not path or not field:
+        message = f"--sops expects FILE:FIELD, got {spec!r}"
+        raise ProbeError(message)
+    result = subprocess.run(  # noqa: S603
+        ["sops", "-d", "--extract", f'["{field}"]', "--output-type", "json", path],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        message = f"sops decrypt failed: {result.stderr.strip()[:160]}"
+        raise ProbeError(message)
+    return _normalise_private_key(json.loads(result.stdout))
+
+
 def _gcloud_token() -> tuple[str, str]:
     """Token for the active gcloud identity, for probing a human's own grants.
 
@@ -736,6 +759,25 @@ ESTATE: tuple[dict[str, str], ...] = (
         "label": "ol-data-platform-production@ -- Canvas sheet + unidentified source",
         "vault": "secret-data/pipelines/google-service-account",
     },
+    # Airbyte's own source credentials, in SOPS rather than Vault -- which is why
+    # no Vault-centric inventory pass found them. Two are for external commercial
+    # partners, whose projects OL cannot see and whose traffic is therefore
+    # invisible to every GCP-side usage signal we have.
+    {
+        "label": "Airbyte google_service_account_json",
+        "sops": "src/bridge/secrets/airbyte/data.production.yaml"
+        ":google_service_account_json",
+    },
+    {
+        "label": "Airbyte emeritus_google_service_account_json -- partner-held?",
+        "sops": "src/bridge/secrets/airbyte/data.production.yaml"
+        ":emeritus_google_service_account_json",
+    },
+    {
+        "label": "Airbyte global_alumni_google_service_account_json -- partner-held?",
+        "sops": "src/bridge/secrets/airbyte/data.production.yaml"
+        ":global_alumni_google_service_account_json",
+    },
     {
         # Found via dagster_server_policy.hcl, not via any inventory pass. OL owns
         # it, so a replacement can be created in mitol01 like any other; what it
@@ -844,6 +886,10 @@ def probe(
         list[str] | None,
         cyclopts.Parameter(help="Heroku config-var source(s) as APP:VAR."),
     ] = None,
+    sops: Annotated[
+        list[str] | None,
+        cyclopts.Parameter(help="SOPS source(s) as FILE:FIELD."),
+    ] = None,
     gcloud: Annotated[
         bool,
         cyclopts.Parameter(
@@ -881,11 +927,17 @@ def probe(
             keys.append(_load_heroku(spec))
         except (ProbeError, OSError, json.JSONDecodeError) as error:
             failures.append({"credential": spec, "errors": {"heroku": str(error)}})
+    for spec in sops or []:
+        try:
+            keys.append(_load_sops(spec))
+        except (ProbeError, OSError, json.JSONDecodeError) as error:
+            failures.append({"credential": spec, "errors": {"sops": str(error)}})
     if gcloud:
         keys.append({"_gcloud": True})
     if not keys and not failures:
         print(
-            "nothing to probe: pass --key-file, --vault, --heroku and/or --gcloud",
+            "nothing to probe: pass --key-file, --vault, --heroku, --sops"
+            " and/or --gcloud",
             file=sys.stderr,
         )
         raise SystemExit(2)
@@ -980,11 +1032,12 @@ def probe_all(
             continue
         print(f"[{index}/{len(ESTATE)}] {label}", file=sys.stderr)
         try:
-            key = (
-                _load_heroku(entry["heroku"])
-                if "heroku" in entry
-                else _load_vault(entry["vault"])
-            )
+            if "heroku" in entry:
+                key = _load_heroku(entry["heroku"])
+            elif "sops" in entry:
+                key = _load_sops(entry["sops"])
+            else:
+                key = _load_vault(entry["vault"])
         except (ProbeError, KeyError, OSError, json.JSONDecodeError) as error:
             # A credential that cannot be loaded is reported, never skipped
             # silently -- a missing row here reads as "no grants" downstream.
