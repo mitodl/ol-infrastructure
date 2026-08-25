@@ -136,8 +136,36 @@ def test_a_granted_into_project_is_third_party(owner):
     assert owner.classify_project("mitx-pipeline-main-dc29") is True
 
 
-def test_legacy_estate_projects_are_ours(owner):
-    assert owner.classify_project("ocw-studio-production") is False
+def test_the_credentials_own_project_is_ours(owner):
+    """Holding its key in our own secret store is the strongest evidence there is."""
+    assert owner.classify_project("ol-data-platform") is False
+
+
+def test_another_standalone_project_is_unknown_not_ours(owner):
+    """An absent parent cannot separate OL's legacy estate from a small partner's.
+
+    Treating an empty parent as a membership test marked EVERY standalone
+    project as OL's -- which would launder an Emeritus or Global Alumni grant
+    into "internal", the same error as keying on `gcloud projects list`.
+    """
+    assert owner.classify_project("ocw-studio-production") is None
+
+
+def test_probing_more_credentials_resolves_more_standalone_projects(
+    grants, monkeypatch
+):
+    """The estate classifies itself: each credential vouches for its own project."""
+    monkeypatch.setattr(
+        grants,
+        "_project_parent",
+        lambda project_id, _cache: PARENTS.get(project_id, grants.UNKNOWN_PARENT),
+    )
+    wider = grants._ownership_for_run(
+        [{"project_id": "ol-data-platform"}, {"project_id": "ocw-studio-production"}],
+        (),
+        (),
+    )
+    assert wider.classify_project("ocw-studio-production") is False
 
 
 def test_an_undescribable_project_is_third_party(owner):
@@ -161,8 +189,9 @@ def test_ownership_spans_every_credential_in_the_run(grants, monkeypatch):
         [{"project_id": "ol-data-platform"}, {"project_id": "mitol01"}], (), ()
     )
     assert both.classify_project("mitol01") is False
-    assert both.classify_project("ocw-studio-production") is False
     assert both.classify_project("mitx-pipeline-main-dc29") is True
+    # Still unknown: it is standalone and no probed credential vouches for it.
+    assert both.classify_project("ocw-studio-production") is None
 
 
 def test_owned_parent_override_is_honoured(grants, monkeypatch):
@@ -191,10 +220,7 @@ def test_owned_project_override_is_honoured(grants, monkeypatch):
 
 def test_service_account_grantors_route_through_the_hierarchy(owner):
     """Every project's SAs share the gserviceaccount.com suffix, ours and theirs."""
-    assert (
-        owner.classify_email("sa@ocw-studio-production.iam.gserviceaccount.com")
-        is False
-    )
+    assert owner.classify_email("sa@ol-data-platform.iam.gserviceaccount.com") is False
     assert (
         owner.classify_email("sa@mitx-pipeline-main-dc29.iam.gserviceaccount.com")
         is True

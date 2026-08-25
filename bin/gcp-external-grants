@@ -414,9 +414,15 @@ class Ownership:
     `gcloud config set account`.
     """
 
-    def __init__(self, owned_parents: set[str], extra_projects: set[str]) -> None:
-        """Hold the parents treated as OL's, plus explicitly-pinned projects."""
+    def __init__(
+        self,
+        owned_parents: set[str],
+        extra_projects: set[str],
+        home_projects: set[str] | None = None,
+    ) -> None:
+        """Hold the parents treated as OL's, plus known-OL and pinned projects."""
         self.owned_parents = owned_parents
+        self.home_projects = home_projects or set()
         self.extra_projects = extra_projects
         self._cache: dict[str, str] = {}
 
@@ -426,15 +432,31 @@ class Ownership:
 
     def classify_project(self, project_id: str) -> bool | None:
         """Report True when third party, False when OL's, None when undecidable."""
-        if project_id in self.extra_projects:
+        if project_id in self.extra_projects or project_id in self.home_projects:
+            # A project whose credential we hold in our own secret store is ours
+            # by the strongest evidence available, whatever its parentage.
             return False
         parent = self.parent_of(project_id)
         if parent == UNKNOWN_PARENT:
             # Not describable by any OL identity. We hold a grant into it and
             # nothing more, which is the definition of an external grant.
             return True
-        if not self.owned_parents:
+        if not parent:
+            # Standalone, with no org above it -- and not one of ours, or it
+            # would have matched home_projects. OL's legacy estate looks exactly
+            # like this, but so does any small third party's project, and
+            # parentage cannot tell them apart. Treating "no parent" as a
+            # membership test would mark EVERY standalone project as OL's,
+            # laundering a partner's grant into "internal" -- the same error as
+            # keying on `gcloud projects list`, in a different disguise. Say
+            # unknown; --owned-project pins the ones you can vouch for.
             return None
+        if not self.owned_parents and not self.home_projects:
+            # Nothing to judge against at all.
+            return None
+        # A project sitting inside some org folder is not in OL's legacy estate,
+        # so an unrecognised parent is a real verdict even when owned_parents is
+        # empty -- which it is for a run made up only of legacy credentials.
         return parent not in self.owned_parents
 
     def classify_email(self, address: str) -> bool | None:
@@ -477,14 +499,19 @@ def _ownership_for_run(
     """
     cache: dict[str, str] = {}
     owned_parents = set(extra_parents)
+    home_projects = set()
     for key in keys:
         home = key.get("project_id", "")
         if not home:
             continue
+        home_projects.add(home)
         parent = _project_parent(home, cache)
-        if parent != UNKNOWN_PARENT:
+        # An empty parent is deliberately NOT added: see classify_project. The
+        # credential's own project is recorded by id instead, which is precise
+        # where "has no parent" is not.
+        if parent and parent != UNKNOWN_PARENT:
             owned_parents.add(parent)
-    model = Ownership(owned_parents, set(extra_projects))
+    model = Ownership(owned_parents, set(extra_projects), home_projects)
     model._cache = cache  # noqa: SLF001
     return model
 

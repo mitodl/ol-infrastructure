@@ -103,10 +103,23 @@ population this tool exists to find. Keying on visibility launders those grants
 into "internal" and drops them from the migration plan. This was not hypothetical:
 see "Two corrections to the tool" below.
 
-A project is OL's when its parent matches one the credentials under test live in:
-no parent at all (every legacy gmail-estate project), or the MIT org folder the
-migration targets. A project that cannot be described by any OL identity is third
-party — OL does not administer what it cannot read metadata for.
+A project is OL's when **a probed credential lives in it** (holding its key in our
+own secret store is the strongest evidence available), or when its parent matches
+one of those credentials' parents — the MIT org folder the migration targets.
+A project that cannot be described by any OL identity is third party: OL does not
+administer what it cannot read metadata for.
+
+**"No parent" is not a membership test.** Every legacy gmail-estate project is
+standalone, but so is any small third party's — parentage cannot tell them apart.
+Treating an empty parent as "OL's" marked *every* standalone project as internal,
+which would launder an Emeritus or Global Alumni grant into "no re-issue needed":
+the same failure as keying on `gcloud projects list`, wearing a different hat. A
+standalone project no probed credential vouches for is now reported **unknown**,
+and `--owned-project` pins the ones you can vouch for by hand.
+
+A practical consequence worth knowing: **the more of the estate one run covers, the
+better it classifies**, because each credential vouches for its own project. Prefer
+`probe-all` over one-off `probe` calls when the classification matters.
 
 The same rule covers service-account grantors, which cannot be judged by domain:
 **every** project's service accounts live under `*.iam.gserviceaccount.com`, a
