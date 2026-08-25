@@ -21,6 +21,14 @@ from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import project_version_paths
 
+# Shared between the two pipeline builders below so the deploy-job lookup in
+# build_kubewatch_pipeline() derives its expected name from the same values
+# passed to pulumi_jobs_chain(), rather than duplicating them as a literal.
+_WEBHOOK_HANDLER_PROJECT_NAME = "ol-infrastructure-kubewatch-webhook-handler"
+_WEBHOOK_HANDLER_STACK_NAMES = [
+    f"applications.{env}" for env in ("CI", "QA", "Production")
+]
+
 
 def build_kubewatch_webhook_handler_pipeline() -> PipelineFragment:
     """Build pipeline for kubewatch webhook handler.
@@ -80,8 +88,8 @@ def build_kubewatch_webhook_handler_pipeline() -> PipelineFragment:
         topology="preview-gated",
         auto_deploy_stages=["CI"],
         pulumi_code=webhook_handler_pulumi_code,
-        stack_names=[f"applications.{env}" for env in ("CI", "QA", "Production")],
-        project_name="ol-infrastructure-kubewatch-webhook-handler",
+        stack_names=_WEBHOOK_HANDLER_STACK_NAMES,
+        project_name=_WEBHOOK_HANDLER_PROJECT_NAME,
         project_source_path=PULUMI_CODE_PATH.joinpath(
             "applications/kubewatch_webhook_handler/"
         ),
@@ -126,18 +134,24 @@ def build_kubewatch_pipeline() -> PipelineFragment:
     # Create dependencies for each kubewatch job to wait for webhook handler.
     # preview-gated expands each gated stage into a preview/deploy pair, so
     # webhook_handler_fragment.jobs is no longer one job per environment --
-    # look up each stage's *deploy* job by name rather than by position.
+    # look up each stage's *deploy* job by name (derived the same way
+    # pulumi_jobs_chain names it: deploy-{project_name}-{slug}, slug being
+    # the stack name lowercased with dots replaced by dashes) rather than by
+    # position.
+    webhook_handler_jobs_by_name = {
+        str(job.name): job for job in webhook_handler_fragment.jobs
+    }
     custom_dependencies = {}
-    for idx, env in enumerate(("CI", "QA", "Production")):
-        deploy_job_name = (
-            "deploy-ol-infrastructure-kubewatch-webhook-handler"
-            f"-applications-{env.lower()}"
-        )
-        webhook_handler_job = next(
-            job
-            for job in webhook_handler_fragment.jobs
-            if str(job.name) == deploy_job_name
-        )
+    for idx, stack_name in enumerate(_WEBHOOK_HANDLER_STACK_NAMES):
+        slug = stack_name.lower().replace(".", "-")
+        deploy_job_name = f"deploy-{_WEBHOOK_HANDLER_PROJECT_NAME}-{slug}"
+        webhook_handler_job = webhook_handler_jobs_by_name.get(deploy_job_name)
+        if webhook_handler_job is None:
+            msg = (
+                f"Expected job {deploy_job_name!r} in the webhook handler "
+                f"fragment; got {sorted(webhook_handler_jobs_by_name)}"
+            )
+            raise ValueError(msg)
         custom_dependencies[idx] = [
             GetStep(
                 get=webhook_handler_code.name,
