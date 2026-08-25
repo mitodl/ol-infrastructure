@@ -47,12 +47,26 @@ config:
   # pre-2026-08-19 sizing number here was measured against a pool that was doing
   # no multiplexing at all.
   #
-  # Why 4 and not fewer: max_client_conn (1500/pod), not backends, is what bounds
-  # the replica count. maxSurge is 0 and maxUnavailable is 1, so a rollout runs on
-  # N-1 pods. At 4 that is 3 x 1500 = 4500 sockets against a peak of 1825 (2.5x).
-  # At 2 a rollout would leave 1500 for 1825 and refuse clients. CPU and backend
-  # demand would both fit on a single pod ten times over; they are not the
-  # constraint.
+  # Why 4: max_client_conn (1500/pod), not backends, is what bounds the replica
+  # count. CPU and backend demand would both fit on a single pod ten times over
+  # and do not bind at any count worth considering.
+  #
+  # The criterion is that peak client sockets still fit while a rollout is in
+  # flight AND one pod is lost unplanned. maxSurge is 0 and maxUnavailable is 1,
+  # so a rollout already runs on N-1; a node eviction or OOM on top of that
+  # leaves N-2. Against the 1825 peak:
+  #
+  #   N=4   rollout 3 x 1500 = 4500 (2.5x)   rollout + 1 loss 3000 (1.6x)   ok
+  #   N=3   rollout 2 x 1500 = 3000 (1.6x)   rollout + 1 loss 1500          refuses
+  #   N=2   rollout 1 x 1500 = 1500          refuses during any rollout
+  #
+  # So the data alone does NOT rule out 3 -- 3 is fine for a rollout on its own,
+  # and if the N-2 case is judged not worth covering then 3 is the better
+  # number. 4 is the conservative end of the range, and two things argue for
+  # taking it: the 1825 peak comes from a six-day window with no large backfill
+  # in it, which is exactly the demand class that has never been measured on
+  # this pool; and going 6 -> 4 -> 3 later costs one config line, where
+  # discovering 3 was too few costs a connection outage during a rollout.
   #
   # The aggregate ceiling is unchanged and that is by construction:
   # max_db_connections is budget / replica_count, so 708 x 6 and 1062 x 4 are both
@@ -77,7 +91,12 @@ config:
   # Down from the previous global 100. Production has never come close to
   # needing it: three days of 1-minute exporter samples peaked at 122 active
   # server connections against an aggregate cap of 4248, and the pool sat on
-  # its min_pool_size floor of 900 the entire time. 80 trims the worst case
+  # its min_pool_size floor of 900 the entire time. Both of those figures are
+  # HISTORICAL -- they were taken before #5464 cut min_pool_size 150 -> 40 and
+  # before pool_mode went session -> transaction, and the equivalents now are a
+  # 13 active peak against a 160 floor. The conclusion is unaffected and gets
+  # stronger, which is why the number is not being moved again here. 80 trims
+  # the worst case
   # without touching anything observed. Note the aggregate cap overstates real
   # headroom -- max_db_connections is budget / replica count, which assumes
   # load spreads evenly across replicas, and measured distribution is heavily
@@ -90,7 +109,9 @@ config:
   # dagster_instance.yaml's event_log_storage comment. QA sets its own, smaller
   # value (90, see Pulumi.QA.yaml): it turned out to have the same failure and
   # to have been logging it continuously, but its per-pod cap is 382 against
-  # this stack's 708 and a prior run-worker incident deadlocked its whole pool,
+  # this stack's 1062 (708 until the replica count went 6 -> 4 above; the
+  # aggregate 4248 is the same either way) and a prior run-worker incident
+  # deadlocked its whole pool,
   # so it gets a sizing pass of its own rather than this number.
   #
   # Re-weighted 2026-08-19 from 100+50 to follow the house rule in
@@ -100,11 +121,17 @@ config:
   # 100 to 50 per process across the 17 long-lived ones (daemon, 2 webservers,
   # 14 code locations) plus every run worker.
   #
-  # 50 is derived from measurement, not from halving 100. Held connections
-  # across the whole pool have ranged 359-1577 over the week since the pooled
-  # storages landed, against a 4248 aggregate cap -- so the FLOOR is ~359, of
-  # which 240 is PgBouncer's own min_pool_size (40 x 6 replicas) rather than
-  # anything a client holds. That leaves roughly 120 of genuine client
+  # 50 is derived from measurement, not from halving 100. The arithmetic below
+  # was done on 2026-08-19 against SIX replicas and is kept as it was performed;
+  # at the current four the PgBouncer floor term is 160 (40 x 4), not 240, which
+  # would leave ~200 of client retention rather than ~120 and make 50 more
+  # generous still. Re-derive here if the floor or the replica count moves again.
+  #
+  # Held connections across the whole pool have ranged 359-1577 over the week
+  # since the pooled storages landed, against a 4248 aggregate cap -- so the
+  # FLOOR is ~359, of which 240 is PgBouncer's own min_pool_size (40 x 6
+  # replicas) rather than anything a client holds. That leaves roughly 120 of
+  # genuine client
   # retention spread across 17+ processes, call it under 10 each at rest. A
   # pool_size of 50 covers that with 5x margin, which is the "pool_size =
   # measured steady state" half of the rule; the 100 of overflow absorbs peaks
