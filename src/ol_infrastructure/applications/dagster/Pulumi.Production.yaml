@@ -25,7 +25,55 @@ config:
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   dagster:db_instance_type: db.r7g.2xlarge
-  dagster:pgbouncer_replica_count: 6
+  # 6 -> 4. The first replica count set from the exporter rather than from a
+  # guess. Six days of 1-minute samples (8640 points) taken entirely after the
+  # session -> transaction pool_mode switch of 2026-08-19 18:23Z:
+  #
+  #   peak concurrent in-flight backends, all pods    13   (p99 8)
+  #   peak backends HELD per pod                      40   = min_pool_size, exactly
+  #   peak client sockets, all pods                 1825   (per-pod peak 330)
+  #   peak pod CPU                                  0.09 cores
+  #   samples with any client waiting                  0
+  #   peak client maxwait                              0s
+  #
+  # Backends held per pod never once exceeded min_pool_size, on any pod, in six
+  # days. The pool has not had to grow since transaction mode landed, so
+  # default_pool_size and max_db_connections have never been approached: peak
+  # in-flight 13 against an aggregate cap of 4248 is a ratio of 0.003.
+  #
+  # Transaction mode is what changed the picture, not the #5464 re-tune. Before
+  # the switch this pool held up to 2104 backends and ran 400-2000 server_active;
+  # after, it multiplexes 1825 client sockets onto ~40 in-flight backends. Every
+  # pre-2026-08-19 sizing number here was measured against a pool that was doing
+  # no multiplexing at all.
+  #
+  # Why 4 and not fewer: max_client_conn (1500/pod), not backends, is what bounds
+  # the replica count. maxSurge is 0 and maxUnavailable is 1, so a rollout runs on
+  # N-1 pods. At 4 that is 3 x 1500 = 4500 sockets against a peak of 1825 (2.5x).
+  # At 2 a rollout would leave 1500 for 1825 and refuse clients. CPU and backend
+  # demand would both fit on a single pod ten times over; they are not the
+  # constraint.
+  #
+  # The aggregate ceiling is unchanged and that is by construction:
+  # max_db_connections is budget / replica_count, so 708 x 6 and 1062 x 4 are both
+  # 4248. What improves is skew tolerance -- a hot pod now saturates at 1062
+  # rather than 708 before it starts refusing, which is the failure QA hit at
+  # 221-active-vs-4 across two replicas.
+  #
+  # Side effect worth knowing: DagsterPgBouncerConnectionHeadroom is a fraction of
+  # pgbouncer_databases_max_connections per pod, so raising the per-pod
+  # denominator makes a given absolute backend count read lower -- 40 backends
+  # goes from 0.056 to 0.038 of the cap. The alert gets less sensitive, not more.
+  # Benign at a 0.003 utilisation ratio, but it is the same denominator trap as
+  # les-a-ratio-alert-s-denominator-constrains-what-you.
+  #
+  # min_pool_size stays at 40 deliberately. One lever per pass -- moving the
+  # floor and the divisor together would make the next measurement
+  # unattributable, which is the failure mode this whole exercise exists to stop
+  # repeating. The floor is the obvious next candidate: 40 was sized for a
+  # session-mode per-replica peak of 35, and transaction mode has cut per-replica
+  # in-flight demand to 2-3.
+  dagster:pgbouncer_replica_count: 4
   # Down from the previous global 100. Production has never come close to
   # needing it: three days of 1-minute exporter samples peaked at 122 active
   # server connections against an aggregate cap of 4248, and the pool sat on
@@ -68,10 +116,20 @@ config:
   # This is purely about not reserving what is not used.
   #
   # The regression to watch is the other failure mode, since lowering pool_size
-  # pushes anything above it onto the churning overflow path: baseline
-  # rate(pgbouncer_stats_totals_server_assignments_total[10m]) has been ~2/s
-  # since the pooled storages landed, against 407-511/s while the storages were
-  # unpooled. If that climbs materially, 50 is below real steady state and
-  # should go back up -- DagsterPgBouncerConnectionChurn alerts at 50/s.
+  # pushes anything above it onto the churning overflow path.
+  #
+  # server_assignments_total is NO LONGER that signal, and the thresholds quoted
+  # in earlier revisions of this comment are dead. Under session mode the counter
+  # incremented about once per client connect, which is why ~2/s read as healthy
+  # and 407-511/s read as connect-per-use. Under transaction mode it increments
+  # about once per TRANSACTION, so it now measures query throughput: measured
+  # 2026-08-25 over the six days since the switch, 75/s at rest and 2673/s at
+  # peak, with zero clients ever waiting and maxwait flat at 0. Nothing is wrong;
+  # the counter means something else. Both churn rules are unlabelled and routed
+  # to `oblivion` for exactly this reason (see metric_rules/dagster_pgbouncer.py).
+  #
+  # Use the client-side view instead -- pgbouncer_pools_client_waiting_connections
+  # and client_maxwait_seconds -- plus the "QueuePool limit of size 50 overflow
+  # 100" timeout logs, which name this pool directly.
   dagster:event_log_pool_size: 50
   dagster:event_log_max_overflow: 100
