@@ -7,6 +7,16 @@ config:
   heroku:user: "mitx-devops"
   xpro:vars:
     CSRF_TRUSTED_ORIGINS: "https://ci.xpro.mit.edu,https://xpro-ci.odl.mit.edu"
+    # CyberSource retired SOAP UsernameToken auth in their test
+    # environment, so the export-compliance check errors out and blocks
+    # both registration and login here.
+    # compliance.api.is_exports_verification_enabled() requires all four
+    # CYBERSOURCE_* compliance settings to be non-empty, so blanking the
+    # merchant ID skips the check.
+    # NOTE: production must keep the check enabled - it is a legal
+    # requirement there. Revert once xPRO moves the check to the
+    # CyberSource REST API (mitodl/hq#13003).
+    CYBERSOURCE_MERCHANT_ID: ""
     CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
     CYBERSOURCE_WSDL_URL: "https://ics2wstest.ic3.com/commerce/1.x/transactionProcessor/CyberSourceTransaction_1.154.wsdl"
     DIGITAL_CREDENTIALS_SUPPORTED_RUNS: ""
