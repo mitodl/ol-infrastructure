@@ -13,16 +13,12 @@
  * client sent it (some redirect routes, e.g. `playlist`, depend on
  * seeing their original query string).
  *
- * See https://github.com/mitodl/hq/issues/12925 for the traffic analysis
- * and the whitelist's provenance -- 28 of these 40 names come from
- * @mitodl/course-search-utils's resourceSearchValidators in the
- * mit-learn frontend repo, not from anything here, so a version bump
- * there can change the real list with no diff in this file. `syllabus`
- * and `syllabus_only` are not from that package either -- they're
- * LearningResourceDrawer's own params (RESOURCE_DRAWER_PARAMS in
- * frontends/main/src/common/urls.ts), read during the drawer's
- * force-dynamic SSR to pick which of three distinct HTML variants to
- * render, so they need the same cache-key protection as `resource`.
+ * The whitelist itself lives in __main__.py as
+ * CACHE_KEY_QUERY_PARAM_WHITELIST (substituted into the whitelist_expr
+ * placeholder below) rather than here, so it's a real Python list -- see
+ * that constant's docstring for provenance and how it maps to mit-learn's
+ * SERVER_KEYED_PARAMS. See also https://github.com/mitodl/hq/issues/12925
+ * for the traffic analysis behind this change.
  */
 declare local var.cache_key_url STRING;
 set var.cache_key_url = req.url;
@@ -32,85 +28,7 @@ set var.cache_key_url = req.url;
 if (req.url.path !~ "^/_next/") {
   set var.cache_key_url = querystring.filter_except(
     var.cache_key_url,
-    "_rsc" +
-    querystring.filtersep() +
-    "q" +
-    querystring.filtersep() +
-    "sortby" +
-    querystring.filtersep() +
-    "resource_type" +
-    querystring.filtersep() +
-    "department" +
-    querystring.filtersep() +
-    "level" +
-    querystring.filtersep() +
-    "platform" +
-    querystring.filtersep() +
-    "offered_by" +
-    querystring.filtersep() +
-    "topic" +
-    querystring.filtersep() +
-    "certification" +
-    querystring.filtersep() +
-    "professional" +
-    querystring.filtersep() +
-    "certification_type" +
-    querystring.filtersep() +
-    "resource_category" +
-    querystring.filtersep() +
-    "resource_type_group" +
-    querystring.filtersep() +
-    "delivery" +
-    querystring.filtersep() +
-    "free" +
-    querystring.filtersep() +
-    "course_feature" +
-    querystring.filtersep() +
-    "ocw_topic" +
-    querystring.filtersep() +
-    "aggregations" +
-    querystring.filtersep() +
-    "search_mode" +
-    querystring.filtersep() +
-    "dev_mode" +
-    querystring.filtersep() +
-    "id" +
-    querystring.filtersep() +
-    "limit" +
-    querystring.filtersep() +
-    "offset" +
-    querystring.filtersep() +
-    "slop" +
-    querystring.filtersep() +
-    "min_score" +
-    querystring.filtersep() +
-    "max_incompleteness_penalty" +
-    querystring.filtersep() +
-    "content_file_score_weight" +
-    querystring.filtersep() +
-    "yearly_decay_percent" +
-    querystring.filtersep() +
-    "resource" +
-    querystring.filtersep() +
-    "syllabus" +
-    querystring.filtersep() +
-    "syllabus_only" +
-    querystring.filtersep() +
-    "page" +
-    querystring.filtersep() +
-    "vector_search" +
-    querystring.filtersep() +
-    "playlist" +
-    querystring.filtersep() +
-    "t" +
-    querystring.filtersep() +
-    "token" +
-    querystring.filtersep() +
-    "error_code" +
-    querystring.filtersep() +
-    "content_type" +
-    querystring.filtersep() +
-    "next"
+    ${whitelist_expr}
   );
 
   # _rsc's value is a per-navigation token (133 distinct values seen in a
@@ -118,7 +36,7 @@ if (req.url.path !~ "^/_next/") {
   # Server Component response from full HTML, so normalize the value out
   # of the cache key. It can arrive bare (`?_rsc`, no `=`), so detect
   # presence against the raw querystring rather than requiring `_rsc=`.
-  if (req.url.qs ~ "(^|&)_rsc(=|&|$)") {
+  if (req.url.qs ~ "(^|&)_rsc(=|&|$$)") {
     set var.cache_key_url = querystring.set(var.cache_key_url, "_rsc", "1");
   }
 

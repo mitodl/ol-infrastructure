@@ -817,6 +817,78 @@ ocw_courses_bucket_backend_name = "OCW S3 Courses"
 ocw_courses_bucket_fqdn = ocw_site_buckets["buckets"]["live"].apply(
     lambda name: f"{name}.s3.us-east-1.amazonaws.com"
 )
+
+# Query params that actually change what the Next.js origin renders, used to
+# narrow the Fastly cache key (see snippets/cache_key_query_whitelist.vcl).
+# See https://github.com/mitodl/hq/issues/12925 for the traffic analysis.
+#
+# The "search facet" and "application" groups mirror SERVER_KEYED_PARAMS in
+# mit-learn's frontends/main/src/common/searchParams.ts entry-for-entry (that
+# registry makes reading an unregistered param a frontend type error, so the
+# two lists are meant to move together) -- keep the param names and grouping
+# in the same order as that list so a diff between the two is easy to read.
+# The trailing "drawer" group is specific to this repo: LearningResourceDrawer
+# reads those params directly (exempt from mit-learn's registry) but they
+# still select distinct SSR HTML variants of the force-dynamic root layout,
+# so they need the same cache-key protection.
+CACHE_KEY_QUERY_PARAM_WHITELIST = [
+    # React Server Component marker. Its value is a per-navigation token, so
+    # the VCL snippet normalizes it to a constant instead of keying on it
+    # directly -- see the snippet for that logic.
+    "_rsc",
+    # Search facet params.
+    "aggregations",
+    "certification",
+    "certification_type",
+    "content_file_score_weight",
+    "course_feature",
+    "delivery",
+    "department",
+    "dev_mode",
+    "free",
+    "id",
+    "level",
+    "limit",
+    "max_incompleteness_penalty",
+    "min_score",
+    "ocw_topic",
+    "offered_by",
+    "offset",
+    "platform",
+    "professional",
+    "q",
+    "resource_category",
+    "resource_type",
+    "resource_type_group",
+    "search_mode",
+    "show_ocw_files",
+    "slop",
+    "sortby",
+    "topic",
+    "yearly_decay_percent",
+    # Application params.
+    "resource",
+    "page",
+    "vector_search",
+    "playlist",
+    "t",
+    "token",
+    "error_code",
+    "content_type",
+    "next",
+    "enrollment_status",
+    "error_type",
+    "enrollment_title",
+    "enrollment_org_id",
+    "order_status",
+    "order_id",
+    "account_action",
+    "account_action_status",
+    # LearningResourceDrawer params (not in mit-learn's registry).
+    "syllabus",
+    "syllabus_only",
+    "recommender",
+]
 mitlearn_fastly_service = fastly.ServiceVcl(
     f"fastly-mit_learn-{stack_info.env_suffix}",
     name=f"MIT Learn {stack_info.env_suffix}",
@@ -973,9 +1045,15 @@ mitlearn_fastly_service = fastly.ServiceVcl(
         ),
         fastly.ServiceVclSnippetArgs(
             name="Build cache key from whitelisted query params",
-            content=Path(__file__)
-            .parent.joinpath("snippets/cache_key_query_whitelist.vcl")
-            .read_text(),
+            content=Template(
+                Path(__file__)
+                .parent.joinpath("snippets/cache_key_query_whitelist.vcl")
+                .read_text()
+            ).substitute(
+                whitelist_expr=(" +\n    querystring.filtersep() +\n    ").join(
+                    f'"{param}"' for param in CACHE_KEY_QUERY_PARAM_WHITELIST
+                )
+            ),
             type="recv",
             # After the S3/media routing above, so it sees req.url post
             # rewrite (e.g. the OCW snippet's querystring.remove), and well
