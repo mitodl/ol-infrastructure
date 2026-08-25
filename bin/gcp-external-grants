@@ -115,8 +115,30 @@ class ProbeError(Exception):
     """A probe could not run. Reported per-probe; never aborts the whole run."""
 
 
+def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
+    """Run an external binary, converting "not installed" into a ProbeError.
+
+    Every subprocess in this tool goes through here. `check=True` is never used:
+    a non-zero exit is data the caller interprets, while a missing binary is not
+    something any caller can interpret, so it becomes a ProbeError with the name
+    of what is missing. Without this, `gcloud` or `sops` being absent crashed the
+    whole run -- which for probe-all means losing every credential after the
+    first, the exact silent-gap failure this tool is built to prevent.
+    """
+    try:
+        return subprocess.run(command, capture_output=True, text=True, check=False)  # noqa: S603
+    except OSError as error:
+        message = f"cannot run {command[0]!r}: {error.strerror or error}"
+        raise ProbeError(message) from error
+
+
 def _load_key_file(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text())
+    """Read a service-account key from a local JSON file."""
+    try:
+        return json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as error:
+        message = f"cannot read {path}: {error}"
+        raise ProbeError(message) from error
 
 
 def _read_vault_secret(
@@ -134,7 +156,16 @@ def _read_vault_secret(
             path=subpath, mount_point=mount, raise_on_deleted_version=False
         )["data"]["data"]
     except (hvac.exceptions.VaultError, KeyError):
+        pass
+    try:
         return client.secrets.kv.v1.read_secret(path=subpath, mount_point=mount)["data"]
+    except (hvac.exceptions.VaultError, KeyError) as error:
+        # The v2 attempt failing is routine -- it is how the version is probed.
+        # The v1 attempt failing is the real error, and it must reach the caller
+        # as a ProbeError: hvac's own exception type is not in any caller's
+        # except clause, so it would abort the entire run.
+        message = f"vault read {mount}/{subpath} failed: {error}"
+        raise ProbeError(message) from error
 
 
 def _extract_key(data: dict[str, Any], field: str) -> dict[str, Any]:
@@ -210,12 +241,7 @@ def _load_heroku(spec: str) -> dict[str, Any]:
     if not app_name or not variable:
         message = f"--heroku expects APP:VAR, got {spec!r}"
         raise ProbeError(message)
-    result = subprocess.run(  # noqa: S603
-        ["heroku", "config:get", variable, "-a", app_name],  # noqa: S607
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = _run(["heroku", "config:get", variable, "-a", app_name])
     if result.returncode != 0:
         message = f"heroku config:get failed: {result.stderr.strip()[:160]}"
         raise ProbeError(message)
@@ -223,7 +249,11 @@ def _load_heroku(spec: str) -> dict[str, Any]:
     if not raw:
         message = f"{variable} is empty or unset on {app_name}"
         raise ProbeError(message)
-    return json.loads(raw)
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as error:
+        message = f"{variable} on {app_name} is not JSON"
+        raise ProbeError(message) from error
 
 
 def _load_sops(spec: str) -> dict[str, Any]:
@@ -237,16 +267,17 @@ def _load_sops(spec: str) -> dict[str, Any]:
     if not path or not field:
         message = f"--sops expects FILE:FIELD, got {spec!r}"
         raise ProbeError(message)
-    result = subprocess.run(  # noqa: S603
-        ["sops", "-d", "--extract", f'["{field}"]', "--output-type", "json", path],  # noqa: S607
-        capture_output=True,
-        text=True,
-        check=False,
+    result = _run(
+        ["sops", "-d", "--extract", f'["{field}"]', "--output-type", "json", path]
     )
     if result.returncode != 0:
         message = f"sops decrypt failed: {result.stderr.strip()[:160]}"
         raise ProbeError(message)
-    return _normalise_private_key(json.loads(result.stdout))
+    try:
+        return _normalise_private_key(json.loads(result.stdout))
+    except json.JSONDecodeError as error:
+        message = f"sops output for {field!r} is not JSON"
+        raise ProbeError(message) from error
 
 
 def _gcloud_token() -> tuple[str, str]:
@@ -256,19 +287,12 @@ def _gcloud_token() -> tuple[str, str]:
     scope, so the Drive/Analytics/YouTube probes will report 403 regardless of
     what the human can actually see. That is a scope limit, not an answer.
     """
-    token = subprocess.run(
-        ["gcloud", "auth", "print-access-token"],  # noqa: S607
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.strip()
-    identity = subprocess.run(
-        ["gcloud", "config", "get-value", "account"],  # noqa: S607
-        capture_output=True,
-        text=True,
-        check=False,
-    ).stdout.strip()
-    return token, identity or "(active gcloud account)"
+    result = _run(["gcloud", "auth", "print-access-token"])
+    if result.returncode != 0:
+        message = f"gcloud could not mint a token: {result.stderr.strip()[:160]}"
+        raise ProbeError(message)
+    identity = _run(["gcloud", "config", "get-value", "account"]).stdout.strip()
+    return result.stdout.strip(), identity or "(active gcloud account)"
 
 
 def _access_token(key: dict[str, Any]) -> str:
@@ -294,7 +318,11 @@ def _access_token(key: dict[str, Any]) -> str:
         # Google echoes the assertion back in some errors; report status only.
         message = f"token exchange failed: HTTP {response.status_code}"
         raise ProbeError(message)
-    return response.json()["access_token"]
+    try:
+        return str(response.json()["access_token"])
+    except (ValueError, KeyError) as error:
+        message = "token endpoint returned no access_token"
+        raise ProbeError(message) from error
 
 
 def _get(url: str, token: str, **params: Any) -> dict[str, Any]:
@@ -305,13 +333,23 @@ def _get(url: str, token: str, **params: Any) -> dict[str, Any]:
         timeout=TIMEOUT,
     )
     if not response.ok:
-        detail = response.json().get("error", {}) if response.content else {}
+        # An error body is not guaranteed to be JSON -- a proxy or gateway can
+        # return HTML, and parsing it blindly turns a reportable HTTP error into
+        # a crash.
+        try:
+            detail = response.json().get("error", {}) if response.content else {}
+        except ValueError:
+            detail = {}
         message = (
             f"HTTP {response.status_code}: "
-            f"{detail.get('message', response.reason)[:160]}"
+            f"{detail.get('message') or response.reason or '(no detail)'}"[:180]
         )
         raise ProbeError(message)
-    return response.json()
+    try:
+        return response.json()
+    except ValueError as error:
+        message = f"non-JSON response from {url.partition('?')[0]}"
+        raise ProbeError(message) from error
 
 
 UNKNOWN_PARENT = "?"
@@ -337,7 +375,10 @@ def _project_parent(project_id: str, cache: dict[str, str]) -> str:
         ]
         if account:
             command.append(f"--account={account}")
-        result = subprocess.run(command, capture_output=True, text=True, check=False)  # noqa: S603
+        try:
+            result = _run(command)
+        except ProbeError:
+            return UNKNOWN_PARENT
         if result.returncode == 0:
             fields = result.stdout.strip().split("\t")
             parent = (
@@ -456,12 +497,10 @@ def _gcloud_accounts() -> tuple[str, ...]:
     re-shelling `gcloud auth list` for each one made a 13-project run spend most
     of its wall clock in subprocess startup.
     """
-    result = subprocess.run(
-        ["gcloud", "auth", "list", "--format=value(account)"],  # noqa: S607
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        result = _run(["gcloud", "auth", "list", "--format=value(account)"])
+    except ProbeError:
+        return ()
     if result.returncode != 0:
         return ()
     return tuple(line.strip() for line in result.stdout.splitlines() if line.strip())
@@ -471,7 +510,10 @@ def _projects_for_account(account: str | None) -> set[str]:
     command = ["gcloud", "projects", "list", "--format=value(projectId)"]
     if account:
         command.append(f"--account={account}")
-    result = subprocess.run(command, capture_output=True, text=True, check=False)  # noqa: S603
+    try:
+        result = _run(command)
+    except ProbeError:
+        return set()
     if result.returncode != 0:
         return set()
     return {line.strip() for line in result.stdout.splitlines() if line.strip()}
@@ -570,25 +612,39 @@ def _probe_shared_files(token: str, owner: Ownership) -> list[dict[str, Any]]:
 
 
 def _probe_analytics(token: str, owner: Ownership) -> list[dict[str, Any]]:  # noqa: ARG001
-    payload = _get(
-        "https://analyticsadmin.googleapis.com/v1beta/accountSummaries",
-        token,
-        pageSize=200,
-    )
-    return [
-        {
-            "product": "Google Analytics (GA4)",
-            "resource_id": prop.get("property", ""),
-            "resource_name": (
-                f"{summary.get('displayName', '')} / {prop.get('displayName', '')}"
-            ),
-            "access": "read (level not exposed by accountSummaries)",
-            "granted_by": "GA account administrator",
-            "third_party": False,
-        }
-        for summary in payload.get("accountSummaries", [])
-        for prop in summary.get("propertySummaries", [])
-    ]
+    """GA4 properties the credential can read, following every page.
+
+    Paginated for the same reason as everything else here: a truncated list is
+    indistinguishable from a complete one in the output, so silent truncation
+    would quietly under-report grants in a document whose entire purpose is to
+    be exhaustive.
+    """
+    grants: list[dict[str, Any]] = []
+    page: str | None = None
+    while True:
+        payload = _get(
+            "https://analyticsadmin.googleapis.com/v1beta/accountSummaries",
+            token,
+            pageSize=200,
+            **({"pageToken": page} if page else {}),
+        )
+        grants.extend(
+            {
+                "product": "Google Analytics (GA4)",
+                "resource_id": prop.get("property", ""),
+                "resource_name": (
+                    f"{summary.get('displayName', '')} / {prop.get('displayName', '')}"
+                ),
+                "access": "read (level not exposed by accountSummaries)",
+                "granted_by": "GA account administrator",
+                "third_party": False,
+            }
+            for summary in payload.get("accountSummaries", [])
+            for prop in summary.get("propertySummaries", [])
+        )
+        page = payload.get("nextPageToken")
+        if not page:
+            return grants
 
 
 def _probe_bigquery(token: str, owner: Ownership) -> list[dict[str, Any]]:
@@ -670,23 +726,32 @@ def _datasets_in(token: str, project_id: str) -> list[str]:
 
 
 def _probe_youtube(token: str, owner: Ownership) -> list[dict[str, Any]]:  # noqa: ARG001
-    payload = _get(
-        "https://www.googleapis.com/youtube/v3/channels",
-        token,
-        part="id,snippet",
-        mine="true",
-    )
-    return [
-        {
-            "product": "YouTube",
-            "resource_id": item.get("id", ""),
-            "resource_name": item.get("snippet", {}).get("title", ""),
-            "access": "channel owner/manager",
-            "granted_by": "YouTube channel owner",
-            "third_party": False,
-        }
-        for item in payload.get("items", [])
-    ]
+    """Channels the credential is authorised against, following every page."""
+    grants: list[dict[str, Any]] = []
+    page: str | None = None
+    while True:
+        payload = _get(
+            "https://www.googleapis.com/youtube/v3/channels",
+            token,
+            part="id,snippet",
+            mine="true",
+            maxResults=50,
+            **({"pageToken": page} if page else {}),
+        )
+        grants.extend(
+            {
+                "product": "YouTube",
+                "resource_id": item.get("id", ""),
+                "resource_name": item.get("snippet", {}).get("title", ""),
+                "access": "channel owner/manager",
+                "granted_by": "YouTube channel owner",
+                "third_party": False,
+            }
+            for item in payload.get("items", [])
+        )
+        page = payload.get("nextPageToken")
+        if not page:
+            return grants
 
 
 Probe = Callable[[str, Ownership], list[dict[str, Any]]]
@@ -710,7 +775,11 @@ def _probe_one(key: dict[str, Any], owner: Ownership) -> dict[str, Any]:
         "errors": {},
     }
     if key.get("_gcloud"):
-        token, result["credential"] = _gcloud_token()
+        try:
+            token, result["credential"] = _gcloud_token()
+        except ProbeError as error:
+            result["errors"]["token"] = str(error)
+            return result
     else:
         try:
             token = _access_token(key)
@@ -915,8 +984,15 @@ def probe(
     ] = None,
 ) -> None:
     """Enumerate external product grants for each supplied credential."""
-    keys: list[dict[str, Any]] = [_load_key_file(path) for path in key_file or []]
+    keys: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
+    for path in key_file or []:
+        try:
+            keys.append(_load_key_file(path))
+        except ProbeError as error:
+            failures.append(
+                {"credential": str(path), "errors": {"key_file": str(error)}}
+            )
     for spec in vault or []:
         try:
             keys.append(_load_vault(spec))
@@ -1090,7 +1166,11 @@ def _warn_on_duplicate_identities(results: list[dict[str, Any]]) -> None:
     seen: dict[str, list[str]] = {}
     for result in results:
         identity = result.get("credential", "")
-        if result.get("grants") or not result.get("errors"):
+        # Anything that resolved to a real identity counts, even if every probe
+        # then errored. Requiring grants-or-no-errors missed the case where two
+        # sources reach one credential AND its probes fail -- which still means a
+        # credential in the manifest went unprobed, just with no rows to show it.
+        if identity and not result.get("errors", {}).get("load"):
             seen.setdefault(identity, []).append(result.get("source_label", identity))
     for identity, labels in seen.items():
         if len(labels) > 1:
