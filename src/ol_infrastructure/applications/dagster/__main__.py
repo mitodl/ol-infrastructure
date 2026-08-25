@@ -464,12 +464,12 @@ rds_defaults = defaults(stack_info)["rds"]
 #                     backstop rather than dead weight, but note storage autoscaling
 #                     (max_allocated_storage 1000) is the real protection: this can
 #                     only fire once autoscaling has hit that ceiling.
-#   EBSIOBalance%     <75%. Pinned at exactly 99, min == max across 720 hourly
-#                     samples. It is a burst-bucket metric and all 74 RDS instances in
-#                     us-east-1 are gp3, which has no burst bucket -- so this alarm
-#                     cannot fire here or on any of the 19 peers carrying it. Left in
-#                     place only because the profile is all-or-nothing; removing it is
-#                     an org-wide change, tracked separately.
+#   EBSIOBalance%     GONE. It was in the profile when this list was written, pinned
+#                     at 99 against a threshold of 75 because it is a burst-bucket
+#                     metric and every RDS instance here is gp3, which has no burst
+#                     bucket. Removed from the production profile in
+#                     components/aws/database.py, so this stack no longer creates it
+#                     and neither do the 19 peers that did.
 #   DiskQueueDepth    >10 for 2 consecutive. The one that works, and the reason this
 #                     is on: 84 of 120 5-min datapoints breached during 2026-08-08/09,
 #                     roughly 40 hours ahead of the connection exhaustion.
