@@ -47,7 +47,7 @@ dependencies = [
   "pulumi-rootly",
   "pulumi-terraform>=6.0.1",
   "pulumi-command>=1.0,<2",
-  "ol-concourse>=0.16,<0.17",
+  "ol-concourse>=0.18,<0.19",
   "pulumiverse-grafana>=2.0.0,<3",
   "pulumiverse-sentry==0.0.9",
   "pyjwt[crypto]>=2.9,<3",
