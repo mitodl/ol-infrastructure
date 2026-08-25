@@ -65,10 +65,13 @@ ok "tutor root: ${TUTOR_ROOT_DIR}"
 # Warn before repointing a tutor root that was serving some other platform:
 # course data and MySQL rows survive, but every URL the LMS emits changes.
 CURRENT_LMS_HOST=$("${TUTOR}" config printvalue LMS_HOST 2>/dev/null || echo "")
-# www.myopenedx.com is tutor's own default, i.e. a root nobody has configured yet.
+# These are tutor's own defaults, i.e. a root nobody has configured yet — it
+# renamed the placeholder in v19 (www.myopenedx.com -> local.openedx.io), and
+# both are in play because this only reads whatever the root already holds.
 if [[ -n "${CURRENT_LMS_HOST}" \
     && "${CURRENT_LMS_HOST}" != "${LMS_HOST}" \
-    && "${CURRENT_LMS_HOST}" != "www.myopenedx.com" ]]; then
+    && "${CURRENT_LMS_HOST}" != "www.myopenedx.com" \
+    && "${CURRENT_LMS_HOST}" != "local.openedx.io" ]]; then
     warn "LMS_HOST is currently '${CURRENT_LMS_HOST}' — repointing it to '${LMS_HOST}'."
     warn "This tutor root is shared with any other project using it."
 fi

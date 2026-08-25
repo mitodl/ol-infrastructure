@@ -32,6 +32,20 @@ hooks.Filters.CONFIG_DEFAULTS.add_item(("OL_LOCAL_DEV_ROOT_DOMAIN", "mit.dev"))
 # (see MITX_REDIRECT_ENABLED below).
 hooks.Filters.CONFIG_DEFAULTS.add_item(("OL_LOCAL_DEV_FORCE_SSO", True))
 
+# Studio's preview host. Tutor stopped shipping a PREVIEW_LMS_HOST default of
+# its own, so this stack owns the value: APISIX routes preview.lms.<root_domain>
+# (local-dev/apps/openedx-tutor/apisix-routes.yaml) and the patches below feed
+# it to FEATURES["PREVIEW_LMS_BASE"] and the session-cookie domain.
+#
+# It has to be declared here rather than only set by tutor-configure.sh, because
+# `tutor plugins enable` renders the environment the moment this plugin becomes
+# active — before that script's `tutor config save --set` block runs. A patch
+# below referencing a value with no default therefore fails on any tutor root
+# whose config.yml does not already carry it, which is every freshly reset one.
+# Anything new these patches interpolate needs a default here for the same
+# reason. tutor-configure.sh's explicit --set still wins over this.
+hooks.Filters.CONFIG_DEFAULTS.add_item(("PREVIEW_LMS_HOST", "preview.{{ LMS_HOST }}"))
+
 # Shared by LMS and CMS: TLS is terminated at the ingress, so the runserver
 # only ever sees plain HTTP and has to be told what the browser used.
 BEHIND_INGRESS = """
@@ -168,13 +182,17 @@ IDA_LOGOUT_URI_LIST = [
 
 # SSO against mitxonline, the way deployed environments do it: ol-social-auth
 # registers the ol-oauth2 backend, and mitxonline is the identity provider
-# (which in turn sits behind Keycloak). edx-platform derives
-# AUTHENTICATION_BACKENDS from THIRD_PARTY_AUTH_BACKENDS while common.py is
-# still being imported, so both lists need the entry — appending to the first
-# alone authenticates nobody.
+# (which in turn sits behind Keycloak).
+#
+# AUTHENTICATION_BACKENDS is the only list that matters, and prepending to it
+# here is enough: third-party auth resolves a provider row's backend_name
+# against it (common/djangoapps/third_party_auth/models.py), and nothing reads
+# THIRD_PARTY_AUTH_BACKENDS at runtime. That name is not a setting at all - it
+# is a key production.py looks for in the LMS_CFG yaml *while building*
+# AUTHENTICATION_BACKENDS (lms/envs/production.py), so it does not survive into
+# the settings module, and touching it from here would be both a NameError and
+# too late to have any effect.
 _OL_SSO_BACKEND = "ol_social_auth.backends.OLOAuth2"
-if _OL_SSO_BACKEND not in THIRD_PARTY_AUTH_BACKENDS:
-    THIRD_PARTY_AUTH_BACKENDS = list(THIRD_PARTY_AUTH_BACKENDS) + [_OL_SSO_BACKEND]
 if _OL_SSO_BACKEND not in AUTHENTICATION_BACKENDS:
     AUTHENTICATION_BACKENDS = [_OL_SSO_BACKEND] + list(AUTHENTICATION_BACKENDS)
 

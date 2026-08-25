@@ -39,6 +39,18 @@ if [[ "${OL_TUTOR_RELAUNCH:-0}" == "1" ]] \
     log "Launching Open edX (first run for ${LMS_HOST}; this can take a while)"
     "${TUTOR}" dev launch --non-interactive
     echo "${LMS_HOST}" > "${LAUNCH_MARKER}"
+
+    # `tutor dev launch` starts the containers *before* it migrates, so on an
+    # empty database LMS and Studio boot against a schema that does not exist
+    # yet. Django's system checks read a waffle switch, that raises
+    # ProgrammingError("Table 'openedx.waffle_switch' doesn't exist"), and the
+    # django-main-thread dies without ever binding port 8000 — while the
+    # StatReloader keeps the container Up, so nothing notices. `tutor dev start`
+    # below then leaves the healthy-looking container alone and the readiness
+    # probe waits out its whole budget on a platform that will never answer.
+    # Restarting them once the migrations are in is the whole fix.
+    log "Restarting LMS and Studio against the migrated database"
+    "${TUTOR}" dev restart lms cms
 else
     log "Open edX already initialised for ${LMS_HOST} (re-run with OL_TUTOR_RELAUNCH=1 to redo init)"
 fi

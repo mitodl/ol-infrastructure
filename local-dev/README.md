@@ -154,6 +154,7 @@ Day-to-day:
 | Stop coding but keep apps running | `Ctrl+C` in the Tilt terminal | Apps stay reachable at their `.dev` URLs; edits no longer sync until Tilt runs again |
 | Shut down for the day | `Ctrl+C` Tilt, then `./local-dev/scripts/stop.sh` | Removes Tilt-managed workloads, pauses the cluster; DB data survives |
 | Destroy everything | `./local-dev/scripts/teardown.sh` | Deletes the cluster, Pulumi resources, certs, /etc/hosts entries |
+| Wipe Open edX (tutor mode) | `./local-dev/scripts/tutor-reset.sh` | Deletes every Open edX course and account; teardown leaves these alone ([details](#resetting-open-edx-state)) |
 
 Closing the Tilt terminal (or Ctrl+C) never deletes anything from the cluster — pods keep running because Kubernetes, not Tilt, keeps them alive. The one thing to remember: with Tilt stopped, a pod that gets recreated comes up from its last-built image *without* your live-synced edits; they re-sync when Tilt next runs.
 
@@ -170,7 +171,8 @@ ol-infrastructure/
 │
 └── local-dev/
     ├── scripts/                 # setup.sh, start.sh, stop.sh, teardown.sh, seed.sh,
-    │                            # heal-exec.sh, prune-docker.sh (each described in its header)
+    │                            # heal-exec.sh, prune-docker.sh, tutor-*.sh
+    │                            # (each described in its header)
     ├── cluster/                 # k3d cluster definition + registry retention config
     ├── certs/                   # mkcert output (gitignored)
     ├── infra/                   # Pulumi stacks: shared in-cluster infra (see EXTENDING.md)
@@ -472,6 +474,10 @@ Tilt owns the platform's lifecycle: stopping Tilt stops the compose project.
 > so later runs go straight to `tutor dev start`. Force a re-init with
 > `OL_TUTOR_RELAUNCH=1 tilt trigger openedx-tutor`.
 
+A re-init replays tutor's own setup against the existing databases; to throw the
+courses and accounts away as well, see [Resetting Open edX
+state](#resetting-open-edx-state).
+
 ### It uses your existing tutor root
 
 `tutor-configure.sh` edits the root that `tutor config printroot` reports — the
@@ -494,8 +500,50 @@ Django trust APISIX's `X-Forwarded-Proto`. The script prints a warning when it
 repoints an `LMS_HOST` that was set to something else, and moves any
 pre-existing `env/dev/docker-compose.override.yml` aside to `.bak`.
 
+Any *other* plugin you have enabled in that root applies too, and one written
+for an older stack will quietly patch the LMS settings out from under this one —
+a hand-rolled plugin pointing at `mitxonline.odl.local`, say, or a second
+`AUTHENTICATION_BACKENDS` assignment. Audit them with `tutor plugins list`;
+only `ol_local_dev` is this stack's.
+
 To hand the tutor root back to another project, re-point those values
 (`tutor config save --set LMS_HOST=...`) and `tutor plugins disable ol_local_dev`.
+
+### Resetting Open edX state
+
+Open edX's databases are the one part of this stack that no script reconciles
+and `teardown.sh` never touches, so they accumulate: accounts and courses from
+whatever you were doing in that tutor root months ago are still there. Stale
+accounts are the ones that bite, because mitxonline creates its learners in
+Open edX by `POST`ing to the registration API, and that call `409`s against a
+username or email already taken — after which enrollment fails with
+`OpenEdxUserMissingError` no matter how often it retries.
+
+```bash
+tilt disable openedx-tutor-config openedx-tutor openedx-tutor-seed openedx-tutor-sso
+./local-dev/scripts/tutor-reset.sh
+tilt enable openedx-tutor-config openedx-tutor openedx-tutor-seed openedx-tutor-sso
+tilt trigger seed-courseware   # courses went with the databases
+```
+
+Disabling the resources first is not optional: Tilt owns `tutor dev start`, so
+it restarts the platform on top of the directory being deleted. The script
+checks and refuses rather than half-wiping.
+
+Coming back is not quick. `tutor dev launch` rebuilds `openedx-dev` on every
+run in dev mode, so a reset always pays for a rebuild — the script keeps every
+image and the BuildKit cache, which is what holds that to minutes instead of the
+tens of minutes of a cold build. Removing `config.yml` adds to the bill:
+`OPENEDX_EXTRA_PIP_REQUIREMENTS` comes back empty and `tutor-configure.sh`
+re-appending `ol-social-auth` invalidates the requirements layer. Removing it is
+also the only way to shed a stale plugin, so it is the default; pass
+`--keep-config` to keep your generated secrets, enabled plugins and that layer.
+
+> **`tutor dev dc down -v` is not a reset.** In tutor 22 the dev compose project
+> bind-mounts its databases out of `$(tutor config printroot)/data`; the only
+> real volume is mongo's `/data/configdb`. `down -v` therefore leaves every
+> account, course and grade exactly where it was. Check for yourself with
+> `docker inspect tutor_dev-mysql-1 --format '{{range .Mounts}}{{.Type}} {{.Source}}{{"\n"}}{{end}}'`.
 
 ### Logging in
 
@@ -745,9 +793,10 @@ One registry case zot cannot reclaim on its own is a repo left with no manifest 
 > **Note:** The teardown script calls `pulumi destroy` automatically to clean up Pulumi-managed resources before deleting the cluster, so no orphaned resources are left behind.
 
 Teardown does not touch Open edX in tutor mode: the compose project and its
-MySQL/MongoDB volumes live in your tutor root, not in the cluster. Remove them
-yourself with `tutor dev dc down -v` (this deletes every course and account) —
-or leave them and the next `tilt up` reuses them.
+databases live in your tutor root, not in the cluster. Leave them and the next
+`tilt up` reuses them, or wipe them with
+[`tutor-reset.sh`](#resetting-open-edx-state) — **not** with `tutor dev dc
+down -v`, which barely deletes anything (see that section for why).
 
 Pulumi state must never outlive the cluster: everything these stacks manage
 lives inside the cluster, but the state lives in this checkout, so state that

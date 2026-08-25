@@ -31,9 +31,16 @@ API_CLIENT_SECRET="mitxonline-local-dev-secret"  # pragma: allowlist secret
 COURSES_CLIENT_ID="mitxonline-courses-local-dev"
 COURSES_CLIENT_SECRET="mitxonline-courses-local-dev-secret"  # pragma: allowlist secret
 
-# mitxonline sends the learner here after Open edX authorises it
-# (openedx/urls.py: login/_private/complete).
-REDIRECT_URI="https://mitxonline.${ROOT_DOMAIN}/login/_private/complete"
+# Where Open edX sends the browser back after authorising mitxonline. Both of
+# mitxonline's routes for it are registered (openedx/urls.py names them
+# openedx-private-oauth-complete and openedx-private-oauth-complete-no-apisix),
+# because the two are not interchangeable and only one is in use at a time:
+# openedx/api.py builds the redirect_uri from OPENEDX_AUTH_COMPLETE_URL, which
+# currently hardcodes the -no-apisix name. Registering only the other one makes
+# /oauth2/authorize reject the unknown redirect_uri with a 400 and every
+# per-learner token exchange fail. Space-separated, which is how
+# django-oauth-toolkit stores a list.
+REDIRECT_URI="https://mitxonline.${ROOT_DOMAIN}/_/auth/complete https://mitxonline.${ROOT_DOMAIN}/login/_private/complete"
 SCOPES="read,write,email,profile"
 
 log() { echo "▶ $*"; }
