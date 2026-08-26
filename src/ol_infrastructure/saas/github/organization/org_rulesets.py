@@ -187,9 +187,10 @@ baseline_default_branch = github.OrganizationRuleset(
     opts=ResourceOptions(protect=True),
 )
 
-# Tier-1 is application, library and infrastructure -- 74 repos. Down to ONE extra rule:
-# an unresolved conversation is feedback that was never answered, and blocking on it
-# costs a reviewer nothing.
+# Tier-1 is application, library and infrastructure -- 73 repos, having been 74 until
+# `ol-django` moved to the `library-unmanaged` archetype on 2026-08-26. Down to ONE
+# extra rule: an unresolved conversation is feedback that was never answered, and
+# blocking on it costs a reviewer nothing.
 #
 # `require_last_push_approval` dropped in #5459, having been added on 2026-08-07 with
 # the reasoning that "an approval that predates the last push is not an approval of what

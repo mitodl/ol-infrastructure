@@ -25,10 +25,22 @@ TIER_ONE: Final = "tier-1"
 #: repo creation.
 TIER_STANDARD: Final = "standard"
 
-#: Deliberately untargeted: upstream forks and archived repos. Distinct from
-#: "unlabelled" -- this is a claim that no org ruleset should apply, which a reviewer
-#: can disagree with. Without it, CON-09 could not tell an intentional exemption from
-#: an oversight.
+#: Deliberately untargeted: upstream forks, archived repos, and -- since 2026-08-26 --
+#: one ACTIVE repo, `ol-django`, whose release flow pushes a version-bump commit
+#: straight to its default branch. See the `library-unmanaged` archetype in
+#: repositories/data/archetypes.yaml for why, and what it costs.
+#:
+#: THAT THIRD CASE IS NOT LIKE THE OTHER TWO. Forks and archived repos are untargeted
+#: because no ruleset could usefully apply to them -- upstream owns the fork's branch,
+#: and GitHub already refuses writes to an archived repo. An ACTIVE repo here gives up
+#: real protection: no required review, and no `non_fast_forward` or `deletion` cover on
+#: its default branch, because targeting is per-ruleset rather than per-rule. SEC-01
+#: exempts `unmanaged`, so the audit reports none of it. Putting an active repo in this
+#: tier is a security decision, not a classification.
+#:
+#: Distinct from "unlabelled" -- this is a claim that no org ruleset should apply, which
+#: a reviewer can disagree with. Without it, CON-09 could not tell an intentional
+#: exemption from an oversight.
 TIER_UNMANAGED: Final = "unmanaged"
 
 #: Order matters only for readability; GitHub stores allowed_values as a set.
