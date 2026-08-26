@@ -47,7 +47,12 @@ tier_property = github.OrganizationCustomProperties(
     value_type="single_select",
     # Required + default is what makes a NEW repo protected at creation (section 3.5).
     # Without the default a new repo carries no tier, matches no ruleset, and is
-    # unprotected until somebody notices -- the exact failure `ol-django` shows today.
+    # unprotected until somebody notices -- the failure `ol-django` showed when this was
+    # written, having been created before any of this existed. Note it is untargeted
+    # AGAIN as of 2026-08-26, but deliberately now: it takes `tier: unmanaged` from the
+    # `library-unmanaged` archetype. Same observable state, opposite meaning -- which is
+    # the whole reason `unmanaged` exists as a value rather than just leaving a repo
+    # unlabelled.
     required=True,
     default_value=TIER_STANDARD,
     allowed_values=list(TIER_VALUES),
