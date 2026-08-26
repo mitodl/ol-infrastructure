@@ -2,8 +2,8 @@
 
 **Status:** stage 0 merged 2026-07-23 (#5083); stage 1 merged 2026-07-27 (#5135), validated
 in production 2026-08-07; stage 2 merged 2026-08-10 (#5344), validated in production
-2026-08-17; stage 3 `mitxonline` **blocked** (see stage 3), `edxapp` unblocked; stage 4
-pending
+2026-08-17; stage 3 `mitxonline` **blocked**, `edxapp` CMS rolled back and **blocked**
+pending retuning (see stage 3), LMS handled separately per install; stage 4 pending
 **Project:** `wp-granian-configuration-overhaul-expose-blocking-t-3debc2`
 **Component:** `src/ol_infrastructure/components/services/k8s.py` — `GranianConfig`
 **Evidence:** witan lessons `les-granianconfig-never-exposes-blocking-threads-bac-874462`,
@@ -439,6 +439,20 @@ Component change lands once; per-app behavior changes as each app's stack is dep
   are ongoing (8 and 10 over 14 days), which is a second independent reason to keep it at
   2 workers for now.
 
+  **Production rollback — 2026-08-26.** The judgment above was wrong because the
+  busy-thread percentile hid the burst shape of a normal Studio authoring page load and
+  the rollout reduced per-pod backpressure by 8×, from 2 workers × 64 to 1 × 16. After
+  `mitxonline` production adopted the new defaults, all three CMS pods repeatedly pinned
+  at exactly 16 active connections, HTTP readiness fell as low as 1/3, and APISIX p95/p99
+  latency repeatedly reached the 60-second histogram ceiling. Tempo traces placed 30–59s
+  before the Django server span began while Django completed the request in roughly
+  0.2–1.1s, locating the delay in Granian's connection backlog rather than the handler or
+  database. The HPA remained at its three-replica floor because CPU and request rate were
+  below target; neither signal observes connection saturation. Restore the pre-overhaul
+  CMS holding pins (2 workers, 32 blocking threads and backpressure 64 per worker) until
+  CMS is retuned with a saturation-aware scaling signal. The application image does not
+  need to be rolled back.
+
   > Growing *past* the declared 4Gi limit looks impossible given
   > `webapp_vpa_max_allowed_memory="4Gi"`, and a reviewer read it that way. It is not.
   > `maxAllowed` bounds the **request**, and `controlledValues: RequestsAndLimits` then
@@ -491,12 +505,12 @@ Component change lands once; per-app behavior changes as each app's stack is dep
   handling deliberately rather than discovering mid-incident
   (`tk-xpro-edxapp-is-6-months-stale-still-on-the-hand--43a5a4`).
 
-  `edxapp` is **not** affected by either finding — `mitxonline-openedx` reports
-  `granian_*` normally (`cms-edxapp-webapp-pod-monitor` and `lms-edxapp-webapp-pod-monitor`
-  both up), and it is behind APISIX so `apisix_http_latency_bucket` gives it the real
-  latency percentiles that stage 2 had to proxy for. Doing `edxapp` CMS first while
-  `mitxonline` is unblocked is a viable resequencing, but it is a production-rollout
-  ordering change and belongs to whoever owns the rollout, not to the implementer.
+  **Current decision:** `edxapp` CMS must remain on its restored holding pins. The
+  production outcome above invalidates the earlier claim that CMS was a safe first
+  rollout despite having observable APISIX latency. Another attempt requires per-install
+  concurrency sizing that accounts for burst shape and backpressure, plus a scaling or
+  alerting signal that detects connection saturation; CPU and request rate alone did not.
+  LMS remains a separate per-install decision and does not make CMS unblocked.
 - **Stage 4 — async apps.** `mit_learn`, `learn_ai`: `workers=2→1` for `mit_learn` and an
   explicit `backpressure` for both. No `blocking_threads` involvement. Lowest expected
   impact, sequenced last because it shares no evidence with the WSGI stages.
@@ -536,5 +550,6 @@ entirely in container args, so there is no data or schema migration to unwind.
 
 1. Runtime cgroup-based `--workers-max-rss` (entrypoint wrapper) — evaluate post-rollout.
 2. TCP liveness / HTTP readiness probe split — eligible after stage 2.
-3. Per-app `blocking_threads` tuning from measured latency, once the uniform 8 is in
-   production everywhere.
+3. Per-app `blocking_threads` and `backpressure` tuning from measured latency and burst
+   saturation before removing any remaining holding pins; the 2026-08-26 CMS rollback
+   disproved a uniform target of 8 threads / 16 backpressure.

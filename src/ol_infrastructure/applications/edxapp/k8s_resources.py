@@ -1148,20 +1148,22 @@ def create_k8s_resources(  # noqa: C901
                 application_module="cms.wsgi:application",
                 port=8000,
                 no_ws=True,
-                # Stage 3 of docs/plans/granian-configuration-overhaul.md: holding
-                # pins deleted, so this adopts the component defaults (1 worker,
-                # 8 blocking threads, 16 backpressure) in place of the 2 workers x
-                # 32 threads Granian used to derive from backlog=128.
-                #
-                # workers_max_rss is unaffected in aggregate, for every stack that
-                # shares this config: the component derives
-                # floor(limit / workers * 0.9), so halving the worker count doubles
-                # the per-worker cap and the pod total is unchanged whatever the
-                # declared limit. (mitxonline CMS at 4Gi: 2 x 1843MiB -> 1 x 3686MiB.
-                # mitx and mitx-staging CMS at 2Gi: 2 x 921MiB -> 1 x 1843MiB.)
-                # What changes is the blast radius of a respawn -- with one worker it
-                # costs the pod's whole serving capacity rather than half -- which is
-                # why LMS, whose respawns are ongoing, is NOT part of this change.
+                # Restore the pre-overhaul holding pins after the 2026-08-26
+                # mitxonline production rollout showed that the component defaults
+                # cannot absorb Studio's bursty authoring traffic. With 1 worker,
+                # 8 blocking threads, and backpressure 16, every CMS pod repeatedly
+                # saturated at 16 active connections, HTTP readiness fell to 1/3,
+                # and APISIX p95/p99 latency reached 60s while Django spans remained
+                # around 0.2-1.1s. CPU- and request-rate-based autoscaling stayed at
+                # the three-replica floor because it cannot see this connection
+                # backlog. Keep these known-good values until CMS concurrency is
+                # retuned with a saturation-aware scaling signal.
+                # See docs/plans/granian-configuration-overhaul.md stage 3.
+                workers=2,
+                runtime_mode="mt",
+                runtime_threads=2,
+                blocking_threads=32,
+                backpressure=64,
                 respawn_failed_workers=True,
                 backlog=128,
                 static_path_mounts=["/openedx/staticfiles"],
