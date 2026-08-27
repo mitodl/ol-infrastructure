@@ -33,6 +33,7 @@ from ol_infrastructure.lib.aws.route53_helper import (
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
+    vcl_snippet,
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import (
@@ -1092,69 +1093,69 @@ for purpose in ("draft", "live", "test"):
             ),
         ],
         snippets=[
-            fastly.ServiceVclSnippetArgs(
+            vcl_snippet(
                 content=snippets_dir.joinpath("ttl_setup.vcl").read_text(),
                 name="TTLs setup",
                 priority=110,
                 type="fetch",
             ),
-            fastly.ServiceVclSnippetArgs(
+            vcl_snippet(
                 content=snippets_dir.joinpath("departments_table.vcl").read_text(),
                 name="Departments Table",
                 type="init",
             ),
-            fastly.ServiceVclSnippetArgs(
+            vcl_snippet(
                 content=snippets_dir.joinpath("s3_bucket_proxying.vcl").read_text(),
                 name="S3 Bucket Proxying",
                 priority=200,
                 type="miss",
             ),
-            fastly.ServiceVclSnippetArgs(
+            vcl_snippet(
                 content=snippets_dir.joinpath("redirects.vcl").read_text(),
                 name="Redirects",
                 type="recv",
             ),
-            fastly.ServiceVclSnippetArgs(
+            vcl_snippet(
                 content=snippets_dir.joinpath(
                     "legacy_ocw_pages_redirect.vcl"
                 ).read_text(),
                 name="Legacy OCW Pages Redirect",
                 type="fetch",
             ),
-            fastly.ServiceVclSnippetArgs(
+            vcl_snippet(
                 content=snippets_dir.joinpath(
                     "set_correct_content_type_for_S3_assets.vcl"
                 ).read_text(),
                 name="Set correct Content-type for S3 assets",
                 type="fetch",
             ),
-            fastly.ServiceVclSnippetArgs(
+            vcl_snippet(
                 content=snippets_dir.joinpath(
                     "enable_streaming_for_mp4.vcl"
                 ).read_text(),
                 name="Enable streaming for mp4 files",
                 type="fetch",
             ),
-            fastly.ServiceVclSnippetArgs(
+            vcl_snippet(
                 content=snippets_dir.joinpath(
                     "clean_response_headers_and_handle_404_on_delivery.vcl"
                 ).read_text(),
                 name="Clean response headers and handle 404 on delivery",
                 type="deliver",
             ),
-            fastly.ServiceVclSnippetArgs(
+            vcl_snippet(
                 content=snippets_dir.joinpath("reroute_redirects.vcl").read_text(),
                 name="Reroute Redirects",
                 type="error",
             ),
-            fastly.ServiceVclSnippetArgs(
+            vcl_snippet(
                 content=snippets_dir.joinpath(
                     "large_object_segmented_caching.vcl"
                 ).read_text(),
                 name="Segmented Caching",
                 type="recv",
             ),
-            fastly.ServiceVclSnippetArgs(
+            vcl_snippet(
                 content=snippets_dir.joinpath(
                     "strip_cookies_and_authorization_and_user_io.vcl"
                 ).read_text(),
@@ -1163,7 +1164,7 @@ for purpose in ("draft", "live", "test"):
             ),
             *(
                 [
-                    fastly.ServiceVclSnippetArgs(
+                    vcl_snippet(
                         content=snippets_dir.joinpath(
                             "image_optimization.vcl"
                         ).read_text(),

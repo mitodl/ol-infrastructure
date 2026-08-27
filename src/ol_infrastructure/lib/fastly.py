@@ -1,9 +1,48 @@
+import re
 from pathlib import Path
 
 import pulumi
 import pulumi_fastly as fastly
 
 from bridge.secrets.sops import read_yaml_secrets
+
+# Snippet-only. Fastly validates conditions and request settings more loosely and we
+# have live ones (with '/' and ',') that this pattern would reject.
+VCL_SNIPPET_NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_\-. ]*$")
+
+
+def validate_vcl_snippet_name(name: str) -> str:
+    """Raise unless the name is accepted by Fastly's VCL snippet endpoint."""
+    if not VCL_SNIPPET_NAME_PATTERN.fullmatch(name):
+        msg = (
+            f"Invalid Fastly VCL snippet name {name!r}. Name must start with a letter "
+            "and contain only alphanumeric, underscore, hyphen, period, and space "
+            "characters."
+        )
+        raise ValueError(msg)
+    return name
+
+
+def vcl_snippet(
+    *,
+    name: str,
+    content: str,
+    type: str,  # noqa: A002
+    priority: int | None = None,
+) -> fastly.ServiceVclSnippetArgs:
+    """Build snippet args, rejecting illegal names during `pulumi preview`.
+
+    An illegal name otherwise 400s mid-apply, after Pulumi has cloned a service
+    version, and the failed run persists the uncreated snippet to state where the
+    provider's SetDiff reads it back as Unmodified -- no later `up` can heal it.
+    """
+    return fastly.ServiceVclSnippetArgs(
+        name=validate_vcl_snippet_name(name),
+        content=content,
+        type=type,
+        priority=priority,
+    )
+
 
 # Documentation:
 # https://docs.fastly.com/en/guides/custom-log-formats#version-2-log-format

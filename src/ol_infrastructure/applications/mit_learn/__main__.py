@@ -85,6 +85,7 @@ from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_po
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
+    vcl_snippet,
 )
 from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
@@ -987,7 +988,7 @@ mitlearn_fastly_service = fastly.ServiceVcl(
         ),
     ],
     snippets=[
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             name="handle domain redirect",
             content=textwrap.dedent(
                 rf"""
@@ -1003,7 +1004,7 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             type="recv",
             priority=10,
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=textwrap.dedent(
                 r"""
             declare local var.is_media_request BOOL;
@@ -1017,7 +1018,7 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             priority=200,
             type="recv",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=textwrap.dedent(
                 r"""
             declare local var.is_ocw_request BOOL;
@@ -1043,7 +1044,7 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             priority=200,
             type="recv",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             name="Build cache key from whitelisted query params",
             content=Template(
                 Path(__file__)
@@ -1060,17 +1061,17 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             # before the cache lookup that always follows vcl_recv.
             priority=250,
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content="unset bereq.http.X-Cache-Key-Url;",
             name="Strip internal cache-key header before backend fetch on miss",
             type="miss",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content="unset bereq.http.X-Cache-Key-Url;",
             name="Strip internal cache-key header before backend fetch on pass",
             type="pass",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=textwrap.dedent(
                 f"""\
             if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
@@ -1080,7 +1081,7 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             name="Strip auth headers in S3 miss requests",
             type="miss",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=textwrap.dedent(
                 f"""\
             if (req.backend == F_{ocw_courses_bucket_backend_name.replace(" ", "_")}) {{
@@ -1090,7 +1091,7 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             name="Strip auth headers for OCW S3 miss requests",
             type="miss",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=textwrap.dedent(
                 f"""\
             if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
@@ -1100,7 +1101,7 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             name="Strip auth headers in S3 pass requests",
             type="pass",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=textwrap.dedent(
                 f"""\
             if (req.backend == F_{ocw_courses_bucket_backend_name.replace(" ", "_")}) {{
@@ -1110,7 +1111,7 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             name="Strip auth headers for OCW S3 pass requests",
             type="pass",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             name="Redirect for to correct domain",
             content=textwrap.dedent(
                 rf"""
@@ -1124,7 +1125,7 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             ),
             type="error",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             name="handle route dictionary redirect",
             content=Path(__file__)
             .parent.joinpath("snippets/redirect_recv.vcl")
@@ -1132,7 +1133,7 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             type="recv",
             priority=10,
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             name="Disable stale-while-revalidate when acting as a shield",
             content=Path(__file__)
             .parent.joinpath("snippets/shield_stale_while_revalidate_guard.vcl")
@@ -1144,21 +1145,21 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             # makes the existing order explicit.
             priority=100,
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             name="deliver route dictionary redirect",
             content=Path(__file__)
             .parent.joinpath("snippets/redirect_deliver.vcl")
             .read_text(),
             type="error",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             name="Set proper Content-Type for media files",
             content=Path(__file__)
             .parent.joinpath("snippets/set_media_content_type.vcl")
             .read_text(),
             type="fetch",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             name="Strip noindex header from NextJS backend",
             content="unset resp.http.X-Robots-Tag;",
             type="deliver",

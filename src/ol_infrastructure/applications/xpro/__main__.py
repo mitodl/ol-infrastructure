@@ -73,6 +73,7 @@ from ol_infrastructure.lib.aws.route53_helper import (
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
+    vcl_snippet,
 )
 from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
@@ -1037,7 +1038,7 @@ xpro_service = fastly.ServiceVcl(
         ),
     ],
     snippets=[
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=f"""// The app needx X-Forwarded-Host to be accurate, and it must not be the
 // comma-separated list that it would be if using a Fastly shield POP and
 // left to the default behavior.
@@ -1046,7 +1047,7 @@ set bereq.http.x-forwarded-host = "{frontend_domain}";""",  # noqa: E501
             name="Set x-forwarded-host - miss",
             type="miss",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=f"""// The app needx X-Forwarded-Host to be accurate, and it must not be the
 // comma-separated list that it would be if using a Fastly shield POP and
 // left to the default behavior.
