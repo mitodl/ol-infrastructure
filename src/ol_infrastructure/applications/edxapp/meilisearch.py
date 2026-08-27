@@ -152,6 +152,21 @@ def create_meilisearch_resources(
         },
     }
 
+    # Meilisearch memory-maps its index, so it relies on page cache within the
+    # container's memory limit to keep that index resident. Left unset,
+    # MEILI_MAX_INDEXING_MEMORY defaults to a fraction of the memory
+    # Meilisearch believes it has, which lets the indexer claim most of the
+    # limit and evict the very page cache it needs -- on mitxonline production
+    # in August 2026 that produced ~667M working-set refaults and 99.9% direct
+    # reclaim, stretching single-document index batches to 60s and timing out
+    # library component creation at the gateway (mitodl/hq#13014). Pinning it
+    # leaves the remainder of the limit for page cache. Only emitted when
+    # configured, so environments that have not been sized for it are unchanged.
+    if max_indexing_memory := meilisearch_config.get("max_indexing_memory"):
+        meilisearch_values["environment"]["MEILI_MAX_INDEXING_MEMORY"] = (
+            max_indexing_memory
+        )
+
     return kubernetes.helm.v3.Release(
         f"ol-{stack_info.env_prefix}-edxapp-meilisearch-helm-release-{stack_info.env_suffix}",
         kubernetes.helm.v3.ReleaseArgs(

@@ -170,9 +170,10 @@ config:
   meilisearch:domain: meilisearch.courses.learn.mit.edu
   meilisearch:replica_count: "1"
   meilisearch:pv_size: 100Gi
-  meilisearch:cpu_request: "250m"
-  meilisearch:memory_request: "1Gi"
-  meilisearch:memory_limit: "4Gi"
+  meilisearch:cpu_request: "2"
+  meilisearch:memory_request: "8Gi"
+  meilisearch:memory_limit: "24Gi"
+  meilisearch:max_indexing_memory: "4Gi"
   typesense:deploy: "true"
   typesense:enabled: "true"
   typesense:course_search_enabled: "true"
