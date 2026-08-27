@@ -31,7 +31,7 @@ SUPERSET_CHART_VERSION = "0.22.4"
 # renovate: datasource=helm depName=tika packageName=tika registryUrl=https://apache.jfrog.io/artifactory/tika
 TIKA_CHART_VERSION = "3.2.2"
 # renovate: datasource=helm depName=apisix packageName=apisix registryUrl=https://apache.github.io/apisix-helm-chart
-APISIX_CHART_VERSION = "2.16.1"
+APISIX_CHART_VERSION = "2.17.0"
 # renovate: datasource=helm depName=aws-load-balancer-controller packageName=aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts
 AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=aws-node-termination-handler packageName=aws-node-termination-handler registryUrl=https://aws.github.io/eks-charts
