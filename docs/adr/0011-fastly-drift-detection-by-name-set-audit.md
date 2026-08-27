@@ -21,10 +21,20 @@ The same class of failure recurred in #5563 with parentheses in two mit-learn ca
 snippet names.
 
 Nothing noticed, because nothing compares Pulumi's state to Fastly's reality. Every
-Fastly-bearing stack runs with `refresh_stack=False` — set *because* the stack has Fastly
-resources, since refresh calls the Fastly API with a token that goes stale mid-rotation
-and fails the whole job. The trigger condition and the detection mechanism are the same
-resource, so coverage is 0% exactly where the risk is 100%.
+Fastly-bearing stack runs with `refresh_stack=False`, so coverage is 0% exactly where the
+risk is 100%.
+
+Those flags are stale scaffolding rather than a standing constraint, which is worth
+stating precisely because the opposite was assumed for a while. They were added in one
+commit (#5134) on 2026-07-27 while the Fastly admin token was mid-rotation, so refresh
+was calling the API with a token being revoked. That rotation completed the same day, the
+replacement token carries no expiry, `fastly.yaml` has otherwise only been rotated in
+2022 and 2024, and `ocw_site` is already back to `True`. So no credential problem blocks
+re-enabling refresh — what does is that refresh writes state before `up`, and a Fastly
+stack refresh drops and re-adds `backends` as secret-flip noise (measured below). The
+deploy-path effect of that is untested, so the flags stay for now and the gap is accepted
+knowingly. It is not a small gap: `refresh_stack=False` disables refresh for the *entire*
+stack, and the affected Production stacks run ~130–172 resources of which 1–5 are Fastly.
 
 #5627 added `validate_vcl_snippet_name()` and closed the *ingress* for this specific
 cause. It does nothing for state that is already wrong, for the other name-keyed child
@@ -37,8 +47,8 @@ object exists on a Fastly service and the live service does not have it."
 
 ### Constraints
 
-- `refresh_stack=False` is load-bearing today and its removal is tracked separately.
-  Detection must not depend on that being fixed first.
+- `refresh_stack=False` is in force on every Fastly-bearing stack today and reverting it
+  is separate work with its own untested risk. Detection must not depend on that first.
 - The check runs against Production. It must not be able to mutate state.
 - The `mitodl/ol-infrastructure` image contains no Pulumi CLI.
 - A nightly check that is not silent when things are healthy gets muted within a week.
@@ -79,8 +89,8 @@ reports for the version currently serving traffic.
 
 **Rationale.** Options 1 and 2 fail the zero-false-positive constraint by a wide margin,
 and option 2 additionally hides the target signal inside its own noise. Option 3 is
-decoupled from the `refresh_stack` work, so it ships now rather than after a credential
-redesign.
+decoupled from the `refresh_stack` work, so it ships now rather than waiting on a change
+to the deploy path.
 
 ### Key Implementation Details
 
@@ -88,16 +98,29 @@ redesign.
   `s3://mitol-pulumi-state/.pulumi/stacks/<project>/<stack>.json` with boto3. The
   resource outputs carry `id`, `activeVersion`, and the name-keyed child collections.
   This needs no Pulumi CLI and no `PULUMI_CONFIG_PASSPHRASE`.
-- **Live side.** `GET /service/<id>/version/<live active version>/<collection>` for
-  `snippet`, `condition`, `header`, `domain`, `request_settings`, and `dictionary`.
-  Authenticated with the existing read-only `global_read_api_key` from SOPS
-  `fastly.yaml`, not the admin token.
+- **Live side.** `GET /service/<id>/version/<live active version>/<collection>` for all
+  eleven name-keyed collections: `snippet`, `condition`, `header`, `backend`, `domain`,
+  `request_settings`, `dictionary`, `cache_settings`, `gzip`, `response_object`, and
+  `logging/https`. Authenticated with the existing read-only `global_read_api_key` from
+  SOPS `fastly.yaml`, not the admin token.
+
+  This list is the detector's entire coverage, so an omission from it is invisible — an
+  unaudited collection produces no findings, which reads exactly like a clean one. The
+  first draft audited seven and silently ignored ~100 live objects across
+  `responseObjects` (27), `cacheSettings` (26), `loggingHttps` (26 readable, 4 secret),
+  and `gzips` (21). Keep `AUDITED_COLLECTIONS` in
+  `bin/fastly-drift-audit` and this list in step.
 - **Compare against the version Fastly is actually serving,** resolved from
   `/service/<id>/details`, rather than the version state believes is active. The question
   is what is serving traffic, not what we think is.
 - **`DECLARED-BUT-ABSENT` fails the job.** That set difference is the #5513/#5563 failure
   mode exactly. `live-but-undeclared` and an `activeVersion` mismatch are reported but do
   not fail, since both are ordinary consequences of a manual UI edit.
+- **Drift exits 1; an audit that could not complete exits 3.** Concourse classifies every
+  nonzero exit as `failed` and fires one hook for all of them, so without distinct codes
+  a Fastly or S3 outage would announce confirmed drift — precisely the false alarm this
+  design is built to avoid. The alert text therefore covers both cases and points at the
+  job output rather than asserting drift.
 - **Delivery:** a nightly Concourse pipeline in the Production `infra` pool, following
   `iam_drift`/`github_drift` in shape, alerting to Slack on failure. Unlike those two it
   does *not* open a pull request — there is no code change to propose. The remedy is the
@@ -116,7 +139,10 @@ Three traps have to be handled or the check false-alarms permanently:
    live service IDs* as the current `ol-application-*` stacks, hundreds of versions stale.
    Scope the scan to project names parsed from `src/**/Pulumi.yaml`, not to an S3 listing.
 3. **`TlsSubscription` also has a `domains` output,** but its members are plain strings.
-   Filter on resource type and skip non-dict members.
+   Filter on resource type, and treat a collection whose members carry no string name as
+   unauditable. Skipping such members individually would also avoid the crash, but it
+   would shrink the *declared* set and therefore shrink `declared - live` — a reader bug
+   would then report clean, which is the wrong direction for a detector to fail in.
 
 ## Consequences
 
@@ -127,10 +153,13 @@ Three traps have to be handled or the check false-alarms permanently:
   can be replayed against the pre-repair v207, which yields exactly
   `DECLARED-BUT-ABSENT: ['Redirect course and program pages to MIT Learn']`. Against the
   repaired v208 it is silent.
-- **Measured silent today.** Full estate run: 36 `ServiceVcl` resources across 32 stacks,
-  81 seconds, `ALERT=0`. The five informational findings are five unauditable `backends`
-  collections and one benign `activeVersion` mismatch (state 14, live 16, all names
-  matching) on `ol-application-edxapp/xpro.Production`.
+- **Measured silent today.** Full estate run over all eleven collections: 36 `ServiceVcl`
+  resources across 32 stacks, `ALERT=0`, ~2.5 minutes. The ten informational findings are
+  five unauditable `backends` collections, four unauditable `loggingHttps`, and one benign
+  `activeVersion` mismatch (state 14, live 16, all names matching) on
+  `ol-application-edxapp/xpro.Production`. Notably the ~100 objects in the four
+  collections added after the first draft all matched, so widening coverage cost no
+  standing noise.
 - Requires **no new IAM and no new credentials.** The Production `infra` pool already has
   `s3:GetObject*`/`s3:ListBucket*` on the bucket via the `pulumi_state` policy module and
   `kms:Decrypt` via `infra`.
@@ -152,8 +181,11 @@ Three traps have to be handled or the check false-alarms permanently:
 
 - Coverage is 32 stacks, not the 8 an earlier estimate suggested: `edxapp` alone carries
   12 stacks and `ocw-site` holds three services per stack.
-- Does not remove the need to fix Fastly token rotation and re-enable `refresh_stack`;
-  it makes that work non-urgent rather than unnecessary.
+- Does not re-enable `refresh_stack`, and so covers only the Fastly slice of those
+  stacks. The ~770 non-Fastly Production resources behind those flags — roughly 180
+  `aws:*` and 60 `vault:*` — remain unrefreshed and unwatched by anything.
+- Does not require fixing Fastly token rotation, which turned out not to be broken. That
+  premise was investigated and dropped; see the Context note above.
 
 ## Implementation Notes
 

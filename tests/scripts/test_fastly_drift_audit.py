@@ -16,9 +16,6 @@ import pytest
 
 SCRIPT_PATH = Path(__file__).resolve().parents[2] / "bin" / "fastly-drift-audit"
 
-# The value half of Pulumi's fixed sentinel pair for a secret-wrapped output.
-SENTINEL_VALUE = "1b47061264138c4ac30d75fd1eb44270"  # pragma: allowlist secret
-
 
 def load_audit_module():
     """Load the audit CLI from bin/.
@@ -132,13 +129,16 @@ def test_no_active_version_skips_rather_than_alerting(audit):
 
 
 def test_secret_wrapped_collection_is_unauditable_not_empty(audit):
-    """`backends` is often stored secret-wrapped rather than as a list.
+    """`backends` and `loggingHttps` are sometimes stored secret-wrapped.
 
     Iterating the sigil dict yields zero names, so every live backend would
     read as `live-but-undeclared` on every service, forever.
     """
     collection = audit.read_collection(
-        {audit.SECRET_SIGIL: SENTINEL_VALUE, "ciphertext": "v1:..."}
+        # Detection keys off the sigil, so the value half of Pulumi's sentinel
+        # pair is irrelevant here and is left out rather than tripping secret
+        # scanners with a well-known constant.
+        {audit.SECRET_SIGIL: "<sentinel>", "ciphertext": "v1:..."}
     )
     assert collection.auditable is False
     assert collection.names == frozenset()
@@ -293,3 +293,48 @@ def test_live_names_requires_a_list(audit):
     assert audit.live_names([{"name": "a"}, {"name": "b"}]) == frozenset({"a", "b"})
     with pytest.raises(TypeError, match="Expected a list"):
         audit.live_names({"msg": "Record not found"})
+
+
+# --- Coverage of the collection list itself ---------------------------------
+
+
+def test_every_name_bearing_collection_in_use_is_audited(audit):
+    """An unaudited collection reports nothing, which reads as clean.
+
+    The first draft audited seven collections and silently ignored ~100 live
+    objects across these four. Coverage is the detector's blind spot, so the
+    set is pinned rather than left to drift as collections are adopted.
+    """
+    assert set(audit.AUDITED_COLLECTIONS) == {
+        "snippets",
+        "conditions",
+        "headers",
+        "backends",
+        "domains",
+        "requestSettings",
+        "dictionaries",
+        "cacheSettings",
+        "gzips",
+        "responseObjects",
+        "loggingHttps",
+    }
+
+
+def test_endpoint_paths_are_the_fastly_spellings(audit):
+    """State keys and API path segments differ; a wrong one 404s at runtime."""
+    assert audit.AUDITED_COLLECTIONS["requestSettings"] == "request_settings"
+    assert audit.AUDITED_COLLECTIONS["responseObjects"] == "response_object"
+    assert audit.AUDITED_COLLECTIONS["cacheSettings"] == "cache_settings"
+    assert audit.AUDITED_COLLECTIONS["gzips"] == "gzip"
+    assert audit.AUDITED_COLLECTIONS["loggingHttps"] == "logging/https"
+
+
+def test_drift_and_error_exit_codes_are_distinct(audit):
+    """Concourse calls every nonzero exit `failed` and fires one hook.
+
+    If a crash exited 1 like real drift does, an S3 or Fastly outage would
+    announce confirmed drift every time.
+    """
+    codes = {audit.EXIT_CLEAN, audit.EXIT_DRIFT, audit.EXIT_USAGE, audit.EXIT_ERROR}
+    assert len(codes) == 4
+    assert audit.EXIT_CLEAN == 0

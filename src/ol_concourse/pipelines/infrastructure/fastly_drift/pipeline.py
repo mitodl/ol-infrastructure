@@ -115,14 +115,23 @@ def drift_job() -> Job:
                         ],
                     ),
                 ),
+                # Concourse classifies ANY nonzero exit as `failed`, so this one
+                # hook covers both real drift (exit 1) and an audit that could not
+                # complete (exit 3 -- S3, SOPS, or the Fastly API). It must not
+                # assert confirmed drift: announcing the hq#12449 failure mode
+                # every time Fastly has an outage is the false alarm this detector
+                # exists to avoid. The job output distinguishes the two, and
+                # `on_error` still covers Concourse-level step errors.
                 on_failure=notification(
                     slack_notification_resource,
-                    "Fastly drift detected",
+                    "Fastly drift audit failed",
                     (
-                        "Pulumi state claims a Fastly object exists that the live"
-                        " service does not have -- the hq#12449 failure mode. No"
-                        " `pulumi up` will heal this on its own. Job output lists the"
-                        f" affected services; repair runbook: {RUNBOOK_URL}"
+                        "Either Pulumi state claims a Fastly object the live service"
+                        " does not have (the hq#12449 failure mode, which no"
+                        " `pulumi up` will heal on its own), or the audit could not"
+                        " complete and the estate is currently unchecked rather than"
+                        " clean. The job output says which: look for `ALERT` lines."
+                        f" Repair runbook: {RUNBOOK_URL}"
                     ),
                     alert_type="failed",
                 ),
@@ -130,9 +139,9 @@ def drift_job() -> Job:
                     slack_notification_resource,
                     "Fastly drift audit errored",
                     (
-                        "The nightly Fastly drift audit failed to run, so the estate"
-                        " is currently unchecked rather than clean. Check the job"
-                        " output."
+                        "The nightly Fastly drift audit did not run to completion, so"
+                        " the estate is currently unchecked rather than clean. Check"
+                        " the job output."
                     ),
                     alert_type="errored",
                 ),
