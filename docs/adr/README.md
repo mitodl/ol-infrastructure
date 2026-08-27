@@ -167,6 +167,7 @@ graph LR
 | [0007](0007-clickhouse-llmops-multi-tenant.md) | Multi-Tenant ClickHouse Cluster for LLMOps on Data EKS | Accepted | 2026-02-25 |
 | [0008](0008-concourse-spot-worker-graceful-drain-no-ephemeral.md) | Concourse Spot Worker Graceful Drain Without Ephemeral Mode | Accepted | 2026-04-08 |
 | [0009](0009-deploy-witan-as-shared-multi-tenant-mcp-service.md) | Deploy witan as a Shared, Multi-Tenant MCP Service | Accepted | 2026-07-07 |
+| [0011](0011-fastly-drift-detection-by-name-set-audit.md) | Detect Fastly Drift by Name-Set Audit, Not by Pulumi Refresh | Proposed | 2026-08-27 |
 
 ## Creating a New ADR
 
