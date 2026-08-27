@@ -1,0 +1,462 @@
+#!/usr/bin/env python3
+"""Compare the Fastly child-object names in Pulumi state against live Fastly.
+
+hq#12449: a VCL snippet whose name contained an illegal `/` was rejected by the
+Fastly API mid-apply, but the failed Pulumi run persisted the full *desired*
+snippet set into the resource's state outputs anyway. The provider's `SetDiff`
+then read the never-created snippet back as `Unmodified`, so no later
+`pulumi up` could heal it -- QA and Production served without the redirect for
+days while every deploy reported success.
+
+Nothing noticed because nothing compares Pulumi's state to Fastly's reality:
+every Fastly-bearing stack runs `refresh_stack=False`, set *because* the stack
+has Fastly resources. `audit` closes that gap. It walks every `ServiceVcl` in
+every stack this repo declares, resolves the version Fastly is actually
+serving, and reports any named child object that state claims exists and the
+live service does not have. `replay` does the same for one stack against one
+explicit version; Fastly versions are immutable, so that is both the regression
+test for the original incident and the way to verify a repair.
+
+Read-only by construction: S3 GETs against the checkpoint bucket and Fastly
+GETs with the read-only `global_read_api_key`. No Pulumi CLI, no
+`PULUMI_CONFIG_PASSPHRASE`, no ability to mutate state.
+
+See docs/adr/0011-fastly-drift-detection-by-name-set-audit.md for the decision
+and the rejected alternatives.
+"""
+
+import json
+import sys
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Annotated, Any
+
+import boto3
+import cyclopts
+import requests
+import yaml
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from bridge.secrets.sops import read_yaml_secrets
+
+app = cyclopts.App(
+    help=(
+        "Compare the Fastly child-object names recorded in Pulumi state against "
+        "the version Fastly is actually serving."
+    )
+)
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+STATE_BUCKET = "mitol-pulumi-state"
+STATE_PREFIX = ".pulumi/stacks/"
+SERVICE_VCL_TYPE = "fastly:index/serviceVcl:ServiceVcl"
+FASTLY_API_ROOT = "https://api.fastly.com"
+REQUEST_TIMEOUT_SECONDS = 30
+RUNBOOK_URL = (
+    "https://engineering.ol.mit.edu/platform_services/cloud_infrastructure/"
+    "fastly_pulumi_state_drift/"
+)
+
+# Pulumi's public marker for a secret-wrapped value. Not a credential -- it is a
+# fixed sentinel key the engine writes in place of the real value.
+SECRET_SIGIL = "4dabf18193072939515e22adb298388d"  # noqa: S105  # pragma: allowlist secret
+
+# State output key -> the path segment of the matching Fastly version endpoint.
+# The two spellings differ, which is the whole reason this mapping is explicit.
+AUDITED_COLLECTIONS = {
+    "snippets": "snippet",
+    "conditions": "condition",
+    "headers": "header",
+    "backends": "backend",
+    "domains": "domain",
+    "requestSettings": "request_settings",
+    "dictionaries": "dictionary",
+}
+
+ALERT = "ALERT"
+INFO = "info"
+SKIP = "skip"
+
+
+@dataclass(frozen=True)
+class DeclaredCollection:
+    """One child collection as Pulumi state records it.
+
+    ``auditable`` false is deliberately distinct from an empty ``names``: a
+    collection we cannot read and a collection that is genuinely empty produce
+    identical set differences, and only one of them is good news.
+    """
+
+    names: frozenset[str]
+    auditable: bool = True
+    reason: str = ""
+
+
+@dataclass(frozen=True)
+class DeclaredService:
+    """One Fastly service as a single stack's checkpoint declares it."""
+
+    project: str
+    stack: str
+    service_id: str
+    state_active_version: int | None
+    collections: Mapping[str, DeclaredCollection]
+
+    @property
+    def label(self) -> str:
+        """Identify the service in report output."""
+        return f"{self.project}/{self.stack} {self.service_id}"
+
+
+@dataclass(frozen=True)
+class Finding:
+    """One difference between declared and live, at one severity."""
+
+    level: str
+    kind: str
+    collection: str = ""
+    names: tuple[str, ...] = ()
+    detail: str = ""
+
+
+@dataclass(frozen=True)
+class ServiceReport:
+    """Every finding for one service, against the version it was compared to."""
+
+    service: DeclaredService
+    live_version: int | None
+    findings: tuple[Finding, ...] = field(default_factory=tuple)
+
+
+def declared_projects(repo_root: Path) -> set[str]:
+    """Every Pulumi project name this repo declares, from ``src/**/Pulumi.yaml``.
+
+    Scope comes from the repo and never from an S3 listing. The bucket retains
+    checkpoints for deleted projects -- ``ol-infrastructure-fastly`` and
+    ``ol-infrastructure-mitxonline-application`` still point at the same live
+    service IDs as the current ``ol-application-*`` stacks, hundreds of
+    versions stale. Auditing those reports the entire live service as drift.
+    """
+    names = {
+        name
+        for path in sorted((repo_root / "src").rglob("Pulumi.yaml"))
+        if isinstance(name := (yaml.safe_load(path.read_text()) or {}).get("name"), str)
+    }
+    if not names:
+        # An empty scope audits nothing and reports clean, which is
+        # indistinguishable from a healthy estate. Fail instead.
+        msg = f"No Pulumi projects found under {repo_root / 'src'}"
+        raise RuntimeError(msg)
+    return names
+
+
+def read_collection(raw: object) -> DeclaredCollection:
+    """Extract the member names of one child collection from a state output."""
+    if raw is None:
+        return DeclaredCollection(frozenset())
+    if isinstance(raw, dict) and SECRET_SIGIL in raw:
+        return DeclaredCollection(
+            frozenset(), auditable=False, reason="secret-wrapped in state"
+        )
+    if not isinstance(raw, list):
+        return DeclaredCollection(
+            frozenset(),
+            auditable=False,
+            reason=f"unexpected {type(raw).__name__} in state",
+        )
+    # A member that is not a dict, or carries no string name, cannot be
+    # compared. Dropping it silently would shrink the declared set and so err
+    # toward reporting clean -- the wrong direction for a detector -- so the
+    # whole collection is marked unreadable instead.
+    if any(not isinstance(m, dict) or not isinstance(m.get("name"), str) for m in raw):
+        return DeclaredCollection(
+            frozenset(), auditable=False, reason="member without a string name"
+        )
+    return DeclaredCollection(frozenset(m["name"] for m in raw))
+
+
+def declared_services(
+    project: str, stack: str, checkpoint: dict[str, Any]
+) -> list[DeclaredService]:
+    """Every live ``ServiceVcl`` recorded in one stack checkpoint."""
+    latest = (checkpoint.get("checkpoint") or {}).get("latest") or {}
+    services = []
+    for resource in latest.get("resources") or []:
+        # `delete: true` marks a resource pending deletion; it is not the
+        # authority for what should be live.
+        if resource.get("type") != SERVICE_VCL_TYPE or resource.get("delete"):
+            continue
+        outputs = resource.get("outputs") or {}
+        service_id = outputs.get("id")
+        if not isinstance(service_id, str):
+            continue
+        active_version = outputs.get("activeVersion")
+        services.append(
+            DeclaredService(
+                project=project,
+                stack=stack,
+                service_id=service_id,
+                state_active_version=(
+                    active_version if isinstance(active_version, int) else None
+                ),
+                collections={
+                    key: read_collection(outputs.get(key))
+                    for key in AUDITED_COLLECTIONS
+                },
+            )
+        )
+    return services
+
+
+def iter_checkpoints(
+    s3_client: Any, projects: set[str]
+) -> Iterator[tuple[str, str, dict[str, Any]]]:
+    """Yield ``(project, stack, checkpoint)`` for every declared project."""
+    paginator = s3_client.get_paginator("list_objects_v2")
+    for project in sorted(projects):
+        prefix = f"{STATE_PREFIX}{project}/"
+        for page in paginator.paginate(Bucket=STATE_BUCKET, Prefix=prefix):
+            for entry in page.get("Contents") or []:
+                key = entry["Key"]
+                # Also excludes the `.json.bak` backups sitting alongside.
+                if not key.endswith(".json"):
+                    continue
+                body = s3_client.get_object(Bucket=STATE_BUCKET, Key=key)["Body"].read()
+                yield project, key[len(prefix) : -len(".json")], json.loads(body)
+
+
+def serving_version(details: Mapping[str, Any]) -> int | None:
+    """Return the version number Fastly reports as active, if any."""
+    for version in details.get("versions") or []:
+        if isinstance(version, dict) and version.get("active"):
+            number = version.get("number")
+            if isinstance(number, int):
+                return number
+    return None
+
+
+def live_names(payload: object) -> frozenset[str]:
+    """Extract member names from a Fastly version collection response."""
+    if not isinstance(payload, list):
+        msg = f"Expected a list from the Fastly API, got {type(payload).__name__}"
+        raise TypeError(msg)
+    return frozenset(
+        member["name"]
+        for member in payload
+        if isinstance(member, dict) and isinstance(member.get("name"), str)
+    )
+
+
+class FastlyReader:
+    """Read-only Fastly API client scoped to the calls this audit makes."""
+
+    def __init__(self, token: str, session: requests.Session | None = None) -> None:
+        """Authenticate every request with a read-only Fastly token."""
+        self._session = session or requests.Session()
+        self._session.headers.update(
+            {"Fastly-Key": token, "Accept": "application/json"}
+        )
+
+    def _get(self, path: str) -> Any:
+        response = self._session.get(
+            f"{FASTLY_API_ROOT}{path}", timeout=REQUEST_TIMEOUT_SECONDS
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def serving_version(self, service_id: str) -> int | None:
+        """Resolve the version currently serving traffic for a service."""
+        return serving_version(self._get(f"/service/{service_id}/details"))
+
+    def collection_names(
+        self, service_id: str, version: int, endpoint: str
+    ) -> frozenset[str]:
+        """List the member names of one collection on one service version."""
+        return live_names(
+            self._get(f"/service/{service_id}/version/{version}/{endpoint}")
+        )
+
+
+def compare(
+    service: DeclaredService,
+    live_version: int | None,
+    live_collections: Mapping[str, frozenset[str]],
+) -> tuple[Finding, ...]:
+    """Diff declared against live names for one service.
+
+    Only ``declared-but-absent`` is an alert. That set difference is the
+    hq#12449 failure mode exactly: state asserts an object exists on the
+    service and it does not. ``live-but-undeclared`` and a version mismatch
+    are ordinary consequences of a manual UI edit, so they are reported and
+    do not fail.
+    """
+    if live_version is None:
+        return (
+            Finding(SKIP, "no-active-version", detail="no version is serving traffic"),
+        )
+    findings = []
+    if (
+        service.state_active_version is not None
+        and service.state_active_version != live_version
+    ):
+        findings.append(
+            Finding(
+                INFO,
+                "active-version-mismatch",
+                detail=f"state {service.state_active_version}, live {live_version}",
+            )
+        )
+    for key, declared in sorted(service.collections.items()):
+        if not declared.auditable:
+            findings.append(
+                Finding(INFO, "unauditable", collection=key, detail=declared.reason)
+            )
+            continue
+        live = live_collections[key]
+        if absent := declared.names - live:
+            findings.append(
+                Finding(
+                    ALERT,
+                    "declared-but-absent",
+                    collection=key,
+                    names=tuple(sorted(absent)),
+                )
+            )
+        if undeclared := live - declared.names:
+            findings.append(
+                Finding(
+                    INFO,
+                    "live-but-undeclared",
+                    collection=key,
+                    names=tuple(sorted(undeclared)),
+                )
+            )
+    return tuple(findings)
+
+
+def audit_service(
+    reader: FastlyReader, service: DeclaredService, version: int | None
+) -> ServiceReport:
+    """Fetch the live side for one service and diff it against state.
+
+    The comparison is always against the version Fastly is *serving*, not the
+    version state believes is active -- in hq#12449 both were 207 and it was
+    the names that differed.
+    """
+    if version is None:
+        return ServiceReport(service, None, compare(service, None, {}))
+    live_collections = {
+        key: reader.collection_names(service.service_id, version, endpoint)
+        for key, endpoint in sorted(AUDITED_COLLECTIONS.items())
+        if service.collections[key].auditable
+    }
+    return ServiceReport(service, version, compare(service, version, live_collections))
+
+
+def fastly_reader() -> FastlyReader:
+    """Build a reader on the read-only token, never the admin token."""
+    return FastlyReader(read_yaml_secrets(Path("fastly.yaml"))["global_read_api_key"])
+
+
+def report(reports: list[ServiceReport], stack_count: int) -> int:
+    """Print the findings and return the intended exit code."""
+    print(
+        f"# Fastly drift audit -- {len(reports)} service(s) across "
+        f"{stack_count} stack(s)\n"
+    )
+    alert_count = 0
+    info_count = 0
+    for service_report in reports:
+        if not service_report.findings:
+            continue
+        print(f"  {service_report.service.label}")
+        for finding in service_report.findings:
+            alert_count += finding.level == ALERT
+            info_count += finding.level == INFO
+            target = f" {finding.collection}" if finding.collection else ""
+            detail = finding.detail or ", ".join(finding.names)
+            print(f"    {finding.level:5}{target} {finding.kind}: {detail}")
+        print()
+    print(
+        f"{len(reports)} service(s) audited, {alert_count} alert(s), "
+        f"{info_count} informational."
+    )
+    if alert_count:
+        print(
+            "\nPulumi state claims these objects exist and Fastly does not have "
+            f"them. Repair with the targeted refresh runbook: {RUNBOOK_URL}"
+        )
+        return 1
+    return 0
+
+
+@app.command
+def audit(
+    *,
+    repo_root: Annotated[
+        Path, cyclopts.Parameter(help="Repo checkout to read Pulumi.yaml scope from.")
+    ] = REPO_ROOT,
+    project: Annotated[
+        list[str] | None,
+        cyclopts.Parameter(help="Restrict to these Pulumi projects (repeatable)."),
+    ] = None,
+) -> int:
+    """Audit every Fastly service declared by every stack in this repo."""
+    projects = declared_projects(repo_root)
+    if project:
+        if unknown := set(project) - projects:
+            print(f"Not declared in this repo: {sorted(unknown)}", file=sys.stderr)
+            return 2
+        projects = set(project)
+
+    reader = fastly_reader()
+    s3_client = boto3.client("s3")
+    reports: list[ServiceReport] = []
+    stacks = 0
+    for project_name, stack, checkpoint in iter_checkpoints(s3_client, projects):
+        services = declared_services(project_name, stack, checkpoint)
+        if not services:
+            continue
+        stacks += 1
+        reports.extend(
+            audit_service(reader, service, reader.serving_version(service.service_id))
+            for service in services
+        )
+    return report(reports, stacks)
+
+
+@app.command
+def replay(
+    project: str,
+    stack: str,
+    version: int,
+    *,
+    repo_root: Annotated[
+        Path, cyclopts.Parameter(help="Repo checkout to read Pulumi.yaml scope from.")
+    ] = REPO_ROOT,
+) -> int:
+    """Audit one stack against one explicit Fastly version.
+
+    Fastly versions are immutable, so this replays a historical version to
+    reproduce a past incident or to confirm a repair actually landed.
+    """
+    if project not in declared_projects(repo_root):
+        print(f"Not declared in this repo: {project}", file=sys.stderr)
+        return 2
+
+    reader = fastly_reader()
+    s3_client = boto3.client("s3")
+    body = s3_client.get_object(
+        Bucket=STATE_BUCKET, Key=f"{STATE_PREFIX}{project}/{stack}.json"
+    )["Body"].read()
+    services = declared_services(project, stack, json.loads(body))
+    if not services:
+        print(f"No Fastly services in {project}/{stack}", file=sys.stderr)
+        return 2
+    return report([audit_service(reader, s, version) for s in services], 1)
+
+
+if __name__ == "__main__":
+    sys.exit(app())
