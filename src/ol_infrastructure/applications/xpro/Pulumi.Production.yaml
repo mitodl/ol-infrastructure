@@ -7,6 +7,7 @@ config:
   heroku:user: "mitx-devops"
   xpro:vars:
     CSRF_TRUSTED_ORIGINS: "https://xpro.mit.edu,https://xpro-web.odl.mit.edu"
+    CYBERSOURCE_REST_ENVIRONMENT: "api.cybersource.com"
     CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://secureacceptance.cybersource.com/pay"
     CYBERSOURCE_WSDL_URL: "https://ics2wsa.ic3.com/commerce/1.x/transactionProcessor/CyberSourceTransaction_1.154.wsdl"
     DRIVE_WEBHOOK_EXPIRATION_MINUTES: 1440
