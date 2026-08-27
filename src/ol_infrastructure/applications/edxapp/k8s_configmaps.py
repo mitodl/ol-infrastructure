@@ -372,6 +372,7 @@ def _build_interpolated_config_dict(
                 "COURSE_ABOUT_VISIBILITY_PERMISSION": "see_about_page",
                 "MITXONLINE_BASE_URL": f"https://{marketing_domain}/",
                 "ENROLLMENT_WEBHOOK_URL": f"https://{marketing_domain}/api/openedx_webhook/enrollment/",
+                "ENROLLMENT_WEBHOOK_SERVICE_WORKER_USERNAME": "login_service_user",
                 "CERTIFICATE_WEBHOOK_URL": f"https://{marketing_domain}/api/openedx_webhook/certificate/",
                 "USE_EXTRACTED_HTML_BLOCK": edxapp_config.get_bool(
                     "use_extracted_html_block", False
