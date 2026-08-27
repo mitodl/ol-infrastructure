@@ -9,6 +9,7 @@ from ol_infrastructure.lib.fastly import (
 )
 
 SRC_ROOT = Path(__file__).parents[3] / "src"
+HELPER_MODULE = SRC_ROOT / "ol_infrastructure" / "lib" / "fastly.py"
 
 
 @pytest.mark.parametrize(
@@ -80,7 +81,7 @@ def test_stacks_build_snippets_through_the_validating_helper():
     for source_file in sorted(SRC_ROOT.rglob("*.py")):
         tree = ast.parse(source_file.read_text())
         for called, node in _snippet_calls(tree):
-            if called == "ServiceVclSnippetArgs" and source_file.name != "fastly.py":
+            if called == "ServiceVclSnippetArgs" and source_file != HELPER_MODULE:
                 offenders.append(f"{source_file}:{node.lineno}")
     assert not offenders
 
