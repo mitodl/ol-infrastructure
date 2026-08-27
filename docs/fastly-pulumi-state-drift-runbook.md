@@ -51,11 +51,25 @@ children from the live active version and overwrites the fiction in state.
 
 ## Prevention (already in place)
 
-`vcl_snippet()` in `src/ol_infrastructure/lib/fastly.py` validates the name and
-raises during `pulumi preview`, before any version is cloned. All snippet
-definitions in the repo go through it, and
-`tests/ol_infrastructure/lib/test_fastly.py` fails CI if a raw
-`fastly.ServiceVclSnippetArgs` or an illegal literal name reappears.
+Two layers, because they fire at different times:
+
+- `tests/ol_infrastructure/lib/test_fastly.py` walks `src/` with `ast` and fails
+  if any snippet name literal is illegal, or if a raw
+  `fastly.ServiceVclSnippetArgs` is constructed outside `lib/fastly.py`. This is
+  the one that runs **before merge**, on the PR.
+- `vcl_snippet()` in `src/ol_infrastructure/lib/fastly.py` validates at
+  construction time and raises, aborting the program before the `ServiceVcl`
+  resource is registered — so an illegal name never reaches the Fastly API and
+  state cannot be corrupted. This is the runtime backstop that catches a name
+  the static scan cannot see (one built at runtime rather than written as a
+  literal).
+
+Note that the backstop fires during `pulumi up`, **not** during a preview: the
+`k8s_apps` pipelines call `pulumi_jobs_chain` without `topology=`, which
+defaults to `deploy-chained`, and only `preview-gated` creates preview jobs. So
+mit-learn, mitxonline and learn-ai have no preview gate at all. The failure is
+safe (the deploy aborts having changed nothing) but it is post-merge, which is
+why the static scan matters.
 
 The validator is deliberately scoped to **snippets only**. Fastly validates
 conditions and request settings more loosely, and we have live ones that this

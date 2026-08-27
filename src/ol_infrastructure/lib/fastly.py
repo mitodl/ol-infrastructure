@@ -30,11 +30,14 @@ def vcl_snippet(
     type: str,  # noqa: A002
     priority: int | None = None,
 ) -> fastly.ServiceVclSnippetArgs:
-    """Build snippet args, rejecting illegal names during `pulumi preview`.
+    """Build snippet args, rejecting an illegal name before the resource registers.
 
-    An illegal name otherwise 400s mid-apply, after Pulumi has cloned a service
-    version, and the failed run persists the uncreated snippet to state where the
-    provider's SetDiff reads it back as Unmodified -- no later `up` can heal it.
+    Raising here aborts the program before the ServiceVcl is registered, so the
+    name never reaches the Fastly API. Otherwise it 400s mid-apply, after Pulumi
+    has cloned a service version, and the failed run persists the uncreated
+    snippet to state where the provider's SetDiff reads it back as Unmodified --
+    no later `up` can heal it. The k8s_apps pipelines have no preview job, so the
+    pre-merge guard is the call-site scan in tests/, not this.
     """
     return fastly.ServiceVclSnippetArgs(
         name=validate_vcl_snippet_name(name),
