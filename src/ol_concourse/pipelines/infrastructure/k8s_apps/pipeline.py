@@ -118,10 +118,29 @@ class AppPipelineParams(BaseModel):
             image build. See :class:`SentrySourcemapsConfig`. Left unset, no source
             maps are uploaded.
         refresh_stack (bool): Whether the Pulumi deploy jobs run `pulumi refresh`
-            before `up`. Defaults to True. Set False for apps whose Pulumi code
-            provisions Fastly resources while the Fastly API token is being
-            rotated -- refresh calls the Fastly API with the old token and fails
-            the whole job.
+            before `up`. Defaults to True, which is what every stack outside the
+            list below uses.
+
+            The existing `False` settings are STALE SCAFFOLDING, not a standing
+            constraint. They were added in #5134 on 2026-07-27 while the Fastly
+            admin token was mid-rotation, so refresh was calling the API with a
+            token being revoked. That rotation finished the same day; the
+            replacement token carries no expiry, and `fastly.yaml` has otherwise
+            only been rotated in 2022 and 2024. Nothing rotates today, and
+            `ocw_site` has already been flipped back to True.
+
+            They were left in place deliberately, not because they are needed:
+            refresh runs before `up` and writes state, and a Fastly stack refresh
+            drops and re-adds `backends` as secret-flip noise (see
+            docs/adr/0011-fastly-drift-detection-by-name-set-audit.md), so
+            re-enabling has an unmeasured deploy-path risk. Note the cost of
+            leaving them: this disables refresh for the ENTIRE stack, not just its
+            Fastly resources, and these stacks are ~170 resources of which about 3
+            are Fastly.
+
+            To revert one: `pulumi preview --refresh` that stack first (preview
+            never writes state) to see what `up` would then do, and flip a single
+            pipeline at a time.
     """
 
     app_name: str

@@ -125,10 +125,19 @@ class SimplePulumiParams(BaseModel):
                           issue being closed, preserving the same promotion workflow
                           used within a single chained pipeline.
         refresh_stack: Whether the Pulumi deploy jobs run `pulumi refresh` before
-                      `up`. Defaults to True. Set False for apps whose Pulumi code
-                      provisions Fastly resources while the Fastly API token is
-                      being rotated -- refresh calls the Fastly API with the old
-                      token and fails the whole job.
+                      `up`. Defaults to True.
+
+                      Any existing `False` here is STALE SCAFFOLDING rather than a
+                      standing constraint: added in #5134 on 2026-07-27 while the
+                      Fastly admin token was mid-rotation, a rotation that
+                      finished that same day. The replacement token has no expiry
+                      and nothing rotates today. Left in place only because
+                      re-enabling refresh carries an unmeasured deploy-path risk
+                      (refresh writes state before `up`, and a Fastly refresh
+                      drops and re-adds `backends` as secret-flip noise). See the
+                      fuller note on AppPipelineParams.refresh_stack in
+                      ../k8s_apps/pipeline.py and
+                      docs/adr/0011-fastly-drift-detection-by-name-set-audit.md.
         topology: "deploy-chained" (default) auto-deploys each stage on code
                  change, gated only by the previous stage's promotion issue.
                  "preview-gated" instead gates every stage on a `pulumi preview`

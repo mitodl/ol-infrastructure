@@ -218,8 +218,13 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
             pulumi_fragments.append(
                 pulumi_jobs_chain(
                     edx_pulumi_code,
-                    # edxapp's Pulumi code provisions Fastly resources; refresh
-                    # calls the Fastly API and fails while the token is rotated.
+                    # Stale scaffolding, not a standing constraint: added in #5134
+                    # on 2026-07-27 while the Fastly admin token was mid-rotation,
+                    # which finished the same day. The replacement token has no
+                    # expiry and nothing rotates today. Left set only because
+                    # re-enabling refresh has an unmeasured deploy-path risk -- see
+                    # AppPipelineParams.refresh_stack in
+                    # src/ol_concourse/pipelines/infrastructure/k8s_apps/pipeline.py.
                     refresh_stack=False,
                     # Gate each stage on a preview OF ITSELF. edxapp is the
                     # largest blast radius in the estate and its environments
