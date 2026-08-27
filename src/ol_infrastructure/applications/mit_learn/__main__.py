@@ -1062,12 +1062,12 @@ mitlearn_fastly_service = fastly.ServiceVcl(
         ),
         fastly.ServiceVclSnippetArgs(
             content="unset bereq.http.X-Cache-Key-Url;",
-            name="Strip internal cache-key header before backend fetch (miss)",
+            name="Strip internal cache-key header before backend fetch on miss",
             type="miss",
         ),
         fastly.ServiceVclSnippetArgs(
             content="unset bereq.http.X-Cache-Key-Url;",
-            name="Strip internal cache-key header before backend fetch (pass)",
+            name="Strip internal cache-key header before backend fetch on pass",
             type="pass",
         ),
         fastly.ServiceVclSnippetArgs(
