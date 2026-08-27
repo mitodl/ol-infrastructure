@@ -372,7 +372,14 @@ def _build_interpolated_config_dict(
                 "COURSE_ABOUT_VISIBILITY_PERMISSION": "see_about_page",
                 "MITXONLINE_BASE_URL": f"https://{marketing_domain}/",
                 "ENROLLMENT_WEBHOOK_URL": f"https://{marketing_domain}/api/openedx_webhook/enrollment/",
-                "ENROLLMENT_WEBHOOK_SERVICE_WORKER_USERNAME": "login_service_user",
+                # The edX account MITx Online authenticates as when it
+                # creates enrollments through the enrollment REST API; the
+                # plugin skips webhooking those back to it. RC runs under a
+                # different account than Production, so it is per-stack.
+                "ENROLLMENT_WEBHOOK_SERVICE_WORKER_USERNAME": edxapp_config.get(
+                    "enrollment_webhook_service_worker_username",
+                    "login_service_user",
+                ),
                 "CERTIFICATE_WEBHOOK_URL": f"https://{marketing_domain}/api/openedx_webhook/certificate/",
                 "USE_EXTRACTED_HTML_BLOCK": edxapp_config.get_bool(
                     "use_extracted_html_block", False
