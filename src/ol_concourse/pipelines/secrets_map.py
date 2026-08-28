@@ -131,6 +131,7 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     "applications/toolhive_data/": [],
     "applications/toolhive_operator/": [],
     "applications/toolhive_swe/": [],
+    "applications/vuln_scanner/": [],
     "applications/witan/": ["witan/"],
     "applications/xpro/": ["fastly.yaml", "vector/", "xpro/"],
     "applications/xqueue/": [],

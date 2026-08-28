@@ -22,8 +22,17 @@
 # runtime, so there's no reason to pick one with a shorter support window.
 FROM mitodl/ol-python-base@sha256:0eedc615b6d7c3040cb14f5bdc186cb1d41ac8663c471666f8edeb748b8bacf1 AS builder
 
+# COPY sources are `reporter/...`, not bare filenames: the Concourse
+# simple_pulumi build job (src/ol_concourse/pipelines/infrastructure/
+# simple_pulumi/pipeline.py's _build_docker_image_job) always sets the build
+# CONTEXT to the whole pulumi_project_path directory (applications/
+# vuln_scanner/), not the Dockerfile's own directory, so paths here are
+# relative to that wider context -- confirmed by reading that job's
+# CONTEXT/DOCKERFILE construction, not assumed. `docker build` from within
+# this reporter/ directory won't work standalone anymore; build from
+# applications/vuln_scanner/ with `-f reporter/Dockerfile`.
 WORKDIR /src
-COPY pyproject.toml uv.lock ./
+COPY reporter/pyproject.toml reporter/uv.lock ./
 RUN uv sync --frozen --no-dev
 
 FROM gcr.io/distroless/base-debian13@sha256:9ef50bca108839d5986e4d84b7f7b2d79024c9293b7c35b162c6c55485bd5868
@@ -41,7 +50,7 @@ COPY --from=builder /usr/local/bin/python3.14 /usr/local/bin/python3.14
 COPY --from=builder /usr/local/bin/python3 /usr/local/bin/python3
 COPY --from=builder /opt/venv /opt/venv
 
-COPY reporter.py /app/reporter.py
+COPY reporter/reporter.py /app/reporter.py
 WORKDIR /app
 
 # No shell to chain commands through, and no CMD -- ENTRYPOINT calls the
