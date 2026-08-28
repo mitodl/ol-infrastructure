@@ -109,7 +109,7 @@ class ParsedReport:
 
 def parse_zap_report(report_path: Path) -> ParsedReport:
     """Parse a ZAP Automation Framework JSON report (the `report` job's
-    `traditional-json`/`risk-confidence-json` template output).
+    `traditional-json` template output).
 
     Shape: {"site": [{"alerts": [{"pluginid", "name", "desc", "riskcode",
     "instances": [{"uri": ...}, ...]}, ...]}, ...]}

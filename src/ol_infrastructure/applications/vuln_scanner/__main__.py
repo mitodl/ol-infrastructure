@@ -290,7 +290,20 @@ def _zap_automation_plan(
         {
             "type": "report",
             "parameters": {
-                "template": "risk-confidence-json",
+                # Verified against a real ZAP run (pinned digest): the
+                # invented "risk-confidence-json" isn't a real template --
+                # ZAP rejects it outright ("Job report invalid template:
+                # risk-confidence-json, valid templates: [...]"), the
+                # Automation Framework run fails, and no report file is
+                # ever written, so this would fail the initContainer (and
+                # the whole CronJob) on every single execution.
+                # "traditional-json" is real and its output -- confirmed by
+                # both reading the report template source and by an actual
+                # run producing report.json -- is exactly the
+                # `site[].{@name, alerts[].{pluginid, name, desc, riskcode,
+                # instances[].uri}}` shape parse_zap_report() already
+                # expects; no parser change needed alongside this fix.
+                "template": "traditional-json",
                 "reportDir": ZAP_REPORT_DIR,
                 "reportFile": Path(ZAP_REPORT_FILENAME).stem,
                 "reportTitle": f"ZAP scan of {target_name}",
