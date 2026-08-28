@@ -12,7 +12,7 @@
   meilisearch:memory_request: "4Gi"
   meilisearch:memory_limit: "4Gi"
   meilisearch:max_indexing_memory: "2Gi" # optional, see Sizing below
-  meilisearch:course_indexing: "all" # optional override, see Course indexing scope below
+  # meilisearch:course_indexing: "all" # optional; defaults to library_downstream_only, see Course indexing scope below
 ```
 
 The difference between `deploy` and `enabled`. Deploy means "deploy the helm chart" whereas enabled means "enable meilisearch integration in the Open edX platform". You can deploy the chart but not enable it in Open edX if you want to test things out first.
@@ -113,11 +113,18 @@ collections and containers) is indexed in every mode.
 | `library_downstream_only` | Only blocks with an `upstream` link to a library. |
 | `none` | None. No indexing task is even enqueued. |
 
-**Every deployment runs `library_downstream_only`.** It is set in
-`k8s_configmaps.py`, not per stack, because we run Meilisearch for Libraries V2
-and course search runs on Typesense; indexing course content here only ever cost
-us memory. `meilisearch:course_indexing` overrides it on a single stack if you
-need `all` or `none` for a specific reason.
+**Every deployment with `meilisearch:enabled` set defaults to
+`library_downstream_only`.** The default lives in `k8s_configmaps.py` rather
+than in each stack, because we run Meilisearch for Libraries V2 and course
+search runs on Typesense; indexing course content here only ever cost us
+memory. Stacks with Meilisearch disabled get no `MEILISEARCH_COURSE_INDEXING`
+key at all.
+
+`meilisearch:course_indexing` overrides the default on a single stack if you
+need `all` or `none` for a specific reason. It is validated during the Pulumi
+run and anything outside the three values above fails the preview, because the
+CMS treats an unrecognised value as `all` — a typo would otherwise silently
+restore full course indexing.
 
 The motivating case: as of 2026-08-28 the mitxonline production index held
 1,319,937 documents of which 966 were library content, at 11.91 GiB against a
