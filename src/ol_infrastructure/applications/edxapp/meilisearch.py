@@ -152,6 +152,18 @@ def create_meilisearch_resources(
         },
     }
 
+    # Meilisearch sizes its indexing buffer at two thirds of the machine's total
+    # memory, measured with the sysinfo crate, which reads the host's
+    # /proc/meminfo and not the cgroup limit. On the m8i-flex.4xlarge core nodes
+    # that means it budgets ~40Gi inside whatever memory_limit we set, so it
+    # never flushes early and leaves the cgroup to reclaim instead. Pin it so
+    # the budget and the limit agree. Only emitted when configured, so the
+    # stacks that have not been sized for it render unchanged.
+    if max_indexing_memory := meilisearch_config.get("max_indexing_memory"):
+        meilisearch_values["environment"]["MEILI_MAX_INDEXING_MEMORY"] = (
+            max_indexing_memory
+        )
+
     return kubernetes.helm.v3.Release(
         f"ol-{stack_info.env_prefix}-edxapp-meilisearch-helm-release-{stack_info.env_suffix}",
         kubernetes.helm.v3.ReleaseArgs(
