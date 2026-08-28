@@ -510,10 +510,49 @@ def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
         }
 
 
+#: Repo-record keys this file reads by subscript rather than `.get()`, so a cache
+#: written before one of them existed crashes far away from the cause. Every command
+#: here runs off the same cached crawl, and the cache carries no version, so the only
+#: thing separating "stale schema" from "current" is which keys the records have.
+#: Adding a field to a repo record means adding it here too.
+_EXPECTED_REPO_KEYS = frozenset(
+    {
+        "name",
+        "has_branch_protection",
+        "ruleset_count",
+        "required_status_checks",
+        "foreign_required_status_checks",
+        "secret_scanning",
+        "secret_scanning_push_protection",
+        "dependabot_security_updates",
+    }
+)
+
+
 def _crawl_org(cache: Path, *, refresh: bool) -> dict[str, Any]:
-    """Return the org crawl, from cache unless --refresh."""
+    """Return the org crawl, from cache unless --refresh.
+
+    A cache from before a field was added is the failure worth naming here. It loads
+    fine, and then some rule 300 lines away subscripts the missing key and dies with a
+    bare `KeyError` that says nothing about caching -- which is how this was reported
+    on #5566, against `foreign_required_status_checks`. The remedy has always been
+    `--refresh`; the point of this check is that the message says so, once, instead of
+    every added field becoming its own puzzle.
+    """
     if cache.exists() and not refresh:
-        return json.loads(cache.read_text())
+        data = json.loads(cache.read_text())
+        repos = data.get("repos") or []
+        # Intersection, not the first record: a half-written cache with one short
+        # record is as broken as one written by older code, and reads the same way.
+        shared = set.intersection(*(set(r) for r in repos)) if repos else set()
+        missing = _EXPECTED_REPO_KEYS - shared if repos else set()
+        if missing:
+            message = (
+                f"{cache} predates {sorted(missing)} and every command here reads the "
+                "same crawl. Re-run with --refresh."
+            )
+            raise SystemExit(message)
+        return data
 
     token = get_installation_token()
     with _client(token) as client:
