@@ -178,6 +178,14 @@ config:
   edxapp:k8s_vpc: applications_vpc
   meilisearch:deploy: "true"
   meilisearch:enabled: "true"
+  # Studio course-block indexing is suspended for mitxonline: 99.93% of the
+  # studio_content index was course XBlocks against a Libraries V2 workload, which
+  # pushed the index to 11.91 GiB on a 4Gi pod. "library_downstream_only" keeps the
+  # course blocks linked to a library upstream (the course-libraries Review tab
+  # needs those) and drops the rest. The Studio course content search modal and the
+  # course outline block-type facets go empty as a result. Reversible: set this back
+  # to "all" and run reindex_studio. See mitodl/hq#13014.
+  meilisearch:course_indexing: library_downstream_only
   meilisearch:domain: meilisearch.courses.learn.mit.edu
   meilisearch:replica_count: "1"
   meilisearch:pv_size: 100Gi

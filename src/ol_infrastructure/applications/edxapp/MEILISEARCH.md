@@ -99,3 +99,54 @@ grep -iR MEILISEARCH ../config/
 ./manage.py cms reindex_studio --experimental
 ```
 Depending on how much content you have, it could be hours.
+
+## Course indexing scope
+
+`meilisearch:course_indexing` controls how much course content Studio writes to
+the `studio_content` index. It maps to the `MEILISEARCH_COURSE_INDEXING` Django
+setting on the CMS. Library content (Libraries V2 blocks, collections and
+containers) is indexed in every mode.
+
+| Value | Course blocks indexed |
+| --- | --- |
+| `all` (default, upstream behaviour) | Every course XBlock. |
+| `library_downstream_only` | Only blocks with an `upstream` link to a library. |
+| `none` | None. No `upsert_xblock_index_doc` or `upsert_course_blocks_docs` task is even enqueued. |
+
+mitxonline runs `library_downstream_only`. As of 2026-08-28 its index held
+1,319,937 documents of which 966 were library content, at 11.91 GiB against a
+4Gi pod limit; the rest was course XBlocks written by ordinary publishes plus a
+batch of course reruns and imports on 2026-08-19/20. See mitodl/hq#13014.
+
+`library_downstream_only` keeps the set the Authoring MFE's course-libraries
+Review tab needs — it lists library components used in a course that have
+upstream updates ready to sync, and queries the index by `usage_key` to hydrate
+them for display. What it gives up:
+
+- the Studio course content search modal;
+- the block-type breakdown in the course outline info sidebar.
+
+LMS-side courseware search and discovery are unaffected: those run on Typesense
+through edx-search, not on Meilisearch.
+
+### Restoring course indexing
+
+The suspension is config, not code. To restore:
+
+1. Set `meilisearch:course_indexing: all` on the stack (or drop the key) and
+   deploy, so the CMS emits `MEILISEARCH_COURSE_INDEXING: all`.
+2. Confirm the running CMS pods picked it up:
+   ```bash
+   kubectl exec -n mitxonline-openedx <cms-pod-name> -- \
+     grep MEILISEARCH_COURSE_INDEXING ../config/cms.env.yml
+   ```
+3. Rebuild the index so existing course content reappears — ongoing publishes
+   only index blocks as they change:
+   ```bash
+   ./manage.py cms reindex_studio --experimental
+   ```
+   Use the non-incremental form. It builds into a temp index and swaps, which is
+   also the only path that reclaims LMDB free pages (see Sizing above).
+4. Size the pod for the result first. A full course index needs far more memory
+   and disk than the library-only one; check `usedIndexSize` from `/stats` on a
+   comparable environment before committing to `memory_limit` and `pv_size`.
