@@ -762,7 +762,10 @@ def _build_fe_config(  # noqa: PLR0913
     prevent FE startup.
 
     When oidc_issuer_url is provided, the full set of oauth2_* FE params is
-    written so that the StarRocks web UI shows the "OAuth2 Login" button.
+    written. Those serve locally-created `IDENTIFIED WITH authentication_oauth2`
+    users and the JDBC driver's browser authorization-code flow; they do not
+    add an "OAuth2 Login" button to the FE web dashboard, which has no OIDC
+    entry point (StarRocks#75370).
     The client secret ends up in a ConfigMap (StarRocks Helm chart limitation);
     access is RBAC-gated and marked as a Pulumi secret so it is not stored
     in plaintext Pulumi state.
@@ -772,7 +775,8 @@ def _build_fe_config(  # noqa: PLR0913
     if oidc_issuer_url is not None:
         _oidc_base = f"{oidc_issuer_url}/protocol/openid-connect"
         conf += (
-            # oauth2_* — web UI "OAuth2 Login" button (browser-redirect flow).
+            # oauth2_* — read by locally-created authentication_oauth2 users
+            # and by the JDBC driver's browser authorization-code flow.
             # StarRocks FE exchanges the authorization code server-side using
             # these credentials; the id_token is stored on the connection context
             # and forwarded to Iceberg REST catalogs when security = JWT.
@@ -859,8 +863,15 @@ if _needs_fe_config:
     fe_spec = cast(dict[str, Any], starrocks_values["starrocksFESpec"])
     _domain = starrocks_config.require("domain")
 
-    # Pull OIDC client credentials from Vault when OIDC is enabled so the FE web
-    # UI can display the "OAuth2 Login" button (requires oauth2_* in fe.conf).
+    # Pull OIDC client credentials from Vault when OIDC is enabled so the
+    # oauth2_* keys can go into fe.conf. Those are what a locally-created
+    # `CREATE USER ... IDENTIFIED WITH authentication_oauth2` account
+    # authenticates against -- the security integration alone is not sufficient
+    # for a user created that way, which is how starrocks:oidc_users works.
+    # They do NOT put an "OAuth2 Login" button on the FE web dashboard: it
+    # answers with `WWW-Authenticate: Basic` unconditionally and has no OIDC
+    # entry point at all (StarRocks#75370). The browser redirect belongs to the
+    # JDBC driver's authorization-code flow, which returns to /api/oauth2.
     _oidc_vault_data: Output | None = None
     if starrocks_config.get_bool("oidc_enabled"):
         _oidc_vault_data = pulumi_vault.generic.get_secret_output(
