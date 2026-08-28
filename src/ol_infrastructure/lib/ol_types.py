@@ -100,6 +100,22 @@ class Services(StrEnum):
 
     airbyte = "airbyte"
     superset = "superset"
+    # Cluster addons. They are deployable units we page about the same way an
+    # application is, even though nobody here wrote the code: an unlabeled
+    # addon is exactly the workload whose alert cannot be routed.
+    apisix = "apisix"
+    aws_load_balancer_controller = "aws-load-balancer-controller"
+    aws_node_termination_handler = "aws-node-termination-handler"
+    cert_manager = "cert-manager"
+    dcgm_exporter = "dcgm-exporter"
+    external_dns = "external-dns"
+    karpenter = "karpenter"
+    keda = "keda"
+    metrics_server = "metrics-server"
+    traefik = "traefik"
+    vantage_agent = "vantage-agent"
+    vault_secrets_operator = "vault-secrets-operator"  # pragma: allowlist secret
+    vertical_pod_autoscaler = "vertical-pod-autoscaler"
     celery_monitoring = "celery-monitoring"
     clickhouse = "clickhouse"
     codejail = "codejail"
@@ -219,11 +235,14 @@ class Component(StrEnum):
     cannot collide with a bare `component` set by a vendor integration.
     """
 
+    agent = "agent"
     api = "api"
     beat = "beat"
     cache = "cache"
     celery = "celery"
+    controller = "controller"
     database = "database"
+    exporter = "exporter"
     frontend = "frontend"
     gateway = "gateway"
     ingress = "ingress"
@@ -233,6 +252,7 @@ class Component(StrEnum):
     queue = "queue"
     search = "search"
     webapp = "webapp"
+    webhook = "webhook"
     worker = "worker"
 
 
@@ -315,6 +335,49 @@ class K8sAppLabels(K8sGlobalLabels):
     pod_security_group: str | None = None
     commit_sha: str | None = None
     release_tag: str | None = None
+
+
+def cluster_addon_labels(
+    *,
+    base_labels: dict[str, str],
+    stack_info: StackInfo,
+    service: Services,
+    component: Component,
+    alert_tier: AlertTier,
+) -> dict[str, str]:
+    """Label a cluster addon's workloads so its alerts can be routed.
+
+    Addons are installed from third-party Helm charts, so they never construct a
+    label model of their own and land in the alerting hierarchy as unlabeled --
+    which is how APISIX, cert-manager and the shared ingress, the widest blast
+    radius in the estate, ended up with nothing for Rootly to route on.
+
+    The base labels win on conflict: `k8s_global_labels` already carries a
+    stack identity in some programs, and rewriting it would churn every pod
+    template for a value that means the same thing.
+
+    Which Helm value to feed the result to is chart-specific and has to be one
+    that does NOT reach `spec.selector` -- a Deployment selector is immutable,
+    so a label that lands there forces a delete-and-recreate of the addon.
+
+    :param base_labels: The program's shared label dict, merged in last.
+    :param stack_info: Supplies the stack and environment labels.
+    :param service: The addon, as its own deployable unit.
+    :param component: Its functional role, the paging discriminator.
+    :param alert_tier: How far an alert about it may escalate.
+    """
+    return (
+        K8sGlobalLabels(
+            # Platform engineering owns the addons in every cluster, so the OU
+            # is not the tenant whose cluster the addon happens to run in.
+            ou=BusinessUnit.operations,
+            service=service,
+            stack=stack_info,
+            component=component,
+            alert_tier=alert_tier,
+        ).model_dump()
+        | base_labels
+    )
 
 
 class AWSBase(BaseModel):

@@ -12,7 +12,14 @@ from bridge.lib.versions import KARPENTER_CHART_VERSION
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.lib.aws.ec2_helper import InstanceClasses, InstanceTypes
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.ol_types import (
+    AlertTier,
+    AWSBase,
+    Component,
+    Services,
+    cluster_addon_labels,
+)
+from ol_infrastructure.lib.pulumi_helper import StackInfo
 from ol_infrastructure.substructure.aws.eks.karpenter_iam import (
     get_cluster_karpenter_iam_policy_document,
 )
@@ -41,6 +48,7 @@ def setup_karpenter(  # noqa: PLR0913
     k8s_provider: kubernetes.Provider,
     aws_account: aws.GetCallerIdentityResult,
     k8s_global_labels: dict[str, str],
+    stack_info: StackInfo,
 ):
     """
     Set up Karpenter resources including SQS queue, EventBridge rules, IAM roles/policies,
@@ -53,7 +61,17 @@ def setup_karpenter(  # noqa: PLR0913
         k8s_provider: The Pulumi Kubernetes provider instance.
         aws_account: The AWS caller identity result.
         k8s_global_labels: A dictionary of global labels to apply to Kubernetes resources.
+        stack_info: Information about the current Pulumi stack.
     """
+    karpenter_labels = cluster_addon_labels(
+        base_labels=k8s_global_labels,
+        stack_info=stack_info,
+        service=Services.karpenter,
+        component=Component.controller,
+        # Nothing provisions capacity while it is down, so a scale-up or a
+        # node replacement stalls until someone notices.
+        alert_tier=AlertTier.page,
+    )
     # Karpenter Interruption Queue
     karpenter_interruption_queue = aws.sqs.Queue(
         f"{cluster_name}-karpenter-interruption-queue",
@@ -255,6 +273,10 @@ def setup_karpenter(  # noqa: PLR0913
                 "serviceMonitor": {
                     "enabled": False,  # works TOO well, need to find a good way to reduce # of metrics
                 },
+                # podLabels reaches the pod template, additionalLabels the
+                # Deployment; the selector is name+instance and untouched.
+                "podLabels": karpenter_labels,
+                "additionalLabels": karpenter_labels,
                 "controller": {
                     "resources": {
                         "requests": {

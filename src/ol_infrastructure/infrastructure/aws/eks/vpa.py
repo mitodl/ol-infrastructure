@@ -17,6 +17,14 @@ import pulumi_eks as eks
 import pulumi_kubernetes as kubernetes
 from pulumi import ResourceOptions
 
+from ol_infrastructure.lib.ol_types import (
+    AlertTier,
+    Component,
+    Services,
+    cluster_addon_labels,
+)
+from ol_infrastructure.lib.pulumi_helper import StackInfo
+
 
 def setup_vpa(
     cluster_name: str,
@@ -26,6 +34,7 @@ def setup_vpa(
     k8s_global_labels: dict[str, str],
     operations_tolerations: list[dict[str, str]],
     versions: dict[str, str],
+    stack_info: StackInfo,
 ) -> kubernetes.helm.v3.Release:
     """
     Install the Vertical Pod Autoscaler as a core cluster capability.
@@ -38,8 +47,19 @@ def setup_vpa(
     :param operations_tolerations: Tolerations for scheduling on
         operations-tainted nodes.
     :param versions: A dictionary of component versions keyed by component name.
+    :param stack_info: Information about the current Pulumi stack.
     :returns: The Helm Release resource, for use as a dependency by VPA objects.
     """
+
+    def vpa_labels(component: Component, alert_tier: AlertTier) -> dict[str, str]:
+        return cluster_addon_labels(
+            base_labels=k8s_global_labels,
+            stack_info=stack_info,
+            service=Services.vertical_pod_autoscaler,
+            component=component,
+            alert_tier=alert_tier,
+        )
+
     # Per-component resource tuning, sized from measured usage rather than the
     # earlier guess that these are "lightweight control-plane processes".
     #
@@ -83,10 +103,14 @@ def setup_vpa(
                 repo="https://kubernetes.github.io/autoscaler",
             ),
             values={
-                "commonLabels": k8s_global_labels,
+                # commonLabels reaches the three workload objects but not
+                # their pod templates, so each component also gets podLabels.
+                "commonLabels": vpa_labels(Component.controller, AlertTier.ticket),
                 "admissionController": {
                     "enabled": True,
                     "replicas": 2,
+                    # failurePolicy is Ignore below, so pods still start.
+                    "podLabels": vpa_labels(Component.webhook, AlertTier.notify),
                     "tolerations": operations_tolerations,
                     # Peak observed 176Mi at 8.5k pods, against a 200Mi ceiling.
                     "resources": {
@@ -115,6 +139,7 @@ def setup_vpa(
                 "recommender": {
                     "enabled": True,
                     "replicas": 1,
+                    "podLabels": vpa_labels(Component.controller, AlertTier.ticket),
                     "tolerations": operations_tolerations,
                     # Heaviest of the three: it keeps usage histograms and
                     # checkpoints on top of the informer caches. Peak observed
@@ -130,6 +155,7 @@ def setup_vpa(
                 "updater": {
                     "enabled": True,
                     "replicas": 1,
+                    "podLabels": vpa_labels(Component.controller, AlertTier.ticket),
                     "tolerations": operations_tolerations,
                     # InPlaceOrRecreate (in-place resize, falls back to eviction)
                     # was promoted to GA and enabled by default in VPA 1.6, so no
