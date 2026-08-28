@@ -606,13 +606,15 @@ def create_k8s_configmaps(  # noqa: PLR0915
         cms_interpolated_config["MEILISEARCH_PUBLIC_URL"] = (
             f"https://{meilisearch_config.require('domain')}"
         )
-        # How much course content Studio writes to the index: "all" (the upstream
-        # default, applied when this is unset), "library_downstream_only" (course
-        # blocks linked to a library upstream, which is what the course-libraries
-        # Review tab needs) or "none". Reversible by changing this value and
-        # re-running reindex_studio. See MEILISEARCH.md.
-        if course_indexing := meilisearch_config.get("course_indexing"):
-            cms_interpolated_config["MEILISEARCH_COURSE_INDEXING"] = course_indexing
+        # How much course content Studio writes to the index. We run Meilisearch for
+        # Libraries V2, not for Studio course search, so every deployment indexes
+        # only the course blocks that carry a library upstream — the set the
+        # course-libraries Review tab needs. Everything else was 99%+ of the index.
+        # Per-stack override for the other two modes, "all" and "none"; see
+        # MEILISEARCH.md for what this gives up and how to restore it.
+        cms_interpolated_config["MEILISEARCH_COURSE_INDEXING"] = (
+            meilisearch_config.get("course_indexing") or "library_downstream_only"
+        )
 
     cms_interpolated_config_map = kubernetes.core.v1.ConfigMap(
         f"ol-{stack_info.env_prefix}-edxapp-cms-interpolated-config-{stack_info.env_suffix}",
