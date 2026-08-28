@@ -157,39 +157,26 @@ def create_k8s_resources(  # noqa: C901
     replicas_dict = edxapp_config.require_object("k8s_replicas")
     resources_dict = edxapp_config.require_object("k8s_resources")
 
-    # Per-install Granian concurrency for the LMS webapp.
+    # Per-install Granian concurrency, keyed by webapp.
     #
-    # CMS took the component defaults everywhere in stage 3, but LMS cannot: the
-    # measured p99 concurrency demand differs by ~65x across installs (mitxonline
-    # LMS needs 17.7 concurrently-busy blocking threads, mitx LMS needs 0.27), so a
-    # single value is either unsafe for one or wasteful for the other. This file is
-    # shared by every install, so the only place that distinction can live is
-    # per-stack config.
+    # This file is shared by every Open edX install (mitx, mitx-staging,
+    # mitxonline, xpro), so a concurrency value written here is a value written
+    # for all four at once. That is how the 2026-08-26 CMS regression happened:
+    # component defaults that suit a 0.25 rps authoring instance were applied to
+    # mitxonline Studio, whose pods then saturated at 16 active connections and
+    # drove APISIX p95/p99 to 60s while Django spans stayed at 0.2-1.1s.
+    # Measured p99 concurrency demand spans ~65x across installs, so no single
+    # value is right for all of them, and the setting belongs per-stack next to
+    # k8s_replicas and k8s_resources rather than in shared code.
     #
-    # Omitted (the default) means the pre-overhaul holding pins: 2 workers x 32
-    # blocking threads, backpressure 64, runtime-mode mt, runtime-threads 2 -- the
-    # values Granian derived from backlog=128 before the overhaul. An install opts
-    # in by setting edxapp:k8s_granian.lms in its stack config; setting it to an
-    # empty mapping opts in to the component defaults with no overrides.
+    # Required, not defaulted: an install's concurrency should be readable in its
+    # own stack file, and a new install should have to state a value rather than
+    # inherit whatever the last person to edit this file happened to choose.
     #
     # See docs/plans/granian-configuration-overhaul.md stage 3.
-    LMS_GRANIAN_HOLDING_PINS = {
-        "workers": 2,
-        "runtime_mode": "mt",
-        "runtime_threads": 2,
-        "blocking_threads": 32,
-        "backpressure": 64,
-    }
-    # `is None` rather than a falsy check: an explicitly configured empty mapping
-    # means "take the component defaults with no per-install overrides", which is a
-    # real thing for a stack to want and is not the same request as omitting the key.
-    # `or` would collapse the two and silently re-pin such a stack to the old values.
-    _lms_granian_override = (edxapp_config.get_object("k8s_granian") or {}).get("lms")
-    lms_granian_concurrency = (
-        LMS_GRANIAN_HOLDING_PINS
-        if _lms_granian_override is None
-        else _lms_granian_override
-    )
+    granian_dict = edxapp_config.require_object("k8s_granian")
+    lms_granian_concurrency = granian_dict["lms"]
+    cms_granian_concurrency = granian_dict["cms"]
 
     # Get various VPC / network configuration information
     data_vpc = network_stack.require_output("data_vpc")
@@ -816,7 +803,7 @@ def create_k8s_resources(  # noqa: C901
                 application_module="lms.wsgi:application",
                 port=8000,
                 no_ws=True,
-                # Concurrency is per-install; see lms_granian_concurrency above.
+                # Per-install; see granian_dict above.
                 **lms_granian_concurrency,
                 respawn_failed_workers=True,
                 backlog=128,
@@ -1148,22 +1135,8 @@ def create_k8s_resources(  # noqa: C901
                 application_module="cms.wsgi:application",
                 port=8000,
                 no_ws=True,
-                # Restore the pre-overhaul holding pins after the 2026-08-26
-                # mitxonline production rollout showed that the component defaults
-                # cannot absorb Studio's bursty authoring traffic. With 1 worker,
-                # 8 blocking threads, and backpressure 16, every CMS pod repeatedly
-                # saturated at 16 active connections, HTTP readiness fell to 1/3,
-                # and APISIX p95/p99 latency reached 60s while Django spans remained
-                # around 0.2-1.1s. CPU- and request-rate-based autoscaling stayed at
-                # the three-replica floor because it cannot see this connection
-                # backlog. Keep these known-good values until CMS concurrency is
-                # retuned with a saturation-aware scaling signal.
-                # See docs/plans/granian-configuration-overhaul.md stage 3.
-                workers=2,
-                runtime_mode="mt",
-                runtime_threads=2,
-                blocking_threads=32,
-                backpressure=64,
+                # Per-install; see granian_dict above.
+                **cms_granian_concurrency,
                 respawn_failed_workers=True,
                 backlog=128,
                 static_path_mounts=["/openedx/staticfiles"],

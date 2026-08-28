@@ -104,6 +104,23 @@ config:
   edxapp:autoscaling_lms_cpu_threshold: "70"
   edxapp:autoscaling_cms_requests_threshold: "20"
   edxapp:autoscaling_cms_cpu_threshold: "70"
+  # Granian concurrency for the LMS and CMS webapps, per install: pre-overhaul
+  # values. This install's traffic does not fit a ceiling of 8 busy blocking
+  # threads -- LMS p99 demand is 17.7, and CMS at backpressure 16 saturated in
+  # production on 2026-08-26. See docs/plans/granian-configuration-overhaul.md.
+  edxapp:k8s_granian:
+    lms:
+      workers: 2
+      runtime_mode: mt
+      runtime_threads: 2
+      blocking_threads: 32
+      backpressure: 64
+    cms:
+      workers: 2
+      runtime_mode: mt
+      runtime_threads: 2
+      blocking_threads: 32
+      backpressure: 64
   edxapp:k8s_replicas:
     webapp:
       lms:

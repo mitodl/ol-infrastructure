@@ -95,12 +95,17 @@ config:
   edxapp:backend_lms_domain: courses-backend.ci.mitx.mit.edu
   edxapp:backend_studio_domain: studio-backend.ci.mitx.mit.edu
   edxapp:backend_preview_domain: preview.ci.mitx.mit.edu
-  # Stage 3 canary for the LMS webapp. Omitting this key keeps the pre-overhaul
-  # holding pins (2 workers x 32 blocking threads); mitx opts in first because its
-  # measured p99 concurrency is 0.27 busy threads against this ceiling of 8, where
-  # mitxonline LMS needs 17.7. See docs/plans/granian-configuration-overhaul.md.
+  # Granian concurrency for the LMS and CMS webapps, per install: this stack's
+  # measured p99 demand is well under a ceiling of 8 busy blocking threads, where
+  # mitxonline needs 17.7 (LMS) and saturates 16 (CMS).
+  # See docs/plans/granian-configuration-overhaul.md.
   edxapp:k8s_granian:
     lms:
+      workers: 1
+      runtime_threads: 1
+      blocking_threads: 8
+      backpressure: 16
+    cms:
       workers: 1
       runtime_threads: 1
       blocking_threads: 8

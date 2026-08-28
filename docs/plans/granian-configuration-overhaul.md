@@ -2,8 +2,9 @@
 
 **Status:** stage 0 merged 2026-07-23 (#5083); stage 1 merged 2026-07-27 (#5135), validated
 in production 2026-08-07; stage 2 merged 2026-08-10 (#5344), validated in production
-2026-08-17; stage 3 `mitxonline` **blocked**, `edxapp` CMS rolled back and **blocked**
-pending retuning (see stage 3), LMS handled separately per install; stage 4 pending
+2026-08-17; stage 3 `mitxonline` **blocked**, `edxapp` LMS and CMS concurrency now
+sourced per install from stack config (see stage 3) -- `mitx`/`mitx-staging` tuned,
+`mitxonline`/`xpro` on holding pins; stage 4 pending
 **Project:** `wp-granian-configuration-overhaul-expose-blocking-t-3debc2`
 **Component:** `src/ol_infrastructure/components/services/k8s.py` — `GranianConfig`
 **Evidence:** witan lessons `les-granianconfig-never-exposes-blocking-threads-bac-874462`,
@@ -505,12 +506,31 @@ Component change lands once; per-app behavior changes as each app's stack is dep
   handling deliberately rather than discovering mid-incident
   (`tk-xpro-edxapp-is-6-months-stale-still-on-the-hand--43a5a4`).
 
-  **Current decision:** `edxapp` CMS must remain on its restored holding pins. The
-  production outcome above invalidates the earlier claim that CMS was a safe first
-  rollout despite having observable APISIX latency. Another attempt requires per-install
-  concurrency sizing that accounts for burst shape and backpressure, plus a scaling or
-  alerting signal that detects connection saturation; CPU and request rate alone did not.
-  LMS remains a separate per-install decision and does not make CMS unblocked.
+  **Current decision:** `edxapp` concurrency is per install, for CMS as well as LMS.
+  `k8s_resources.py` is shared by four installs, so a value written there is a value
+  written for all four at once -- which is how a default sized for a 0.25 rps authoring
+  instance reached `mitxonline` Studio. Both webapps now read
+  `edxapp:k8s_granian.{lms,cms}` from stack config, alongside `k8s_replicas` and
+  `k8s_resources`. The key is required rather than defaulted: an install's concurrency
+  should be readable in its own stack file, and a new install should have to state a
+  value rather than inherit whatever was last written into shared code.
+
+  | install | LMS | CMS |
+  | --- | --- | --- |
+  | `mitx`, `mitx-staging` | 1 × 8, backpressure 16 | 1 × 8, backpressure 16 |
+  | `mitxonline`, `xpro` | 2 × 32, backpressure 64 | 2 × 32, backpressure 64 |
+
+  This preserves every live value as of 2026-08-28 and reverses only the collateral half
+  of the rollback: #5607 restored the holding pins in shared code, which would also have
+  dragged `mitx` and `mitx-staging` CMS back to 2 workers on their next deploy. Both have
+  run 1 worker × 8 threads since 2026-08-24T17:18Z with a peak blocking queue of 5 (`mitx`)
+  and 0 (`mitx-staging`) and zero container restarts over 3 days; `mitx` CMS does touch its
+  backpressure ceiling of 16, for 52 minutes out of 3 days, which is the signal to watch if
+  its authoring traffic grows.
+
+  Raising `mitxonline` off the holding pins still requires concurrency sizing that accounts
+  for burst shape and backpressure, plus a scaling or alerting signal that detects
+  connection saturation; CPU and request rate alone did not.
 - **Stage 4 — async apps.** `mit_learn`, `learn_ai`: `workers=2→1` for `mit_learn` and an
   explicit `backpressure` for both. No `blocking_threads` involvement. Lowest expected
   impact, sequenced last because it shares no evidence with the WSGI stages.
