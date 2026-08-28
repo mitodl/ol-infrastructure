@@ -688,11 +688,42 @@ if oidc_enabled:
     # to the StarRocks identity.
     #
     # This coexists with keycloak_oauth2 so that:
-    #   - Web UI users: keycloak_oauth2 (browser OAuth2 redirect)
+    #   - JDBC users:      keycloak_oauth2 (the driver opens a browser for the
+    #                      authorization-code exchange; StarRocks completes it
+    #                      server-side at /api/oauth2)
     #   - mysql CLI users: keycloak_jwt (pre-fetched id_token via starrocks-auth)
-    # The id_token stored on the connection context is also forwarded to
-    # Iceberg REST catalogs when iceberg.catalog.security = JWT, enabling
-    # per-user identity delegation to the catalog.
+    # Neither is the FE web dashboard, which has no OIDC entry point at all --
+    # it answers `WWW-Authenticate: Basic` unconditionally (StarRocks#75370) and
+    # is no longer published externally. Do not widen the APISIX route on the
+    # belief that keycloak_oauth2 needs it.
+    # Forwarding the id_token to an Iceberg REST catalog under
+    # iceberg.catalog.security = JWT is proven to work (StarRocks 4.1.3 against
+    # Lakekeeper v0.13.1, 2026-08-07: Lakekeeper's audit log showed two distinct
+    # end-user subjects on list_namespaces/create_namespace). It is inert for
+    # this catalog, which is iceberg.catalog.type = glue and has no per-session
+    # token path at all.
+    #
+    # Two caveats for whoever wires up the REST catalog:
+    #   - security = JWT supplies no credential of its own, which breaks two
+    #     different things. Both are cured by pairing it with
+    #     iceberg.catalog.oauth2.credential as a bootstrap:
+    #       * Catalog INITIALIZATION. RESTSessionCatalog.initialize() runs with
+    #         no user session, so GET /v1/config goes out unauthenticated. A
+    #         catalog that requires auth there 401s and CREATE EXTERNAL CATALOG
+    #         fails outright. This is what the 2026-08-07 spike hit against
+    #         Lakekeeper.
+    #       * Token attachment on every LATER call. Where the server does allow
+    #         an anonymous GET /v1/config, the catalog is created and logins
+    #         succeed, but OAuth2SecurityConfigBuilder.build() falls back to
+    #         NONE when neither a static token nor a credential is present, so
+    #         RESTSessionCatalog is initialized without an OAuth2 auth manager
+    #         and the per-session token buildContext() produces is dropped.
+    #         Requests then fail at namespace resolution with "missing bearer
+    #         token". This is StarRocks#75792; the fix is #75811, open and
+    #         unreviewed since 2026-07-03.
+    #   - The FE metadata cache bypasses the catalog, so catalog-side authz is
+    #     not consulted on cached reads. StarRocks GRANTs stay the query-time
+    #     filter.
     def _build_jwt_integration_sql(args: list[str]) -> str:
         issuer = json.dumps(args[0])[1:-1]
         _n = _JWT_SECURITY_INTEGRATION_NAME
@@ -739,7 +770,8 @@ if oidc_enabled:
     )
 
     # Point the FE authentication chain at both security integrations.
-    # keycloak_oauth2: web UI browser-redirect OAuth2 flow
+    # keycloak_oauth2: JDBC browser authorization-code flow (not the web UI --
+    #                  the dashboard has no OIDC entry point, StarRocks#75370)
     # keycloak_jwt:    mysql CLI client-plugin flow (id_token pre-fetched)
     # StarRocks persists ADMIN SET FRONTEND CONFIG changes to BDB so they
     # survive pod restarts without requiring a fe.conf change.
@@ -830,8 +862,8 @@ if oidc_enabled:
         f");\n"
         # Attach the group provider to both Security Integrations so that
         # role assignment from Keycloak groups works regardless of whether
-        # the user authenticated via the web UI (keycloak_oauth2) or the
-        # mysql CLI client-plugin flow (keycloak_jwt).
+        # the user authenticated via the JDBC authorization-code flow
+        # (keycloak_oauth2) or the mysql CLI client-plugin flow (keycloak_jwt).
         f"ALTER SECURITY INTEGRATION {_OIDC_SECURITY_INTEGRATION_NAME}\n"
         f"    SET ('group_provider' = '{_group_provider_name}',"
         f" 'permitted_groups' = '{_permitted}');\n"
