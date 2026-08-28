@@ -1487,6 +1487,29 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         )
         # MASAI SCHOOL [END]
 
+        onboard_oidc_org(
+            OIDCIdpConfig(
+                idp_alias="APPLY7",
+                idp_display_name="Apply7",
+                org_oidc_metadata_url="https://keycloak.apply7.cn/realms/mit-learn/.well-known/openid-configuration",
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                client_id="mit-learn",
+            ),
+            org=OrgConfig(
+                # Same as upGrad/Masai School: Apply7 users log in via a
+                # direct kc_idp_hint link, not domain-based home-realm
+                # discovery, so no domain is needed to gate access.
+                org_domains=[],
+                org_name="Apply7",
+                org_alias="APPLY7",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
+
     # B2B Organizations [END]
 
     if stack_info.env_suffix in ["ci", "qa"]:
