@@ -68,11 +68,15 @@ k8s_global_labels = K8sGlobalLabels(
 application_labels = {**k8s_global_labels.model_dump(), "app": "vuln-scanner"}
 
 targets = vuln_scanner_config.require_object("targets")
-zap_scan_type = vuln_scanner_config.get("zap_scan_type") or "baseline"
-if zap_scan_type not in {"baseline", "full"}:
-    # Rejects an accidentally-cleared `zap_scan_type: ""` (which `or` above
-    # would otherwise silently treat the same as "unset" and downgrade to
-    # baseline) as well as any other typo, instead of masking it.
+# .get() (not `or "baseline"`) on purpose: `or` would coalesce an
+# explicit empty string to the same thing as "unset" *before* the check
+# below ever saw it, silently downgrading a cleared config value to
+# baseline instead of rejecting it as invalid -- caught in review, since
+# an earlier version of this exact code did that.
+zap_scan_type = vuln_scanner_config.get("zap_scan_type")
+if zap_scan_type is None:
+    zap_scan_type = "baseline"
+elif zap_scan_type not in {"baseline", "full"}:
     msg = (
         f"vuln_scanner:zap_scan_type must be 'baseline' or 'full', "
         f"got {zap_scan_type!r}"
@@ -329,9 +333,17 @@ _ZAP_ENTRYPOINT = (
 )
 
 
-# Same defensive shape as ZAP's wrapper above, applied for consistency even
-# though Nuclei is not known to exit non-zero on matches the way ZAP's
-# legacy wrapper scripts do.
+# Unlike ZAP's wrapper above, this one DOES check the scan's own exit
+# code -- verified empirically (real `docker run` against the pinned
+# digest, v3.11.1, scanning a live target that actually matched two
+# templates) that Nuclei exits 0 whether or not it finds anything, so
+# there's no "exit 0 might just mean it found alerts" ambiguity to work
+# around. Without this, an initContainer that writes a partial/empty
+# report before crashing would still pass `test -f` and succeed, and
+# main()'s scan_completed=True default for Nuclei (see ParsedReport's
+# docstring in reporter.py) would then treat that partial file as a
+# genuinely clean scan -- archiving every real, previously-tracked
+# finding on the strength of a crash, not a clean run.
 #
 # No `-t`/`-update-template-dir` flags -- verified by hand (real
 # `docker run` against the pinned digest, v3.11.1) that `-td` was never a
@@ -346,12 +358,20 @@ _ZAP_ENTRYPOINT = (
 # under Nuclei's own default locations beneath it, and the scan step
 # finds them with no extra flags needed.
 def _nuclei_entrypoint(target_url: str) -> str:
+    # Politeness: Nuclei's real defaults (verified via -h against the pinned
+    # digest) are -rate-limit 150 (req/s) and -concurrency 25 -- aggressive
+    # for a single WAF-protected QA route it's the only thing hitting.
+    # Same rationale as ZAP's threadPerHost/delayInMs below: capped well
+    # under the defaults so a scheduled scan doesn't read as an attack to
+    # whatever's fronting the target. Revisit alongside the route owner
+    # before this schedule is enabled in earnest, same as ZAP's `full` mode.
     return (
         f"nuclei -update-templates; "
-        f"nuclei -target {target_url} "
+        f"nuclei -target {target_url} -rate-limit 10 -concurrency 10 "
         f"-jsonl -output {NUCLEI_REPORT_PATH}; "
-        f'echo "nuclei exited $?"; '
-        f"test -f {NUCLEI_REPORT_PATH}"
+        f"SCAN_EXIT=$?; "
+        f'echo "nuclei scan exited $SCAN_EXIT"; '
+        f'test -f {NUCLEI_REPORT_PATH} && [ "$SCAN_EXIT" -eq 0 ]'
     )
 
 

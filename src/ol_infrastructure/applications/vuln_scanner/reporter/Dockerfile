@@ -35,8 +35,16 @@ WORKDIR /src
 COPY reporter/pyproject.toml reporter/uv.lock ./
 RUN uv sync --frozen --no-dev
 
-FROM gcr.io/distroless/base-debian13@sha256:9ef50bca108839d5986e4d84b7f7b2d79024c9293b7c35b162c6c55485bd5868
+FROM gcr.io/distroless/base-debian13:nonroot@sha256:d199d20fb09c898d8822ae5cbd5cf3c6d424e9b5e1fc2eb9a719a7752cd9d861
 
+# `:nonroot`, not the bare tag -- the bare tag sets no USER at all (confirmed
+# via `docker inspect ... --format '{{.Config.User}}'`, empty string), which
+# defaults to root. _reporter_container()'s security context sets
+# runAsNonRoot=True and deliberately leaves runAsUser unset, on the
+# assumption that the image itself supplies a non-root user -- with the bare
+# tag that assumption was false and kubelet would have rejected the pod at
+# startup. `:nonroot` sets USER to a real, verified UID 65532.
+#
 # distroless/base ships no language runtime at all (that's the point -- no
 # shell, no package manager, minimal attack surface), so the interpreter
 # itself has to come from the builder stage alongside the venv it built.

@@ -397,10 +397,24 @@ def archive_stale_findings(
     identifiers = [{"Id": id_, "ProductArn": product_arn} for id_ in stale_ids]
     # BatchUpdateFindings caps at 100 identifiers per call.
     for i in range(0, len(identifiers), 100):
-        securityhub_client.batch_update_findings(
+        response = securityhub_client.batch_update_findings(
             FindingIdentifiers=identifiers[i : i + 100],
             RecordState="ARCHIVED",
         )
+        # Per-finding failures land in UnprocessedFindings, not an SDK
+        # exception -- ignoring this would let the job log "archived" and
+        # exit 0 while some findings silently stayed ACTIVE, the same
+        # partial-failure class import_findings already guards against.
+        unprocessed = response.get("UnprocessedFindings", [])
+        if unprocessed:
+            for failure in unprocessed:
+                logger.error(
+                    "Failed to archive finding %s: %s",
+                    failure.get("FindingIdentifier", {}).get("Id"),
+                    failure.get("ErrorMessage"),
+                )
+            msg = f"{len(unprocessed)} findings failed to archive"
+            raise RuntimeError(msg)
     logger.info("Archived %d stale findings for %s", len(stale_ids), generator_id)
 
 
