@@ -78,6 +78,7 @@ REPOS_DIR = (
 ORG = "mitodl"
 DEFAULT_SAMPLE = 20
 _POOL = 8
+_PAGE = 100
 
 #: The workflow run id inside an Actions check run's `html_url`:
 #: `.../actions/runs/<run_id>/job/<job_id>`. Checks from other apps (GitGuardian,
@@ -131,6 +132,37 @@ def _gh(*args: str) -> Any:
     return json.loads(result.stdout or "null")
 
 
+def _gh_all(path: str, key: str) -> list[Any]:
+    """Every page of an endpoint that returns a list under `key`, not just the first.
+
+    All three endpoints below cap a page, and one of them caps it at 30 rather than 100
+    (`/commits/{sha}/status` takes no `per_page` in its documented default). Reading
+    only the first page would drop checks that exist, and a check this tool did not read
+    is indistinguishable from one that was never produced -- the same conflation the
+    rate-limit handling in `_gh` exists to prevent, arriving by a quieter route.
+
+    The bias is toward refusing a safe name rather than clearing an unsafe one: a
+    dropped check lowers `produced` while `eligible` stands, so the verdict goes
+    `unsafe` and `drift` exits non-zero. That fails the rollout loudly instead of
+    shipping a ruleset that wedges a repo. Still worth closing, because "the tool said
+    unsafe and was wrong" costs somebody an afternoon.
+    """
+    items: list[Any] = []
+    page = 1
+    while True:
+        joiner = "&" if "?" in path else "?"
+        body = _gh("api", f"{path}{joiner}per_page={_PAGE}&page={page}")
+        if not body:
+            break
+        batch = body.get(key) or []
+        items.extend(batch)
+        total = body.get("total_count")
+        if len(batch) < _PAGE or (total is not None and len(items) >= total):
+            break
+        page += 1
+    return items
+
+
 def _checks_on(repo: str, sha: str) -> tuple[dict[str, str | None], set[str]]:
     """One commit's checks: name -> owning workflow path, plus the workflows that ran.
 
@@ -144,8 +176,8 @@ def _checks_on(repo: str, sha: str) -> tuple[dict[str, str | None], set[str]]:
     """
     workflows: set[str] = set()
     by_run: dict[str, str] = {}
-    runs = _gh("api", f"repos/{ORG}/{repo}/actions/runs?head_sha={sha}&per_page=100")
-    for run in (runs or {}).get("workflow_runs", []):
+    runs = _gh_all(f"repos/{ORG}/{repo}/actions/runs?head_sha={sha}", "workflow_runs")
+    for run in runs:
         path = run.get("path") or ""
         # `dynamic/...` paths are GitHub's synthetic runs for code scanning and the
         # Copilot reviewer. They are not files anybody edits, so treating them as
@@ -156,12 +188,10 @@ def _checks_on(repo: str, sha: str) -> tuple[dict[str, str | None], set[str]]:
         workflows.add(path)
 
     owners: dict[str, str | None] = {}
-    check_runs = _gh("api", f"repos/{ORG}/{repo}/commits/{sha}/check-runs?per_page=100")
-    for run in (check_runs or {}).get("check_runs", []):
+    for run in _gh_all(f"repos/{ORG}/{repo}/commits/{sha}/check-runs", "check_runs"):
         match = _RUN_ID.search(run.get("html_url") or "")
         owners[run["name"]] = by_run.get(match.group(1)) if match else None
-    status = _gh("api", f"repos/{ORG}/{repo}/commits/{sha}/status")
-    for entry in (status or {}).get("statuses", []):
+    for entry in _gh_all(f"repos/{ORG}/{repo}/commits/{sha}/status", "statuses"):
         owners.setdefault(entry["context"], None)
     return owners, workflows
 

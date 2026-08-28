@@ -260,3 +260,47 @@ class TestRateLimitIsNotSwallowed:
     ) -> None:
         """A force-pushed-away head is a sample we cannot read, not a reason to stop."""
         assert self._run(monkeypatch, "gh: Not Found (HTTP 404)", 1) is None
+
+
+class TestPagination:
+    """A check the tool did not read must not become a check that was never produced.
+
+    Every endpoint `_checks_on` uses caps a page, and `/commits/{sha}/status` caps at 30
+    rather than 100. Reading one page silently drops the rest, which lands as a lower
+    `produced` against an unchanged `eligible` -- a SAFE name reported unsafe.
+    """
+
+    def _pages(self, monkeypatch: pytest.MonkeyPatch, pages: list[Any]) -> list[Any]:
+        calls = iter(pages)
+        monkeypatch.setattr(tool, "_gh", lambda *_a: next(calls, None))
+        return tool._gh_all("repos/o/r/thing", "items")
+
+    def test_follows_every_page(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        full = [{"n": i} for i in range(tool._PAGE)]
+        rest = [{"n": "last"}]
+        got = self._pages(
+            monkeypatch,
+            [{"items": full, "total_count": tool._PAGE + 1}, {"items": rest}],
+        )
+        assert len(got) == tool._PAGE + 1
+
+    def test_stops_on_a_short_page(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A page below the cap is the last one, so nothing further is requested."""
+        got = self._pages(monkeypatch, [{"items": [{"n": 1}]}, {"items": [{"n": 2}]}])
+        assert got == [{"n": 1}]
+
+    def test_stops_once_total_count_is_reached(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`total_count` ends it even when the page came back exactly full."""
+        full = [{"n": i} for i in range(tool._PAGE)]
+        got = self._pages(
+            monkeypatch, [{"items": full, "total_count": tool._PAGE}, {"items": full}]
+        )
+        assert len(got) == tool._PAGE
+
+    def test_an_unreadable_endpoint_yields_nothing(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A 404 on a garbage-collected head is still tolerated, not paged forever."""
+        assert self._pages(monkeypatch, [None]) == []
