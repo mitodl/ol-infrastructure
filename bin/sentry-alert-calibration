@@ -157,9 +157,12 @@ class SentryApi:
         for detector in response.json():
             if detector.get("type") != "metric_issue":
                 continue
-            snuba = (detector["dataSources"][0].get("queryObj") or {}).get(
-                "snubaQuery"
-            ) or {}
+            sources = detector.get("dataSources") or []
+            snuba = (
+                (sources[0].get("queryObj") or {}).get("snubaQuery") or {}
+                if sources
+                else {}
+            )
             thresholds = tuple(
                 sorted(
                     (condition["conditionResult"], float(condition["comparison"]))
