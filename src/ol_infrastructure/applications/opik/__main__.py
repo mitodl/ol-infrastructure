@@ -263,7 +263,7 @@ opik_helm_release = kubernetes.helm.v3.Release(
                         # "relaxed" is a no-op. The backend defaults to strict
                         # (config.yml destinationGuard), which is what we run
                         # today because chart 2.2.35 sets nothing -- but 2.2.43
-                        # starts shipping "relaxed" in backend.env, and that
+                        # starts shipping "relaxed" in component.backend.env, and that
                         # ConfigMap reaches us through the envFrom below. Upstream
                         # relaxes it because a self-hosted auth service may sit on
                         # a private range. Setting it here keeps the chart bump
