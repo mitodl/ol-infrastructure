@@ -51,7 +51,9 @@ def setup_vpa(
     :returns: The Helm Release resource, for use as a dependency by VPA objects.
     """
 
-    def vpa_labels(component: Component, alert_tier: AlertTier) -> dict[str, str]:
+    def vpa_labels(
+        component: Component | None = None, alert_tier: AlertTier | None = None
+    ) -> dict[str, str]:
         return cluster_addon_labels(
             base_labels=k8s_global_labels,
             stack_info=stack_info,
@@ -105,7 +107,13 @@ def setup_vpa(
             values={
                 # commonLabels reaches the three workload objects but not
                 # their pod templates, so each component also gets podLabels.
-                "commonLabels": vpa_labels(Component.controller, AlertTier.ticket),
+                # Service only: one key covers all three Deployments, and the
+                # admission controller does not share the other two's role or
+                # tier. Phase 3 joins Deployment-level alerts through
+                # kube_deployment_labels, so a shared component/alert_tier here
+                # would confidently mis-tier that one; absent labels fall
+                # through to the severity catch-all instead.
+                "commonLabels": vpa_labels(),
                 "admissionController": {
                     "enabled": True,
                     "replicas": 2,

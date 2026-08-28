@@ -342,8 +342,8 @@ def cluster_addon_labels(
     base_labels: dict[str, str],
     stack_info: StackInfo,
     service: Services,
-    component: Component,
-    alert_tier: AlertTier,
+    component: Component | None = None,
+    alert_tier: AlertTier | None = None,
 ) -> dict[str, str]:
     """Label a cluster addon's workloads so its alerts can be routed.
 
@@ -359,6 +359,13 @@ def cluster_addon_labels(
     Which Helm value to feed the result to is chart-specific and has to be one
     that does NOT reach `spec.selector` -- a Deployment selector is immutable,
     so a label that lands there forces a delete-and-recreate of the addon.
+
+    `component` and `alert_tier` are optional because several charts expose a
+    single label key covering workloads that do not share a role: one
+    `commonLabels` for all three VPA Deployments, for instance. Omit whichever
+    of the two is not true of every workload the key reaches. A missing tier
+    routes on the `severity` catch-all, i.e. today's behaviour; a wrong tier
+    routes confidently to the wrong place.
 
     :param base_labels: The program's shared label dict, merged in last.
     :param stack_info: Supplies the stack and environment labels.

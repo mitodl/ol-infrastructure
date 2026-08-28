@@ -39,7 +39,7 @@ def setup_keda(
         stack_info: Information about the current Pulumi stack.
     """
 
-    def keda_labels(component: Component) -> dict[str, str]:
+    def keda_labels(component: Component | None = None) -> dict[str, str]:
         return cluster_addon_labels(
             base_labels=k8s_global_labels,
             stack_info=stack_info,
@@ -102,6 +102,13 @@ def setup_keda(
             cleanup_on_fail=True,
             skip_await=True,
             values={
+                # additionalLabels is the chart's only workload-object key,
+                # and one map covers all three Deployments -- so it carries the
+                # service and the tier, which they share, and no component,
+                # which they do not. Without it the Deployment-level rules
+                # (DeploymentReplicasMissing, DeploymentUnavailable) would join
+                # against nothing for KEDA.
+                "additionalLabels": keda_labels(),
                 # The chart keys podLabels by component, so each of the three
                 # pods can carry the role it actually plays.
                 "podLabels": {
