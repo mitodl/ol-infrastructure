@@ -13,6 +13,7 @@ from pulumi_aws import athena, glue, iam, s3
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.iam_helper import (
+    cross_environment_glue_denial,
     data_lake_glue_resources,
     lint_iam_policy,
 )
@@ -359,5 +360,17 @@ if query_engine_aws_account_id and query_engine_aws_external_id:
         policy_arn=query_engine_iam_policy.arn,
         role=query_engine_role.name,
     )
+
+    # Carried on the role rather than in the policy above, for the reason given
+    # where that policy is built. Empty in production.
+    query_engine_glue_denial = cross_environment_glue_denial(stack_info.env_suffix)
+    if query_engine_glue_denial:
+        iam.RolePolicy(
+            f"data-lake-query-engine-role-glue-denial-{stack_info.env_suffix}",
+            role=query_engine_role.name,
+            policy=json.dumps(
+                {"Version": "2012-10-17", "Statement": query_engine_glue_denial}
+            ),
+        )
 
     export("sql_engine_role_arn", query_engine_role.arn)
