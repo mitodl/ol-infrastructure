@@ -14,3 +14,5 @@ config:
   # Flip to "full" (active attack payloads) only after a baseline run has
   # been reviewed -- see the plan doc's staged-rollout rationale.
   vuln_scanner:zap_scan_type: baseline
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgF8do6fTjk01Sz/Lf46auVlAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM1oHCKzoKW0Cedj4JAgEQgDujDdmk272DbVMx9JvxkVPKZgjs6gqECXYjq+ofLfiGqWPop2p7sgw2jH5Mj5yXgHhPRZ4Egp4H7rhivg==
