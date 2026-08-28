@@ -352,18 +352,19 @@ def import_findings(securityhub_client: Any, findings: list[dict[str, Any]]) -> 
 
 def fetch_existing_findings(
     securityhub_client: Any, *, product_arn: str, generator_id: str
-) -> dict[str, str]:
-    """Return `{finding Id: CreatedAt}` for this (generator, target)'s
-    currently-ACTIVE findings.
+) -> dict[str, dict[str, Any]]:
+    """Return `{finding Id: full finding dict}` for this (generator,
+    target)'s currently-ACTIVE findings.
 
     Scoped by GeneratorId alone (already target-specific -- see
     `generator_id_for`), since Security Hub's GetFindings filters can't query
     the nested Resources[].Details.Other.TargetName map each finding carries.
     Shared by `main` (to preserve each existing finding's original CreatedAt
-    on re-import) and `archive_stale_findings` (to know what's no longer
-    present), so this only queries once per run rather than twice.
+    on re-import) and `archive_stale_findings` (which needs the *whole*
+    finding, not just its Id -- see that function's docstring for why), so
+    this only queries once per run rather than twice.
     """
-    existing: dict[str, str] = {}
+    existing: dict[str, dict[str, Any]] = {}
     paginator = securityhub_client.get_paginator("get_findings")
     for page in paginator.paginate(
         Filters={
@@ -373,49 +374,47 @@ def fetch_existing_findings(
         }
     ):
         for finding in page.get("Findings", []):
-            existing[finding["Id"]] = finding["CreatedAt"]
+            existing[finding["Id"]] = finding
     return existing
 
 
 def archive_stale_findings(
     securityhub_client: Any,
     *,
-    product_arn: str,
-    generator_id: str,
-    previous_ids: set[str],
+    existing: dict[str, dict[str, Any]],
     current_ids: set[str],
+    updated_at: str,
 ) -> None:
-    """Archive any previously-active finding for this (generator, target)
-    that isn't present in the current run -- ASFF findings never
-    auto-resolve, so this is the only thing that makes a fixed issue clear.
+    """Archive any previously-active finding that isn't present in the
+    current run -- ASFF findings never auto-resolve, so this is the only
+    thing that makes a fixed issue clear.
+
+    Goes through BatchImportFindings, not BatchUpdateFindings: confirmed
+    against boto3's own service model that BatchUpdateFindings's input
+    shape has no RecordState member at all (`RecordState` is documented as
+    "intended for finding providers... can be updated only by using the
+    BatchImportFindings operation" -- AWS's ASFF docs), so a call setting
+    it there is rejected client-side with ParamValidationError before any
+    network request is even made. Confirmed separately that this is safe
+    to do by resending a fetched finding largely as-is: GetFindings'
+    output shape for a finding and BatchImportFindings' Findings[] input
+    shape are the same AwsSecurityFinding type, so there's no unknown-field
+    risk in the other direction either.
     """
-    stale_ids = previous_ids - current_ids
+    stale_ids = set(existing) - current_ids
     if not stale_ids:
-        logger.info("No stale findings to archive for %s", generator_id)
+        logger.info("No stale findings to archive")
         return
 
-    identifiers = [{"Id": id_, "ProductArn": product_arn} for id_ in stale_ids]
-    # BatchUpdateFindings caps at 100 identifiers per call.
-    for i in range(0, len(identifiers), 100):
-        response = securityhub_client.batch_update_findings(
-            FindingIdentifiers=identifiers[i : i + 100],
-            RecordState="ARCHIVED",
-        )
-        # Per-finding failures land in UnprocessedFindings, not an SDK
-        # exception -- ignoring this would let the job log "archived" and
-        # exit 0 while some findings silently stayed ACTIVE, the same
-        # partial-failure class import_findings already guards against.
-        unprocessed = response.get("UnprocessedFindings", [])
-        if unprocessed:
-            for failure in unprocessed:
-                logger.error(
-                    "Failed to archive finding %s: %s",
-                    failure.get("FindingIdentifier", {}).get("Id"),
-                    failure.get("ErrorMessage"),
-                )
-            msg = f"{len(unprocessed)} findings failed to archive"
-            raise RuntimeError(msg)
-    logger.info("Archived %d stale findings for %s", len(stale_ids), generator_id)
+    archived_findings = []
+    for id_ in stale_ids:
+        finding = dict(existing[id_])
+        finding["RecordState"] = "ARCHIVED"
+        finding["UpdatedAt"] = updated_at
+        archived_findings.append(finding)
+
+    import_findings(securityhub_client, archived_findings)
+    logger.info("Archived %d stale findings", len(archived_findings))
 
 
 def main() -> int:
@@ -512,8 +511,8 @@ def main() -> int:
             product_arn=product_arn,
             created_at=existing.get(
                 finding_id(generator_id, target_name, alert.rule_id, alert.location),
-                now,
-            ),
+                {},
+            ).get("CreatedAt", now),
             updated_at=now,
         )
         for alert in parsed.alerts
@@ -524,10 +523,9 @@ def main() -> int:
     current_ids = {f["Id"] for f in findings}
     archive_stale_findings(
         securityhub_client,
-        product_arn=product_arn,
-        generator_id=generator_id,
-        previous_ids=set(existing.keys()),
+        existing=existing,
         current_ids=current_ids,
+        updated_at=now,
     )
     return 0
 

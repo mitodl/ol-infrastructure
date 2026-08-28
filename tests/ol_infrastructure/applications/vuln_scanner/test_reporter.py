@@ -396,13 +396,35 @@ def _paginated_client(pages: list[list[dict[str, Any]]]) -> MagicMock:
     return client
 
 
-def test_fetch_existing_findings_returns_id_to_created_at_map():
-    """Paginated GetFindings results flatten into one {Id: CreatedAt} map."""
+def _existing_finding(id_: str, **overrides) -> dict[str, Any]:
+    finding = {
+        "Id": id_,
+        "ProductArn": (
+            "arn:aws:securityhub:us-east-1:610119931565:product/610119931565/default"
+        ),
+        "GeneratorId": "zap-automation-framework/mitlearn-qa",
+        "AwsAccountId": "610119931565",
+        "SchemaVersion": "2018-10-08",
+        "Types": ["Software and Configuration Checks/Vulnerabilities"],
+        "CreatedAt": "2026-01-01T00:00:00Z",
+        "UpdatedAt": "2026-01-01T00:00:00Z",
+        "Severity": {"Label": "LOW", "Normalized": 30},
+        "Title": "t",
+        "Description": "d",
+        "Resources": [{"Type": "Other", "Id": "x"}],
+        "RecordState": "ACTIVE",
+    }
+    finding.update(overrides)
+    return finding
+
+
+def test_fetch_existing_findings_returns_id_to_full_finding_map():
+    """Paginated GetFindings results flatten into one {Id: full finding} map."""
     client = _paginated_client(
         [
             [
-                {"Id": "a", "CreatedAt": "2026-01-01T00:00:00Z"},
-                {"Id": "b", "CreatedAt": "2026-02-01T00:00:00Z"},
+                _existing_finding("a"),
+                _existing_finding("b", CreatedAt="2026-02-01T00:00:00Z"),
             ]
         ]
     )
@@ -411,89 +433,95 @@ def test_fetch_existing_findings_returns_id_to_created_at_map():
         client, product_arn="arn:...:default", generator_id="zap-automation-framework/x"
     )
 
-    assert existing == {
-        "a": "2026-01-01T00:00:00Z",
-        "b": "2026-02-01T00:00:00Z",
-    }
+    assert set(existing) == {"a", "b"}
+    assert existing["a"]["CreatedAt"] == "2026-01-01T00:00:00Z"
+    assert existing["b"]["CreatedAt"] == "2026-02-01T00:00:00Z"
+
+
+def test_archive_stale_findings_uses_batch_import_not_batch_update():
+    """RecordState can only be set via BatchImportFindings (confirmed against
+    boto3's own service model: BatchUpdateFindings has no RecordState input
+    member at all, and passing one raises ParamValidationError client-side,
+    before any network call). archive_stale_findings must never call
+    batch_update_findings for this.
+    """
+    client = MagicMock()
+    client.batch_import_findings.return_value = {"FailedCount": 0}
+    existing = {"a": _existing_finding("a")}
+
+    reporter.archive_stale_findings(
+        client, existing=existing, current_ids=set(), updated_at="2026-08-28T00:00:00Z"
+    )
+
+    client.batch_update_findings.assert_not_called()
+    client.batch_import_findings.assert_called_once()
+    sent = client.batch_import_findings.call_args.kwargs["Findings"][0]
+    assert sent["RecordState"] == "ARCHIVED"
+    assert sent["UpdatedAt"] == "2026-08-28T00:00:00Z"
+    assert sent["Id"] == "a"
 
 
 def test_archive_stale_findings_archives_only_missing_ids():
     """Only Ids absent from the current run get archived, not the whole set."""
     client = MagicMock()
-    client.batch_update_findings.return_value = {"UnprocessedFindings": []}
+    client.batch_import_findings.return_value = {"FailedCount": 0}
+    existing = {
+        "a": _existing_finding("a"),
+        "b": _existing_finding("b"),
+        "c": _existing_finding("c"),
+    }
 
     reporter.archive_stale_findings(
-        client,
-        product_arn="arn:aws:securityhub:us-east-1:610119931565:product/610119931565/default",
-        generator_id="zap-automation-framework/mitlearn-qa",
-        previous_ids={"a", "b", "c"},
-        current_ids={"b"},
+        client, existing=existing, current_ids={"b"}, updated_at="2026-08-28T00:00:00Z"
     )
 
-    client.batch_update_findings.assert_called_once()
     archived_ids = {
-        identifier["Id"]
-        for identifier in client.batch_update_findings.call_args.kwargs[
-            "FindingIdentifiers"
-        ]
+        f["Id"] for f in client.batch_import_findings.call_args.kwargs["Findings"]
     }
     assert archived_ids == {"a", "c"}
-    assert client.batch_update_findings.call_args.kwargs["RecordState"] == "ARCHIVED"
 
 
 def test_archive_stale_findings_noop_when_nothing_stale():
     """Nothing stale means no API call at all -- not a call with an empty list."""
     client = MagicMock()
+    existing = {"a": _existing_finding("a")}
 
     reporter.archive_stale_findings(
-        client,
-        product_arn="arn:...:default",
-        generator_id="zap-automation-framework/mitlearn-qa",
-        previous_ids={"a"},
-        current_ids={"a"},
+        client, existing=existing, current_ids={"a"}, updated_at="2026-08-28T00:00:00Z"
     )
 
-    client.batch_update_findings.assert_not_called()
+    client.batch_import_findings.assert_not_called()
 
 
 def test_archive_stale_findings_batches_at_100():
-    """BatchUpdateFindings caps at 100 identifiers per call -- chunk accordingly."""
+    """BatchImportFindings caps at 100 findings per call -- chunk accordingly."""
     client = MagicMock()
-    client.batch_update_findings.return_value = {"UnprocessedFindings": []}
-    previous_ids = {str(i) for i in range(150)}
+    client.batch_import_findings.return_value = {"FailedCount": 0}
+    existing = {str(i): _existing_finding(str(i)) for i in range(150)}
 
     reporter.archive_stale_findings(
-        client,
-        product_arn="arn:...:default",
-        generator_id="zap-automation-framework/mitlearn-qa",
-        previous_ids=previous_ids,
-        current_ids=set(),
+        client, existing=existing, current_ids=set(), updated_at="2026-08-28T00:00:00Z"
     )
 
-    assert client.batch_update_findings.call_count == 2
+    assert client.batch_import_findings.call_count == 2
 
 
-def test_archive_stale_findings_raises_on_unprocessed():
-    """BatchUpdateFindings reports per-finding failures in
-    UnprocessedFindings without raising an SDK exception -- ignoring the
-    response would let the job log "archived" and exit 0 while some
-    findings silently stayed ACTIVE.
+def test_archive_stale_findings_raises_on_partial_failure():
+    """BatchImportFindings' FailedCount/FailedFindings must raise -- ignoring
+    it would let the job log "archived" and exit 0 while some findings
+    silently stayed ACTIVE.
     """
     client = MagicMock()
-    client.batch_update_findings.return_value = {
-        "UnprocessedFindings": [
-            {
-                "FindingIdentifier": {"Id": "a", "ProductArn": "arn:...:default"},
-                "ErrorMessage": "boom",
-            }
-        ]
+    client.batch_import_findings.return_value = {
+        "FailedCount": 1,
+        "FailedFindings": [{"Id": "a", "ErrorMessage": "boom"}],
     }
+    existing = {"a": _existing_finding("a")}
 
-    with pytest.raises(RuntimeError, match="1 findings failed to archive"):
+    with pytest.raises(RuntimeError, match="1 findings failed to import"):
         reporter.archive_stale_findings(
             client,
-            product_arn="arn:...:default",
-            generator_id="zap-automation-framework/mitlearn-qa",
-            previous_ids={"a"},
+            existing=existing,
             current_ids=set(),
+            updated_at="2026-08-28T00:00:00Z",
         )
