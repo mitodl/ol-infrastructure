@@ -69,9 +69,12 @@ config:
   edxapp:backend_studio_domain: studio-backend.xpro.mit.edu
   edxapp:backend_preview_domain: preview-backend.xpro.mit.edu
   # Granian concurrency for the LMS and CMS webapps, per install: pre-overhaul
-  # values. This install's traffic does not fit a ceiling of 8 busy blocking
-  # threads -- LMS p99 demand is 17.7, and CMS at backpressure 16 saturated in
-  # production on 2026-08-26. See docs/plans/granian-configuration-overhaul.md.
+  # values, retained because xpro has no measurement to size them from. Its
+  # edxapp stack still runs the hand-rolled pre-OLApplicationK8s deployments
+  # (xpro-production-edxapp-{cms,lms}-webapp), so it never reaches this code
+  # path in production; the xpro-openedx namespace emits no granian_* series at
+  # all. Size these from xpro's own traffic once the stack deploys.
+  # See docs/plans/granian-configuration-overhaul.md.
   edxapp:k8s_granian:
     lms:
       workers: 2
