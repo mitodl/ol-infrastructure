@@ -11,9 +11,10 @@ nothing noticed because `pulumi preview` showed no diff.
     was delivered.
   - The `Low Urgency` escalation path was created in the Rootly UI on
     2025-05-10 and has never been in Pulumi.
-  - The six Sentry metric alert rules are the only Sentry alerting that
-    exists, and pulumiverse-sentry cannot express the Rootly sentry_app
-    action's settings blob (see the closed spike), so they stay UI-managed.
+  - Six Sentry metric alert rules were the only Sentry alerting that existed,
+    entirely outside IaC, and every one of them was measured incapable of
+    firing. They were deleted on 2026-08-28; the replacement set is not built
+    yet, and this reports that absence rather than passing over it in silence.
   - Every Grafana Slack contact point held a JSON-escaped webhook URL for six
     weeks. Declared config == live config the whole time; both were wrong.
     Only the *delivery* result distinguished them.
@@ -89,18 +90,18 @@ ROOTLY_SENTRY_SOURCE = "sentry"
 # 340226 firing 24 times through 2026-07-20T18:49:09Z, which matches the newest
 # Sentry-sourced Rootly alert exactly. Rootly went quiet because Sentry did.
 #
-# Sentry went quiet because five of the six rules aggregate
+# It went quiet because five of the six rules aggregated
 # count_unique(tags[sentry:user]) on projects that attach no user identity at
 # all, and the sixth -- openedx-residential, the only one ever firing -- lost
-# its user signal on 2026-07-21 and has read a flat zero since. See
-# bin/sentry-alert-calibration for the measurement.
+# its user signal on 2026-07-21. All six were deleted on 2026-08-28, so the
+# silence is now guaranteed rather than merely likely.
 #
 # Left at DRIFT this would exit 1 every night, which is the
 # standing-red-nobody-reads failure this whole check exists to avoid. Clear it
-# to None once the signal is restored: a silence after that is a real broken
-# pipe and should fail the run again.
+# to None once the rebuild lands: a silence after that is a real broken pipe
+# and should fail the run again.
 SENTRY_SILENCE_EXPLAINED_BY: str | None = (
-    "tk-all-sentry-alerting-is-dark-5-of-6-rules-alert-o-c56da3"
+    "tk-rebuild-sentry-alerting-from-scratch-on-signals--dfd607"
 )
 
 # The oblivion contact point is a deliberate drop sink: it points at a blocked
@@ -144,108 +145,31 @@ class DetectorExpectation:
     tracked_by: str = ""
 
 
-# Captured from live state on 2026-08-28 via
-# GET /api/0/organizations/<org>/detectors/ and .../workflows/<id>/.
+# Sentry metric alerting was DELETED IN FULL on 2026-08-28. All six detectors
+# and their six exclusively-owned workflows are gone, on purpose.
 #
-# The legacy `/organizations/<org>/alert-rules/` API these were first written
-# against was sunset on 2026-08-28 and now returns 410 "This API no longer
-# exists", along with `/incidents/` and the per-project `/rules/` endpoint.
-# Metric alerts are now detectors; their notification actions are workflows.
+# Why: measurement showed none of them could do anything. All six aggregated
+# count_unique(tags[sentry:user]); openedx-residential, openedx-mitxonline and
+# mit-learn emit zero unique users against 3.7k/19k/697k errors, xpro and
+# openedx-mitxpro peak at 1 and 5 users/hour against a threshold of 25, and
+# mitxonline's was disabled with thresholds above its observed maximum. The one
+# rule that ever delivered to Rootly lost its input signal on 2026-07-21. Full
+# pre-deletion state, enough to recreate any of them, is committed at
+# src/ol_infrastructure/infrastructure/sentry/metric_alerts_snapshot_2026-08-28.json
 #
-# Anything carrying `tracked_by` is a filed, unfixed defect -- do not "correct"
-# the recorded value to something nicer without actually changing Sentry.
-SENTRY_DETECTORS: tuple[DetectorExpectation, ...] = (
-    DetectorExpectation(
-        legacy_rule_id=340226,
-        detector_id="2925269",
-        project="openedx-residential",
-        name="MITx Residential User Issues - On-Call",
-        enabled=True,
-        aggregate="count_unique(tags[sentry:user])",
-        window_seconds=300,
-        environment="mitx-production",
-        query="is:unresolved",
-        thresholds=((50, 10.0), (75, 30.0)),
-        # Both tiers on the paging policy: the split is decorative.
-        targets=(DEFAULT_ESCALATION_POLICY,),
-        tracked_by="tk-sentry-s-critical-warning-triggers-both-route-to-994f1b",
-    ),
-    DetectorExpectation(
-        legacy_rule_id=340225,
-        detector_id="2925266",
-        project="mitxonline",
-        name="MITx Online User Issues - On-Call",
-        # Disabled in Sentry, so it cannot fire whatever the thresholds say.
-        enabled=False,
-        aggregate="count_unique(tags[sentry:user])",
-        window_seconds=3600,
-        environment="production",
-        query="is:unresolved",
-        # 125/150 against an observed 30d maximum of 76 unique users/hour, so
-        # unreachable even if it were enabled. Both facts are in the task.
-        thresholds=((50, 125.0), (75, 150.0)),
-        targets=(DEFAULT_ESCALATION_POLICY,),
-        tracked_by="tk-all-sentry-alerting-is-dark-5-of-6-rules-alert-o-c56da3",
-    ),
-    DetectorExpectation(
-        legacy_rule_id=271650,
-        detector_id="2814158",
-        project="mit-learn",
-        name="open-next (mit learn) Users Experiencing Errors OpsGenie Alert",
-        enabled=True,
-        aggregate="count_unique(tags[sentry:user])",
-        window_seconds=3600,
-        environment="production",
-        query="is:unresolved",
-        thresholds=((75, 25.0),),
-        targets=(PLATFORM_ENGINEERING_GROUP,),
-        tracked_by="tk-all-sentry-alerting-is-dark-5-of-6-rules-alert-o-c56da3",
-    ),
-    # The next three reach Rootly with no notification target configured at
-    # all -- the action's settings blob is empty, not merely set to Default.
-    DetectorExpectation(
-        legacy_rule_id=271649,
-        detector_id="2814157",
-        project="openedx-mitxpro",
-        name="openedx-mitxpro User Experienced Errors Opsgenie Alert",
-        enabled=True,
-        aggregate="count_unique(tags[sentry:user])",
-        window_seconds=3600,
-        environment="xpro-production",
-        query="is:unresolved",
-        thresholds=((75, 25.0),),
-        targets=(None,),
-        tracked_by="tk-three-sentry-alert-rules-still-notify-opsgenie-w-c2e3ec",
-    ),
-    DetectorExpectation(
-        legacy_rule_id=271648,
-        detector_id="2814156",
-        project="openedx-mitxonline",
-        name="openedx-mitxonline Userse Experiencing Errors Rootly Alert",
-        enabled=True,
-        aggregate="count_unique(tags[sentry:user])",
-        window_seconds=3600,
-        environment="mitxonline-production",
-        query="",
-        thresholds=((75, 25.0),),
-        targets=(None,),
-        tracked_by="tk-three-sentry-alert-rules-still-notify-opsgenie-w-c2e3ec",
-    ),
-    DetectorExpectation(
-        legacy_rule_id=271338,
-        detector_id="2814155",
-        project="xpro",
-        name="XPro Users Experiencing Issues Alert",
-        enabled=True,
-        aggregate="count_unique(tags[sentry:user])",
-        window_seconds=3600,
-        environment="production",
-        query="is:unresolved",
-        thresholds=((75, 25.0),),
-        targets=(None,),
-        tracked_by="tk-three-sentry-alert-rules-still-notify-opsgenie-w-c2e3ec",
-    ),
-)
+# Leave this empty until the replacement set is designed and created. Adding an
+# entry here is how a rebuilt detector gets asserted; until then any detector
+# that appears in Sentry is reported as DRIFT, which is the intended behaviour --
+# it means someone created alerting that nothing is checking.
+#
+# Note detectors cannot be created through the API (POST is 405), so the rebuild
+# is UI work. Deletion, which is what happened here, is supported.
+SENTRY_DETECTORS: tuple[DetectorExpectation, ...] = ()
+
+# Tracks the rebuild. While SENTRY_DETECTORS is empty this is what the check
+# cites for having no Sentry coverage at all -- deliberate absence, reported
+# rather than passed over in silence.
+SENTRY_REBUILD_TASK = "tk-rebuild-sentry-alerting-from-scratch-on-signals--dfd607"
 
 # Rootly alert route rules, keyed by id. Pulumi cannot model a rule's `enabled`
 # flag, which is how these two came to sit disabled for 19 days: they are what
@@ -386,13 +310,26 @@ def check_sentry_rules(report: Report) -> None:
         if detector.get("type") == "metric_issue"
     }
 
+    if not SENTRY_DETECTORS:
+        # Zero declared expectations means zero Sentry metric alerting. Say so
+        # out loud: a check that passes silently over an empty alerting estate
+        # is the "looks like coverage" failure in its purest form.
+        report.known(
+            check,
+            "Sentry metric alerting",
+            f"no metric detectors are declared and {len(live)} exist in Sentry; "
+            "all six were deleted on 2026-08-28 because none could fire, and "
+            f"the replacement set is not built yet -- {SENTRY_REBUILD_TASK}",
+        )
+
     expected_ids = {expected.legacy_rule_id for expected in SENTRY_DETECTORS}
     for extra in sorted(set(live) - expected_ids, key=str):
         report.drift(
             check,
             f"detector for rule {extra}",
             "a metric detector exists in Sentry that is not recorded here; "
-            "either add it with its expected target or delete it",
+            "record it with its expected query, thresholds and Rootly target, "
+            "or delete it -- alerting nothing checks is how this started",
         )
 
     for expected in SENTRY_DETECTORS:
@@ -641,11 +578,25 @@ def check_sentry_liveness(report: Report, max_silent_days: int) -> None:
     if (datetime.now(UTC) - created).days <= max_silent_days:
         return
 
+    subject = "MITOL Sentry -> Rootly"
+    if not SENTRY_DETECTORS:
+        # No declared detectors means no list of projects to judge the silence
+        # against, and nothing that could deliver anyway. Saying "the projects
+        # are quiet" here would be false -- they emit hundreds of thousands of
+        # errors; there is simply nothing left to alert on them.
+        report.known(
+            check,
+            subject,
+            "no Sentry alert can reach Rootly: every metric detector was "
+            f"deleted on 2026-08-28 and none has been rebuilt -- "
+            f"{SENTRY_REBUILD_TASK}",
+        )
+        return
+
     volumes = _sentry_error_volumes()
     noisy = sorted(
         rule.project for rule in SENTRY_DETECTORS if volumes.get(rule.project, 0) > 0
     )
-    subject = "MITOL Sentry -> Rootly"
     # Deliberately no day count or error volume here: both move every day, and
     # this report is diffed against the previous run to decide whether anything
     # actually changed. Identify the silence by the newest alert instead.
