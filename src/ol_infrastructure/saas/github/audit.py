@@ -530,11 +530,20 @@ RULES: tuple[Rule, ...] = (
         "low",
         "active",
         "no push in 12+ months -- archive candidate",
+        # Fires on forks too, deliberately: a fork nobody has synced in a year is as
+        # much a stale-mirror signal as an OL-owned repo is an archive candidate --
+        # exempting forks entirely (the CON-03/SEC-01 pattern) would hide the 58 of 74
+        # 2026-08-24 findings that are forks, and "upstream may itself be abandoned" is
+        # a real question worth surfacing, not noise. What differs is the remediation:
+        # a fork is not ours to archive on staleness alone, so the wording says "check
+        # upstream" rather than "archive it".
         lambda r: (
             (
                 f"last push {r.get('_pushed_at', '?')[:10]}",
-                "active development",
-                "archive it",
+                "active development, or an explicit `archived` archetype",
+                "check whether upstream is still maintained; archive the mirror if not"
+                if r.get("archetype") == "fork"
+                else "archive it",
             )
             if _is_stale(r)
             else None
