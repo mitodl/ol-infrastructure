@@ -11,9 +11,39 @@
   meilisearch:cpu_request: "250m"
   meilisearch:memory_request: "4Gi"
   meilisearch:memory_limit: "4Gi"
+  meilisearch:max_indexing_memory: "4Gi" # optional, see Sizing below
 ```
 
 The difference between `deploy` and `enabled`. Deploy means "deploy the helm chart" whereas enabled means "enable meilisearch integration in the Open edX platform". You can deploy the chart but not enable it in Open edX if you want to test things out first.
+
+## Sizing
+
+Meilisearch memory-maps its index, so it depends on page cache *inside* the pod's
+memory limit to keep that index resident. Size the three memory knobs against the
+index rather than against a fixed guess:
+
+- `memory_limit` must exceed `indexSize` + `max_indexing_memory` + roughly 1Gi of
+  process heap. Below that the container reclaims its own page cache on every write,
+  which stretches single-document index batches from milliseconds to tens of seconds.
+- `memory_request` should be close to the expected steady working set, not a token
+  value. Kubernetes schedules on the request, so a request far below actual usage lets
+  the node be packed to the point where *node-level* reclaim evicts the page cache -
+  reintroducing the same thrashing the limit was raised to prevent.
+- `max_indexing_memory` sets `MEILI_MAX_INDEXING_MEMORY`. Left unset, Meilisearch
+  defaults to a fraction of the memory it believes it has, which inside a container can
+  exceed the cgroup limit and lets the indexer evict the page cache it depends on.
+  Pin it so the remainder of the limit is available for the resident index.
+  The key is only emitted when configured, so stacks that omit it are unchanged.
+
+Read the current index size before choosing values:
+
+```python
+c.get_all_stats()  # databaseSize, and per-index indexSize / numberOfDocuments
+```
+
+For reference, mitxonline production in August 2026 had a 11.9Gi `studio_content`
+index against a 4Gi limit, which produced ~667M working-set refaults and 99.9% direct
+reclaim (mitodl/hq#13014).
 
 ## SOPS secrets
 
