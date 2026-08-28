@@ -463,6 +463,42 @@ pingdom_integration_ids: [<integration-id>, ...]  # Pingdom integration IDs for 
 
 ---
 
+## Drift detection for the parts Pulumi cannot manage
+
+`bin/alerting-drift-check` asserts live state that no provider can express, so
+the only honest control over it is detection:
+
+- The six Sentry metric alert rules. pulumiverse-sentry cannot write a trigger
+  action's `settings` blob, so the rules stay UI-managed and their Rootly
+  notification targets are checked against expectations recorded in the script.
+- The CI/QA Rootly route rules that keep non-production alerts off the paging
+  path. Pulumi cannot model a route rule's `enabled` flag; these two sat
+  disabled for 19 days with no diff to show for it.
+- Contact-point **delivery**, per stack, read from each notifier's own
+  last-attempt result. A declared-config == live-config check cannot catch a
+  contact point holding a malformed or revoked webhook: every Slack contact
+  point here held a JSON-escaped URL for six weeks while `pulumi preview`
+  showed no diff. `oblivion` is exempt — its permanent send failure is the
+  design.
+- Absence: whether any Sentry-sourced alert has reached Rootly at all
+  recently, qualified by whether those projects are still emitting errors.
+  Every per-object assertion above can pass while nothing is delivered.
+
+Findings come out at three levels. `DRIFT` means live differs from
+expectation, and exits 1. `KNOWN` means live matches an expectation that is
+itself a filed, unfixed defect — recorded so the check goes red if someone
+changes it halfway. `INFO` means not assertable right now, e.g. a contact
+point that has never attempted a notification, whose empty error field proves
+nothing.
+
+It never repairs. Auto-repairing config a provider cannot fully represent is
+how the empty-shell rules got there. The nightly `alerting-drift` Concourse
+job (`src/ol_concourse/pipelines/infrastructure/alerting_drift/pipeline.py`)
+runs it and opens a PR against `docs/generated/alerting-drift-report.md` when
+the report changes.
+
+---
+
 ## Phase status (as of 2026-08-05)
 
 - **Phase 5** — Done. The legacy Grafana Concourse pipelines have been deleted:
