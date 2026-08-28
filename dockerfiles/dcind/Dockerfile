@@ -29,8 +29,9 @@ COPY entrypoint.sh /entrypoint.sh
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Set by the Concourse pipeline from the dagger github-release resource.
-# Empty falls back to whatever install.sh calls latest.
+# Set by the Concourse pipeline from DAGGER_VERSION in src/bridge/lib/versions.py,
+# via its projected pin in src/bridge/lib/version_pins/. Renovate bumps that pin.
+# Empty falls back to whatever install.sh calls latest, for local builds.
 ARG DAGGER_VERSION=""
 
 # Install dagger.io for newer builds of openedx and other CI tasks
