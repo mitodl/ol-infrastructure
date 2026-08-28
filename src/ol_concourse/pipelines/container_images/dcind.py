@@ -16,26 +16,34 @@ from ol_concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from ol_concourse.lib.resources import git_repo, github_release, registry_image
+from ol_concourse.lib.resources import git_repo, registry_image
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
 from ol_concourse.pipelines.ecr import configure_ecr_repository_task
+from ol_concourse.pipelines.versions_map import version_pin_paths
+
+# The dagger version comes from bridge.lib.versions, not from a github_release
+# resource tracking dagger/dagger. A tracked release with trigger=True republishes
+# mitodl/dcind:latest the moment upstream cuts a tag, with nothing in between --
+# the same auto-tracking that put Concourse 8.3.0 into production and broke every
+# worker (see the note in pipelines/infrastructure/concourse/pipeline.py). Renovate
+# bumps versions.py, the sync-version-pins hook regenerates the pin below inside
+# that PR, and merging it is what rebuilds the image.
+(DAGGER_VERSION_PIN,) = version_pin_paths("DAGGER_VERSION")
 
 ol_inf_repo = git_repo(
     name=Identifier("ol-infrastructure-repository"),
     uri="https://github.com/mitodl/ol-infrastructure",
     branch="main",
     check_every="24h",
-    paths=["dockerfiles/dcind/"],
+    paths=["dockerfiles/dcind/", DAGGER_VERSION_PIN],
 )
 
-dagger_release = github_release(
-    name=Identifier("dagger-release-binary"),
-    owner="dagger",
-    repository="dagger",
-    order_by="time",
-    github_token="",
-)
+COLLECT_DAGGER_VERSION = f"""set -e
+version="$(cat {ol_inf_repo.name}/{DAGGER_VERSION_PIN})"
+echo "DAGGER_VERSION=$version" > dagger-version/args_file
+echo "$version" > dagger-version/tag_file
+"""
 
 dcind_release_image = Resource(
     name=Identifier("dcind-release-resource-image"),
@@ -58,13 +66,12 @@ dcind_ecr_image = registry_image(
 
 
 docker_pipeline = Pipeline(
-    resources=[ol_inf_repo, dagger_release, dcind_release_image, dcind_ecr_image],
+    resources=[ol_inf_repo, dcind_release_image, dcind_ecr_image],
     jobs=[
         Job(
             name=Identifier("build-and-publish-container"),
             plan=[
                 GetStep(get=ol_inf_repo.name, trigger=True),
-                GetStep(get=dagger_release.name, trigger=True),
                 TaskStep(
                     task=Identifier("collect-dagger-version"),
                     config=TaskConfig(
@@ -77,18 +84,13 @@ docker_pipeline = Pipeline(
                                 "aws_region": ECR_REGION,
                             },
                         ),
-                        inputs=[Input(name=dagger_release.name)],
+                        inputs=[Input(name=ol_inf_repo.name)],
                         outputs=[
                             Output(name=Identifier("dagger-version")),
                         ],
                         run=Command(
                             path="sh",
-                            args=[
-                                "-xc",
-                                f"""echo "DAGGER_VERSION=$(cat {dagger_release.name}/tag | grep -Eo '[0-9]+\\.[0-9]+\\.[0-9]+')" > dagger-version/args_file;
-                                echo "$(cat {dagger_release.name}/tag | grep -Eo '[0-9]+\\.[0-9]+\\.[0-9]+')" > dagger-version/tag_file;
-                                """,  # noqa: E501
-                            ],
+                            args=["-xc", COLLECT_DAGGER_VERSION],
                         ),
                     ),
                 ),
