@@ -981,7 +981,31 @@ starrocks_apisix_httproute = OLApisixHTTPRoute(
         OLApisixHTTPRouteConfig(
             route_name=f"{stack_info.env_prefix}-starrocks",
             hosts=[starrocks_config.require("domain")],
-            paths=["/*"],
+            # Publish ONLY the OAuth2 callback. The JDBC OAuth2 flow completes
+            # its token exchange at this path, and nothing else on the FE's HTTP
+            # port is meant to be reachable from the internet.
+            #
+            # This used to be ["/*"], which exposed the whole FE HTTP surface.
+            # StarRocks gates those endpoints on Config.enable_http_auth, which
+            # upstream defaults to false, so they answered anonymously. Measured
+            # against QA on 2026-08-28: /api/show_data returned the cluster's
+            # total data size and /api/show_runtime_info returned FE JVM memory
+            # and thread counts, both with no credentials.
+            #
+            # Do NOT "fix" that by setting enable_http_auth = true instead. The
+            # operator wires the FE's startup, liveness AND readiness probes to
+            # an unauthenticated HTTPGet on /api/health (fe_pod.go:72-74,
+            # HEALTH_API_PATH), and HealthAction.needAuth() returns that same
+            # flag -- so enabling it 401s all three probes and crashloops every
+            # FE pod. The @ConfField comment in Config.java claiming health
+            # probes are "always exempt" does not hold for the FE.
+            #
+            # The FE web dashboard is no longer reachable over this domain. It
+            # only ever accepted native Basic Auth (OIDC users cannot log into
+            # it at all -- StarRocks#75370), so its audience was operators
+            # holding native credentials, who can port-forward instead.
+            paths=["/api/oauth2"],
+            path_match_type="Exact",
             backend_service_name=f"{stack_info.env_prefix}-starrocks-fe-service",
             backend_service_port=8030,
             plugins=[],

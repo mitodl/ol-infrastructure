@@ -690,9 +690,23 @@ if oidc_enabled:
     # This coexists with keycloak_oauth2 so that:
     #   - Web UI users: keycloak_oauth2 (browser OAuth2 redirect)
     #   - mysql CLI users: keycloak_jwt (pre-fetched id_token via starrocks-auth)
-    # The id_token stored on the connection context is also forwarded to
-    # Iceberg REST catalogs when iceberg.catalog.security = JWT, enabling
-    # per-user identity delegation to the catalog.
+    # Forwarding the id_token to an Iceberg REST catalog under
+    # iceberg.catalog.security = JWT is proven to work (StarRocks 4.1.3 against
+    # Lakekeeper v0.13.1, 2026-08-07: Lakekeeper's audit log showed two distinct
+    # end-user subjects on list_namespaces/create_namespace). It is inert for
+    # this catalog, which is iceberg.catalog.type = glue and has no per-session
+    # token path at all.
+    #
+    # Two caveats for whoever wires up the REST catalog:
+    #   - security = JWT supplies no credential for catalog INITIALIZATION.
+    #     RESTSessionCatalog.initialize() runs with no user session, so
+    #     GET /v1/config goes out unauthenticated and CREATE EXTERNAL CATALOG
+    #     fails against a catalog that requires auth. Pair it with
+    #     iceberg.catalog.oauth2.credential as a bootstrap. This is what
+    #     StarRocks#75792 is actually reporting.
+    #   - The FE metadata cache bypasses the catalog, so catalog-side authz is
+    #     not consulted on cached reads. StarRocks GRANTs stay the query-time
+    #     filter.
     def _build_jwt_integration_sql(args: list[str]) -> str:
         issuer = json.dumps(args[0])[1:-1]
         _n = _JWT_SECURITY_INTEGRATION_NAME
