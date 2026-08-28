@@ -712,10 +712,15 @@ open_metadata_application = kubernetes.helm.v3.Release(
             "hpa": {
                 "enabled": True,
             },
-            # Ref: https://docs.open-metadata.org/v1.13.x/deployment/semantic-search
-            # 1.13: hybrid search is now automatic when SEMANTIC_SEARCH_ENABLED=true;
-            # the per-query semanticSearch flag is removed. Run the Search Index App
-            # after upgrading to populate vector fields in OpenSearch.
+            # Ref: https://docs.open-metadata.org/latest/deployment/semantic-search
+            # Hybrid search is automatic when SEMANTIC_SEARCH_ENABLED=true; there is no
+            # per-query semanticSearch flag. Run the Search Index App after upgrading
+            # to populate vector fields in OpenSearch.
+            # 2.0 moved the embedding provider/model/credential settings out of
+            # naturalLanguageSearch and under llmConfiguration.embeddings, but kept
+            # every env var name below except AWS_BEDROCK_REGION. llmConfiguration's
+            # own `enabled` flag gates only the chat/completion client, not embeddings,
+            # so semantic search needs no LLM_* vars.
             # EMBEDDING_PROVIDER=bedrock (not djl): DJL is unusable on the official
             # Alpine/musl-based server image - it fails to load its glibc-linked
             # PyTorch native runtime every time. Unresolved upstream as of 1.13.1:
@@ -723,7 +728,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
             # Bedrock auth uses the pod's IRSA role (open_metadata_bedrock_iam_policy
             # below) via the AWS default credential provider chain - no API key
             # needed, just the region and the IAM-auth flag below.
-            # LOG_FORMAT=json (1.13) enables JSON-structured Dropwizard server logs.
+            # LOG_FORMAT=json enables JSON-structured Dropwizard server logs.
             "extraEnvs": [
                 {
                     "name": "SEMANTIC_SEARCH_ENABLED",
@@ -734,42 +739,35 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     "value": "bedrock",
                 },
                 # BedrockEmbeddingClient rejects an empty embeddingModelId in its
-                # constructor, and 1.13.x defaults AWS_BEDROCK_EMBED_MODEL_ID to "".
-                # Without this the vector search service never initializes: OM logs a
-                # single ERROR ("Bedrock embedding model ID is required") per pod start
-                # and per reindex, then serves lexical-only results with no further
-                # complaint. Confirmed dead in production from 2026-07-30 through
-                # 2026-08-23 (15 ERRORs, zero successful inits, and no Bedrock
-                # InvokeModel activity in CloudWatch) despite the two settings above.
-                # The dataAssetEmbeddings index alias is created either way, so it is
-                # not evidence that embeddings work.
+                # constructor, and 1.13.x defaulted AWS_BEDROCK_EMBED_MODEL_ID to "",
+                # so the vector search service never initialized: OM logged a single
+                # ERROR ("Bedrock embedding model ID is required") per pod start and
+                # per reindex, then served lexical-only results without complaint.
+                # 2.0 now defaults to this same model id, making the setting redundant
+                # but explicit - it pins the model the existing index was built with.
                 {
                     "name": "AWS_BEDROCK_EMBED_MODEL_ID",
                     "value": "amazon.titan-embed-text-v2:0",
                 },
-                # titan-embed-text-v2 supports 1024/512/256. 512 matches the default
-                # OM 2.0 will apply, so the index mapping does not have to change
-                # again at upgrade time.
+                # titan-embed-text-v2 supports 1024/512/256. 512 matches the 2.0
+                # default, so the knn_vector mapping does not change at upgrade time.
                 {
                     "name": "AWS_BEDROCK_EMBEDDING_DIMENSION",
                     "value": "512",
                 },
                 # Selects the IRSA credential chain over the static access-key fields,
-                # which are empty. 1.13.x defaults this to false; 2.0 defaults it to
-                # true, so it is redundant after the upgrade but harmless.
+                # which are empty. 2.0 already defaults this to true, so it is
+                # redundant - kept because being explicit beats depending on a default
+                # that upstream has already flipped once (1.13.x had it false).
                 {
                     "name": "BEDROCK_AWS_IAM_AUTH_ENABLED",
                     "value": "true",
                 },
-                # Three region vars for three consumers. 1.13.x reads the Bedrock
-                # block's region from AWS_BEDROCK_REGION; 2.0 moved that to
-                # AWS_DEFAULT_REGION (drop AWS_BEDROCK_REGION with the 2.0 bump); and
-                # the AWS SDK v2 region-provider chain used by the IRSA credentials
-                # exchange only recognizes AWS_REGION.
-                {
-                    "name": "AWS_BEDROCK_REGION",
-                    "value": "us-east-1",
-                },
+                # Two region vars for two consumers. 2.0 reads the Bedrock block's
+                # region from AWS_DEFAULT_REGION (llmConfiguration.bedrock.awsConfig);
+                # AWS_BEDROCK_REGION, which 1.13.x used, no longer appears anywhere in
+                # conf/openmetadata.yaml. The AWS SDK v2 region-provider chain used by
+                # the IRSA credentials exchange only recognizes AWS_REGION.
                 {
                     "name": "AWS_DEFAULT_REGION",
                     "value": "us-east-1",
