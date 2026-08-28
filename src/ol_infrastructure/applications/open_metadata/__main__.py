@@ -716,11 +716,11 @@ open_metadata_application = kubernetes.helm.v3.Release(
             # Hybrid search is automatic when SEMANTIC_SEARCH_ENABLED=true; there is no
             # per-query semanticSearch flag. Run the Search Index App after upgrading
             # to populate vector fields in OpenSearch.
-            # 2.0 moved the embedding provider/model/credential settings out of
-            # naturalLanguageSearch and under llmConfiguration.embeddings, but kept
-            # every env var name below except AWS_BEDROCK_REGION. llmConfiguration's
-            # own `enabled` flag gates only the chat/completion client, not embeddings,
-            # so semantic search needs no LLM_* vars.
+            # 2.0 moved the embedding settings out of naturalLanguageSearch: provider/model
+            # now live under llmConfiguration.embeddings, while credentials live under
+            # llmConfiguration.bedrock.awsConfig. Every env var name below remains except
+            # AWS_BEDROCK_REGION. llmConfiguration's own `enabled` flag gates only the
+            # chat/completion client, not embeddings, so semantic search needs no LLM_* vars.
             # EMBEDDING_PROVIDER=bedrock (not djl): DJL is unusable on the official
             # Alpine/musl-based server image - it fails to load its glibc-linked
             # PyTorch native runtime every time. Unresolved upstream as of 1.13.1:
