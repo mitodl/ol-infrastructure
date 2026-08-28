@@ -50,7 +50,7 @@ config:
     OPENEDX_OAUTH_PROVIDER: "ol-oauth2"
     OPENEDX_SOCIAL_LOGIN_PATH: "/auth/login/ol-oauth2/?auth_entry=login"
     OPENEDX_STUDIO_API_BASE_URL: "https://studio.courses.rc.learn.mit.edu"
-    OPENTELEMETRY_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces"
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318"
     OPENTELEMETRY_SERVICE_NAME: "mitxonline-webapp"
     OTEL_RESOURCE_ATTRIBUTES: "service.namespace=mitxonline,service.instance.id=$(KUBERNETES_POD_NAME)"
     OTEL_TRACES_SAMPLER: "parentbased_traceidratio"
