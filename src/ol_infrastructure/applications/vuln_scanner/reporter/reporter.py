@@ -6,8 +6,10 @@ raw report to a shared volume. Responsibilities, in order:
 1. Upload the raw report to S3, under ``<tool>/<target>/<date>/``.
 2. Convert each alert/match into an AWS Security Finding Format (ASFF)
    finding and import it into Security Hub via ``BatchImportFindings``.
-3. Archive (via ``BatchUpdateFindings``) any previously-imported finding for
-   this (tool, target) pair that no longer appears in the current run --
+3. Archive (via ``BatchImportFindings`` with ``RecordState: ARCHIVED`` --
+   ``RecordState`` cannot be set via ``BatchUpdateFindings``, verified
+   against boto3's service model) any previously-imported finding for this
+   (tool, target) pair that no longer appears in the current run --
    ASFF findings never auto-resolve, so without this step a fixed issue
    would sit ``RecordState: ACTIVE`` in Security Hub forever.
 
@@ -162,7 +164,31 @@ def _nuclei_cve_ids(info: dict[str, Any]) -> tuple[str, ...]:
     return ()
 
 
-def parse_nuclei_report(report_path: Path) -> ParsedReport:
+def _last_nuclei_stats(stats_path: Path) -> dict[str, Any] | None:
+    """Parse the last line of Nuclei's `-stats-json` output.
+
+    Nuclei appends one JSONL summary line every `-stats-interval` seconds
+    plus a final one at exit, so the last line is the most complete tally.
+    Returns None if the file is missing/empty/unparseable so the caller
+    treats that the same as "no positive signal" rather than crashing.
+    """
+    if not stats_path.exists():
+        return None
+    last_stats: dict[str, Any] | None = None
+    for raw_line in stats_path.read_text().splitlines():
+        stripped_line = raw_line.strip()
+        if not stripped_line:
+            continue
+        try:
+            last_stats = json.loads(stripped_line)
+        except json.JSONDecodeError:
+            continue
+    return last_stats
+
+
+def parse_nuclei_report(
+    report_path: Path, stats_path: Path | None = None
+) -> ParsedReport:
     """Parse Nuclei's `-jsonl` output: one JSON object per matched line."""
     alerts: list[RawAlert] = []
     for raw_line in report_path.read_text().splitlines():
@@ -184,15 +210,26 @@ def parse_nuclei_report(report_path: Path) -> ParsedReport:
                 cve_ids=_nuclei_cve_ids(info),
             )
         )
-    # Known gap, not silently ignored: unlike ZAP's `site` list, Nuclei's
-    # `-jsonl` output has no equivalent "did it actually probe the target"
-    # signal when zero matches come back -- a genuinely clean scan and a
-    # scan that never reached the target both produce an empty file.
-    # scan_completed is left True (today's actual behavior, unchanged) until
-    # a reliable positive signal is added (e.g. parsing Nuclei's own
-    # end-of-run stats output, once CLI flags are verified against the
-    # pinned image -- see the flag-verification note in __main__.py).
-    return ParsedReport(alerts=alerts, scan_completed=True)
+    # A non-empty match list is itself proof the scan reached the target.
+    # An empty result is ambiguous -- a genuinely clean scan and a scan that
+    # never reached the target (DNS/TLS/routing/WAF/template-load failure)
+    # both produce zero matches -- so it needs Nuclei's own `-stats-json`
+    # summary (see __main__.py's _nuclei_entrypoint) to disambiguate.
+    # Verified live: a reachable target with zero matches reports
+    # `errors: 0`, while an unresolvable one reports `errors > 0` -- so
+    # `errors == 0` plus at least one request actually made is a genuine
+    # positive completion signal. A missing/unparseable stats file is
+    # treated conservatively as "not confirmed" rather than assumed clean.
+    if alerts:
+        scan_completed = True
+    else:
+        stats = _last_nuclei_stats(stats_path) if stats_path is not None else None
+        scan_completed = bool(
+            stats is not None
+            and int(stats.get("errors", 1)) == 0
+            and int(stats.get("requests", 0)) > 0
+        )
+    return ParsedReport(alerts=alerts, scan_completed=scan_completed)
 
 
 PARSERS = {
@@ -438,7 +475,12 @@ def main() -> int:
         logger.error("Report file %s does not exist", report_path)
         return 1
 
-    parsed = PARSERS[tool](report_path)
+    if tool == "nuclei":
+        raw_stats_path = _env("VULN_SCANNER_STATS_PATH", required=False, default="")
+        stats_path = Path(raw_stats_path) if raw_stats_path else None
+        parsed = parse_nuclei_report(report_path, stats_path)
+    else:
+        parsed = PARSERS[tool](report_path)
     logger.info(
         "Parsed %d alerts/matches from %s report (scan_completed=%s)",
         len(parsed.alerts),

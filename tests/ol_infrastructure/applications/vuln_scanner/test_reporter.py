@@ -210,6 +210,153 @@ def test_parse_nuclei_report_unknown_severity_falls_back_to_informational(tmp_pa
     assert parsed.alerts[0].severity == "informational"
 
 
+def _stats_line(**overrides) -> str:
+    stats = {
+        "duration": "0:00:01",
+        "errors": "0",
+        "hosts": "1",
+        "matched": "0",
+        "requests": "1",
+        "templates": "1",
+        "total": "1",
+    }
+    stats.update(overrides)
+    return json.dumps(stats)
+
+
+def test_parse_nuclei_report_empty_with_no_stats_path_is_not_completed(tmp_path):
+    """No stats file at all (e.g. an older invocation without -stats-json)
+    is the conservative case: an empty report alone is never enough to
+    trust archival, this is exactly the bug reported against this code by
+    a human reviewer (an empty report was previously always treated as a
+    genuinely clean, completed scan).
+    """
+    report_path = tmp_path / "report.jsonl"
+    report_path.write_text("")
+
+    parsed = reporter.parse_nuclei_report(report_path, stats_path=None)
+
+    assert parsed.alerts == []
+    assert parsed.scan_completed is False
+
+
+def test_parse_nuclei_report_empty_with_missing_stats_file_is_not_completed(tmp_path):
+    """The stats path env var is set but the file was never written --
+    treated the same as no signal at all, not assumed clean.
+    """
+    report_path = tmp_path / "report.jsonl"
+    report_path.write_text("")
+    stats_path = tmp_path / "stats.jsonl"  # never created
+
+    parsed = reporter.parse_nuclei_report(report_path, stats_path=stats_path)
+
+    assert parsed.scan_completed is False
+
+
+def test_parse_nuclei_report_empty_with_clean_stats_is_completed(tmp_path):
+    """Verified live against the pinned Nuclei image: a target that was
+    actually reached, with zero matches, reports `errors: 0` in its
+    -stats-json summary -- that's the genuine positive signal that
+    distinguishes a real clean scan from one that never reached the target.
+    """
+    report_path = tmp_path / "report.jsonl"
+    report_path.write_text("")
+    stats_path = tmp_path / "stats.jsonl"
+    stats_path.write_text(_stats_line(errors="0", requests="1") + "\n")
+
+    parsed = reporter.parse_nuclei_report(report_path, stats_path=stats_path)
+
+    assert parsed.alerts == []
+    assert parsed.scan_completed is True
+
+
+def test_parse_nuclei_report_empty_with_errors_is_not_completed(tmp_path):
+    """Verified live: an unresolvable target reports `errors > 0` --
+    exactly the failure mode (DNS/TLS/routing/WAF/template-load) a human
+    reviewer flagged as indistinguishable from a clean scan before this
+    check existed.
+    """
+    report_path = tmp_path / "report.jsonl"
+    report_path.write_text("")
+    stats_path = tmp_path / "stats.jsonl"
+    stats_path.write_text(_stats_line(errors="2", requests="1") + "\n")
+
+    parsed = reporter.parse_nuclei_report(report_path, stats_path=stats_path)
+
+    assert parsed.scan_completed is False
+
+
+def test_parse_nuclei_report_empty_with_zero_requests_is_not_completed(tmp_path):
+    """errors=0 alone isn't sufficient -- a scan that made zero requests
+    (e.g. target list filtered to nothing before any request went out)
+    reports zero errors trivially but never actually probed anything.
+    """
+    report_path = tmp_path / "report.jsonl"
+    report_path.write_text("")
+    stats_path = tmp_path / "stats.jsonl"
+    stats_path.write_text(_stats_line(errors="0", requests="0") + "\n")
+
+    parsed = reporter.parse_nuclei_report(report_path, stats_path=stats_path)
+
+    assert parsed.scan_completed is False
+
+
+def test_parse_nuclei_report_uses_last_stats_line(tmp_path):
+    """Nuclei appends one stats line per interval plus a final one at exit
+    -- an early tick showing errors could be superseded by a clean final
+    tally (or vice versa), so only the last line should be trusted.
+    """
+    report_path = tmp_path / "report.jsonl"
+    report_path.write_text("")
+    stats_path = tmp_path / "stats.jsonl"
+    stats_path.write_text(
+        _stats_line(errors="3", requests="1")
+        + "\n"
+        + _stats_line(errors="0", requests="5")
+        + "\n"
+    )
+
+    parsed = reporter.parse_nuclei_report(report_path, stats_path=stats_path)
+
+    assert parsed.scan_completed is True
+
+
+def test_parse_nuclei_report_tolerates_banner_noise_in_stats_file(tmp_path):
+    """Nuclei's -stats-json shares stderr with banner/progress text
+    (verified live) -- non-JSON lines in that file must be skipped, not
+    crash the parse.
+    """
+    report_path = tmp_path / "report.jsonl"
+    report_path.write_text("")
+    stats_path = tmp_path / "stats.jsonl"
+    stats_path.write_text(
+        "\n"
+        "[INF] Templates loaded for current scan: 10730\n"
+        + _stats_line(errors="0", requests="1")
+        + "\n"
+    )
+
+    parsed = reporter.parse_nuclei_report(report_path, stats_path=stats_path)
+
+    assert parsed.scan_completed is True
+
+
+def test_parse_nuclei_report_matches_present_ignores_bad_stats(tmp_path):
+    """A non-empty match list is proof enough on its own -- stats
+    shouldn't be consulted (and definitely shouldn't override) when
+    matches already confirm the scan reached the target.
+    """
+    report_path = tmp_path / "report.jsonl"
+    report_path.write_text(_nuclei_line() + "\n")
+    stats_path = tmp_path / "stats.jsonl"
+    stats_path.write_text(_stats_line(errors="5") + "\n")
+
+    parsed = reporter.parse_nuclei_report(report_path, stats_path=stats_path)
+
+    assert parsed.scan_completed is True
+    assert len(parsed.alerts) == 1
+
+
 # ---------------------------------------------------------------------------
 # generator_id_for / finding_id
 # ---------------------------------------------------------------------------

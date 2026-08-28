@@ -132,7 +132,6 @@ vuln_scanner_iam_policy_document = {
             "Effect": "Allow",
             "Action": [
                 "securityhub:BatchImportFindings",
-                "securityhub:BatchUpdateFindings",
                 "securityhub:GetFindings",
             ],
             "Resource": "*",
@@ -190,6 +189,7 @@ NUCLEI_IMAGE = "projectdiscovery/nuclei@sha256:582d5546902e67052097cb2d07296c642
 ZAP_REPORT_DIR = "/zap/wrk/report"
 ZAP_REPORT_FILENAME = "report.json"
 NUCLEI_REPORT_PATH = "/shared/nuclei-report.jsonl"
+NUCLEI_STATS_PATH = "/shared/nuclei-stats.jsonl"
 NUCLEI_TEMPLATES_DIR = "/nuclei-templates"
 
 
@@ -378,30 +378,53 @@ def _nuclei_entrypoint(target_url: str) -> str:
     # under the defaults so a scheduled scan doesn't read as an attack to
     # whatever's fronting the target. Revisit alongside the route owner
     # before this schedule is enabled in earnest, same as ZAP's `full` mode.
+    #
+    # -stats-json (redirected from stderr to NUCLEI_STATS_PATH -- verified
+    # live against the pinned image that Nuclei writes -stats-json lines
+    # to *stderr*, not stdout; stdout carries a duplicate stream of match
+    # records even with -output set) gives the reporter a genuine positive
+    # reachability signal: its "errors" count is 0 for a target that was
+    # actually reached (even with zero matches), and non-zero when
+    # resolution/connection/TLS failed outright -- confirmed via live runs
+    # against a reachable no-match target vs. an unresolvable one. Banner/
+    # progress text can share that same stderr stream, but the reporter's
+    # parser already tolerates and skips non-JSON lines.
     return (
         f"nuclei -update-templates; "
-        f"nuclei -target {target_url} -rate-limit 10 -concurrency 10 "
-        f"-jsonl -output {NUCLEI_REPORT_PATH}; "
+        f"nuclei -target {target_url} -rate-limit 10 -concurrency 10 -silent "
+        f"-stats -stats-json -jsonl -output {NUCLEI_REPORT_PATH} "
+        f"2> {NUCLEI_STATS_PATH}; "
         f"SCAN_EXIT=$?; "
         f'echo "nuclei scan exited $SCAN_EXIT"; '
-        f'test -f {NUCLEI_REPORT_PATH} && [ "$SCAN_EXIT" -eq 0 ]'
+        f'[ "$SCAN_EXIT" -eq 0 ]'
     )
 
 
 def _reporter_container(
-    *, tool: str, target_name: str, target_url: str, report_path: str
+    *,
+    tool: str,
+    target_name: str,
+    target_url: str,
+    report_path: str,
+    stats_path: str | None = None,
 ) -> core.v1.ContainerArgs:
+    env = [
+        core.v1.EnvVarArgs(name="VULN_SCANNER_TOOL", value=tool),
+        core.v1.EnvVarArgs(name="VULN_SCANNER_TARGET_NAME", value=target_name),
+        core.v1.EnvVarArgs(name="VULN_SCANNER_TARGET_URL", value=target_url),
+        core.v1.EnvVarArgs(name="VULN_SCANNER_REPORT_PATH", value=report_path),
+        core.v1.EnvVarArgs(name="VULN_SCANNER_S3_BUCKET", value=report_bucket_name),
+        core.v1.EnvVarArgs(name="AWS_REGION", value=aws_config.region),
+    ]
+    if stats_path is not None:
+        # Nuclei only -- see reporter.py's parse_nuclei_report() for why this
+        # is needed to tell a genuinely clean scan apart from one that never
+        # reached the target.
+        env.append(core.v1.EnvVarArgs(name="VULN_SCANNER_STATS_PATH", value=stats_path))
     return core.v1.ContainerArgs(
         name="reporter",
         image=reporter_image,
-        env=[
-            core.v1.EnvVarArgs(name="VULN_SCANNER_TOOL", value=tool),
-            core.v1.EnvVarArgs(name="VULN_SCANNER_TARGET_NAME", value=target_name),
-            core.v1.EnvVarArgs(name="VULN_SCANNER_TARGET_URL", value=target_url),
-            core.v1.EnvVarArgs(name="VULN_SCANNER_REPORT_PATH", value=report_path),
-            core.v1.EnvVarArgs(name="VULN_SCANNER_S3_BUCKET", value=report_bucket_name),
-            core.v1.EnvVarArgs(name="AWS_REGION", value=aws_config.region),
-        ],
+        env=env,
         volume_mounts=[
             core.v1.VolumeMountArgs(name="shared-reports", mount_path="/shared")
         ],
@@ -418,11 +441,27 @@ def _cronjob(
     name: str,
     schedule: str,
     init_containers: list[core.v1.ContainerArgs],
+    init_container_names: list[str],
     reporter_container: core.v1.ContainerArgs,
     volumes: list[core.v1.VolumeArgs],
     pod_security_context: core.v1.PodSecurityContextArgs,
     depends_on: list[Resource],
 ) -> batch.v1.CronJob:
+    # Exclude the third-party scanner init container(s) from the EKS pod
+    # identity webhook's credential injection. By default the webhook
+    # injects the pod's IRSA token/env vars into *every* container,
+    # including initContainers -- confirmed against
+    # amazon-eks-pod-identity-webhook's own README, whose own annotation
+    # example explicitly lists an initContainer -- which would otherwise
+    # hand ZAP/Nuclei the reporter's securityhub:BatchImportFindings/
+    # GetFindings credentials. Only the reporter container (the main
+    # `containers` entry, never listed here) needs them.
+    #
+    # Taken as an explicit plain-string list rather than read back off
+    # `init_containers[*].name` -- that field is typed `Input[str]` (could
+    # be an Output), so reflecting it back out isn't type-safe even though
+    # every name here is, in practice, always a plain literal.
+    skip_containers = ",".join(init_container_names)
     return batch.v1.CronJob(
         f"vuln-scanner-{name}-{stack_info.env_suffix}",
         metadata=meta.v1.ObjectMetaArgs(
@@ -444,7 +483,12 @@ def _cronjob(
                     backoff_limit=1,
                     active_deadline_seconds=5400,
                     template=core.v1.PodTemplateSpecArgs(
-                        metadata=meta.v1.ObjectMetaArgs(labels=application_labels),
+                        metadata=meta.v1.ObjectMetaArgs(
+                            labels=application_labels,
+                            annotations={
+                                "eks.amazonaws.com/skip-containers": skip_containers
+                            },
+                        ),
                         spec=core.v1.PodSpecArgs(
                             restart_policy="Never",
                             service_account_name=vuln_scanner_irsa_service_account_name,
@@ -521,6 +565,7 @@ for index, target in enumerate(targets):
             # all fire at once.
             schedule=_stagger_schedule(3, index),
             init_containers=[zap_init_container],
+            init_container_names=["zap-scan"],
             reporter_container=_reporter_container(
                 tool="zap",
                 target_name=target_name,
@@ -583,11 +628,13 @@ for index, target in enumerate(targets):
             # cluster resources.
             schedule=_stagger_schedule(4, index),
             init_containers=[nuclei_init_container],
+            init_container_names=["nuclei-scan"],
             reporter_container=_reporter_container(
                 tool="nuclei",
                 target_name=target_name,
                 target_url=target_url,
                 report_path=NUCLEI_REPORT_PATH,
+                stats_path=NUCLEI_STATS_PATH,
             ),
             volumes=[
                 core.v1.VolumeArgs(
