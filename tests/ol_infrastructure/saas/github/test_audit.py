@@ -10,7 +10,7 @@ repos than it claims. That mistake has been made twice on this project, both tim
 caught by cross-checking a percentage against raw data rather than by reading the code.
 """
 
-from typing import Any
+from typing import Any, get_args
 
 import pytest
 
@@ -210,11 +210,16 @@ def test_population_matches_each_rules_scope() -> None:
 
 
 def test_every_rule_declares_a_known_axis_and_scope() -> None:
-    """Guards the reporter, which indexes findings by both."""
+    """Guards the reporter, which indexes findings by both.
+
+    Reads the vocabularies off the `Literal` aliases rather than restating them. The
+    hand-written copy went stale the first time a scope was added, failing on the new
+    scope rather than on anything wrong with it.
+    """
     for rule in audit.RULES:
-        assert rule.axis in ("security", "consistency", "developer-experience")
-        assert rule.scope in ("active", "archived", "fleet")
-        assert rule.severity in ("high", "medium", "low")
+        assert rule.axis in get_args(audit.Axis)
+        assert rule.scope in get_args(audit.Scope)
+        assert rule.severity in get_args(audit.Severity)
 
 
 def test_rule_ids_are_unique() -> None:
@@ -367,3 +372,51 @@ def test_removable_kinds_exclude_the_two_that_cost_something() -> None:
     """The headline "N removable today" is summed over this set."""
     assert "no-access" not in audit.REMOVABLE_KINDS
     assert "outside" not in audit.REMOVABLE_KINDS
+
+
+def test_sec03_is_scoped_to_active_tier_one() -> None:
+    """The denominator decides whether this rule is readable or noise.
+
+    102 of the 176 active repos are `unmanaged` forks with no CI of ours to require, so
+    scoping to `active` would bury the 74 repos where the finding is real. An ARCHIVED
+    tier-1 repo is excluded for a different reason: repository.py writes the tier
+    property on archived repos too, so `tier == tier-1` alone would drag read-only
+    repos into a rule about gating merges nobody can make.
+    """
+    assert "SEC-03" in fired([repo(tier="tier-1")])
+    assert "SEC-03" not in fired([repo(tier="unmanaged")])
+    assert "SEC-03" not in fired([repo(tier="standard")])
+    assert "SEC-03" not in fired([repo(tier="tier-1", archived=True)])
+
+
+def test_sec03_clears_once_checks_are_required() -> None:
+    assert "SEC-03" not in fired([repo(tier="tier-1", required_status_checks=["test"])])
+
+
+def test_sec03_is_not_satisfied_by_having_a_ruleset() -> None:
+    """The whole finding is a repo that looks protected and gates none of its CI.
+
+    ol-infrastructure carries three rulesets and required nothing, which is why this
+    cannot be folded into SEC-01.
+    """
+    assert "SEC-03" in fired([repo(tier="tier-1", _ruleset_count=3)])
+
+
+def test_population_counts_tier_one_actives_only() -> None:
+    fleet = [
+        repo(name="a", tier="tier-1"),
+        repo(name="b", tier="tier-1", archived=True),
+        repo(name="c", tier="unmanaged"),
+    ]
+    assert audit.population(fleet, "tier-1") == 1
+    assert audit.population(fleet, "active") == 2
+
+
+def test_sec03_accepts_checks_required_outside_pulumi() -> None:
+    """`lehrer` and `ol-analytics-api` solved this before we did, via hand-made
+    repo-level rulesets Pulumi does not model. Reporting them would make the audit
+    wrong about the two repos that are already compliant.
+    """
+    assert "SEC-03" not in fired(
+        [repo(tier="tier-1", _required_status_checks_live=["gate"])]
+    )

@@ -4,6 +4,8 @@ _custom_properties:
 _excluded_environments: 3
 _has_branch_protection: false
 _pushed_at: '2026-08-14T23:15:21Z'
+_required_status_checks_live:
+- test
 _ruleset_count: 3
 _visibility: public
 allow_merge_commit: true

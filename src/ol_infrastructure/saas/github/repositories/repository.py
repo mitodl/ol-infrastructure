@@ -129,8 +129,15 @@ def _tier_property(
     )
 
 
-def build(repo: dict[str, Any]) -> None:
-    """Emit the resource family for one repo."""
+def build(repo: dict[str, Any]) -> github.Repository:
+    """Emit the resource family for one repo, and return the `Repository` itself.
+
+    RETURNED SO CALLERS CAN DEPEND ON IT. Every resource here passes `repository=name`
+    as a plain string, which carries no Pulumi dependency, so each one needs an explicit
+    `depends_on`. rulesets.py sits in a different module and needs the same edge;
+    handing it the resource is what lets `__main__.py` wire the two together without
+    either module reaching into the other's internals.
+    """
     name = repo["name"]
     archived = bool(repo.get("archived"))
 
@@ -152,7 +159,7 @@ def build(repo: dict[str, Any]) -> None:
             ),
         )
         _tier_property(name, repo["tier"], repository)
-        return
+        return repository
 
     # retain_on_delete is the counterweight for administration:write (section 2.2).
     # Removing a repo from data/repos/ drops it from Pulumi state and NEVER from
@@ -254,3 +261,5 @@ def build(repo: dict[str, Any]) -> None:
             permission=permission,
             opts=ResourceOptions(depends_on=[repository]),
         )
+
+    return repository
