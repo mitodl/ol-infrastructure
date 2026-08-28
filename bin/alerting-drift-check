@@ -84,6 +84,20 @@ PLATFORM_ENGINEERING_GROUP = "Group:9f00e9f1-2f13-470e-a856-50ab5003f260"
 # Rootly's `source` value for alerts that came from Sentry.
 ROOTLY_SENTRY_SOURCE = "sentry"
 
+# The Sentry -> Rootly silence is already explained and filed, so it reports as
+# KNOWN rather than DRIFT: mitxonline's rule needs 25 unique users inside 60
+# minutes and production runs ~1-2 unique users/hour, so it structurally cannot
+# trip (measured 2026-08-18 in
+# tk-establish-why-no-sentry-alert-has-reached-rootly-4ff0a5). Left at DRIFT it
+# would exit 1 every night until the thresholds move, which is the
+# standing-red-nobody-reads failure this whole check exists to avoid.
+#
+# Clear this to None once the thresholds are recalibrated. A silence after that
+# is a real broken pipe, and should go back to failing the run.
+SENTRY_SILENCE_EXPLAINED_BY: str | None = (
+    "tk-define-and-implement-the-sentry-two-tier-thresho-9834c6"
+)
+
 # The oblivion contact point is a deliberate drop sink: it points at a blocked
 # address so every send fails. Its permanent error is the design, not drift.
 DELIVERY_CHECK_EXEMPT = frozenset({"oblivion"})
@@ -541,12 +555,19 @@ def check_sentry_liveness(report: Report, max_silent_days: int) -> None:
         f"{max_silent_days} day threshold"
     )
     if noisy:
-        report.drift(
-            check,
-            subject,
+        unexplained = (
             f"{detail}, while these alerting projects are still emitting "
-            f"errors over 14d: {', '.join(noisy)}",
+            f"errors over 14d: {', '.join(noisy)}"
         )
+        if SENTRY_SILENCE_EXPLAINED_BY:
+            report.known(
+                check,
+                subject,
+                f"{unexplained}. Expected until the thresholds are "
+                f"recalibrated -- {SENTRY_SILENCE_EXPLAINED_BY}",
+            )
+        else:
+            report.drift(check, subject, unexplained)
     else:
         report.info(
             check,

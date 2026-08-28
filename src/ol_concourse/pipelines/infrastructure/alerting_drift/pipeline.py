@@ -81,13 +81,14 @@ ol_infrastructure_image = AnonymousResource(
     },
 )
 
-# The check exits 1 whenever it finds DRIFT (KNOWN and INFO findings exit 0),
-# and there is an outstanding DRIFT finding today -- so a non-zero exit cannot
-# fail the job. An unhandled exception also exits 1 and would be
-# indistinguishable by exit code alone. The check only ever prints findings to
-# stdout (see its module docstring), so a non-empty stderr reliably means it
-# broke; that is checked explicitly here so an execution failure aborts before
-# a truncated report gets committed as though it were a clean run.
+# The check exits 1 whenever it finds DRIFT (KNOWN and INFO findings exit 0).
+# That must not fail the job: a DRIFT finding is the thing this pipeline exists
+# to report, and aborting on it would suppress the very report that carries it.
+# An unhandled exception also exits 1 and would be indistinguishable by exit
+# code alone. The check only ever prints findings to stdout (see its module
+# docstring), so a non-empty stderr reliably means it broke; that is checked
+# explicitly here so an execution failure aborts before a truncated report gets
+# committed as though it were a clean run.
 DRIFT_REPORT_COMMAND = (
     f"mkdir -p ol-infrastructure/{REPORT_PATH.rsplit('/', 1)[0]}\n"
     "PYTHONPATH=ol-infrastructure/src python"
