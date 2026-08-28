@@ -11,7 +11,6 @@ config:
     LOG_LEVEL: INFO
     DEBUG: "false"
     OPENTELEMETRY_SERVICE_NAME: ol-analytics-api
-    OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318
     OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
     OTEL_TRACES_SAMPLER: parentbased_traceidratio
     OTEL_TRACES_SAMPLER_ARG: "0.25"
