@@ -29,12 +29,10 @@ from ol_infrastructure.lib.pulumi_helper import StackInfo
 # this solely to add ``opentelemetry`` (which is NOT enabled by default) without
 # silently dropping any plugin that applications already rely on.
 #
-# One deliberate deviation from upstream: ``server-info`` is omitted. It was
-# already absent from the 3.17 list this replaces, so leaving it out preserves
-# what we run today rather than enabling a plugin as a side effect of a version
-# bump. It serves version and hostname over the control API, which the chart
-# binds to 127.0.0.1 and fronts with no Service, so enabling it would buy us
-# nothing here. Turning it on is a separate call.
+# ``server-info`` is absent here because upstream comments it out of its own
+# default list ("deprecated and will be removed in a future release") in both
+# 3.17 and 3.18.  This list is the active set, so it stays out -- no local
+# exception to carry forward on the next upgrade.
 #
 # 3.18 adds ``ai-cache``, ``ai-lakera-guard`` and ``ldap-auth-advanced`` to the
 # defaults and removes none.
