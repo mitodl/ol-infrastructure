@@ -254,6 +254,24 @@ opik_helm_release = kubernetes.helm.v3.Release(
                         "ANALYTICS_DB_DATABASE_NAME": CLICKHOUSE_DATABASE,
                         "ANALYTICS_DB_USERNAME": CLICKHOUSE_USER,
                         "ANALYTICS_DB_MIGRATIONS_USER": CLICKHOUSE_USER,
+                        # Pinned to opik's own application default rather than
+                        # the chart's. This is the SSRF guard on the token URL
+                        # of an admin-configured custom LLM provider: "strict"
+                        # requires https and refuses loopback, link-local
+                        # (including 169.254.169.254), RFC 1918, IPv6
+                        # unique-local and multicast destinations, while
+                        # "relaxed" is a no-op. The backend defaults to strict
+                        # (config.yml destinationGuard), which is what we run
+                        # today because chart 2.2.35 sets nothing -- but 2.2.43
+                        # starts shipping "relaxed" in component.backend.env, and that
+                        # ConfigMap reaches us through the envFrom below. Upstream
+                        # relaxes it because a self-hosted auth service may sit on
+                        # a private range. Setting it here keeps the chart bump
+                        # from silently weakening a guard we already run with; if
+                        # a custom provider ever does need an internal token URL,
+                        # this is the knob, and flipping it is then a deliberate
+                        # decision rather than a side effect of a version bump.
+                        "LLM_PROVIDER_TOKEN_AUTH_DESTINATION_GUARD": "strict",
                     },
                     # Layer the VSO-synced credentials Secret on top of the
                     # ConfigMap. Listing the Secret last lets it override the
