@@ -28,7 +28,8 @@ indexer run (04:00, every 4h) after this job's 03:20 slot. The dataset named in
 the barrier, ``RepoSymbol``, is one this job compacts (``frags 14 → 1``).
 
 NOT fully understood: the same compaction runs daily and the wedge appeared on
-four days out of fourteen, so compaction is necessary and not sufficient.
+four days out of fourteen, so compaction alone is not sufficient; the additional
+condition that triggers the wedge is unknown.
 Server uptime across the optimize run is not the discriminator either — it was
 identical on clean days.
 
