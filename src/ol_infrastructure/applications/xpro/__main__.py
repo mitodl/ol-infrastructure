@@ -350,6 +350,7 @@ app_env_vars = {
     "CRON_COURSERUN_SYNC_HOURS": "*",
     "CYBERSOURCE_MERCHANT_ID": "mit_odl_xpro",
     "CYBERSOURCE_REFERENCE_PREFIX": f"xpro-{env_name}",
+    "CYBERSOURCE_REST_MERCHANT_ID": "mit_odl_xpro",
     "HUBSPOT_PIPELINE_ID": "75e28846-ad0d-4be2-a027-5e1da6590b98",
     "MITOL_DIGITAL_CREDENTIALS_AUTH_TYPE": "code",
     "MITOL_DIGITAL_CREDENTIALS_DEEP_LINK_URL": "dccrequest://request",

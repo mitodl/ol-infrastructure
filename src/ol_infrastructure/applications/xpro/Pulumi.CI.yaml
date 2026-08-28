@@ -17,6 +17,7 @@ config:
     # requirement there. Revert once xPRO moves the check to the
     # CyberSource REST API (mitodl/hq#13003).
     CYBERSOURCE_MERCHANT_ID: ""
+    CYBERSOURCE_REST_ENVIRONMENT: "apitest.cybersource.com"
     CYBERSOURCE_SECURE_ACCEPTANCE_URL: "https://testsecureacceptance.cybersource.com/pay"
     CYBERSOURCE_WSDL_URL: "https://ics2wstest.ic3.com/commerce/1.x/transactionProcessor/CyberSourceTransaction_1.154.wsdl"
     DIGITAL_CREDENTIALS_SUPPORTED_RUNS: ""
