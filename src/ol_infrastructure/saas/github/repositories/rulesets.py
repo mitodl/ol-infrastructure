@@ -77,16 +77,20 @@ Those jobs have since landed: ol-infrastructure #5567 (2026-08-24), mitxonline #
 `if: always()`, without which a failed dependency skips the gate and GitHub reads a
 skipped required check as satisfied.
 
-`mit-learn` requires `openapi-diff` as well, and that is the exception that proves the
-rule rather than a second list creeping back. `needs:` cannot cross workflow files and
-`openapi-diff` lives in its own, so no gate can absorb it. It is safe to require only
-because mit-learn #3825 also gave it an `--err-ignore` allowlist
-(`openapi/oasdiff-err-ignore.txt`): before that it went red on INTENTIONAL breaking API
-changes -- red at merge on 8 of the last 40 mit-learn PRs, release PRs included -- and
-requiring it would have forced a bypass on every deliberate API change, which trains
-people to bypass. Now such a change adds a line to a reviewed file in the repo that made
-it. If that allowlist turns out to be unusable in practice, drop `openapi-diff` from
-mit-learn's YAML; the gate is unaffected.
+`mit-learn` needs TWO gates, and that is a property of `needs:` rather than a list
+creeping back. `needs:` only reaches jobs in the same workflow file, and mit-learn's
+oasdiff check lives in `openapi-diff.yml` on a `pull_request` trigger while `ci-gate`
+sits in `ci.yml` on `push`. So that workflow carries its own `openapi-diff-gate` and the
+two are required side by side -- each still a single stable context standing for its
+whole workflow, which is the property that matters.
+
+Requiring the oasdiff check at all is safe only because mit-learn #3825 gave it an
+`--err-ignore` allowlist (`openapi/oasdiff-err-ignore.txt`): before that it went red on
+INTENTIONAL breaking API changes -- red at merge on 8 of the last 40 mit-learn PRs,
+release PRs included -- and requiring it would have forced a bypass on every deliberate
+API change, which trains people to bypass. Now such a change adds a line to a reviewed
+file in the repo that made it. If that allowlist turns out to be unusable in practice,
+drop `openapi-diff-gate` from mit-learn's YAML; `ci-gate` is unaffected.
 
 WHAT THE GATE DOES NOT FIX is a branch older than the gate itself. A PR cut before
 `ci-gate` existed does not define the job, so it produces no such check and hangs with

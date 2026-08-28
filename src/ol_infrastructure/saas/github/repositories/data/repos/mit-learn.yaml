@@ -24,7 +24,7 @@ merge_commit_title: MERGE_MESSAGE
 name: mit-learn
 required_status_checks:
 - ci-gate
-- openapi-diff
+- openapi-diff-gate
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:

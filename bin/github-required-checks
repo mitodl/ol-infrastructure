@@ -91,14 +91,26 @@ app = cyclopts.App(
 )
 
 
+class RateLimitError(RuntimeError):
+    """The API stopped answering, so nothing read after this point means anything."""
+
+
 def _gh(*args: str) -> Any:
     """One `gh api`/`gh pr` call, JSON out.
 
-    Failures return an empty result rather than raising. A commit whose check-runs
-    endpoint 404s (the PR's head was force-pushed away, the branch was deleted and
+    A 404 returns an empty result rather than raising. A commit whose check-runs
+    endpoint has gone (the PR's head was force-pushed away, the branch deleted and
     garbage-collected) is a sample we cannot read, not a reason to abandon the run --
     and every command reports the number of PRs actually read, so a short sample is
     visible rather than silently treated as complete.
+
+    EXHAUSTING THE RATE LIMIT IS DIFFERENT AND MUST NOT BE SWALLOWED. A full sample of
+    three repos costs a few hundred core calls, so hitting the cap mid-run is ordinary.
+    Treating those 403s as "no data" makes a check that is merely unread look like a
+    check that was never produced -- which is how a real run of this tool reported
+    mit-learn's `openapi-diff` as ABSENT 0/0 minutes after reporting it clean. In a tool
+    whose entire job is to stop a silent outage, degrading silently is the one failure
+    it cannot have.
     """
     result = subprocess.run(  # noqa: S603
         ["gh", *args],  # noqa: S607
@@ -107,6 +119,14 @@ def _gh(*args: str) -> Any:
         check=False,
     )
     if result.returncode != 0:
+        stderr = result.stderr or ""
+        if "rate limit" in stderr.lower() or "secondary rate" in stderr.lower():
+            msg = (
+                "GitHub API rate limit exhausted mid-run, so the remaining results "
+                "would be indistinguishable from checks that never ran. Re-run after "
+                "`gh api rate_limit` recovers, or lower --prs."
+            )
+            raise RateLimitError(msg)
         return None
     return json.loads(result.stdout or "null")
 
@@ -488,4 +508,8 @@ def drift(
 
 
 if __name__ == "__main__":
-    app()
+    try:
+        app()
+    except RateLimitError as limited:
+        print(f"\n{limited}", file=sys.stderr)
+        sys.exit(2)

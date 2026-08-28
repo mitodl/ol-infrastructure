@@ -224,3 +224,39 @@ class TestDriftExitStatus:
         assert (
             self._run(monkeypatch, {"ci-gate": _evidence(produced=4, eligible=4)}) == 0
         )
+
+
+class TestRateLimitIsNotSwallowed:
+    """A 403 must not read as "this check was never produced".
+
+    Written from a live run: a full sample of three repos exhausted the core quota, and
+    the next command reported mit-learn's `openapi-diff` as ABSENT 0/0 minutes after
+    `drift` had reported the same context clean. Under the old behaviour that verdict is
+    indistinguishable from a context nothing produces, which is the one thing this tool
+    exists to detect.
+    """
+
+    def _run(self, monkeypatch: pytest.MonkeyPatch, stderr: str, code: int) -> Any:
+        class Result:
+            returncode = code
+            stdout = ""
+
+        Result.stderr = stderr  # type: ignore[attr-defined]
+        monkeypatch.setattr(tool.subprocess, "run", lambda *_a, **_k: Result())
+        return tool._gh("api", "anything")
+
+    def test_rate_limit_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The core-quota message `gh` prints when the hourly budget is gone."""
+        with pytest.raises(tool.RateLimitError):
+            self._run(monkeypatch, "API rate limit exceeded for user ID 1", 1)
+
+    def test_secondary_rate_limit_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The abuse-detection variant, which reads differently and matters the same."""
+        with pytest.raises(tool.RateLimitError):
+            self._run(monkeypatch, "You have exceeded a secondary rate limit", 1)
+
+    def test_a_missing_commit_is_still_tolerated(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A force-pushed-away head is a sample we cannot read, not a reason to stop."""
+        assert self._run(monkeypatch, "gh: Not Found (HTTP 404)", 1) is None
