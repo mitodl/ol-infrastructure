@@ -83,7 +83,7 @@ from ol_infrastructure.lib.aws.route53_helper import (
     fastly_certificate_validation_records,
     lookup_zone_id_from_domain,
 )
-from ol_infrastructure.lib.fastly import get_fastly_provider
+from ol_infrastructure.lib.fastly import get_fastly_provider, vcl_snippet
 from ol_infrastructure.lib.k8s_keda import (
     build_webapp_keda_config,
     create_webapp_prometheus_trigger_auth,
@@ -1197,13 +1197,13 @@ mitxonline_service = fastly.ServiceVcl(
         ),
     ],
     snippets=[
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=uai_b2c_redirect_vcl,
             name="Redirect UAI B2C paths to MIT Learn",
             priority=100,
             type="recv",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=course_program_redirect_vcl,
             name="Redirect course and program pages to MIT Learn",
             # Runs after the UAI B2C redirects (priority 100) so that their
@@ -1212,7 +1212,7 @@ mitxonline_service = fastly.ServiceVcl(
             priority=150,
             type="recv",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=catalog_redirect_vcl,
             name="Redirect catalog pages to MIT Learn",
             # /catalog/* doesn't overlap with /courses/* or /programs/*, so
@@ -1221,7 +1221,7 @@ mitxonline_service = fastly.ServiceVcl(
             priority=160,
             type="recv",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=textwrap.dedent("""\
             if (obj.status == 602) {
               set obj.status = 301;
@@ -1239,7 +1239,7 @@ mitxonline_service = fastly.ServiceVcl(
             name="Handle UAI B2C external redirects",
             type="error",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=textwrap.dedent("""\
             if (obj.status == 603) {
               set obj.status = 301;
@@ -1258,7 +1258,7 @@ mitxonline_service = fastly.ServiceVcl(
             name="Handle course and program redirects to MIT Learn",
             type="error",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=textwrap.dedent("""\
             if (obj.status == 604) {
               set obj.status = 301;
@@ -1277,7 +1277,7 @@ mitxonline_service = fastly.ServiceVcl(
             name="Handle catalog redirects to MIT Learn",
             type="error",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=textwrap.dedent(r"""
             declare local var.is_media_request BOOL;
             set var.is_media_request = false;
@@ -1290,7 +1290,7 @@ mitxonline_service = fastly.ServiceVcl(
             priority=200,
             type="recv",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=textwrap.dedent(f"""\
             if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
               unset bereq.http.Authorization;
@@ -1298,7 +1298,7 @@ mitxonline_service = fastly.ServiceVcl(
             name="Strip auth headers in S3 miss requests",
             type="miss",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=textwrap.dedent(f"""\
             if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
               unset bereq.http.Authorization;

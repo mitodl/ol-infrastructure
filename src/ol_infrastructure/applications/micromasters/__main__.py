@@ -77,6 +77,7 @@ from ol_infrastructure.lib.aws.route53_helper import (
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
+    vcl_snippet,
 )
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
@@ -1192,7 +1193,7 @@ micromasters_fastly_service = fastly.ServiceVcl(
         ),
     ],
     snippets=[
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             name="Redirect to correct domain",
             content=textwrap.dedent(
                 rf"""

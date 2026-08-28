@@ -63,6 +63,7 @@ from ol_infrastructure.lib.aws.route53_helper import (
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
+    vcl_snippet,
 )
 from ol_infrastructure.lib.ol_types import AWSBase, Services
 from ol_infrastructure.lib.pulumi_helper import (
@@ -979,7 +980,7 @@ if site_project_deployment:
     _sp = site_project_deployment
     _apps_alt = "|".join(site_project_mfe_apps)
     _site_project_snippets.append(
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=textwrap.dedent(
                 f"""\
                 unset req.http.X-Site-Project;
@@ -1001,7 +1002,7 @@ if site_project_deployment:
     # index.html is the SPA entry point; it must never be cached so deploys
     # take effect immediately.  Versioned chunk files may be cached indefinitely.
     _site_project_snippets.append(
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=textwrap.dedent(
                 f"""\
                 if (req.url ~ "/{_sp}-site/index\\.html$") {{
@@ -1122,7 +1123,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
     ],
     snippets=[
         *_site_project_snippets,
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=textwrap.dedent(
                 """\
                 if (table.contains(marketing_redirects, req.url.path)) {
@@ -1132,7 +1133,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
             name="Interrupt Redirected Requests",
             type="recv",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=textwrap.dedent(
                 f"""\
                 if (req.url.path ~ "{mfe_regex}") {{
@@ -1143,7 +1144,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
             name="Strip headers to S3 backend",
             type="recv",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=textwrap.dedent(
                 """\
                 if (req.url.path ~ "^/asset-v1:") {
@@ -1155,7 +1156,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
             name="Shorten the TTL for assets uploaded in studio",
             type="fetch",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=textwrap.dedent(
                 f"""\
                 if (beresp.status == 404 && req.url.path ~ "{mfe_regex}") {{
@@ -1165,7 +1166,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
             name="Manage 404 On S3 Origin for MFE",
             type="fetch",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=textwrap.dedent(
                 f"""\
                 declare local var.mfe_path STRING;
@@ -1179,7 +1180,7 @@ edxapp_fastly_service = fastly.ServiceVcl(
             priority=120,
             type="error",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             content=textwrap.dedent(
                 """\
                 if (obj.status == 618 && obj.response == "redirect") {
