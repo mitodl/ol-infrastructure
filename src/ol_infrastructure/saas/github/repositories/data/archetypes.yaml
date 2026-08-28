@@ -77,49 +77,10 @@ archetypes:
     tier: tier-1
     visibility: public
 
-  # Published packages and shared libraries: smoot-design, open-edx-plugins, ...
+  # Published packages and shared libraries: ol-django, smoot-design, ...
   library:
     extends: base
     tier: tier-1
-
-  # A library whose release flow writes to its own default branch, and which is
-  # therefore deliberately placed OUTSIDE org-ruleset governance. Today: `ol-django`.
-  #
-  # WHY. `scripts/release.py create --app <pkg> --push` bumps the version, folds
-  # `changelog.d/` into CHANGELOG.md, commits, tags `<dist>/v<version>`, and pushes the
-  # commit AND the tag. Under `tier-1` the commit half is rejected by
-  # `baseline-default-branch`'s `pull_request` rule -- but a tag is a separate ref that
-  # no ruleset here targets, so the tag lands anyway and `ci.yml`'s tag-gated `release`
-  # job publishes to PyPI. The result is a shipped package whose release commit is on no
-  # branch at all: the version bump never reaches `main` and the consumed changelog.d/
-  # entries are never removed, so the NEXT release recomputes from a stale base.
-  #
-  # That is not hypothetical. `mitol-django-payment-gateway/v2026.8.26` is live on PyPI
-  # while `main` still reads 2026.8.10 and still carries the three changelog.d/ entries
-  # that release consumed; 8 of the 30 most recent release tags are orphaned this way.
-  #
-  # WHAT IT COSTS, stated plainly because nothing else will state it. No org ruleset
-  # targets `unmanaged`, and bypass is per-RULESET rather than per-rule, so this does not
-  # merely relax the review requirement -- it also drops `non_fast_forward` and
-  # `deletion` on the default branch of a public, published library. AND SEC-01 EXEMPTS
-  # `unmanaged`, so the audit will not report any of it. This comment is the only record
-  # that the exposure was chosen rather than overlooked.
-  #
-  # WHY AN ARCHETYPE AND NOT `tier: unmanaged` ON THE REPO'S OWN YAML. Because that does
-  # not survive. `_deviations()` in `bin/github-org-inventory` skips `tier` outright, so
-  # the crawl never writes a top-level tier into a repo file -- the next
-  # `crawl --refresh` would regenerate `repos/ol-django.yaml` without it, silently
-  # returning the repo to `library`/`tier-1` and re-breaking the release flow with no
-  # error anywhere. Archetype assignment lives in `archetypes-proposed.yaml`, which is
-  # hand-maintained and preserved across crawls, so it is the only durable place to say
-  # this. Same reason the YAML comment you are reading lives here and not there:
-  # `crawl` regenerates the per-repo files with `yaml.safe_dump`, which drops comments.
-  #
-  # TO RETIRE THIS: fix the push ordering in ol-django's `release.py` so the tag is
-  # pushed only after the branch lands, then move the repo back to `library`.
-  library-unmanaged:
-    extends: library
-    tier: unmanaged
 
   # ol-infrastructure, ol-concourse, dagster.
   infrastructure:
