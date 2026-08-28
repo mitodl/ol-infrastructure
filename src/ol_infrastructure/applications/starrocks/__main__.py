@@ -32,6 +32,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
 )
+from ol_infrastructure.lib.aws.iam_helper import cross_environment_glue_denial
 from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
@@ -282,6 +283,28 @@ if starrocks_config.get_bool("enable_data_lake_integration"):
                 "data_lake_query_engine_iam_policy_arn"
             ),
             role=starrocks_auth_binding.irsa_role.name,
+            opts=ResourceOptions(parent=starrocks_auth_binding),
+        )
+
+    # The attachments above hand this role both environments' catalogs, which
+    # for a lower environment means handing it production. The guard against
+    # that has to be an inline policy on this role: the managed policies are
+    # shared across environments, so a Deny placed in one of them also lands on
+    # the production role and revokes production's access to its own catalog.
+    # Empty in production, which is the environment being protected.
+    _cross_environment_glue_denial = cross_environment_glue_denial(
+        stack_info.env_suffix
+    )
+    if _cross_environment_glue_denial:
+        iam.RolePolicy(
+            f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-cross-environment-glue-denial",
+            role=starrocks_auth_binding.irsa_role.name,
+            policy=json.dumps(
+                {
+                    "Version": "2012-10-17",
+                    "Statement": _cross_environment_glue_denial,
+                }
+            ),
             opts=ResourceOptions(parent=starrocks_auth_binding),
         )
 

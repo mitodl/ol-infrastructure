@@ -402,6 +402,15 @@ def cross_environment_glue_denial(env_suffix: str) -> list[dict[str, Any]]:
     undone by a later Allow, and widening a grant for some unrelated reason is
     the way this would realistically regress.
 
+    Attach the result to the principal being constrained -- an inline role policy
+    -- and never to a managed policy that is shared across environments. A Deny
+    applies to whichever principal holds the document, not to the environment
+    that generated it, so a shared policy carries it onto every role it is
+    attached to. That is how the production StarRocks role ended up holding QA's
+    "deny production" statement and losing the production Glue catalog: an
+    explicit Deny cannot be undone by the Allow in the production policy attached
+    beside it.
+
     ``arn:aws:glue:*:*:catalog`` is deliberately absent, and must stay absent.
     Every Glue operation requires permission on the catalog, so denying it would
     deny every Glue call these identities make -- including the ones against

@@ -284,10 +284,19 @@ query_engine_permissions: list[dict[str, str | list[str]]] = [
     },
 ]
 
+# The cross-environment Deny deliberately does not belong in this document.
+# Unlike the inline policies in applications/{airbyte,dagster,open_metadata},
+# this is a shared managed policy, and applications/starrocks attaches every
+# environment's copy to every StarRocks IRSA role so each instance can query
+# both data lake catalogs. A Deny embedded here travels onto those foreign
+# principals: the QA copy landed its "deny production" statement on the
+# production role, where an explicit Deny beat the Allow from the production
+# copy attached alongside it, and production StarRocks lost the production Glue
+# catalog. The Deny constrains a principal, not a grant, so it is attached to
+# the StarRocks role itself in applications/starrocks.
 query_engine_iam_permissions = {
     "Version": "2012-10-17",
-    "Statement": query_engine_permissions
-    + cross_environment_glue_denial(stack_info.env_suffix),
+    "Statement": query_engine_permissions,
 }
 
 # Create instance profile for granting access to S3 buckets
@@ -351,5 +360,17 @@ if query_engine_aws_account_id and query_engine_aws_external_id:
         policy_arn=query_engine_iam_policy.arn,
         role=query_engine_role.name,
     )
+
+    # Carried on the role rather than in the policy above, for the reason given
+    # where that policy is built. Empty in production.
+    query_engine_glue_denial = cross_environment_glue_denial(stack_info.env_suffix)
+    if query_engine_glue_denial:
+        iam.RolePolicy(
+            f"data-lake-query-engine-role-glue-denial-{stack_info.env_suffix}",
+            role=query_engine_role.name,
+            policy=json.dumps(
+                {"Version": "2012-10-17", "Statement": query_engine_glue_denial}
+            ),
+        )
 
     export("sql_engine_role_arn", query_engine_role.arn)
