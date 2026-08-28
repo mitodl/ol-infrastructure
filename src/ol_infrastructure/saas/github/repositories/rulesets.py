@@ -2,8 +2,7 @@
 
 SEC-03 -- every repo in the org runs CI and none of it can block a merge. Closing that
 needs the one rule the §5.4 org-ruleset design deliberately left per-repo, because check
-names are per-repo facts: `ol-infrastructure` produces `test`, `mit-learn` produces
-`python-tests` and `javascript-tests`, and no org-wide ruleset can name both.
+names are per-repo facts and no org-wide ruleset can name them all.
 
 THERE IS NO DRY RUN. `enforcement: evaluate` does not exist on the Team plan -- the API
 accepts the PUT and then does nothing at all (see organization/org_rulesets.py, which
@@ -16,10 +15,17 @@ The only defence is that the names are checked against reality before they land:
 
     uv run bin/github-required-checks sample mit-learn --prs 20
 
-reports how many of the last N merged PRs produced each check. Only names present on
-EVERY sampled PR belong in `required_status_checks`. A name at 19/20 is not a flake to
-round up -- it is a check that some PR did not produce, and requiring it blocks that
-kind of PR forever.
+scores each check name against the merged PRs where it COULD have reported -- the ones
+whose head commit defines the job and whose workflow actually ran -- and only a name it
+marks SAFE belongs in `required_status_checks`. A name missing from a PR that defined it
+and ran its workflow is not a flake to round up: it is a check that some PR did not
+produce, and requiring it blocks that kind of PR forever.
+
+That scope is what makes the aggregate gates below requirable at all. A raw
+"appeared on N of the last 40" reads a job added last week (`ci-gate`, 31/40 on
+ol-infrastructure, every miss a branch cut before it existed) identically to a
+path-filtered one (`Run zizmor`, 1/40, and permanently unrequirable). Only the first is
+safe, and no percentage separates them.
 
 WHAT MAKES A NAME UNSAFE TO REQUIRE, all observed live in this org on 2026-08-21:
 
@@ -27,23 +33,25 @@ WHAT MAKES A NAME UNSAFE TO REQUIRE, all observed live in this org on 2026-08-21
                             touching `.github/workflows/**` (1 of the last 40). A
                             workflow that does not trigger produces no check run at
                             all, so the ruleset waits forever rather than passing.
+                            The `on:` block states this outright, so
+                            `bin/github-required-checks` reads it there and refuses
+                            the name rather than inferring it from a count.
   unreliable reviewers      `Seer Code Review` (22/40) and
                             `copilot-pull-request-reviewer` (11/40) attach only
                             sometimes. They are advisory by design.
   matrix shard names        `mitxonline`'s `python-tests (1)`..`(4)`. See below: this is
                             not a hypothetical, the rename already happened.
-  checks that fail on       `openapi-diff` runs `oasdiff breaking --fail-on ERR`, so it
-  purpose                   goes red on INTENTIONAL breaking API changes. It reported on
-                            40/40 mit-learn PRs and was red at merge on 8 of them,
-                            release PRs included. Requiring it would force a bypass
-                            on every deliberate API change, which trains people to
-                            bypass. Reporting reliably and passing reliably are
-                            different properties; only the first is a sampling
-                            question.
+  checks that fail on       A check that reports reliably can still fail on purpose.
+  purpose                   `openapi-diff` is the case, and requiring it needed an
+                            allowlist in the repo that produces it before it was
+                            reasonable -- see the note on mit-learn below. Reporting
+                            reliably and passing reliably are different properties;
+                            only the first is a sampling question.
 
-SAMPLE SIZE IS PART OF THE ANSWER. `CodeQL` and `Analyze (*)` look perfectly stable at
-20 PRs on ol-infrastructure and drop to 38/40 at forty. Twenty is not enough to clear a
-name.
+SAMPLE SIZE IS PART OF THE ANSWER. On 2026-08-21 `CodeQL` and `Analyze (*)` looked
+perfectly stable at 20 PRs on ol-infrastructure and dropped to 38/40 at forty. (They
+read 40/40 again on 2026-08-28, which is the point rather than a correction: a name
+can look clean at any single window.) Twenty is not enough to clear a name.
 
 THE MATRIX RENAME IS NOT A THOUGHT EXPERIMENT. In February 2026 mitxonline produced one
 check named `python-tests`. Commit 63ded115 on 2026-07-23 ("Shard CI pytest run across a
@@ -56,11 +64,36 @@ carries the shard count twice in its own ci.yml (`matrix: group: [1, 2, 3, 4]` a
 are required today, and `_allow_matrix_shard_checks` exists so that changing that
 has to be deliberate.
 
-THE DURABLE FIX IS AN AGGREGATE GATE JOB, not a longer list here. A `ci-ok` job
-with `needs:` every other job, required as a single static context, puts the list
-of what must pass in the file that owns the jobs, so resizing a matrix and updating
-the gate are the same edit by the same person. That needs one PR per application
-repo and is filed as follow-up work; the lists here protect the fleet until then.
+WHAT IS ACTUALLY REQUIRED IS AN AGGREGATE GATE JOB, one per repo, and not the list of
+job names an earlier draft of this file carried. A `ci-gate` job with `needs:` every
+other job in its workflow, required as a single static context, puts the list of what
+must pass in the file that owns the jobs -- so resizing a matrix and updating the gate
+are one edit by one person in one repo, and the failure modes above stop being reachable
+from here at all. `lehrer` had already done this for itself (`gate`, `fast-checks`)
+before this work started.
+
+Those jobs have since landed: ol-infrastructure #5567 (2026-08-24), mitxonline #3876
+(2026-08-25), mit-learn #3825. Each `needs:` every job in its workflow and runs under
+`if: always()`, without which a failed dependency skips the gate and GitHub reads a
+skipped required check as satisfied.
+
+`mit-learn` requires `openapi-diff` as well, and that is the exception that proves the
+rule rather than a second list creeping back. `needs:` cannot cross workflow files and
+`openapi-diff` lives in its own, so no gate can absorb it. It is safe to require only
+because mit-learn #3825 also gave it an `--err-ignore` allowlist
+(`openapi/oasdiff-err-ignore.txt`): before that it went red on INTENTIONAL breaking API
+changes -- red at merge on 8 of the last 40 mit-learn PRs, release PRs included -- and
+requiring it would have forced a bypass on every deliberate API change, which trains
+people to bypass. Now such a change adds a line to a reviewed file in the repo that made
+it. If that allowlist turns out to be unusable in practice, drop `openapi-diff` from
+mit-learn's YAML; the gate is unaffected.
+
+WHAT THE GATE DOES NOT FIX is a branch older than the gate itself. A PR cut before
+`ci-gate` existed does not define the job, so it produces no such check and hangs with
+nothing to re-run -- and unlike a wrong name this resolves itself on a rebase. On
+2026-08-28 that was 45 of 46 open mit-learn PRs, 37 of 45 on mitxonline and 19 of 44 on
+ol-infrastructure. `bin/github-required-checks blocked` lists them by name and exits
+non-zero, and is the check to run immediately before `pulumi up` rather than after.
 
 BYPASS MIRRORS THE ORG RULESETS, AND THAT IS A NARROWER CHOICE THAN IT LOOKS.
 `_BYPASS` copies `_ADMIN_BYPASS` from organization/org_rulesets.py: owners `always`,

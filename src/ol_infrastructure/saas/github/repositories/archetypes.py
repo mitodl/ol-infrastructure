@@ -241,8 +241,9 @@ def _check_required_status_checks(fleet: list[dict[str, Any]]) -> None:
             "required_status_checks data would block merges:\n  "
             + "\n  ".join(problems)
             + "\nVerify every context against real check runs first: "
-            "`uv run bin/github-required-checks sample <repo>`. A name that is not "
-            "on 100% of sampled PRs must not be required -- there is no dry-run "
+            "`uv run bin/github-required-checks sample <repo>`, and that no open PR is "
+            "left unable to produce it: `uv run bin/github-required-checks blocked`. "
+            "Only a name that tool marks SAFE may be required -- there is no dry-run "
             "enforcement mode on this plan."
         )
         raise ValueError(message)
