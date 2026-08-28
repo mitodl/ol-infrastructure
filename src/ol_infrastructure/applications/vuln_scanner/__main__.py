@@ -165,14 +165,23 @@ reporter_image = format_docker_image_ref(
     reporter_image_repository, "VULN_SCANNER_REPORTER"
 )
 
-# Floating tags are a placeholder, not the intended end state (see the plan
-# doc's hardened-images section) -- before first real deploy, pin both by
-# digest (`ghcr.io/zaproxy/zaproxy@sha256:...`,
-# `projectdiscovery/nuclei@sha256:...`) via
-# `docker buildx imagetools inspect <image>:<tag>`. Not fabricated here since
-# a made-up digest would just fail to pull.
-ZAP_IMAGE = "ghcr.io/zaproxy/zaproxy:stable"
-NUCLEI_IMAGE = "projectdiscovery/nuclei:latest"
+# Pinned by digest, not floating tags, so what runs is deliberate and
+# reviewable -- captured via `docker buildx imagetools inspect <image>:<tag>`
+# against the real ghcr.io/zaproxy/zaproxy:stable and
+# projectdiscovery/nuclei:latest tags on 2026-08-28.
+#
+# NOT currently Renovate-tracked, unlike this repo's usual pattern
+# (src/bridge/lib/versions.py's `# renovate: datasource=docker depName=...`
+# convention) -- that registry is tag-based (`VERSION = "0.7.7"`-style)
+# throughout, with no existing digest-pin precedent to follow, and a bare
+# `image@sha256:...` with no tag reference doesn't give Renovate's docker
+# datasource a tag to diff the digest against anyway. Bumping either of
+# these currently means manually re-running `imagetools inspect` and
+# editing here -- a real gap, not a solved one; worth a follow-up to add a
+# proper Renovate custom manager for this file if these need to move
+# automatically rather than by manual review.
+ZAP_IMAGE = "ghcr.io/zaproxy/zaproxy@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef"  # noqa: E501
+NUCLEI_IMAGE = "projectdiscovery/nuclei@sha256:582d5546902e67052097cb2d07296c642d50a1afc5e44623cb038845df9a32eb"  # noqa: E501
 
 ZAP_REPORT_DIR = "/zap/wrk/report"
 ZAP_REPORT_FILENAME = "report.json"
@@ -324,14 +333,22 @@ _ZAP_ENTRYPOINT = (
 # though Nuclei is not known to exit non-zero on matches the way ZAP's
 # legacy wrapper scripts do.
 #
-# The -update-templates/-td flag names and default template directory
-# below should be re-verified against whichever Nuclei version ends up
-# pinned by digest before first real deploy -- CLI flags have drifted
-# across Nuclei releases.
+# No `-t`/`-update-template-dir` flags -- verified by hand (real
+# `docker run` against the pinned digest, v3.11.1) that `-td` was never a
+# real flag, and that `-t`/`-update-template-dir` don't compose the way
+# pointing both at the same custom directory would suggest: doing that
+# caused Nuclei to decide templates "weren't installed" there and
+# auto-install its own default set into a second, nested directory, so
+# the scan silently ran a different, smaller template set than the one
+# `-update-templates` had just written. The simpler, verified-working
+# pattern relies on `$HOME` alone (see the container's HOME env var,
+# pointed at NUCLEI_TEMPLATES_DIR): both commands land templates/config
+# under Nuclei's own default locations beneath it, and the scan step
+# finds them with no extra flags needed.
 def _nuclei_entrypoint(target_url: str) -> str:
     return (
-        f"nuclei -update-templates -td {NUCLEI_TEMPLATES_DIR}; "
-        f"nuclei -target {target_url} -td {NUCLEI_TEMPLATES_DIR} "
+        f"nuclei -update-templates; "
+        f"nuclei -target {target_url} "
         f"-jsonl -output {NUCLEI_REPORT_PATH}; "
         f'echo "nuclei exited $?"; '
         f"test -f {NUCLEI_REPORT_PATH}"
@@ -500,13 +517,13 @@ for index, target in enumerate(targets):
         image=NUCLEI_IMAGE,
         command=["/bin/sh", "-c", _nuclei_entrypoint(target_url)],
         env=[
-            # Nuclei writes its own state (template version/checksum
-            # tracking for -update-templates) under $HOME/.config/nuclei,
-            # separate from the -td templates directory -- with
-            # read_only_root_filesystem=True and no volume over the
-            # image's default $HOME, that write would fail or silently
-            # no-op every run. Pointed at the one writable volume this
-            # container has rather than adding a second emptyDir.
+            # Verified by hand (real `docker run`, v3.11.1): Nuclei installs
+            # templates to $HOME/nuclei-templates and writes its own
+            # config/cache to $HOME/.config/nuclei and $HOME/.cache/nuclei --
+            # all three land under this one writable volume just by setting
+            # HOME, no other flags needed. With read_only_root_filesystem=True
+            # and no volume over the image's default $HOME (/root), those
+            # writes would otherwise fail or silently no-op every run.
             core.v1.EnvVarArgs(name="HOME", value=NUCLEI_TEMPLATES_DIR),
         ],
         volume_mounts=[
