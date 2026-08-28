@@ -32,6 +32,8 @@ for service in ["kms", "network"]:
     simple_pulumi_chain = pulumi_jobs_chain(
         simple_pulumi_code,
         refresh_stack=True,
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
         project_name=_SIMPLE_SERVICE_PROJECT_NAMES[service],
         stack_names=["CI", "QA", "Production"],
         project_source_path=PULUMI_CODE_PATH.joinpath(f"infrastructure/aws/{service}/"),
@@ -73,6 +75,7 @@ for service in ["dns", "policies", "iam"]:
     oneoff_pulumi_chain = pulumi_jobs_chain(
         oneoff_pulumi_code,
         refresh_stack=True,
+        topology="preview-gated",
         project_name=f"ol-infrastructure-aws-{service}",
         stack_names=["default"],
         project_source_path=PULUMI_CODE_PATH.joinpath(f"infrastructure/aws/{service}/"),

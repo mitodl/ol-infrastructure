@@ -72,6 +72,8 @@ for network in [
     consul_pulumi_infrastructure_fragment = pulumi_jobs_chain(
         consul_pulumi_infrastructure_code,
         refresh_stack=True,
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
         project_name="ol-infrastructure-consul",
         stack_names=[f"{network}.{stage}" for stage in stages],
         project_source_path=PULUMI_CODE_PATH.joinpath("infrastructure/consul/"),
@@ -91,6 +93,8 @@ for network in [
     consul_pulumi_substructure_fragment = pulumi_jobs_chain(
         consul_pulumi_substructure_code,
         refresh_stack=True,
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
         project_name="ol-substructure-consul",
         stack_names=[f"{network}.{stage}" for stage in stages],
         project_source_path=PULUMI_CODE_PATH.joinpath("substructure/consul/"),

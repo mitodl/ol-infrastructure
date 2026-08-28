@@ -102,6 +102,8 @@ def build_xqueue_pipeline(release_name: str):
         pulumi_fragment = pulumi_jobs_chain(
             xqueue_pulumi_code,
             refresh_stack=True,
+            topology="preview-gated",
+            auto_deploy_stages=["CI"],
             stack_names=[
                 f"{deployment.deployment_name}.{stage}"
                 for stage in deployment.envs_by_release(release_name)
