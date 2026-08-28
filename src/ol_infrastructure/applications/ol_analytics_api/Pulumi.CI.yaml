@@ -11,12 +11,13 @@ config:
     LOG_LEVEL: INFO
     DEBUG: "false"
     OPENTELEMETRY_SERVICE_NAME: ol-analytics-api
-    OPENTELEMETRY_ENDPOINT: http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces
-    OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
-    OTEL_TRACES_SAMPLER: parentbased_traceidratio
-    OTEL_TRACES_SAMPLER_ARG: "0.25"
-    OTEL_PROPAGATORS: tracecontext,baggage
-    OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT: "128"
+    # No OTLP endpoint, protocol, sampler or propagator config here, unlike
+    # Pulumi.QA.yaml and Pulumi.Production.yaml. setup_grafana early-returns for
+    # CI, so operations-ci runs no Alloy and there is nothing to export to --
+    # see ships_telemetry() in lib/otel.py. Everything the SDK reads only when
+    # an exporter exists is therefore dead config here; the app takes its
+    # no-exporter path instead of failing an export per batch forever. Don't
+    # restore these for parity with the other environments.
     OTEL_RESOURCE_ATTRIBUTES: service.namespace=ol-analytics
     SENTRY_LOG_LEVEL: ERROR
     SENTRY_TRACES_SAMPLE_RATE: "0.001"
