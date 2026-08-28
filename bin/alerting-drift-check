@@ -405,7 +405,13 @@ def _check_tier_split(
             if action.get("sentryAppId") == ROOTLY_SENTRY_APP_ID:
                 live_targets.add(_rootly_target(action))
 
-    if len(live_targets) > 1:
+    # Not exactly one live target means there is no collapse to report: more
+    # than one and the tiers genuinely differ; none at all and the Rootly
+    # action is missing, which check_sentry_rules has already reported per
+    # tier. Both must return before the pop() below, which raises on an empty
+    # set -- reachable as soon as the tier fix lands and the two expected
+    # targets diverge.
+    if len(live_targets) != 1:
         return
     if len(expected_targets) > 1:
         report.drift(

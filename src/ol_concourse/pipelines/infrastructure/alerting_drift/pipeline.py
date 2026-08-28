@@ -81,8 +81,8 @@ ol_infrastructure_image = AnonymousResource(
     },
 )
 
-# The check exits 1 when it finds drift, which is the expected outcome for as
-# long as any KNOWN-level defect is outstanding -- so a non-zero exit cannot
+# The check exits 1 whenever it finds DRIFT (KNOWN and INFO findings exit 0),
+# and there is an outstanding DRIFT finding today -- so a non-zero exit cannot
 # fail the job. An unhandled exception also exits 1 and would be
 # indistinguishable by exit code alone. The check only ever prints findings to
 # stdout (see its module docstring), so a non-empty stderr reliably means it
