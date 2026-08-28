@@ -258,6 +258,11 @@ inline-quotes = "double"
 # assemble varied Grafana panel JSON, and inherently long PromQL/LogQL/TraceQL
 # expression strings, same rationale as metric_rules/log_rules above.
 "src/ol_infrastructure/infrastructure/grafana_alerting/dashboards/*.py" = ["E501", "PLR0913"]
+# CronJob/ASFF-finding builder helpers: many keyword-only params to assemble
+# Kubernetes Job specs and ASFF finding dicts, same many-keyword-args
+# rationale as the dashboards helpers above.
+"src/ol_infrastructure/applications/vuln_scanner/__main__.py" = ["PLR0913"]
+"src/ol_infrastructure/applications/vuln_scanner/reporter/reporter.py" = ["PLR0913"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,0 +1,16 @@
+---
+# NOTE: secretsprovider/encryptedkey are intentionally omitted here -- they
+# are minted by a real `pulumi stack init QA --secrets-provider=awskms://...`
+# run against live AWS/Pulumi credentials, which this authoring session does
+# not have. Whoever runs that stack init for the first time should end up
+# with those two keys added here by the Pulumi CLI itself; do not hand-write
+# a fake encryptedkey value.
+config:
+  vuln_scanner:targets:
+  - name: mitlearn-qa
+    url: https://api.rc.learn.mit.edu
+    openapi_schema_url: https://api.rc.learn.mit.edu/api/v1/schema/
+  # "baseline" = ZAP passive scan only (openapi discovery + passiveScan-wait).
+  # Flip to "full" (active attack payloads) only after a baseline run has
+  # been reviewed -- see the plan doc's staged-rollout rationale.
+  vuln_scanner:zap_scan_type: baseline
