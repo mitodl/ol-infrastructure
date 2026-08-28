@@ -293,6 +293,7 @@ library:
 - ocw_oer_export
 - ol-customizations-nytimes-library
 - ol-data-platform
+- ol-django
 - ol-github-workflows
 - ol-infra-health-checks
 - ol-keycloak
@@ -322,5 +323,3 @@ library:
 - video_translation_demo
 - world_geographic_regions
 - xanalytics
-library-unmanaged:
-- ol-django
