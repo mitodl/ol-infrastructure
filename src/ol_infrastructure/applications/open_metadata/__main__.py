@@ -722,7 +722,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
             # https://github.com/open-metadata/OpenMetadata/issues/29576
             # Bedrock auth uses the pod's IRSA role (open_metadata_bedrock_iam_policy
             # below) via the AWS default credential provider chain - no API key
-            # needed, just AWS_DEFAULT_REGION.
+            # needed, just the region and the IAM-auth flag below.
             # LOG_FORMAT=json (1.13) enables JSON-structured Dropwizard server logs.
             "extraEnvs": [
                 {
@@ -733,11 +733,43 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     "name": "EMBEDDING_PROVIDER",
                     "value": "bedrock",
                 },
-                # Bedrock's region (parsed by OM from AWS_DEFAULT_REGION per
-                # conf/openmetadata.yaml) and the AWS SDK v2 region-provider
-                # chain (which the IRSA credentials exchange uses internally,
-                # and only recognizes AWS_REGION) read two different env vars -
-                # set both rather than assume one covers the other.
+                # BedrockEmbeddingClient rejects an empty embeddingModelId in its
+                # constructor, and 1.13.x defaults AWS_BEDROCK_EMBED_MODEL_ID to "".
+                # Without this the vector search service never initializes: OM logs a
+                # single ERROR ("Bedrock embedding model ID is required") per pod start
+                # and per reindex, then serves lexical-only results with no further
+                # complaint. Confirmed dead in production from 2026-07-30 through
+                # 2026-08-23 (15 ERRORs, zero successful inits, and no Bedrock
+                # InvokeModel activity in CloudWatch) despite the two settings above.
+                # The dataAssetEmbeddings index alias is created either way, so it is
+                # not evidence that embeddings work.
+                {
+                    "name": "AWS_BEDROCK_EMBED_MODEL_ID",
+                    "value": "amazon.titan-embed-text-v2:0",
+                },
+                # titan-embed-text-v2 supports 1024/512/256. 512 matches the default
+                # OM 2.0 will apply, so the index mapping does not have to change
+                # again at upgrade time.
+                {
+                    "name": "AWS_BEDROCK_EMBEDDING_DIMENSION",
+                    "value": "512",
+                },
+                # Selects the IRSA credential chain over the static access-key fields,
+                # which are empty. 1.13.x defaults this to false; 2.0 defaults it to
+                # true, so it is redundant after the upgrade but harmless.
+                {
+                    "name": "BEDROCK_AWS_IAM_AUTH_ENABLED",
+                    "value": "true",
+                },
+                # Three region vars for three consumers. 1.13.x reads the Bedrock
+                # block's region from AWS_BEDROCK_REGION; 2.0 moved that to
+                # AWS_DEFAULT_REGION (drop AWS_BEDROCK_REGION with the 2.0 bump); and
+                # the AWS SDK v2 region-provider chain used by the IRSA credentials
+                # exchange only recognizes AWS_REGION.
+                {
+                    "name": "AWS_BEDROCK_REGION",
+                    "value": "us-east-1",
+                },
                 {
                     "name": "AWS_DEFAULT_REGION",
                     "value": "us-east-1",
