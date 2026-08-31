@@ -535,15 +535,30 @@ def check_grafana_delivery(report: Report) -> None:
             for integration in receiver.get("integrations") or []:
                 subject = f"{stack}/{name} ({integration.get('name')})"
                 error = integration.get("lastNotifyAttemptError")
-                attempt = str(integration.get("lastNotifyAttempt", ""))
+                attempt = integration.get("lastNotifyAttempt")
                 if error:
                     report.drift(check, subject, f"last notification failed: {error}")
-                elif attempt.startswith(NEVER_ATTEMPTED):
+                elif attempt is None:
+                    # Every stack currently returns this field as a string, so
+                    # this is a boundary guard rather than an observed break.
+                    # It is here because falling through would say nothing at
+                    # all, and a silent skip inside an absence check reads
+                    # exactly like a pass.
                     report.info(
                         check,
                         subject,
-                        "never attempted a notification, so an empty error "
-                        "field proves nothing about whether it works",
+                        "Grafana returned no lastNotifyAttempt, so nothing can "
+                        "be concluded about whether it delivers",
+                    )
+                elif str(attempt).startswith(NEVER_ATTEMPTED):
+                    report.info(
+                        check,
+                        subject,
+                        "no notification attempted since the last config "
+                        "reload, so an empty error field proves nothing about "
+                        "whether it works. A contact-point test does not "
+                        "settle it either: that is a separate code path from "
+                        "the notifier and leaves this field untouched",
                     )
 
 
