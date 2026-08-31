@@ -568,12 +568,26 @@ def check_sentry_liveness(report: Report, max_silent_days: int) -> None:
     )
     response.raise_for_status()
     alerts = response.json().get("data", [])
+    subject = "MITOL Sentry -> Rootly"
+    # No declared detectors means no list of projects to judge a silence
+    # against, and nothing that could deliver anyway. Saying "the projects are
+    # quiet" here would be false -- they emit hundreds of thousands of errors;
+    # there is simply nothing left to alert on them.
+    no_detectors = (
+        "no Sentry alert can reach Rootly: every metric detector was "
+        f"deleted on 2026-08-28 and none has been rebuilt -- "
+        f"{SENTRY_REBUILD_TASK}"
+    )
+
     if not alerts:
-        report.drift(
-            check,
-            "MITOL Sentry -> Rootly",
-            "Rootly holds no Sentry-sourced alert at all",
-        )
+        # Rootly ages alerts out, so an empty result is where a deliberate
+        # silence ends up, not only where a broken pipe does. Checking the
+        # detectors here too is what stops the nightly job going permanently
+        # red once the last pre-deletion alert expires.
+        if not SENTRY_DETECTORS:
+            report.known(check, subject, no_detectors)
+        else:
+            report.drift(check, subject, "Rootly holds no Sentry-sourced alert at all")
         return
 
     latest = alerts[0]["attributes"]
@@ -581,19 +595,8 @@ def check_sentry_liveness(report: Report, max_silent_days: int) -> None:
     if (datetime.now(UTC) - created).days <= max_silent_days:
         return
 
-    subject = "MITOL Sentry -> Rootly"
     if not SENTRY_DETECTORS:
-        # No declared detectors means no list of projects to judge the silence
-        # against, and nothing that could deliver anyway. Saying "the projects
-        # are quiet" here would be false -- they emit hundreds of thousands of
-        # errors; there is simply nothing left to alert on them.
-        report.known(
-            check,
-            subject,
-            "no Sentry alert can reach Rootly: every metric detector was "
-            f"deleted on 2026-08-28 and none has been rebuilt -- "
-            f"{SENTRY_REBUILD_TASK}",
-        )
+        report.known(check, subject, no_detectors)
         return
 
     volumes = _sentry_error_volumes()
