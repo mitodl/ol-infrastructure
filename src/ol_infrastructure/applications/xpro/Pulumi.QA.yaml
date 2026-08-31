@@ -6,6 +6,7 @@ config:
     secure: v1:CwgCINZqs7rxJOiU:xMp2xgeZd+tGV/v10GRE0fJ7Snuwah5tHbKh2ojO3mbTjBhjI77Gqd6PyvUIBe/H8R8DxQ==
   heroku:user: "mitx-devops"
   xpro:vars:
+    CANONICAL_HOSTNAME_REDIRECT_ENABLED: "True"
     CSRF_TRUSTED_ORIGINS: "https://rc.xpro.mit.edu,https://xpro-rc.odl.mit.edu"
     # CyberSource retired SOAP UsernameToken auth in their test
     # environment, so the export-compliance check errors out and blocks
