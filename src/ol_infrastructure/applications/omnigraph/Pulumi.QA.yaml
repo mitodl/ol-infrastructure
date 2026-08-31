@@ -45,5 +45,55 @@ config:
   # Cross-checked against storage_prefix at preview time — see the CI
   # config's comment on this same key for why.
   omnigraph:internal_schema_version: 6
+  # ★ QA ONLY, AND IT IS AN INSTRUMENT SETTING, NOT A TUNING. Raised 4 -> 50 so
+  # the data tier's per-actor admission cap stops bounding a measurement OF the
+  # data tier. Neither Production nor CI sets this key, so both stay on
+  # data_tier.py's DEFAULT_PER_ACTOR_INFLIGHT_MAX of 4. Do not copy this there.
+  #
+  # WHY, IN SEQUENCE. omnigraph #531 (in the `edge` build agent-kit#305 pinned)
+  # stages independent tables at the loader's write concurrency instead of a
+  # pinned 1, so the engine should absorb more concurrent writes. Two caps have
+  # each stopped that being measurable, and each was found by reading the
+  # refusal text rather than by guessing:
+  #   1. witan's client-side `_WriteGate`, 4. Raised to 50 for QA in #5671:
+  #      throughput went 6 -> 9 acked, then flattened at 9 for BOTH 16 and 24
+  #      writers.
+  #   2. this cap. With 50 slots client-side, every remaining refusal read
+  #      "actor in-flight count cap 4 exceeded (HTTP 429)" — 44 such lines in
+  #      the witan pod log across two runs, and ZERO from witan's own gate.
+  # The engine has still never been reached. This removes the second cap for
+  # the same reason the first went: at the cap it stays a candidate explanation
+  # for whatever is observed.
+  #
+  # ★ THE SIZING RATIONALE IN data_tier.py IS STALE, WHICH IS WHY THIS MOVES AT
+  # ALL. That comment derives 4 from a 30s deadline — measured 2026-08-12: n=4
+  # wall 15.54s, n=6 31.20s, n=8 51.08s/p50 33.29s, hence "at 4 every admitted
+  # write lands inside the deadline; at 8 the median is past it". The 30s came
+  # from three hardcoded ToolHive constants. ToolHive is GONE (#5448) and the
+  # budget is now 120s (WITAN_REMOTE_CALL_BUDGET_SECONDS), against which even
+  # the n=8 measurement fits with room to spare.
+  #
+  # ★ MEMORY IS NOT THE RISK, AND THIS IS THE LOAD-BEARING SAFETY POINT.
+  # In-flight MEMORY is bounded by per_actor_bytes_max, deliberately left at
+  # its default (256 MiB, sized against the pod's 2Gi limit). That is a
+  # separate and still-enforced per-actor bound, so raising the COUNT does not
+  # raise how many bytes an actor may have in flight: one actor is capped at
+  # 256 MiB whether its count limit is 4 or 50. The count was never the memory
+  # bound — data_tier.py says so itself.
+  #
+  # THE REAL RISK IS TIME, and it is the experiment. Writes are serialised per
+  # graph and the 2026-08-12 numbers show per-write cost RISING with writers
+  # (0.31 -> 0.16 req/s). If #531 did not change that, admitting 50 queues work
+  # past even the 120s budget and the caller gets a 502 of indeterminate
+  # outcome instead of a clean 429. Provoking that on QA is the point — the
+  # probe counts it in its INDETERMINATE bucket, which has been 0 in every run
+  # so far. On Production it would be a regression.
+  #
+  # Unquoted because `__main__.py` reads it with `get_int` and `_bounded_cap`
+  # refuses anything outside 0..u32 — out of range, omnigraph silently reverts
+  # to its OWN upstream defaults (16 in flight, 4 GiB), which are looser than
+  # ours in both directions. 50 is above upstream's 16, deliberately, and well
+  # inside the accepted range.
+  omnigraph:per_actor_inflight_max: 50
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgHdah3681q3jIoMB6EquY0xAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMQkBOIyzkj00xRzZ9AgEQgDvOaikBeNnKV3FG4ZgMGvt3MOO4WsufLhs1b/FFH28hvQEuaZnfrQ1oLOS4NHXINUEJweVvuqaQUVj9gg==
