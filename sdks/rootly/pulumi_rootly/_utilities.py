@@ -327,31 +327,13 @@ def get_plugin_download_url():
 def get_version():
     return "5.17.2"
 
-_package_lock = asyncio.Lock()
-_package_ref = ...
-async def get_package():
-	global _package_ref
-	if _package_ref is ...:
-		if pulumi.runtime.settings._sync_monitor_supports_parameterization():
-			async with _package_lock:
-				if _package_ref is ...:
-					monitor = pulumi.runtime.settings.get_monitor()
-					parameterization = resource_pb2.Parameterization(
-						name="rootly",
-						version=get_version(),
-						value=base64.b64decode("eyJyZW1vdGUiOnsidXJsIjoicmVnaXN0cnkub3BlbnRvZnUub3JnL3Jvb3RseWhxL3Jvb3RseSIsInZlcnNpb24iOiI1LjE3LjIifX0="),
-					)
-					registerPackageResponse = monitor.RegisterPackage(
-						resource_pb2.RegisterPackageRequest(
-							name="terraform-provider",
-							version="1.2.0",
-							download_url=get_plugin_download_url(),
-							parameterization=parameterization,
-						))
-					_package_ref = registerPackageResponse.ref
-	# TODO: This check is only needed for parameterized providers, normal providers can return None for get_package when we start
-	# using package with them.
-	if _package_ref is None or _package_ref is ...:
-		raise Exception("The Pulumi CLI does not support parameterization. Please update the Pulumi CLI.")
-	return _package_ref
+async def get_package() -> str:
+	return await pulumi.runtime.register_package(
+		base_provider_name="terraform-provider",
+		base_provider_version="1.2.0",
+		base_provider_download_url=get_plugin_download_url() or "",
+		package_name="rootly",
+		package_version=get_version(),
+		base64_parameter="eyJyZW1vdGUiOnsidXJsIjoicmVnaXN0cnkub3BlbnRvZnUub3JnL3Jvb3RseWhxL3Jvb3RseSIsInZlcnNpb24iOiI1LjE3LjIifX0=",
+	)
 	
