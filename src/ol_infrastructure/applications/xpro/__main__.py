@@ -337,7 +337,7 @@ vault.kv.Secret(
     "xpro-vault-secrets-sentry",
     path="secret-xpro/sentry",
     data_json=sentry_stack.require_output("xpro_sentry_dsn").apply(
-        lambda dsn: json.dumps({**xpro_vault_secrets["sentry"], "dsn": dsn})
+        lambda dsn: json.dumps({"dsn": dsn})
     ),
 )
 
