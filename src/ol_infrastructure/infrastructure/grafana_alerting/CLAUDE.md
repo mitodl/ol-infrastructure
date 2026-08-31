@@ -216,6 +216,30 @@ Two things to check first:
    breaks live silences, and dead-links the Grafana URL embedded in every past
    Rootly alert.
 
+Between the import and the first apply, every preview of the stack reports the
+imported group as `~ update` with `diff: ~disableProvenance,rules`, on an
+otherwise-empty diff and regardless of what the preview was actually run for.
+That is the pending adoption showing itself, not drift: `rules` is the live
+hand-made rule against what the code now declares, and `disableProvenance` is
+unset in the imported state against the provider's `false` default. Both settle
+on the first apply and do not re-diff, so `disable_provenance` does not need
+setting explicitly in code.
+
+The three MIT Learn synthetic-monitoring groups were misread this way in
+2026-08 and filed as UI drift about to be silently reverted. The rules' own
+version history (`GET /api/v1/provisioning/alert-rules/{uid}/versions`) settled
+it: across all three, the only human edits were the original 2026-04 creation
+and two self-reverted experiments (a 24-second pause/unpause, a trailing slash
+on an instance label put back 9 minutes later). Nothing hand-tuned existed to
+lose. **Read that endpoint before assuming a rule was edited in the UI** — it
+names the author and timestamp of every version, and distinguishes a real hand
+edit from an adoption that has not been applied yet.
+
+After the first apply the rules report `provenance: "api"` and the Grafana UI
+refuses to edit them, so UI-originated drift cannot recur for an adopted group.
+Changes should therefore be made through this program, although another client
+with provisioning-API access can still modify the group.
+
 ### Adding a new log alert rule
 
 Same pattern, but open the relevant file in `log_rules/` and use a LogQL
