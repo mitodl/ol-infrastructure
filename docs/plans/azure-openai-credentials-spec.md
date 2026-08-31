@@ -83,9 +83,14 @@ Per environment, for `consumer in {mitlearn, learn-ai, mitxonline}`:
 - `azure_native.resources.ResourceGroup`, `ol-openai-{env}`, one per environment.
 - `azure_native.cognitiveservices.Account`, one per consumer, named
   `ol-openai-{consumer}-{env}`. `kind="OpenAI"`, `sku="S0"`, `public_network_access="Enabled"`,
-  `disable_local_auth` left **false** (additive migration, key auth stays available).
-  `custom_sub_domain_name` **must** be set or the account accepts only API-key auth, which
-  defeats Entra token auth entirely.
+  `disable_local_auth=True`. Nothing in this design consumes an Azure account key: pods use
+  `WorkloadIdentityCredential`, laptops use `AzureCliCredential`, and the `OPENAI_API_KEY`
+  fallback this migration preserves targets openai.com rather than Azure. Leaving local auth
+  on would create two live credentials per account that bypass RBAC entirely and that nothing
+  needs. (Corrected 2026-08-31 after a Copilot review; the earlier text left this false on an
+  "additive migration" rationale that conflated Azure account keys with the unrelated OpenAI
+  API key.) `custom_sub_domain_name` **must** be set or the account accepts only API-key auth,
+  which defeats Entra token auth entirely.
 - `azure_native.cognitiveservices.Deployment` for `gpt-4o`, `gpt-4o-mini`, `gpt-5.2` on each
   account. Model versions stay unpinned by default (which versions exist is a property of the
   subscription and region, and a wrong version string fails at deployment creation rather than
@@ -426,5 +431,4 @@ allocate heavily to Production and minimally to CI and QA.
 Application source changes in mit-learn, learn-ai, edx-platform, and edx-extensions to
 actually use `azure-identity` and the Azure OpenAI SDK; rotating or removing the existing
 static OpenAI keys; a shared AI gateway or proxy; Azure OpenAI cost and budget alerting;
-multi-region failover; `disable_local_auth` on the Cognitive Services accounts (a follow-up
-once every consumer is off key auth).
+multi-region failover.

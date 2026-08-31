@@ -158,10 +158,13 @@ for consumer, (namespace, service_account) in CONSUMER_SUBJECTS.items():
             # exists to stop using.
             custom_sub_domain_name=account_name,
             public_network_access="Enabled",
-            # Left enabled deliberately: this migration is additive and the existing
-            # static-key wiring stays working alongside it. Flipping this to true is
-            # the final step of the migration, once no app depends on key auth.
-            disable_local_auth=False,
+            # Keyless. Nothing in this design consumes an Azure account key: pods use
+            # WorkloadIdentityCredential, laptops use AzureCliCredential after
+            # az login, and the OPENAI_API_KEY fallback this migration preserves
+            # targets openai.com rather than Azure. Leaving local auth on would
+            # create two live credentials per account that bypass RBAC entirely and
+            # that nothing needs.
+            disable_local_auth=True,
         ),
         tags=resource_tags | {"consumer": consumer},
         opts=azure_opts,
