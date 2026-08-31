@@ -415,9 +415,12 @@ def cross_environment_glue_denial(env_suffix: str) -> list[dict[str, Any]]:
     ``iam:CreatePolicy``, ``iam:CreatePolicyVersion`` and ``iam:AttachRolePolicy``
     but not ``iam:PutRolePolicy``, so an inline policy fails from CI with
     AccessDenied while the surrounding managed-policy update succeeds -- which
-    publishes the Allow and strands the environment without the Deny. A
-    ``pulumi preview`` run under a developer's own credentials does not catch
-    this, because those credentials do have ``iam:PutRolePolicy``.
+    publishes the Allow and strands the environment without the Deny. Nothing
+    local catches this: a ``pulumi preview`` performs no writes, so it cannot
+    surface a write-permission gap, and a developer applying by hand would not
+    hit it either, since developer credentials do carry ``iam:PutRolePolicy``.
+    Check what the deploy role can actually do before reaching for a new IAM
+    resource type here.
 
     ``arn:aws:glue:*:*:catalog`` is deliberately absent, and must stay absent.
     Every Glue operation requires permission on the catalog, so denying it would
