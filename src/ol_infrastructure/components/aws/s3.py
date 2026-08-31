@@ -202,6 +202,20 @@ class S3BucketConfig(AWSBase):
             "requiring uploads longer than 7 days."
         ),
     )
+    noncurrent_version_expiration_days: int | None = Field(
+        default=None,
+        description=(
+            "Days a noncurrent object version is retained before S3 deletes it "
+            "permanently, plus cleanup of delete markers left with no versions "
+            "behind them. Only meaningful on a versioned bucket, and only set it "
+            "where losing the ability to undelete by version id after this many "
+            "days is acceptable -- hence no default. On a versioned bucket that "
+            "is written by a system which deletes or overwrites objects, leaving "
+            "this unset means every deleted object is billed forever: the "
+            "data-lake buckets reached 95-99% noncurrent bytes that way "
+            "(RFC 12711 storage audit, 2026-08-31)."
+        ),
+    )
     cors_rules: list[s3.BucketCorsConfigurationCorsRuleArgs] | None = Field(
         default=None,
         description="CORS configuration rules for the bucket.",
@@ -337,6 +351,33 @@ class S3BucketConfig(AWSBase):
             and self.abort_incomplete_mpu_days < 1
         ):
             error_message = "abort_incomplete_mpu_days must be >= 1"
+            raise ValueError(error_message)
+        return self
+
+    @model_validator(mode="after")
+    def check_noncurrent_version_expiration(self) -> "S3BucketConfig":
+        """Reject a noncurrent-version expiry that cannot do what it says.
+
+        S3 requires >= 1 day. Setting it on an unversioned bucket is rejected
+        rather than ignored: the rule would be accepted by AWS and silently
+        never fire, which reads as "deleted objects are being cleaned up" while
+        nothing is.
+        """
+        if self.noncurrent_version_expiration_days is None:
+            return self
+        if self.noncurrent_version_expiration_days < 1:
+            error_message = "noncurrent_version_expiration_days must be >= 1"
+            raise ValueError(error_message)
+        versioned = (
+            self.versioning_status == "Enabled"
+            if self.versioning_status is not None
+            else self.versioning_enabled
+        )
+        if not versioned:
+            error_message = (
+                "noncurrent_version_expiration_days is set but the bucket is not "
+                "versioned; the rule would never fire"
+            )
             raise ValueError(error_message)
         return self
 
@@ -512,6 +553,41 @@ class OLBucket(pulumi.ComponentResource):
                 ],
             )
             lifecycle_rules.append(intelligent_tiering_rule)
+
+        # Expire noncurrent versions, and sweep the delete markers left behind.
+        #
+        # Iceberg never mutates an object -- it writes new keys and changes which
+        # keys a snapshot references -- so any file a retained snapshot still
+        # references has never been deleted and is the CURRENT version. A
+        # noncurrent version can only exist because the key was already deleted
+        # or overwritten, i.e. nothing references it. Expiring these cannot
+        # break time travel, a running query, or a rollback; what it removes is
+        # the ability to undelete by version id.
+        #
+        # expired_object_delete_marker cleans up the marker once its last
+        # noncurrent version is gone. Those are free to store but they are
+        # returned by every LIST, so they slow down listing and inflate object
+        # counts (>115k of them per data-lake bucket at audit time). AWS rejects
+        # this alongside a tag or size filter, but a prefix-only filter is fine,
+        # so it shares the rule with the expiration rather than needing its own.
+        #
+        # Appended last so adding it does not renumber the existing rules, which
+        # would otherwise show up in preview as a rewrite of the tiering rule
+        # rather than as the pure addition it is.
+        if config.noncurrent_version_expiration_days is not None:
+            lifecycle_rules.append(
+                s3.BucketLifecycleConfigurationRuleArgs(
+                    id="expire-noncurrent-versions",
+                    status="Enabled",
+                    filter=s3.BucketLifecycleConfigurationRuleFilterArgs(prefix=""),
+                    noncurrent_version_expiration=s3.BucketLifecycleConfigurationRuleNoncurrentVersionExpirationArgs(
+                        noncurrent_days=config.noncurrent_version_expiration_days,
+                    ),
+                    expiration=s3.BucketLifecycleConfigurationRuleExpirationArgs(
+                        expired_object_delete_marker=True,
+                    ),
+                )
+            )
 
         # Only create lifecycle configuration if there are rules
         if lifecycle_rules:

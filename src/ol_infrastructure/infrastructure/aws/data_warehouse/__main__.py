@@ -148,6 +148,25 @@ for data_stage in data_stages:
         config=S3BucketConfig(
             bucket_name=f"ol-data-lake-{data_stage}-{stack_info.env_suffix}",
             versioning_enabled=True,
+            # These buckets are versioned and are written by systems that
+            # delete constantly -- dbt-trino drops the previous generation of
+            # every model on each full rebuild -- so without this every deleted
+            # object was billed forever. Audited 2026-08-31: 802 TB across the
+            # staging, mart and dimensional production buckets against 20.9 TB
+            # of current-version bytes; 95.5-99.9% was noncurrent versions and
+            # delete markers.
+            #
+            # Safe for Iceberg by construction: Iceberg never mutates an object,
+            # so a file any retained snapshot references has never been deleted
+            # and is the current version. A noncurrent version exists only
+            # because the key was already deleted or overwritten.
+            #
+            # 90 days is the undelete window, not a reclaim horizon. The
+            # historical backlog is well past it (100% of sampled noncurrent
+            # bytes in staging, 90.6% in mart), but the dimensional layer
+            # rebuilds often enough that ~76% of its churn is younger than 90
+            # days and stays resident at steady state.
+            noncurrent_version_expiration_days=90,
             server_side_encryption_enabled=True,
             kms_key_id=s3_kms_key["arn"],
             bucket_key_enabled=True,
