@@ -42,6 +42,7 @@ GCP = "ol-infrastructure-gcp"
 SFTP = "ol-infrastructure-aws-sftp"
 S3_SITES = "ol-infrastructure-aws-s3"
 GEMINI_API = "ol-infrastructure-gemini-api"
+AZURE_OPENAI = "ol-infrastructure-azure-openai"
 
 # ---------------------------------------------------------------------------
 # substructure/
