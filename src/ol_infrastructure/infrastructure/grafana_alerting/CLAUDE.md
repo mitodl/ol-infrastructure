@@ -468,9 +468,14 @@ pingdom_integration_ids: [<integration-id>, ...]  # Pingdom integration IDs for 
 `bin/alerting-drift-check` asserts live state that no provider can express, so
 the only honest control over it is detection:
 
-- The six Sentry metric alert rules. pulumiverse-sentry cannot write a trigger
-  action's `settings` blob, so the rules stay UI-managed and their Rootly
-  notification targets are checked against expectations recorded in the script.
+- Sentry metric detectors. pulumiverse-sentry cannot write a trigger action's
+  `settings` blob, so these stay UI-managed and are asserted against
+  expectations recorded in the script's `SENTRY_DETECTORS` table. That table is
+  currently **empty**: all six detectors were deleted on 2026-08-28 because
+  measurement showed none of them could fire. Until the replacement set is
+  built, any detector appearing in Sentry is reported as `DRIFT` — it means
+  someone created alerting that nothing is checking. Adding an entry to the
+  table is how a rebuilt detector comes under assertion.
 - The CI/QA Rootly route rules that keep non-production alerts off the paging
   path. Pulumi cannot model a route rule's `enabled` flag; these two sat
   disabled for 19 days with no diff to show for it.
