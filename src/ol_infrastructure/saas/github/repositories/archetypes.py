@@ -249,6 +249,38 @@ def _check_required_status_checks(fleet: list[dict[str, Any]]) -> None:
         raise ValueError(message)
 
 
+def _check_protected_release_branches(fleet: list[dict[str, Any]]) -> None:
+    """Fail on `protected_release_branches` data GitHub would reject or that lies.
+
+    Same shape of check as `_check_required_status_checks`: archived repos can't
+    carry rulesets, and a non-string/empty entry would build a ruleset that
+    matches nothing while still claiming (via `_ruleset_count`-style tooling) that
+    the branch is protected.
+    """
+    problems: list[str] = []
+    for repo in fleet:
+        branches = repo.get("protected_release_branches")
+        if not branches:
+            continue
+        name = repo["name"]
+        if repo.get("archived"):
+            problems.append(f"{name}: archived repos cannot carry rulesets")
+            continue
+        if not isinstance(branches, list) or any(
+            not isinstance(b, str) or not b.strip() for b in branches
+        ):
+            problems.append(
+                f"{name}: protected_release_branches must be a list of "
+                "non-empty strings"
+            )
+    if problems:
+        message = (
+            "fleet data carries invalid protected_release_branches:\n  "
+            + "\n  ".join(problems)
+        )
+        raise ValueError(message)
+
+
 def _check_team_references(fleet: list[dict[str, Any]]) -> None:
     """Fail if any repo grants to a team slug absent from teams.yaml.
 
@@ -309,6 +341,7 @@ def load_fleet() -> list[dict[str, Any]]:
     _check_public_repo_teams(fleet)
     _check_dependabot_requires_alerts(fleet)
     _check_required_status_checks(fleet)
+    _check_protected_release_branches(fleet)
 
     # The dotfile trap is silent by construction, so assert rather than trust.
     assignments = yaml.safe_load((DATA_DIR / "archetypes-proposed.yaml").read_text())

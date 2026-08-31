@@ -1,8 +1,15 @@
-"""Per-repo rulesets: required status checks, and nothing else.
+"""Per-repo rulesets: required status checks, and release-branch protection.
 
 SEC-03 -- every repo in the org runs CI and none of it can block a merge. Closing that
 needs the one rule the §5.4 org-ruleset design deliberately left per-repo, because check
 names are per-repo facts and no org-wide ruleset can name them all.
+
+A second, unrelated ruleset also lives here: `build_release_branches()` blocks deletion
+and force-push on the `release`/`release-candidate` branches of repos still driven by
+the release-script bot ("Doof"). See that function's docstring -- it exists because the
+fleet-wide `delete_branch_on_merge` default silently deletes those branches on the PR
+merge that promotes one to the other, and the classic branch protection that used to
+prevent that is invisible to this stack and was dropped once already.
 
 THERE IS NO DRY RUN. `enforcement: evaluate` does not exist on the Team plan -- the API
 accepts the PUT and then does nothing at all (see organization/org_rulesets.py, which
@@ -194,6 +201,67 @@ def _check(
     """
     return github.RepositoryRulesetRulesRequiredStatusChecksRequiredCheckArgs(
         context=context,
+    )
+
+
+#: The name GitHub shows for the release-branch ruleset this module creates.
+RELEASE_BRANCHES_RULESET_NAME = "protected-release-branches"
+
+
+def _release_branch_conditions(
+    branches: list[str],
+) -> github.RepositoryRulesetConditionsArgs:
+    return github.RepositoryRulesetConditionsArgs(
+        ref_name=github.RepositoryRulesetConditionsRefNameArgs(
+            includes=[f"refs/heads/{branch}" for branch in branches],
+            excludes=[],
+        ),
+    )
+
+
+def build_release_branches(repo: dict[str, Any], repository: github.Repository) -> None:
+    """Protect a repo's release branches from deletion and force-push.
+
+    Targets `release`/`release-candidate`-style branches on repos still driven by
+    the release-script bot ("Doof"): a persistent `release-candidate` branch gets
+    promoted to `release` by merging a PR whose head is `release-candidate`, and the
+    fleet-wide `delete_branch_on_merge` default (converged in #5468) deletes a PR's
+    head branch on merge -- so without an explicit rule here, promoting a release
+    deletes the branch the next release cycle needs to exist.
+
+    This happened to `micromasters`: its `release-candidate` branch was deleted and
+    never recreated, and its `release` branch carried no protection at all (2026-08-31
+    audit). It is exactly the class of "invisible drift" org_rulesets.py warns
+    about -- classic per-branch protection is not visible to this stack and isn't
+    swept along with the rest of the org-ruleset migration, so restoring it here
+    (rather than by hand through the UI) is what keeps a future sweep from silently
+    dropping it again.
+
+    Deliberately narrower than `build()`'s default-branch ruleset: only `deletion`
+    and `non_fast_forward` are required. Nothing here asserts review counts or
+    status checks on these branches -- they receive fast-forward promotions from a
+    bot, not reviewed PRs from contributors, and `baseline-default-branch` /
+    `tier-1-hardening` already don't apply here since both scope to
+    `~DEFAULT_BRANCH` only.
+    """
+    branches = repo.get("protected_release_branches")
+    if not branches:
+        return
+
+    name = repo["name"]
+    github.RepositoryRuleset(
+        f"mitodl-repo-protected-release-branches-{name}",
+        name=RELEASE_BRANCHES_RULESET_NAME,
+        repository=name,
+        target="branch",
+        enforcement="active",
+        bypass_actors=_BYPASS,
+        conditions=_release_branch_conditions(sorted(branches)),
+        rules=github.RepositoryRulesetRulesArgs(
+            non_fast_forward=True,
+            deletion=True,
+        ),
+        opts=ResourceOptions(protect=True, depends_on=[repository]),
     )
 
 

@@ -47,6 +47,7 @@ from ol_infrastructure.lib.github_helper import (
     get_installation_token,
 )
 from ol_infrastructure.saas.github.repositories.rulesets import (
+    RELEASE_BRANCHES_RULESET_NAME,
     REQUIRED_CHECKS_RULESET_NAME,
 )
 from ol_infrastructure.saas.github.tiers import TIER_PROPERTY_NAME
@@ -323,6 +324,42 @@ def _required_checks(
     return sorted(set(ours)), sorted(set(foreign))
 
 
+def _release_branches(
+    client: httpx.Client,
+    name: str,
+    rulesets: list[dict[str, Any]],
+) -> list[str]:
+    """Recover the branch names our release-branch ruleset protects, if any.
+
+    Same reasoning as `_required_checks` above, and the same failure without it:
+    `crawl` rebuilds every repo YAML from scratch, so a hand-added
+    `protected_release_branches` value is not preserved unless the crawl derives it
+    from live state -- it is deleted, the ruleset it described disappears from the
+    fleet data, and Pulumi wants to remove the resource. That already happened once
+    to `required_status_checks` (#5566); this closes the same gap for release-branch
+    protection before it can repeat.
+
+    Identified by ruleset NAME (`RELEASE_BRANCHES_RULESET_NAME`), same as
+    `_required_checks` -- the id is assigned by GitHub at creation and differs per
+    repo. `source_type` filtering excludes inherited org rulesets for the same reason
+    it does there, though no org ruleset targets these branches today.
+    """
+    branches: set[str] = set()
+    for listed in rulesets:
+        if listed.get("source_type") != "Repository":
+            continue
+        if listed.get("name") != RELEASE_BRANCHES_RULESET_NAME:
+            continue
+        detail = _maybe(client, f"/repos/{ORG}/{name}/rulesets/{listed['id']}")
+        if not detail:
+            continue
+        includes = ((detail.get("conditions") or {}).get("ref_name") or {}).get(
+            "includes"
+        ) or []
+        branches.update(ref.removeprefix("refs/heads/") for ref in includes)
+    return sorted(branches)
+
+
 def _push_restrictions(
     protection: dict[str, Any] | None,
 ) -> dict[str, list[str]] | None:
@@ -407,6 +444,7 @@ def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
         required_checks, foreign_required_checks = _required_checks(
             client, name, protection, rulesets
         )
+        release_branches = _release_branches(client, name, rulesets)
         push_restrictions = _push_restrictions(protection)
 
         return {
@@ -453,6 +491,7 @@ def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
             ),
             "required_status_checks": required_checks,
             "foreign_required_status_checks": foreign_required_checks,
+            "protected_release_branches": release_branches,
             "ruleset_count": len(rulesets),
             "rulesets": [
                 {
@@ -522,6 +561,7 @@ _EXPECTED_REPO_KEYS = frozenset(
         "ruleset_count",
         "required_status_checks",
         "foreign_required_status_checks",
+        "protected_release_branches",
         "secret_scanning",
         "secret_scanning_push_protection",
         "dependabot_security_updates",
@@ -1218,6 +1258,11 @@ def crawl(
         # The one genuinely per-repo rule (§5.4) -- check names differ per repo.
         if repo["required_status_checks"]:
             doc["required_status_checks"] = repo["required_status_checks"]
+        # Same reasoning: without this, `crawl` deletes the declaration on every repo
+        # that has one and Pulumi tries to remove the ruleset it protects. See
+        # `_release_branches`.
+        if repo["protected_release_branches"]:
+            doc["protected_release_branches"] = repo["protected_release_branches"]
         if repo["teams"]:
             doc["teams"] = repo["teams"]
         # "Not enforced" must not become "not recorded". Where the archetype has no
