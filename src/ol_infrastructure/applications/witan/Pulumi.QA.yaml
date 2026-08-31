@@ -5,5 +5,51 @@ config:
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
   # witan:oidc_audience: witan
+  # ★ QA ONLY, AND IT IS AN INSTRUMENT SETTING, NOT A TUNING. Raised 4 -> 50 to
+  # take this gate OUT OF THE EXPERIMENT entirely. Neither Production nor CI
+  # sets this key at all, so both stay on witan's code default of 4 — which
+  # deployment.py describes as the measured value — and this edit must not be
+  # copied to them while the gate is load-bearing there.
+  #
+  # Why: omnigraph #531 (in the `edge` build pinned by agent-kit#305) stages
+  # independent tables at the loader's write concurrency instead of a pinned 1,
+  # so the engine should be able to take more concurrent writes. It measured as
+  # exactly zero improvement — 16 writers -> 6 acked, 24 writers -> 6 acked,
+  # identical to the pre-#531 baselines. Adding 50% more load admitted not one
+  # more write, which is the signature of a fixed cap rather than an engine
+  # limit, and every refusal named it: "4 writes are already in flight ...
+  # waiting longer cannot help".
+  #
+  # So the ceiling under test was this gate, not the data tier, and the engine
+  # change could not show up at all.
+  #
+  # ★ WHY 50 AND NOT 16. 16 would have matched the probe's default writer count,
+  # which is precisely the problem: at the cap the gate is still a candidate
+  # explanation for anything observed, so a result would confound "the engine
+  # saturated" with "the gate bound again, one notch higher". 50 is
+  # comfortably above any writer count we would run (16, 24), so the count
+  # limit can never be reached and whatever the probe then measures is the data
+  # tier. Removing a variable beats moving it.
+  #
+  # NOTE WHAT THIS DOES *NOT* DISABLE: `_WriteGate.admit` is deadline-aware as
+  # well as count-limited — it also refuses when the EWMA says a write cannot
+  # finish inside WITAN_REMOTE_CALL_BUDGET_SECONDS. That path stays live, and it
+  # is the one worth watching now: with slots always free, any refusal that
+  # still appears is the gate predicting real data-tier slowness rather than
+  # counting.
+  #
+  # WITAN_REMOTE_WRITE_QUEUE_SECONDS is deliberately left at its default (10s) —
+  # one variable at a time, or a changed result cannot be attributed. With 50
+  # slots it should never be reached anyway.
+  #
+  # ★ THE RISK THIS ACCEPTS, stated because the gate exists to prevent it: the
+  # gate refuses BEFORE sending, so the caller learns "NOTHING WAS WRITTEN".
+  # Admitting more writes than the tier can finish inside
+  # WITAN_REMOTE_CALL_BUDGET_SECONDS trades that clean refusal for a 502 whose
+  # outcome is INDETERMINATE — the exact failure the gate was built to stop, and
+  # the one this project spent three days eliminating. On QA, provoking it is
+  # the experiment and the probe counts it (its INDETERMINATE bucket). On
+  # Production it would be a regression.
+  witan:remote_write_max_inflight: "50"
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgFurjegA1WE1b8N4qiEM2KVAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMPKzZtLLEs+e1lDyxAgEQgDvcpTPZFDqJ0PRIVpj9brgaTIzNqWSoJAIjfZmtHhx574TzRhGmQ8O2iFsh1Em3Gev5En32LbkcHW4z9w==
