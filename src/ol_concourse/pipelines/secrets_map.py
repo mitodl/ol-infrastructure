@@ -151,6 +151,10 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     "infrastructure/aws/private_ca/": [],
     "infrastructure/aws/s3_sites/": [],
     "infrastructure/aws/sftp_servers/": [],
+    # azure.<env>.yaml is provider auth, but its subscription_id and tenant_id are
+    # also exported as stack outputs and consumed by the application stacks, so it is
+    # content-bearing rather than credential-only.
+    "infrastructure/azure/openai/": ["pulumi/azure.*.yaml"],
     # consul.<env>.yaml's basic_auth_password is baked into the server cloud-init
     # userdata, so it is content-bearing here (unlike the provider-auth reads in
     # substructure/consul and applications/concourse via lib.consul).
