@@ -113,6 +113,16 @@ keycloak_stack = (
     if stack_info.env_suffix in ("ci", "qa", "production")
     else None
 )
+# Same shape as Keycloak: MITx Online is deployed to CI/QA/Production only, so
+# the Dev Dagster stack goes without the host and that source stays unavailable
+# there. Its app database is what the mitxonline_app dlt source reads
+# (RFC 12711 step 8) -- the QA data lake cannot validate the B2B dashboard while
+# it holds nothing from the QA app.
+mitxonline_stack = (
+    make_stack_reference(projects.MITXONLINE, stack_info.name)
+    if stack_info.env_suffix in ("ci", "qa", "production")
+    else None
+)
 
 # VPC and network configuration
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
@@ -2269,6 +2279,14 @@ for location in code_locations:
             {
                 "name": "KEYCLOAK_DB_HOST",
                 "value": keycloak_stack.require_output("keycloak")["rds_host"],
+            }
+        )
+
+    if name == "data_loading" and mitxonline_stack is not None:
+        deployment["env"].append(
+            {
+                "name": "MITXONLINE_APP_DB_HOST",
+                "value": mitxonline_stack.require_output("mitxonline")["rds_host"],
             }
         )
 
