@@ -27,32 +27,39 @@ https://docs.stacklok.com/toolhive/guides-vmcp/authentication:
 - a ``VirtualMCPServer`` (``swe-vmcp``) that aggregates every backend in the group
   behind a single endpoint and validates those Keycloak-issued bearer tokens.
 
-Incoming auth (MCP clients register and log in with Keycloak directly):
+Incoming auth (MCP clients log in with Keycloak directly, via a static CLI client):
     ``spec.incomingAuth`` (type ``oidc``) is the ONLY auth surface on the vMCP; there
     is no embedded authorization server. The vMCP is a pure OAuth resource server: it
     advertises RFC 9728 protected-resource metadata pointing at Keycloak (the
     ``ol-platform-engineering`` realm) as the authorization server, and validates
     bearer tokens Keycloak issued against ``MCP_OIDC_CONFIG_NAME``'s issuer/JWKS.
 
-    The end-to-end flow for a client such as Claude Code: hit the endpoint → get a
-    401 whose ``WWW-Authenticate``/protected-resource metadata names Keycloak as the
-    authorization server → the client discovers Keycloak's own
-    ``/.well-known/openid-configuration`` and registers itself directly against
-    Keycloak's native Dynamic Client Registration endpoint (RFC 7591,
-    ``/realms/ol-platform-engineering/clients-registrations/openid-connect``) → a
-    browser opens to Keycloak's own ``/protocol/openid-connect/auth`` for login →
-    Keycloak issues the access token straight to the client (PKCE, no client secret
-    for these public/native registrations) → the client calls the vMCP with that
-    bearer token, which ``incomingAuth`` validates against Keycloak's issuer.
+    Deliberately NOT Dynamic Client Registration (RFC 7591). DCR needs an
+    unauthenticated ``/register`` endpoint by design, which means any internet
+    caller could create a client in this realm — not a misconfiguration to gate,
+    but what DCR IS. See the TOOLHIVE block in
+    ``substructure/keycloak/ol_platform_engineering.py`` for why the standards
+    answer to that (an Initial Access Token) doesn't actually help here: MCP
+    client tooling doesn't send one, so it converges on the exact same outcome
+    as this design anyway, minus the open endpoint. Instead: ONE Pulumi-managed
+    public client (``toolhive-swe-cli``, provisioned there), shared across every
+    engineer the way a single OAuth client_id is shared by all installs of e.g.
+    the GitHub CLI. A client such as Claude Code is configured once with
+    ``claude mcp add --client-id toolhive-swe-cli --callback-port 8080 ...``,
+    then: hit the endpoint → get a 401 naming Keycloak as the authorization
+    server → a browser opens to Keycloak's ``/protocol/openid-connect/auth`` for
+    login (PKCE, no client secret — this is a public client) → Keycloak issues
+    the access token straight to the client → the client calls the vMCP with
+    that bearer token, which ``incomingAuth`` validates against Keycloak's
+    issuer.
 
-    This has no vMCP-side OAuth state to persist: no embedded auth server, no signing
-    keys, no DCR client store, and therefore no Redis. Keycloak's own (already-HA)
-    datastore is what now holds client registrations and sessions. This replaces the
+    This has no vMCP-side OAuth state to persist: no embedded auth server, no
+    signing keys, no DCR client store, and therefore no Redis. This replaces the
     prior embedded-auth-server design, which stored its DCR registrations in a
-    single-replica in-cluster Redis with no PodDisruptionBudget; when QA's node pool
-    churned that Redis pod's zone-pinned volume, DCR lookups failed and clients saw
-    ``invalid_client``. See ol-infrastructure tk-switch-toolhive-swe-vmcp-incomingauth
-    -to-validat-b8e450.
+    single-replica in-cluster Redis with no PodDisruptionBudget; when QA's node
+    pool churned that Redis pod's zone-pinned volume, DCR lookups failed and
+    clients saw ``invalid_client``. See ol-infrastructure
+    tk-switch-toolhive-swe-vmcp-incomingauth-to-validat-b8e450.
 
     OPERATOR ACTION REQUIRED per environment after this apply: the removed
     StatefulSet's ``volumeClaimTemplates`` PVC (``data-toolhive-swe-redis-0``, a
@@ -65,23 +72,13 @@ Incoming auth (MCP clients register and log in with Keycloak directly):
     Audience: Keycloak 26.7.2 (the pinned KEYCLOAK_VERSION) does not implement RFC
     8707 resource indicators — confirmed via the upstream keycloak/keycloak issue
     tracker, where support is tracked as in-progress for milestone 26.8.0 (issue
-    #51413 and related PRs), not yet shipped. So a token issued to a
-    dynamically-registered client carries no ``aud`` claim matching this vMCP's
-    resource URL by default. The keycloak substructure
-    (``ol_platform_engineering.py``, TOOLHIVE block) provisions an OPTIONAL client
-    scope (``toolhive-swe-audience``, realm-wide via ``RealmOptionalClientScopes``)
-    with an ``AudienceProtocolMapper`` that stamps ``VMCP_RESOURCE_ID`` onto the
-    access token when requested. ``incomingAuth.oidcConfigRef.scopes`` below
-    advertises it in the RFC 9728 protected-resource metadata so a compliant DCR
-    client requests it automatically; a client that ignores the advertisement and
-    never requests the scope will fail ``incomingAuth``'s audience check.
-
-    STILL UNVERIFIED (not something this repo can confirm — needs a live check in
-    the Keycloak admin console before this is applied): whether the realm's
-    Anonymous client-registration policy set's ``Trusted Hosts`` policy is
-    configured permissively enough to allow unauthenticated DCR from MCP clients
-    calling from arbitrary IPs (an empty trusted-hosts list with "host sending
-    registration request must match" enabled would block DCR outright).
+    #51413 and related PRs), not yet shipped. So the token minted for
+    ``toolhive-swe-cli`` would carry no ``aud`` claim matching this vMCP's resource
+    URL by default. The keycloak substructure (``ol_platform_engineering.py``,
+    TOOLHIVE block) stamps one in unconditionally via a plain per-client
+    ``AudienceProtocolMapper`` — the client is Pulumi-managed with a fixed
+    client_id, so this needs none of the realm-wide default/optional-scope
+    machinery a DCR design without a fixed client_id would have required.
 
     APISIX does NOT participate in authentication — it only terminates TLS and proxies
     every path (``/mcp``, ``/.well-known/*``) through to the vMCP Service.
@@ -209,9 +206,9 @@ VMCP_RESOURCE_URL = f"https://{VMCP_DOMAIN}"
 # trailing slash.
 VMCP_RESOURCE_ID = f"{VMCP_RESOURCE_URL}/"
 
-# Keycloak realm MCP clients register against and authenticate with directly (no
-# vMCP-side broker). The SSO hostname follows the per-environment convention
-# sso[-<env>].ol.mit.edu.
+# Keycloak realm MCP clients authenticate against directly (no vMCP-side
+# broker), using the static toolhive-swe-cli client. The SSO hostname follows
+# the per-environment convention sso[-<env>].ol.mit.edu.
 if stack_info.env_suffix == "production":
     KEYCLOAK_DOMAIN = "sso.ol.mit.edu"
 else:
@@ -530,24 +527,26 @@ swe_virtualmcpserver = kubernetes.apiextensions.CustomResource(
     ),
     spec={
         "groupRef": {"name": MCP_GROUP_NAME},
-        # No authServerConfig: the vMCP is a pure resource server. MCP clients do
-        # RFC 7591 DCR and login directly against Keycloak; there is no vMCP-side
-        # OAuth state (no signing keys, no DCR store, no Redis) to provision here.
+        # No authServerConfig: the vMCP is a pure resource server. MCP clients log
+        # in directly against Keycloak using the static toolhive-swe-cli client
+        # (keycloak substructure, TOOLHIVE block); there is no vMCP-side OAuth
+        # state (no signing keys, no DCR store, no Redis) to provision here.
         "incomingAuth": {
             "type": "oidc",
             "oidcConfigRef": {
                 "name": MCP_OIDC_CONFIG_NAME,
                 # Trailing-slash form: matches the RFC 8707 resource MCP clients
-                # actually send (see VMCP_RESOURCE_ID).
+                # actually send (see VMCP_RESOURCE_ID). toolhive-swe-cli's
+                # AudienceProtocolMapper stamps this value onto every token it
+                # mints unconditionally, so unlike a DCR design there is no
+                # separate audience scope that needs to be advertised/requested
+                # here for the claim to be present.
                 "audience": VMCP_RESOURCE_ID,
                 "resourceUrl": VMCP_RESOURCE_ID,
-                # Advertised in RFC 9728 protected-resource metadata so a compliant
-                # DCR client requests these at Keycloak automatically.
-                # offline_access for refresh tokens; toolhive-swe-audience is the
-                # optional client scope (keycloak substructure, TOOLHIVE block)
-                # that stamps VMCP_RESOURCE_ID onto the token's aud claim — without
-                # it Keycloak issues no audience this incomingAuth check accepts.
-                "scopes": ["openid", "offline_access", "toolhive-swe-audience"],
+                # Advertised in RFC 9728 protected-resource metadata so a
+                # compliant client requests offline_access (for refresh tokens)
+                # at Keycloak automatically.
+                "scopes": ["openid", "offline_access"],
             },
         },
         "serviceType": "ClusterIP",
