@@ -374,11 +374,13 @@ def _build_interpolated_config_dict(
                 "ENROLLMENT_WEBHOOK_URL": f"https://{marketing_domain}/api/openedx_webhook/enrollment/",
                 # The edX account MITx Online authenticates as when it
                 # creates enrollments through the enrollment REST API; the
-                # plugin skips webhooking those back to it. RC runs under a
-                # different account than Production, so it is per-stack.
-                "ENROLLMENT_WEBHOOK_SERVICE_WORKER_USERNAME": edxapp_config.get(
-                    "enrollment_webhook_service_worker_username",
-                    "login_service_user",
+                # plugin skips webhooking those back to it. Each stack names
+                # its own account -- RC's differs from Production's -- so
+                # this is required rather than defaulted, and a new
+                # mitxonline stack has to state it instead of silently
+                # inheriting an account it does not use.
+                "ENROLLMENT_WEBHOOK_SERVICE_WORKER_USERNAME": edxapp_config.require(
+                    "enrollment_webhook_service_worker_username"
                 ),
                 "CERTIFICATE_WEBHOOK_URL": f"https://{marketing_domain}/api/openedx_webhook/certificate/",
                 "USE_EXTRACTED_HTML_BLOCK": edxapp_config.get_bool(
