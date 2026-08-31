@@ -146,6 +146,12 @@ vuln_scanner_auth_binding = OLEKSAuthBinding(
         stack_info=stack_info,
         aws_config=aws_config,
         iam_policy_document=vuln_scanner_iam_policy_document,
+        # Security Hub's finding actions have no resource-level ARN scoping
+        # (see vuln_scanner_iam_policy_document's own comment) -- Resource: "*"
+        # is the only shape they support, not a widened grant. Same blanket
+        # suppression pattern as jupyterhub_data/concourse/jupyterhub for a
+        # genuinely unavoidable RESOURCE_STAR finding.
+        parliament_config={"RESOURCE_STAR": {"ignore_locations": []}},
         vault_policy_path=Path(__file__).parent.joinpath("vuln_scanner_policy.hcl"),
         cluster_name=cluster_stack.require_output("cluster_name"),
         cluster_identities=cluster_stack.require_output("cluster_identities"),
