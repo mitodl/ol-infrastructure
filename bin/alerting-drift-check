@@ -310,16 +310,19 @@ def check_sentry_rules(report: Report) -> None:
         if detector.get("type") == "metric_issue"
     }
 
-    if not SENTRY_DETECTORS:
-        # Zero declared expectations means zero Sentry metric alerting. Say so
-        # out loud: a check that passes silently over an empty alerting estate
-        # is the "looks like coverage" failure in its purest form.
+    if not SENTRY_DETECTORS and not live:
+        # Nothing declared and nothing live: no Sentry metric alerting exists
+        # at all. Say so out loud -- a check that passes silently over an empty
+        # alerting estate is the "looks like coverage" failure in its purest
+        # form. Conditioned on `live` being empty too, because KNOWN means live
+        # matches the recorded expectation; detectors that do exist contradict
+        # it and are reported as DRIFT below instead.
         report.known(
             check,
             "Sentry metric alerting",
-            f"no metric detectors are declared and {len(live)} exist in Sentry; "
-            "all six were deleted on 2026-08-28 because none could fire, and "
-            f"the replacement set is not built yet -- {SENTRY_REBUILD_TASK}",
+            "no metric detectors are declared and none exist in Sentry; all "
+            "six were deleted on 2026-08-28 because none could fire, and the "
+            f"replacement set is not built yet -- {SENTRY_REBUILD_TASK}",
         )
 
     expected_ids = {expected.legacy_rule_id for expected in SENTRY_DETECTORS}
