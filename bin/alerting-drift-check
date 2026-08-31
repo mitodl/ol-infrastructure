@@ -375,12 +375,18 @@ def _check_detector_enabled(
     live_enabled = bool(detector.get("enabled"))
     if live_enabled == expected.enabled:
         if not live_enabled:
-            report.known(
-                check,
-                subject,
+            detail = (
                 "detector is disabled in Sentry, so it cannot fire whatever "
-                f"its thresholds say -- {expected.tracked_by}",
+                "its thresholds say"
             )
+            if expected.tracked_by:
+                report.known(check, subject, f"{detail} -- {expected.tracked_by}")
+            else:
+                # KNOWN means live matches an expectation that is itself a
+                # filed defect; with nothing filed there is no defect to cite,
+                # and appending an empty tracked_by left a dangling " -- ".
+                # Still reported: an inert detector must not pass in silence.
+                report.info(check, subject, detail)
         return
     if live_enabled:
         report.drift(
