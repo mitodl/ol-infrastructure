@@ -54,9 +54,12 @@ Incoming auth (MCP clients register and log in with Keycloak directly):
     ``invalid_client``. See ol-infrastructure tk-switch-toolhive-swe-vmcp-incomingauth
     -to-validat-b8e450.
 
-    Audience: Keycloak does not implement RFC 8707 resource indicators, so a token
-    it issues to a dynamically-registered client carries no ``aud`` claim matching
-    this vMCP's resource URL by default. The keycloak substructure
+    Audience: Keycloak 26.7.2 (the pinned KEYCLOAK_VERSION) does not implement RFC
+    8707 resource indicators — confirmed via the upstream keycloak/keycloak issue
+    tracker, where support is tracked as in-progress for milestone 26.8.0 (issue
+    #51413 and related PRs), not yet shipped. So a token issued to a
+    dynamically-registered client carries no ``aud`` claim matching this vMCP's
+    resource URL by default. The keycloak substructure
     (``ol_platform_engineering.py``, TOOLHIVE block) provisions an OPTIONAL client
     scope (``toolhive-swe-audience``, realm-wide via ``RealmOptionalClientScopes``)
     with an ``AudienceProtocolMapper`` that stamps ``VMCP_RESOURCE_ID`` onto the

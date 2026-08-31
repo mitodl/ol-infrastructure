@@ -279,12 +279,15 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
     # what incomingAuth.oidcConfigRef.audience checks the token's `aud` against.
     toolhive_swe_audience = f"{toolhive_swe_resource_url}/"
 
-    # Keycloak does not implement RFC 8707 resource indicators, so a token minted
-    # for a dynamically-registered client carries no `aud` matching the vMCP's
-    # resource URL unless a client scope maps one in and a client actually
-    # requests it. This scope does that mapping; it is OPTIONAL (not default) so
-    # only a client that requests `toolhive-swe-audience` gets the extra audience,
-    # rather than every client in the realm.
+    # Keycloak 26.7.2 (this repo's pinned KEYCLOAK_VERSION) does not implement RFC
+    # 8707 resource indicators — confirmed via the upstream keycloak/keycloak issue
+    # tracker, where support is tracked as in-progress for milestone 26.8.0 (issue
+    # #51413 and related PRs), not yet shipped. So a token minted for a
+    # dynamically-registered client carries no `aud` matching the vMCP's resource
+    # URL unless a client scope maps one in and a client actually requests it. This
+    # scope does that mapping; it is OPTIONAL (not default) so only a client that
+    # requests `toolhive-swe-audience` gets the extra audience, rather than every
+    # client in the realm.
     toolhive_swe_audience_scope = keycloak.openid.ClientScope(
         "ol-platform-engineering-toolhive-swe-audience-scope",
         realm_id="ol-platform-engineering",
