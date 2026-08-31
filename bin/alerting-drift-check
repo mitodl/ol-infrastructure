@@ -45,6 +45,7 @@ Usage:
     bin/alerting-drift-check sentry-liveness --max-silent-days 14
 """
 
+import re
 import sys
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -252,6 +253,37 @@ def _rootly_client() -> httpx.Client:
     return _client(read_yaml_secrets(ROOTLY_SECRET)["api_token"])
 
 
+def _sentry_pages(client: httpx.Client, url: str) -> list[dict[str, Any]]:
+    """Every page of a cursor-paginated Sentry list endpoint.
+
+    Worth the loop even though the org is at 26 detectors against a 100-item
+    page: /detectors/ returns every detector type, so `error` and
+    `issue_stream` detectors consume the same window, and that headroom
+    shrinks with ordinary Sentry use rather than with metric alerting. A
+    metric detector pushed onto page two would simply not appear in `live`,
+    and the "exists in Sentry but is not recorded here" DRIFT would not fire
+    -- a silent pass, which is the failure this whole script exists to catch.
+
+    Mirrors SentryApi.list in bin/import-sentry-config: follow `rel="next"`
+    only while it also reports `results="true"`, since Sentry always sends a
+    next link.
+    """
+    items: list[dict[str, Any]] = []
+    next_url: str | None = url
+    params: dict[str, Any] | None = {"per_page": 100}
+    while next_url:
+        response = client.get(next_url, params=params)
+        response.raise_for_status()
+        items.extend(response.json())
+        next_url, params = None, None
+        for link in response.headers.get("link", "").split(","):
+            if 'rel="next"' in link and 'results="true"' in link:
+                match = re.search(r"<([^>]+)>", link)
+                if match:
+                    next_url = match.group(1)
+    return items
+
+
 def _rootly_target(action: dict[str, Any]) -> str | None:
     """Pull rootly_notification_target out of a workflow action's settings."""
     for setting in (action.get("data") or {}).get("settings") or []:
@@ -300,13 +332,11 @@ def check_sentry_rules(report: Report) -> None:
     check = "sentry-rules"
     client, org = _sentry_client()
 
-    response = client.get(
-        f"{SENTRY_API}/organizations/{org}/detectors/", params={"per_page": 100}
-    )
-    response.raise_for_status()
     live = {
         detector.get("alertRuleId"): detector
-        for detector in response.json()
+        for detector in _sentry_pages(
+            client, f"{SENTRY_API}/organizations/{org}/detectors/"
+        )
         if detector.get("type") == "metric_issue"
     }
 
