@@ -484,8 +484,11 @@ def _check_detector_targets(
             detail = "no workflows are linked, so nothing reaches Rootly"
         elif want == (None,):
             detail = "no Rootly notification target configured at all"
-        else:
+        elif len(want) == 1:
             detail = f"Rootly target is {want[0]!r}"
+        else:
+            listed = ", ".join(repr(value) for value in want)
+            detail = f"Rootly targets are {listed}"
         if len(want) == 1 and len(expected.thresholds) > 1:
             detail += "; warning and critical share it, so the tier split is cosmetic"
         report.known(check, subject, f"{detail} -- {expected.tracked_by}")
