@@ -1,0 +1,7 @@
+---
+name: ol-application-vuln-scanner
+runtime: python
+description: DAST scanning (ZAP + Nuclei) of internal web applications, starting with
+  MIT Learn QA, reporting to S3 and AWS Security Hub.
+backend:
+  url: s3://mitol-pulumi-state/

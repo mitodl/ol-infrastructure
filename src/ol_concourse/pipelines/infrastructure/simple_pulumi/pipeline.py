@@ -667,6 +667,30 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         ),
         build=BuildConfig(dockerfile_path="./Dockerfile"),
     ),
+    "vuln-scanner": SimplePulumiParams(
+        app_name="vuln-scanner",
+        pulumi_project_path="applications/vuln_scanner/",
+        pulumi_project_name="ol-application-vuln-scanner",
+        # Only Pulumi.QA.yaml exists -- this scans MIT Learn's QA endpoint
+        # specifically, deliberately not Production (see __main__.py's
+        # module docstring).
+        stages=["QA"],
+        # Same reasoning as release-bot: don't auto-deploy a tool that runs
+        # active attack payloads and holds real S3-write/Security-Hub
+        # credentials on every push -- gate it on a reviewed preview instead.
+        topology="preview-gated",
+        # The reporter image's Dockerfile lives in a `reporter/` subdirectory
+        # of pulumi_project_path, not at its root like release-bot's --
+        # dockerfile_path is relative to pulumi_project_path (this job's
+        # build CONTEXT), so the Dockerfile's own COPY sources are
+        # `reporter/...`, not bare filenames.
+        docker_image=DockerImageConfig(
+            image_repository="vuln-scanner-reporter",
+            ecr_region=ECR_REGION,
+            env_var_for_digest="VULN_SCANNER_REPORTER_DOCKER_SHA",
+        ),
+        build=BuildConfig(dockerfile_path="./reporter/Dockerfile"),
+    ),
 }
 
 
