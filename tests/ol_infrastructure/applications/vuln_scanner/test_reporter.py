@@ -12,8 +12,10 @@ import json
 from typing import Any
 from unittest.mock import MagicMock
 
+import botocore.session
 import pytest
 import reporter
+from botocore.validate import validate_parameters
 
 # ---------------------------------------------------------------------------
 # parse_zap_report
@@ -474,15 +476,40 @@ def test_build_asff_finding_severity_under_finding_provider_fields():
     option" for finding providers -- it's what lets Security Hub protect a
     customer's manual severity override from being clobbered by our next
     weekly re-import.
+
+    FindingProviderFields.Severity is a narrower shape than top-level
+    Severity -- confirmed via botocore's own BatchImportFindings service
+    model, and the hard way, via a live ParamValidationError against real
+    Security Hub: only Label/Original are valid members here, Normalized
+    is top-level-only and gets rejected if included.
     """
     finding = _build_finding(_alert(severity="critical"))
 
     assert finding["FindingProviderFields"]["Severity"] == {
         "Label": "CRITICAL",
-        "Normalized": 95,
         "Original": "critical",
     }
     assert finding["Severity"] == {"Label": "CRITICAL", "Normalized": 95}
+
+
+def test_build_asff_finding_validates_against_real_batch_import_shape():
+    """Regression guard for the exact bug a live run against real Security
+    Hub caught (FindingProviderFields.Severity.Normalized -- not a valid
+    member of that narrower shape, only of top-level Severity): validates
+    the constructed finding against botocore's actual BatchImportFindings
+    service model, offline and without AWS credentials. A MagicMock-based
+    client (as used elsewhere in this file) doesn't enforce real parameter
+    shapes and would not have caught this.
+    """
+    findings = [
+        _build_finding(_alert(severity="critical")),
+        _build_finding(_alert(severity="low", cve_ids=("CVE-2020-1111",))),
+    ]
+    session = botocore.session.get_session()
+    op_model = session.get_service_model("securityhub").operation_model(
+        "BatchImportFindings"
+    )
+    validate_parameters({"Findings": findings}, op_model.input_shape)
 
 
 # ---------------------------------------------------------------------------

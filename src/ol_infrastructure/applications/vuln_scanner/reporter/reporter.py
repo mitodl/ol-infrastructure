@@ -315,9 +315,14 @@ def build_asff_finding(
         # so this just makes a brand-new finding immediately correct
         # without waiting on that replication step.
         "FindingProviderFields": {
+            # FindingProviderFields.Severity is a narrower shape than the
+            # top-level Severity below -- confirmed against boto3's own
+            # BatchImportFindings service model (and, live, by an actual
+            # ParamValidationError on a real Security Hub import): only
+            # Label and Original are valid members here, Normalized is
+            # top-level-only.
             "Severity": {
                 "Label": label,
-                "Normalized": normalized,
                 "Original": alert.severity,
             },
             "Types": [finding_type],

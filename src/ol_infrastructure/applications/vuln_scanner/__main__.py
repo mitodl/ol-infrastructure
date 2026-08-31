@@ -617,6 +617,13 @@ for index, target in enumerate(targets):
             core.v1.VolumeMountArgs(
                 name="nuclei-templates", mount_path=NUCLEI_TEMPLATES_DIR
             ),
+            # Found by actually running this against the real cluster (not
+            # something docs or a local `docker run` surfaced): Nuclei's
+            # dialer creates its own scratch dir under /tmp regardless of
+            # $HOME, independent of the templates/config/cache paths above --
+            # "mkdir /tmp/nuclei<random>: read-only file system" with only
+            # read_only_root_filesystem=True and no volume over /tmp.
+            core.v1.VolumeMountArgs(name="nuclei-tmp", mount_path="/tmp"),  # noqa: S108
         ],
         resources=core.v1.ResourceRequirementsArgs(
             requests={"cpu": "500m", "memory": "512Mi"},
@@ -649,7 +656,7 @@ for index, target in enumerate(targets):
                     name="shared-reports",
                     empty_dir=core.v1.EmptyDirVolumeSourceArgs(),
                 ),
-                # The one writable exception to readOnlyRootFilesystem --
+                # Writable exceptions to readOnlyRootFilesystem --
                 # Nuclei's template feed updates far more often than its
                 # image does, so template refresh needs a writable
                 # directory even with the image itself pinned by digest.
@@ -657,6 +664,12 @@ for index, target in enumerate(targets):
                 # pinning" section.
                 core.v1.VolumeArgs(
                     name="nuclei-templates",
+                    empty_dir=core.v1.EmptyDirVolumeSourceArgs(),
+                ),
+                # Nuclei's dialer needs a writable /tmp regardless of
+                # $HOME -- see the mount comment on nuclei_init_container.
+                core.v1.VolumeArgs(
+                    name="nuclei-tmp",
                     empty_dir=core.v1.EmptyDirVolumeSourceArgs(),
                 ),
             ],
