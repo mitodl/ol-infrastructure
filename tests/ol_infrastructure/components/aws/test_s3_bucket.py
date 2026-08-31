@@ -610,3 +610,147 @@ class TestOLBucketAbortMPUResource:
         return pulumi.Output.from_input(bucket.bucket_lifecycle).apply(
             check_no_lifecycle
         )
+
+
+class TestS3BucketConfigNoncurrentVersionExpirationValidation:
+    """Validate the noncurrent-version expiry field on S3BucketConfig."""
+
+    @staticmethod
+    def get_valid_tags():
+        return {
+            "OU": "operations",
+            "Environment": "test",
+            "Application": "test-app",
+            "Owner": "test-owner",
+        }
+
+    def test_unset_by_default(self):
+        """No default: expiring deleted versions is a per-bucket decision."""
+        config = S3BucketConfig(
+            bucket_name="test-bucket",
+            tags=self.get_valid_tags(),
+        )
+        assert config.noncurrent_version_expiration_days is None
+
+    def test_valid_value_accepted_on_versioned_bucket(self):
+        config = S3BucketConfig(
+            bucket_name="test-bucket",
+            versioning_enabled=True,
+            noncurrent_version_expiration_days=90,
+            tags=self.get_valid_tags(),
+        )
+        assert config.noncurrent_version_expiration_days == 90
+
+    def test_zero_rejected(self):
+        with pytest.raises(ValueError, match="must be >= 1"):
+            S3BucketConfig(
+                bucket_name="test-bucket",
+                versioning_enabled=True,
+                noncurrent_version_expiration_days=0,
+                tags=self.get_valid_tags(),
+            )
+
+    def test_rejected_on_unversioned_bucket(self):
+        """A rule that can never fire is worse than no rule.
+
+        AWS accepts NoncurrentVersionExpiration on a bucket that was never
+        versioned and silently never applies it, which reads as "deleted
+        objects are being cleaned up" while nothing is.
+        """
+        with pytest.raises(ValueError, match="versioning disabled"):
+            S3BucketConfig(
+                bucket_name="test-bucket",
+                versioning_enabled=False,
+                noncurrent_version_expiration_days=90,
+                tags=self.get_valid_tags(),
+            )
+
+    def test_accepted_when_versioning_suspended(self):
+        """Suspension stops new versions; it does not remove the existing ones.
+
+        AWS documents NoncurrentVersionExpiration as applying to a bucket with
+        versioning "enabled (or suspended)", and expiring what accumulated
+        before suspension is a legitimate reason to set this.
+        """
+        config = S3BucketConfig(
+            bucket_name="test-bucket",
+            versioning_enabled=True,
+            versioning_status="Suspended",
+            noncurrent_version_expiration_days=90,
+            tags=self.get_valid_tags(),
+        )
+        assert config.noncurrent_version_expiration_days == 90
+
+    def test_rejected_when_versioning_status_disabled(self):
+        """versioning_status overrides versioning_enabled, so it decides here."""
+        with pytest.raises(ValueError, match="versioning disabled"):
+            S3BucketConfig(
+                bucket_name="test-bucket",
+                versioning_enabled=True,
+                versioning_status="Disabled",
+                noncurrent_version_expiration_days=90,
+                tags=self.get_valid_tags(),
+            )
+
+
+class TestOLBucketNoncurrentVersionExpirationResource:
+    """OLBucket emits the expiry rule only when the config asks for it."""
+
+    @staticmethod
+    def get_valid_tags():
+        return {
+            "OU": "operations",
+            "Environment": "test",
+            "Application": "test-app",
+            "Owner": "test-owner",
+        }
+
+    @staticmethod
+    def _rule_ids(bucket):
+        return bucket.bucket_lifecycle.rules.apply(
+            lambda rules: [
+                rule.get("id") if isinstance(rule, dict) else getattr(rule, "id", None)
+                for rule in (rules or [])
+            ]
+        )
+
+    @pulumi.runtime.test
+    def test_rule_absent_by_default(self):
+        config = S3BucketConfig(
+            bucket_name="test-noncurrent-default",
+            versioning_enabled=True,
+            tags=self.get_valid_tags(),
+        )
+        bucket = OLBucket("test-noncurrent-default", config=config)
+
+        def check(rule_ids):
+            assert "expire-noncurrent-versions" not in rule_ids, (
+                f"Expiry rule should not appear unless asked for, got: {rule_ids}"
+            )
+
+        return self._rule_ids(bucket).apply(check)
+
+    @pulumi.runtime.test
+    def test_rule_present_and_appended_last(self):
+        """Present when set, and last so it does not renumber existing rules.
+
+        Ordering is load-bearing for review, not for S3: inserting ahead of the
+        tiering rule makes `pulumi preview` render the change as a rewrite of
+        that rule rather than as the addition it is.
+        """
+        config = S3BucketConfig(
+            bucket_name="test-noncurrent-set",
+            versioning_enabled=True,
+            noncurrent_version_expiration_days=90,
+            tags=self.get_valid_tags(),
+        )
+        bucket = OLBucket("test-noncurrent-set", config=config)
+
+        def check(rule_ids):
+            assert rule_ids[-1] == "expire-noncurrent-versions", (
+                f"Expiry rule must be appended last, got: {rule_ids}"
+            )
+            assert "abort-incomplete-multipart-uploads" in rule_ids
+            assert "intelligent-tiering-transition" in rule_ids
+
+        return self._rule_ids(bucket).apply(check)
