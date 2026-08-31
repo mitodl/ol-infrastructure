@@ -7,9 +7,6 @@
 # ---------------------------------------------------------------------------
 config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service")
 config.define_bool("per_app_databases", usage="Deploy isolated DB/Valkey per app namespace")
-# openedx_mode is declared but not yet wired: nothing branches on it, and
-# local-dev/apps/openedx/Tiltfile is not yet included by the APPS loop below.
-config.define_string("openedx_mode", usage="qa (default) or local (Tutor)")
 config.define_string_list("prebuilt_tags", usage="Prebuilt image tag overrides per app, e.g. mit-learn=0.62.0 learn-ai=0.28.3")
 config.define_string("disk_keep_tags", usage="Newest tilt-built image tags kept per repo by the disk janitor (default: 3). Overrides LOCAL_DEV_DISK_KEEP_TAGS env var.")
 config.define_string("disk_buildcache_max_gb", usage="Docker build-cache size cap in GB (default: 10% of total disk; 0 disables). Overrides LOCAL_DEV_BUILDCACHE_MAX_GB env var.")
@@ -18,7 +15,6 @@ cfg = config.parse()
 
 enabled_apps = cfg.get("enabled_apps", ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"])
 per_app_databases = cfg.get("per_app_databases", False)
-openedx_mode = cfg.get("openedx_mode", "qa")
 
 # Every service hostname, CORS origin, APISIX route, and Keycloak redirect URI
 # derives from this value. local-dev/tiltlib.star reads the same environment

@@ -191,6 +191,10 @@ Edit `tilt_config.json`:
 
 Only the listed apps will be deployed. Shared infrastructure always runs.
 
+### Open edX
+
+Open edX is not part of this stack. Run it from the [lehrer](https://github.com/mitodl/lehrer) repo instead — `lehrer dev setup` then `lehrer dev start` brings up its own k3d cluster with LMS, CMS, codejail, notes, and the MFEs. An `apps/openedx` entry that reused this cluster's Valkey and OpenSearch was started here and never finished; it was removed rather than carried as a second copy to keep in sync with lehrer's manifests.
+
 ### Test accounts
 
 Log in at any app (or `https://sso.ol.mit.dev` directly) with the seeded Keycloak users: `admin@odl.local`, `student@odl.local`, `prof@odl.local` — password `localdev123` for all three.  <!-- pragma: allowlist secret -->
@@ -320,7 +324,7 @@ tilt trigger seed-mit-learn-fixtures
 | `prebuilt_tags` | see example file | `["app=tag"]` list of image tags used when the app repo is not checked out locally. |
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
 | `log_retention_period` | `168h` | How long Grafana/Loki keeps logs — see [Log retention](#log-retention). |
-| `per_app_databases`, `openedx_mode` | — | Declared but not wired to anything yet; setting them has no effect. |
+| `per_app_databases` | — | Declared but not wired to anything yet; setting it has no effect. |
 
 The rule of thumb for which config surface a knob belongs to: settings that change **which/how Tilt runs things** (apps, image tags) go in `tilt_config.json`; anything that sets an **env var or secret value inside a workload** (API keys, feature flags, endpoints) goes in a gitignored `app-env.local.yaml` override ConfigMap — see [Local Configuration Overrides](#local-configuration-overrides).
 
@@ -506,6 +510,10 @@ AWS_SECRET_ACCESS_KEY: "minioadmin"  # pragma: allowlist secret
 ---
 
 ## Troubleshooting
+
+### `tilt up` fails with `specified unknown setting name 'openedx_mode'`
+
+`config.parse()` rejects any key in `tilt_config.json` that the Tiltfile does not declare, so the whole Tiltfile fails to load. `openedx_mode` was never wired to anything and has been removed — delete the key from your `tilt_config.json`. See [Open edX](#open-edx) for where that stack lives now.
 
 ### `tilt up` fails on `local-infra` (Pulumi errors)
 
