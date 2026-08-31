@@ -100,7 +100,7 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
     # signals that aren't any one team's concern (e.g. HPAAtMaxReplicas*,
     # which fires for every CI/QA/production workload). Uses its own
     # `slack_notifications_devops_warnings` secret (a per-stack required key
-    # in the grafana-alerting secrets file; see AGENTS.md § Secrets reference).
+    # in the grafana-alerting secrets file; see CLAUDE.md § Secrets reference).
     # Deliberately a distinct pair of contact points, not a shared one with
     # ocw-misc: each destination has its own contact point to keep the
     # resource-name→channel mapping obvious from resource names alone.
