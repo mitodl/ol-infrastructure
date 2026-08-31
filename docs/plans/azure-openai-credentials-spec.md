@@ -390,21 +390,30 @@ ol-openai-ci/          ol-openai-{mitlearn,learn-ai,mitxonline}-ci
 ```
 
 Attribution has to come from the resource, because the metrics have no caller dimension. And
-TPM quota is allocated per subscription per region per model and is *shared* across accounts,
-so splitting into more accounts does not buy throughput isolation; per-deployment capacity
-allocation does, and that works in any layout. Consequence to watch, unchanged: 9 accounts by
-3 models is 27 deployments dividing one regional pool, so allocate capacity heavily to
-Production and minimally to CI and QA.
+TPM quota is *shared* across accounts, so splitting into more accounts does not buy throughput
+isolation; per-deployment capacity allocation does, and that works in any layout.
+
+The consequence to watch, corrected 2026-08-31 after a Copilot review caught the earlier
+version of this paragraph asserting one pool for all 27 deployments: quota is pooled **per
+model and version, per deployment type**. These are `GlobalStandard` deployments, and
+[Microsoft's docs](https://learn.microsoft.com/en-us/azure/ai-foundry/openai/quotas-limits)
+state that "deployments of the same model and version share one quota pool across all regions
+in a subscription" — so the pool is not per region either, which the earlier text also got
+wrong. Nine deployments of a given model (three consumers by three environments) share that
+model's pool; the three models do not compete with each other. Plan capacity per model, and
+allocate heavily to Production and minimally to CI and QA.
 
 ## 10. Open questions
 
 - **Q1. Subscription and region. STILL OPEN, blocks deployment.** The subscription is
   `1a5054d4-e995-477d-9551-e08d33f60fdb` (`ol-engineering`). Confirm
   `Microsoft.CognitiveServices` is registered, the subscription is approved for Azure OpenAI,
-  and the regional TPM quota for `gpt-4o`, `gpt-4o-mini`, and `gpt-5.2`. The answer needs to be
-  a number, not a yes, because 27 deployments divide one pool. A subscription without quota
-  fails at `Deployment` creation, not at preview. This blocks deploying, not writing or
-  reviewing the code.
+  and the TPM quota for `gpt-4o`, `gpt-4o-mini`, and `gpt-5.2`. The answer needs to be **three
+  numbers, one per model**, not a yes: each model has its own pool, and nine deployments share
+  it (§4). A subscription without quota fails at `Deployment` creation, not at preview. The
+  Production stack now refuses to preview at all without an explicit
+  `azure_openai:model_capacity`, so this cannot be deployed on a guessed number. Blocks
+  deploying, not writing or reviewing the code.
 - **Q2. Entra security group for developers.** Which group, and who administers membership?
   Creating one is permitted (`allowedToCreateSecurityGroups: true`), but an existing
   IS&T-managed group with the right membership would be preferable to a new one nobody owns.
