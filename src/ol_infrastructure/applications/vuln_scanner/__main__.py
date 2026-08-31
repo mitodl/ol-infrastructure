@@ -43,8 +43,10 @@ from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
     parse_stack,
 )
+from ol_infrastructure.lib.vault import setup_vault_provider
 
 stack_info = parse_stack()
+setup_vault_provider(stack_info)
 vuln_scanner_config = Config("vuln_scanner")
 aws_account = get_caller_identity()
 
