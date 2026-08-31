@@ -1,8 +1,15 @@
-"""Per-repo rulesets: required status checks, and nothing else.
+"""Per-repo rulesets: required status checks, and release-branch protection.
 
 SEC-03 -- every repo in the org runs CI and none of it can block a merge. Closing that
 needs the one rule the §5.4 org-ruleset design deliberately left per-repo, because check
 names are per-repo facts and no org-wide ruleset can name them all.
+
+A second, unrelated ruleset also lives here: `build_release_branches()` blocks deletion
+and force-push on the `release`/`release-candidate` branches of repos still driven by
+the release-script bot ("Doof"). See that function's docstring -- it exists because the
+fleet-wide `delete_branch_on_merge` default silently deletes those branches on the PR
+merge that promotes one to the other, and the classic branch protection that used to
+prevent that is invisible to this stack and was dropped once already.
 
 THERE IS NO DRY RUN. `enforcement: evaluate` does not exist on the Team plan -- the API
 accepts the PUT and then does nothing at all (see organization/org_rulesets.py, which
