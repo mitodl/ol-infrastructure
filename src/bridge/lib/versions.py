@@ -137,7 +137,7 @@ MCP_SENTRY_VERSION = "0.37.0"
 # ToolHive-built npx wrapper image for the Context7 MCP server (upstash/context7
 # stdio mode). Tag tracks the dockyard build, not the upstream npm pkg.
 # renovate: datasource=docker depName=context7 packageName=ghcr.io/stacklok/dockyard/npx/context7
-MCP_CONTEXT7_VERSION = "4.0.0"
+MCP_CONTEXT7_VERSION = "4.0.3"
 # AWS's official SigV4 proxy image, the stdio bridge to the managed AWS MCP Server
 # endpoint. Image tags track the PyPI package (mcp-proxy-for-aws) one-for-one.
 # renovate: datasource=docker depName=mcp-proxy-for-aws packageName=public.ecr.aws/mcp-proxy-for-aws/mcp-proxy-for-aws
