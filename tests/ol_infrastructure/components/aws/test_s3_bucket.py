@@ -653,11 +653,11 @@ class TestS3BucketConfigNoncurrentVersionExpirationValidation:
     def test_rejected_on_unversioned_bucket(self):
         """A rule that can never fire is worse than no rule.
 
-        AWS accepts NoncurrentVersionExpiration on an unversioned bucket and
-        silently never applies it, which reads as "deleted objects are being
-        cleaned up" while nothing is.
+        AWS accepts NoncurrentVersionExpiration on a bucket that was never
+        versioned and silently never applies it, which reads as "deleted
+        objects are being cleaned up" while nothing is.
         """
-        with pytest.raises(ValueError, match="not versioned"):
+        with pytest.raises(ValueError, match="versioning disabled"):
             S3BucketConfig(
                 bucket_name="test-bucket",
                 versioning_enabled=False,
@@ -665,13 +665,29 @@ class TestS3BucketConfigNoncurrentVersionExpirationValidation:
                 tags=self.get_valid_tags(),
             )
 
-    def test_rejected_when_versioning_status_suspends(self):
+    def test_accepted_when_versioning_suspended(self):
+        """Suspension stops new versions; it does not remove the existing ones.
+
+        AWS documents NoncurrentVersionExpiration as applying to a bucket with
+        versioning "enabled (or suspended)", and expiring what accumulated
+        before suspension is a legitimate reason to set this.
+        """
+        config = S3BucketConfig(
+            bucket_name="test-bucket",
+            versioning_enabled=True,
+            versioning_status="Suspended",
+            noncurrent_version_expiration_days=90,
+            tags=self.get_valid_tags(),
+        )
+        assert config.noncurrent_version_expiration_days == 90
+
+    def test_rejected_when_versioning_status_disabled(self):
         """versioning_status overrides versioning_enabled, so it decides here."""
-        with pytest.raises(ValueError, match="not versioned"):
+        with pytest.raises(ValueError, match="versioning disabled"):
             S3BucketConfig(
                 bucket_name="test-bucket",
                 versioning_enabled=True,
-                versioning_status="Suspended",
+                versioning_status="Disabled",
                 noncurrent_version_expiration_days=90,
                 tags=self.get_valid_tags(),
             )

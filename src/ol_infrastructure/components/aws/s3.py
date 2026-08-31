@@ -207,7 +207,9 @@ class S3BucketConfig(AWSBase):
         description=(
             "Days a noncurrent object version is retained before S3 deletes it "
             "permanently, plus cleanup of delete markers left with no versions "
-            "behind them. Only meaningful on a versioned bucket, and only set it "
+            "behind them. Requires versioning to be Enabled or Suspended (a "
+            "suspended bucket still holds the versions made before it was "
+            "suspended), and only set it "
             "where losing the ability to undelete by version id after this many "
             "days is acceptable -- hence no default. On a versioned bucket that "
             "is written by a system which deletes or overwrites objects, leaving "
@@ -358,10 +360,16 @@ class S3BucketConfig(AWSBase):
     def check_noncurrent_version_expiration(self) -> "S3BucketConfig":
         """Reject a noncurrent-version expiry that cannot do what it says.
 
-        S3 requires >= 1 day. Setting it on an unversioned bucket is rejected
-        rather than ignored: the rule would be accepted by AWS and silently
-        never fire, which reads as "deleted objects are being cleaned up" while
-        nothing is.
+        S3 requires >= 1 day. Setting it on a bucket that has never been
+        versioned is rejected rather than ignored: AWS accepts the rule and
+        silently never fires it, which reads as "deleted objects are being
+        cleaned up" while nothing is.
+
+        `Suspended` counts as versioned here. Suspending versioning stops new
+        noncurrent versions being created but does not remove the ones already
+        there, and NoncurrentVersionExpiration is exactly how those get cleaned
+        up -- AWS documents the action as applying to a bucket "that has
+        versioning enabled (or suspended)".
         """
         if self.noncurrent_version_expiration_days is None:
             return self
@@ -369,14 +377,14 @@ class S3BucketConfig(AWSBase):
             error_message = "noncurrent_version_expiration_days must be >= 1"
             raise ValueError(error_message)
         versioned = (
-            self.versioning_status == "Enabled"
+            self.versioning_status in {"Enabled", "Suspended"}
             if self.versioning_status is not None
             else self.versioning_enabled
         )
         if not versioned:
             error_message = (
-                "noncurrent_version_expiration_days is set but the bucket is not "
-                "versioned; the rule would never fire"
+                "noncurrent_version_expiration_days is set but the bucket has "
+                "versioning disabled; the rule would never fire"
             )
             raise ValueError(error_message)
         return self
