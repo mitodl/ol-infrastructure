@@ -275,36 +275,43 @@ if starrocks_config.get_bool("oidc_enabled"):
 _DATA_LAKE_ENVS = ("QA", "Production")
 
 if starrocks_config.get_bool("enable_data_lake_integration"):
+    _dw_stacks = {}
     for _data_lake_env in _DATA_LAKE_ENVS:
-        _dw_stack = make_stack_reference(projects.DATA_WAREHOUSE, _data_lake_env)
+        _dw_stacks[_data_lake_env] = make_stack_reference(
+            projects.DATA_WAREHOUSE, _data_lake_env
+        )
         iam.RolePolicyAttachment(
             f"starrocks-data-lake-policy-{stack_info.env_suffix}-{_data_lake_env}",
-            policy_arn=_dw_stack.require_output(
+            policy_arn=_dw_stacks[_data_lake_env].require_output(
                 "data_lake_query_engine_iam_policy_arn"
             ),
             role=starrocks_auth_binding.irsa_role.name,
             opts=ResourceOptions(parent=starrocks_auth_binding),
         )
 
-    # The attachments above hand this role both environments' catalogs, which
-    # for a lower environment means handing it production. The guard against
-    # that has to be an inline policy on this role: the managed policies are
-    # shared across environments, so a Deny placed in one of them also lands on
-    # the production role and revokes production's access to its own catalog.
-    # Empty in production, which is the environment being protected.
-    _cross_environment_glue_denial = cross_environment_glue_denial(
-        stack_info.env_suffix
-    )
-    if _cross_environment_glue_denial:
-        iam.RolePolicy(
+    # The attachments above hand this role both environments' catalogs, which for
+    # a lower environment means handing it production. The guard has to be scoped
+    # to this role rather than folded into either policy above, since those are
+    # shared across environments and a Deny in one of them also lands on the
+    # production role and revokes production's access to its own catalog.
+    #
+    # It is attached as a managed policy, not an inline one: the Concourse deploy
+    # role has iam:AttachRolePolicy but not iam:PutRolePolicy, so an inline policy
+    # cannot be applied from CI. Gate on the helper rather than on the presence of
+    # the stack output -- it is empty in production, where no such policy exists.
+    if cross_environment_glue_denial(stack_info.env_suffix):
+        # Reuse the reference from the loop when this environment is one of the
+        # data lake envs; a second StackReference to the same stack is a
+        # duplicate-URN error. CI is not in _DATA_LAKE_ENVS and needs its own.
+        _same_env_dw_stack = _dw_stacks.get(stack_info.name) or make_stack_reference(
+            projects.DATA_WAREHOUSE, stack_info.name
+        )
+        iam.RolePolicyAttachment(
             f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-cross-environment-glue-denial",
-            role=starrocks_auth_binding.irsa_role.name,
-            policy=json.dumps(
-                {
-                    "Version": "2012-10-17",
-                    "Statement": _cross_environment_glue_denial,
-                }
+            policy_arn=_same_env_dw_stack.require_output(
+                "data_lake_cross_environment_glue_denial_policy_arn"
             ),
+            role=starrocks_auth_binding.irsa_role.name,
             opts=ResourceOptions(parent=starrocks_auth_binding),
         )
 

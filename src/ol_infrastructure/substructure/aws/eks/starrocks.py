@@ -1,5 +1,3 @@
-import json
-
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, ResourceOptions, StackReference, export
 from pulumi_aws import get_caller_identity, iam
@@ -81,18 +79,18 @@ def setup_starrocks(
         role=starrocks_trust_role.role.name,
     )
 
-    # Carried on the role rather than in the managed policy above, which is shared
-    # across environments and so cannot hold a Deny that applies to only one of
-    # them. Empty in production. Defence in depth: the policy's Allow is already
-    # scoped to this environment's namespaces.
-    starrocks_glue_denial = cross_environment_glue_denial(stack_info.env_suffix)
-    if starrocks_glue_denial:
-        iam.RolePolicy(
+    # Scoped to this role rather than folded into the managed policy above, which
+    # is shared across environments and so cannot hold a Deny that applies to only
+    # one of them. Attached as a managed policy because the Concourse deploy role
+    # has iam:AttachRolePolicy but not iam:PutRolePolicy. Empty in production.
+    # Defence in depth: the policy's Allow is already scoped to this environment.
+    if cross_environment_glue_denial(stack_info.env_suffix):
+        iam.RolePolicyAttachment(
             f"{cluster_name}-starrocks-cross-environment-glue-denial",
-            role=starrocks_trust_role.role.name,
-            policy=json.dumps(
-                {"Version": "2012-10-17", "Statement": starrocks_glue_denial}
+            policy_arn=data_warehouse_stack.require_output(
+                "data_lake_cross_environment_glue_denial_policy_arn"
             ),
+            role=starrocks_trust_role.role.name,
         )
 
     # skip_await=False (the default) makes this resource block until Helm confirms

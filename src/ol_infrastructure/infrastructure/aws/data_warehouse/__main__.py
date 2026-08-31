@@ -285,15 +285,13 @@ query_engine_permissions: list[dict[str, str | list[str]]] = [
 ]
 
 # The cross-environment Deny deliberately does not belong in this document.
-# Unlike the inline policies in applications/{airbyte,dagster,open_metadata},
-# this is a shared managed policy, and applications/starrocks attaches every
-# environment's copy to every StarRocks IRSA role so each instance can query
-# both data lake catalogs. A Deny embedded here travels onto those foreign
-# principals: the QA copy landed its "deny production" statement on the
-# production role, where an explicit Deny beat the Allow from the production
-# copy attached alongside it, and production StarRocks lost the production Glue
-# catalog. The Deny constrains a principal, not a grant, so it is attached to
-# the StarRocks role itself in applications/starrocks.
+# applications/starrocks attaches every environment's copy of this policy to
+# every StarRocks IRSA role so each instance can query both data lake catalogs.
+# A Deny embedded here travels onto those foreign principals: the QA copy landed
+# its "deny production" statement on the production role, where an explicit Deny
+# beat the Allow from the production copy attached alongside it, and production
+# StarRocks lost the production Glue catalog. The Deny constrains a principal,
+# not a grant, so it ships as its own policy below.
 query_engine_iam_permissions = {
     "Version": "2012-10-17",
     "Statement": query_engine_permissions,
@@ -313,6 +311,41 @@ query_engine_iam_policy = iam.Policy(
 )
 
 export("data_lake_query_engine_iam_policy_arn", query_engine_iam_policy.arn)
+
+# A standalone managed policy rather than an inline RolePolicy on each principal.
+# The Concourse deploy role is granted iam:CreatePolicy, iam:CreatePolicyVersion
+# and iam:AttachRolePolicy but NOT iam:PutRolePolicy, so an inline policy cannot
+# be applied from CI at all -- it fails with AccessDenied while the surrounding
+# managed-policy update succeeds, which strands the environment with the Allow
+# published and the Deny missing. Keep this as a managed policy attached to the
+# specific roles that need it; see cross_environment_glue_denial.
+#
+# Empty in production, which is the environment being protected, so no policy is
+# created there and consumers must gate on the same helper before referencing
+# the export.
+cross_environment_glue_denial_statements = cross_environment_glue_denial(
+    stack_info.env_suffix
+)
+if cross_environment_glue_denial_statements:
+    cross_environment_glue_denial_policy = iam.Policy(
+        f"data-lake-cross-environment-glue-denial-policy-{stack_info.env_suffix}",
+        name=f"data-lake-cross-environment-glue-denial-policy-{stack_info.env_suffix}",
+        path=f"/ol-data/etl-policy-{stack_info.env_suffix}/",
+        policy=json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": cross_environment_glue_denial_statements,
+            }
+        ),
+        description=(
+            "Denies this environment's data lake identities any Glue action on a "
+            "protected environment's catalog"
+        ),
+    )
+    export(
+        "data_lake_cross_environment_glue_denial_policy_arn",
+        cross_environment_glue_denial_policy.arn,
+    )
 
 # The external query engine (Starburst Galaxy) cross-account trust role is only
 # configured for environments that actually connect an external query engine to
@@ -363,14 +396,11 @@ if query_engine_aws_account_id and query_engine_aws_external_id:
 
     # Carried on the role rather than in the policy above, for the reason given
     # where that policy is built. Empty in production.
-    query_engine_glue_denial = cross_environment_glue_denial(stack_info.env_suffix)
-    if query_engine_glue_denial:
-        iam.RolePolicy(
+    if cross_environment_glue_denial_statements:
+        iam.RolePolicyAttachment(
             f"data-lake-query-engine-role-glue-denial-{stack_info.env_suffix}",
+            policy_arn=cross_environment_glue_denial_policy.arn,
             role=query_engine_role.name,
-            policy=json.dumps(
-                {"Version": "2012-10-17", "Statement": query_engine_glue_denial}
-            ),
         )
 
     export("sql_engine_role_arn", query_engine_role.arn)

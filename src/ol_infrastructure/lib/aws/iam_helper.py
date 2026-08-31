@@ -402,14 +402,25 @@ def cross_environment_glue_denial(env_suffix: str) -> list[dict[str, Any]]:
     undone by a later Allow, and widening a grant for some unrelated reason is
     the way this would realistically regress.
 
-    Attach the result to the principal being constrained -- an inline role policy
-    -- and never to a managed policy that is shared across environments. A Deny
-    applies to whichever principal holds the document, not to the environment
-    that generated it, so a shared policy carries it onto every role it is
-    attached to. That is how the production StarRocks role ended up holding QA's
-    "deny production" statement and losing the production Glue catalog: an
-    explicit Deny cannot be undone by the Allow in the production policy attached
-    beside it.
+    Attach the result to the principal being constrained, and never to a policy
+    that is shared across environments. A Deny applies to whichever principal
+    holds the document, not to the environment that generated it, so a shared
+    policy carries it onto every role it is attached to. That is how the
+    production StarRocks role ended up holding QA's "deny production" statement
+    and losing the production Glue catalog: an explicit Deny cannot be undone by
+    the Allow in the production policy attached beside it.
+
+    Ship it as a dedicated managed policy attached to those principals, not as an
+    inline ``iam.RolePolicy``. The Concourse deploy role is granted
+    ``iam:CreatePolicy``, ``iam:CreatePolicyVersion`` and ``iam:AttachRolePolicy``
+    but not ``iam:PutRolePolicy``, so an inline policy fails from CI with
+    AccessDenied while the surrounding managed-policy update succeeds -- which
+    publishes the Allow and strands the environment without the Deny. Nothing
+    local catches this: a ``pulumi preview`` performs no writes, so it cannot
+    surface a write-permission gap, and a developer applying by hand would not
+    hit it either, since developer credentials do carry ``iam:PutRolePolicy``.
+    Check what the deploy role can actually do before reaching for a new IAM
+    resource type here.
 
     ``arn:aws:glue:*:*:catalog`` is deliberately absent, and must stay absent.
     Every Glue operation requires permission on the catalog, so denying it would
