@@ -247,15 +247,17 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
     # Required, Max Clients Limit, Allowed Client Scopes) are unaffected by this and
     # still apply.
     #
-    # MUST be imported before the first `pulumi up` that includes this resource, or
-    # Pulumi will try to CREATE a second "Trusted Hosts" policy alongside the
-    # existing restrictive one rather than adopting it — Keycloak ANDs every
-    # anonymous policy together, so a second permissive one would NOT override the
-    # first; the deny-all would still apply. Per environment, run (resource type
-    # keycloak:index/realmClientRegistrationPolicy:RealmClientRegistrationPolicy,
-    # resource name ol-platform-engineering-trusted-hosts-policy, import id
-    # "ol-platform-engineering/Trusted Hosts/trusted-hosts/anonymous"):
-    #   pulumi import <type> <name> <id>
+    # `opts.import_` below makes Pulumi ADOPT the existing policy on first apply
+    # rather than create a second one — this is load-bearing, not cosmetic.
+    # Without it, a `pulumi up` that reaches this resource before anyone has run a
+    # manual `pulumi import` would create a second "Trusted Hosts" policy alongside
+    # the existing restrictive one. Keycloak ANDs every anonymous policy together,
+    # so the second, permissive policy would NOT override the first — the
+    # deny-all would silently persist and DCR would keep failing, with the apply
+    # itself reporting success. `import_` closes that: it is consulted only when
+    # the resource is not yet in this stack's Pulumi state, so it is a no-op for
+    # QA (already imported into state on 2026-08-31) and self-adopts on CI's and
+    # Production's first apply without a separate manual step for either.
     keycloak.RealmClientRegistrationPolicy(
         "ol-platform-engineering-trusted-hosts-policy",
         realm_id="ol-platform-engineering",
@@ -266,7 +268,11 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
             "host-sending-registration-request-must-match": "false",
             "client-uris-must-match": "false",
         },
-        opts=resource_options,
+        opts=resource_options.merge(
+            ResourceOptions(
+                import_="ol-platform-engineering/Trusted Hosts/trusted-hosts/anonymous"
+            )
+        ),
     )
     if stack_info.env_suffix == "production":
         toolhive_swe_resource_url = "https://toolhive-swe.ol.mit.edu"

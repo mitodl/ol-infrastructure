@@ -54,6 +54,14 @@ Incoming auth (MCP clients register and log in with Keycloak directly):
     ``invalid_client``. See ol-infrastructure tk-switch-toolhive-swe-vmcp-incomingauth
     -to-validat-b8e450.
 
+    OPERATOR ACTION REQUIRED per environment after this apply: the removed
+    StatefulSet's ``volumeClaimTemplates`` PVC (``data-toolhive-swe-redis-0``, a
+    100Gi EBS volume) is NOT deleted by Kubernetes' default retention behavior —
+    it was never a standalone Pulumi resource, so Pulumi cannot clean it up either.
+    Once the switch to Keycloak-direct auth is confirmed working, manually run
+    ``kubectl delete pvc data-toolhive-swe-redis-0 -n toolhive-swe`` (per cluster)
+    or it keeps billing for an unused volume indefinitely.
+
     Audience: Keycloak 26.7.2 (the pinned KEYCLOAK_VERSION) does not implement RFC
     8707 resource indicators — confirmed via the upstream keycloak/keycloak issue
     tracker, where support is tracked as in-progress for milestone 26.8.0 (issue
