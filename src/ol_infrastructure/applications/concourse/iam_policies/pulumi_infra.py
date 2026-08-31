@@ -490,15 +490,6 @@ policy_definition = {
                 "arn:aws:iam::*:user/ol-infrastructure/*",
                 "arn:aws:iam::*:group/ol-applications/*",
                 "arn:aws:iam::*:group/ol-infrastructure/*",
-                # applications/concourse/__main__.py provisions this role's own
-                # permissions boundary policy under this path (deliberately
-                # outside ol-applications/* and ol-infrastructure/* -- see the
-                # comment on concourse_infra_worker_permissions_boundary).
-                # Managing it still needs ordinary IAM policy actions (tagging,
-                # version create/delete as its content changes), so its path
-                # has to be reachable here even though the boundary mechanism
-                # itself keeps this role from repointing or widening it.
-                "arn:aws:iam::*:policy/ol-security-boundaries/concourse/*",
                 # infrastructure/aws/iam/__main__.py provisions these specific
                 # users and groups at the default "/" path rather than under
                 # /ol-applications/* or /ol-infrastructure/*. Enumerated
