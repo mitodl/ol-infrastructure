@@ -103,6 +103,7 @@ def build_xqueue_pipeline(release_name: str):
             xqueue_pulumi_code,
             refresh_stack=True,
             topology="preview-gated",
+            record_deployments=False,
             auto_deploy_stages=["CI"],
             stack_names=[
                 f"{deployment.deployment_name}.{stage}"
