@@ -68,13 +68,29 @@ CONSUMER_SUBJECTS = {
 
 location = azure_config.get("location") or "eastus"
 
-# Capacity is in thousands of tokens per minute and is drawn from a single regional
-# pool shared by every deployment in the subscription. With three models on each of
-# three accounts there are nine deployments per environment dividing that pool, so
-# non-production gets only enough to exercise the code path.
-default_capacity = azure_config.get_int("model_capacity") or (
-    50 if stack_info.env_suffix == "production" else 5
-)
+# Capacity is in thousands of tokens per minute. For the GlobalStandard deployments
+# below, quota is pooled per model *and version* across every region in the
+# subscription -- not one pool shared by all models, and not per region. So the three
+# deployments of a given model in this environment compete with that model's six
+# deployments in the other two environments, and with nothing else.
+# Ref: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/quotas-limits
+#
+# Production has no default. The subscription's approved per-model quota is not known
+# yet (see the spec's open questions), and a default that silently asks for capacity
+# nobody has confirmed turns a bootstrap into a partial deploy: the account and
+# identity create, then Deployment creation fails on quota. Non-production gets only
+# enough to exercise the code path.
+configured_capacity = azure_config.get_int("model_capacity")
+if stack_info.env_suffix == "production" and configured_capacity is None:
+    msg = (
+        "azure_openai:model_capacity must be set explicitly for Production. "
+        "Check the subscription's approved TPM quota for each model in "
+        f"{location} first -- `az cognitiveservices usage list -l {location}` -- "
+        "and remember the value is per model, per deployment across every "
+        "environment."
+    )
+    raise ValueError(msg)
+default_capacity = configured_capacity or 5
 
 # gpt-4o and gpt-4o-mini are learn-ai's current defaults; gpt-5.2 is what edxapp's
 # translations config already asks OpenAI for. Deploying all three is what lets Azure

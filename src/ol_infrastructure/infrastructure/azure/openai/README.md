@@ -87,10 +87,22 @@ Pinning also switches that deployment to `NoAutoUpgrade`, so a new default versi
 cannot change model behaviour under a running application with no deploy and no diff.
 
 Capacity (`azure_openai:model_capacity`, in thousands of tokens per minute) defaults to
-50 for Production and 5 elsewhere. TPM quota is allocated **per subscription, per
-region, per model** and is shared across every account, so all 27 deployments across the
-three environments divide one pool. Raising a non-production capacity takes quota away
-from Production.
+5 outside Production. **Production has no default and must be set explicitly** — the
+stack raises at preview otherwise. The subscription's approved quota is not known yet,
+and a default that asks for capacity nobody confirmed turns a bootstrap into a partial
+deploy: the account and identity create, then `Deployment` creation fails on quota.
+
+Quota is pooled **per model and version, per deployment type** — not one pool shared by
+all models. These are `GlobalStandard` deployments, and [Microsoft's
+docs](https://learn.microsoft.com/en-us/azure/ai-foundry/openai/quotas-limits) are
+explicit that "deployments of the same model and version share one quota pool across
+all regions in a subscription", so the pool is not per region either.
+
+Concretely: the three `gpt-4o` deployments in an environment compete with the six
+`gpt-4o` deployments in the other two environments, and with nothing else. Not all 27
+deployments against one pool. Capacity planning sums nine deployments per model, three
+times over, against three separate pools. Raising a non-production capacity still takes
+quota from Production, but only for that one model.
 
 ## Local development
 
