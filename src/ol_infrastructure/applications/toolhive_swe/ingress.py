@@ -4,10 +4,11 @@ The ``VirtualMCPServer`` is exposed to the internet on the operations cluster
 using the hybrid HTTPRoute + ApisixTls pattern (ADR-0003): cert-manager issues a
 Let's Encrypt certificate for the host and the paired ApisixTls resource binds
 it to the APISIX gateway, while a Gateway API HTTPRoute routes every path
-(``/mcp``, ``/authorize``, ``/token``, ``/oauth/callback``, ``/.well-known/*``)
-to the vMCP Service. APISIX does NOT participate in authentication — it only
-terminates TLS and proxies through; all auth (OAuth endpoints + token
-validation) happens inside the vMCP, so no plugins are attached.
+(``/mcp``, ``/.well-known/*``) to the vMCP Service. APISIX does NOT participate
+in authentication — it only terminates TLS and proxies through; the vMCP is a
+pure OAuth resource server (no embedded auth server, no token endpoints of its
+own) validating bearer tokens Keycloak issued directly to MCP clients, so no
+plugins are attached.
 
 The hostname must also be present in the operations EKS stack's
 ``eks:apisix_domains`` so external-dns points it at the APISIX NLB.
@@ -57,8 +58,8 @@ def create_ingress_resources(
     )
 
     # Gateway API HTTPRoute attaching the host to the shared operations APISIX
-    # gateway and routing all paths (MCP + OAuth + /.well-known/*) to the vMCP
-    # Service. No plugins: authentication happens inside the vMCP.
+    # gateway and routing all paths (MCP + /.well-known/*) to the vMCP Service.
+    # No plugins: token validation happens inside the vMCP.
     vmcp_httproute = OLApisixHTTPRoute(
         f"toolhive-swe-vmcp-apisix-httproute-{stack_info.env_suffix}",
         route_configs=[
