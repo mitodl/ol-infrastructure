@@ -105,6 +105,7 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
         "MCP_PROXY_FOR_AWS_VERSION",
         "MCP_SENTRY_VERSION",
     ],
+    "applications/vuln_scanner/": [],
     "applications/witan/": [],
     "applications/xpro/": ["NGINX_VERSION"],
     "applications/xqueue/": ["NGINX_VERSION"],

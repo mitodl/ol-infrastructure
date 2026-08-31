@@ -154,6 +154,28 @@ def test_con03_exempts_forks_and_archived() -> None:
     assert "CON-03" in fired([repo(archetype="library", default_branch="master")])
 
 
+def test_dx07_fires_on_stale_forks_too_but_with_different_remediation() -> None:
+    """Unlike CON-03/SEC-01, DX-07 does not exempt forks -- 58 of the 74 stale active
+    repos measured 2026-08-24 are forks, and a fork nobody has synced in a year is a
+    real signal (upstream may itself be dormant), not noise. What has to differ is the
+    remediation: a fork is not ours to archive on staleness alone.
+    """
+    stale_fork = repo(
+        name="stale-fork", archetype="fork", _pushed_at="2020-01-01T00:00:00Z"
+    )
+    stale_owned = repo(
+        name="stale-owned", archetype="library", _pushed_at="2020-01-01T00:00:00Z"
+    )
+    findings = {
+        f.repo: f
+        for f in audit.evaluate([stale_fork, stale_owned])
+        if f.rule_id == "DX-07"
+    }
+    assert findings["stale-owned"].remediation == "archive it"
+    assert findings["stale-fork"].remediation != "archive it"
+    assert "upstream" in findings["stale-fork"].remediation
+
+
 def test_archived_repos_are_out_of_scope_for_active_rules() -> None:
     """An archived repo must not be reported for things nobody can change on it."""
     archived = repo(archived=True, topics=[], description=None, allow_auto_merge=False)

@@ -130,6 +130,7 @@ def build_notes_pipeline(
             notes_pulumi_code,
             refresh_stack=True,
             topology="preview-gated",
+            record_deployments=False,
             auto_deploy_stages=["CI"],
             stack_names=[
                 f"{deployment.deployment_name}.{stage}"

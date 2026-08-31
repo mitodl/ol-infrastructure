@@ -86,6 +86,7 @@ def build_kubewatch_webhook_handler_pipeline() -> PipelineFragment:
     webhook_handler_fragment = pulumi_jobs_chain(
         refresh_stack=True,
         topology="preview-gated",
+        record_deployments=False,
         auto_deploy_stages=["CI"],
         pulumi_code=webhook_handler_pulumi_code,
         stack_names=_WEBHOOK_HANDLER_STACK_NAMES,
@@ -163,6 +164,7 @@ def build_kubewatch_pipeline() -> PipelineFragment:
     kubewatch_fragment = pulumi_jobs_chain(
         refresh_stack=True,
         topology="preview-gated",
+        record_deployments=False,
         auto_deploy_stages=["CI"],
         pulumi_code=kubewatch_pulumi_code,
         stack_names=[f"applications.{env}" for env in ("CI", "QA", "Production")],

@@ -26,6 +26,7 @@ ocw_theme_code = git_repo(
 pulumi_jobs = pulumi_jobs_chain(
     refresh_stack=True,
     topology="preview-gated",
+    record_deployments=False,
     pulumi_code=ocw_site_pulumi_code,
     stack_names=[
         "QA",

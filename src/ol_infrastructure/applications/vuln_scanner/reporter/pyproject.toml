@@ -1,0 +1,12 @@
+[project]
+name = "vuln-scanner-reporter"
+version = "0.1.0"
+description = "Uploads ZAP/Nuclei scan reports to S3 and imports findings into AWS Security Hub via ASFF."
+requires-python = ">=3.14"
+dependencies = ["boto3>=1.34,<2"]
+
+# A standalone script, not an installable package -- tells uv to just
+# install dependencies into the venv rather than trying to build/install
+# this project itself as a wheel.
+[tool.uv]
+package = false

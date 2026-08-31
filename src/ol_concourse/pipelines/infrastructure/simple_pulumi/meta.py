@@ -226,6 +226,7 @@ if __name__ == "__main__":
         "toolhive-operator",
         "toolhive-swe",
         "vector-log-proxy",
+        "vuln-scanner",
         "xpro-partner-dns",
     ]
 

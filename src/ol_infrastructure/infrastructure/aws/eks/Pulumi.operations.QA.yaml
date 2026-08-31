@@ -28,6 +28,7 @@ config:
   - toolhive-apps
   - toolhive-data
   - omnigraph
+  - vuln-scanner
   - witan
   eks:nodegroups:
     worker-xlarge:

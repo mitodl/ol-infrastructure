@@ -131,6 +131,7 @@ class Services(StrEnum):
     tika = "tika"
     toolhive = "toolhive"
     omnigraph = "omnigraph"
+    vuln_scanner = "vuln-scanner"
     witan = "witan"
     vector_log_proxy = "vector-log-proxy"
     xpro = "xpro"

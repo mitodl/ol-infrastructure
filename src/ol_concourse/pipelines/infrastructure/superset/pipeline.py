@@ -131,6 +131,7 @@ def build_superset_docker_pipeline() -> Pipeline:
         pulumi_code_repo,
         refresh_stack=True,
         topology="preview-gated",
+        record_deployments=False,
         auto_deploy_stages=["CI"],
         stack_names=["CI", "QA", "Production"],
         project_name="ol-infrastructure-superset-server",

@@ -99,6 +99,7 @@ aws_account = get_caller_identity()
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 policy_stack = make_stack_reference(projects.POLICIES, "default")
 dns_stack = make_stack_reference(projects.DNS, "default")
+sentry_stack = make_stack_reference(projects.SENTRY, "default")
 vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
@@ -666,10 +667,15 @@ ovs_server_vault_mount = vault.Mount(
     ),
     opts=ResourceOptions(delete_before_replace=True),
 )
+# The Sentry DSN is owned by the ol-infrastructure-sentry stack rather than SOPS,
+# so it is merged into the collected secrets here instead of being carried in
+# data.{env}.yaml. See ol-infrastructure#5004.
 ovs_server_secrets = vault.generic.Secret(
     "ovs-server-configuration-secrets",
     path=ovs_server_vault_mount.path.apply("{}/ovs-secrets".format),
-    data_json=json.dumps(secrets),
+    data_json=sentry_stack.require_output("odl_video_service_sentry_dsn").apply(
+        lambda dsn: json.dumps({**secrets, "sentry": {"dsn": dsn}})
+    ),
 )
 
 

@@ -23,6 +23,7 @@ config:
     GITHUB_WEBHOOK_BRANCH: 'release-candidate'
     GTM_ACCOUNT_ID: GTM-57BZ8PN
     HUGO_CSRF_COOKIE_NAME: learn_rc_csrftoken
+    LEARN_AI_SYLLABUS_ENDPOINT: https://api.rc.learn.mit.edu/ai/http/syllabus_agent/
     MAILGUN_FROM_EMAIL: 'MIT OCW <no-reply@ocw-rc.mail.odl.mit.edu'
     MAILGUN_SENDER_DOMAIN: 'ocw-rc.mail.odl.mit.edu'
     MAILGUN_URL: https://api.mailgun.net/v3/ocw-rc.mail.odl.mit.edu

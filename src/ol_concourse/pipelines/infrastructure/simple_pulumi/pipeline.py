@@ -139,6 +139,12 @@ class SimplePulumiParams(BaseModel):
         auto_deploy_stages: Only used with topology="preview-gated". Stages
                            listed here keep today's auto-deploy-on-change
                            behavior instead of being gated. Typically ["CI"].
+        record_deployments: Only used with topology="preview-gated". Whether
+                           each deploy posts a "... deployed." GitHub issue as
+                           an audit record. Defaults to False -- under
+                           preview-gated the gate issue is what authorises the
+                           deploy, so the record issue is pure noise unless a
+                           pipeline specifically wants an audit trail.
     """
 
     app_name: str
@@ -156,6 +162,7 @@ class SimplePulumiParams(BaseModel):
     refresh_stack: bool = True
     topology: Literal["deploy-chained", "preview-gated"] = "deploy-chained"
     auto_deploy_stages: list[str] | None = None
+    record_deployments: bool = False
 
     @model_validator(mode="before")
     @classmethod
@@ -667,6 +674,30 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         ),
         build=BuildConfig(dockerfile_path="./Dockerfile"),
     ),
+    "vuln-scanner": SimplePulumiParams(
+        app_name="vuln-scanner",
+        pulumi_project_path="applications/vuln_scanner/",
+        pulumi_project_name="ol-application-vuln-scanner",
+        # Only Pulumi.QA.yaml exists -- this scans MIT Learn's QA endpoint
+        # specifically, deliberately not Production (see __main__.py's
+        # module docstring).
+        stages=["QA"],
+        # Same reasoning as release-bot: don't auto-deploy a tool that runs
+        # active attack payloads and holds real S3-write/Security-Hub
+        # credentials on every push -- gate it on a reviewed preview instead.
+        topology="preview-gated",
+        # The reporter image's Dockerfile lives in a `reporter/` subdirectory
+        # of pulumi_project_path, not at its root like release-bot's --
+        # dockerfile_path is relative to pulumi_project_path (this job's
+        # build CONTEXT), so the Dockerfile's own COPY sources are
+        # `reporter/...`, not bare filenames.
+        docker_image=DockerImageConfig(
+            image_repository="vuln-scanner-reporter",
+            ecr_region=ECR_REGION,
+            env_var_for_digest="VULN_SCANNER_REPORTER_DOCKER_SHA",
+        ),
+        build=BuildConfig(dockerfile_path="./reporter/Dockerfile"),
+    ),
 }
 
 
@@ -865,6 +896,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                     custom_dependencies=cross_env_custom_deps or None,
                     topology=params.topology,
                     auto_deploy_stages=params.auto_deploy_stages,
+                    record_deployments=params.record_deployments,
                 )
 
                 # Collect resources and jobs
@@ -899,6 +931,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                 custom_dependencies=cross_env_custom_deps or None,
                 topology=params.topology,
                 auto_deploy_stages=params.auto_deploy_stages,
+                record_deployments=params.record_deployments,
             )
 
             all_pipeline_resources = [
@@ -936,6 +969,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             custom_dependencies=cross_env_custom_deps or None,
             topology=params.topology,
             auto_deploy_stages=params.auto_deploy_stages,
+            record_deployments=params.record_deployments,
         )
 
         all_pipeline_resources = [
