@@ -45,10 +45,42 @@ config:
   # Cross-checked against storage_prefix at preview time — see the CI
   # config's comment on this same key for why.
   omnigraph:internal_schema_version: 6
-  # ★ QA ONLY, AND IT IS AN INSTRUMENT SETTING, NOT A TUNING. Raised 4 -> 50 so
-  # the data tier's per-actor admission cap stops bounding a measurement OF the
-  # data tier. Neither Production nor CI sets this key, so both stay on
-  # data_tier.py's DEFAULT_PER_ACTOR_INFLIGHT_MAX of 4. Do not copy this there.
+  # ★★ THE EXPERIMENT THIS WAS RAISED FOR IS OVER, IT FAILED, AND THE VALUE
+  # STAYS ANYWAY. Read this before "fixing" it.
+  #
+  # RESULT: with this cap at 50 AND witan's client-side gate also at 50, a
+  # 16-writer probe against QA returned 0 acked / 16 errored with 8
+  # INDETERMINATE (errored but committed), and every read timed out. The witan
+  # pod log recorded 13 `outcome: ok` for the same 16 writes — thirteen writes
+  # landed and not one caller learned it. Progression:
+  #     gate 4  / actor 4    6 acked, 0 INDETERMINATE  (clean refusals)
+  #     gate 50 / actor 4    9 acked, 0 INDETERMINATE  (clean 429s)
+  #     gate 50 / actor 50   0 acked, 8 INDETERMINATE  (collapse)
+  #
+  # ★ THE MEMORY PREDICTION HELD; THE TIME ONE DID NOT SAVE US. No OOMKill, 0
+  # restarts, pod Ready throughout — per_actor_bytes_max at 256 MiB did its job
+  # exactly as argued below. The failure was purely TIME: writes are still
+  # serialised per graph, the queue ran past the 120s budget, and callers
+  # collected errors for work that had already committed. So #531's parallel
+  # staging did NOT change the per-graph serialisation, and data_tier.py's knee
+  # is real even though its 30s premise went stale.
+  #
+  # ★ MAINTAINER DECISION 2026-08-31: KEEP 50 ON QA REGARDLESS. QA sees no real
+  # use, so the exposure has no victim, and leaving it lifted keeps QA
+  # unblocked for future sizing work without another two deploy cycles. This is
+  # deliberate, not an un-reverted experiment.
+  #
+  # ★ NEVER COPY THIS TO CI OR PRODUCTION. Neither sets this key, so both stay
+  # on data_tier.py's DEFAULT_PER_ACTOR_INFLIGHT_MAX of 4, and the collapse
+  # above is what raising it there would buy.
+  #
+  # DO NOT chase more throughput by raising caps further — that lever is spent.
+  # The next honest one is reducing per-write cost: a single-row insert costs a
+  # full-table FilteredRead upstream, and batching the hot witan write paths.
+  #
+  # The original rationale for trying 50 follows, kept because the reasoning
+  # about WHY each cap had to move is still correct; only its hoped-for outcome
+  # was wrong.
   #
   # WHY, IN SEQUENCE. omnigraph #531 (in the `edge` build agent-kit#305 pinned)
   # stages independent tables at the loader's write concurrency instead of a

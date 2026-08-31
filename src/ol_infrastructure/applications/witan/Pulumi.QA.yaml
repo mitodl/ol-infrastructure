@@ -5,11 +5,37 @@ config:
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
   # witan:oidc_audience: witan
-  # ★ QA ONLY, AND IT IS AN INSTRUMENT SETTING, NOT A TUNING. Raised 4 -> 50 to
-  # take this gate OUT OF THE EXPERIMENT entirely. Neither Production nor CI
-  # sets this key at all, so both stay on witan's code default of 4 — which
-  # deployment.py describes as the measured value — and this edit must not be
-  # copied to them while the gate is load-bearing there.
+  # ★★ THE EXPERIMENT THIS WAS RAISED FOR IS OVER, IT FAILED, AND THE VALUE
+  # STAYS ANYWAY. Read this before "fixing" it.
+  #
+  # RESULT: with this gate at 50 AND omnigraph's per-actor cap also at 50, a
+  # 16-writer probe against QA returned 0 acked / 16 errored with 8
+  # INDETERMINATE (errored but committed), and every read timed out. The witan
+  # pod log recorded 13 `outcome: ok` for the same 16 writes — thirteen writes
+  # landed and not one caller learned it. That is precisely the
+  # indeterminate-write failure the gate exists to prevent. Progression:
+  #     gate 4  / actor 4    6 acked, 0 INDETERMINATE  (clean refusals)
+  #     gate 50 / actor 4    9 acked, 0 INDETERMINATE  (clean 429s)
+  #     gate 50 / actor 50   0 acked, 8 INDETERMINATE  (collapse)
+  # So omnigraph #531 bought no capacity that survives removing the caps, and
+  # the caps' value was never throughput — it is turning "your write may or
+  # may not have happened" into "nothing was written, retry".
+  #
+  # ★ MAINTAINER DECISION 2026-08-31: KEEP 50 ON QA REGARDLESS. QA sees no real
+  # use, so the exposure has no victim, and leaving it lifted keeps QA
+  # unblocked for future sizing work without another two deploy cycles. This is
+  # deliberate, not an un-reverted experiment. QA is knowingly a place where
+  # concurrent writes go indeterminate: treat a QA write-concurrency symptom as
+  # expected, not as a new bug.
+  #
+  # ★ NEVER COPY THIS TO CI OR PRODUCTION. Neither sets this key, so both stay
+  # on witan's code default of 4 — which deployment.py describes as the
+  # measured value — and there the gate is load-bearing, with real users on the
+  # other side of it.
+  #
+  # The original rationale for trying 50 follows, kept because the reasoning
+  # about WHY the first cap had to move is still correct; only its hoped-for
+  # outcome was wrong.
   #
   # Why: omnigraph #531 (in the `edge` build pinned by agent-kit#305) stages
   # independent tables at the loader's write concurrency instead of a pinned 1,
