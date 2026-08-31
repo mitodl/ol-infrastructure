@@ -236,9 +236,9 @@ names the author and timestamp of every version, and distinguishes a real hand
 edit from an adoption that has not been applied yet.
 
 After the first apply the rules report `provenance: "api"` and the Grafana UI
-refuses to edit them, so this drift class cannot recur for an adopted group —
-which is also why a genuine post-adoption change has to come through this
-program rather than the UI.
+refuses to edit them, so UI-originated drift cannot recur for an adopted group.
+Changes should therefore be made through this program, although another client
+with provisioning-API access can still modify the group.
 
 ### Adding a new log alert rule
 
