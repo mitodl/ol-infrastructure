@@ -125,8 +125,8 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                 password="((dockerhub.password))",  # noqa: S106
             )
 
-            # Each earthly build requires several inputs, build that list pre-emptively
-            earthly_build_job = Job(
+            # Each build requires several inputs, build that list pre-emptively
+            edxapp_build_job = Job(
                 name=f"build-{release_name}-{deployment_name}-edxapp-image",
                 build_log_retention={"builds": 10},
                 max_in_flight=1,
@@ -160,9 +160,9 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                                     "tag": "latest",
                                 },
                             ),
-                            # Use some cleverness with path to mount resources within
-                            # the earthly git resource so code is where the Earthfile
-                            # expects
+                            # Mount edx-platform and the theme as siblings of the
+                            # lehrer checkout so the dagger module's relative
+                            # --source / --theme-source paths resolve.
                             inputs=[
                                 Input(name=lehrer_git_resource.name),
                                 Input(name=edx_platform_git_resource.name),
@@ -199,7 +199,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                 ],
             )
 
-            job_names.append(earthly_build_job.name)
+            job_names.append(edxapp_build_job.name)
 
             container_fragments.append(
                 PipelineFragment(
@@ -211,7 +211,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                         *theme_git_resources,
                         *edx_platform_git_resources,
                     ],
-                    jobs=[earthly_build_job],
+                    jobs=[edxapp_build_job],
                 )
             )
 
@@ -244,7 +244,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                         GetStep(
                             get=edx_registry_image_resource.name,
                             trigger=False,
-                            passed=[earthly_build_job.name],
+                            passed=[edxapp_build_job.name],
                             params={"skip_download": True},
                         ),
                     ],

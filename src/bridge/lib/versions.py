@@ -4,6 +4,8 @@ CONCOURSE_VERSION = "8.3.0"  # (TMM 2026-03-06) - Pin to <8.1.0 because of some 
 CONSUL_TEMPLATE_VERSION = "0.42.1"
 # renovate: datasource=github-releases depName=consul packageName=hashicorp/consul
 CONSUL_VERSION = "2.0.3"
+# renovate: datasource=github-releases depName=dagger packageName=dagger/dagger
+DAGGER_VERSION = "0.21.9"
 # renovate: datasource=pypi depName=jupyterhub packageName=jupyterhub
 JUPYTERHUB_VERSION = "5.5.1"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
@@ -13,7 +15,7 @@ LEEK_VERSION = "0.7.7"
 # renovate: datasource=docker depName=meilisearch packageName=getmeili/meilisearch
 MEILISEARCH_VERSION = "v1.53.1"
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
-OPEN_METADATA_VERSION = "1.13.3"
+OPEN_METADATA_VERSION = "2.0.0"
 # renovate: datasource=github-releases depName=traefik packageName=traefik/traefik
 TRAEFIK_VERSION = "3.7.11"
 # renovate: datasource=docker depName=typesense packageName=typesense/typesense
@@ -31,7 +33,7 @@ SUPERSET_CHART_VERSION = "0.22.4"
 # renovate: datasource=helm depName=tika packageName=tika registryUrl=https://apache.jfrog.io/artifactory/tika
 TIKA_CHART_VERSION = "3.2.2"
 # renovate: datasource=helm depName=apisix packageName=apisix registryUrl=https://apache.github.io/apisix-helm-chart
-APISIX_CHART_VERSION = "2.16.1"
+APISIX_CHART_VERSION = "2.17.0"
 # renovate: datasource=helm depName=aws-load-balancer-controller packageName=aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts
 AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=aws-node-termination-handler packageName=aws-node-termination-handler registryUrl=https://aws.github.io/eks-charts
@@ -39,7 +41,7 @@ AWS_NODE_TERMINATION_HANDLER_CHART_VERSION = "0.27.2"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager registryUrl=https://charts.jetstack.io
 CERT_MANAGER_CHART_VERSION = "v1.21.1"
 # renovate: datasource=helm depName=dagster packageName=dagster registryUrl=https://dagster-io.github.io/helm
-DAGSTER_CHART_VERSION = "1.13.18"
+DAGSTER_CHART_VERSION = "1.13.20"
 # renovate: datasource=aws-eks-addon depName=aws-ebs-csi-driver versioning=aws-eks-addon
 EBS_CSI_DRIVER_VERSION = "v1.63.0-eksbuild.1"
 # renovate: datasource=aws-eks-addon depName=aws-efs-csi-driver versioning=aws-eks-addon
@@ -49,7 +51,7 @@ EXTERNAL_DNS_CHART_VERSION = "1.21.1"
 # renovate: datasource=github-releases depName=gateway-api packageName=kubernetes-sigs/gateway-api
 GATEWAY_API_VERSION = "v1.6.1"
 # renovate: datasource=docker depName=karpenter packageName=public.ecr.aws/karpenter/karpenter
-KARPENTER_CHART_VERSION = "1.14.0"
+KARPENTER_CHART_VERSION = "1.14.1"
 # renovate: datasource=helm depName=keda packageName=keda registryUrl=https://kedacore.github.io/charts
 KEDA_CHART_VERSION = "2.20.2"
 # renovate: datasource=helm depName=kubewatch packageName=kubewatch registryUrl=https://robusta-charts.storage.googleapis.com
@@ -57,7 +59,7 @@ KUBEWATCH_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=meilisearch packageName=meilisearch registryUrl=https://meilisearch.github.io/meilisearch-kubernetes
 MEILISEARCH_CHART_VERSION = "0.38.0"
 # renovate: datasource=helm depName=opik packageName=opik registryUrl=https://comet-ml.github.io/opik
-OPIK_CHART_VERSION = "2.2.35"
+OPIK_CHART_VERSION = "2.2.43"
 # renovate: datasource=helm depName=operator packageName=operator registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
 STARROCKS_OPERATOR_CHART_VERSION = "1.11.7"
 # renovate: datasource=helm depName=operator packageName=starrocks registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
@@ -80,7 +82,7 @@ CLICKHOUSE_SERVER_VERSION = "25.8.1.2953.altinitystable"
 # renovate: datasource=docker depName=clickhouse/clickhouse-keeper packageName=clickhouse/clickhouse-keeper
 CLICKHOUSE_KEEPER_VERSION = "26.7-alpine"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
-TRAEFIK_CHART_VERSION = "41.2.0"
+TRAEFIK_CHART_VERSION = "41.4.0"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
 VANTAGE_K8S_AGENT_CHART_VERSION = "1.9.5"
 # renovate: datasource=helm depName=vault-secrets-operator packageName=vault-secrets-operator registryUrl=https://helm.releases.hashicorp.com
@@ -101,7 +103,7 @@ MARIMO_OPERATOR_VERSION = "v0.3.0"
 # renovate: datasource=docker depName=marimo-jupyterlab packageName=ghcr.io/mitodl/marimo-jupyterlab
 MARIMO_JUPYTERLAB_VERSION = "latest"
 # renovate: datasource=helm depName=k8s-monitoring packageName=k8s-monitoring registryUrl=https://grafana.github.io/helm-charts
-GRAFANA_K8S_MONITORING_CHART_VERSION = "4.4.0"
+GRAFANA_K8S_MONITORING_CHART_VERSION = "4.5.0"
 # renovate: datasource=helm depName=dcgm-exporter packageName=dcgm-exporter registryUrl=https://nvidia.github.io/dcgm-exporter/helm-charts
 NVIDIA_DCGM_EXPORTER_CHART_VERSION = "4.8.3"
 # renovate: datasource=helm depName=nvidia-device-plugin packageName=nvidia-device-plugin registryUrl=https://nvidia.github.io/k8s-device-plugin
@@ -123,9 +125,9 @@ TYPESENSE_OPERATOR_CHART_VERSION = "0.4.1"
 # renovate: datasource=helm depName=vertical-pod-autoscaler packageName=vertical-pod-autoscaler registryUrl=https://kubernetes.github.io/autoscaler
 VPA_CHART_VERSION = "0.11.0"
 # renovate: datasource=docker depName=toolhive-operator-crds packageName=ghcr.io/stacklok/toolhive/toolhive-operator-crds
-TOOLHIVE_OPERATOR_CRDS_CHART_VERSION = "0.44.0"
+TOOLHIVE_OPERATOR_CRDS_CHART_VERSION = "0.46.0"
 # renovate: datasource=docker depName=toolhive-operator packageName=ghcr.io/stacklok/toolhive/toolhive-operator
-TOOLHIVE_OPERATOR_CHART_VERSION = "0.44.0"
+TOOLHIVE_OPERATOR_CHART_VERSION = "0.46.0"
 # renovate: datasource=docker depName=mcp-grafana packageName=grafana/mcp-grafana
 MCP_GRAFANA_VERSION = "1.1.0"
 # ToolHive-built npx wrapper image for the Sentry MCP server (getsentry/sentry-mcp

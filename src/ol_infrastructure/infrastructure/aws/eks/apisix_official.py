@@ -21,18 +21,26 @@ from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 # APISIX's default enabled-plugins list for the version shipped by the pinned
-# chart (chart 2.16.x => APISIX 3.17.x), extracted verbatim from
-# https://github.com/apache/apisix/blob/3.17.0/apisix/cli/config.lua
+# chart (chart 2.17.x => APISIX 3.18.x), taken from
+# https://github.com/apache/apisix/blob/3.18.0/apisix/cli/config.lua
 #
 # Setting ``apisix.plugins`` in the Helm values REPLACES this default list
 # rather than extending it, so the full list must be reproduced here.  We do
 # this solely to add ``opentelemetry`` (which is NOT enabled by default) without
 # silently dropping any plugin that applications already rely on.
 #
+# ``server-info`` is absent here because upstream comments it out of its own
+# default list ("deprecated and will be removed in a future release") in both
+# 3.17 and 3.18.  This list is the active set, so it stays out -- no local
+# exception to carry forward on the next upgrade.
+#
+# 3.18 adds ``ai-cache``, ``ai-lakera-guard`` and ``ldap-auth-advanced`` to the
+# defaults and removes none.
+#
 # IMPORTANT: revisit this list on every APISIX major/minor upgrade.  If it
 # drifts from the APISIX default for the running version, plugins omitted here
 # will stop loading.  ``opentelemetry`` is appended at the end below.
-APISIX_DEFAULT_PLUGINS_3_17: list[str] = [
+APISIX_DEFAULT_PLUGINS_3_18: list[str] = [
     "real-ip",
     "ai",
     "client-control",
@@ -59,6 +67,7 @@ APISIX_DEFAULT_PLUGINS_3_17: list[str] = [
     "authz-casbin",
     "authz-casdoor",
     "wolf-rbac",
+    "ldap-auth-advanced",
     "ldap-auth",
     "hmac-auth",
     "basic-auth",
@@ -83,8 +92,10 @@ APISIX_DEFAULT_PLUGINS_3_17: list[str] = [
     "ai-rate-limiting",
     "ai-proxy-multi",
     "ai-proxy",
+    "ai-cache",
     "ai-aws-content-moderation",
     "ai-aliyun-content-moderation",
+    "ai-lakera-guard",
     "proxy-mirror",
     "graphql-proxy-cache",
     "proxy-rewrite",
@@ -142,7 +153,7 @@ APISIX_DEFAULT_PLUGINS_3_17: list[str] = [
 # Full enabled-plugins list applied via the Helm chart: APISIX defaults plus the
 # opentelemetry plugin, which emits OTLP traces (not metrics) for every request.
 APISIX_ENABLED_PLUGINS: list[str] = [
-    *APISIX_DEFAULT_PLUGINS_3_17,
+    *APISIX_DEFAULT_PLUGINS_3_18,
     "opentelemetry",
 ]
 
@@ -223,7 +234,7 @@ def setup_apisix(
     session_cookie_name = mit_learn_session_cookie_name(stack_info.env_suffix)
 
     # APISIX chart uses a different chart version scheme
-    # Chart version 2.16.x contains APISIX 3.17.x
+    # Chart version 2.17.x contains APISIX 3.18.x
     apisix_chart_version = versions["APISIX_CHART"]
 
     # OpenTelemetry tracing is exported to the in-cluster Grafana Alloy receiver,

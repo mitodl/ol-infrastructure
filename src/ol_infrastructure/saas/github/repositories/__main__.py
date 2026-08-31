@@ -22,7 +22,7 @@ same failure mode as a repo missing from the fleet entirely.
 import pulumi
 
 from ol_infrastructure.lib.github_helper import setup_github_provider
-from ol_infrastructure.saas.github.repositories import archetypes, repository
+from ol_infrastructure.saas.github.repositories import archetypes, repository, rulesets
 
 # Must run before any github.* resource is constructed: the stack transformation
 # attaches the App-authenticated provider to every one of them.
@@ -41,4 +41,4 @@ if batch:
     pulumi.log.info(f"batch filter active: {len(fleet)} of the fleet")
 
 for repo in fleet:
-    repository.build(repo)
+    rulesets.build(repo, repository.build(repo))

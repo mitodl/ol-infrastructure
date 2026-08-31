@@ -49,7 +49,7 @@ Mimir (per-stack metrics storage, exposed as a Prometheus datasource)
 Grafana Alertmanager
     │  matches fired alerts against the NotificationPolicy route tree
     ▼
-Rootly webhook  ──or──  Slack (#notifications-ocw-misc)
+Rootly webhook  ──or──  Slack (#devops-warnings)
 ```
 
 **Grafana-managed vs Mimir ruler-managed rules**
@@ -391,27 +391,23 @@ Pulumi's own reported result.
 The notification policy in `alertmanager.py` mirrors the original
 `grafana-alerts/alertmanager.yaml` route tree:
 
-1. `channel=notifications-ocw-misc` → Slack by severity (warning/critical),
-   anything else with that label is silenced.
-2. `channel=devops-warnings` → a separate pair of Slack contact points, same
-   pattern as (1), reusing the OCW misc webhook/token with a different
-   `recipient`. `HPAAtMaxReplicas*` uses this route deliberately (see
+1. `channel=devops-warnings` → a pair of Slack contact points by severity.
+   `HPAAtMaxReplicas*` uses this route deliberately (see
    `metric_rules/eks_general.py`) to stay off the paging path entirely --
-   at-max is a capacity fact, not an incident -- and not (1), since that
-   rule fires cluster-wide, not just for OCW's workloads.
-3. `alertname=~Kube.*` → silenced (built-in k8s noise, not actionable).
-4. `alertname=~Pod(OOMKilled|CrashLooping)(Warning|Critical)` → Rootly, but
+   at-max is a capacity fact, not an incident.
+2. `alertname=~Kube.*` → silenced (built-in k8s noise, not actionable).
+3. `alertname=~Pod(OOMKilled|CrashLooping)(Warning|Critical)` → Rootly, but
    grouped at the namespace level (root `group_bies` drops to `deployment`,
    no `pod`/`container`) with `group_interval=30m`/`repeat_interval=12h`, so
    a churning workload reports once instead of minting one alert per pod
    name.
-5. `severity=warning` → Rootly.
-6. `severity=critical` → Rootly.
-7. Default (catch-all) → `oblivion` (empty contact point, acts as drop sink).
+4. `severity=warning` → Rootly.
+5. `severity=critical` → Rootly.
+6. Default (catch-all) → `oblivion` (empty contact point, acts as drop sink).
 
 OpsGenie is no longer active. All actionable alerts route to Rootly.
 
-**Rule 7 is load-bearing, not just a fallback.** A rule carrying no `severity`
+**Rule 6 is load-bearing, not just a fallback.** A rule carrying no `severity`
 label is still evaluated and still recorded in `grafanacloud-alert-state-history`
 — it is simply delivered nowhere. `metric_rules/apisix_edge.py` uses that
 deliberately, to calibrate new thresholds against real firing data at zero paging
@@ -433,13 +429,13 @@ That rule is plugin-owned and stays in `oblivion` deliberately — the latency
 signal it carries is now covered by the `- Elevated Request Latency` rules in
 `metric_rules/synthetic_monitoring.py`, which reach `#devops-warnings`.
 
-**Route 3 swallows by *name*, not just by missing label.** `alertname =~ Kube.*`
+**Route 2 swallows by *name*, not just by missing label.** `alertname =~ Kube.*`
 sits above the severity routes and carries `continue_=False`, so any rule whose
 name starts with `Kube` goes to `oblivion` no matter what `severity` it carries.
 Our own `KubernetesJobFailedWarning`/`Critical` matched it and were undeliverable
 for as long as they existed — 254 firings in 30 days on the production stack and
 104 on QA, none of which reached Rootly. They are now `WorkloadJobFailed*`.
-**Do not name a rule `Kube*` unless you intend it to be silenced**; route 3 is
+**Do not name a rule `Kube*` unless you intend it to be silenced**; route 2 is
 meant for the built-in kube-state-metrics alerts, not for rules defined here.
 
 ---
@@ -453,7 +449,6 @@ Required keys per secrets file:
 grafana_url: https://<stack>.grafana.net
 grafana_api_token: <service-account-token>
 rootly_bearer_token: <rootly-webhook-bearer-token>
-slack_notifications_ocw_misc_api_url: <slack-webhook-url>
 slack_notifications_devops_warnings: <slack-webhook-url>  # required; used by devops-warnings contact points
 
 # Production only (Pingdom checks run from production stack only):

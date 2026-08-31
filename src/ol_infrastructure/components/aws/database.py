@@ -649,17 +649,33 @@ class OLAmazonDB(pulumi.ComponentResource):
             "ci": ci_profiles,
             "qa": {},
             "production": {
-                "EBSIOBlance": {
-                    "comparison_operator": "LessThanThreshold",
-                    "description": "RDS - EBS IO Balance Remaining",
-                    "datapoints_to_alarm": 2,
-                    "level": "warning",
-                    "period": 300,  # 5 minutes
-                    "evaluation_periods": 2,  # 10 minutes
-                    "metric_name": "EBSIOBalance%",
-                    "threshold": 75,  # percent
-                    "unit": "Percent",
-                },
+                # There was an EBSIOBalance% alarm here, at < 75% for 2 periods. It
+                # was removed because it could not fire, on any database we run.
+                #
+                # EBSIOBalance% reports how much of a burst-credit bucket is left, and
+                # only volume types that have such a bucket ever deplete it. Every one
+                # of the 74 RDS instances in us-east-1 is gp3, which has provisioned
+                # IOPS and no burst bucket, so the metric is emitted but pinned. Across
+                # 30 days and 720 hourly samples the MINIMUM is 99.0 on all seven
+                # databases sampled -- ol-etl-db-production, ol-mitlearn-db-production,
+                # edxapp-db-mitx-production, keycloak-production,
+                # ol-superset-db-production, micromasters-production-app-db and
+                # odl-video-service-production. Against a threshold of 75 that is not a
+                # quiet alarm, it is an arithmetically impossible one, and all 19 of the
+                # alarms this created sat in OK permanently.
+                #
+                # A constant being reported back as though it were a measurement is the
+                # same failure the Dagster pool investigation turned up in CloudWatch
+                # DatabaseConnections, which min_pool_size pinned to a flat 900. Both
+                # look like healthy signal until you check whether the number can move.
+                #
+                # This leaves gp3 IO saturation uncovered. The metrics that would cover
+                # it are ReadIOPS/WriteIOPS against provisioned IOPS and
+                # ReadThroughput/WriteThroughput against provisioned throughput, both
+                # per instance -- so a house-wide threshold needs those ratios checked
+                # across every database on this profile first. DiskQueueDepth below is
+                # the partial stand-in until then: it measures the queue that IO
+                # saturation produces, without knowing what the ceiling is.
                 "DiskQueueDepth": {
                     "comparison_operator": "GreaterThanThreshold",
                     "description": "RDS - Disk Queue Depth - Requests waiting",

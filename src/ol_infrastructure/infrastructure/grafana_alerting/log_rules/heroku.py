@@ -104,7 +104,7 @@ def create(
                 for_="1m",
                 no_data_state="OK",
                 exec_err_state="OK",
-                labels={"severity": "warning", "channel": "notifications-ocw-misc"},
+                labels={"severity": "warning"},
                 annotations={
                     "description": "A 3play transcript request has failed in NonProduction.",
                 },
@@ -119,7 +119,7 @@ def create(
                 for_="1m",
                 no_data_state="OK",
                 exec_err_state="OK",
-                labels={"severity": "warning", "channel": "notifications-ocw-misc"},
+                labels={"severity": "warning"},
                 annotations={
                     "description": "A 3play transcript request has failed in Production.",
                 },

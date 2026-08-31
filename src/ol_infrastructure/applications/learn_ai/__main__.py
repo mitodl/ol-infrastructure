@@ -76,6 +76,7 @@ from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
+    vcl_snippet,
 )
 from ol_infrastructure.lib.k8s_keda import (
     build_webapp_keda_config,
@@ -375,17 +376,17 @@ learn_ai_fastly_service = fastly.ServiceVcl(
         ),
     ],
     snippets=[
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             name="Add frontend to path",
             content=Path("files/frontend_path_prefix.vcl").read_text(),
             type="recv",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             name="Return custom 404 page",
             content=Path("files/custom_404.vcl").read_text(),
             type="deliver",
         ),
-        fastly.ServiceVclSnippetArgs(
+        vcl_snippet(
             name="Redirect for to correct domain",
             content=textwrap.dedent(
                 rf"""

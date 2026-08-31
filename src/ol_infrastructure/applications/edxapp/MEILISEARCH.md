@@ -11,9 +11,39 @@
   meilisearch:cpu_request: "250m"
   meilisearch:memory_request: "4Gi"
   meilisearch:memory_limit: "4Gi"
+  meilisearch:max_indexing_memory: "2Gi" # optional, see Sizing below
 ```
 
 The difference between `deploy` and `enabled`. Deploy means "deploy the helm chart" whereas enabled means "enable meilisearch integration in the Open edX platform". You can deploy the chart but not enable it in Open edX if you want to test things out first.
+
+## Sizing
+
+`max_indexing_memory` sets `MEILI_MAX_INDEXING_MEMORY`, the ceiling on the buffer
+Meilisearch fills before flushing a batch to disk. Left unset it defaults to two
+thirds of the machine's total memory, which it measures with the `sysinfo` crate
+— that reads the host's `/proc/meminfo`, not the cgroup. In a container on a
+64GiB node it therefore budgets ~40GiB no matter what `memory_limit` says, never
+flushes early, and leaves the kernel to reclaim inside the cgroup instead. Set it
+to a fraction of `memory_limit` so the two agree, leaving the remainder for the
+process and for page cache over the memory-mapped index. The key is only emitted
+when configured, so stacks that omit it are unchanged.
+
+Note this caps the indexing buffer, not total process memory: Meilisearch also
+memory-maps its index, and those pages count against the cgroup. Sizing the rest
+is a separate question from this knob — check `usedIndexSize`, not `indexSize`,
+before reasoning about how much of an index is real data:
+
+```bash
+kubectl exec -n <namespace> meilisearch-0 -c meilisearch -- \
+  sh -c 'curl -s -H "Authorization: Bearer $MEILI_MASTER_KEY" localhost:7700/stats'
+```
+
+`indexSize` is space *allocated* to the index's LMDB file, including free pages;
+`usedIndexSize` is what is actually occupied. LMDB never returns freed pages to
+the OS, so rewriting documents in place inflates `indexSize` permanently. Only a
+rebuild through the temp-index-and-swap path (a non-incremental
+`./manage.py cms reindex_studio`) reclaims it — `--incremental` writes in place
+and does not.
 
 ## SOPS secrets
 

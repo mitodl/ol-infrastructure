@@ -483,11 +483,6 @@ def create(
             # instead of bypassing it. See
             # docs/plans/grafana-alerting-remediation-spec.md §3c.
             #
-            # Not `channel: notifications-ocw-misc`: this rule covers every
-            # HPA cluster-wide, not just OCW's, so that channel would be the
-            # wrong audience for most of what it fires on (flagged in review
-            # on #5503). `devops-warnings` is its own contact-point pair in
-            # alertmanager.py, reusing the same Slack webhook/token.
             alerting.RuleGroupRuleArgs(
                 name="HPAAtMaxReplicasWarning",
                 condition="C",

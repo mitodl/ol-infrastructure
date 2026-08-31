@@ -6,6 +6,7 @@ reachable -- if they disagreed, the code would declare something the crawl never
 recorded.
 """
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -179,6 +180,75 @@ def _check_dependabot_requires_alerts(fleet: list[dict[str, Any]]) -> None:
         raise ValueError(message)
 
 
+#: A check name ending in `(...)` is one cell of a job matrix -- see rulesets.py.
+_MATRIX_SHARD = re.compile(r"\(.+\)$")
+
+#: Per-repo opt-in for requiring matrix shard names.
+#: See `_check_required_status_checks`.
+MATRIX_OPT_IN = "_allow_matrix_shard_checks"
+
+
+def _check_required_status_checks(fleet: list[dict[str, Any]]) -> None:
+    """Fail on required-check data that would block every PR on a repo.
+
+    Unlike the other checks here, this one is not guarding against a crash further down.
+    `rulesets.py` will happily build a ruleset from any list of strings, and GitHub will
+    accept it. The failure is silent and total: a context nothing produces leaves every
+    PR permanently pending, and because `enforcement: evaluate` does not exist on this
+    plan there is no state between "not enforced" and "enforced on the org's busiest
+    repos". Data that is wrong in an obvious way should not reach that point.
+
+    Three things are refused:
+
+    archived repos  GitHub rejects ruleset writes on them, so it is unsatisfiable data.
+    empty strings   an empty context blocks the branch and names nothing in the UI.
+    matrix shards   `python-tests (1)` is a valid context and requiring it works
+                    today.
+                    What it does not survive is somebody editing that matrix in a
+                    DIFFERENT repository: drop to three shards and `python-tests (4)` is
+                    still required, never produced again, and every PR on that repo
+                    blocks forever with the cause two repos away. Requiring one is
+                    allowed, but only from a repo file that sets
+                    `_allow_matrix_shard_checks: true`, so it is a decision somebody
+                    made rather than a name copied out of a
+                    `bin/github-required-checks sample` run.
+    """
+    problems: list[str] = []
+    for repo in fleet:
+        contexts = repo.get("required_status_checks")
+        if not contexts:
+            continue
+        name = repo["name"]
+        if repo.get("archived"):
+            problems.append(f"{name}: archived repos cannot carry rulesets")
+            continue
+        if not isinstance(contexts, list) or any(
+            not isinstance(c, str) or not c.strip() for c in contexts
+        ):
+            problems.append(
+                f"{name}: required_status_checks must be a list of non-empty strings"
+            )
+            continue
+        if not repo.get(MATRIX_OPT_IN):
+            shards = sorted(c for c in contexts if _MATRIX_SHARD.search(c))
+            if shards:
+                problems.append(
+                    f"{name}: {shards} look like job-matrix shard names; set "
+                    f"`{MATRIX_OPT_IN}: true` to require them anyway"
+                )
+    if problems:
+        message = (
+            "required_status_checks data would block merges:\n  "
+            + "\n  ".join(problems)
+            + "\nVerify every context against real check runs first: "
+            "`uv run bin/github-required-checks sample <repo>`, and that no open PR is "
+            "left unable to produce it: `uv run bin/github-required-checks blocked`. "
+            "Only a name that tool marks SAFE may be required -- there is no dry-run "
+            "enforcement mode on this plan."
+        )
+        raise ValueError(message)
+
+
 def _check_team_references(fleet: list[dict[str, Any]]) -> None:
     """Fail if any repo grants to a team slug absent from teams.yaml.
 
@@ -238,6 +308,7 @@ def load_fleet() -> list[dict[str, Any]]:
     _check_permission_values(fleet)
     _check_public_repo_teams(fleet)
     _check_dependabot_requires_alerts(fleet)
+    _check_required_status_checks(fleet)
 
     # The dotfile trap is silent by construction, so assert rather than trust.
     assignments = yaml.safe_load((DATA_DIR / "archetypes-proposed.yaml").read_text())

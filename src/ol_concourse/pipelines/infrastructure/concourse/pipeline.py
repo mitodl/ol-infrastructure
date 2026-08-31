@@ -69,6 +69,8 @@ concourse_ami_fragment = packer_jobs(
 concourse_pulumi_fragment = pulumi_jobs_chain(
     concourse_pulumi_code,
     refresh_stack=True,
+    topology="preview-gated",
+    auto_deploy_stages=["CI"],
     stack_names=["CI", "QA", "Production"],
     project_name="ol-infrastructure-concourse-application",
     project_source_path=PULUMI_CODE_PATH.joinpath("applications/concourse/"),

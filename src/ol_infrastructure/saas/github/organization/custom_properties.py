@@ -47,7 +47,8 @@ tier_property = github.OrganizationCustomProperties(
     value_type="single_select",
     # Required + default is what makes a NEW repo protected at creation (section 3.5).
     # Without the default a new repo carries no tier, matches no ruleset, and is
-    # unprotected until somebody notices -- the exact failure `ol-django` shows today.
+    # unprotected until somebody notices -- the failure `ol-django` showed before
+    # phase 3 tiered it, having been created before any of this existed.
     required=True,
     default_value=TIER_STANDARD,
     allowed_values=list(TIER_VALUES),

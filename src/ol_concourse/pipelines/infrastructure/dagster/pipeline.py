@@ -242,6 +242,7 @@ def build_dagster_docker_pipeline() -> Pipeline:
     pulumi_fragment = pulumi_jobs_chain(
         pulumi_code,
         refresh_stack=True,
+        topology="preview-gated",
         stack_names=["QA", "Production"],
         project_name="ol-infrastructure-dagster-server",
         project_source_path=PULUMI_CODE_PATH.joinpath("applications/dagster/"),

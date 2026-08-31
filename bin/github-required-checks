@@ -1,0 +1,545 @@
+#!/usr/bin/env python3
+"""Find out which check names a repo actually produces, before requiring any of them.
+
+SEC-03's fix (`required_status_checks` in
+src/ol_infrastructure/saas/github/repositories/rulesets.py) has no dry run: the Team plan
+has no `evaluate` enforcement mode, so a ruleset naming a context that does not exist
+blocks every PR on that repo from the moment it applies, and the only symptom is a PR
+stuck on "Expected -- Waiting for status to be reported". This tool is the substitute for
+the dry run.
+
+    uv run bin/github-required-checks sample mit-learn
+    uv run bin/github-required-checks blocked
+    uv run bin/github-required-checks drift
+
+WHY THIS IS NOT A PERCENTAGE. "appeared on N of the last 40 merged PRs" cannot separate
+three situations that need three different answers, and the aggregate gate jobs this repo
+now requires sit in the one the raw count reads worst:
+
+  conditional by design   `Run zizmor` is on 1/40 ol-infrastructure PRs because
+                          actions-static-analysis.yml declares
+                          `paths: [".github/workflows/**"]`. Requiring it blocks every
+                          PR that does not touch a workflow. NEVER requirable, and the
+                          workflow file says so outright -- so this is read from the
+                          `on:` block rather than inferred from a count.
+
+  the workflow no-showed  ol-infrastructure #5590 merged with no run of pytest.yml at
+                          all, so `test` and `ci-gate` are both missing from it for the
+                          same reason and neither name is implicated. Around 1 in 40,
+                          mitxonline #3810 likewise. It is a real cost -- such a PR
+                          needs a re-trigger or a bypass under any ruleset -- and it is
+                          reported as its own line rather than shaved off every name's
+                          percentage.
+
+  the job is newer than   `ci-gate` landed in ol-infrastructure #5567 on 2026-08-24 and
+  the PR                  reads 31/40. The nine PRs missing it merged from branches cut
+                          before it existed: their head commit does not define the job,
+                          so no run of it was ever possible. Scoring those as failures
+                          makes every newly added job permanently unrequirable.
+
+So a check is scored ONLY against merged PRs whose own head commit defines the job AND
+whose workflow actually ran. That needs the workflow file as of each PR's head sha, which
+is one extra call per PR per workflow, and it makes the verdict exact rather than a
+threshold somebody has to argue about.
+
+SAMPLING IS BACKWARD-LOOKING AND THAT IS ITS LIMIT. A gate job that landed last week is
+clean on every PR that could have produced it and still blocks any OPEN PR branched
+before it, until that branch is rebased. History cannot see those. `blocked` is the
+forward-looking half and the one to run immediately before `pulumi up`: it reads the open
+PRs and names the ones that would hang the moment the ruleset applies.
+
+`drift` is the ongoing half, for CI: it fails when a declared context stops being
+produced (a renamed job, a resized matrix, a workflow deleted in an application repo) or
+was never produced at all -- the latter being how "the ruleset landed before the gate job
+did" surfaces here rather than as every PR on that repo hanging.
+
+All three go through the `gh` CLI rather than the App installation the crawl uses: check
+runs are readable with the ordinary token every engineer already has, and needing the
+sops key to answer "what does CI call this job" would stop people running it.
+"""
+
+import base64
+import json
+import re
+import subprocess
+import sys
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Annotated, Any
+
+import cyclopts
+import yaml
+
+REPOS_DIR = (
+    Path(__file__).resolve().parent.parent
+    / "src/ol_infrastructure/saas/github/repositories/data/repos"
+)
+ORG = "mitodl"
+DEFAULT_SAMPLE = 20
+_POOL = 8
+_PAGE = 100
+
+#: The workflow run id inside an Actions check run's `html_url`:
+#: `.../actions/runs/<run_id>/job/<job_id>`. Checks from other apps (GitGuardian,
+#: pre-commit.ci, Sentry) do not match. Nothing in this repo can tell whether those
+#: could have run on a given PR, so they are scored against every sampled PR.
+_RUN_ID = re.compile(r"/actions/runs/(\d+)/")
+
+app = cyclopts.App(
+    name="github-required-checks",
+    help="Sample the check names a repo's merged PRs actually produce.",
+)
+
+
+class RateLimitError(RuntimeError):
+    """The API stopped answering, so nothing read after this point means anything."""
+
+
+def _gh(*args: str) -> Any:
+    """One `gh api`/`gh pr` call, JSON out.
+
+    A 404 returns an empty result rather than raising. A commit whose check-runs
+    endpoint has gone (the PR's head was force-pushed away, the branch deleted and
+    garbage-collected) is a sample we cannot read, not a reason to abandon the run --
+    and every command reports the number of PRs actually read, so a short sample is
+    visible rather than silently treated as complete.
+
+    EXHAUSTING THE RATE LIMIT IS DIFFERENT AND MUST NOT BE SWALLOWED. A full sample of
+    three repos costs a few hundred core calls, so hitting the cap mid-run is ordinary.
+    Treating those 403s as "no data" makes a check that is merely unread look like a
+    check that was never produced -- which is how a real run of this tool reported
+    mit-learn's `openapi-diff` as ABSENT 0/0 minutes after reporting it clean. In a tool
+    whose entire job is to stop a silent outage, degrading silently is the one failure
+    it cannot have.
+    """
+    result = subprocess.run(  # noqa: S603
+        ["gh", *args],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        stderr = result.stderr or ""
+        if "rate limit" in stderr.lower() or "secondary rate" in stderr.lower():
+            msg = (
+                "GitHub API rate limit exhausted mid-run, so the remaining results "
+                "would be indistinguishable from checks that never ran. Re-run after "
+                "`gh api rate_limit` recovers, or lower --prs."
+            )
+            raise RateLimitError(msg)
+        return None
+    return json.loads(result.stdout or "null")
+
+
+def _gh_all(path: str, key: str) -> list[Any]:
+    """Every page of an endpoint that returns a list under `key`, not just the first.
+
+    All three endpoints below cap a page, and one of them caps it at 30 rather than 100
+    (`/commits/{sha}/status` takes no `per_page` in its documented default). Reading
+    only the first page would drop checks that exist, and a check this tool did not read
+    is indistinguishable from one that was never produced -- the same conflation the
+    rate-limit handling in `_gh` exists to prevent, arriving by a quieter route.
+
+    The bias is toward refusing a safe name rather than clearing an unsafe one: a
+    dropped check lowers `produced` while `eligible` stands, so the verdict goes
+    `unsafe` and `drift` exits non-zero. That fails the rollout loudly instead of
+    shipping a ruleset that wedges a repo. Still worth closing, because "the tool said
+    unsafe and was wrong" costs somebody an afternoon.
+    """
+    items: list[Any] = []
+    page = 1
+    while True:
+        joiner = "&" if "?" in path else "?"
+        body = _gh("api", f"{path}{joiner}per_page={_PAGE}&page={page}")
+        if not body:
+            break
+        batch = body.get(key) or []
+        items.extend(batch)
+        total = body.get("total_count")
+        if len(batch) < _PAGE or (total is not None and len(items) >= total):
+            break
+        page += 1
+    return items
+
+
+def _checks_on(repo: str, sha: str) -> tuple[dict[str, str | None], set[str]]:
+    """One commit's checks: name -> owning workflow path, plus the workflows that ran.
+
+    Check runs and legacy commit statuses are separate endpoints, and
+    `required_status_checks` contexts match against both -- `GitGuardian Security
+    Checks` arrives as one and `test` as the other. Reading only check-runs would make
+    a perfectly requirable context look absent.
+
+    A name maps to `None` when nothing attributes it to a workflow in this repo: commit
+    statuses, and checks from apps that are not Actions.
+    """
+    workflows: set[str] = set()
+    by_run: dict[str, str] = {}
+    runs = _gh_all(f"repos/{ORG}/{repo}/actions/runs?head_sha={sha}", "workflow_runs")
+    for run in runs:
+        path = run.get("path") or ""
+        # `dynamic/...` paths are GitHub's synthetic runs for code scanning and the
+        # Copilot reviewer. They are not files anybody edits, so treating them as
+        # workflows would invent absences nobody can act on.
+        if not path.startswith(".github/"):
+            continue
+        by_run[str(run["id"])] = path
+        workflows.add(path)
+
+    owners: dict[str, str | None] = {}
+    for run in _gh_all(f"repos/{ORG}/{repo}/commits/{sha}/check-runs", "check_runs"):
+        match = _RUN_ID.search(run.get("html_url") or "")
+        owners[run["name"]] = by_run.get(match.group(1)) if match else None
+    for entry in _gh_all(f"repos/{ORG}/{repo}/commits/{sha}/status", "statuses"):
+        owners.setdefault(entry["context"], None)
+    return owners, workflows
+
+
+def _workflow_at(repo: str, path: str, sha: str) -> tuple[set[str], bool] | None:
+    """(check names the workflow defines, is it path-filtered) as of one commit.
+
+    `None` when the file does not exist at that commit, which is the whole point: a PR
+    branched before a job was added cannot be evidence against that job.
+
+    A job's check-run name is `jobs.<id>.name` when set and the id otherwise, so both go
+    in. Matrix jobs report as `name (value, value)`, which no caller can reconstruct
+    without the matrix values, so `_defines` prefix-matches instead.
+    """
+    blob = _gh("api", f"repos/{ORG}/{repo}/contents/{path}?ref={sha}")
+    if not blob or "content" not in blob:
+        return None
+    try:
+        parsed = yaml.safe_load(base64.b64decode(blob["content"]).decode())
+    except (yaml.YAMLError, ValueError):
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    names: set[str] = set()
+    for job_id, job in (parsed.get("jobs") or {}).items():
+        names.add(job_id)
+        if isinstance(job, dict) and isinstance(job.get("name"), str):
+            names.add(job["name"])
+    # `on:` parses as the boolean True -- YAML 1.1, which pyyaml still implements.
+    triggers = parsed.get("on", parsed.get(True)) or {}
+    filtered = isinstance(triggers, dict) and any(
+        isinstance(spec, dict) and ("paths" in spec or "paths-ignore" in spec)
+        for spec in triggers.values()
+    )
+    return names, filtered
+
+
+def _defines(defined: set[str], check: str) -> bool:
+    """Report whether a workflow defining these job names produces this check."""
+    return check in defined or any(check.startswith(f"{name} (") for name in defined)
+
+
+class Evidence:
+    """How one check name behaved across the PRs where it could have reported.
+
+    `eligible` counts merged PRs whose head commit defines the job AND whose workflow
+    ran. `produced` is how many of those actually reported it. Requiring a name is safe
+    only when those are equal, non-zero, and the workflow is not path-filtered.
+    """
+
+    def __init__(self) -> None:
+        """Start with no evidence either way."""
+        self.produced = 0
+        self.eligible = 0
+        self.workflow: str | None = None
+        self.filtered = False
+        self.first_seen: int | None = None
+
+    @property
+    def missing(self) -> int:
+        """PRs that could have produced this check and did not."""
+        return self.eligible - self.produced
+
+    @property
+    def safe(self) -> bool:
+        """Whether this name may be required without blocking some kind of PR."""
+        return self.eligible > 0 and not self.missing and not self.filtered
+
+    @property
+    def verdict(self) -> str:
+        """The label `sample` prints, and why the name did or did not clear."""
+        if self.filtered:
+            return "FILTERED"
+        if not self.eligible:
+            return "ABSENT"
+        return "SAFE  " if self.safe else "unsafe"
+
+
+def _read(
+    repo: str, pulls: list[dict[str, Any]]
+) -> tuple[dict[str, Evidence], Counter[str]]:
+    """Score every check name seen across `pulls`, newest first."""
+    with ThreadPoolExecutor(max_workers=_POOL) as pool:
+        per_pr = list(pool.map(lambda p: _checks_on(repo, p["headRefOid"]), pulls))
+
+    # First pass establishes only which names exist and which workflow owns each.
+    # Attribution can come back empty on an individual PR (a run aged out of the
+    # `actions/runs` window), so the owner is whichever PR could attribute it; counting
+    # happens in the second pass, where produced and eligible are decided per PR by the
+    # same test and cannot disagree.
+    evidence: dict[str, Evidence] = {}
+    for owners, _ in per_pr:
+        for name, workflow in owners.items():
+            found = evidence.setdefault(name, Evidence())
+            found.workflow = found.workflow or workflow
+
+    # Which workflows have to be read, and at which commits. Only workflows that own a
+    # name matter, so a repo with twenty workflows and two requirable checks reads two.
+    paths = {f.workflow for f in evidence.values() if f.workflow}
+    wanted = [(path, pull["headRefOid"]) for path in paths for pull in pulls]
+    with ThreadPoolExecutor(max_workers=_POOL) as pool:
+        loaded = list(
+            pool.map(lambda pair: _workflow_at(repo, pair[0], pair[1]), wanted)
+        )
+    at: dict[tuple[str, str], tuple[set[str], bool] | None] = dict(
+        zip(wanted, loaded, strict=True)
+    )
+
+    for name, found in evidence.items():
+        for (owners, ran), pull in zip(per_pr, pulls, strict=True):
+            if found.workflow is None:
+                # No workflow to hold responsible, so every PR is a fair test.
+                found.eligible += 1
+            else:
+                source = at[(found.workflow, pull["headRefOid"])]
+                if source is None:
+                    continue
+                defined, filtered = source
+                found.filtered = found.filtered or filtered
+                if not (_defines(defined, name) and found.workflow in ran):
+                    continue
+                found.eligible += 1
+            if name in owners:
+                found.produced += 1
+                # `pulls` is newest first, so the last write is the oldest such PR.
+                found.first_seen = pull["number"]
+
+    absent: Counter[str] = Counter()
+    for path in paths:
+        absent[path] = sum(
+            1
+            for (_, ran), pull in zip(per_pr, pulls, strict=True)
+            if at[(path, pull["headRefOid"])] is not None and path not in ran
+        )
+    return evidence, absent
+
+
+def _merged(repo: str, prs: int) -> list[dict[str, Any]]:
+    return (
+        _gh(
+            "pr",
+            "list",
+            "-R",
+            f"{ORG}/{repo}",
+            "--state",
+            "merged",
+            "--limit",
+            str(prs),
+            "--json",
+            "number,headRefOid",
+        )
+        or []
+    )
+
+
+def _declared() -> dict[str, list[str]]:
+    """Every repo whose YAML declares `required_status_checks`."""
+    declared: dict[str, list[str]] = {}
+    for path in sorted(REPOS_DIR.glob("*.yaml")):
+        data = yaml.safe_load(path.read_text())
+        contexts = data.get("required_status_checks")
+        if contexts:
+            declared[data["name"]] = contexts
+    return declared
+
+
+@app.command
+def sample(
+    repos: Annotated[
+        list[str], cyclopts.Parameter(help="Repo names, without the org.")
+    ],
+    prs: Annotated[
+        int, cyclopts.Parameter(help="How many merged PRs to read.")
+    ] = DEFAULT_SAMPLE,
+) -> None:
+    """Report, per check name, how it behaved on the PRs where it could have reported."""
+    for repo in repos:
+        pulls = _merged(repo, prs)
+        print(f"\n## {repo}  ({len(pulls)} merged PRs read)")
+        if not pulls:
+            print("  no merged PRs -- nothing to require, nothing to verify against")
+            continue
+        evidence, absent = _read(repo, pulls)
+        ordered = sorted(
+            evidence.items(), key=lambda kv: (not kv[1].safe, -kv[1].produced, kv[0])
+        )
+        for name, found in ordered:
+            scope = found.workflow or "any PR"
+            note = ""
+            if found.filtered:
+                note = " -- path-filtered workflow, never requirable"
+            elif found.safe and found.eligible < len(pulls):
+                note = f", first seen #{found.first_seen}"
+            print(
+                f"  {found.verdict} {found.produced}/{found.eligible} of the PRs that "
+                f"could run it  {name}  [{scope}{note}]"
+            )
+        for path, misses in sorted(absent.items()):
+            if misses:
+                print(
+                    f"\n  NOTE {path} did not run at all on {misses}/{len(pulls)} PRs "
+                    "that define it.\n       Requiring anything from it makes such a PR "
+                    "need a re-trigger or a bypass."
+                )
+        print(
+            "\n  Only SAFE names may be required. 'unsafe' means the check was absent "
+            "from a PR\n  that defined it and ran its workflow, so requiring it blocks "
+            "that kind of PR forever."
+        )
+
+
+@app.command
+def blocked(
+    repos: Annotated[
+        list[str] | None,
+        cyclopts.Parameter(
+            help="Repos to check. Default: every repo declaring checks."
+        ),
+    ] = None,
+) -> None:
+    """Name the OPEN PRs that a declared ruleset would hang. Exits non-zero if any.
+
+    The question sampling cannot answer. A gate job that landed last week is clean on
+    every merged PR that could have produced it, and still blocks any open PR cut before
+    it existed, because that branch's head commit does not define the job -- there is no
+    failure to look at, just a check that will never report. Those PRs need a rebase, and
+    their authors would rather hear it here than from a stuck merge box.
+    """
+    declared = _declared()
+    targets = {r: declared[r] for r in repos if r in declared} if repos else declared
+    if not targets:
+        print("no repo declares required_status_checks")
+        return
+    wedged = False
+    for repo, contexts in sorted(targets.items()):
+        pulls = (
+            _gh(
+                "pr",
+                "list",
+                "-R",
+                f"{ORG}/{repo}",
+                "--state",
+                "open",
+                "--limit",
+                "100",
+                "--json",
+                "number,headRefOid,title,isDraft",
+            )
+            or []
+        )
+        if not pulls:
+            print(f"{repo}: no open PRs")
+            continue
+        with ThreadPoolExecutor(max_workers=_POOL) as pool:
+            seen = list(pool.map(lambda p: _checks_on(repo, p["headRefOid"])[0], pulls))
+        hits = [
+            (pull, sorted(c for c in contexts if c not in names))
+            for pull, names in zip(pulls, seen, strict=True)
+            if any(c not in names for c in contexts)
+        ]
+        if not hits:
+            print(f"{repo}: all {len(pulls)} open PRs produce every required context")
+            continue
+        wedged = True
+        print(f"\n{repo}: {len(hits)} of {len(pulls)} open PRs would hang")
+        for pull, missing in hits:
+            draft = " (draft)" if pull["isDraft"] else ""
+            print(
+                f"  #{pull['number']}{draft}  missing {missing}  {pull['title'][:48]}"
+            )
+    if wedged:
+        print(
+            "\nThese PRs produce no such check, so there is nothing to re-run: rebase "
+            "them onto\nthe commit that added the job, or apply the ruleset knowing "
+            "they need it first."
+        )
+        sys.exit(1)
+
+
+@app.command
+def drift(
+    prs: Annotated[
+        int, cyclopts.Parameter(help="How many merged PRs to read per repo.")
+    ] = DEFAULT_SAMPLE,
+) -> None:
+    """Re-verify every declared context against live check runs. Exits non-zero on drift.
+
+    Meant for CI. Two failures it catches, both of which otherwise surface only as PRs
+    hanging on a repo whose owners have no reason to look here:
+
+    a context that stopped   A job renamed or a matrix resized in an application repo
+                             leaves a name required here that is never produced again.
+    a context that never     The ruleset landed before the workflow that produces it.
+    started                  Requiring `ci-gate` on a repo whose gate job is still in an
+                             unmerged PR wedges every PR on that repo.
+    """
+    declared = _declared()
+    if not declared:
+        print("no repo declares required_status_checks")
+        return
+    bad = False
+    for repo, contexts in declared.items():
+        pulls = _merged(repo, prs)
+        if not pulls:
+            print(f"{repo}: SKIPPED -- no merged PRs to verify against")
+            continue
+        evidence, _ = _read(repo, pulls)
+        clean = True
+        for context in contexts:
+            found = evidence.get(context)
+            if found is None or not found.eligible:
+                bad = True
+                clean = False
+                print(
+                    f"{repo}: {context!r} required but never produced on any of the "
+                    f"last {len(pulls)} merged PRs -- wrong name, or the job that "
+                    "produces it has not merged yet"
+                )
+            elif found.filtered:
+                bad = True
+                clean = False
+                print(
+                    f"{repo}: {context!r} required but {found.workflow} is "
+                    "path-filtered, so PRs that touch nothing it watches never "
+                    "produce it"
+                )
+            elif found.missing:
+                bad = True
+                clean = False
+                print(
+                    f"{repo}: {context!r} required but missing from {found.missing} of "
+                    f"the {found.eligible} merged PRs that defined it and ran "
+                    f"{found.workflow}"
+                )
+        if clean:
+            print(f"{repo}: {len(contexts)} contexts, all clean over {len(pulls)} PRs")
+    if bad:
+        print(
+            "\nA required context that is not produced blocks every PR on that repo. "
+            "Land the\nworkflow first, fix it, or drop the context from the repo's "
+            "YAML."
+        )
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    try:
+        app()
+    except RateLimitError as limited:
+        print(f"\n{limited}", file=sys.stderr)
+        sys.exit(2)

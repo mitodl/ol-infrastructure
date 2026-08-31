@@ -239,6 +239,8 @@ def create_xpro_k8s_secrets(
                 "CYBERSOURCE_ACCESS_KEY": '{{ get .Secrets "access_key" }}',
                 "CYBERSOURCE_INQUIRY_LOG_NACL_ENCRYPTION_KEY": '{{ get .Secrets "inquiry_log_nacl_encryption_key" }}',
                 "CYBERSOURCE_PROFILE_ID": '{{ get .Secrets "profile_id" }}',
+                "CYBERSOURCE_REST_KEY_ID": '{{ get .Secrets "rest_key_id" }}',
+                "CYBERSOURCE_REST_SECRET": '{{ get .Secrets "rest_secret" }}',
                 "CYBERSOURCE_SECURITY_KEY": '{{ get .Secrets "security_key" }}',
                 "CYBERSOURCE_TRANSACTION_KEY": '{{ get .Secrets "transaction_key" }}',
             },

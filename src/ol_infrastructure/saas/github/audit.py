@@ -24,10 +24,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from ol_infrastructure.saas.github.tiers import TIER_PROPERTY_NAME
+from ol_infrastructure.saas.github.tiers import TIER_ONE, TIER_PROPERTY_NAME
 
 Axis = Literal["security", "consistency", "developer-experience"]
-Scope = Literal["active", "archived", "fleet"]
+Scope = Literal["active", "archived", "fleet", "tier-1"]
 Severity = Literal["high", "medium", "low"]
 
 #: A repo is an archive candidate (DX-07) after this long with no push.
@@ -98,6 +98,12 @@ def _in_scope(repo: dict[str, Any], scope: Scope) -> bool:
     archived = bool(repo.get("archived"))
     if scope == "fleet":
         return True
+    if scope == "tier-1":
+        # Active AND tier-1. Not just `tier == TIER_ONE`: an archived tier-1 repo is
+        # still tiered (repository.py writes the property on archived repos too), so
+        # dropping the archived test would put read-only repos in the denominator of
+        # rules that only make sense for repos someone still pushes to.
+        return not archived and repo.get("tier") == TIER_ONE
     return archived if scope == "archived" else not archived
 
 
@@ -462,6 +468,47 @@ RULES: tuple[Rule, ...] = (
         lambda r: (
             ("empty", "a one-line description", "add `description` to the repo's YAML")
             if not r.get("description")
+            else None
+        ),
+    ),
+    Rule(
+        "SEC-03",
+        "security",
+        "high",
+        "tier-1",
+        "no required status checks -- CI cannot block a merge",
+        # Scoped to tier-1 rather than all active repos, and that is the honest scope
+        # rather than a convenient one: `unmanaged` covers the 102 forks, which have no
+        # CI of ours to require, and firing on them would bury the 74 repos where this
+        # is real under noise nobody can act on.
+        #
+        # WHAT THIS COSTS WHEN IT IS UNFIXED, measured 2026-08-21 rather than argued:
+        # 12 of ol-infrastructure's last 40 merges landed with `test` red, every one a
+        # Renovate PR, and mit-learn #3812-#3816 auto-merged in 71 seconds with tests
+        # failing and had to be reverted by #3822. An unenforced check is not a weaker
+        # version of an enforced one; it is decoration.
+        #
+        # Deliberately NOT satisfied by "some ruleset exists" -- SEC-01 already asks
+        # that question. A repo can carry the org baseline, show three rulesets in the
+        # API, and still require nothing of its CI. That combination is the whole
+        # finding, so it has to be its own rule.
+        # SATISFIED BY EITHER FIELD, and the second one is not a loophole. `lehrer` and
+        # `ol-analytics-api` already require checks through hand-made repo-level
+        # rulesets that Pulumi does not model -- repository.py deliberately imports no
+        # RepositoryRuleset, so they are invisible to `required_status_checks`. Reading
+        # only the managed field would report the two repos that solved this before we
+        # did, which is the fastest way to teach people the audit is wrong. The
+        # `_`-prefixed field is observed state from the crawl, same as `_ruleset_count`.
+        # It should disappear once those rulesets are imported.
+        lambda r: (
+            (
+                "none required",
+                "the repo's own test jobs required",
+                "verify names with `bin/github-required-checks sample <repo>`, "
+                "then add `required_status_checks` to the repo's YAML",
+            )
+            if not r.get("required_status_checks")
+            and not r.get("_required_status_checks_live")
             else None
         ),
     ),

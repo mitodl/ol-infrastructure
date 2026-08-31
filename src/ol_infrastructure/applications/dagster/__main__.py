@@ -464,12 +464,12 @@ rds_defaults = defaults(stack_info)["rds"]
 #                     backstop rather than dead weight, but note storage autoscaling
 #                     (max_allocated_storage 1000) is the real protection: this can
 #                     only fire once autoscaling has hit that ceiling.
-#   EBSIOBalance%     <75%. Pinned at exactly 99, min == max across 720 hourly
-#                     samples. It is a burst-bucket metric and all 74 RDS instances in
-#                     us-east-1 are gp3, which has no burst bucket -- so this alarm
-#                     cannot fire here or on any of the 19 peers carrying it. Left in
-#                     place only because the profile is all-or-nothing; removing it is
-#                     an org-wide change, tracked separately.
+#   EBSIOBalance%     GONE. It was in the profile when this list was written, pinned
+#                     at 99 against a threshold of 75 because it is a burst-bucket
+#                     metric and every RDS instance here is gp3, which has no burst
+#                     bucket. Removed from the production profile in
+#                     components/aws/database.py, so this stack no longer creates it
+#                     and neither do the 19 peers that did.
 #   DiskQueueDepth    >10 for 2 consecutive. The one that works, and the reason this
 #                     is on: 84 of 120 5-min datapoints breached during 2026-08-08/09,
 #                     roughly 40 hours ahead of the connection exhaustion.
@@ -732,9 +732,13 @@ dagster_db_secret = OLVaultK8SSecret(
 # show it: instantaneous load spreads evenly (1-18 active per pod), so fewer/larger
 # replicas is a live option rather than an urgent fix.
 #
-# Left alone here deliberately. This pass changes min_pool_size, and changing the
-# multiplier in the same breath would make the result unattributable -- which is the
-# failure mode the whole exercise exists to stop repeating.
+# Production took that option on 2026-08-25, 6 -> 4, and it is the first replica count
+# on this stack derived from measurement rather than assumed. The binding constraint
+# turned out to be max_client_conn rather than backends: maxSurge is 0 below, so a
+# rollout runs on N-1 pods, and the peak client-socket count has to fit in
+# (N-1) x max_client_conn. Backend demand does not bind at any plausible N -- six days
+# of post-transaction-mode samples peaked at 13 concurrent in-flight backends across
+# the whole fleet. Full derivation in Pulumi.Production.yaml.
 pgbouncer_replica_count = dagster_config.get_int("pgbouncer_replica_count") or 2
 
 # Cap the connections PgBouncer can open against RDS, in aggregate across every replica.
@@ -2633,6 +2637,33 @@ dagster_helm_values = {
                 # 2 minutes timeout for loading code locations (handles slow locations)
                 "name": "DAGSTER_CODE_SERVER_TIMEOUT_SECONDS",
                 "value": "120",
+            },
+            {
+                # A run status sensor processes at most this many runs per tick,
+                # and run_failure_notification_sensor sets
+                # monitor_all_code_locations=True, which pins its *fetch* limit
+                # to the same number (dagster
+                # _core/definitions/run_status_sensor_definition.py,
+                # _get_run_status_sensor_fetch_limit). At the default 30s tick
+                # the stock value of 5 is a ceiling of 5 * 2880 = 14,400 runs
+                # per day for every code location combined.
+                #
+                # Production failures arrived at ~12,000/day through August
+                # 2026 -- 84% of that ceiling -- so the sensor had no headroom
+                # to recover from a backlog and did not. On 2026-08-25 it was
+                # reporting runs that had executed on 2026-08-13: a twelve day
+                # lag, which made every Sentry timestamp a report time rather
+                # than a failure time and left issues looking live long after
+                # the underlying defect was fixed.
+                #
+                # 25 gives ~72,000/day, roughly 6x the observed failure rate, so
+                # a burst is absorbed rather than queued. Deliberately not
+                # higher: each processed run costs the daemon an event log read,
+                # and Sentry ingest scales with this number during a runaway
+                # (the Slack path is already rate limited per fingerprint,
+                # Sentry is not).
+                "name": "DAGSTER_RUN_STATUS_SENSOR_PROCESS_LIMIT",
+                "value": "25",
             },
             {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
         ],
