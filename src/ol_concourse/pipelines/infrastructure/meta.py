@@ -54,6 +54,10 @@ PIPELINE_CONFIGS: list[tuple[str, str]] = [
         "src/ol_concourse/pipelines/infrastructure/dagster/pipeline.py",
     ),
     (
+        "alerting-drift",
+        "src/ol_concourse/pipelines/infrastructure/alerting_drift/pipeline.py",
+    ),
+    (
         "github-estate-drift",
         "src/ol_concourse/pipelines/infrastructure/github_drift/pipeline.py",
     ),

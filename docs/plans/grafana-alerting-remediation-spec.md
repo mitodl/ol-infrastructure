@@ -639,7 +639,7 @@ Scope when it starts: 2-3 forecast jobs, Slack only, 30 days, measured against k
 incidents. The 944-firing `adaptive_traces_forecast_learn_webapp` job is the control
 group for what skipping that step produces.
 
-Cost is unquantified. `CLAUDE.md` records Synthetic Monitoring being rejected at
+Cost is unquantified. `AGENTS.md` records Synthetic Monitoring being rejected at
 ~$3,200/mo; get a quote against the current contract before committing.
 
 ---

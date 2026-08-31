@@ -24,7 +24,7 @@ generating alerts. Only the first is under version control.
 | Synthetic Monitoring rules | 7 | Hand-created in UI | Rule-level receiver override → Rootly |
 | Grafana Cloud ML (Adaptive Traces) | 5/stack | Auto-created by plugin | `Adaptive Traces` webhook |
 
-The Pulumi `CLAUDE.md` states Phase 5 retired the cortextool path. The *pipelines* were
+The Pulumi `AGENTS.md` states Phase 5 retired the cortextool path. The *pipelines* were
 retired; **the rules they pushed were never deleted from the rulers and are still being
 evaluated and delivered.**
 
@@ -166,7 +166,7 @@ no `severity` label — under the notification policy they would go to `oblivion
 set `notification_settings.receiver: "Rootly"` directly on the rule, which bypasses the
 route tree. Pulumi has no visibility into these.
 
-Two stale OpsGenie contact points also remain, despite `CLAUDE.md` recording OpsGenie as
+Two stale OpsGenie contact points also remain, despite `AGENTS.md` recording OpsGenie as
 retired.
 
 The SM rules are also poorly specified. `Learn NextJS Homepage (Bypass Fastly) - Check
@@ -179,7 +179,7 @@ query measures availability. The annotation is misleading to whoever gets paged.
 
 Every `*Warning` EKS rule filters `cluster=~".*-(ci|qa)"` but is deployed to all three
 stacks. Each Mimir tenant only holds its own environment's clusters, so on the production
-stack these rules match nothing, permanently. That is by design per `CLAUDE.md`, and
+stack these rules match nothing, permanently. That is by design per `AGENTS.md`, and
 `no_data_state="OK"` keeps them quiet — but it means **production has no warning tier at
 all.** Every EKS alert that fires in production is `critical` and pages. There is no
 lower-severity band available for "worth knowing, not worth waking someone."
@@ -308,7 +308,7 @@ single genuine outlier.
 ### 5.4 Cost
 
 Grafana Cloud ML forecasts and outlier detectors are billed per job and consume series in
-the ML metrics tenant. `CLAUDE.md` already records that Synthetic Monitoring was rejected
+the ML metrics tenant. `AGENTS.md` already records that Synthetic Monitoring was rejected
 on cost (~$3,200/mo at the desired cadence), so this needs a quote against the current
 contract before committing — I have not verified current pricing and would not want a
 plan built on a guess.

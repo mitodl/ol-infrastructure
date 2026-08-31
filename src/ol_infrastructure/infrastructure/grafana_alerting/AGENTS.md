@@ -100,7 +100,7 @@ Rootly). That path is independent of Grafana and is managed in
 | `dashboards/keycloak_overview.py` | General service-health overview across all realms: logins, JVM, HTTP, DB pool, GC, JDBC cache, plus raw error/warning log tails. |
 | `dashboards/keycloak_olapps_realm.py` | Holistic authentication-activity view for just the olapps realm -- logins, registrations, token flows, and a per-identity-provider breakdown (success + failure) from Loki. For devs/management, not hardware/JVM. |
 | `pingdom_checks.py` | Pingdom uptime checks via Pulumi dynamic provider. Runs in the production stack only. |
-| `CLAUDE.md` | This file. |
+| `AGENTS.md` | This file. |
 
 ---
 
@@ -479,6 +479,47 @@ slack_notifications_devops_warnings: <slack-webhook-url>  # required; used by de
 pingdom_api_token: <pingdom-api-token>
 pingdom_integration_ids: [<integration-id>, ...]  # Pingdom integration IDs for alert routing
 ```
+
+---
+
+## Drift detection for the parts Pulumi cannot manage
+
+`bin/alerting-drift-check` asserts live state that no provider can express, so
+the only honest control over it is detection:
+
+- Sentry metric detectors. pulumiverse-sentry cannot write a trigger action's
+  `settings` blob, so these stay UI-managed and are asserted against
+  expectations recorded in the script's `SENTRY_DETECTORS` table. That table is
+  currently **empty**: all six detectors were deleted on 2026-08-28 because
+  measurement showed none of them could fire. Until the replacement set is
+  built, any detector appearing in Sentry is reported as `DRIFT` — it means
+  someone created alerting that nothing is checking. Adding an entry to the
+  table is how a rebuilt detector comes under assertion.
+- The CI/QA Rootly route rules that keep non-production alerts off the paging
+  path. Pulumi cannot model a route rule's `enabled` flag; these two sat
+  disabled for 19 days with no diff to show for it.
+- Contact-point **delivery**, per stack, read from each notifier's own
+  last-attempt result. A declared-config == live-config check cannot catch a
+  contact point holding a malformed or revoked webhook: every Slack contact
+  point here held a JSON-escaped URL for six weeks while `pulumi preview`
+  showed no diff. `oblivion` is exempt — its permanent send failure is the
+  design.
+- Absence: whether any Sentry-sourced alert has reached Rootly at all
+  recently, qualified by whether those projects are still emitting errors.
+  Every per-object assertion above can pass while nothing is delivered.
+
+Findings come out at three levels. `DRIFT` means live differs from
+expectation, and exits 1. `KNOWN` means live matches an expectation that is
+itself a filed, unfixed defect — recorded so the check goes red if someone
+changes it halfway. `INFO` means not assertable right now, e.g. a contact
+point that has never attempted a notification, whose empty error field proves
+nothing.
+
+It never repairs. Auto-repairing config a provider cannot fully represent is
+how the empty-shell rules got there. The nightly `alerting-drift` Concourse
+job (`src/ol_concourse/pipelines/infrastructure/alerting_drift/pipeline.py`)
+runs it and opens a PR against `docs/generated/alerting-drift-report.md` when
+the report changes.
 
 ---
 

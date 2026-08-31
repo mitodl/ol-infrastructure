@@ -1,0 +1,783 @@
+#!/usr/bin/env python3
+"""Assert that the parts of our alerting control plane Pulumi cannot model are
+still configured the way we think they are.
+
+Three separate incidents in this project shared one shape: a piece of alerting
+config lived outside IaC, silently changed or was silently never right, and
+nothing noticed because `pulumi preview` showed no diff.
+
+  - The CI/QA Rootly route rules sat disabled for 19 days. Pulumi cannot model
+    a route rule's `enabled` flag, so declared and live agreed while nothing
+    was delivered.
+  - The `Low Urgency` escalation path was created in the Rootly UI on
+    2025-05-10 and has never been in Pulumi.
+  - Six Sentry metric alert rules were the only Sentry alerting that existed,
+    entirely outside IaC, and every one of them was measured incapable of
+    firing. They were deleted on 2026-08-28; the replacement set is not built
+    yet, and this reports that absence rather than passing over it in silence.
+  - Every Grafana Slack contact point held a JSON-escaped webhook URL for six
+    weeks. Declared config == live config the whole time; both were wrong.
+    Only the *delivery* result distinguished them.
+
+So this checks live state against expectations recorded here, and reports.
+It never repairs: auto-repairing config the provider cannot fully represent
+is how the empty-shell problem started in the first place.
+
+Findings are one of three levels:
+
+  DRIFT  live state differs from what we expect. Exit code 1. Investigate.
+  KNOWN  live state matches expectation, but the expectation itself is a
+         defect we have already filed and not yet fixed. Exit code 0 --
+         it is here so the check goes red if someone "fixes" it halfway.
+  INFO   not assertable right now (e.g. a contact point that has never been
+         used, whose empty error field is absence of evidence).
+
+Exit code alone cannot distinguish "found drift" from "crashed" -- both are 1.
+Every finding is printed to stdout and nothing else ever is, so a non-empty
+stderr means the run broke rather than that it found something. The
+`alerting-drift` Concourse job relies on that to avoid committing a truncated
+report as though it were a clean one.
+
+Usage:
+    bin/alerting-drift-check                    # every check
+    bin/alerting-drift-check sentry-rules
+    bin/alerting-drift-check grafana-delivery
+    bin/alerting-drift-check sentry-liveness --max-silent-days 14
+"""
+
+import re
+import sys
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+import cyclopts
+import httpx
+
+from bridge.secrets.sops import read_yaml_secrets
+
+app = cyclopts.App(
+    help=(
+        "Assert live alerting config that Pulumi cannot manage. Reports only; "
+        "never repairs. See the module docstring for why each check exists."
+    )
+)
+
+SENTRY_API = "https://sentry.io/api/0"
+ROOTLY_API = "https://api.rootly.com/v1"
+
+SENTRY_SECRET = Path("sentry/account.yaml")
+ROOTLY_SECRET = Path("rootly/account.yaml")
+GRAFANA_SECRETS = {
+    "ci": Path("grafana_cloud/api.ci.yaml"),
+    "qa": Path("grafana_cloud/api.qa.yaml"),
+    "production": Path("grafana_cloud/api.production.yaml"),
+}
+
+# The Rootly Sentry integration, as a Sentry app. A trigger action of type
+# sentry_app pointed anywhere else is not our alerting path.
+ROOTLY_SENTRY_APP_ID = 39357
+
+# Rootly notification targets, as they appear in a trigger action's settings.
+DEFAULT_ESCALATION_POLICY = "EscalationPolicy:96629210-cc41-4e57-b059-b182a0f01c5b"
+PLATFORM_ENGINEERING_GROUP = "Group:9f00e9f1-2f13-470e-a856-50ab5003f260"
+
+# Rootly's `source` value for alerts that came from Sentry.
+ROOTLY_SENTRY_SOURCE = "sentry"
+
+# The Sentry -> Rootly silence is explained and filed, so it reports as KNOWN
+# rather than DRIFT. The pipe is not broken: Sentry's own incident history shows
+# 340226 firing 24 times through 2026-07-20T18:49:09Z, which matches the newest
+# Sentry-sourced Rootly alert exactly. Rootly went quiet because Sentry did.
+#
+# It went quiet because five of the six rules aggregated
+# count_unique(tags[sentry:user]) on projects that attach no user identity at
+# all, and the sixth -- openedx-residential, the only one ever firing -- lost
+# its user signal on 2026-07-21. All six were deleted on 2026-08-28, so the
+# silence is now guaranteed rather than merely likely.
+#
+# Left at DRIFT this would exit 1 every night, which is the
+# standing-red-nobody-reads failure this whole check exists to avoid. Clear it
+# to None once the rebuild lands: a silence after that is a real broken pipe
+# and should fail the run again.
+SENTRY_SILENCE_EXPLAINED_BY: str | None = (
+    "tk-rebuild-sentry-alerting-from-scratch-on-signals--dfd607"
+)
+
+# The oblivion contact point is a deliberate drop sink: it points at a blocked
+# address so every send fails. Its permanent error is the design, not drift.
+DELIVERY_CHECK_EXEMPT = frozenset({"oblivion"})
+
+# Grafana reports "no notification has ever been attempted" as the zero time.
+NEVER_ATTEMPTED = "0001-01-01"
+
+
+@dataclass(frozen=True)
+class DetectorExpectation:
+    """A Sentry metric detector, managed by hand rather than by Pulumi.
+
+    Keyed on `legacy_rule_id` rather than the detector id: that is the number
+    every prior investigation, task and Rootly alert refers to, and the
+    detectors API still carries it as `alertRuleId`.
+    """
+
+    legacy_rule_id: int
+    detector_id: str
+    project: str
+    name: str
+    # Whether the detector should be evaluating at all.
+    enabled: bool
+    # The snuba subscription this detector reads. A change to any of these is a
+    # change to what is being watched, not merely to how loudly.
+    aggregate: str
+    window_seconds: int
+    environment: str
+    query: str
+    # Sentry issue priority -> firing threshold. 75 is critical, 50 is warning.
+    thresholds: tuple[tuple[int, float], ...]
+    # Distinct rootly_notification_target values across the linked workflows.
+    # None means an action that carries no target at all. Two entries mean a
+    # real warning/critical split; one entry across a two-tier detector means
+    # the split is cosmetic.
+    targets: tuple[str | None, ...]
+    # A defect already filed against this expectation, if the state recorded
+    # here is one we intend to change. Drives KNOWN rather than DRIFT.
+    tracked_by: str = ""
+
+
+# Sentry metric alerting was DELETED IN FULL on 2026-08-28. All six detectors
+# and their six exclusively-owned workflows are gone, on purpose.
+#
+# Why: measurement showed none of them could do anything. All six aggregated
+# count_unique(tags[sentry:user]); openedx-residential, openedx-mitxonline and
+# mit-learn emit zero unique users against 3.7k/19k/697k errors, xpro and
+# openedx-mitxpro peak at 1 and 5 users/hour against a threshold of 25, and
+# mitxonline's was disabled with thresholds above its observed maximum. The one
+# rule that ever delivered to Rootly lost its input signal on 2026-07-21. Full
+# pre-deletion state, enough to recreate any of them, is committed at
+# src/ol_infrastructure/infrastructure/sentry/metric_alerts_snapshot_2026-08-28.json
+#
+# Leave this empty until the replacement set is designed and created. Adding an
+# entry here is how a rebuilt detector gets asserted; until then any detector
+# that appears in Sentry is reported as DRIFT, which is the intended behaviour --
+# it means someone created alerting that nothing is checking.
+#
+# Note detectors cannot be created through the API (POST is 405), so the rebuild
+# is UI work. Deletion, which is what happened here, is supported.
+SENTRY_DETECTORS: tuple[DetectorExpectation, ...] = ()
+
+# Tracks the rebuild. While SENTRY_DETECTORS is empty this is what the check
+# cites for having no Sentry coverage at all -- deliberate absence, reported
+# rather than passed over in silence.
+SENTRY_REBUILD_TASK = "tk-rebuild-sentry-alerting-from-scratch-on-signals--dfd607"
+
+# Rootly alert route rules, keyed by id. Pulumi cannot model a rule's `enabled`
+# flag, which is how these two came to sit disabled for 19 days: they are what
+# keeps CI and QA alerts off the production paging path.
+ROOTLY_ROUTES: dict[str, str] = {
+    "588edbfc-4d8b-4cb7-8b6f-27eaa0918503": (
+        "Grafana Prometheus CI - Slack Warnings Route"
+    ),
+    "691913ad-dd27-4eba-80ec-5b878f285365": (
+        "Grafana Prometheus QA - Slack Warnings Route"
+    ),
+}
+
+
+@dataclass
+class Finding:
+    """One assertion result, at one of the three levels above."""
+
+    level: str
+    check: str
+    subject: str
+    detail: str
+
+
+@dataclass
+class Report:
+    """Accumulates findings across checks and renders them once."""
+
+    findings: list[Finding] = field(default_factory=list)
+
+    def drift(self, check: str, subject: str, detail: str) -> None:
+        """Record live state differing from expectation. Fails the run."""
+        self.findings.append(Finding("DRIFT", check, subject, detail))
+
+    def known(self, check: str, subject: str, detail: str) -> None:
+        """Record a filed, unfixed defect that live state still matches."""
+        self.findings.append(Finding("KNOWN", check, subject, detail))
+
+    def info(self, check: str, subject: str, detail: str) -> None:
+        """Record something not assertable right now."""
+        self.findings.append(Finding("INFO", check, subject, detail))
+
+    def render(self) -> int:
+        """Print every finding grouped by level; return the exit code."""
+        by_level: dict[str, list[Finding]] = {"DRIFT": [], "KNOWN": [], "INFO": []}
+        for finding in self.findings:
+            by_level[finding.level].append(finding)
+
+        for level in ("DRIFT", "KNOWN", "INFO"):
+            entries = by_level[level]
+            if not entries:
+                continue
+            print(f"\n{level} ({len(entries)})")
+            for finding in entries:
+                print(f"  [{finding.check}] {finding.subject}")
+                print(f"      {finding.detail}")
+
+        drift_count = len(by_level["DRIFT"])
+        print(
+            f"\n{drift_count} drift, {len(by_level['KNOWN'])} known-defect, "
+            f"{len(by_level['INFO'])} not-assertable"
+        )
+        return 1 if drift_count else 0
+
+
+def _client(token: str) -> httpx.Client:
+    return httpx.Client(
+        headers={"Authorization": f"Bearer {token}"},
+        follow_redirects=True,
+        timeout=60,
+    )
+
+
+def _sentry_client() -> tuple[httpx.Client, str]:
+    secrets = read_yaml_secrets(SENTRY_SECRET)
+    return _client(secrets["auth_token"]), secrets["organization"]
+
+
+def _rootly_client() -> httpx.Client:
+    return _client(read_yaml_secrets(ROOTLY_SECRET)["api_token"])
+
+
+def _sentry_pages(client: httpx.Client, url: str) -> list[dict[str, Any]]:
+    """Every page of a cursor-paginated Sentry list endpoint.
+
+    Worth the loop even though the org is at 26 detectors against a 100-item
+    page: /detectors/ returns every detector type, so `error` and
+    `issue_stream` detectors consume the same window, and that headroom
+    shrinks with ordinary Sentry use rather than with metric alerting. A
+    metric detector pushed onto page two would simply not appear in `live`,
+    and the "exists in Sentry but is not recorded here" DRIFT would not fire
+    -- a silent pass, which is the failure this whole script exists to catch.
+
+    Mirrors SentryApi.list in bin/import-sentry-config: follow `rel="next"`
+    only while it also reports `results="true"`, since Sentry always sends a
+    next link.
+    """
+    items: list[dict[str, Any]] = []
+    next_url: str | None = url
+    params: dict[str, Any] | None = {"per_page": 100}
+    while next_url:
+        response = client.get(next_url, params=params)
+        response.raise_for_status()
+        items.extend(response.json())
+        next_url, params = None, None
+        for link in response.headers.get("link", "").split(","):
+            if 'rel="next"' in link and 'results="true"' in link:
+                match = re.search(r"<([^>]+)>", link)
+                if match:
+                    next_url = match.group(1)
+    return items
+
+
+def _rootly_target(action: dict[str, Any]) -> str | None:
+    """Pull rootly_notification_target out of a workflow action's settings."""
+    for setting in (action.get("data") or {}).get("settings") or []:
+        if setting.get("name") == "rootly_notification_target":
+            return setting.get("value")
+    return None
+
+
+def _workflow_targets(
+    client: httpx.Client, org: str, workflow_ids: list[str]
+) -> tuple[set[str | None], list[str]]:
+    """Distinct Rootly targets across a detector's workflows, and any problems."""
+    targets: set[str | None] = set()
+    problems: list[str] = []
+    for workflow_id in workflow_ids:
+        response = client.get(
+            f"{SENTRY_API}/organizations/{org}/workflows/{workflow_id}/"
+        )
+        if response.status_code != httpx.codes.OK:
+            problems.append(f"workflow {workflow_id} returned {response.status_code}")
+            continue
+        workflow = response.json()
+        if not workflow.get("enabled"):
+            problems.append(f"workflow {workflow_id} is disabled")
+        rootly_actions = [
+            action
+            for action_filter in workflow.get("actionFilters") or []
+            for action in action_filter.get("actions") or []
+            if str((action.get("config") or {}).get("targetIdentifier"))
+            == str(ROOTLY_SENTRY_APP_ID)
+        ]
+        if not rootly_actions:
+            problems.append(f"workflow {workflow_id} has no Rootly sentry_app action")
+        targets.update(_rootly_target(action) for action in rootly_actions)
+    return targets, problems
+
+
+def check_sentry_rules(report: Report) -> None:
+    """Assert the six UI-managed Sentry metric detectors still reach Rootly.
+
+    Reads the detectors/workflows API. The `/alert-rules/` and `/incidents/`
+    endpoints this originally used were sunset on 2026-08-28 and now return
+    410; detectors carry the old rule id as `alertRuleId`, which is what these
+    expectations are still keyed on.
+    """
+    check = "sentry-rules"
+    client, org = _sentry_client()
+
+    live = {
+        detector.get("alertRuleId"): detector
+        for detector in _sentry_pages(
+            client, f"{SENTRY_API}/organizations/{org}/detectors/"
+        )
+        if detector.get("type") == "metric_issue"
+    }
+
+    if not SENTRY_DETECTORS and not live:
+        # Nothing declared and nothing live: no Sentry metric alerting exists
+        # at all. Say so out loud -- a check that passes silently over an empty
+        # alerting estate is the "looks like coverage" failure in its purest
+        # form. Conditioned on `live` being empty too, because KNOWN means live
+        # matches the recorded expectation; detectors that do exist contradict
+        # it and are reported as DRIFT below instead.
+        report.known(
+            check,
+            "Sentry metric alerting",
+            "no metric detectors are declared and none exist in Sentry; all "
+            "six were deleted on 2026-08-28 because none could fire, and the "
+            f"replacement set is not built yet -- {SENTRY_REBUILD_TASK}",
+        )
+
+    expected_ids = {expected.legacy_rule_id for expected in SENTRY_DETECTORS}
+    for extra in sorted(set(live) - expected_ids, key=str):
+        report.drift(
+            check,
+            f"detector for rule {extra}",
+            "a metric detector exists in Sentry that is not recorded here; "
+            "record it with its expected query, thresholds and Rootly target, "
+            "or delete it -- alerting nothing checks is how this started",
+        )
+
+    for expected in SENTRY_DETECTORS:
+        subject = f"{expected.legacy_rule_id} {expected.name}"
+        detector = live.get(expected.legacy_rule_id)
+        if detector is None:
+            report.drift(
+                check,
+                subject,
+                f"no metric detector carries alertRuleId {expected.legacy_rule_id}; "
+                f"{expected.project} has no metric alerting",
+            )
+            continue
+
+        if detector["id"] != expected.detector_id:
+            report.info(
+                check,
+                subject,
+                f"detector id is {detector['id']}, recorded as {expected.detector_id}",
+            )
+        if detector.get("name") != expected.name:
+            report.info(check, subject, f"renamed to {detector.get('name')!r}")
+
+        _check_detector_enabled(report, check, subject, expected, detector)
+        _check_detector_query(report, check, subject, expected, detector)
+        _check_detector_thresholds(report, check, subject, expected, detector)
+
+        targets, problems = _workflow_targets(
+            client, org, detector.get("workflowIds") or []
+        )
+        for problem in problems:
+            report.drift(check, subject, problem)
+        _check_detector_targets(report, check, subject, expected, targets)
+
+
+def _check_detector_enabled(
+    report: Report,
+    check: str,
+    subject: str,
+    expected: DetectorExpectation,
+    detector: dict[str, Any],
+) -> None:
+    live_enabled = bool(detector.get("enabled"))
+    if live_enabled == expected.enabled:
+        if not live_enabled:
+            detail = (
+                "detector is disabled in Sentry, so it cannot fire whatever "
+                "its thresholds say"
+            )
+            if expected.tracked_by:
+                report.known(check, subject, f"{detail} -- {expected.tracked_by}")
+            else:
+                # KNOWN means live matches an expectation that is itself a
+                # filed defect; with nothing filed there is no defect to cite,
+                # and appending an empty tracked_by left a dangling " -- ".
+                # Still reported: an inert detector must not pass in silence.
+                report.info(check, subject, detail)
+        return
+    if live_enabled:
+        report.drift(
+            check, subject, "detector is now enabled; it was recorded as disabled"
+        )
+    else:
+        report.drift(
+            check,
+            subject,
+            "detector has been DISABLED in Sentry -- it evaluates nothing and "
+            f"{expected.project} has lost this alerting",
+        )
+
+
+def _check_detector_query(
+    report: Report,
+    check: str,
+    subject: str,
+    expected: DetectorExpectation,
+    detector: dict[str, Any],
+) -> None:
+    """Check the snuba subscription, which is what the detector watches."""
+    sources = detector.get("dataSources") or []
+    if not sources:
+        report.drift(check, subject, "detector has no data source")
+        return
+    snuba = (sources[0].get("queryObj") or {}).get("snubaQuery") or {}
+    for field_name, live_value, expected_value in (
+        ("aggregate", snuba.get("aggregate"), expected.aggregate),
+        ("timeWindow", snuba.get("timeWindow"), expected.window_seconds),
+        ("environment", snuba.get("environment"), expected.environment),
+        ("query", snuba.get("query"), expected.query),
+    ):
+        if live_value != expected_value:
+            report.drift(
+                check,
+                subject,
+                f"snuba {field_name} is {live_value!r}, expected "
+                f"{expected_value!r} -- the detector is watching something else",
+            )
+
+
+def _check_detector_thresholds(
+    report: Report,
+    check: str,
+    subject: str,
+    expected: DetectorExpectation,
+    detector: dict[str, Any],
+) -> None:
+    conditions = (detector.get("conditionGroup") or {}).get("conditions") or []
+    live = tuple(
+        sorted(
+            (condition["conditionResult"], float(condition["comparison"]))
+            for condition in conditions
+            if condition.get("type") == "gt"
+        )
+    )
+    if live != tuple(sorted(expected.thresholds)):
+        report.drift(
+            check,
+            subject,
+            f"firing thresholds are {live}, expected "
+            f"{tuple(sorted(expected.thresholds))} (priority, value)",
+        )
+
+
+def _check_detector_targets(
+    report: Report,
+    check: str,
+    subject: str,
+    expected: DetectorExpectation,
+    targets: set[str | None],
+) -> None:
+    """Compare the distinct Rootly targets, which is where a collapse shows up."""
+    live = tuple(sorted(targets, key=lambda value: (value is None, value or "")))
+    want = tuple(
+        sorted(expected.targets, key=lambda value: (value is None, value or ""))
+    )
+    if live != want:
+        report.drift(
+            check,
+            subject,
+            f"Rootly notification targets are {live}, expected {want}"
+            + (
+                "; the warning/critical split has collapsed onto one target"
+                if len(want) > 1 and len(live) == 1
+                else ""
+            ),
+        )
+        return
+    if expected.tracked_by:
+        if not want:
+            # Distinct from (None,): no workflows are linked at all, rather
+            # than a linked workflow whose action carries no target.
+            detail = "no workflows are linked, so nothing reaches Rootly"
+        elif want == (None,):
+            detail = "no Rootly notification target configured at all"
+        elif len(want) == 1:
+            detail = f"Rootly target is {want[0]!r}"
+        else:
+            listed = ", ".join(repr(value) for value in want)
+            detail = f"Rootly targets are {listed}"
+        if len(want) == 1 and len(expected.thresholds) > 1:
+            detail += "; warning and critical share it, so the tier split is cosmetic"
+        report.known(check, subject, f"{detail} -- {expected.tracked_by}")
+
+
+def check_rootly_routes(report: Report) -> None:
+    """Assert the CI/QA route rules that keep non-prod alerts off paging."""
+    check = "rootly-routes"
+    client = _rootly_client()
+
+    for route_id, name in ROOTLY_ROUTES.items():
+        response = client.get(f"{ROOTLY_API}/alert_routes/{route_id}")
+        if response.status_code != httpx.codes.OK:
+            report.drift(
+                check,
+                name,
+                f"GET returned {response.status_code}; the route is gone, so "
+                "its alerts fall through to whatever routes next",
+            )
+            continue
+        attributes = response.json()["data"]["attributes"]
+        if not attributes.get("enabled"):
+            report.drift(
+                check,
+                name,
+                "route is disabled; its alerts are no longer diverted to Slack",
+            )
+        if attributes.get("name") != name:
+            report.info(check, name, f"renamed to {attributes.get('name')!r}")
+
+
+def check_grafana_delivery(report: Report) -> None:
+    """Assert Grafana contact points are actually delivering, not just declared.
+
+    A declared-config == live-config drift check cannot catch a contact point
+    holding a malformed or revoked webhook: Pulumi showed no diff on these for
+    the six weeks they were undeliverable. The only signal that separates the
+    two is the notifier's own last-attempt result.
+    """
+    check = "grafana-delivery"
+
+    for stack, secret_path in GRAFANA_SECRETS.items():
+        secrets = read_yaml_secrets(secret_path)
+        client = _client(secrets["grafana_api_token"])
+        url = secrets["grafana_url"].rstrip("/")
+        response = client.get(f"{url}/api/alertmanager/grafana/config/api/v1/receivers")
+        response.raise_for_status()
+
+        for receiver in response.json():
+            name = receiver.get("name", "")
+            if name in DELIVERY_CHECK_EXEMPT:
+                continue
+            for integration in receiver.get("integrations") or []:
+                subject = f"{stack}/{name} ({integration.get('name')})"
+                error = integration.get("lastNotifyAttemptError")
+                attempt = integration.get("lastNotifyAttempt")
+                if error:
+                    report.drift(check, subject, f"last notification failed: {error}")
+                elif attempt is None:
+                    # Every stack currently returns this field as a string, so
+                    # this is a boundary guard rather than an observed break.
+                    # It is here because falling through would say nothing at
+                    # all, and a silent skip inside an absence check reads
+                    # exactly like a pass.
+                    report.info(
+                        check,
+                        subject,
+                        "Grafana returned no lastNotifyAttempt, so nothing can "
+                        "be concluded about whether it delivers",
+                    )
+                elif str(attempt).startswith(NEVER_ATTEMPTED):
+                    report.info(
+                        check,
+                        subject,
+                        "no notification attempted since the last config "
+                        "reload, so an empty error field proves nothing about "
+                        "whether it works. A contact-point test does not "
+                        "settle it either: that is a separate code path from "
+                        "the notifier and leaves this field untouched",
+                    )
+
+
+def check_sentry_liveness(report: Report, max_silent_days: int) -> None:
+    """Assert Sentry alerts are still reaching Rootly at all.
+
+    Absence detection, which is the failure this project keeps rediscovering:
+    every per-object assertion above can pass while nothing is delivered. A
+    silence is only a finding when the underlying projects are still producing
+    errors -- a quiet project is allowed to be quiet.
+    """
+    check = "sentry-liveness"
+    rootly = _rootly_client()
+
+    response = rootly.get(
+        f"{ROOTLY_API}/alerts",
+        params={
+            "page[size]": 1,
+            "sort": "-created_at",
+            "filter[source]": ROOTLY_SENTRY_SOURCE,
+        },
+    )
+    response.raise_for_status()
+    alerts = response.json().get("data", [])
+    subject = "MITOL Sentry -> Rootly"
+    # No declared detectors means no list of projects to judge a silence
+    # against, and nothing that could deliver anyway. Saying "the projects are
+    # quiet" here would be false -- they emit hundreds of thousands of errors;
+    # there is simply nothing left to alert on them.
+    no_detectors = (
+        "no Sentry alert can reach Rootly: every metric detector was "
+        f"deleted on 2026-08-28 and none has been rebuilt -- "
+        f"{SENTRY_REBUILD_TASK}"
+    )
+
+    if not alerts:
+        # Rootly ages alerts out, so an empty result is where a deliberate
+        # silence ends up, not only where a broken pipe does. Checking the
+        # detectors here too is what stops the nightly job going permanently
+        # red once the last pre-deletion alert expires.
+        if not SENTRY_DETECTORS:
+            report.known(check, subject, no_detectors)
+        else:
+            report.drift(check, subject, "Rootly holds no Sentry-sourced alert at all")
+        return
+
+    latest = alerts[0]["attributes"]
+    created = datetime.fromisoformat(latest["created_at"])
+    if (datetime.now(UTC) - created).days <= max_silent_days:
+        return
+
+    if not SENTRY_DETECTORS:
+        report.known(check, subject, no_detectors)
+        return
+
+    volumes = _sentry_error_volumes()
+    noisy = sorted(
+        rule.project for rule in SENTRY_DETECTORS if volumes.get(rule.project, 0) > 0
+    )
+    # Deliberately no day count or error volume here: both move every day, and
+    # this report is diffed against the previous run to decide whether anything
+    # actually changed. Identify the silence by the newest alert instead.
+    detail = (
+        f"newest Sentry-sourced alert is {latest['short_id']} at "
+        f"{latest['created_at']} ({latest.get('summary')!r}), older than the "
+        f"{max_silent_days} day threshold"
+    )
+    if noisy:
+        unexplained = (
+            f"{detail}, while these alerting projects are still emitting "
+            f"errors over 14d: {', '.join(noisy)}"
+        )
+        if SENTRY_SILENCE_EXPLAINED_BY:
+            report.known(
+                check,
+                subject,
+                f"{unexplained}. Expected while the user-identity signal "
+                f"these rules count is absent -- {SENTRY_SILENCE_EXPLAINED_BY}",
+            )
+        else:
+            report.drift(check, subject, unexplained)
+    else:
+        report.info(
+            check,
+            subject,
+            f"{detail}; no alerting project emitted errors over 14d either, "
+            "so the silence may be genuine",
+        )
+
+
+def _sentry_error_volumes() -> dict[str, int]:
+    """14-day error counts keyed by project slug, for the alerting projects."""
+    client, org = _sentry_client()
+    slugs = {rule.project for rule in SENTRY_DETECTORS}
+
+    ids_to_slugs: dict[int, str] = {}
+    for slug in slugs:
+        response = client.get(f"{SENTRY_API}/projects/{org}/{slug}/")
+        if response.status_code == httpx.codes.OK:
+            ids_to_slugs[int(response.json()["id"])] = slug
+
+    stats = client.get(
+        f"{SENTRY_API}/organizations/{org}/stats_v2/",
+        params={
+            "field": "sum(quantity)",
+            "groupBy": "project",
+            "category": "error",
+            "statsPeriod": "14d",
+            "interval": "1d",
+        },
+    )
+    stats.raise_for_status()
+
+    volumes: dict[str, int] = {}
+    for group in stats.json().get("groups", []):
+        project = ids_to_slugs.get(group["by"]["project"])
+        if project:
+            volumes[project] = group["totals"]["sum(quantity)"]
+    return volumes
+
+
+@app.command(name="sentry-rules")
+def sentry_rules_command() -> None:
+    """Check the six UI-managed Sentry metric alert rules."""
+    report = Report()
+    check_sentry_rules(report)
+    sys.exit(report.render())
+
+
+@app.command(name="rootly-routes")
+def rootly_routes_command() -> None:
+    """Check the CI/QA Rootly route rules are still enabled."""
+    report = Report()
+    check_rootly_routes(report)
+    sys.exit(report.render())
+
+
+@app.command(name="grafana-delivery")
+def grafana_delivery_command() -> None:
+    """Check Grafana contact points are delivering, across all three stacks."""
+    report = Report()
+    check_grafana_delivery(report)
+    sys.exit(report.render())
+
+
+@app.command(name="sentry-liveness")
+def sentry_liveness_command(max_silent_days: int = 7) -> None:
+    """Check Sentry alerts are still reaching Rootly.
+
+    Parameters
+    ----------
+    max_silent_days
+        How long Rootly may go without a Sentry-sourced alert before that
+        counts as a finding.
+    """
+    report = Report()
+    check_sentry_liveness(report, max_silent_days)
+    sys.exit(report.render())
+
+
+@app.default
+def all_checks(max_silent_days: int = 7) -> None:
+    """Run every check and report once.
+
+    Parameters
+    ----------
+    max_silent_days
+        How long Rootly may go without a Sentry-sourced alert before that
+        counts as a finding.
+    """
+    report = Report()
+    check_sentry_rules(report)
+    check_rootly_routes(report)
+    check_grafana_delivery(report)
+    check_sentry_liveness(report, max_silent_days)
+    sys.exit(report.render())
+
+
+if __name__ == "__main__":
+    app()

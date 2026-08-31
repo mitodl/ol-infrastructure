@@ -1,0 +1,341 @@
+#!/usr/bin/env python3
+"""Measure whether the Sentry metric alert rules *can* fire, before arguing about
+what their thresholds should be.
+
+All six rules alert on `count_unique(tags[sentry:user])` over a rolling window.
+A threshold on that aggregate is only meaningful if the project actually
+attaches user identity to its error events -- and most of ours do not. Three
+projects have emitted hundreds of thousands of errors over 90 days with a
+unique-user count of exactly zero, so no threshold, however low, can ever make
+those rules fire.
+
+So this reports two things per rule, in this order, because the second question
+is meaningless until the first is answered:
+
+  1. Is there a signal at all? Daily unique-user counts over the window, and
+     whether they have stopped. `openedx-residential` ran 21-86 users/day
+     through 2026-07-21 and has been flat zero since, which is why the alerting
+     that used to work stopped.
+  2. Given the signal, what would the current thresholds do? The distribution
+     of the rule's own aggregate over its own window, and how many buckets sit
+     at or above each configured trigger.
+
+Cross-check every conclusion against `firings`, which reports what Sentry
+itself did rather than what a historical query reconstructs.
+
+Sentry sunset the `/alert-rules/` and `/incidents/` APIs on 2026-08-28 (410,
+"This API no longer exists"). Metric alerts are now *detectors*; their firings
+are metric issues found with `detector:<id>`; their notification actions are
+*workflows*. Rule configuration is read live from the detectors API rather than
+copied here, because the two APIs disagreed about 340225's thresholds (25/50
+legacy vs 125/150 detector) right up until the legacy one was withdrawn.
+
+Reading historical aggregates has a caveat worth stating: `is:unresolved`
+filters on an issue's CURRENT state, so a historical reconstruction is not
+exactly what the rule saw at evaluation time. It is close enough to tell a
+zero signal from a live one, which is what this is for.
+
+Usage:
+    bin/sentry-alert-calibration baselines
+    bin/sentry-alert-calibration baselines --stats-period 90d
+    bin/sentry-alert-calibration signal --rule 340226 --days 45
+    bin/sentry-alert-calibration firings
+"""
+
+import statistics
+import sys
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+import cyclopts
+import httpx
+
+from bridge.secrets.sops import read_yaml_secrets
+
+app = cyclopts.App(
+    help=(
+        "Measure the Sentry metric alert rules' own aggregate against their own "
+        "windows. See the module docstring for why signal presence comes first."
+    )
+)
+
+SENTRY_API = "https://sentry.io/api/0"
+SENTRY_SECRET = Path("sentry/account.yaml")
+
+# Every rule uses this aggregate. Measuring `count_unique(user)` instead gives
+# nearly the same numbers today but is not the expression being evaluated.
+AGGREGATE = "count_unique(tags[sentry:user])"
+
+
+@dataclass(frozen=True)
+class Rule:
+    """One metric detector's live configuration, as Sentry reports it."""
+
+    legacy_rule_id: int
+    detector_id: str
+    project: str
+    name: str
+    enabled: bool
+    environment: str
+    query: str
+    window_minutes: int
+    # Sentry issue priority -> firing threshold. 75 is critical, 50 is warning.
+    thresholds: tuple[tuple[int, float], ...]
+
+    @property
+    def critical(self) -> float | None:
+        """Firing threshold for priority 75, if the detector has one."""
+        return next((v for p, v in self.thresholds if p == 75), None)
+
+    @property
+    def warning(self) -> float | None:
+        """Firing threshold for priority 50, if the detector has one."""
+        return next((v for p, v in self.thresholds if p == 50), None)
+
+
+# Read live rather than hardcoded. The legacy `/alert-rules/` API reported
+# 340225 at warning 25 / critical 50 right up until it was sunset on
+# 2026-08-28; the detectors API reports the same rule at 125 / 150. Copying
+# either into this file would have baked in a number that is wrong somewhere.
+
+
+class SentryApi:
+    """Minimal authenticated Sentry client for the endpoints used here."""
+
+    def __init__(self) -> None:
+        """Read the org and token out of sops and open a client."""
+        secrets = read_yaml_secrets(SENTRY_SECRET)
+        self.org = secrets["organization"]
+        self.client = httpx.Client(
+            headers={"Authorization": f"Bearer {secrets['auth_token']}"},
+            follow_redirects=True,
+            timeout=180,
+        )
+        self._project_ids: dict[str, str] = {}
+
+    def project_id(self, slug: str) -> str:
+        """Resolve a project slug to the numeric id the stats endpoints want."""
+        if slug not in self._project_ids:
+            response = self.client.get(f"{SENTRY_API}/projects/{self.org}/{slug}/")
+            response.raise_for_status()
+            self._project_ids[slug] = response.json()["id"]
+        return self._project_ids[slug]
+
+    def series(
+        self, rule: Rule, stats_period: str, interval: str
+    ) -> list[tuple[int, int]]:
+        """Time series of the rule's own aggregate, as (epoch, value) pairs."""
+        response = self.client.get(
+            f"{SENTRY_API}/organizations/{self.org}/events-stats/",
+            params={
+                "yAxis": AGGREGATE,
+                "project": self.project_id(rule.project),
+                "environment": rule.environment,
+                "query": f"event.type:error {rule.query}".strip(),
+                "statsPeriod": stats_period,
+                "interval": interval,
+                "dataset": "errors",
+            },
+        )
+        response.raise_for_status()
+        return [
+            (point[0], point[1][0]["count"])
+            for point in response.json().get("data", [])
+            if point[1]
+        ]
+
+    def rules(self) -> list[Rule]:
+        """Every metric detector, read live from Sentry."""
+        response = self.client.get(
+            f"{SENTRY_API}/organizations/{self.org}/detectors/",
+            params={"per_page": 100},
+        )
+        response.raise_for_status()
+        found = []
+        for detector in response.json():
+            if detector.get("type") != "metric_issue":
+                continue
+            sources = detector.get("dataSources") or []
+            snuba = (
+                (sources[0].get("queryObj") or {}).get("snubaQuery") or {}
+                if sources
+                else {}
+            )
+            thresholds = tuple(
+                sorted(
+                    (condition["conditionResult"], float(condition["comparison"]))
+                    for condition in (detector.get("conditionGroup") or {}).get(
+                        "conditions"
+                    )
+                    or []
+                    if condition.get("type") == "gt"
+                )
+            )
+            found.append(
+                Rule(
+                    legacy_rule_id=detector.get("alertRuleId"),
+                    detector_id=detector["id"],
+                    project=self.project_slug(detector["projectId"]),
+                    name=detector.get("name", ""),
+                    enabled=bool(detector.get("enabled")),
+                    environment=snuba.get("environment", ""),
+                    query=snuba.get("query", ""),
+                    window_minutes=int(snuba.get("timeWindow", 0)) // 60,
+                    thresholds=thresholds,
+                )
+            )
+        return sorted(found, key=lambda rule: str(rule.legacy_rule_id))
+
+    def project_slug(self, project_id: str) -> str:
+        """Resolve a numeric project id back to its slug."""
+        response = self.client.get(f"{SENTRY_API}/projects/{self.org}/{project_id}/")
+        response.raise_for_status()
+        return response.json()["slug"]
+
+    def firings(self, rule: Rule, stats_period: str) -> list[dict[str, Any]]:
+        """Return the metric issues this detector actually raised.
+
+        Replaces the sunset `/incidents/` endpoint: a metric alert firing is
+        now an issue carrying `detector:<id>`.
+        """
+        response = self.client.get(
+            f"{SENTRY_API}/organizations/{self.org}/issues/",
+            params={
+                "query": f"detector:{rule.detector_id}",
+                "project": self.project_id(rule.project),
+                "statsPeriod": stats_period,
+                "limit": 25,
+            },
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+def _percentile(values: list[int], quantile: float) -> int:
+    ordered = sorted(values)
+    return ordered[min(len(ordered) - 1, round(quantile * (len(ordered) - 1)))]
+
+
+def _day(epoch: int) -> str:
+    return datetime.fromtimestamp(epoch, tz=UTC).date().isoformat()
+
+
+@app.command
+def baselines(stats_period: str = "30d") -> None:
+    """Signal presence, then threshold behaviour, for every rule.
+
+    Parameters
+    ----------
+    stats_period
+        Sentry lookback for the bucketed series, e.g. 30d or 90d. A 5-minute
+        window over 90d is a lot of buckets; Sentry may reject it.
+    """
+    api = SentryApi()
+    for rule in api.rules():
+        print(f"\n=== {rule.legacy_rule_id}  {rule.project}  env={rule.environment}")
+        print(
+            f"    window={rule.window_minutes}m  query={rule.query!r}  "
+            f"enabled={rule.enabled}  thresholds={rule.thresholds}"
+        )
+        if not rule.enabled:
+            print("    DISABLED -- this detector evaluates nothing at all.")
+
+        daily = api.series(rule, stats_period, "1d")
+        live_days = [(epoch, value) for epoch, value in daily if value > 0]
+        print(
+            f"    signal: {len(live_days)}/{len(daily)} days carry any user "
+            f"identity at all"
+        )
+        if not live_days:
+            print(
+                "    NO SIGNAL -- this rule cannot fire at any threshold. Fix "
+                "user context in the SDK, or alert on something the project "
+                "actually emits."
+            )
+            continue
+        print(
+            f"    signal spans {_day(live_days[0][0])} to "
+            f"{_day(live_days[-1][0])}, peak {max(v for _, v in daily)}/day"
+        )
+        if live_days[-1][0] != daily[-1][0]:
+            print(
+                f"    SIGNAL STOPPED after {_day(live_days[-1][0])} and has not "
+                "returned -- the rule is dark from that date on"
+            )
+
+        buckets = api.series(rule, stats_period, f"{rule.window_minutes}m")
+        values = [value for _, value in buckets]
+        nonzero = [value for value in values if value > 0]
+        if not nonzero:
+            print("    no non-empty windows; nothing to calibrate against")
+            continue
+        print(
+            f"    {len(nonzero)}/{len(values)} non-empty windows: "
+            f"median={statistics.median(nonzero):g} "
+            f"p90={_percentile(nonzero, 0.90)} p99={_percentile(nonzero, 0.99)} "
+            f"max={max(values)}"
+        )
+        for label, threshold in (
+            ("critical", rule.critical),
+            ("warning", rule.warning),
+        ):
+            if threshold is None:
+                continue
+            crossings = sum(1 for value in values if value >= threshold)
+            print(
+                f"    {label}={threshold:g}: {crossings}/{len(values)} windows "
+                f"at or above ({100 * crossings / len(values):.1f}%)"
+            )
+
+
+@app.command
+def signal(rule: str, days: int = 45) -> None:
+    """Print one rule's daily unique-user counts, to date a signal loss.
+
+    Parameters
+    ----------
+    rule
+        Sentry alert rule id, e.g. 340226.
+    days
+        How many days back to print.
+    """
+    api = SentryApi()
+    known = api.rules()
+    matches = [
+        candidate for candidate in known if str(candidate.legacy_rule_id) == rule
+    ]
+    if not matches:
+        print(f"unknown rule {rule}; known: {[r.legacy_rule_id for r in known]}")
+        sys.exit(1)
+    for epoch, value in api.series(matches[0], f"{days}d", "1d"):
+        print(f"  {_day(epoch)}  {value}")
+
+
+@app.command
+def firings(stats_period: str = "90d") -> None:
+    """Report what Sentry itself recorded, as a check on the reconstructions.
+
+    Parameters
+    ----------
+    stats_period
+        Sentry lookback, e.g. 90d.
+    """
+    api = SentryApi()
+    for rule in api.rules():
+        fired = api.firings(rule, stats_period)
+        total = sum(int(issue.get("count", 0)) for issue in fired)
+        print(
+            f"=== {rule.legacy_rule_id} {rule.project} enabled={rule.enabled}: "
+            f"{len(fired)} metric issue(s), {total} firing(s)"
+        )
+        for issue in fired[:5]:
+            print(
+                f"    {issue.get('shortId')} firstSeen={issue.get('firstSeen')} "
+                f"lastSeen={issue.get('lastSeen')} count={issue.get('count')}"
+            )
+
+
+if __name__ == "__main__":
+    app()

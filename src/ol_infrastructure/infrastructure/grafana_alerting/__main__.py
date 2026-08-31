@@ -7,7 +7,7 @@ Bootstraps the Grafana provider and delegates to submodules:
   dashboards    — Grafana dashboards (all stacks)
   pingdom_checks — Pingdom uptime checks via dynamic provider (production stack only)
 
-See CLAUDE.md in this directory for a full description of the architecture.
+See AGENTS.md in this directory for a full description of the architecture.
 """
 
 from pathlib import Path
