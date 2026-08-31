@@ -289,6 +289,13 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         implicit_flow_enabled=False,
         direct_access_grants_enabled=False,
         service_accounts_enabled=False,
+        # Public client with no secret — PKCE is the ONLY proof-of-possession
+        # this flow has, so it must be server-enforced, not just assumed because
+        # the client happens to send one. Omitting this leaves Keycloak willing
+        # to complete the authorization-code exchange with no verifier at all,
+        # reopening the interception attack PKCE exists to close. Same setting,
+        # same reasoning as ol-platform-engineering-grafana-client below.
+        pkce_code_challenge_method="S256",
         valid_redirect_uris=[
             "http://localhost:8080/callback",
             "http://127.0.0.1:8080/callback",
