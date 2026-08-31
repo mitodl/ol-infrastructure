@@ -231,6 +231,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                     # releases, so mitx CI and mitx QA are built by DIFFERENT
                     # chain calls and a next-stack preview cannot span them.
                     topology="preview-gated",
+                    record_deployments=False,
                     auto_deploy_stages=["CI"],
                     stack_names=[
                         f"{deployment.deployment_name}.{stage}"

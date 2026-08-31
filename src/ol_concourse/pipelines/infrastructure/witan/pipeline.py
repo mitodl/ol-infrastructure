@@ -139,6 +139,7 @@ def build_witan_pipeline() -> PipelineFragment:
     deploy_fragment = pulumi_jobs_chain(
         refresh_stack=True,
         topology="preview-gated",
+        record_deployments=False,
         auto_deploy_stages=["CI"],
         pulumi_code=pulumi_code,
         stack_names=list(ENVIRONMENTS),

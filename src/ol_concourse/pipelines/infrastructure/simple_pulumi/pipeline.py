@@ -139,6 +139,12 @@ class SimplePulumiParams(BaseModel):
         auto_deploy_stages: Only used with topology="preview-gated". Stages
                            listed here keep today's auto-deploy-on-change
                            behavior instead of being gated. Typically ["CI"].
+        record_deployments: Only used with topology="preview-gated". Whether
+                           each deploy posts a "... deployed." GitHub issue as
+                           an audit record. Defaults to False -- under
+                           preview-gated the gate issue is what authorises the
+                           deploy, so the record issue is pure noise unless a
+                           pipeline specifically wants an audit trail.
     """
 
     app_name: str
@@ -156,6 +162,7 @@ class SimplePulumiParams(BaseModel):
     refresh_stack: bool = True
     topology: Literal["deploy-chained", "preview-gated"] = "deploy-chained"
     auto_deploy_stages: list[str] | None = None
+    record_deployments: bool = False
 
     @model_validator(mode="before")
     @classmethod
@@ -889,6 +896,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                     custom_dependencies=cross_env_custom_deps or None,
                     topology=params.topology,
                     auto_deploy_stages=params.auto_deploy_stages,
+                    record_deployments=params.record_deployments,
                 )
 
                 # Collect resources and jobs
@@ -923,6 +931,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                 custom_dependencies=cross_env_custom_deps or None,
                 topology=params.topology,
                 auto_deploy_stages=params.auto_deploy_stages,
+                record_deployments=params.record_deployments,
             )
 
             all_pipeline_resources = [
@@ -960,6 +969,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             custom_dependencies=cross_env_custom_deps or None,
             topology=params.topology,
             auto_deploy_stages=params.auto_deploy_stages,
+            record_deployments=params.record_deployments,
         )
 
         all_pipeline_resources = [

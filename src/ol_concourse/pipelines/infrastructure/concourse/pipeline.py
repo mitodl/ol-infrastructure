@@ -70,6 +70,7 @@ concourse_pulumi_fragment = pulumi_jobs_chain(
     concourse_pulumi_code,
     refresh_stack=True,
     topology="preview-gated",
+    record_deployments=False,
     auto_deploy_stages=["CI"],
     stack_names=["CI", "QA", "Production"],
     project_name="ol-infrastructure-concourse-application",
