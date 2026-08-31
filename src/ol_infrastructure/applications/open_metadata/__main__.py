@@ -789,11 +789,31 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     "eks.amazonaws.com/role-arn": open_metadata_irsa_role.role.arn,
                 },
             },
+            # The chart defaults omjobOperator to 256Mi/128Mi, which is well under
+            # what this actually uses. Measured on data-production over 7 days to
+            # 2026-08-31: working set idles at ~215Mi right after a restart, climbs
+            # monotonically, and gets OOMKilled at the 256Mi ceiling having peaked at
+            # 254Mi - 11 kills in 7 days, roughly one every 15 hours. The old 128Mi
+            # request understated real usage (p50 ~230Mi) by nearly half, so the
+            # scheduler was placing this pod as if it were tiny.
+            # Not version-specific: the same sawtooth shows on 1.13.3, 1.13.4 and
+            # (in QA) 2.0.0, while CI on 2.0.0 never restarts. It tracks OMJob volume,
+            # so the busiest environment is the most exposed.
+            # The 254Mi peak is a CENSORED observation - the container is killed at the
+            # limit, so real demand is unknown and could be higher. 1Gi is deliberately
+            # generous to uncover the true plateau rather than to be a tight fit; once
+            # a few days of unclipped data exist, re-measure and set this from the
+            # observed ceiling. If the climb never plateaus it is a leak in
+            # omjob-operator and belongs upstream.
             "omjobOperator": {
                 "enabled": True,
                 "image": {
                     "repository": "docker.getcollate.io/openmetadata/omjob-operator",
                     "tag": OPEN_METADATA_VERSION,
+                },
+                "resources": {
+                    "requests": {"cpu": "100m", "memory": "256Mi"},
+                    "limits": {"cpu": "500m", "memory": "1Gi"},
                 },
             },
             "envFrom": [
