@@ -85,7 +85,7 @@ Read directly from the installed SDK source
 ```python
 def get_provider(props, config):
     ...
-    providerStr = props[PROVIDER_KEY]   # PROVIDER_KEY = "__provider"
+    providerStr = props[PROVIDER_KEY]  # PROVIDER_KEY = "__provider"
 ```
 
 Every dynamic resource carries its entire CRUD implementation as a pickled (`dill`) Python object

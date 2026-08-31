@@ -96,7 +96,7 @@ creating a new pipeline, add an entry to `PIPELINE_CONFIGS` in that file:
 ```python
 PIPELINE_CONFIGS: list[tuple[str, str]] = [
     ("my-pipeline-name", "src/ol_concourse/pipelines/infrastructure/myapp/pipeline.py"),
-    ...
+    ...,
 ]
 ```
 

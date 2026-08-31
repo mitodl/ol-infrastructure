@@ -232,12 +232,15 @@ except RuntimeError:
 ```python
 import pulumi
 
+
 # MUST set mocks before import
 class MyMocks(pulumi.runtime.Mocks):
     def new_resource(self, args):
         return [args.name + "_id", args.inputs]
+
     def call(self, args):
         return {}
+
 
 pulumi.runtime.set_mocks(MyMocks())
 

@@ -449,8 +449,8 @@ alert instantly and re-firing under the new pod name).
 Add to `PodOOMKilled*` and `PodCrashLooping*`:
 
 ```python
-keep_firing_for="30m",
-missing_series_evals_to_resolve=10,
+keep_firing_for = ("30m",)
+missing_series_evals_to_resolve = (10,)
 ```
 
 `keep_firing_for` holds the alert through the gap between a pod dying and its
@@ -463,24 +463,32 @@ root grouping without reverting the deliberate `alertmanager.py:99-122` fix. Add
 policy branch **above** the `severity=warning` / `severity=critical` branches:
 
 ```python
-alerting.NotificationPolicyPolicyArgs(
-    matchers=[
-        alerting.NotificationPolicyPolicyMatcherArgs(
-            label="alertname",
-            match="=~",
-            value="Pod(OOMKilled|CrashLooping)(Warning|Critical)",
-        )
-    ],
-    contact_point="rootly",
-    continue_=False,
-    # Deliberately drops `pod` and `container`: a churning workload mints a
-    # new pod name per restart, and the root grouping then mints a new Rootly
-    # alert per name. Grouping at the deployment level reports the workload
-    # once. See the analysis, section 3.3.
-    group_bies=["alertname", "grafana_folder", "cluster", "namespace", "deployment"],
-    group_interval="30m",
-    repeat_interval="12h",
-),
+(
+    alerting.NotificationPolicyPolicyArgs(
+        matchers=[
+            alerting.NotificationPolicyPolicyMatcherArgs(
+                label="alertname",
+                match="=~",
+                value="Pod(OOMKilled|CrashLooping)(Warning|Critical)",
+            )
+        ],
+        contact_point="rootly",
+        continue_=False,
+        # Deliberately drops `pod` and `container`: a churning workload mints a
+        # new pod name per restart, and the root grouping then mints a new Rootly
+        # alert per name. Grouping at the deployment level reports the workload
+        # once. See the analysis, section 3.3.
+        group_bies=[
+            "alertname",
+            "grafana_folder",
+            "cluster",
+            "namespace",
+            "deployment",
+        ],
+        group_interval="30m",
+        repeat_interval="12h",
+    ),
+)
 ```
 
 Caveat to check on first apply: Grafana requires `alertname` and `grafana_folder` in any

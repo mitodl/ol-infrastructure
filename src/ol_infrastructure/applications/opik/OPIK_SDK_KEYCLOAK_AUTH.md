@@ -132,11 +132,7 @@ class KeycloakClientCredentialsAuth(httpx.Auth):
     def _get_token(self, *, force_refresh: bool = False) -> str:
         with self._lock:
             now = time.monotonic()
-            if (
-                force_refresh
-                or self._access_token is None
-                or now >= self._expires_at
-            ):
+            if force_refresh or self._access_token is None or now >= self._expires_at:
                 self._refresh_locked()
             assert self._access_token is not None  # noqa: S101
             return self._access_token
@@ -156,8 +152,8 @@ class KeycloakClientCredentialsAuth(httpx.Auth):
 
         self._access_token = payload["access_token"]
         expires_in = float(payload.get("expires_in", 60))
-        self._expires_at = (
-            time.monotonic() + max(0.0, expires_in - _REFRESH_SKEW_SECONDS)
+        self._expires_at = time.monotonic() + max(
+            0.0, expires_in - _REFRESH_SKEW_SECONDS
         )
 
 

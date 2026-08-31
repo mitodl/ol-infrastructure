@@ -245,31 +245,24 @@ aws s3api list-objects-v2 \
 import boto3
 
 # Initialize S3 client
-s3 = boto3.client('s3')
+s3 = boto3.client("s3")
 
 # Your configuration (provided by MIT)
-bucket_name = 'ol-b2b-partners-storage-ci'
-prefix = 'b2btestpartner1/'
+bucket_name = "ol-b2b-partners-storage-ci"
+prefix = "b2btestpartner1/"
 
 # List objects in your prefix
-response = s3.list_objects_v2(
-    Bucket=bucket_name,
-    Prefix=prefix
-)
+response = s3.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
 
-if 'Contents' in response:
+if "Contents" in response:
     print(f"Files in {prefix}:")
-    for obj in response['Contents']:
+    for obj in response["Contents"]:
         print(f"  - {obj['Key']} ({obj['Size']} bytes)")
 else:
     print(f"No files found in {prefix}")
 
 # Download a file
-s3.download_file(
-    bucket_name,
-    f'{prefix}example.txt',
-    'local-example.txt'
-)
+s3.download_file(bucket_name, f"{prefix}example.txt", "local-example.txt")
 print("File downloaded successfully!")
 ```
 
@@ -682,27 +675,28 @@ from aws_cdk import (
 )
 from constructs import Construct
 
+
 class MITStorageAccessStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
 
         # Parameters
         bucket_name = CfnParameter(
-            self, "BucketName",
+            self,
+            "BucketName",
             type="String",
             default="ol-b2b-partners-storage-production",
-            description="MIT bucket name"
+            description="MIT bucket name",
         )
 
         prefix = CfnParameter(
-            self, "Prefix",
-            type="String",
-            description="Your assigned prefix"
+            self, "Prefix", type="String", description="Your assigned prefix"
         )
 
         # Create IAM policy
         policy = iam.ManagedPolicy(
-            self, "MITStoragePolicy",
+            self,
+            "MITStoragePolicy",
             managed_policy_name="MIT-B2B-Storage-Access",
             description="Access to MIT B2B Partners Storage bucket",
             statements=[
@@ -718,7 +712,7 @@ class MITStorageAccessStack(Stack):
                                 prefix.value_as_string,
                             ]
                         }
-                    }
+                    },
                 ),
                 iam.PolicyStatement(
                     sid="ReadMITBucketObjects",
@@ -731,9 +725,9 @@ class MITStorageAccessStack(Stack):
                     ],
                     resources=[
                         f"arn:aws:s3:::{bucket_name.value_as_string}/{prefix.value_as_string}/*"
-                    ]
-                )
-            ]
+                    ],
+                ),
+            ],
         )
 ```
 

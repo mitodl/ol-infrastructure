@@ -123,20 +123,20 @@ import requests
 credential = {
     "@context": [
         "https://www.w3.org/2018/credentials/v1",
-        "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
+        "https://purl.imsglobal.org/spec/ob/v3p0/context.json",
     ],
     "type": ["VerifiableCredential", "OpenBadgeCredential"],
     "issuer": {
         "id": "did:key:...",  # Your DID from key generation
-        "name": "MIT Open Learning"
+        "name": "MIT Open Learning",
     },
     "credentialSubject": {
         "type": "AchievementSubject",
         "achievement": {
             "name": "Course Completion",
-            "description": "Completed Python Programming course"
-        }
-    }
+            "description": "Completed Python Programming course",
+        },
+    },
 }
 
 # Call issuer coordinator (internal service)
@@ -144,15 +144,9 @@ response = requests.post(
     "http://issuer-coordinator.digital-credentials.svc.cluster.local:4005/credentials/issue",
     json={
         "credential": credential,
-        "options": {
-            "credentialStatus": {
-                "type": "StatusList2021Entry"
-            }
-        }
+        "options": {"credentialStatus": {"type": "StatusList2021Entry"}},
     },
-    headers={
-        "Authorization": f"Bearer {TENANT_TOKEN}"
-    }
+    headers={"Authorization": f"Bearer {TENANT_TOKEN}"},
 )
 
 signed_credential = response.json()

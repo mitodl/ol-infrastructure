@@ -62,7 +62,9 @@ Edit `src/ol_infrastructure/applications/clickhouse/__main__.py`:
 
 a. Add the password config read:
 ```python
-langfuse_password = clickhouse_config.get_secret("langfuse_password") or Output.secret("changeme")
+langfuse_password = clickhouse_config.get_secret("langfuse_password") or Output.secret(
+    "changeme"
+)
 ```
 
 b. Add to the `vault.kv.SecretV2` data_json:

@@ -128,6 +128,7 @@ uv run pytest tests/ --lf
 
 ```python
 """Tests for MyComponent."""
+
 import pulumi
 
 
@@ -170,27 +171,27 @@ test_component = MyComponent(
 @pulumi.runtime.test
 def test_security_group_created():
     """Verify security group is created."""
+
     def check_vpc(args):
         urn, vpc_id = args
         assert vpc_id == "vpc-12345", f"Expected vpc-12345, got {vpc_id}"
 
     return pulumi.Output.all(
-        test_component.security_group.urn,
-        test_component.security_group.vpc_id
+        test_component.security_group.urn, test_component.security_group.vpc_id
     ).apply(check_vpc)
 
 
 @pulumi.runtime.test
 def test_instance_has_tags():
     """Verify instance has required tags."""
+
     def check_tags(args):
         urn, tags = args
         assert tags, f"Instance {urn} must have tags"
         assert "Name" in tags, f"Instance {urn} must have Name tag"
 
     return pulumi.Output.all(
-        test_component.instance.urn,
-        test_component.instance.tags
+        test_component.instance.urn, test_component.instance.tags
     ).apply(check_tags)
 ```
 
@@ -200,12 +201,15 @@ def test_instance_has_tags():
 ```python
 import pulumi
 
+
 # Define and set mocks at module level
 class MyMocks(pulumi.runtime.Mocks):
     def new_resource(self, args):
         return [args.name + "_id", args.inputs]
+
     def call(self, args):
         return {}
+
 
 pulumi.runtime.set_mocks(MyMocks())
 
@@ -222,10 +226,9 @@ def test_property():
         assert value == "expected"
 
     # RETURN the apply() call
-    return pulumi.Output.all(
-        component.resource.urn,
-        component.resource.property
-    ).apply(check)
+    return pulumi.Output.all(component.resource.urn, component.resource.property).apply(
+        check
+    )
 ```
 
 **3. Testing multiple outputs:**
@@ -253,16 +256,14 @@ def test_no_public_ssh():
     def check_rules(args):
         urn, ingress = args
         ssh_open = any(
-            rule["from_port"] == 22
-            and "0.0.0.0/0" in rule["cidr_blocks"]
+            rule["from_port"] == 22 and "0.0.0.0/0" in rule["cidr_blocks"]
             for rule in ingress
         )
         assert not ssh_open, f"SG {urn} exposes SSH to internet"
 
-    return pulumi.Output.all(
-        security_group.urn,
-        security_group.ingress
-    ).apply(check_rules)
+    return pulumi.Output.all(security_group.urn, security_group.ingress).apply(
+        check_rules
+    )
 ```
 
 ## Shared Fixtures
@@ -293,6 +294,7 @@ When using `@pulumi.runtime.test`, define mocks at module level:
 ```python
 import pulumi
 
+
 class MyMocks(pulumi.runtime.Mocks):
     def new_resource(self, args):
         return [args.name + "_id", args.inputs]
@@ -307,6 +309,7 @@ class MyMocks(pulumi.runtime.Mocks):
             return {"endpoint": "db.example.com:5432"}
         return {}
 
+
 # Set mocks BEFORE importing infrastructure code
 pulumi.runtime.set_mocks(MyMocks())
 ```
@@ -320,15 +323,18 @@ Use pytest markers to categorize tests:
 ```python
 import pytest
 
+
 @pytest.mark.unit
 def test_fast_unit_test():
     """Fast test that doesn't deploy infrastructure."""
     pass
 
+
 @pytest.mark.integration
 def test_slow_integration_test():
     """Slow test that deploys to AWS."""
     pass
+
 
 @pytest.mark.policy
 def test_policy_enforcement():

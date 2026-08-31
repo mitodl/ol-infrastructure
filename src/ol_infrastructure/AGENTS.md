@@ -51,11 +51,15 @@ Components in `components/` **must**:
 import pulumi
 from ol_infrastructure.lib.ol_types import AWSBase
 
+
 class MyConfig(AWSBase):
     instance_count: int = 1
 
+
 class MyComponent(pulumi.ComponentResource):
-    def __init__(self, name: str, config: MyConfig, opts: pulumi.ResourceOptions | None = None):
+    def __init__(
+        self, name: str, config: MyConfig, opts: pulumi.ResourceOptions | None = None
+    ):
         super().__init__("ol:aws:MyComponent", name, opts=opts)
         # create child resources with opts=pulumi.ResourceOptions(parent=self)
 ```
@@ -76,8 +80,9 @@ class MyComponent(pulumi.ComponentResource):
 
 ```python
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+
 stack_info = parse_stack()
-env_upper = stack_info.name        # "QA" | "Production" | "CI" | "Dev"
+env_upper = stack_info.name  # "QA" | "Production" | "CI" | "Dev"
 env_lower = stack_info.env_suffix  # "qa" | "production" | "ci" | "dev"
 ```
 
@@ -85,8 +90,11 @@ env_lower = stack_info.env_suffix  # "qa" | "production" | "ci" | "dev"
 
 ```python
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
+
 policy_doc = {"Version": "2012-10-17", "Statement": [...]}
-lint_iam_policy(policy_doc)  # raises on errors; signature: (policy_document, stringify=False)
+lint_iam_policy(
+    policy_doc
+)  # raises on errors; signature: (policy_document, stringify=False)
 ```
 
 ### Resource tags
@@ -95,6 +103,7 @@ lint_iam_policy(policy_doc)  # raises on errors; signature: (policy_document, st
 
 ```python
 from ol_infrastructure.lib.ol_types import BusinessUnit
+
 tags = {"OU": BusinessUnit.operations, "Environment": stack_info.name}
 ```
 

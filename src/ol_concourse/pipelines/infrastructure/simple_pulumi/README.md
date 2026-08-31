@@ -100,15 +100,15 @@ This outputs the pipeline definition to both `definition.json` and stdout.
 
 ```python
 class SimplePulumiParams(BaseModel):
-    app_name: str                           # Application name (required)
-    pulumi_project_path: str                # Path relative to src/ol_infrastructure/ (required)
-    stack_prefix: str                       # Pulumi stack prefix (required)
-    pulumi_project_name: str                # Defaults to "ol-infrastructure-{app_name}"
-    stages: list[str]                       # Defaults to ["CI", "QA", "Production"]
-    deployment_groups: list[str] | None     # Deployment groups for multi-group projects
-    auto_discover_stacks: bool              # Auto-discover stacks from filesystem
-    additional_watched_paths: list[str]     # Extra paths to watch (default: [])
-    branch: str                             # Git branch (default: "main")
+    app_name: str  # Application name (required)
+    pulumi_project_path: str  # Path relative to src/ol_infrastructure/ (required)
+    stack_prefix: str  # Pulumi stack prefix (required)
+    pulumi_project_name: str  # Defaults to "ol-infrastructure-{app_name}"
+    stages: list[str]  # Defaults to ["CI", "QA", "Production"]
+    deployment_groups: list[str] | None  # Deployment groups for multi-group projects
+    auto_discover_stacks: bool  # Auto-discover stacks from filesystem
+    additional_watched_paths: list[str]  # Extra paths to watch (default: [])
+    branch: str  # Git branch (default: "main")
 ```
 
 **Note**: Setting `deployment_groups` automatically enables `auto_discover_stacks`.

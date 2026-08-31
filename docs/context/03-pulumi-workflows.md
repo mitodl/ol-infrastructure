@@ -73,6 +73,7 @@ Example component structure:
 from pulumi import ComponentResource, export
 from ol_infrastructure.lib.ol_types import AWSBase
 
+
 class MyComponent(ComponentResource):
     def __init__(self, name: str, config: MyConfig, opts=None):
         super().__init__("custom:resource:MyComponent", name, opts=opts)
