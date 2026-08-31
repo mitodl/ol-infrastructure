@@ -3,8 +3,13 @@
 Key differences from the existing jupyterhub/deployment.py:
 - No OLApisixOIDCResources — JupyterHub owns auth via GenericOAuthenticator
 - APISIX route provides TLS termination and WebSocket proxying only
-- Injects TRINO_TOKEN from the user's OIDC access token via KubeSpawner pre_spawn_hook
-- JUPYTERHUB_CRYPT_KEY is required for auth state (access/refresh token) encryption
+- JUPYTERHUB_CRYPT_KEY is required because GenericOAuthenticator runs with
+  enable_auth_state, which encrypts stored access/refresh tokens
+- Notebooks authenticate to Starburst Galaxy themselves via Galaxy's OAuth2
+  flow; the hub does not hand them a token (see the comment on singleuser
+  extraEnv below)
+- The singleuser postStart hook seeds every notebook template baked into the
+  image into each user's persistent home directory, without clobbering edits
 - Uses EFS dynamic storage (efs-sc) for per-user home directories
 - No course image pre-puller
 """
@@ -45,19 +50,6 @@ from ol_infrastructure.components.services.vault import (
 from ol_infrastructure.lib.jupyterhub_config import get_authenticator_config
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 from ol_infrastructure.lib.vault import postgres_role_statements
-
-# JupyterHub KubeSpawner pre_spawn_hook: injects the user's Keycloak OIDC access token
-# as TRINO_TOKEN so notebooks can authenticate against Starburst Galaxy per-user
-# without any manual credential management. Token refresh is handled by JupyterHub
-# automatically (Keycloak sessions are 2 hours idle per ol-data-platform realm config).
-_PRE_SPAWN_HOOK = """
-async def pre_spawn_hook(spawner):
-    auth_state = await spawner.user.get_auth_state()
-    if auth_state and auth_state.get("access_token"):
-        spawner.environment["TRINO_TOKEN"] = auth_state["access_token"]
-
-c.KubeSpawner.pre_spawn_hook = pre_spawn_hook
-"""
 
 # KubeSpawner profile list: currently defines Standard and Large CPU/memory tiers.
 _PROFILE_LIST = f"""
@@ -127,6 +119,9 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
     )
     keycloak_base_url = jupyterhub_data_config.get("keycloak_base_url") or ""
     keycloak_realm = jupyterhub_data_config.get("keycloak_realm") or "ol-data-platform"
+    trino_catalog = (
+        jupyterhub_data_config.get("trino_catalog") or "ol_data_lake_production"
+    )
 
     # Vault Policy
     vault_policy = vault.Policy(
@@ -483,9 +478,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                         },
                     ],
                     "extraConfig": {
-                        "hubDataConfig.py": (
-                            _COMMON_HUB_CONFIG + _PRE_SPAWN_HOOK + _PROFILE_LIST
-                        ),
+                        "hubDataConfig.py": (_COMMON_HUB_CONFIG + _PROFILE_LIST),
                     },
                     "config": auth_config,
                     "resources": {
@@ -511,9 +504,20 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     "cmd": ["jupyterhub-singleuser"],
                     "startTimeout": 300,
                     "networkPolicy": {"enabled": False},
-                    # Seed a getting-started notebook into the user's home on
-                    # first login. cp -n is a no-op if the file already exists,
-                    # so user edits are never overwritten by a pod restart.
+                    # Seed the notebook templates into the user's home on first
+                    # login: getting_started.py (minimal starting point), demo.py
+                    # (full tour) and README.md. Copying the whole directory means
+                    # a new template ships with the image rather than needing a
+                    # matching change here.
+                    #
+                    # cp -n is load-bearing: home is a persistent EFS volume, so
+                    # it must never overwrite a copy the user has edited. The
+                    # corollary is that template FIXES do not reach users who
+                    # already have a copy.
+                    #
+                    # `|| true` guards the container: a postStart hook that exits
+                    # non-zero kills it, and the glob fails if the templates
+                    # directory is ever empty.
                     "lifecycleHooks": {
                         "postStart": {
                             "exec": {
@@ -521,10 +525,8 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                                     "sh",
                                     "-c",
                                     "mkdir -p /home/jovyan/notebooks && "
-                                    "cp -n "
-                                    "/usr/local/share/marimo/templates/"
-                                    "getting_started.py "
-                                    "/home/jovyan/notebooks/getting_started.py",
+                                    "cp -n /usr/local/share/marimo/templates/* "
+                                    "/home/jovyan/notebooks/ || true",
                                 ]
                             }
                         }
@@ -547,9 +549,26 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                             ),
                         }
                     },
+                    # Endpoint only, no credential. Starburst Galaxy authenticates
+                    # query clients itself: the notebook uses Galaxy's OAuth2
+                    # flow (trino.auth.OAuth2Authentication), Galaxy federates
+                    # the login to Keycloak SSO, and Galaxy issues its own
+                    # token. Galaxy has no issuer trust for a third-party IdP,
+                    # so a Keycloak access token passed as a bearer JWT is
+                    # rejected with "401 Authentication required". Injecting one
+                    # here would also go stale within minutes, since a pod's
+                    # environment is fixed for the pod's lifetime.
+                    #
+                    # TRINO_USER is deliberately absent. marimo's environment
+                    # scanner offers a "Quick add" Trino connection only when
+                    # TRINO_HOST, TRINO_USER and TRINO_CATALOG are all set, and
+                    # the snippet it generates uses BasicAuthentication or no
+                    # auth at all — neither of which Galaxy accepts here. Adding
+                    # TRINO_USER would surface a one-click connection that 401s.
                     "extraEnv": {
                         "TRINO_HOST": trino_host,
                         "TRINO_PORT": "443",
+                        "TRINO_CATALOG": trino_catalog,
                         "JUPYTERHUB_SINGLEUSER_APP": (
                             "jupyter_server.serverapp.ServerApp"
                         ),

@@ -1,11 +1,14 @@
 """JupyterHub Data application deployment for MIT Open Learning Data Platform.
 
 This project deploys a JupyterHub instance to the data EKS cluster. It uses
-GenericOAuthenticator against the ol-data-platform Keycloak realm so that
-JupyterHub itself holds each user's OIDC access token. KubeSpawner then injects
-the token as TRINO_TOKEN into the single-user server environment, enabling
-per-user JWT auth against Starburst Galaxy without any credential management
-in the notebook itself.
+GenericOAuthenticator against the ol-data-platform Keycloak realm to
+authenticate access to the notebook environment itself.
+
+Warehouse access is a separate handshake: notebooks authenticate to Starburst
+Galaxy through Galaxy's own OAuth2 flow, which federates the login to the same
+Keycloak SSO. Only the endpoint (TRINO_HOST / TRINO_PORT / TRINO_CATALOG) is
+injected into the single-user environment — Galaxy does not accept a
+Keycloak-issued JWT, so there is no token for the hub to pass along.
 """
 
 import json
