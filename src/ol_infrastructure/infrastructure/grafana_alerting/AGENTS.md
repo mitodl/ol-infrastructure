@@ -100,7 +100,7 @@ Rootly). That path is independent of Grafana and is managed in
 | `dashboards/keycloak_overview.py` | General service-health overview across all realms: logins, JVM, HTTP, DB pool, GC, JDBC cache, plus raw error/warning log tails. |
 | `dashboards/keycloak_olapps_realm.py` | Holistic authentication-activity view for just the olapps realm -- logins, registrations, token flows, and a per-identity-provider breakdown (success + failure) from Loki. For devs/management, not hardware/JVM. |
 | `pingdom_checks.py` | Pingdom uptime checks via Pulumi dynamic provider. Runs in the production stack only. |
-| `CLAUDE.md` | This file. |
+| `AGENTS.md` | This file. |
 
 ---
 
