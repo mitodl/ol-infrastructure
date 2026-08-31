@@ -120,6 +120,15 @@ mongodb_atlas_stack = make_stack_reference(
 notes_stack = make_stack_reference(
     projects.EDX_NOTES, f"{stack_info.env_prefix}.{stack_info.name}"
 )
+# Azure OpenAI is provisioned for the mitxonline deployment only, and only in
+# environments where infrastructure/azure/openai has been deployed -- a StackReference
+# to a stack that does not exist fails the whole preview, so this is a config switch
+# rather than an env_prefix check alone.
+azure_openai_stack = (
+    make_stack_reference(projects.AZURE_OPENAI, stack_info.name)
+    if edxapp_config.get_bool("enable_azure_openai")
+    else None
+)
 
 #############
 # Variables #
@@ -1295,6 +1304,7 @@ k8s_resources = create_k8s_resources(
     stack_info=stack_info,
     vault_config=Config("vault"),
     vault_policy=edxapp_vault_policy,
+    azure_openai_stack=azure_openai_stack,
 )
 
 export_dict = {

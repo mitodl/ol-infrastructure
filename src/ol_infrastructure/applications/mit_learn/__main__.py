@@ -8,6 +8,7 @@ from pathlib import Path
 from string import Template
 
 import pulumi_fastly as fastly
+import pulumi_kubernetes as kubernetes
 import pulumi_qdrant_cloud as qdrant_cloud
 import pulumi_vault as vault
 from pulumi import (
@@ -82,6 +83,12 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.azure_workload_identity import (
+    azure_identity_env,
+    azure_identity_token_mount,
+    azure_identity_token_volume,
+    azure_openai_env,
+)
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
@@ -463,6 +470,21 @@ vault_k8s_resources = OLVaultK8SResources(
 )
 
 ### End vault resources
+
+# Dedicated ServiceAccount for the mitlearn workloads. Until this existed they ran
+# under the namespace's `default` ServiceAccount, which is not something an Azure
+# federated identity credential can be scoped to usefully: its subject is an exact
+# string with no wildcards, so trusting `default` would trust anything that ever runs
+# in this namespace. Named to match the existing `mitlearn-app` security group.
+mitlearn_service_account = kubernetes.core.v1.ServiceAccount(
+    f"mitlearn-service-account-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="mitlearn-app",
+        namespace=learn_namespace,
+        labels=k8s_app_labels,
+    ),
+)
+
 # Create a security group for the application pods
 mitlearn_app_security_group = ec2.SecurityGroup(
     f"mitlearn-app-sg-{stack_info.env_suffix}",
@@ -1370,6 +1392,32 @@ interpolated_vars = {
 env_vars.update(**interpolated_vars)
 env_vars.update(**mitlearn_config.get_object("vars"))
 
+# Azure OpenAI, additive alongside the existing OPENAI_API_KEY wiring, which is not
+# touched. Nothing here is secret: the managed identity is reached by exchanging the
+# projected ServiceAccount token mounted below, so the client id is an identifier
+# rather than a credential and there is nothing to rotate.
+#
+# A StackReference to a stack that does not exist fails the whole preview, so this is
+# a config switch that gets flipped per environment once infrastructure/azure/openai
+# has been deployed there.
+if mitlearn_config.get_bool("enable_azure_openai"):
+    azure_openai_stack = make_stack_reference(projects.AZURE_OPENAI, stack_info.name)
+    env_vars.update(azure_identity_env(azure_openai_stack, "mitlearn"))
+    env_vars.update(
+        azure_openai_env(
+            azure_openai_stack,
+            "mitlearn",
+            api_version=mitlearn_config.get("azure_openai_api_version") or "2024-10-21",
+            default_deployment=mitlearn_config.get("azure_openai_default_deployment")
+            or "gpt-4o",
+        )
+    )
+    azure_identity_volumes = [azure_identity_token_volume()]
+    azure_identity_volume_mounts = [azure_identity_token_mount()]
+else:
+    azure_identity_volumes = []
+    azure_identity_volume_mounts = []
+
 # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
 # carries organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(env_vars, k8s_app_labels)
@@ -1640,6 +1688,9 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_max_replicas=mitlearn_config.get_int("max_replicas") or 10,
         application_security_group_id=mitlearn_app_security_group.id,
         application_security_group_name=mitlearn_app_security_group.name,
+        application_service_account_name=mitlearn_service_account.metadata.name,
+        extra_volumes=azure_identity_volumes,
+        extra_volume_mounts=azure_identity_volume_mounts,
         application_image_repository="mitodl/mit-learn-app",
         **docker_image_config_kwargs("MIT_LEARN"),
         application_cmd_array=["uwsgi"],

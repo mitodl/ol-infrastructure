@@ -73,6 +73,12 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
+from ol_infrastructure.lib.azure_workload_identity import (
+    azure_identity_env,
+    azure_identity_token_mount,
+    azure_identity_token_volume,
+    azure_openai_env,
+)
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
@@ -714,6 +720,32 @@ opik_keycloak_secret = OLVaultK8SSecret(
 
 env_vars = dict(learn_ai_config.require_object("env_vars") or {})
 
+# Azure OpenAI, additive alongside the existing OPENAI_API_KEY wiring, which is not
+# touched. Nothing here is secret: the managed identity is reached by exchanging the
+# projected ServiceAccount token mounted below, so the client id is an identifier
+# rather than a credential and there is nothing to rotate.
+#
+# A StackReference to a stack that does not exist fails the whole preview, so this is
+# a config switch that gets flipped per environment once infrastructure/azure/openai
+# has been deployed there.
+if learn_ai_config.get_bool("enable_azure_openai"):
+    azure_openai_stack = make_stack_reference(projects.AZURE_OPENAI, stack_info.name)
+    env_vars.update(azure_identity_env(azure_openai_stack, "learn-ai"))
+    env_vars.update(
+        azure_openai_env(
+            azure_openai_stack,
+            "learn-ai",
+            api_version=learn_ai_config.get("azure_openai_api_version") or "2024-10-21",
+            default_deployment=learn_ai_config.get("azure_openai_default_deployment")
+            or "gpt-4o",
+        )
+    )
+    azure_identity_volumes = [azure_identity_token_volume()]
+    azure_identity_volume_mounts = [azure_identity_token_mount()]
+else:
+    azure_identity_volumes = []
+    azure_identity_volume_mounts = []
+
 # Opik instrumentation (non-secret settings). OPIK_URL_OVERRIDE is derived from
 # the opik application stack's exported URL so it tracks the deployed instance
 # per environment; the workspace/project are static for our OSS install. The
@@ -784,6 +816,8 @@ learn_ai_app_k8s = OLApplicationK8s(
         # Use the fixed name used in the SecurityGroupPolicy spec
         application_security_group_name=Output.from_input("learn-ai-app"),
         application_service_account_name=learn_ai_service_account.metadata.name,
+        extra_volumes=azure_identity_volumes,
+        extra_volume_mounts=azure_identity_volume_mounts,
         application_image_repository="mitodl/learn-ai-app",
         **docker_image_config_kwargs("LEARN_AI"),
         application_min_replicas=learn_ai_config.get("min_replicas") or 2,
