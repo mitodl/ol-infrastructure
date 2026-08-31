@@ -885,6 +885,7 @@ CACHE_KEY_QUERY_PARAM_WHITELIST = [
     "order_id",
     "account_action",
     "account_action_status",
+    "is_new_user",
     # LearningResourceDrawer params (not in mit-learn's registry).
     "syllabus",
     "syllabus_only",
