@@ -197,6 +197,67 @@ def _check(
     )
 
 
+#: The name GitHub shows for the release-branch ruleset this module creates.
+RELEASE_BRANCHES_RULESET_NAME = "protected-release-branches"
+
+
+def _release_branch_conditions(
+    branches: list[str],
+) -> github.RepositoryRulesetConditionsArgs:
+    return github.RepositoryRulesetConditionsArgs(
+        ref_name=github.RepositoryRulesetConditionsRefNameArgs(
+            includes=[f"refs/heads/{branch}" for branch in branches],
+            excludes=[],
+        ),
+    )
+
+
+def build_release_branches(repo: dict[str, Any], repository: github.Repository) -> None:
+    """Protect a repo's release branches from deletion and force-push.
+
+    Targets `release`/`release-candidate`-style branches on repos still driven by
+    the release-script bot ("Doof"): a persistent `release-candidate` branch gets
+    promoted to `release` by merging a PR whose head is `release-candidate`, and the
+    fleet-wide `delete_branch_on_merge` default (converged in #5468) deletes a PR's
+    head branch on merge -- so without an explicit rule here, promoting a release
+    deletes the branch the next release cycle needs to exist.
+
+    This happened to `micromasters`: its `release-candidate` branch was deleted and
+    never recreated, and its `release` branch carried no protection at all (2026-08-31
+    audit). It is exactly the class of "invisible drift" org_rulesets.py warns
+    about -- classic per-branch protection is not visible to this stack and isn't
+    swept along with the rest of the org-ruleset migration, so restoring it here
+    (rather than by hand through the UI) is what keeps a future sweep from silently
+    dropping it again.
+
+    Deliberately narrower than `build()`'s default-branch ruleset: only `deletion`
+    and `non_fast_forward` are required. Nothing here asserts review counts or
+    status checks on these branches -- they receive fast-forward promotions from a
+    bot, not reviewed PRs from contributors, and `baseline-default-branch` /
+    `tier-1-hardening` already don't apply here since both scope to
+    `~DEFAULT_BRANCH` only.
+    """
+    branches = repo.get("protected_release_branches")
+    if not branches:
+        return
+
+    name = repo["name"]
+    github.RepositoryRuleset(
+        f"mitodl-repo-protected-release-branches-{name}",
+        name=RELEASE_BRANCHES_RULESET_NAME,
+        repository=name,
+        target="branch",
+        enforcement="active",
+        bypass_actors=_BYPASS,
+        conditions=_release_branch_conditions(sorted(branches)),
+        rules=github.RepositoryRulesetRulesArgs(
+            non_fast_forward=True,
+            deletion=True,
+        ),
+        opts=ResourceOptions(protect=True, depends_on=[repository]),
+    )
+
+
 def build(repo: dict[str, Any], repository: github.Repository) -> None:
     """Emit the required-status-checks ruleset for one repo, if it declares any.
 
