@@ -457,6 +457,21 @@ def test_build_asff_finding_cve_type_and_vulnerabilities_when_cve_present():
     assert finding["Vulnerabilities"] == [{"Id": "CVE-2021-44228"}]
 
 
+def test_build_asff_finding_resource_tags_for_console_filtering():
+    """Resources[].Tags (not UserDefinedFields, which BatchImportFindings
+    can only set on a finding's very first import) carries tool/target so
+    they're filterable as ordinary AWS resource tags in the console.
+    """
+    finding = _build_finding(
+        _alert(), generator_id="nuclei/mitlearn-qa", target_name="mitlearn-qa"
+    )
+
+    assert finding["Resources"][0]["Tags"] == {
+        "vuln-scanner:tool": "nuclei",
+        "vuln-scanner:target": "mitlearn-qa",
+    }
+
+
 def test_build_asff_finding_preserves_created_at_distinct_from_updated_at():
     """CreatedAt must reflect the finding's original import, not "now" on
     every re-import -- nothing protects it from provider overwrites the way

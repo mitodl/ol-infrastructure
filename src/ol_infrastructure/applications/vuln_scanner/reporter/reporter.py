@@ -334,6 +334,19 @@ def build_asff_finding(
                 "Type": "Other",
                 "Id": alert.location or target_url,
                 "Region": region,
+                # Resource tags, not UserDefinedFields -- the latter can only
+                # be set on a finding's first BatchImportFindings call and is
+                # then reserved for the customer to manage afterward (per
+                # AWS's own docs), so a later re-import with a changed tag
+                # value would silently never apply. Resources[].Tags has no
+                # such restriction, and resource tagging is a first-class,
+                # broadly-supported concept across the AWS console (unlike
+                # the narrower GeneratorId/Product filters that turned out
+                # not to be reliably filterable in Security Hub's console).
+                "Tags": {
+                    "vuln-scanner:tool": generator_id.split("/", maxsplit=1)[0],
+                    "vuln-scanner:target": target_name,
+                },
                 "Details": {
                     "Other": {
                         "TargetName": target_name,
