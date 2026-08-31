@@ -80,6 +80,15 @@ path "postgres-keycloak/creds/readonly/*" {
 path "postgres-keycloak/creds/readonly" {
   capabilities = ["read"]
 }
+# MITx Online application database, ingested by the data_loading dlt pipeline
+# (RFC 12711 step 8). Distinct from mariadb-mitxonline above, which is the
+# Open edX MySQL database for the same deployment.
+path "postgres-mitxonline/creds/readonly/*" {
+  capabilities = ["read"]
+}
+path "postgres-mitxonline/creds/readonly" {
+  capabilities = ["read"]
+}
 path "secret-data/" {
   capabilities = ["list"]
 }
