@@ -427,7 +427,7 @@ Landed 2026-08-20, with two corrections to the sketch below.
 class AlertTier(StrEnum):
     """Paging eligibility for alerts about this workload."""
 
-    page = "page"      # wake someone: user-facing or data-integrity impact
+    page = "page"  # wake someone: user-facing or data-integrity impact
     notify = "notify"  # business-hours attention: degraded, self-healing, or redundant
     ticket = "ticket"  # record only, never notifies
 

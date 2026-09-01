@@ -65,6 +65,7 @@ except RuntimeError:
 
 ```python
 """Tests for MyComponent."""
+
 import asyncio
 import pulumi
 
@@ -117,27 +118,27 @@ test_component = MyComponent(
 @pulumi.runtime.test
 def test_security_group_created():
     """Verify security group is created with correct VPC."""
+
     def check_vpc_id(args):
         urn, vpc_id = args
         assert vpc_id == "vpc-12345"
 
     return pulumi.Output.all(
-        test_component.security_group.urn,
-        test_component.security_group.vpc_id
+        test_component.security_group.urn, test_component.security_group.vpc_id
     ).apply(check_vpc_id)
 
 
 @pulumi.runtime.test
 def test_tags_applied():
     """Verify required tags are present."""
+
     def check_tags(args):
         urn, tags = args
         assert tags
         assert "Environment" in tags
 
     return pulumi.Output.all(
-        test_component.instance.urn,
-        test_component.instance.tags
+        test_component.instance.urn, test_component.instance.tags
     ).apply(check_tags)
 ```
 
@@ -149,8 +150,10 @@ def test_tags_applied():
 class MyMocks(pulumi.runtime.Mocks):
     def new_resource(self, args):
         return [args.name + "_id", args.inputs]
+
     def call(self, args):
         return {}
+
 
 # Set mocks BEFORE importing code under test
 pulumi.runtime.set_mocks(MyMocks())
@@ -164,15 +167,15 @@ from ol_infrastructure.components.aws.my_component import MyComponent
 @pulumi.runtime.test
 def test_resource_property():
     """Test description."""
+
     def check_value(args):
         urn, actual_value = args
         assert actual_value == "expected"
 
     # RETURN the Output.apply() call
-    return pulumi.Output.all(
-        component.resource.urn,
-        component.resource.property
-    ).apply(check_value)
+    return pulumi.Output.all(component.resource.urn, component.resource.property).apply(
+        check_value
+    )
 ```
 
 **3. Testing multiple outputs:**
@@ -198,6 +201,7 @@ def test_multiple_properties():
 @pulumi.runtime.test
 def test_resource_created():
     """Verify resource was created."""
+
     def check_exists(urn):
         assert urn
         assert "my-component" in urn
@@ -249,6 +253,7 @@ uv run pytest tests/ --disable-pytest-warnings
 
 ```python
 """Integration tests for network infrastructure."""
+
 import pytest
 import pulumi
 from pulumi import automation as auto
@@ -327,6 +332,7 @@ tests/
 
 ```python
 """Shared pytest fixtures for Pulumi tests."""
+
 import pytest
 import pulumi
 
@@ -334,6 +340,7 @@ import pulumi
 @pytest.fixture(scope="session", autouse=True)
 def pulumi_mocks():
     """Set up Pulumi mocks for all unit tests."""
+
     class PulumiMocks(pulumi.runtime.Mocks):
         def new_resource(self, args: pulumi.runtime.MockResourceArgs):
             return [args.name + "_id", args.inputs]

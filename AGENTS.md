@@ -198,7 +198,10 @@ uv run pre-commit run --all-files         # optional; budget 2+ minutes
 def create_resource(name: str, config: dict[str, Any]) -> Resource:
     pass
 
+
 from pydantic import BaseModel
+
+
 class Config(BaseModel):
     environment: str
     replicas: int = 3

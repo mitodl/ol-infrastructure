@@ -42,8 +42,8 @@ The org's `.github` repo generates `repos/.github.yaml`. **A shell glob or `glob
 will silently skip it**; `pathlib.Path.glob()` will not:
 
 ```python
-len(list(Path("repos").glob("*.yaml")))   # 316  <- correct
-len(glob.glob("repos/*.yaml"))            # 315  <- silently drops .github
+len(list(Path("repos").glob("*.yaml")))  # 316  <- correct
+len(glob.glob("repos/*.yaml"))  # 315  <- silently drops .github
 ```
 
 Any loader here must use `pathlib`, or enumerate with `iterdir()` and filter on suffix.

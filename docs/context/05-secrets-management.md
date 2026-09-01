@@ -54,6 +54,7 @@ set_env_secrets("qa")  # Decrypts and sets environment variables
 
 # Access secrets in code
 import os
+
 db_password = os.environ["DB_PASSWORD"]
 
 # Write to Vault
