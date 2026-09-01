@@ -114,19 +114,22 @@ Existing application project names (the `name:` field in each app's `Pulumi.yaml
 Each data stack exports a standardized dictionary:
 
 ```python
-pulumi.export("<app_slug>_data", {
-    # Security groups
-    "app_security_group_id": app_sg.id,
-    "app_security_group_name": app_sg.name,
-    "db_security_group_id": db_sg.id,
-    # Database
-    "db_address": db.db_instance.address,
-    "db_port": db.db_instance.port,
-    "db_identifier": db.db_instance.identifier,
-    # Cache (if applicable)
-    "cache_address": cache.address,
-    "cache_auth_token": pulumi.Output.secret(cache.cache_cluster.auth_token),
-})
+pulumi.export(
+    "<app_slug>_data",
+    {
+        # Security groups
+        "app_security_group_id": app_sg.id,
+        "app_security_group_name": app_sg.name,
+        "db_security_group_id": db_sg.id,
+        # Database
+        "db_address": db.db_instance.address,
+        "db_port": db.db_instance.port,
+        "db_identifier": db.db_instance.identifier,
+        # Cache (if applicable)
+        "cache_address": cache.address,
+        "cache_auth_token": pulumi.Output.secret(cache.cache_cluster.auth_token),
+    },
+)
 ```
 
 `cache_auth_token` (and any other credential value in this dict) must be wrapped in
