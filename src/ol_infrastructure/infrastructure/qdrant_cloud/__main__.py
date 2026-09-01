@@ -44,9 +44,11 @@ desired_package_name = qdrant_cloud_config.get("desired_package_name") or "mx2"
 # is represented by one entry in the package's available_additional_resources.
 desired_disk_gib = qdrant_cloud_config.get_int("desired_disk_gib")
 
-# Optional target total RAM per node in GiB. When set to a value larger than
-# the base package RAM, additional memory slabs are requested via
-# resource_configurations (the "memory slider" in the Qdrant Cloud UI).
+# Optional target total RAM per node in GiB. Unlike disk, RAM cannot be
+# purchased as an additional resource slab on any Qdrant Cloud package (the
+# booking catalogue's available_additional_resources only ever prices disk);
+# more RAM requires moving to a package with a larger base RAM allocation.
+# This is validated below once the package's booking data is available.
 desired_ram_gib = qdrant_cloud_config.get_int("desired_ram_gib")
 
 booking_result = qdrant_cloud.get_booking_packages(
@@ -122,21 +124,14 @@ if package.resource_configurations:
 
     if desired_ram_gib is not None:
         base_ram_gib = _parse_gib(package.resource_configurations[0].ram)
-        effective_ram_gib = desired_ram_gib - base_ram_gib
-        if effective_ram_gib > 0:
-            if not package.available_additional_resources:
-                msg = (
-                    f"Package {desired_package_name!r} does not support additional "
-                    "RAM (no available_additional_resources)."
-                )
-                raise ValueError(msg)
-            extra_resources.append(
-                qdrant_cloud.AccountsClusterConfigurationNodeConfigurationResourceConfigurationArgs(
-                    amount=effective_ram_gib,
-                    resource_type="ram",
-                    resource_unit="Gi",
-                )
+        if desired_ram_gib > base_ram_gib:
+            msg = (
+                f"Package {desired_package_name!r} has {base_ram_gib}Gi base RAM "
+                f"and cannot be topped up to {desired_ram_gib}Gi: RAM is not a "
+                "purchasable additional resource on any Qdrant Cloud package "
+                "(only disk is). Pick a package with a larger base RAM instead."
             )
+            raise ValueError(msg)
 
     if extra_resources:
         node_resource_configurations = extra_resources
