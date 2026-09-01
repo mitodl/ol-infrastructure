@@ -13,7 +13,10 @@ import pulumi_kubernetes as kubernetes
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from bridge.lib.constants import mit_learn_session_cookie_name
-from bridge.lib.magic_numbers import AWS_LOAD_BALANCER_NAME_MAX_LENGTH
+from bridge.lib.magic_numbers import (
+    AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
+    DEFAULT_HTTPS_PORT,
+)
 from ol_infrastructure.lib.aws.eks_helper import (
     cached_image_uri,
 )
@@ -542,11 +545,16 @@ def setup_apisix(
                     # (4318); the plugin appends ``/v1/traces`` itself.  From the
                     # receiver, traces flow through the existing tail-sampling
                     # pipeline to Grafana Cloud (see grafana.py gc-otlp-endpoint).
-                    **(
-                        {"pluginAttrs": {"opentelemetry": otel_plugin_metadata}}
-                        if otel_tracing_enabled
-                        else {}
-                    ),
+                    "pluginAttrs": {
+                        # Redirect http requests to port 443, not APISIX's
+                        # internal TLS port 9443 (hq#10999)
+                        "redirect": {"https_port": DEFAULT_HTTPS_PORT},
+                        **(
+                            {"opentelemetry": otel_plugin_metadata}
+                            if otel_tracing_enabled
+                            else {}
+                        ),
+                    },
                     "trustedAddresses": fastly_ips,
                     # Enable comprehensive per-phase request lifecycle tracing
                     # (SSL/SNI, rewrite, access, header_filter, body_filter, log).
