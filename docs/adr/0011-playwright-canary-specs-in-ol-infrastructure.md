@@ -206,9 +206,10 @@ apply. That is more machinery than the tidiness was worth.
 
 ### Neutral Consequences
 
-- `mitodl/end-user-test-canaries` was created before the reversal and is now
-  **unused**. It holds one commit and no dependents. It should be archived or deleted;
-  it is deliberately not registered in the Pulumi repository fleet.
+- `mitodl/end-user-test-canaries` was created before the reversal and **deleted the
+  same day**, once its only commit (the scaffold now living under
+  `src/ol_concourse/pipelines/canaries/`) had been superseded. It was never registered
+  in the Pulumi repository fleet, so nothing there needs unwinding.
 - Alerting for these canaries must stay distinct from Grafana Synthetic Monitoring's
   HTTP probes so the two do not double-page. Tracked separately.
 
