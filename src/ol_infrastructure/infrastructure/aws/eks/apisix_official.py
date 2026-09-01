@@ -13,7 +13,10 @@ import pulumi_kubernetes as kubernetes
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from bridge.lib.constants import mit_learn_session_cookie_name
-from bridge.lib.magic_numbers import AWS_LOAD_BALANCER_NAME_MAX_LENGTH
+from bridge.lib.magic_numbers import (
+    AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
+    DEFAULT_HTTPS_PORT,
+)
 from ol_infrastructure.lib.aws.eks_helper import (
     cached_image_uri,
 )
@@ -545,7 +548,7 @@ def setup_apisix(
                     "pluginAttrs": {
                         # Redirect http requests to port 443, not APISIX's
                         # internal TLS port 9443 (hq#10999)
-                        "redirect": {"https_port": 443},
+                        "redirect": {"https_port": DEFAULT_HTTPS_PORT},
                         **(
                             {"opentelemetry": otel_plugin_metadata}
                             if otel_tracing_enabled
