@@ -5,7 +5,7 @@
 # ---------------------------------------------------------------------------
 # Developer configuration
 # ---------------------------------------------------------------------------
-config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service")
+config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service openedx")
 config.define_bool("per_app_databases", usage="Deploy isolated DB/Valkey per app namespace")
 config.define_string_list("prebuilt_tags", usage="Prebuilt image tag overrides per app, e.g. mit-learn=0.62.0 learn-ai=0.28.3")
 config.define_string("disk_keep_tags", usage="Newest tilt-built image tags kept per repo by the disk janitor (default: 3). Overrides LOCAL_DEV_DISK_KEEP_TAGS env var.")
@@ -223,6 +223,17 @@ APPS = [
                 "cmd": "python manage.py createpresets",
             },
         ],
+    },
+    {
+        # Open edX, composed from the lehrer repo rather than built here — its
+        # Tiltfile calls lehrer's setup() and passes this cluster's topology.
+        # Off by default: the platform image build is long enough that it should
+        # be opted into, with `tilt up -- --enabled_apps mit-learn,openedx`.
+        "name": "openedx",
+        "dir": "openedx",
+        "namespace": "openedx",
+        "deploy_name": "lms",
+        "tiltfile": "./local-dev/apps/openedx/Tiltfile",
     },
 ]
 

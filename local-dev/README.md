@@ -193,7 +193,25 @@ Only the listed apps will be deployed. Shared infrastructure always runs.
 
 ### Open edX
 
-Open edX is not part of this stack. Run it from the [lehrer](https://github.com/mitodl/lehrer) repo instead — `lehrer dev setup` then `lehrer dev start` brings up its own k3d cluster with LMS, CMS, codejail, notes, and the MFEs. An `apps/openedx` entry that reused this cluster's Valkey and OpenSearch was started here and never finished; it was removed rather than carried as a second copy to keep in sync with lehrer's manifests.
+Open edX runs **in this cluster**, composed from the [lehrer](https://github.com/mitodl/lehrer) repo — not as a second k3d cluster alongside it. It is off by default because the platform image build is long:
+
+```bash
+tilt up -- --enabled_apps mit-learn,openedx
+```
+
+It needs lehrer checked out next to this repo (or `MITOL_WORKSPACE_ROOT` pointing at the directory that holds it). Nothing else: the `openedx-secrets` Secret is created for you from lehrer's `local-dev/secret-defaults.yaml`, the same file `lehrer dev setup` reads.
+
+How the split works, and why it is not a fork of lehrer's manifests:
+
+| Owned by lehrer | Owned by this repo |
+|---|---|
+| Platform/notes/codejail images, all k8s manifests, MariaDB + MongoDB | Which shared services to reuse, ingress, hostnames |
+
+`local-dev/apps/openedx/Tiltfile` calls lehrer's `setup()` with this cluster's topology. Valkey and OpenSearch come from the shared `local-infra` namespace rather than a second copy in `openedx` (`manage_infra: False`); MariaDB and MongoDB stay lehrer's, since this cluster has neither. Ingress is APISIX on the shared wildcard cert.
+
+Config differences live in `local-dev/apps/openedx/configmaps/` as `*-config-overrides` ConfigMaps, which lehrer's manifests layer **last** in `envFrom`. Only the keys that actually differ belong there — hosts and public URLs. Everything else is inherited, so a key added on lehrer's side arrives without an edit here. Overriding one more key means adding one line, not copying a ConfigMap.
+
+To run Open edX on its own instead — no MIT Learn, no shared infra — use `lehrer dev setup` && `lehrer dev start` in the lehrer repo, which brings up a self-contained cluster.
 
 ### Test accounts
 
