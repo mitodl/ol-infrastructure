@@ -66,6 +66,7 @@ and a disabled ruleset is invisible everywhere except `/orgs/{org}/rulesets`.
 import pulumi_github as github
 from pulumi import ResourceOptions
 
+from bridge.settings.apps import RELEASE_BOT_APP_ID
 from ol_infrastructure.saas.github.organization.teams import github_teams
 from ol_infrastructure.saas.github.tiers import (
     TIER_ONE,
@@ -117,6 +118,36 @@ _ADMIN_BYPASS = [
         actor_type="Team",
         actor_id=github_teams["odl-engineering"].id.apply(int),
         bypass_mode="pull_request",
+    ),
+    # ol-release-bot, added by hand on 2026-09-01 and registered here so an apply
+    # does not revert it. The Concourse `release` resource's `action: finish` merges
+    # `releases/<version>` into the default branch and pushes it directly, which
+    # `baseline-default-branch`'s `pull_request` rule rejected outright:
+    #
+    #   remote: error: GH013: Repository rule violations found for refs/heads/main.
+    #   remote: - Changes must be made through a pull request.
+    #
+    # That failure stranded ol-analytics-api's `releases/2026.8.28.2` on the remote,
+    # deployed to production but never merged back, until it was finished by hand
+    # (mitodl/ol-analytics-api#43).
+    #
+    # THIS RESTORES PARITY, IT DOES NOT WIDEN ANYTHING. The legacy release-script bot
+    # ("Doof") does the identical direct push and was never blocked, purely because
+    # its `odlbot` identity is a member of `odl-engineering-owners` above and inherits
+    # that team's `always` bypass -- it pushed `Release 0.78.2` onto mit-learn's
+    # default branch on 2026-09-01, three weeks after these rulesets went `active`.
+    # An App installed on selected repos holding `contents: write` is a narrower
+    # actor than the human PAT it replaces, so the net grant here is a reduction.
+    #
+    # `always` rather than `pull_request`, unlike the two contractor teams: the whole
+    # point is a direct push, and a `pull_request`-mode bypass only relaxes rules at
+    # PR merge time. Opening a PR instead was considered and does not work -- the
+    # App's installation holds `pull_requests: read`, so it can neither open nor merge
+    # one, and `required_approving_review_count: 1` above would still want a human.
+    github.OrganizationRulesetBypassActorArgs(
+        actor_type="Integration",
+        actor_id=RELEASE_BOT_APP_ID,
+        bypass_mode="always",
     ),
 ]
 

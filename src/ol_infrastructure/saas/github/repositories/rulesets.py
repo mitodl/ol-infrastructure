@@ -113,12 +113,22 @@ ol-infrastructure. `bin/github-required-checks blocked` lists them by name and e
 non-zero, and is the check to run immediately before `pulumi up` rather than after.
 
 BYPASS MIRRORS THE ORG RULESETS, AND THAT IS A NARROWER CHOICE THAN IT LOOKS.
-`_BYPASS` copies `_ADMIN_BYPASS` from organization/org_rulesets.py: owners `always`,
+`_BYPASS` copies the team entries of `_ADMIN_BYPASS` from
+organization/org_rulesets.py: owners `always`,
 `odl-engineering` and `arbisoft-contractors` at `pull_request`. So a human on either
 team can still merge a red build, and for humans this rule is advisory.
 
 That is deliberate, and it still fixes the failure that prompted the work, because
-bypass actors are TEAMS and the actor that caused the harm is an App. On 2026-08-21
+every bypass actor here is a TEAM and the actor that caused the harm is an App.
+
+  AMENDED 2026-09-01. That is no longer literally true: `ol-release-bot` is an App
+  and holds `always` on the required-status-checks rulesets of the repos it
+  releases. The argument below is unaffected -- it turns on `renovate[bot]` in
+  particular having no bypass entry, not on Apps being categorically excluded. The
+  test to apply to any future App entry is whether that App merges PRs, which
+  ol-release-bot does not and cannot: its installation holds `pull_requests: read`.
+
+On 2026-08-21
 Renovate merged mit-learn #3812-#3816 in 71 seconds, two of them with `python-tests`
 already red on their own branch, breaking `main` and costing a revert (#3822) three
 hours later. The same thing had been running quietly on ol-infrastructure: 12 of the
@@ -144,10 +154,17 @@ from typing import Any
 import pulumi_github as github
 from pulumi import ResourceOptions
 
+from bridge.settings.apps import RELEASE_BOT_APP_ID, release_workflow_repos
 from ol_infrastructure.saas.github.repositories import archetypes
 
-#: Mirrors `_ADMIN_BYPASS` in organization/org_rulesets.py exactly (decision: Tobias,
-#: 2026-08-21). See the module docstring for what that does and does not buy.
+#: Mirrors the THREE TEAM ENTRIES of `_ADMIN_BYPASS` in organization/org_rulesets.py
+#: (decision: Tobias, 2026-08-21). See the module docstring for what that does and
+#: does not buy.
+#:
+#: No longer a character-for-character mirror: `_ADMIN_BYPASS` also carries
+#: ol-release-bot, which applies to every tier-1 default branch org-wide, whereas
+#: here the App belongs only on the repos it actually releases. That split is
+#: `_RELEASE_BOT_BYPASS` and `_required_checks_bypass()` below.
 _BYPASS = [
     github.RepositoryRulesetBypassActorArgs(
         actor_type="Team",
@@ -165,6 +182,44 @@ _BYPASS = [
         bypass_mode="pull_request",
     ),
 ]
+
+#: ol-release-bot, added by hand on 2026-09-01 and registered here so an apply does
+#: not revert it. See the matching entry in organization/org_rulesets.py for the full
+#: reasoning; the short version is that `action: finish` pushes a merge commit
+#: straight at the default branch, and a freshly pushed commit carries no check runs,
+#: so `required_status_checks` rejects it before any check can report.
+#:
+#: NOT FOLDED INTO `_BYPASS`, deliberately. That list is shared with
+#: `build_release_branches()`, and the App has no business bypassing deletion and
+#: force-push on `release`/`release-candidate` -- see that function.
+_RELEASE_BOT_BYPASS = github.RepositoryRulesetBypassActorArgs(
+    actor_type="Integration",
+    actor_id=RELEASE_BOT_APP_ID,
+    bypass_mode="always",
+)
+
+#: "owner/repo" slugs from `bridge.settings.apps.APPS`, the registry the Concourse
+#: pipeline generator and the release bot already share. Read once at import.
+_RELEASE_WORKFLOW_REPOS = release_workflow_repos()
+
+
+def _required_checks_bypass(
+    name: str,
+) -> list[github.RepositoryRulesetBypassActorArgs]:
+    """Bypass actors for one repo's required-status-checks ruleset.
+
+    The App is added ONLY to repos whose releases it cuts. `ol-infrastructure` also
+    requires `ci-gate` and must not get an entry: it is released by hand, so a bypass
+    there would be privilege granted to an actor that never pushes to it.
+
+    Membership is derived rather than listed so the two cannot drift -- registering an
+    app in `APPS` is what grants it the bypass, and a repo that declares no
+    `required_status_checks` builds no ruleset here and needs nothing either way.
+    """
+    if f"mitodl/{name}" not in _RELEASE_WORKFLOW_REPOS:
+        return _BYPASS
+    return [*_BYPASS, _RELEASE_BOT_BYPASS]
+
 
 #: GitHub's alias for whatever the repo's default branch is, so this does not have to
 #: know which of `main` or `master` a repo is on. Same device as the org rulesets.
@@ -243,6 +298,14 @@ def build_release_branches(repo: dict[str, Any], repository: github.Repository) 
     bot, not reviewed PRs from contributors, and `baseline-default-branch` /
     `tier-1-hardening` already don't apply here since both scope to
     `~DEFAULT_BRANCH` only.
+
+    KEEPS PLAIN `_BYPASS`: ol-release-bot gets no entry, and that is not an
+    oversight. `release` and `release-candidate` are the LEGACY Doof branch names,
+    matched here as exact refs with no wildcard; the Concourse release resource
+    works on `releases/<version>`, which these conditions cannot match, so the App
+    never touches a ref this ruleset governs. Granting it deletion and force-push
+    here would be privilege for a push that cannot happen. These rulesets become
+    dead config once the last repo leaves the release-script workflow.
     """
     branches = repo.get("protected_release_branches")
     if not branches:
@@ -291,7 +354,7 @@ def build(repo: dict[str, Any], repository: github.Repository) -> None:
         repository=name,
         target="branch",
         enforcement="active",
-        bypass_actors=_BYPASS,
+        bypass_actors=_required_checks_bypass(name),
         conditions=_DEFAULT_BRANCH_ONLY,
         rules=github.RepositoryRulesetRulesArgs(
             required_status_checks=github.RepositoryRulesetRulesRequiredStatusChecksArgs(

@@ -88,3 +88,33 @@ def slack_channel(app_name: str) -> str | None:
     """Return the configured Slack channel ID for release notifications, if any."""
     entry = APPS.get(app_name)
     return entry.slack_channel if entry else None
+
+
+#: GitHub App id for `ol-release-bot`, the identity the Concourse `release`,
+#: `github-issues` and `github-deployments` resources authenticate as. This is the
+#: APP id (`app_id`), not the installation id -- ruleset bypass actors key on the
+#: former. Re-derive with:
+#:
+#:     gh api /orgs/mitodl/installations \
+#:       --jq '.installations[] | select(.app_slug=="ol-release-bot") | .app_id'
+#:
+#: Lives here rather than in the GitHub Pulumi stacks because both of them need it
+#: and neither owns it: it is a fact about the release workflow, which this module
+#: is the registry for.
+RELEASE_BOT_APP_ID = 4437866
+
+
+def release_workflow_repos() -> frozenset[str]:
+    """Return the "owner/repo" slugs whose releases ol-release-bot cuts.
+
+    Deduplicated, because two app entries can share one repo -- ``mit-learn`` and
+    ``mit-learn-nextjs`` are independently versioned pipelines over the same
+    ``mitodl/mit-learn`` history.
+
+    Consumed by ``ol_infrastructure/saas/github/repositories/rulesets.py`` to decide
+    which repos need a bypass actor for the App. Deriving it from ``APPS`` rather
+    than re-listing the repos over there is what keeps the two from drifting: adding
+    an app here is the single edit that also grants it the bypass it will need the
+    first time ``action: finish`` pushes to its default branch.
+    """
+    return frozenset(github_repo(app_name) for app_name in APPS)
