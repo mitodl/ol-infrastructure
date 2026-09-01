@@ -379,10 +379,15 @@ def onboard_oidc_org(
     Pass an OrgConfig to create the org, or an existing keycloak.Organization
     to attach a second IdP to an org that was already created.
 
-    Returns the created IdentityProvider (or None if the metadata URL was
-    inaccessible) so callers can attach identity_provider_alias-scoped
-    resources, e.g. AttributeImporterIdentityProviderMapper, with a real
-    Pulumi dependency edge instead of a bare alias string.
+    Returns the created IdentityProvider, or None if
+    oidc_identity_provider_args_from_discovery_url could not build a config
+    for it -- an inaccessible/unparseable discovery URL, a provider missing
+    required scopes (openid, email, profile), or a provider that doesn't
+    support the selected client-auth method (client_secret_basic when
+    oidc_config.client_secret is set, private_key_jwt otherwise). Callers
+    should check for None before attaching identity_provider_alias-scoped
+    resources, e.g. AttributeImporterIdentityProviderMapper, which need a
+    real Pulumi dependency edge rather than a bare alias string.
     """
     keycloak_org = (
         org if isinstance(org, keycloak.Organization) else create_org_for_learn(org)
