@@ -423,5 +423,6 @@ def onboard_oidc_org(
         organization_id=keycloak_org.id,
         validate_signature=True,
         trust_email=True,
+        opts=oidc_config.resource_options,
         **oidc_idp_arg_map,
     )
