@@ -23,7 +23,7 @@ from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
 )
 
 
-def create_olapps_realm(  # noqa: PLR0913, PLR0915
+def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     env_name: str,
@@ -271,6 +271,28 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 required_for_roles=[],
                 permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
                     views=["admin", "user"], edits=["admin", "user"]
+                ),
+            ),
+            # Populated via IdP-broker attribute mappers (e.g. Apply7's
+            # customer_id/customer_name OIDC claims) rather than user input,
+            # so these are admin-only and never required -- most users have
+            # no value here at all.
+            keycloak.RealmUserProfileAttributeArgs(
+                name="customerId",
+                display_name="${customerId}",
+                group="user-metadata",
+                required_for_roles=[],
+                permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
+                    views=["admin"], edits=["admin"]
+                ),
+            ),
+            keycloak.RealmUserProfileAttributeArgs(
+                name="customerName",
+                display_name="${customerName}",
+                group="user-metadata",
+                required_for_roles=[],
+                permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
+                    views=["admin"], edits=["admin"]
                 ),
             ),
         ],
@@ -1487,7 +1509,7 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         )
         # MASAI SCHOOL [END]
 
-        onboard_oidc_org(
+        apply7_oidc_identity_provider = onboard_oidc_org(
             OIDCIdpConfig(
                 idp_alias="APPLY7",
                 idp_display_name="Apply7",
@@ -1509,6 +1531,34 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                 resource_options=resource_options,
             ),
         )
+        if apply7_oidc_identity_provider is not None:
+            # Apply7-proposed claims identifying which of their customers a
+            # user belongs to. Requires customerId/customerName to be
+            # declared (admin-only) on the realm's user profile above --
+            # otherwise Keycloak silently drops attribute-importer writes to
+            # undeclared ("unmanaged") user attributes.
+            keycloak.AttributeImporterIdentityProviderMapper(
+                "map-apply7-oidc-customer-id-attribute",
+                realm=ol_apps_realm.id,
+                claim_name="customer_id",
+                identity_provider_alias=apply7_oidc_identity_provider.alias,
+                user_attribute="customerId",
+                extra_config={
+                    "syncMode": "INHERIT",
+                },
+                opts=resource_options,
+            )
+            keycloak.AttributeImporterIdentityProviderMapper(
+                "map-apply7-oidc-customer-name-attribute",
+                realm=ol_apps_realm.id,
+                claim_name="customer_name",
+                identity_provider_alias=apply7_oidc_identity_provider.alias,
+                user_attribute="customerName",
+                extra_config={
+                    "syncMode": "INHERIT",
+                },
+                opts=resource_options,
+            )
 
     # B2B Organizations [END]
 

@@ -373,11 +373,16 @@ class OIDCIdpConfig(BaseModel):
 def onboard_oidc_org(
     oidc_config: OIDCIdpConfig,
     org: OrgConfig | keycloak.Organization,
-) -> None:
+) -> keycloak.oidc.IdentityProvider | None:
     """Create an OIDC IdP and link it to an org.
 
     Pass an OrgConfig to create the org, or an existing keycloak.Organization
     to attach a second IdP to an org that was already created.
+
+    Returns the created IdentityProvider (or None if the metadata URL was
+    inaccessible) so callers can attach identity_provider_alias-scoped
+    resources, e.g. AttributeImporterIdentityProviderMapper, with a real
+    Pulumi dependency edge instead of a bare alias string.
     """
     keycloak_org = (
         org if isinstance(org, keycloak.Organization) else create_org_for_learn(org)
@@ -398,12 +403,12 @@ def onboard_oidc_org(
             f"Skipping OIDC IdP creation for {oidc_config.idp_alias} due to "
             f"inaccessible metadata URL"
         )
-        return
+        return None
     oidc_idp_arg_map["extra_config"] = {
         "jwtX509HeadersEnabled": True,
     } | oidc_idp_arg_map.get("extra_config", {})
     oidc_idp_arg_map["login_hint"] = True  # Preserve existing login_hint configuration
-    keycloak.oidc.IdentityProvider(
+    return keycloak.oidc.IdentityProvider(
         f"ol-apps-{resource_alias}-oidc-idp",
         alias=keycloak_alias,
         client_id=oidc_config.client_id,
