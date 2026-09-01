@@ -1102,10 +1102,13 @@ course_program_redirect_vcl = "\n".join(
 
 # Catalog pages redirect to MIT Learn's unit catalog view - no per-page mapping,
 # every /catalog/* path (and any sub-filter/department) goes to the same fixed
-# destination. Uses a distinct error code (604) from the course/program
-# redirects (603) and UAI B2C redirects (602) so this is fully additive.
+# destination. Bare /courses/ and /programs/ (no ID) are included here too,
+# since they're the index/listing views for those sections - the per-ID
+# redirect above requires a non-empty path segment, so it never matches these.
+# Uses a distinct error code (604) from the course/program redirects (603) and
+# UAI B2C redirects (602) so this is fully additive.
 catalog_redirect_vcl = (
-    f'if (req.url.path ~ "^/catalog(/.*)?$") {{\n'
+    f'if (req.url.path ~ "^/catalog(/.*)?$" || req.url.path ~ "^/(courses|programs)/?$") {{\n'
     f'  set req.http.x-redir-location = "https://{learn_frontend_domain}/c/unit/mitx";\n'
     f"  error 604;\n"
     f"}}"
