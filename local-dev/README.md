@@ -191,6 +191,28 @@ Edit `tilt_config.json`:
 
 Only the listed apps will be deployed. Shared infrastructure always runs.
 
+### Open edX
+
+Open edX runs **in this cluster**, composed from the [lehrer](https://github.com/mitodl/lehrer) repo — not as a second k3d cluster alongside it. It is off by default because the platform image build is long:
+
+```bash
+tilt up -- --enabled_apps mit-learn,openedx
+```
+
+It needs lehrer checked out next to this repo (or `MITOL_WORKSPACE_ROOT` pointing at the directory that holds it). Nothing else: the `openedx-secrets` Secret is created for you from lehrer's `local-dev/secret-defaults.yaml`, the same file `lehrer dev setup` reads.
+
+How the split works, and why it is not a fork of lehrer's manifests:
+
+| Owned by lehrer | Owned by this repo |
+|---|---|
+| Platform/notes/codejail images, all k8s manifests, MariaDB + MongoDB | Which shared services to reuse, ingress, hostnames |
+
+`local-dev/apps/openedx/Tiltfile` calls lehrer's `setup()` with this cluster's topology. Valkey and OpenSearch come from the shared `local-infra` namespace rather than a second copy in `openedx` (`manage_infra: False`); MariaDB and MongoDB stay lehrer's, since this cluster has neither. Ingress is APISIX on the shared wildcard cert.
+
+Config differences live in `local-dev/apps/openedx/configmaps/` as `*-config-overrides` ConfigMaps, which lehrer's manifests layer **last** in `envFrom`. Only the keys that actually differ belong there — hosts and public URLs. Everything else is inherited, so a key added on lehrer's side arrives without an edit here. Overriding one more key means adding one line, not copying a ConfigMap.
+
+To run Open edX on its own instead — no MIT Learn, no shared infra — use `lehrer dev setup` && `lehrer dev start` in the lehrer repo, which brings up a self-contained cluster.
+
 ### Test accounts
 
 Log in at any app (or `https://sso.ol.mit.dev` directly) with the seeded Keycloak users: `admin@odl.local`, `student@odl.local`, `prof@odl.local` — password `localdev123` for all three.  <!-- pragma: allowlist secret -->
@@ -320,7 +342,7 @@ tilt trigger seed-mit-learn-fixtures
 | `prebuilt_tags` | see example file | `["app=tag"]` list of image tags used when the app repo is not checked out locally. |
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
 | `log_retention_period` | `168h` | How long Grafana/Loki keeps logs — see [Log retention](#log-retention). |
-| `per_app_databases`, `openedx_mode` | — | Declared but not wired to anything yet; setting them has no effect. |
+| `per_app_databases` | — | Declared but not wired to anything yet; setting it has no effect. |
 
 The rule of thumb for which config surface a knob belongs to: settings that change **which/how Tilt runs things** (apps, image tags) go in `tilt_config.json`; anything that sets an **env var or secret value inside a workload** (API keys, feature flags, endpoints) goes in a gitignored `app-env.local.yaml` override ConfigMap — see [Local Configuration Overrides](#local-configuration-overrides).
 
@@ -506,6 +528,10 @@ AWS_SECRET_ACCESS_KEY: "minioadmin"  # pragma: allowlist secret
 ---
 
 ## Troubleshooting
+
+### `tilt up` fails with `specified unknown setting name 'openedx_mode'`
+
+`config.parse()` rejects any key in `tilt_config.json` that the Tiltfile does not declare, so the whole Tiltfile fails to load. `openedx_mode` was never wired to anything and has been removed — delete the key from your `tilt_config.json`. See [Open edX](#open-edx) for where that stack lives now.
 
 ### `tilt up` fails on `local-infra` (Pulumi errors)
 

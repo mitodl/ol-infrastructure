@@ -1,51 +1,90 @@
-# openedx integration Tiltfile for ol-infrastructure local dev.
+# Open edX (lehrer) composed into the ol-infrastructure local-dev cluster.
 #
-# Deploys edx-platform (LMS/CMS), codejail, edx-notes-api, and compiled MFEs
-# into the openedx namespace, sharing ol-infrastructure's Valkey and OpenSearch.
-# MySQL and MongoDB are deployed here since ol-infrastructure doesn't include them.
+# The point of this file is that there is exactly one Open edX local-dev stack
+# and one k3d cluster. lehrer owns the build definitions and manifests; this
+# repo owns deployment topology, and passes that topology to lehrer's setup()
+# rather than forking its manifests. See
+# pf-decision-lehrer-owns-build-definitions-ol-infras.
+#
+# What "composed" means concretely, versus `lehrer dev start`:
+#   - Valkey and OpenSearch come from the shared local-infra namespace
+#     (manage_infra=False), not a second copy in the openedx namespace.
+#   - MariaDB and MongoDB are still lehrer's, since this cluster has neither.
+#   - Ingress is APISIX on the shared wildcard cert, not port-forwards.
+#   - Config deltas are layered via configmaps/, not a forked ConfigMap.
 #
 # Prerequisites:
-#   - MITOL_WORKSPACE_ROOT must be set (or lehrer must be at <workspace_root>/lehrer)
-#   - lehrer repo must be checked out alongside ol-infrastructure
+#   - lehrer checked out at $MITOL_WORKSPACE_ROOT/lehrer (defaults to a sibling
+#     of this repo)
+#   - the local-infra-core and local-infra-apps Pulumi stacks applied, which is
+#     what creates the openedx namespace and replicates local-dev-tls into it
 
-workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/../../..")
+load("../../tiltlib.star", "k8s_yaml_local")
+
+workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
 lehrer_dir = os.path.join(workspace_root, "lehrer")
 
 if not os.path.exists(os.path.join(lehrer_dir, ".git")):
     print("WARNING: lehrer repo not found at " + lehrer_dir + " — skipping openedx deployment.")
     print("  Set MITOL_WORKSPACE_ROOT to the directory containing the lehrer repo.")
 else:
-    load(os.path.join(lehrer_dir, "local-dev/lehrer-core.star"), "setup")
+    # load_dynamic, not load: Starlark's load() takes a string literal only, so
+    # a path derived from MITOL_WORKSPACE_ROOT cannot go through it.
+    setup = load_dynamic(os.path.join(lehrer_dir, "local-dev/lehrer-core.star"))["setup"]
 
     local_dev = os.path.join(lehrer_dir, "local-dev")
 
-    # Apply integration-specific configmaps (Valkey, ol-infra OpenSearch, public URLs).
-    k8s_yaml(config.main_dir + "/configmaps/lms-config.yaml")
-    k8s_yaml(config.main_dir + "/configmaps/cms-config.yaml")
+    # Applied through k8s_yaml_local, not k8s_yaml, for the 'mit.dev' ->
+    # LOCAL_DEV_ROOT_DOMAIN substitution. Layered last in envFrom by lehrer's
+    # manifests.
+    #
+    # k8s_yaml_local's own fingerprint does NOT reach these pods: it stamps
+    # Deployments passed in the same call (tiltlib.star _stamp_deployments) and
+    # lehrer applies its Deployments separately inside setup(). The rollout
+    # comes from config_override_paths below, which folds these two files into
+    # the checksum lehrer stamps on its platform pod templates.
+    k8s_yaml_local([
+        "configmaps/lms-config.yaml",
+        "configmaps/cms-config.yaml",
+    ])
 
     setup({
         "deploy_config":   os.path.join(lehrer_dir, "deployments/mit-ol"),
         "registry":        "localhost:5001",
         "registry_k8s":    "k3d-registry.localhost:5001",
-        "redis_host":      "valkey-primary.local-infra.svc.cluster.local",
-        "opensearch_host": "opensearch-master.local-infra.svc.cluster.local",
+        # Shared with every other app in this cluster. The chart names the
+        # Service "opensearch-cluster-master", which is also what mit-learn's
+        # OPENSEARCH_URL points at.
+        "opensearch_host": "opensearch-cluster-master.local-infra.svc.cluster.local",
         "namespace":       "openedx",
+        # This cluster already runs Valkey and OpenSearch; it runs neither
+        # MariaDB nor MongoDB, so those two stay lehrer's.
         "manage_infra":    False,
         "mysql_managed":   True,
         "mongo_managed":   True,
+        # Created from lehrer's local-dev/secret-defaults.yaml, the same file
+        # `lehrer dev setup` reads. Nothing here restates the key list.
+        "manage_secrets":  True,
         "ingress":         "apisix",
         "mfe_hot_reload":  False,
         "notes_repo":      "https://github.com/openedx/edx-notes-api",
-        "helm_override_dir": config.main_dir + "/helm",
+        # Empty: lehrer's own operator values are correct here, and
+        # helm_values() falls back to them.
+        "helm_override_dir": "",
         "local_dev_dir":   local_dev,
-        "lms_base_url":    "https://lms.mit.dev",
-        "cms_base_url":    "https://studio.mit.dev",
-        "notes_public_url": "https://notes.mit.dev",
-        "apply_platform_configmaps": False,
+        # True: lehrer applies its full lms-config/cms-config and this repo
+        # supplies only deltas via the *-config-overrides ConfigMaps above.
+        # Setting False would mean forking the whole ConfigMap and drifting.
+        "apply_platform_configmaps": True,
+        # Folded into the pod-template checksum lehrer stamps on the platform
+        # Deployments, so editing an override actually rolls LMS/CMS/workers.
+        "config_override_paths": [
+            config.main_dir + "/local-dev/apps/openedx/configmaps/lms-config.yaml",
+            config.main_dir + "/local-dev/apps/openedx/configmaps/cms-config.yaml",
+        ],
         "release_name":    "master",
         "deploy_name":     "mitxonline",
         "settings_ns":     "mitol",
     })
 
-    # APISIX routes for lms/studio/notes/mfe on the ol-infra cluster
-    k8s_yaml(config.main_dir + "/apisix-routes.yaml")
+    k8s_yaml_local(["apisix-routes.yaml"])
