@@ -22,54 +22,66 @@ https://docs.stacklok.com/toolhive/guides-vmcp/authentication:
   Grafana Cloud MCP endpoint is not proxied instead), also joined to the group,
 - the per-stack optional ``context7``, ``sentry`` and ``aws`` ``MCPServer``s, each
   gated behind a ``toolhive_swe:<name>_enabled`` boolean (see mcp_servers.py),
-- an ``MCPOIDCConfig`` (``swe-vmcp-oidc``) used to validate the JWTs the vMCP's own
-  embedded auth server issues (its issuer is the vMCP endpoint itself), and
+- an ``MCPOIDCConfig`` (``swe-vmcp-oidc``) used to validate the JWTs Keycloak issues
+  directly to MCP clients, and
 - a ``VirtualMCPServer`` (``swe-vmcp``) that aggregates every backend in the group
-  behind a single endpoint and fronts them with an embedded OAuth authorization
-  server.
+  behind a single endpoint and validates those Keycloak-issued bearer tokens.
 
-Incoming auth (browser login via Keycloak, brokered by ToolHive):
-    Authentication uses ToolHive's EMBEDDED authorization server
-    (``spec.authServerConfig``). The vMCP is the OAuth provider that MCP clients talk
-    to: it exposes ``/authorize``, ``/token``, ``/register`` and
-    ``/.well-known/oauth-authorization-server`` at its own URL and BROKERS interactive
-    login to Keycloak (the ``ol-platform-engineering`` realm) as an upstream OIDC
-    provider. ``spec.incomingAuth`` then validates the JWTs the embedded server issues
-    (issuer == the vMCP endpoint) and advertises the protected-resource metadata
-    (RFC 9728) that points clients at the embedded auth server.
+Incoming auth (MCP clients log in with Keycloak directly, via a static CLI client):
+    ``spec.incomingAuth`` (type ``oidc``) is the ONLY auth surface on the vMCP; there
+    is no embedded authorization server. The vMCP is a pure OAuth resource server: it
+    advertises RFC 9728 protected-resource metadata pointing at Keycloak (the
+    ``ol-platform-engineering`` realm) as the authorization server, and validates
+    bearer tokens Keycloak issued against ``MCP_OIDC_CONFIG_NAME``'s issuer/JWKS.
 
-    The end-to-end flow for a client such as Claude Code: hit the endpoint → get a
-    401 pointing at the vMCP's own auth server → the client registers itself via
-    Dynamic Client Registration (RFC 7591), so NO pre-registered client_id is needed
-    on the client side (just the URL) → a browser opens to the vMCP's ``/authorize``,
-    which redirects to Keycloak for login → Keycloak redirects back to the vMCP's
-    ``/oauth/callback`` → the vMCP mints its own JWT → the client retries with that
-    bearer token, which ``incomingAuth`` validates.
+    Deliberately NOT Dynamic Client Registration (RFC 7591). DCR needs an
+    unauthenticated ``/register`` endpoint by design, which means any internet
+    caller could create a client in this realm — not a misconfiguration to gate,
+    but what DCR IS. See the TOOLHIVE block in
+    ``substructure/keycloak/ol_platform_engineering.py`` for why the standards
+    answer to that (an Initial Access Token) doesn't actually help here: MCP
+    client tooling doesn't send one, so it converges on the exact same outcome
+    as this design anyway, minus the open endpoint. Instead: ONE Pulumi-managed
+    public client (``toolhive-swe-cli``, provisioned there), shared across every
+    engineer the way a single OAuth client_id is shared by all installs of e.g.
+    the GitHub CLI. A client such as Claude Code is configured once with
+    ``claude mcp add --client-id toolhive-swe-cli --callback-port 8080 ...``,
+    then: hit the endpoint → get a 401 naming Keycloak as the authorization
+    server → a browser opens to Keycloak's ``/protocol/openid-connect/auth`` for
+    login (PKCE, no client secret — this is a public client) → Keycloak issues
+    the access token straight to the client → the client calls the vMCP with
+    that bearer token, which ``incomingAuth`` validates against Keycloak's
+    issuer.
 
-    Keycloak sees ONE ordinary CONFIDENTIAL web-app client (``ol-toolhive-client``,
-    provisioned by the keycloak substructure) whose secret is synced from Vault
-    (``secret-operations/sso/toolhive``) into this namespace by the Vault Secrets
-    Operator and referenced as the upstream provider's ``clientSecretRef``. No
-    Keycloak Dynamic Client Registration is required — DCR happens against the vMCP,
-    not Keycloak.
+    This has no vMCP-side OAuth state to persist: no embedded auth server, no
+    signing keys, no DCR client store, and therefore no Redis. This replaces the
+    prior embedded-auth-server design, which stored its DCR registrations in a
+    single-replica in-cluster Redis with no PodDisruptionBudget; when QA's node
+    pool churned that Redis pod's zone-pinned volume, DCR lookups failed and
+    clients saw ``invalid_client``. See ol-infrastructure
+    tk-switch-toolhive-swe-vmcp-incomingauth-to-validat-b8e450.
+
+    OPERATOR ACTION REQUIRED per environment after this apply: the removed
+    StatefulSet's ``volumeClaimTemplates`` PVC (``data-toolhive-swe-redis-0``, a
+    100Gi EBS volume) is NOT deleted by Kubernetes' default retention behavior —
+    it was never a standalone Pulumi resource, so Pulumi cannot clean it up either.
+    Once the switch to Keycloak-direct auth is confirmed working, manually run
+    ``kubectl delete pvc data-toolhive-swe-redis-0 -n toolhive-swe`` (per cluster)
+    or it keeps billing for an unused volume indefinitely.
+
+    Audience: Keycloak 26.7.2 (the pinned KEYCLOAK_VERSION) does not implement RFC
+    8707 resource indicators — confirmed via the upstream keycloak/keycloak issue
+    tracker, where support is tracked as in-progress for milestone 26.8.0 (issue
+    #51413 and related PRs), not yet shipped. So the token minted for
+    ``toolhive-swe-cli`` would carry no ``aud`` claim matching this vMCP's resource
+    URL by default. The keycloak substructure (``ol_platform_engineering.py``,
+    TOOLHIVE block) stamps one in unconditionally via a plain per-client
+    ``AudienceProtocolMapper`` — the client is Pulumi-managed with a fixed
+    client_id, so this needs none of the realm-wide default/optional-scope
+    machinery a DCR design without a fixed client_id would have required.
 
     APISIX does NOT participate in authentication — it only terminates TLS and proxies
-    every path (``/mcp``, ``/authorize``, ``/token``, ``/oauth/callback``,
-    ``/.well-known/*``) through to the vMCP Service.
-
-    Two pieces of state must persist for clients to stay authenticated across vMCP
-    pod restarts, and both are provisioned here:
-      * Signing material — ``authServerConfig.signingKeySecretRefs`` (an RSA-2048
-        PKCS#8 PEM key) and ``hmacSecretRefs`` (a 256-bit base64 HMAC), read from
-        encrypted stack config (``toolhive_swe:auth_server_signing_key`` /
-        ``:auth_server_hmac_secret``) so they are stable across deploys. Without these
-        the auth server uses ephemeral keys and previously issued tokens break on
-        restart.
-      * Session + DCR registration store — ``authServerConfig.storage.redis`` points
-        at a small single-replica in-cluster Redis (StatefulSet + PVC, defined in this
-        stack). Without it these live in memory and are wiped on restart, so DCR
-        clients get ``invalid_client`` and must re-register. Redis runs with
-        requirepass; the CRD requires a password (aclUserConfig.passwordSecretRef).
+    every path (``/mcp``, ``/.well-known/*``) through to the vMCP Service.
 
 AWS access (for the ``aws`` backend):
     The ``aws`` backend is AWS's official ``mcp-proxy-for-aws`` SigV4 proxy in front
@@ -107,19 +119,9 @@ from ol_infrastructure.applications.toolhive_swe.mcp_servers import (
     TOOLHIVE_SERVICE,
     create_mcp_servers,
 )
-from ol_infrastructure.applications.toolhive_swe.redis import (
-    REDIS_PASSWORD_SECRET_KEY,
-    REDIS_PASSWORD_SECRET_NAME,
-    create_redis_resources,
-    redis_addr,
-)
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
-)
-from ol_infrastructure.components.services.vault import (
-    OLVaultK8SSecret,
-    OLVaultK8SStaticSecretConfig,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -190,9 +192,9 @@ k8s_labels = K8sGlobalLabels(
 # Plain label dict applied to the raw K8s objects we manage directly.
 k8s_global_labels = k8s_labels.model_dump()
 
-# Public hostname the vMCP is served on. This is also the embedded auth server's
-# issuer and the OAuth resource identifier ToolHive advertises + validates.
-# Follows the per-environment convention toolhive-swe[.<env>].ol.mit.edu.
+# Public hostname the vMCP is served on — the OAuth resource identifier
+# ``incomingAuth`` validates. Follows the per-environment convention
+# toolhive-swe[.<env>].ol.mit.edu.
 if stack_info.env_suffix == "production":
     VMCP_DOMAIN = "toolhive-swe.ol.mit.edu"
 else:
@@ -200,43 +202,19 @@ else:
 VMCP_RESOURCE_URL = f"https://{VMCP_DOMAIN}"
 # RFC 8707 resource identifier / token audience. MCP clients (e.g. Claude Code)
 # canonicalize a bare origin with a trailing slash per WHATWG URL rules and send
-# THAT as the `resource` parameter, so the registered audience must include the
-# trailing slash or the embedded auth server rejects the token request with
-# "resource is not a registered audience". (The AS issuer, by contrast, must NOT
-# have a trailing slash, so it keeps using VMCP_RESOURCE_URL.)
+# THAT as the `resource` parameter, so the audience checked here must include the
+# trailing slash.
 VMCP_RESOURCE_ID = f"{VMCP_RESOURCE_URL}/"
-# Where Keycloak redirects after the user logs in (handled by the vMCP broker).
-VMCP_OAUTH_CALLBACK = f"{VMCP_RESOURCE_URL}/oauth/callback"
 
-# Keycloak realm the embedded auth server brokers login to (upstream OIDC provider).
-# The SSO hostname follows the per-environment convention sso[-<env>].ol.mit.edu.
+# Keycloak realm MCP clients authenticate against directly (no vMCP-side
+# broker), using the static toolhive-swe-cli client. The SSO hostname follows
+# the per-environment convention sso[-<env>].ol.mit.edu.
 if stack_info.env_suffix == "production":
     KEYCLOAK_DOMAIN = "sso.ol.mit.edu"
 else:
     KEYCLOAK_DOMAIN = f"sso-{stack_info.env_suffix}.ol.mit.edu"
 KEYCLOAK_ISSUER = f"https://{KEYCLOAK_DOMAIN}/realms/ol-platform-engineering"
-OIDC_CLIENT_ID = "ol-toolhive-client"
 MCP_OIDC_CONFIG_NAME = "swe-vmcp-oidc"
-
-# K8s Secret (synced from Vault by VSO) holding the Keycloak client secret that the
-# embedded auth server uses to broker to the upstream provider.
-UPSTREAM_SECRET_NAME = "toolhive-swe-oidc-upstream"  # noqa: S105  # pragma: allowlist secret
-UPSTREAM_SECRET_KEY = "client-secret"  # noqa: S105  # pragma: allowlist secret
-
-# Persistent signing material for the embedded auth server. Generated once per
-# environment and stored as encrypted stack config (via `pulumi config set --secret`)
-# so it remains stable across deploys and pod restarts (vs. ephemeral keys generated
-# at startup, which would invalidate previously issued tokens).
-SIGNING_KEY_SECRET_NAME = "toolhive-swe-authserver-signing-key"  # noqa: S105  # pragma: allowlist secret
-SIGNING_KEY_SECRET_KEY = "signing-key"  # noqa: S105  # pragma: allowlist secret
-HMAC_SECRET_NAME = "toolhive-swe-authserver-hmac"  # noqa: S105  # pragma: allowlist secret
-HMAC_SECRET_KEY = "hmac-key"  # noqa: S105  # pragma: allowlist secret
-
-# In-cluster Redis backing the embedded auth server's persistent storage (OAuth
-# sessions + DCR client registrations), so those survive vMCP pod restarts.
-# Provisioned in redis.py; the vMCP spec below references the address and the
-# password Secret.
-REDIS_ADDR = redis_addr(TOOLHIVE_NAMESPACE)
 
 #############################################
 #   Vault auth binding + AWS read-only IRSA #
@@ -434,86 +412,6 @@ if aws_mcp_enabled:
         role=toolhive_swe_auth_binding.irsa_role.name,
     )
 
-# Sync the Keycloak client secret from Vault into a namespace-local K8s Secret so
-# ToolHive's embedded auth server can reference it as the upstream clientSecretRef.
-upstream_oidc_secret = OLVaultK8SSecret(
-    f"toolhive-swe-oidc-upstream-secret-{stack_info.env_suffix}",
-    resource_config=OLVaultK8SStaticSecretConfig(
-        name=UPSTREAM_SECRET_NAME,
-        namespace=TOOLHIVE_NAMESPACE,
-        labels=k8s_global_labels,
-        dest_secret_labels=k8s_global_labels,
-        dest_secret_name=UPSTREAM_SECRET_NAME,
-        dest_secret_type="Opaque",  # pragma: allowlist secret  # noqa: S106
-        mount="secret-operations",
-        mount_type="kv-v1",
-        path="sso/toolhive",
-        exclude_raw=True,
-        excludes=[".*"],
-        templates={UPSTREAM_SECRET_KEY: '{{ get .Secrets "client_secret" }}'},
-        refresh_after="1h",
-        vaultauth=toolhive_swe_auth_binding.vault_k8s_resources.auth_name,
-    ),
-    opts=ResourceOptions(
-        delete_before_replace=True,
-        depends_on=toolhive_swe_auth_binding.vault_k8s_resources,
-    ),
-)
-
-##############################################
-#   Embedded auth server persistent keys      #
-##############################################
-# Signing material from encrypted stack config so it is stable across deploys (and
-# not regenerated), which keeps issued tokens valid across vMCP pod restarts.
-# Generate + set (per environment):
-#   openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \
-#     | pulumi config set --secret toolhive_swe:auth_server_signing_key --
-#   openssl rand -base64 32 \
-#     | pulumi config set --secret toolhive_swe:auth_server_hmac_secret --
-# RSA-2048 PKCS#8 PEM signing key used by the embedded auth server to sign JWTs.
-authserver_signing_key_pem = toolhive_swe_config.require_secret(
-    "auth_server_signing_key"
-)
-# 256-bit base64 HMAC secret.
-authserver_hmac_secret_value = toolhive_swe_config.require_secret(
-    "auth_server_hmac_secret"
-)
-
-# Materialise both as K8s Secrets referenced by authServerConfig below.
-authserver_signing_key_secret = kubernetes.core.v1.Secret(
-    f"toolhive-swe-authserver-signing-key-secret-{stack_info.env_suffix}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=SIGNING_KEY_SECRET_NAME,
-        namespace=TOOLHIVE_NAMESPACE,
-        labels=k8s_global_labels,
-    ),
-    type="Opaque",
-    string_data={SIGNING_KEY_SECRET_KEY: authserver_signing_key_pem},
-    opts=ResourceOptions(delete_before_replace=True),
-)
-authserver_hmac_key_secret = kubernetes.core.v1.Secret(
-    f"toolhive-swe-authserver-hmac-secret-{stack_info.env_suffix}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=HMAC_SECRET_NAME,
-        namespace=TOOLHIVE_NAMESPACE,
-        labels=k8s_global_labels,
-    ),
-    type="Opaque",
-    string_data={HMAC_SECRET_KEY: authserver_hmac_secret_value},
-    opts=ResourceOptions(delete_before_replace=True),
-)
-
-##############################################
-#   In-cluster Redis (embedded AS storage)    #
-##############################################
-# Password Secret + headless Service + StatefulSet, defined in redis.py.
-redis_resources = create_redis_resources(
-    stack_info=stack_info,
-    namespace=TOOLHIVE_NAMESPACE,
-    k8s_global_labels=k8s_global_labels,
-    toolhive_swe_config=toolhive_swe_config,
-)
-
 #########################################
 #   MCPTelemetryConfig (ToolHive tier)   #
 #########################################
@@ -590,9 +488,10 @@ mcp_servers = create_mcp_servers(
 #########################################
 #   MCPOIDCConfig (incoming validation)  #
 #########################################
-# Validates the JWTs issued by the vMCP's own embedded auth server, so the issuer
-# is the vMCP endpoint itself (NOT Keycloak — Keycloak is the upstream the embedded
-# server brokers to). Referenced by the VirtualMCPServer's incomingAuth below.
+# Validates JWTs Keycloak issues directly to MCP clients, so the issuer is Keycloak
+# itself (NOT the vMCP — there is no embedded auth server to self-issue tokens
+# anymore). jwksUrl is left to OIDC discovery against this issuer. Referenced by the
+# VirtualMCPServer's incomingAuth below.
 mcp_oidc_config = kubernetes.apiextensions.CustomResource(
     f"toolhive-swe-mcp-oidc-config-{stack_info.env_suffix}",
     api_version="toolhive.stacklok.dev/v1beta1",
@@ -605,7 +504,7 @@ mcp_oidc_config = kubernetes.apiextensions.CustomResource(
     spec={
         "type": "inline",
         "inline": {
-            "issuer": VMCP_RESOURCE_URL,
+            "issuer": KEYCLOAK_ISSUER,
         },
     },
     opts=ResourceOptions(depends_on=[cluster_stack]),
@@ -615,9 +514,8 @@ mcp_oidc_config = kubernetes.apiextensions.CustomResource(
 #   VirtualMCPServer aggregator          #
 #########################################
 # Aggregates every backend in the ``swe-tools`` group behind a single endpoint and
-# fronts them with an embedded OAuth authorization server that brokers login to
-# Keycloak. Tool-name collisions across backends are resolved by prefixing with the
-# workload name.
+# validates bearer tokens Keycloak issued directly to MCP clients. Tool-name
+# collisions across backends are resolved by prefixing with the workload name.
 swe_virtualmcpserver = kubernetes.apiextensions.CustomResource(
     f"toolhive-swe-vmcp-{stack_info.env_suffix}",
     api_version="toolhive.stacklok.dev/v1beta1",
@@ -629,69 +527,26 @@ swe_virtualmcpserver = kubernetes.apiextensions.CustomResource(
     ),
     spec={
         "groupRef": {"name": MCP_GROUP_NAME},
-        # Embedded auth server: the vMCP is the OAuth provider MCP clients talk to,
-        # brokering interactive login to Keycloak as an upstream OIDC provider.
-        "authServerConfig": {
-            "issuer": VMCP_RESOURCE_URL,
-            # Scopes every DCR-registered client is allowed to request at
-            # /oauth/authorize regardless of what it registered with. MCP clients
-            # (e.g. Claude Code) auto-request ``offline_access`` for refresh tokens
-            # once the AS advertises it, so it must be permitted here or the AS
-            # rejects the authorization with ``invalid_scope``. Kept deliberately
-            # narrow (openid + offline_access); every value must also be in the
-            # upstream-derived scope set below or the auth server fails to start.
-            "baselineClientScopes": ["openid", "offline_access"],
-            # Persistent signing material so issued tokens survive pod restarts
-            # (omitting these makes the auth server generate ephemeral keys).
-            "signingKeySecretRefs": [
-                {"name": SIGNING_KEY_SECRET_NAME, "key": SIGNING_KEY_SECRET_KEY}
-            ],
-            "hmacSecretRefs": [{"name": HMAC_SECRET_NAME, "key": HMAC_SECRET_KEY}],
-            # Persistent storage for OAuth sessions + DCR client registrations, so
-            # clients don't have to re-register/re-auth after a vMCP pod restart.
-            "storage": {
-                "type": "redis",
-                "redis": {
-                    "addr": REDIS_ADDR,
-                    # Password-only AUTH (usernameSecretRef omitted) against the
-                    # requirepass-protected in-cluster Redis.
-                    "aclUserConfig": {
-                        "passwordSecretRef": {
-                            "name": REDIS_PASSWORD_SECRET_NAME,
-                            "key": REDIS_PASSWORD_SECRET_KEY,
-                        },
-                    },
-                },
-            },
-            "upstreamProviders": [
-                {
-                    "name": "keycloak",
-                    "type": "oidc",
-                    "oidcConfig": {
-                        "issuerUrl": KEYCLOAK_ISSUER,
-                        "clientId": OIDC_CLIENT_ID,
-                        "clientSecretRef": {
-                            "name": UPSTREAM_SECRET_NAME,
-                            "key": UPSTREAM_SECRET_KEY,
-                        },
-                        "redirectUri": VMCP_OAUTH_CALLBACK,
-                        # offline_access so ToolHive obtains a refresh token from
-                        # Keycloak and so it appears in the upstream-derived scope
-                        # set that baselineClientScopes is validated against.
-                        "scopes": ["openid", "profile", "email", "offline_access"],
-                    },
-                }
-            ],
-        },
-        # Validate the JWTs the embedded auth server issues.
+        # No authServerConfig: the vMCP is a pure resource server. MCP clients log
+        # in directly against Keycloak using the static toolhive-swe-cli client
+        # (keycloak substructure, TOOLHIVE block); there is no vMCP-side OAuth
+        # state (no signing keys, no DCR store, no Redis) to provision here.
         "incomingAuth": {
             "type": "oidc",
             "oidcConfigRef": {
                 "name": MCP_OIDC_CONFIG_NAME,
                 # Trailing-slash form: matches the RFC 8707 resource MCP clients
-                # actually send (see VMCP_RESOURCE_ID).
+                # actually send (see VMCP_RESOURCE_ID). toolhive-swe-cli's
+                # AudienceProtocolMapper stamps this value onto every token it
+                # mints unconditionally, so unlike a DCR design there is no
+                # separate audience scope that needs to be advertised/requested
+                # here for the claim to be present.
                 "audience": VMCP_RESOURCE_ID,
                 "resourceUrl": VMCP_RESOURCE_ID,
+                # Advertised in RFC 9728 protected-resource metadata so a
+                # compliant client requests offline_access (for refresh tokens)
+                # at Keycloak automatically.
+                "scopes": ["openid", "offline_access"],
             },
         },
         "serviceType": "ClusterIP",
@@ -729,12 +584,6 @@ swe_virtualmcpserver = kubernetes.apiextensions.CustomResource(
             mcp_servers.group,
             *mcp_servers.servers,
             mcp_oidc_config,
-            upstream_oidc_secret,
-            authserver_signing_key_secret,
-            authserver_hmac_key_secret,
-            redis_resources.password_secret,
-            redis_resources.service,
-            redis_resources.statefulset,
             # Absent in CI, where the vMCP references no telemetry config.
             *([swe_telemetry_vmcp] if swe_telemetry_vmcp else []),
         ]
@@ -758,5 +607,5 @@ vmcp_cert, vmcp_httproute = create_ingress_resources(
 export("toolhive_namespace", TOOLHIVE_NAMESPACE)
 export("mcp_group_name", MCP_GROUP_NAME)
 export("vmcp_domain", VMCP_DOMAIN)
-export("vmcp_oauth_issuer", VMCP_RESOURCE_URL)
-export("vmcp_upstream_issuer", KEYCLOAK_ISSUER)
+export("vmcp_resource_id", VMCP_RESOURCE_ID)
+export("vmcp_oidc_issuer", KEYCLOAK_ISSUER)

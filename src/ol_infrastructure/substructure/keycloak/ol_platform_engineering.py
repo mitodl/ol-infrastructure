@@ -226,61 +226,104 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
     # OPIK [END] # noqa: ERA001
 
     # TOOLHIVE [START] # noqa: ERA001
-    # Authentication for the ToolHive SWE VirtualMCPServer is handled by ToolHive's
-    # embedded OAuth authorization server (spec.authServerConfig — see the
-    # ol-application-toolhive-swe stack). That embedded auth server is the OAuth
-    # provider MCP clients talk to; it BROKERS interactive login to this realm as an
-    # upstream OIDC provider. So from Keycloak's perspective the vMCP is a single
-    # ordinary CONFIDENTIAL web-app client: it runs the authorization-code flow and
-    # Keycloak redirects back to the vMCP's ``/oauth/callback``. MCP clients register
-    # dynamically against the vMCP (DCR), so no per-client Keycloak config is needed.
+    # The ToolHive SWE VirtualMCPServer (ol-application-toolhive-swe stack) is a
+    # pure OAuth resource server with no embedded auth server of its own: MCP
+    # clients authenticate directly against Keycloak.
     #
-    # The client secret is published to Vault so the Vault Secrets Operator can sync
-    # it into the toolhive-swe namespace, where ToolHive references it as the
-    # upstream provider's ``clientSecretRef``.
+    # Deliberately NOT RFC 7591 Dynamic Client Registration. DCR needs an open,
+    # unauthenticated /register endpoint by design (that is the whole point — no
+    # manual per-client setup), which means "any internet caller can create a
+    # client in this realm" is not a misconfiguration to gate, it is what DCR IS.
+    # Keycloak's Trusted Hosts client-registration policy can restrict which
+    # SOURCE HOSTS may call /register, but MCP clients run from arbitrary
+    # developer machines with no fixed IP set to allowlist, and Keycloak's
+    # Initial-Access-Token gate (RFC 7591's own answer to unauthenticated abuse)
+    # doesn't help either: the MCP spec's own registration sequence diagram
+    # shows POST /register with no Authorization header, and Claude Code's own
+    # docs confirm there is no supported way to supply one — an AS that requires
+    # one just makes Claude Code report "Incompatible auth server: does not
+    # support dynamic client registration" and fall back to its documented
+    # pre-configured-credentials path (`claude mcp add --client-id ...`) anyway.
+    # So a token-gated DCR endpoint and a static client converge on the identical
+    # client-side outcome; the static client below is that simpler, equivalent
+    # path, with no open registration endpoint to abuse in the first place.
+    #
+    # Revisit if Keycloak's upstream CIMD work (Client ID Metadata Document,
+    # tracked alongside RFC 8707 resource indicators in
+    # https://github.com/keycloak/keycloak/issues/51413, explicitly scoped for
+    # "AI tools like Claude and ChatGPT", targeted at milestone 26.8.0 — not
+    # shipped as of KEYCLOAK_VERSION 26.7.2) lands AND MCP client tooling adopts
+    # it: CIMD resolves a client_id as a URL the client hosts itself rather than
+    # a value Keycloak persists from an anonymous write, which is a genuinely
+    # different, spam-resistant trust model — unlike an Initial Access Token,
+    # not just a reframing of the same static-client tradeoff.
     if stack_info.env_suffix == "production":
         toolhive_swe_resource_url = "https://toolhive-swe.ol.mit.edu"
     else:
         toolhive_swe_resource_url = (
             f"https://toolhive-swe.{stack_info.env_suffix}.ol.mit.edu"
         )
-    ol_platform_engineering_toolhive_client = keycloak.openid.Client(
-        "ol-platform-engineering-toolhive-client",
-        name="ol-platform-engineering-toolhive-client",
+    # RFC 8707 trailing-slash form — must match VMCP_RESOURCE_ID in the
+    # ol-application-toolhive-swe stack's __main__.py exactly, since that value is
+    # what incomingAuth.oidcConfigRef.audience checks the token's `aud` against.
+    toolhive_swe_audience = f"{toolhive_swe_resource_url}/"
+
+    # PUBLIC (no secret — a distributed CLI can't keep one confidential; PKCE
+    # covers the authorization-code exchange) and shared across every engineer,
+    # the same way a single client_id is shared by all installs of e.g. the
+    # GitHub CLI. Each person runs, once:
+    #   claude mcp add --transport http --client-id toolhive-swe-cli \
+    #     --callback-port 8080 toolhive-swe <VMCP_RESOURCE_URL>/mcp
+    # `--callback-port` MUST be 8080 for everyone: the loopback redirect URI
+    # below is a fixed value (OAuth native-app loopback redirects, RFC 8252,
+    # need an exact match — Keycloak does not support a wildcard port here), not
+    # negotiated per-client the way DCR's redirect_uri would have been.
+    ol_platform_engineering_toolhive_swe_cli_client = keycloak.openid.Client(
+        "ol-platform-engineering-toolhive-swe-cli-client",
+        name="ol-platform-engineering-toolhive-swe-cli-client",
         realm_id="ol-platform-engineering",
-        client_id="ol-toolhive-client",
-        client_secret=keycloak_realm_config.get(
-            "ol-platform-engineering-toolhive-client-secret"
-        ),
+        client_id="toolhive-swe-cli",
         enabled=True,
-        access_type="CONFIDENTIAL",
+        access_type="PUBLIC",
         standard_flow_enabled=True,
         implicit_flow_enabled=False,
-        service_accounts_enabled=False,
         direct_access_grants_enabled=False,
-        # ToolHive's embedded auth server is the only OAuth client of this realm;
-        # Keycloak redirects back to the vMCP broker's callback after login.
-        valid_redirect_uris=[f"{toolhive_swe_resource_url}/oauth/callback"],
+        service_accounts_enabled=False,
+        # Public client with no secret — PKCE is the ONLY proof-of-possession
+        # this flow has, so it must be server-enforced, not just assumed because
+        # the client happens to send one. Omitting this leaves Keycloak willing
+        # to complete the authorization-code exchange with no verifier at all,
+        # reopening the interception attack PKCE exists to close. Same setting,
+        # same reasoning as ol-platform-engineering-grafana-client below.
+        pkce_code_challenge_method="S256",
+        valid_redirect_uris=[
+            "http://localhost:8080/callback",
+            "http://127.0.0.1:8080/callback",
+        ],
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
-    vault.generic.Secret(
-        "ol-platform-engineering-toolhive-client-vault-oidc-credentials",
-        path="secret-operations/sso/toolhive",
-        data_json=Output.all(
-            url=ol_platform_engineering_toolhive_client.realm_id.apply(
-                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
-            ),
-            client_id=ol_platform_engineering_toolhive_client.client_id,
-            client_secret=ol_platform_engineering_toolhive_client.client_secret,
-            # Independent random value carried for parity with other SSO entries;
-            # not used by ToolHive's upstream provider config.
-            secret=session_secret,
-            realm_id=ol_platform_engineering_toolhive_client.realm_id,
-            realm_name="ol-platform-engineering",
-            realm_public_key=ol_platform_engineering_toolhive_client.realm_id.apply(
-                fetch_realm_public_key_partial
-            ),
-        ).apply(json.dumps),
+
+    # Keycloak 26.7.2 (this repo's pinned KEYCLOAK_VERSION) does not implement RFC
+    # 8707 resource indicators — confirmed via the upstream keycloak/keycloak issue
+    # tracker (#51413), where support is tracked as in-progress for milestone
+    # 26.8.0, not yet shipped. So the token minted for this client carries no
+    # `aud` matching the vMCP's resource URL unless stamped in explicitly. Because
+    # this is a single Pulumi-managed client (unlike the DCR design this replaced,
+    # which had no fixed client_id to attach a mapper to), that stamping is a
+    # plain per-client AudienceProtocolMapper — the same pattern as
+    # ol-platform-engineering-witan-cli-audience-mapper above and
+    # ol-data-platform-superset-audience-mapper — unconditional on every token
+    # this client mints, with no realm-wide default/optional-scope surface to
+    # manage or re-verify against live state.
+    keycloak.openid.AudienceProtocolMapper(
+        "ol-platform-engineering-toolhive-swe-cli-audience-mapper",
+        realm_id="ol-platform-engineering",
+        client_id=ol_platform_engineering_toolhive_swe_cli_client.id,
+        name="toolhive-swe-audience",
+        included_custom_audience=toolhive_swe_audience,
+        add_to_access_token=True,
+        add_to_id_token=False,
+        opts=resource_options,
     )
     # TOOLHIVE [END] # noqa: ERA001
 
