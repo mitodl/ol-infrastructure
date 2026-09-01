@@ -1,0 +1,104 @@
+---
+# LMS configuration for the ol-infrastructure local-dev integration.
+#
+# This is a full replacement for lehrer's own
+# local-dev/manifests/platform/configmap-lms.yaml, not an overlay: the Tiltfile
+# passes apply_platform_configmaps=False, and lehrer's setup() uses that only to
+# decide whether to apply its copy.  Its redis_host/opensearch_host/lms_base_url
+# arguments do not patch the ConfigMap, so every key lehrer's version sets has to
+# be repeated here.  Keep the two in sync when lehrer's changes.
+#
+# Differences from lehrer's copy:
+#   - Valkey and OpenSearch point at ol-infrastructure's shared instances in the
+#     local-infra namespace rather than per-namespace Helm installs.
+#   - Public URLs are the local-dev hostnames, not localhost ports.
+#   - The logout fan-out settings at the bottom, which are what make hq#12763
+#     reproducible locally.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lms-config
+  namespace: openedx
+data:
+  # MySQL and MongoDB are still deployed per-namespace (mysql_managed and
+  # mongo_managed are True in the Tiltfile; ol-infrastructure has neither).
+  MYSQL_HOST: "mysql.openedx.svc.cluster.local"
+  MYSQL_PORT: "3306"
+  MYSQL_DB_NAME: "edxapp"
+  MYSQL_USER: "edxapp"
+
+  # Shared Valkey in local-infra, per the Tiltfile's redis_host.
+  CELERY_BROKER_TRANSPORT: "redis"
+  CELERY_BROKER_HOSTNAME: "valkey-primary.local-infra.svc.cluster.local"
+  CELERY_BROKER_USER: ""
+  CELERY_BROKER_PASSWORD: ""
+  CELERY_BROKER_VHOST: ""
+
+  MONGODB_HOST: "mongodb-svc.openedx.svc.cluster.local"
+  MONGODB_PORT: "27017"
+  MONGODB_USER: "edxapp"
+  MONGODB_DB: "edxapp"
+  MONGODB_REPLICASET: "mongodb"
+  MONGODB_AUTH_SOURCE: "admin"
+
+  # Shared OpenSearch in local-infra, per the Tiltfile's opensearch_host.
+  ELASTIC_SEARCH_HOST: "opensearch-master.local-infra.svc.cluster.local"
+  ELASTIC_SEARCH_PORT: "9200"
+
+  CODE_JAIL_REST_SERVICE_HOST: "http://codejail.openedx.svc.cluster.local:8000"
+  ENABLE_CODEJAIL_REST_SERVICE: "true"
+
+  EDXNOTES_INTERNAL_API: "http://notes.openedx.svc.cluster.local:8000/api/v1"
+  EDXNOTES_PUBLIC_API: "https://notes.mit.dev/api/v1"
+  ENABLE_EDXNOTES: "true"
+
+  # Service URLs (accessible from the browser), matching the Tiltfile's
+  # lms_base_url / cms_base_url and the APISIX routes alongside this file.
+  LMS_BASE_URL: "https://lms.mit.dev"
+  CMS_BASE_URL: "https://studio.mit.dev"
+
+  STATIC_ROOT_BASE: "/openedx/staticfiles"
+
+  LOG_DIR: "/openedx/data/var/log/edx"
+  LOGGING_ENV: "sandbox"
+  LOCAL_LOGLEVEL: "INFO"
+
+  DEBUG: "true"
+  # JSON-encoded: the aqueduct ALLOWED_HOSTS field is list[Any], and
+  # pydantic-settings parses list-typed env vars as JSON.
+  ALLOWED_HOSTS: '["*"]'
+  # APISIX terminates TLS in front of this, so the app itself speaks http.
+  HTTPS: "off"
+
+  OL_SETTINGS_DIR: ""
+
+  SERVICE_VARIANT: "lms"
+
+  # ---------------------------------------------------------------------- #
+  # Cross-application logout (hq#12763)
+  # ---------------------------------------------------------------------- #
+  # LogoutView renders one hidden iframe per entry here, each with
+  # ?no_redirect=1 appended, so that a logout started anywhere tears down every
+  # application's session.  Mirrors IDA_LOGOUT_URI_LIST in
+  # src/ol_infrastructure/applications/edxapp/k8s_configmaps.py.  Without this
+  # the local stack cannot reproduce the bug at all: nothing fans out.
+  #
+  # JSON-encoded for the same reason as ALLOWED_HOSTS above.
+  IDA_LOGOUT_URI_LIST: '["https://mitxonline.mit.dev/logout", "https://studio.mit.dev/logout",
+    "https://api.learn.mit.dev/logout"]'
+
+  # Gates the ?redirect_url= that Learn's logout interstitial passes; without
+  # Learn's host here is_safe_login_or_logout_redirect rejects it and the
+  # interstitial never learns the fan-out finished.
+  LOGIN_REDIRECT_WHITELIST: '["lms.mit.dev", "studio.mit.dev", "mitxonline.mit.dev",
+    "learn.mit.dev", "api.learn.mit.dev"]'
+
+  # Matches what this deployment actually serves in production -- the
+  # "mitxonline" overrides in edxapp/config_builder.py set ALLOW-FROM, beating
+  # the DENY in build_base_general_config.  Confirmed live:
+  #   $ curl -sI https://courses.learn.mit.edu/logout | grep -i x-frame
+  #   x-frame-options: ALLOW-FROM CANVAS.MIT.EDU
+  # Kept here rather than left unset so local behaviour matches production; the
+  # APISIX route beside this file replaces it with an explicit frame-ancestors
+  # CSP on /logout, since no current browser implements ALLOW-FROM.
+  X_FRAME_OPTIONS: "ALLOW-FROM canvas.mit.edu"

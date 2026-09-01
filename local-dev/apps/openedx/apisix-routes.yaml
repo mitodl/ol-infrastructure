@@ -1,0 +1,144 @@
+---
+# APISIX routes for Open edX in the ol-infrastructure local-dev cluster.
+#
+# Unlike the mit-learn and mitxonline routes, these carry no openid-connect
+# plugin: Open edX authenticates through its own social-auth pipeline, not the
+# gateway.  APISIX is only terminating TLS and routing here.
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: openedx-tls
+  namespace: openedx
+spec:
+  ingressClassName: apache-apisix
+  hosts:
+  - "lms.mit.dev"
+  - "studio.mit.dev"
+  - "notes.mit.dev"
+  secret:
+    name: local-dev-tls
+    namespace: openedx
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixPluginConfig
+metadata:
+  name: openedx-shared-plugins
+  namespace: openedx
+spec:
+  plugins:
+  - name: redirect
+    enable: true
+    config:
+      http_to_https: true
+  - name: prometheus
+    enable: true
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: openedx-route
+  namespace: openedx
+spec:
+  ingressClassName: apache-apisix
+  http:
+  # Mirrors the lms-logout route in
+  # src/ol_infrastructure/applications/edxapp/k8s_resources.py.
+  #
+  # This deployment serves X_FRAME_OPTIONS = "ALLOW-FROM canvas.mit.edu", a
+  # directive no current browser implements, so whether it restricts framing at
+  # all is UA-dependent (hq#12763).  Drop it for this path only and state the
+  # policy in CSP instead, which browsers do implement.  The rest of the LMS
+  # keeps whatever the app sends.
+  - name: lms-logout
+    priority: 10
+    match:
+      hosts:
+      - "lms.mit.dev"
+      paths:
+      - "/logout"
+      - "/logout/"
+    backends:
+    - serviceName: lms
+      servicePort: 8000
+    plugin_config_name: openedx-shared-plugins
+    plugins:
+    - name: response-rewrite
+      enable: true
+      config:
+        headers:
+          remove:
+          - "X-Frame-Options"
+          set:
+            Content-Security-Policy: "frame-ancestors 'self' https://api.learn.mit.dev"
+
+  - name: lms
+    priority: 0
+    match:
+      hosts:
+      - "lms.mit.dev"
+      paths:
+      - "/*"
+    backends:
+    - serviceName: lms
+      servicePort: 8000
+    plugin_config_name: openedx-shared-plugins
+    timeout:
+      connect: 600s
+      read: 600s
+      send: 600s
+
+  # Studio is itself one of the IDAs the LMS logout page frames, and serves the
+  # same unimplemented ALLOW-FROM directive.  Name the allowed ancestors
+  # explicitly: the LMS host as the immediate parent, and Learn's because it
+  # sits above the LMS once Learn's interstitial is in play -- frame-ancestors
+  # is checked against every ancestor, not just the nearest.
+  - name: cms-logout
+    priority: 10
+    match:
+      hosts:
+      - "studio.mit.dev"
+      paths:
+      - "/logout"
+      - "/logout/"
+    backends:
+    - serviceName: cms
+      servicePort: 8010
+    plugin_config_name: openedx-shared-plugins
+    plugins:
+    - name: response-rewrite
+      enable: true
+      config:
+        headers:
+          remove:
+          - "X-Frame-Options"
+          set:
+            Content-Security-Policy: >-
+              frame-ancestors 'self' https://lms.mit.dev https://api.learn.mit.dev
+
+  - name: cms
+    priority: 0
+    match:
+      hosts:
+      - "studio.mit.dev"
+      paths:
+      - "/*"
+    backends:
+    - serviceName: cms
+      servicePort: 8010
+    plugin_config_name: openedx-shared-plugins
+    timeout:
+      connect: 600s
+      read: 600s
+      send: 600s
+
+  - name: notes
+    priority: 0
+    match:
+      hosts:
+      - "notes.mit.dev"
+      paths:
+      - "/*"
+    backends:
+    - serviceName: notes
+      servicePort: 8000
+    plugin_config_name: openedx-shared-plugins

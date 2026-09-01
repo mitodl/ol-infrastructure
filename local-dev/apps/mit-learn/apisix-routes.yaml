@@ -86,6 +86,16 @@ spec:
         unauth_action: pass
         session:
           secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+          # Flat keys, matching OLApisixOIDCConfig -- lua-resty-session 4.x on
+          # APISIX 3.17+ ignores the nested `cookie:` form.  Named as in
+          # production so this session is distinguishable in devtools from
+          # MITx Online's, which is the whole subject of hq#12763.  MITx Online's
+          # /mitxonline/* routes read this same cookie and must match it exactly.
+          cookie_domain: ".learn.mit.dev"
+          cookie_name: "mitlearn_apisix_session"
+          absolute_timeout: 1209600
+          idling_timeout: 0
+          rolling_timeout: 0
         ssl_verify: false
 
   - name: logout-redirect
@@ -135,6 +145,16 @@ spec:
         unauth_action: auth
         session:
           secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+          # Flat keys, matching OLApisixOIDCConfig -- lua-resty-session 4.x on
+          # APISIX 3.17+ ignores the nested `cookie:` form.  Named as in
+          # production so this session is distinguishable in devtools from
+          # MITx Online's, which is the whole subject of hq#12763.  MITx Online's
+          # /mitxonline/* routes read this same cookie and must match it exactly.
+          cookie_domain: ".learn.mit.dev"
+          cookie_name: "mitlearn_apisix_session"
+          absolute_timeout: 1209600
+          idling_timeout: 0
+          rolling_timeout: 0
         ssl_verify: false
 ---
 # ApisixRoute — /learn/ prefix (strips prefix before forwarding to backend).
@@ -185,6 +205,16 @@ spec:
         unauth_action: pass
         session:
           secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+          # Flat keys, matching OLApisixOIDCConfig -- lua-resty-session 4.x on
+          # APISIX 3.17+ ignores the nested `cookie:` form.  Named as in
+          # production so this session is distinguishable in devtools from
+          # MITx Online's, which is the whole subject of hq#12763.  MITx Online's
+          # /mitxonline/* routes read this same cookie and must match it exactly.
+          cookie_domain: ".learn.mit.dev"
+          cookie_name: "mitlearn_apisix_session"
+          absolute_timeout: 1209600
+          idling_timeout: 0
+          rolling_timeout: 0
         ssl_verify: false
 
   - name: logout-redirect
@@ -240,4 +270,14 @@ spec:
         unauth_action: auth
         session:
           secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+          # Flat keys, matching OLApisixOIDCConfig -- lua-resty-session 4.x on
+          # APISIX 3.17+ ignores the nested `cookie:` form.  Named as in
+          # production so this session is distinguishable in devtools from
+          # MITx Online's, which is the whole subject of hq#12763.  MITx Online's
+          # /mitxonline/* routes read this same cookie and must match it exactly.
+          cookie_domain: ".learn.mit.dev"
+          cookie_name: "mitlearn_apisix_session"
+          absolute_timeout: 1209600
+          idling_timeout: 0
+          rolling_timeout: 0
         ssl_verify: false

@@ -30,6 +30,10 @@ data:
   MITOL_API_BASE_URL: "https://api.learn.mit.dev"
   # Redirect target for first-time OIDC logins; defaults to a legacy open.odl.local host.
   MITOL_NEW_USER_LOGIN_URL: "https://learn.mit.dev/onboarding"
+  # Open edX's logout page, which Learn's logout interstitial frames so the
+  # logout fans out to MITx Online and studio without leaving learn.mit.dev
+  # (hq#12763).  Must match the openedx app's lms_base_url.
+  OPENEDX_LOGOUT_URL: "https://lms.mit.dev/logout"
 
   # mkcert root CA — trusts the local wildcard TLS cert for inter-pod HTTPS
   # (e.g. Django OIDC token exchange with Keycloak at sso.ol.mit.dev)

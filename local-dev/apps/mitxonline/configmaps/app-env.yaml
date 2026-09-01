@@ -14,11 +14,14 @@ data:
   # mitxonline.odl.local:8013 host, which doesn't resolve in this stack.
   MITXONLINE_NEW_USER_LOGIN_URL: "https://mitxonline.mit.dev/create-profile"
 
-  # The trailing "&" is deliberate: the view appends "?redirect_url=..." to this
-  # value, and it keeps no_redirect parsing as exactly "1".
-  # If the openedx app is ever enabled here, change this to
-  # https://lms.mit.dev/logout to match how the deployed envs do it.
-  LOGOUT_REDIRECT_URL: "https://mitxonline.mit.dev/logout?no_redirect=1&"
+  # Open edX's logout page, matching how the deployed envs set this.  It fans
+  # the logout out to every entry in the LMS's IDA_LOGOUT_URI_LIST -- MITx
+  # Online, studio and Learn -- which is what makes hq#12763 reproducible here.
+  #
+  # This used to point back at MITx Online's own /logout?no_redirect=1& because
+  # the openedx app was not deployed locally; that self-loop tore down only this
+  # application's session, so a cross-application logout bug could not show up.
+  LOGOUT_REDIRECT_URL: "https://lms.mit.dev/logout"
   MITX_ONLINE_DB_DISABLE_SSL: "True"
   MITX_ONLINE_USE_S3: "False"
   DEBUG: "False"
