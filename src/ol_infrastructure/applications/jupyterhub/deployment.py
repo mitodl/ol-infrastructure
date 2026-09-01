@@ -23,6 +23,7 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    oidc_gateway_pre_function_plugin,
     stale_session_cookie_cleanup_plugin,
 )
 from ol_infrastructure.components.services.cert_manager import (
@@ -186,6 +187,17 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                 # host belongs to mit-learn, which clears it from its own
                 # routes.  Safe to delete once the old cookies have aged out.
                 stale_session_cookie_cleanup_plugin(),
+                # Two pre-openid-connect fixes, necessarily one plugin (APISIX
+                # allows a single serverless-pre-function per config).  The
+                # expired-authentication-session callbacks are the same ones
+                # api.learn and mitxonline see, at this host's much smaller
+                # volume (2/day).  The canonical-origin redirect matters more
+                # here than anywhere else: nb.learn and authoring.nb.learn are
+                # the two hosts Keycloak actually rejects today, 61 hits over
+                # 7 days between them, because they take direct plain-HTTP
+                # traffic that the `redirect` default plugin never gets to
+                # upgrade.
+                oidc_gateway_pre_function_plugin(),
             ],
         ),
     )

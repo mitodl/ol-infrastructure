@@ -60,6 +60,7 @@ Repository = "https://github.com/mitodl/ol-infrastructure"
 dev = [
   "copier",
   "datamodel-code-generator",
+  "lupa>=2.0",
   "mypy",
   "pip>=26.0.1",
   "pre-commit>=4.0.0,<5",
