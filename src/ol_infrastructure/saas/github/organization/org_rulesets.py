@@ -134,8 +134,9 @@ _ADMIN_BYPASS = [
     # THIS RESTORES PARITY, IT DOES NOT WIDEN ANYTHING. The legacy release-script bot
     # ("Doof") does the identical direct push and was never blocked, purely because
     # its `odlbot` identity is a member of `odl-engineering-owners` above and inherits
-    # that team's `always` bypass -- it pushed `Release 0.78.2` onto mit-learn's
-    # default branch on 2026-09-01, three weeks after these rulesets went `active`.
+    # that team's `always` bypass -- it pushed mit-learn 31d67335 ("Release date for
+    # 0.78.2", no associated PR) straight onto that repo's default branch on
+    # 2026-09-01, three weeks after these rulesets went `active`.
     # An App installed on selected repos holding `contents: write` is a narrower
     # actor than the human PAT it replaces, so the net grant here is a reduction.
     #
