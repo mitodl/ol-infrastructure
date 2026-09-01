@@ -96,8 +96,7 @@ src/ol_infrastructure/applications/<app>/
 ## Stack Naming Convention
 
 Existing application project names (the `name:` field in each app's `Pulumi.yaml`) are
-**not** uniform — e.g. `ol-infrastructure-airbyte-server`,
-`ol-infrastructure-bootcamps-ecommerce-application`,
+**not** uniform — e.g. `ol-infrastructure-airbyte-server` and
 `ol-infrastructure-odl-video-service-env`. Data stack project names therefore define a
 **new, standardized** convention rather than deriving from the app project's name:
 
@@ -232,7 +231,7 @@ pulumi state move \
 | redash | Postgres | Yes | No (EC2-based) |
 | superset | Postgres | Yes | No (EC2-based) |
 | edxapp | MariaDB | Yes | Yes (k8s_resources, k8s_secrets, k8s_configmaps, k8s_autoscaling) |
-| learn_ai | — (cache only) | — | No |
+| learn_ai | Postgres | Yes | Yes (`__main__.py`) |
 
 ### DB Only (no cache)
 
@@ -244,7 +243,9 @@ pulumi state move \
 | jupyterhub | Postgres | Yes | Yes (`deployment.py`) |
 | open_metadata | Postgres | Yes | No |
 | airbyte | Postgres | Yes | No |
-| bootcamps | Postgres | Yes | No |
+
+`bootcamps` is intentionally excluded from this inventory because the application has
+been retired and its infrastructure definition has been removed.
 
 ## Implementation Phases
 
@@ -263,7 +264,7 @@ cases. Complete one full end-to-end cycle before proceeding to other application
 
 Lower risk due to simpler resource topology.
 
-Applications: `concourse`, `airbyte`, `dagster`, `keycloak`, `bootcamps`
+Applications: `concourse`, `airbyte`, `dagster`, `keycloak`
 
 ### Phase 3 — Batch B: DB + Cache with K8s
 
@@ -274,7 +275,7 @@ Applications: `ocw_studio`, `odl_video_service`, `xpro`, `micromasters`, `redash
 
 - `jupyterhub` — `deployment.py` integration pattern differs from standard `k8s_secrets.py`
 - `open_metadata` — straightforward but lower priority
-- `learn_ai` — cache-only (no DB); simplest data stack possible
+- `learn_ai` — DB + Cache with K8s dynamic-secret integration in `__main__.py`
 - `edxapp` — highest complexity: MariaDB engine, multiple K8s sub-modules
   (`k8s_resources.py`, `k8s_secrets.py`, `k8s_configmaps.py`, `k8s_autoscaling.py`),
   and downstream dependency from `edx_notes`
