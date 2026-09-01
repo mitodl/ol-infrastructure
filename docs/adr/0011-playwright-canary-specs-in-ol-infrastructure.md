@@ -1,4 +1,4 @@
-# 0011. Playwright Canary Specs Live in a Dedicated Repository
+# 0011. Playwright Canary Specs Live in ol-infrastructure, on the Stock Playwright Image
 
 **Status:** Accepted
 **Date:** 2026-09-01
@@ -30,8 +30,9 @@ and who owns a failing canary.
 
 ### Constraints
 
-- `ol-infrastructure` is a **Python monorepo with zero JavaScript**: no `package.json`,
-  no lockfile, no Node tooling in `.pre-commit-config.yaml`, and 0 `.ts`/`.tsx` files.
+- `ol-infrastructure` is a **Python monorepo with, before this change, zero
+  JavaScript**: no `package.json`, no lockfile, no Node tooling in
+  `.pre-commit-config.yaml`, and 0 `.ts`/`.tsx` files.
 - The ECR pull-through cache covers only `public.ecr.aws` (`ecr-public`) and Docker Hub
   (`dockerhub`) — see `src/ol_infrastructure/infrastructure/aws/ecr/__main__.py`. There
   is **no cache rule for `mcr.microsoft.com`**, where the official Playwright images
@@ -61,28 +62,30 @@ Established empirically on 2026-09-01, not assumed:
    is *not* installed globally — `/usr/lib/node_modules` holds only `corepack`, `npm`
    and `yarn`. `npx --yes playwright test` therefore fails to resolve
    `@playwright/test` from the config. An install step is mandatory.
-4. **That install is nearly free when the repo is dedicated.** With `@playwright/test`
-   plus TypeScript as the only dependencies, `npm ci` is **6 packages in 335 ms**, and
-   no browser download happens because the image already has them. A full canary run
-   against RC completed in ~1.2 s. This is what makes a purpose-built container image
-   (option c) unnecessary machinery rather than an optimization.
+4. **That install is nearly free when the dependency set is tiny.** With
+   `@playwright/test` plus TypeScript as the only dependencies, `npm ci` is **6 packages
+   in ~400 ms**, and no browser download happens because the image already has them. A
+   full canary run against RC completed in ~1.1 s. This is what makes a purpose-built
+   container image unnecessary machinery rather than an optimization.
 5. **The image is small and fast to pull:** `mcr.microsoft.com/playwright:v1.62.1-noble`
    is 0.95 GB on disk, pulled in ~20 s, multi-arch with `linux/amd64`.
 6. **Runner and image versions cannot drift.** Pinning `@playwright/test` 1.58.1 against
    the `v1.62.1-noble` image fails with
    `browserType.launch: Executable doesn't exist at /ms-playwright/chromium_headless_shell-1208/...`
-   — a message naming neither the pin nor the image tag. This is the primary operational
-   footgun of any stock-image approach and must be guarded, not documented.
+   — a message naming neither the pin nor the image tag. Any approach that keeps the pin
+   and the image tag in separate repositories has to guard this; one that keeps them
+   together can make it impossible instead.
 
 ### Options Considered
 
-1. **Specs in `ol-infrastructure` under the canary pipeline directory**
-   - Pros: cheapest to start; no image build; specs sit next to the pipeline that runs
-     them; single repo to change when onboarding a canary.
-   - Cons: introduces the first JavaScript/TypeScript, `package.json`, lockfile and Node
-     toolchain into a 467-file Python monorepo, along with its own Renovate stream and
-     lint/format story. Couples an ~91K-line infrastructure repo's watched paths to test
-     authoring, so every spec edit is a commit in the repo that also deploys production.
+1. **Specs in `ol-infrastructure` under the canary pipeline directory** — *chosen*
+   - Pros: the `@playwright/test` pin and the pipeline that pulls the matching image
+     live in one repository, so the version is a single source of truth and finding 6
+     stops being a hazard. One git resource, not two. Adding a journey is one PR. No
+     third repository for a debugger to discover.
+   - Cons: introduces the first JavaScript/TypeScript, `package.json` and lockfile into
+     a Python monorepo, and with it a Node toolchain that a Python-and-Pulumi reviewer
+     pool now has to care about.
 
 2. **Specs in the target application's own repo** (e.g. `mitodl/mit-learn`)
    - Pros: tests live with the app; app developers own them; for MIT Learn the specs and
@@ -98,100 +101,110 @@ Established empirically on 2026-09-01, not assumed:
    - Pros: most reproducible, fastest at run time.
    - Cons: most machinery — a `BuildConfig`/`DockerImageConfig` path, an ECR repo, and an
      image-build job to maintain. Finding 4 removes the motivation: the run-time cost it
-     would optimize away is 335 ms.
+     would optimize away is ~400 ms.
 
-4. **A dedicated canary repository** (`mitodl/end-user-test-canaries`) — *chosen*
-   - Pros: keeps Node tooling out of the Python monorepo and application test data out
-     of the canaries; one repo owns the whole canary fleet regardless of how many
-     properties it covers; a canary spec change is not a commit in the repo that deploys
-     production; the meta pipeline watches exactly one extra git resource, not N.
-   - Cons: a third repo in the loop; contributors must know it exists; it is one more
-     Renovate stream that must be kept in lockstep with the pipeline's image tag.
+4. **A dedicated canary repository** (`mitodl/end-user-test-canaries`)
+   - Pros: keeps Node tooling out of the Python monorepo; one repo owns the canary fleet
+     regardless of how many properties it covers.
+   - Cons: makes the `@playwright/test` pin and the pipeline's image tag a **cross-repo
+     lockstep pair**, so finding 6 must be guarded by a check script and a Renovate PR
+     bumping the pin is not independently mergeable. Adds a third repository to the
+     debugging path, and a repository-registration obligation against the
+     Pulumi-managed repo fleet.
 
 ## Decision
 
-**Chosen Option:** Option 4 — a dedicated repository,
-[`mitodl/end-user-test-canaries`](https://github.com/mitodl/end-user-test-canaries),
-public, running against the **stock** `mcr.microsoft.com/playwright` image with a pinned
-`npm ci`.
+**Chosen Option:** Option 1 — specs in `ol-infrastructure` under
+`src/ol_concourse/pipelines/canaries/`, run against the **stock**
+`mcr.microsoft.com/playwright` image with a pinned `npm ci`. No image is built.
 
-This is a refinement of option (a)'s packaging (stock image, checked-out specs, no image
-build) placed in its own repository rather than in `ol-infrastructure`. It takes option
-(b)'s "tests are their own artifact with their own owner" property without taking its
-"fleet health depends on N application repos" cost, and it declines option (c) on the
-strength of finding 4.
+**This decision was reversed once during the same session, and the reversal is the
+substance of it.** Option 4 was chosen first and a repository
+(`mitodl/end-user-test-canaries`) was created. Re-examining it against the codebase
+showed two of the arguments for separation did not survive contact with the facts:
+
+- *"Don't grant canary spec authors commits in the repository that deploys
+  production."* Wrong. `data/repos/ol-infrastructure.yaml` already grants
+  `odl-engineering: maintain`, so every engineer already has more access than that.
+- *"Spec edits become commits in the repository that deploys production."* Overstated.
+  Concourse path-watching already scopes this precisely; that is exactly what
+  `PULUMI_WATCHED_PATHS` and `project_secrets_paths` exist to do. Specs under the canary
+  directory trigger canary pipelines and nothing else.
+
+With those removed, the remaining case for a separate repository was tidiness, and its
+cost was concrete: a cross-repo version lockstep requiring a guard script, plus a
+`pulumi import` of the already-created repository before the 316-repo fleet stack could
+apply. That is more machinery than the tidiness was worth.
 
 **Rationale:**
 
-- Findings 3 and 4 together are the crux. An install step is unavoidable, but it is only
-  cheap while the dependency set stays tiny — which is true in a dedicated repo and
-  false in an application workspace. The same fact that kills the naive "no install
-  needed" version of option (a) also kills option (c)'s justification.
+- Findings 3, 4 and 6 together are the crux. An install step is unavoidable, and it is
+  only cheap while the dependency set stays tiny — true here, false in an application
+  workspace. And because the pin and the pipeline are now in one repository, the
+  pipeline **derives** the image tag from `package.json` (`1.62.1` →
+  `mcr.microsoft.com/playwright:v1.62.1-noble`) instead of carrying its own copy.
+  Finding 6's failure mode becomes unreachable by construction rather than guarded, and
+  a Renovate bump of the pin is self-contained.
 - The distinction that matters is not *where the code lives* but *what the test is for*.
   A PR gate must be strict; a canary must be stable, because it wakes a human. Finding 2
-  shows those requirements actively fighting inside one file. Separate artifacts let
-  each be correct.
-- `ol-infrastructure` having exactly zero JavaScript is a property worth keeping. Adding
-  a Node toolchain to it for canary specs is a permanent tax on a repo whose reviewers
-  are Python and Pulumi engineers.
+  shows those requirements actively fighting inside one file. Keeping canaries as their
+  own specs — in whichever repo — is what lets each be correct.
+- The cost actually paid is one `package.json` in one directory. `.pre-commit-config.yaml`
+  has no Node hooks, `ruff` and `mypy` ignore the directory, and nothing else in the
+  repository needs to know it exists.
 
 **Key Implementation Details:**
 
-- The canary repo pins `@playwright/test` and the pipeline pulls the matching
-  `mcr.microsoft.com/playwright:v<version>-noble` tag. `CanaryParams` carries
-  `playwright_version` as the pipeline-side half of that pair.
-- `bin/check-image-pin.mjs` in the canary repo fails fast when the two disagree,
-  converting finding 6's cryptic `Executable doesn't exist` into a message naming both
-  versions. The pipeline runs it before any journey.
+- `package.json` is the single source of truth for the Playwright version.
+  `CanaryParams` must **derive** the image tag from it and never hardcode one.
 - `playwright.config.ts` **throws** when `CANARY_BASE_URL` is unset. A canary with a
   default target reports green against the wrong environment, which is worse than one
   that refuses to start.
 - Credentials are never committed. They arrive as environment variables sourced from
-  Vault. The repository is public, and `mit-learn`'s `e2e/smoke.spec.ts` currently
-  hardcodes a live RC login — the failure mode this rule exists to prevent.
+  Vault. `mit-learn`'s `e2e/smoke.spec.ts` currently hardcodes a live RC login in public
+  source — the failure mode this rule exists to prevent.
 - Chromium runs with `--disable-dev-shm-usage`. A Concourse task container gets the 64 MB
   default `/dev/shm`, which is where Chromium places renderer shared memory; without the
   flag a journey dies mid-run as a bare tab crash.
 - `forbidOnly` is unconditional, unlike an application suite that only sets it under CI.
   A stray `.only` in a canary silently stops every other journey for that property from
   being checked, and nothing would report the gap.
+- Dependency discipline is a written rule in the directory's `AGENTS.md`: only
+  `@playwright/test` and TypeScript. Finding 4's economics hold only while that is true.
 
 ## Consequences
 
 ### Positive Consequences
 
-- `ol-infrastructure` stays Python-only; no Node toolchain, lockfile or JS lint config.
-- Onboarding a property stays two list edits in `ol-infrastructure`, matching
-  `simple_pulumi`; adding a *journey* to an existing property needs no pipeline change
-  at all.
-- `npm ci` stays a sub-second, 6-package install, and stays that way only if the repo's
-  dependency discipline holds — which is now an explicit rule in its `AGENTS.md`.
-- Canary specs are reviewable by the people who own the journeys without granting them
-  commits in the repository that deploys production infrastructure.
-- Moving later to option (c) remains a `CanaryParams` field addition plus a build job,
-  not a rewrite, because the specs are already an independently checked-out artifact.
+- The Playwright version is one string in one file. No cross-repo lockstep, no guard
+  script, no "this Renovate PR is not independently mergeable" caveat.
+- One git resource in the canary pipelines, and `CanaryParams` needs no
+  `spec_repo`/`spec_ref` fields.
+- Onboarding a property stays two list edits, matching `simple_pulumi`; adding a
+  *journey* to an existing property needs no pipeline change at all.
+- Nothing to register against the Pulumi-managed repository fleet, and no
+  `pulumi import` obligation.
+- A canary failure is debugged in one repository, by people who already have access.
 
 ### Negative Consequences
 
-- A third repository in the loop for anyone debugging a canary failure.
-- The `@playwright/test` pin and the pipeline's image tag are a two-repo lockstep pair.
-  A Renovate PR bumping the pin alone is **not** independently mergeable. Guarded by
-  `check:image-pin`, but it is a real cross-repo coupling.
+- `ol-infrastructure` now contains JavaScript. The `AGENTS.md` in that directory exists
+  to keep the blast radius at one directory, but the precedent is real and the next
+  person wanting a `package.json` elsewhere will cite it.
+- Renovate will now raise Node dependency PRs against a repository whose reviewers are
+  Python and Pulumi engineers.
 - Journeys for MIT Learn must be written fresh rather than reusing the existing `e2e/`
   suite. The `login()` helper's knowledge of the multi-screen Keycloak flow is worth
   porting; its data fixtures are not.
 - Duplication of intent with `mit-learn`'s `e2e/` suite is now possible — two places
-  test login. Accepted deliberately: they are testing different things (does this change
-  break login vs. is login broken for users right now).
+  test login. Accepted deliberately: they test different things (does this change break
+  login vs. is login broken for users right now).
 
 ### Neutral Consequences
 
-- The canary repo is **not** currently registered in the Pulumi-managed repository fleet
-  (`src/ol_infrastructure/saas/github/repositories/`). Bringing it under management
-  requires importing the already-created `github.Repository` into stack state first: the
-  provider's create is `POST /orgs/mitodl/repos`, which returns 422 for an existing repo
-  and would hard-fail the whole 316-repo fleet deploy. Registration was deliberately
-  deferred rather than half-done. Tracked as follow-up work.
+- `mitodl/end-user-test-canaries` was created before the reversal and is now
+  **unused**. It holds one commit and no dependents. It should be archived or deleted;
+  it is deliberately not registered in the Pulumi repository fleet.
 - Alerting for these canaries must stay distinct from Grafana Synthetic Monitoring's
   HTTP probes so the two do not double-page. Tracked separately.
 
@@ -202,8 +215,8 @@ strength of finding 4.
 - **Dependencies:** Canary login credentials sourced via SOPS/Vault
   (`tk-source-the-mit-learn-rc-canary-login-credentials-1125c7`) block the first real
   journey, not this decision.
-- **Verification performed:** `npm ci`, `npx tsc --noEmit`, `npm run check:image-pin`,
-  and a passing journey against `https://rc.learn.mit.edu`, all inside
+- **Verification performed:** `npm ci`, `npm run typecheck`, image-tag derivation from
+  `package.json`, and a passing journey against `https://rc.learn.mit.edu`, all inside
   `mcr.microsoft.com/playwright:v1.62.1-noble`.
 
 ## Related Decisions
@@ -218,8 +231,8 @@ strength of finding 4.
 ## References
 
 - Playwright Docker images: <https://playwright.dev/docs/docker>
-- `mitodl/mit-learn` `e2e/README.md` — states the intent to run this suite against RC as
-  an automated quality gate, which is the adjacent goal this decision separates from.
+- `mitodl/mit-learn` `e2e/README.md` — states the intent to run that suite against RC as
+  an automated quality gate, the adjacent goal this decision separates from.
 
 ---
 
@@ -227,6 +240,6 @@ strength of finding 4.
 
 | Date | Reviewer | Decision | Notes |
 |------|----------|----------|-------|
-| 2026-09-01 | cpatti | Approved | Chose a dedicated public repo over specs-in-ol-infrastructure; deferred Pulumi fleet registration pending state import |
+| 2026-09-01 | cpatti | Approved | Initially chose a dedicated repo; reversed within the session to specs-in-ol-infrastructure once the separation arguments were checked against the codebase |
 
 **Last Updated:** 2026-09-01

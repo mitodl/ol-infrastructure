@@ -168,7 +168,7 @@ graph LR
 | [0008](0008-concourse-spot-worker-graceful-drain-no-ephemeral.md) | Concourse Spot Worker Graceful Drain Without Ephemeral Mode | Accepted | 2026-04-08 |
 | [0009](0009-deploy-witan-as-shared-multi-tenant-mcp-service.md) | Deploy witan as a Shared, Multi-Tenant MCP Service | Accepted | 2026-07-07 |
 | [0010](0010-pingdom-checks-unmanaged-in-pulumi-state.md) | Pingdom Checks Unmanaged in Pulumi State | Proposed | 2026-07-20 |
-| [0011](0011-playwright-canary-specs-in-a-dedicated-repository.md) | Playwright Canary Specs Live in a Dedicated Repository | Accepted | 2026-09-01 |
+| [0011](0011-playwright-canary-specs-in-ol-infrastructure.md) | Playwright Canary Specs Live in ol-infrastructure, on the Stock Playwright Image | Accepted | 2026-09-01 |
 
 ## Creating a New ADR
 

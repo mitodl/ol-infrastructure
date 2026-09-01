@@ -1,0 +1,15 @@
+{
+  "name": "ol-canaries",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Playwright end-user journey canaries for MIT Open Learning web properties",
+  "scripts": {
+    "canary": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}
