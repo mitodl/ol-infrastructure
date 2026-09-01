@@ -33,6 +33,10 @@ LABEL maintainer="ODL DevOps <mitx-devops@mit.edu>"
 # own Dockerfile / apt.txt.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+      # adduser is absent from the DHI dev image's curated package set
+      # (python:X-slim shipped it implicitly); required by the mitodl user
+      # creation below.
+      adduser \
       build-essential \
       ca-certificates \
       curl \
