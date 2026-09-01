@@ -19,15 +19,24 @@ Even a spanmetrics dashboard with the right metric name would be misleading.
 Tempo generates spanmetrics from what it *ingests*, i.e. after tail sampling,
 so RED computed that way describes the sample rather than the traffic.
 Measured 2026-09-01 against mitxonline-webapp, which had been emitting for 25h
-(learn-webapp was mid-rollout and not yet a fair comparison):
+(learn-webapp was mid-rollout and not yet a fair comparison), 1h rate windows:
 
-  request rate   414/s from `http_server_duration_milliseconds_count`
-                 1.06/s from `traces_spanmetrics_latency_count` -- ~0.26%
-  p95 latency    381 ms native, 620 ms trace-derived -- 63% pessimistic
+  request rate   431/s from `http_server_duration_milliseconds_count`
+                 1.05/s from `traces_spanmetrics_latency_count` -- 0.24%
 
-The direction of the latency error is not even stable: on learn-webapp the
-trace-derived p95 read *lower* than native. There is no correction factor to
-apply, which is why these panels read the meter directly.
+The latency error is not a bias you could correct for, it is noise. Over the
+same three hours, p95 on mitxonline-webapp:
+
+  native, 1h window        357 - 401 ms
+  native, 5m window        328 - 408 ms
+  trace-derived, 1h        320 - 545 ms
+  trace-derived, 5m        231 - 1246 ms
+
+A 5.4x swing on the trace-derived estimate across a window where the native
+measurement moved 11%, because at ~1 sampled span/s a 5m bucket holds a few
+hundred spans and the tail sampler picked them for being slow or errored.
+Reading it at one instant can show it 60% high or 40% low. That is why these
+panels read the meter directly rather than applying a fudge factor.
 
 `http_server_duration_milliseconds_*` bypasses the tail sampler entirely. In
 the `grafana-k8s-monitoring-alloy-receiver` pipeline only `traces` route into
