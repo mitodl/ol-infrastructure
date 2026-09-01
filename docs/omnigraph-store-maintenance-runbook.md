@@ -297,10 +297,11 @@ the memory side.
 
 ### Cost, measured
 
-Production, 16 graphs / 18 branches / 3.97 GB: **~24 minutes of write outage**
-end to end, of which the rebuild itself was ~2 minutes. The backup and the two
-image rolls dominate, and the witan roll waits on its pre-deploy migration Job
-(~8 minutes).
+Production, 16 graphs / 18 branches / 3.97 GB (90,634 objects): **~24 minutes of
+write outage** end to end (01:43–02:07 UTC), of which the rebuild itself was
+only ~2 minutes. The backup and the two image rolls dominate, and the witan roll
+in particular waits on its pre-deploy migration Job — measured at 8m on QA and
+11m on production, so budget the larger figure.
 
 ### Which principal, and why not break-glass
 
