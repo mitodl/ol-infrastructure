@@ -2342,17 +2342,7 @@ class OLApplicationK8s(ComponentResource):
                                         "--concurrency=2",  # Don't try to use all cores on node
                                         "--prefetch-multiplier=1",
                                     ],
-                                    env=[
-                                        kubernetes.core.v1.EnvVarArgs(
-                                            name="CELERY_TASK_ACKS_LATE",
-                                            value="True",
-                                        ),
-                                        kubernetes.core.v1.EnvVarArgs(
-                                            name="CELERY_TASK_REJECT_ON_WORKER_LOST",
-                                            value="True",
-                                        ),
-                                        *application_deployment_env_vars,
-                                    ],
+                                    env=application_deployment_env_vars,
                                     env_from=application_deployment_envfrom,
                                     resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                         requests=celery_worker_config.resource_requests,
