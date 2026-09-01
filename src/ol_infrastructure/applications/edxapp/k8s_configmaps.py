@@ -225,6 +225,20 @@ def _build_interpolated_config_dict(
         "ENABLE_MFE_CONFIG_API": True,
         "FRONTEND_SITE_CONFIG": {
             "basename": "/",
+            # The origin the Site Project itself is served from. It is the LMS
+            # host because Fastly serves the Site Project under /apps there
+            # rather than giving it a host of its own (see the "Handle Site
+            # Project routing" VCL snippets in __main__.py).
+            #
+            # Must be set here rather than left to the value compiled into the
+            # bundle: one build artifact is promoted CI -> QA -> Production, and
+            # the mitx artifact additionally serves mitx-staging, whose LMS
+            # origins differ again. Without this, every environment but the one
+            # the build config names falls back to that environment's origin for
+            # auth redirects. frontend-base awaits the runtime config before
+            # configureAuth, so the value set here is the one the auth service
+            # is built with.
+            "baseUrl": f"https://{domains['lms']}",
             "lmsBaseUrl": f"https://{domains['lms']}",
             "loginUrl": f"https://{domains['lms']}/login",
             "logoutUrl": f"https://{domains['lms']}/logout",
