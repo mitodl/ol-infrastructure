@@ -11,7 +11,6 @@ spec:
   - "lms.mit.dev"
   - "studio.mit.dev"
   - "notes.mit.dev"
-  - "mfe.mit.dev"
   secret:
     name: local-dev-tls
     namespace: openedx
@@ -94,23 +93,4 @@ spec:
       servicePort: 8000
     plugin_config_name: openedx-shared-plugins
 ---
-# MFE — compiled nginx serving the default OEP-65 site project.
-apiVersion: apisix.apache.org/v2
-kind: ApisixRoute
-metadata:
-  name: mfe-route
-  namespace: openedx
-spec:
-  ingressClassName: apache-apisix
-  http:
-  - name: mfe
-    priority: 0
-    match:
-      hosts:
-      - "mfe.mit.dev"
-      paths:
-      - "/*"
-    backends:
-    - serviceName: mfe-default
-      servicePort: 80
-    plugin_config_name: openedx-shared-plugins
+...
