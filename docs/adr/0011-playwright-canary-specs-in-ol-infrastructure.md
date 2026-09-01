@@ -67,8 +67,12 @@ Established empirically on 2026-09-01, not assumed:
    in ~400 ms**, and no browser download happens because the image already has them. A
    full canary run against RC completed in ~1.1 s. This is what makes a purpose-built
    container image unnecessary machinery rather than an optimization.
-5. **The image is small and fast to pull:** `mcr.microsoft.com/playwright:v1.62.1-noble`
-   is 0.95 GB on disk, pulled in ~20 s, multi-arch with `linux/amd64`.
+5. **The image is acceptable to pull:** `mcr.microsoft.com/playwright:v1.62.1-noble`
+   carries ~2.4 GB of filesystem content, 1.3 GB of which is the baked browsers under
+   `/ms-playwright`; `docker images` accounts it as 3.53 GB. It pulled in ~20 s on a
+   developer connection and is multi-arch with `linux/amd64`. Note that
+   `docker image inspect --format '{{.Size}}'` reports 0.95 GB for this image, which
+   does not match the filesystem — do not quote it.
 6. **Runner and image versions cannot drift.** Pinning `@playwright/test` 1.58.1 against
    the `v1.62.1-noble` image fails with
    `browserType.launch: Executable doesn't exist at /ms-playwright/chromium_headless_shell-1208/...`
