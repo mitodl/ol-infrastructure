@@ -99,10 +99,83 @@ WitanToolCallErrorRate instead, which is why neither rule is redundant with the
 other: this one is not traffic-dependent but only speaks at boot, and that one
 speaks continuously but only while there is traffic.
 
+WitanCodeBridgeNoBindings
+---------------------------
+The cross-repo bridge going quiet, keyed on the OUTCOME rather than on an
+exception. On 2026-08-25 the production bridge graph wedged on a stranded
+`Armed` write intent and stayed wedged for roughly 15 hours before a human
+noticed. Its signature is the reason this rule exists: every repo reported
+``errors=0`` while writing zero bindings, so nothing raised, nothing logged at
+ERROR, and Sentry had nothing to catch. agent-kit#288 later made a bridge write
+that RAISES loud, and omnigraph #561 fixed that particular wedge -- but both
+are keyed to a known mechanism, and a detector keyed to the result is
+independent of whichever mechanism comes next.
+
+The CI indexer (CronJob ``witan-ci-indexer``, namespace ``witan``, cluster
+``operations-production``) runs every 4 hours and prints one line per repo:
+
+    index .: scanned=2017 indexed=0 skipped=1989 symbols=1013 edges=2180 bindings=221 errors=0
+
+★ FLEET-WIDE, NEVER PER-REPO. A per-repo ``bindings=0`` rule would fire
+constantly on healthy runs. Measured over the two consecutive 2026-09-01 cycles
+(16:00Z and 20:00Z, 14 repos each): 8 of 14 reported zero in the 20:00Z cycle,
+and 7 of the 14 reported zero in BOTH. There is more than one innocent reason
+for it -- one repo declared nothing to bind across both cycles (``scanned=1582``
+wrote ``bindings=0`` at ``indexed=30`` and again at ``indexed=23``), while
+another went ``bindings=119`` -> ``0`` as its ``indexed`` dropped 1 -> 0. Either
+way the per-repo signal is noise, and a rule built on it would be silenced
+within a day. The defensible trigger is the whole cycle summing to zero.
+
+★ ZERO, NOT A FLOOR. The fleet total moves cycle to cycle on healthy runs --
+932 at 16:00Z and 850 at 20:00Z on 2026-09-01 -- and an earlier measurement
+recorded in the task has one repo drifting 248 -> 123 -> 110 -> 104 over three
+cycles before settling. Six healthy cycles spanned 657-821. Any absolute floor
+sized against that would false-positive; only zero is defensible without more
+baseline than we have.
+
+★ COULD A GENUINELY QUIET CYCLE BE FLEET-ZERO? It is the obvious false positive
+for this rule, and it is answered empirically rather than by argument: across
+the 6.9 days from 2026-08-26T00:00Z -- which includes the 2026-08-29/30 weekend
+-- no 5h window was ever fleet-zero. The expression returns a real 0 at every
+hourly step over that whole span.
+
+★ WHY THE EXPRESSION IS A PRODUCT AND NOT ``== 0``. base.py's stage C fires on
+``last(A) > 0``, so the obvious ``sum(...) == 0`` is exactly wrong: it returns
+a row carrying the value 0 and therefore never fires. The rule multiplies the
+line count by ``(total == bool 0)``, which is the line count in the bad case
+and a real 0 in the good one. A real 0 also matters for a second reason -- an
+alert that evaluates to a visible zero can be told apart from one that is
+silently broken, which two of this project's earlier measurements could not.
+
+The 5h window is longer than the 4h cycle so a single cycle is always fully
+covered, with margin for a late or slow run. Depending on where evaluation
+falls in the cycle it may span TWO cycles rather than one; that only ever
+delays firing (both cycles must be zero), never suppresses it -- the previous
+good cycle ages out within about an hour of the bad one.
+
+NOT covered here: the indexer not running at all. No lines means no series,
+which is NoData, which is OK. That case belongs to
+``WitanScheduledJobNeverSucceeded`` and eks_general.py's CronJob staleness
+rules, which watch the schedule rather than its output.
+
 Verification
 --------------
-Both expressions were evaluated against the production Loki tenant on
-2026-08-24, and both were shown to be able to FIRE rather than only to be
+``WitanCodeBridgeNoBindings`` was backtested against the production Loki tenant
+on 2026-09-01, in both directions rather than only for quiet:
+
+  During the 2026-08-25 wedge the expression returns 24-71 continuously from
+  09:30Z to 20:00Z, and drops back to 0 at 20:30Z when the bridge recovered --
+  so the rule would have fired within about an hour of the failing cycle
+  instead of the ~15 hours it actually took.
+  Over the 6.9 days from 2026-08-26T00:00Z to 2026-09-01T21:00Z it returns a
+  real 0 at every hourly step, with no NoData gaps: the instrument is live and
+  quiet, not absent.
+  The underlying ``sum_over_time`` of the unwrapped counts reads 1782 across
+  the two cycles preceding 2026-09-01T20:55Z, matching the 850 counted by hand
+  off the 20:00Z cycle's 14 lines.
+
+Both expressions written 2026-08-24 were evaluated against the production Loki
+tenant that day, and both were shown to be able to FIRE rather than only to be
 quiet:
 
   WitanCedarDenials     returns nothing as committed; the identical expression
@@ -140,6 +213,16 @@ _GRAPH_BASELINE_WINDOW = "7d"
 _GRAPH_RECENT_BOOT_WINDOW = "6h"
 
 _OMNIGRAPH_STREAM = 'namespace="omnigraph", container="omnigraph-server"'
+
+# The CI indexer's stream. It runs in exactly one cluster
+# (`operations-production`), so unlike the omnigraph rules above there is no
+# prod/non-prod split -- the CI and QA Grafana stacks have their own Loki
+# tenants, where this selector simply returns nothing.
+_CI_INDEXER_STREAM = 'namespace="witan", service_name="witan-ci-indexer"'
+
+# Longer than the indexer's 4h cycle so one cycle is always fully covered. See
+# the module docstring on why spanning two cycles is acceptable.
+_BINDINGS_WINDOW = "5h"
 
 _CEDAR_SUMMARY = (
     "omnigraph is denying requests under Cedar policy in {{ $labels.cluster }}"
@@ -183,6 +266,37 @@ _QUARANTINE_DESCRIPTION = (
     " If a graph was removed on purpose, silence this for a week while the"
     " baseline re-learns, and confirm the removal really was intended, because a"
     " graph lost during a storage migration looks exactly the same from here."
+)
+
+
+_NO_BINDINGS_SUMMARY = (
+    "the witan code bridge wrote zero cross-repo bindings across a whole"
+    " indexer cycle in {{ $labels.cluster }}"
+)
+
+_NO_BINDINGS_DESCRIPTION = (
+    "Every repo the CI indexer touched in the last 5 hours reported"
+    " `bindings=0`, so the shared cross-repo bridge graph took no writes at"
+    " all. `code_interface_providers` / `code_interface_consumers` and every"
+    " cross-repo answer built on them degrade silently while this holds --"
+    " nothing raises and nothing reaches Sentry, which is why this rule reads"
+    " the OUTCOME rather than waiting for an exception. That is exactly how the"
+    " 2026-08-25 wedge stayed invisible for ~15 hours: `errors=0` on every"
+    " repo, zero bindings on every repo."
+    " ★ CHECK IT IS THE FLEET, NOT ONE REPO. Half the fleet reports"
+    " `bindings=0` on a perfectly healthy cycle -- 8 of 14 repos in the"
+    " 2026-09-01 20:00Z run -- either because the repo declares nothing to bind"
+    " or because nothing in it changed that cycle. Only the whole cycle summing"
+    " to zero means anything. Read the cycle with"
+    ' `{namespace="witan", service_name="witan-ci-indexer"} |='
+    ' "bindings="` and confirm no repo wrote any.'
+    " Then look at the bridge graph itself: a stranded `Armed` write intent on"
+    " `code-bridge` was the 2026-08-25 mechanism (omnigraph #561, shipped in"
+    " v0.10.0, heals it), and `kubectl -n witan logs job/<newest witan-ci-index"
+    " job>` carries the per-repo lines with any error context."
+    " If the indexer stopped running entirely this rule says nothing --"
+    " it is NoData, not a fire. WitanScheduledJobNeverSucceeded and the"
+    " CronJob staleness rules cover that case."
 )
 
 
@@ -231,6 +345,39 @@ def _graph_quarantine_expr(cluster_filter: str) -> str:
         f"    min_over_time({stream} {parsed} [{_GRAPH_RECENT_BOOT_WINDOW}])\n"
         "  )\n"
         ") > 0"
+    )
+
+
+def _no_bindings_expr() -> str:
+    """Index lines in the window when the fleet wrote zero bindings, else 0.
+
+    A PRODUCT, not a comparison, and the shape is load-bearing. base.py's stage
+    C fires on ``last(A) > 0``, so the natural ``sum(...) == 0`` returns a row
+    carrying 0 and never fires. Multiplying the line count by the ``bool``
+    comparison yields the count when the total is zero and a real 0 when it is
+    not -- which fires correctly AND stays visibly alive in the rule's history,
+    so a broken rule can be told from a quiet one.
+
+    Both halves parse the same lines the same way rather than sharing a
+    sub-expression, because LogQL has no way to bind one. ``regexp`` (not a
+    line filter on ``bindings=0``) because the value is what matters and the
+    count of lines carrying any value is the other half of the test.
+
+    Grouped ``by (cluster)`` so the alert carries a resource-identifying label:
+    the notification policy groups on ``cluster``, and both sides carry the
+    identical label set so the binary operation matches cleanly.
+    """
+    matched = f'{{{_CI_INDEXER_STREAM}}} |= "bindings=" | regexp "bindings=(?P<bindings_written>[0-9]+)"'
+    return (
+        "sum by (cluster) (\n"
+        f"  count_over_time({matched} [{_BINDINGS_WINDOW}])\n"
+        ")\n"
+        "*\n"
+        "(\n"
+        "  sum by (cluster) (\n"
+        f"    sum_over_time({matched} | unwrap bindings_written [{_BINDINGS_WINDOW}])\n"
+        "  ) == bool 0\n"
+        ")"
     )
 
 
@@ -302,6 +449,33 @@ def create(
                     "description": _QUARANTINE_DESCRIPTION,
                 },
                 datas=rd(_graph_quarantine_expr(_PROD_CLUSTERS)),
+            ),
+            # --- Cross-repo bridge wrote nothing for a whole cycle ---
+            # One rule, not a prod/non-prod pair: the CI indexer runs only in
+            # operations-production, and the other stacks' Loki tenants return
+            # no data for this selector.
+            #
+            # Warning, not critical. A quiet bridge degrades cross-repo answers
+            # -- `code_interface_*` stops resolving across repos -- but leaves
+            # every per-repo graph and all of witan's memory and task surface
+            # working. It wants somebody to look during the day, which is what
+            # the previous 15-hour outage actually needed and did not get.
+            #
+            # for_="0m": stage A already integrates over 5 hours, so a
+            # pending period would only add latency to a condition that is by
+            # construction not transient.
+            alerting.RuleGroupRuleArgs(
+                name="WitanCodeBridgeNoBindingsWarning",
+                condition="C",
+                for_="0m",
+                no_data_state="OK",
+                exec_err_state="OK",
+                labels={"severity": "warning", "environment": "production"},
+                annotations={
+                    "summary": _NO_BINDINGS_SUMMARY,
+                    "description": _NO_BINDINGS_DESCRIPTION,
+                },
+                datas=rd(_no_bindings_expr()),
             ),
         ],
         opts=resource_opts,

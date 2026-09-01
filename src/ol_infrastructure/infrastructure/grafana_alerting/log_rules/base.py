@@ -59,6 +59,9 @@ Sub-modules
                  2026-08-24. Both parse with `decolorize` first, because
                  omnigraph writes ANSI escapes between a field name and
                  its value and a line filter silently matches nothing.
+                 Also the CI indexer writing zero cross-repo bindings across
+                 a whole cycle (2026-09-01), which reads witan's own plain
+                 stdout and needs no decolorize.
 """
 
 import json
