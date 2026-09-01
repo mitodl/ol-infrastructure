@@ -1104,7 +1104,7 @@ course_program_redirect_vcl = "\n".join(
 # every /catalog/* path (and any sub-filter/department) goes to the same fixed
 # destination. Bare /courses/ and /programs/ (no ID) are included here too,
 # since they're the index/listing views for those sections - the per-ID
-# redirect below requires a non-empty path segment, so it never matches these.
+# redirect above requires a non-empty path segment, so it never matches these.
 # Uses a distinct error code (604) from the course/program redirects (603) and
 # UAI B2C redirects (602) so this is fully additive.
 catalog_redirect_vcl = (
