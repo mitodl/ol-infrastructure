@@ -621,7 +621,8 @@ ocw_studio_k8s_app = OLApplicationK8s(
             application_module="main.wsgi:application",
             # Stage 1 of docs/plans/granian-configuration-overhaul.md: holding pins
             # removed, so this app now runs on the component defaults (1 worker, 8
-            # blocking threads, 16 backpressure, runtime defaults).
+            # blocking threads, DEFAULT_WSGI_BACKPRESSURE connections, runtime
+            # defaults).
             blocking_threads_idle_timeout=120,
             enable_metrics=True,
             # Serve /static/* from Granian's Rust layer instead of the sidecar.

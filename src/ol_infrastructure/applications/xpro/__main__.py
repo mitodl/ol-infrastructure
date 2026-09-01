@@ -590,26 +590,16 @@ if k8s_deploy:
                 # pins removed, so this app now runs on the component defaults (1
                 # worker, 8 blocking threads, runtime defaults).
                 #
-                # backpressure is pinned above the component default of
-                # 2 * blocking_threads because that default assumes a connection
-                # is a request. Since the nginx sidecar was removed the 26 APISix
-                # pods hold their upstream keepalive connections directly against
-                # Granian, and an idle keepalive connection spends backpressure
-                # budget without doing any work. At 16 the budget was consumed by
-                # idle connections alone -- granian_connections_active sat pinned
-                # at exactly 16 per pod while blocking threads were 1-2% busy --
-                # which starved the readiness probe (it shares this pool, see the
-                # probe notes in components/services/k8s.py) and flapped both pods
-                # out of the EndpointSlice, leaving APISix with "no valid upstream
-                # node" and ~26% of xpro requests answered with an instant 503.
-                #
-                # Request concurrency does not need this headroom: ~3 req/s at
-                # ~0.2s of in-Python time per request is well under 1 in flight,
-                # so blocking_threads stays at 8 and remains the real limit on
-                # concurrent work. 128 just stops the connection count from being
-                # the binding constraint, and matches the per-worker connection
-                # counts mitlearn already sustains.
-                backpressure=128,
+                # The backpressure=128 pin added by #5692 to end the 2026-08-31
+                # outage is gone: the component default is no longer derived from
+                # blocking_threads, so this app inherits a connection budget sized
+                # for the gateway's keepalive population rather than for its thread
+                # pool. That is what the pin existed to work around. Rationale and
+                # the outage evidence now live on GranianConfig.backpressure in
+                # components/services/k8s.py, so they are not restated per app.
+                # Request concurrency is unaffected: ~3 req/s at ~0.2s of in-Python
+                # time per request is well under 1 in flight, and blocking_threads
+                # stays at 8 as the real limit on concurrent work.
                 blocking_threads_idle_timeout=120,
                 enable_metrics=True,
                 # Serve /static/* from Granian's Rust layer instead of the sidecar

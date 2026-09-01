@@ -43,11 +43,19 @@ DEFAULT_WSGI_BLOCKING_THREADS = 8
 # worker, not in-flight requests, so it is deliberately not derived from
 # DEFAULT_WSGI_BLOCKING_THREADS: with the nginx sidecar gone the 26 APISix pods hold
 # their upstream keepalive connections directly against Granian, and an idle keepalive
-# spends budget while doing no work. 128 sits above every connection population
-# measured in production (xpro 37 max, mitxonline 23, mitlearn 154 across two workers)
-# and coincides with what Granian itself would derive from backlog=128 at workers=1.
+# spends budget while doing no work.
+#
+# granian_connections_active is a per-*worker* series (it carries a `worker` label), so
+# these are per-worker populations. Sized above the largest observed anywhere, which is
+# mitlearn at 154: mitlearn is the busiest app and the only one running uncapped
+# (interface asginl, backlog=None), so it is the only measurement that reveals real
+# demand rather than the ceiling it was given. Every WSGI app measured below it was
+# capped, so their numbers (xpro 37 against a 128 cap, mitxonline 23 against 64) are
+# upper-bounded by their own pins and cannot be read as demand. Picking a number from
+# capped apps is how the 16 that took xpro down got chosen.
+#
 # blocking_threads remains the real limit on concurrent Python work.
-DEFAULT_WSGI_BACKPRESSURE = 128
+DEFAULT_WSGI_BACKPRESSURE = 256
 EIGHT_HOURS_SECONDS = 28800
 FIVE_MINUTES = 60 * 5
 FORUM_SERVICE_PORT = 4567

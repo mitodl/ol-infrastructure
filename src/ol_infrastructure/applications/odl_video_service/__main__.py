@@ -898,7 +898,8 @@ ovs_k8s_app = OLApplicationK8s(
             application_module="odl_video.wsgi:application",
             # Stage 1 of docs/plans/granian-configuration-overhaul.md: holding pins
             # removed, so this app now runs on the component defaults (1 worker, 8
-            # blocking threads, 16 backpressure, runtime defaults).
+            # blocking threads, DEFAULT_WSGI_BACKPRESSURE connections, runtime
+            # defaults).
             blocking_threads_idle_timeout=120,
             enable_metrics=True,
             log_level=(ovs_config.get("log_level") or "info").lower(),
@@ -947,11 +948,11 @@ ovs_k8s_app = OLApplicationK8s(
                 ),
                 initial_delay_seconds=15,
                 period_seconds=15,
-                # Wider than the default 3x/3s: readiness shares the Granian
+                # Matches default_probe_configs: readiness shares the Granian
                 # connection budget with user traffic and its failure is
                 # correlated across replicas, so a fast eviction empties the
-                # EndpointSlice instead of shedding load. See
-                # default_probe_configs in components/services/k8s.py.
+                # EndpointSlice instead of shedding load. Kept in step with the
+                # component default -- see components/services/k8s.py.
                 failure_threshold=6,
                 timeout_seconds=5,
             ),

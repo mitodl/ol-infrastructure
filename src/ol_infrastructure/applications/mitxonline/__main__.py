@@ -637,7 +637,11 @@ mitxonline_k8s_app = OLApplicationK8s(
             # this app's stage of the rollout. Granian derived backpressure=64
             # (backlog=128 // workers=2) and blocking_threads=64 // 2 = 32.
             # Delete all four (and revert workers to the default) to adopt the
-            # component defaults (1 worker, 8 blocking threads, 16 backpressure).
+            # component defaults (1 worker, 8 blocking threads, and
+            # DEFAULT_WSGI_BACKPRESSURE connections). Note backpressure is no
+            # longer derived from blocking_threads: it caps connections, and the
+            # component default is well above this 64 (which is not binding here --
+            # this app peaks at 23 connections per worker).
             # See docs/plans/granian-configuration-overhaul.md
             workers=MITXONLINE_GRANIAN_WORKERS,
             runtime_mode="mt",

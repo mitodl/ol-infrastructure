@@ -235,7 +235,7 @@ concurrency behavior aren't changed in the same rollout window.
   > 32 threads fixed it because it also raised backpressure to 64, not because CMS needed
   > 64 threads.
   >
-  > Component fix: `backpressure` now defaults to a flat `DEFAULT_WSGI_BACKPRESSURE = 128`
+  > Component fix: `backpressure` now defaults to a flat `DEFAULT_WSGI_BACKPRESSURE = 256`
   > connection budget, independent of `blocking_threads`, and the readiness failure budget
   > widens to 6 failures x 15s / 5s timeout because this failure mode is correlated across
   > replicas -- fast eviction empties the endpoints instead of shedding load, and
@@ -243,6 +243,20 @@ concurrency behavior aren't changed in the same rollout window.
   > app port: Granian serves one application listener, and its metrics listener answers
   > from the Rust runtime and knows nothing about Django's dependencies. Lesson
   > `les-granian-backpressure-budgets-connections-not-req-6064fb`.
+  >
+  > **Two corrections to the correction, from PR review.** `granian_connections_active`
+  > carries a `worker` label -- it is per worker, not per pod. Every capped app's number
+  > is therefore an upper bound imposed by its own pin, not a measurement of demand, and
+  > the only app running uncapped (mitlearn: `asginl`, `backlog=None`) reaches 154 on a
+  > single worker. 256 is sized above that rather than above the capped apps, since
+  > choosing from capped apps is exactly how the 16 that took xpro down was arrived at.
+  >
+  > And the CMS case is not purely a connection ceiling. Measured per container over 7
+  > days, mitxonline CMS reaches 21.6 concurrently-busy blocking threads per pod (p99
+  > 17.2) with `granian_blocking_queue` up to 32 deep on individual workers -- real work
+  > waiting on threads. So CMS's `backpressure=64` pin is removed while its thread pins
+  > (2 workers x 32) stay: the rollback conflated two limits and only one of them was the
+  > cause, but the other is not absent. mitxonline LMS, for contrast, peaks at 5.4.
 
 ## Capacity math
 
@@ -585,8 +599,13 @@ entirely in container args, so there is no data or schema migration to unwind.
    per-app exercise: it is a connection budget with one fleet-wide default (see the
    correction under item 5 above), and the 2026-08-26 CMS rollback that appeared to disprove
    a uniform 8-thread target was a connection-ceiling failure, not a thread shortfall.
-4. The remaining explicit `backpressure` pins -- mitxonline app (64), edxapp CMS (64)
-   and the edxapp LMS holding pins (64) -- still cap below the component default.
-   `mitxonline-openedx` is currently pinned at its 64 ceiling with blocking threads
-   ~4.6% busy, the same signature. Removing those pins needs the mitxonline edxapp
-   deploy path unblocked first (`tk-mitxonline-edxapp-production-deploys-have-been-b-d87ca6`).
+4. The remaining explicit `backpressure` pins -- mitxonline app (64) and the edxapp LMS
+   holding pins (64) -- still cap below the component default. Neither is binding
+   (mitxonline app peaks at 23 connections per worker, mitxonline LMS at 26-28), so they
+   are left to their own rollout stages rather than swept along here. edxapp CMS, which
+   *was* binding at 64 on both workers continuously, is unpinned in the same change that
+   raised the default.
+5. CMS thread sizing (2 workers x 32 blocking threads) is still unmeasured against a
+   target rather than merely against demand. Demand is now known -- 21.6 busy threads per
+   pod at peak -- so a one-worker shape needs at least ~24 threads, not the component's 8.
+   Tracked as `tk-mitxonline-cms-needs-a-saturation-aware-scaling--cf08a8`.
