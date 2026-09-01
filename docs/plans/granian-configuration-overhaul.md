@@ -214,6 +214,36 @@ the nginx sidecar already absorbs part of the risk (the probe hits nginx, not gr
 **Tracked as a separate task**, sequenced after the pilot in stage 2 so probe behavior and
 concurrency behavior aren't changed in the same rollout window.
 
+  > **Correction (2026-09-01, after the xpro outage).** Two claims above are wrong.
+  >
+  > First, `backpressure` caps *connections*, not in-flight requests, so lowering it to 16
+  > made the probe hazard worse rather than less urgent. With the nginx sidecar removed
+  > (#5541, #5549) APISIX holds its upstream keepalive connections directly against
+  > Granian, and idle keepalives spend the budget while doing no work: xpro sat pinned at
+  > exactly `2 * blocking_threads` = 16 active connections per pod with its blocking
+  > threads 1-2% busy. Readiness is an HTTP GET on the same port and so competes for the
+  > same budget; it timed out on ~80% of attempts, both replicas left the EndpointSlice
+  > with zero container restarts, and APISIX answered ~26% of xpro requests with an
+  > instant "no valid upstream node" 503 for ~18 hours.
+  >
+  > Second, "the sidecar absorbs part of the risk" no longer describes any deployment.
+  > Every Granian app now talks to APISIX directly.
+  >
+  > The 2026-08-26 mitxonline CMS rollback was the same failure, misread at the time as a
+  > thread-concurrency shortfall: "saturated at 16 active connections, HTTP readiness fell
+  > to 1/3, APISIX p95/p99 60s while Django spans stayed 0.2-1.1s". Restoring 2 workers x
+  > 32 threads fixed it because it also raised backpressure to 64, not because CMS needed
+  > 64 threads.
+  >
+  > Component fix: `backpressure` now defaults to a flat `DEFAULT_WSGI_BACKPRESSURE = 128`
+  > connection budget, independent of `blocking_threads`, and the readiness failure budget
+  > widens to 6 failures x 15s / 5s timeout because this failure mode is correlated across
+  > replicas -- fast eviction empties the endpoints instead of shedding load, and
+  > Kubernetes has no minimum-available floor for readiness. Readiness stays HTTP on the
+  > app port: Granian serves one application listener, and its metrics listener answers
+  > from the Rust runtime and knows nothing about Django's dependencies. Lesson
+  > `les-granian-backpressure-budgets-connections-not-req-6064fb`.
+
 ## Capacity math
 
 Per-pod nominal request concurrency:
@@ -550,6 +580,13 @@ entirely in container args, so there is no data or schema migration to unwind.
 
 1. Runtime cgroup-based `--workers-max-rss` (entrypoint wrapper) — evaluate post-rollout.
 2. TCP liveness / HTTP readiness probe split — eligible after stage 2.
-3. Per-app `blocking_threads` and `backpressure` tuning from measured latency and burst
-   saturation before removing any remaining holding pins; the 2026-08-26 CMS rollback
-   disproved a uniform target of 8 threads / 16 backpressure.
+3. Per-app `blocking_threads` tuning from measured latency and burst saturation before
+   removing any remaining holding pins. `backpressure` is no longer part of that
+   per-app exercise: it is a connection budget with one fleet-wide default (see the
+   correction under item 5 above), and the 2026-08-26 CMS rollback that appeared to disprove
+   a uniform 8-thread target was a connection-ceiling failure, not a thread shortfall.
+4. The remaining explicit `backpressure` pins -- mitxonline app (64), edxapp CMS (64)
+   and the edxapp LMS holding pins (64) -- still cap below the component default.
+   `mitxonline-openedx` is currently pinned at its 64 ceiling with blocking threads
+   ~4.6% busy, the same signature. Removing those pins needs the mitxonline edxapp
+   deploy path unblocked first (`tk-mitxonline-edxapp-production-deploys-have-been-b-d87ca6`).

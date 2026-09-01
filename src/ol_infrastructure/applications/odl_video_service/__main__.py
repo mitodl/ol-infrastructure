@@ -947,7 +947,12 @@ ovs_k8s_app = OLApplicationK8s(
                 ),
                 initial_delay_seconds=15,
                 period_seconds=15,
-                failure_threshold=3,
+                # Wider than the default 3x/3s: readiness shares the Granian
+                # connection budget with user traffic and its failure is
+                # correlated across replicas, so a fast eviction empties the
+                # EndpointSlice instead of shedding load. See
+                # default_probe_configs in components/services/k8s.py.
+                failure_threshold=6,
                 timeout_seconds=5,
             ),
             "startup_probe": kubernetes.core.v1.ProbeArgs(

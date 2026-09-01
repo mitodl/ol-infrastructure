@@ -39,9 +39,15 @@ DEFAULT_WSGI_PORT = 8073  # Arbitrary
 # for the GIL, so this tracks the container's CPU allocation (100m-500m requested for
 # our webapps), not the request rate.
 DEFAULT_WSGI_BLOCKING_THREADS = 8
-# Multiplier applied to blocking_threads to derive Granian's --backpressure for WSGI
-# apps: enough in-flight requests to keep every thread busy plus one queued each.
-DEFAULT_WSGI_BACKPRESSURE_MULTIPLIER = 2
+# Granian's --backpressure for WSGI apps. This caps accepted *connections* per
+# worker, not in-flight requests, so it is deliberately not derived from
+# DEFAULT_WSGI_BLOCKING_THREADS: with the nginx sidecar gone the 26 APISix pods hold
+# their upstream keepalive connections directly against Granian, and an idle keepalive
+# spends budget while doing no work. 128 sits above every connection population
+# measured in production (xpro 37 max, mitxonline 23, mitlearn 154 across two workers)
+# and coincides with what Granian itself would derive from backlog=128 at workers=1.
+# blocking_threads remains the real limit on concurrent Python work.
+DEFAULT_WSGI_BACKPRESSURE = 128
 EIGHT_HOURS_SECONDS = 28800
 FIVE_MINUTES = 60 * 5
 FORUM_SERVICE_PORT = 4567

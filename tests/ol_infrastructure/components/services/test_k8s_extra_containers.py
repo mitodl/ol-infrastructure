@@ -804,6 +804,20 @@ def test_liveness_is_tcp_while_readiness_stays_http():
     assert probes["readiness_probe"].tcp_socket is None
 
 
+def test_readiness_failure_budget_tolerates_connection_contention():
+    """Readiness shares Granian's connection budget with user traffic.
+
+    A tight budget turns transient contact with the ``--backpressure`` ceiling
+    into an empty EndpointSlice, because the cause is correlated across every
+    replica. 6 failures at a 15s period is ~90s of sustained failure before a
+    pod is evicted. See default_probe_configs and the xpro outage of 2026-08-31.
+    """
+    readiness = default_probe_configs(DEFAULT_WSGI_PORT)["readiness_probe"]
+    assert readiness.period_seconds == 15
+    assert readiness.failure_threshold == 6
+    assert readiness.timeout_seconds == 5
+
+
 @pulumi.runtime.test
 def test_ports_align_without_nginx_sidecar():
     """No sidecar: container, probes and Service all land on DEFAULT_WSGI_PORT."""

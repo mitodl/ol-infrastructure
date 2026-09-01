@@ -24,7 +24,7 @@ from pydantic import (
 from bridge.lib.magic_numbers import (
     DEFAULT_NGINX_PORT,
     DEFAULT_REDIS_PORT,
-    DEFAULT_WSGI_BACKPRESSURE_MULTIPLIER,
+    DEFAULT_WSGI_BACKPRESSURE,
     DEFAULT_WSGI_BLOCKING_THREADS,
     DEFAULT_WSGI_PORT,
     MAXIMUM_K8S_NAME_LENGTH,
@@ -126,10 +126,39 @@ def default_probe_configs(port: int) -> dict[str, kubernetes.core.v1.ProbeArgs]:
     worker thread, so it distinguishes "the process is gone" from "the process
     is busy".
 
-    The trade-off is deliberate: liveness no longer restarts a pod whose Granian
-    workers are wedged but whose listener still accepts. Readiness does still
-    fail in that case, so the pod is pulled from the Service endpoints and stops
-    receiving traffic -- it just is not killed automatically.
+    Readiness is the harder half, because there is nowhere else to put it.
+    Granian serves one application listener; its metrics listener answers from
+    the Rust runtime and knows nothing about whether Django can reach its
+    dependencies, so it cannot stand in for a readiness check. Readiness
+    therefore shares the port -- and the ``--backpressure`` connection budget --
+    with user traffic, and a probe that competes for the resource it is meant to
+    report on will report on it wrongly under exactly the conditions that matter.
+
+    Two things follow, and both are load-bearing:
+
+    1. ``backpressure`` must be sized from the connection population, not from
+       ``blocking_threads`` (see ``GranianConfig.backpressure``). When the budget
+       was ``2 * blocking_threads``, idle APISix keepalives consumed all of it and
+       readiness timed out on ~80% of attempts against pods whose worker threads
+       were 1-2% busy.
+    2. The failure budget here is deliberately wide -- 6 failures at a 15s period,
+       ~90s of sustained failure before eviction, against a 5s timeout. Readiness
+       failure from connection-level contention is correlated across replicas
+       because every replica shares the cause, so eviction does not shed load onto
+       healthy pods, it empties the EndpointSlice. Kubernetes has no
+       minimum-available floor for readiness the way PodDisruptionBudgets bound
+       voluntary disruption, so an empty EndpointSlice is a reachable state, and
+       APISix answers it with an instant "no valid upstream node" 503 rather than
+       a slow 200. Serving slowly from a saturated pod beats serving nothing.
+
+    An earlier version of this docstring called the liveness trade-off benign --
+    "the pod is pulled from the Service endpoints and stops receiving traffic, it
+    just is not killed automatically". The xpro outage of 2026-08-31 falsified
+    that: with liveness on TCP there is no restart to break the loop, readiness
+    never recovers on its own because the keepalive connections do not go away,
+    and the condition persisted from the rollout until it was diagnosed by hand
+    the next morning. TCP liveness is still right; what was wrong was treating
+    endpoint removal as the safe failure mode.
     """
     return {
         # Liveness probe to check that the process is still there at all. See the
@@ -149,8 +178,11 @@ def default_probe_configs(port: int) -> dict[str, kubernetes.core.v1.ProbeArgs]:
             ),
             initial_delay_seconds=15,  # Wait 15 seconds before first probe
             period_seconds=15,
-            failure_threshold=3,  # Consider failed after 3 attempts
-            timeout_seconds=3,
+            # ~90s of sustained failure before the pod leaves the EndpointSlice.
+            # See the docstring: this failure is correlated across replicas, so
+            # evicting fast empties the endpoints rather than shedding load.
+            failure_threshold=6,
+            timeout_seconds=5,
         ),
         # Startup probe to ensure the application is fully initialized before other probes start
         "startup_probe": kubernetes.core.v1.ProbeArgs(
@@ -309,6 +341,10 @@ class GranianConfig(BaseModel):
     explicitly for WSGI apps instead of being left to Granian's
     ``backpressure = backlog // workers`` / ``blocking_threads = backpressure // 2``
     derivation, which yielded 32 GIL-competing threads per worker at the old defaults.
+    The two are resolved independently: ``blocking_threads`` bounds concurrent Python
+    work, ``backpressure`` bounds accepted connections, and connections here are mostly
+    idle gateway keepalives rather than requests. See the ``backpressure`` field for
+    what deriving one from the other cost in production.
 
     **Port/nginx coupling:** when ``import_nginx_config=True`` on
     ``OLApplicationK8sConfig``, the nginx config proxies to a fixed upstream address
@@ -333,12 +369,22 @@ class GranianConfig(BaseModel):
     ``DEFAULT_WSGI_BLOCKING_THREADS`` rather than letting Granian derive it from
     ``backpressure // 2``."""
     backpressure: PositiveInt | None = None
-    """Maximum in-flight requests a single worker will accept before it stops draining the
-    accept queue (granian ``--backpressure``). Excess connections wait in the kernel
-    backlog (and behind the nginx sidecar), which is where they belong -- an oversized
-    backpressure just moves the queue inside the worker where it inflates tail latency
-    invisibly. When ``None`` on a WSGI app, resolves to 2x the resolved
-    ``blocking_threads``."""
+    """Maximum *connections* a single worker will accept before it stops draining the
+    accept queue (granian ``--backpressure``). Not requests: a connection consumes this
+    budget for as long as it is open, whether or not it is carrying a request. Excess
+    connections wait in the kernel backlog. When ``None`` on a WSGI app, resolves to
+    ``DEFAULT_WSGI_BACKPRESSURE``.
+
+    This used to resolve to ``2 * blocking_threads``, which assumed one connection
+    implies one request in flight. That assumption held only while an nginx sidecar
+    absorbed the connection fan-in. With the sidecar gone, APISix keeps upstream
+    keepalive connections open directly against Granian, and idle keepalives alone
+    exhausted the budget: xpro sat pinned at exactly 16 active connections per pod with
+    its blocking threads 1-2% busy, which starved the readiness probe (same port, same
+    budget) and emptied the EndpointSlice, and ~26% of xpro requests were answered with
+    an instant APISix 503 on 2026-08-31. Size this from the plausible connection
+    population, never from ``blocking_threads``; ``blocking_threads`` is what limits
+    concurrent Python work."""
     no_ws: bool = True
     limit_workers_max_rss: bool = True
     """When ``True`` (default), automatically cap each worker's RSS at 90 % of the
@@ -354,9 +400,10 @@ class GranianConfig(BaseModel):
     """Seconds before an idle blocking thread is retired (granian ``--blocking-threads-idle-timeout``). Omitted when ``None``."""
     respawn_failed_workers: bool = True
     backlog: PositiveInt | None = 128
-    """Kernel listen backlog (granian ``--backlog``). Now that ``backpressure`` is
-    resolved explicitly this no longer feeds Granian's thread-pool derivation, so it means
-    only what it says: how many connections queue outside the workers."""
+    """Kernel listen backlog (granian ``--backlog``). Now that ``backpressure`` and
+    ``blocking_threads`` are resolved explicitly this no longer feeds Granian's own
+    derivations, so it means only what it says: how many connections queue outside the
+    workers."""
     log_level: str = "warning"
     application_module: str = "main.wsgi:application"
     enable_metrics: bool = True
@@ -457,9 +504,7 @@ class GranianConfig(BaseModel):
             if self.blocking_threads is None:
                 self.blocking_threads = DEFAULT_WSGI_BLOCKING_THREADS
             if self.backpressure is None:
-                self.backpressure = (
-                    DEFAULT_WSGI_BACKPRESSURE_MULTIPLIER * self.blocking_threads
-                )
+                self.backpressure = DEFAULT_WSGI_BACKPRESSURE
         elif self.blocking_threads is not None and self.blocking_threads > 1:
             msg = (
                 f"granian_config.blocking_threads={self.blocking_threads} was set with "
