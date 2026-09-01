@@ -108,7 +108,12 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
     service_account_name: str,
     jupyterhub_data_config: Config,
 ) -> kubernetes.helm.v3.Release:
-    """Provision JupyterHub data Helm release with GenericOAuthenticator and Trino token injection."""  # noqa: E501
+    """Provision the JupyterHub data Helm release.
+
+    Authentication is GenericOAuthenticator against Keycloak for the hub itself.
+    Query clients authenticate to Starburst Galaxy separately, via Galaxy's own
+    OAuth2 flow from inside the notebook — the hub injects no Trino credentials.
+    """
     base_name = "jupyterhub-data"
     env_name = stack_info.name
     vault_policy_hcl = (
