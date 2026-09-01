@@ -12,7 +12,7 @@ from kubernetes.utils.quantity import parse_quantity
 from pydantic import ValidationError
 
 from bridge.lib.magic_numbers import (
-    DEFAULT_WSGI_BACKPRESSURE_MULTIPLIER,
+    DEFAULT_WSGI_BACKPRESSURE,
     DEFAULT_WSGI_BLOCKING_THREADS,
 )
 from ol_infrastructure.components.services.k8s import GranianConfig
@@ -47,23 +47,24 @@ def test_runtime_mode_omitted_when_none():
 def test_wsgi_defaults_resolve_at_config_time():
     gc = GranianConfig()
     assert gc.blocking_threads == DEFAULT_WSGI_BLOCKING_THREADS
-    assert gc.backpressure == (
-        DEFAULT_WSGI_BACKPRESSURE_MULTIPLIER * DEFAULT_WSGI_BLOCKING_THREADS
-    )
+    assert gc.backpressure == DEFAULT_WSGI_BACKPRESSURE
 
 
 def test_wsgi_defaults_emitted():
     args = GranianConfig().build_args()
     assert arg_value(args, "--blocking-threads") == str(DEFAULT_WSGI_BLOCKING_THREADS)
-    assert arg_value(args, "--backpressure") == str(
-        DEFAULT_WSGI_BACKPRESSURE_MULTIPLIER * DEFAULT_WSGI_BLOCKING_THREADS
-    )
+    assert arg_value(args, "--backpressure") == str(DEFAULT_WSGI_BACKPRESSURE)
 
 
-def test_wsgi_explicit_blocking_threads_drives_backpressure():
+def test_wsgi_blocking_threads_does_not_drive_backpressure():
+    """The connection budget is independent of the Python thread pool.
+
+    Deriving one from the other is what let idle APISix keepalives exhaust the
+    budget and take xpro down on 2026-08-31; see GranianConfig.backpressure.
+    """
     gc = GranianConfig(blocking_threads=4)
     assert gc.blocking_threads == 4
-    assert gc.backpressure == 8
+    assert gc.backpressure == DEFAULT_WSGI_BACKPRESSURE
 
 
 def test_wsgi_explicit_backpressure_preserved():

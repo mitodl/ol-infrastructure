@@ -906,7 +906,8 @@ micromasters_k8s_app = OLApplicationK8s(
             application_module="micromasters.wsgi:application",
             # Stage 2 of docs/plans/granian-configuration-overhaul.md: holding pins
             # removed, so this app now runs on the component defaults (1 worker, 8
-            # blocking threads, 16 backpressure, runtime defaults).
+            # blocking threads, DEFAULT_WSGI_BACKPRESSURE connections, runtime
+            # defaults).
             blocking_threads_idle_timeout=120,
             enable_metrics=True,
             # Serve /static/* from Granian's Rust layer instead of the sidecar
@@ -1014,8 +1015,13 @@ micromasters_k8s_app = OLApplicationK8s(
                 ),
                 initial_delay_seconds=15,
                 period_seconds=15,
-                failure_threshold=3,
-                timeout_seconds=3,
+                # Matches default_probe_configs: readiness shares the Granian
+                # connection budget with user traffic and its failure is
+                # correlated across replicas, so a fast eviction empties the
+                # EndpointSlice instead of shedding load. Kept in step with the
+                # component default -- see components/services/k8s.py.
+                failure_threshold=6,
+                timeout_seconds=5,
             ),
             "startup_probe": kubernetes.core.v1.ProbeArgs(
                 http_get=kubernetes.core.v1.HTTPGetActionArgs(

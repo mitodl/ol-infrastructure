@@ -94,7 +94,6 @@ config:
       workers: 1
       runtime_threads: 1
       blocking_threads: 8
-      backpressure: 16
   edxapp:k8s_replicas:
     webapp:
       cms:
