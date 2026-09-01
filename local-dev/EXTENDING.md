@@ -79,8 +79,10 @@ short enough to read end to end.
 The pattern, and what makes it hold up over time:
 
 1. **The owning repo exposes a parameterised entry point.** lehrer's
-   `local-dev/lehrer-core.star` exports `setup(cfg)`; this repo `load()`s it
-   and passes topology. No manifests are copied.
+   `local-dev/lehrer-core.star` exports `setup(cfg)`; this repo pulls it in with
+   `load_dynamic()` and passes topology. No manifests are copied. It has to be
+   `load_dynamic()` rather than `load()`, because the path depends on
+   `MITOL_WORKSPACE_ROOT` and Starlark's `load()` takes a string literal only.
 2. **Say which shared services to reuse.** `manage_infra: False` tells lehrer
    not to install Valkey/OpenSearch because `local-infra` already has them.
    Anything this cluster genuinely lacks (MariaDB, MongoDB) stays the owning

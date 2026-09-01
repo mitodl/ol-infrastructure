@@ -34,9 +34,15 @@ else:
 
     local_dev = os.path.join(lehrer_dir, "local-dev")
 
-    # Applied through k8s_yaml_local, not k8s_yaml, so 'mit.dev' becomes
-    # LOCAL_DEV_ROOT_DOMAIN and the pod-template fingerprint restarts platform
-    # pods when these change. Layered last in envFrom by lehrer's manifests.
+    # Applied through k8s_yaml_local, not k8s_yaml, for the 'mit.dev' ->
+    # LOCAL_DEV_ROOT_DOMAIN substitution. Layered last in envFrom by lehrer's
+    # manifests.
+    #
+    # k8s_yaml_local's own fingerprint does NOT reach these pods: it stamps
+    # Deployments passed in the same call (tiltlib.star _stamp_deployments) and
+    # lehrer applies its Deployments separately inside setup(). The rollout
+    # comes from config_override_paths below, which folds these two files into
+    # the checksum lehrer stamps on its platform pod templates.
     k8s_yaml_local([
         "configmaps/lms-config.yaml",
         "configmaps/cms-config.yaml",
@@ -70,6 +76,12 @@ else:
         # supplies only deltas via the *-config-overrides ConfigMaps above.
         # Setting False would mean forking the whole ConfigMap and drifting.
         "apply_platform_configmaps": True,
+        # Folded into the pod-template checksum lehrer stamps on the platform
+        # Deployments, so editing an override actually rolls LMS/CMS/workers.
+        "config_override_paths": [
+            config.main_dir + "/local-dev/apps/openedx/configmaps/lms-config.yaml",
+            config.main_dir + "/local-dev/apps/openedx/configmaps/cms-config.yaml",
+        ],
         "release_name":    "master",
         "deploy_name":     "mitxonline",
         "settings_ns":     "mitol",
