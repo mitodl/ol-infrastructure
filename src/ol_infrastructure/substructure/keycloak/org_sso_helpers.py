@@ -404,9 +404,14 @@ def onboard_oidc_org(
         client_secret=oidc_config.client_secret,
     )
     if oidc_idp_arg_map is None:
+        # oidc_identity_provider_args_from_discovery_url already logged the
+        # specific cause (unreachable/unparseable URL, missing required
+        # scopes, or an unsupported client-auth method) via the standard
+        # logging module; this is a Pulumi-visible pointer to that, not a
+        # restatement of the cause.
         pulumi.log.warn(
-            f"Skipping OIDC IdP creation for {oidc_config.idp_alias} due to "
-            f"inaccessible metadata URL"
+            f"Skipping OIDC IdP creation for {oidc_config.idp_alias}; see "
+            f"the preceding log message for the specific cause"
         )
         return None
     oidc_idp_arg_map["extra_config"] = {
