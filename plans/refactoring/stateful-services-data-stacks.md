@@ -219,6 +219,15 @@ pulumi state move \
 3. Run `pulumi preview` on the **data stack** → expect zero planned changes
 4. Run `pulumi preview` on the **app stack** → expect zero planned changes
 
+For `edxapp`, preserve its database-address output while downstream consumers migrate:
+
+1. When `edxapp` starts consuming the data stack, keep the existing `edxapp["mariadb"]`
+   output as a pass-through export of the data stack's `db_address`.
+2. Update `edx_notes` and `xqueue` to reference the corresponding `edxapp` data stack
+   directly, deploy both consumers, and verify their previews and database connectivity.
+3. Remove the `edxapp["mariadb"]` pass-through only after both consumer deployments are
+   verified.
+
 ## Applications Inventory
 
 ### Has DB + Cache (both to move)
@@ -235,6 +244,9 @@ pulumi state move \
 | superset | Postgres | Yes | No (EC2-based) |
 | edxapp | MariaDB | Yes | Yes (k8s_resources, k8s_secrets, k8s_configmaps, k8s_autoscaling) |
 | learn_ai | Postgres | Yes | Yes (`__main__.py`) |
+
+`edxapp` also supplies its MariaDB address to the `edx_notes` and `xqueue` stacks. These
+consumers must follow the staged pass-through migration in Step 4.
 
 ### DB Only (no cache)
 
@@ -281,7 +293,8 @@ Applications: `ocw_studio`, `odl_video_service`, `xpro`, `micromasters`, `redash
 - `learn_ai` — DB + Cache with K8s dynamic-secret integration in `__main__.py`
 - `edxapp` — highest complexity: MariaDB engine, multiple K8s sub-modules
   (`k8s_resources.py`, `k8s_secrets.py`, `k8s_configmaps.py`, `k8s_autoscaling.py`),
-  and downstream dependency from `edx_notes`
+  and downstream database-address dependencies from `edx_notes` and `xqueue`; follow
+  the staged pass-through migration in Step 4
 
 ### Phase 5 — CI/CD updates
 
