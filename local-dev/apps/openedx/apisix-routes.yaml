@@ -1,0 +1,116 @@
+---
+# TLS certs for openedx services — reuse the shared local-dev-tls wildcard cert.
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: openedx-tls
+  namespace: openedx
+spec:
+  ingressClassName: apache-apisix
+  hosts:
+  - "lms.mit.dev"
+  - "studio.mit.dev"
+  - "notes.mit.dev"
+  - "mfe.mit.dev"
+  secret:
+    name: local-dev-tls
+    namespace: openedx
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixPluginConfig
+metadata:
+  name: openedx-shared-plugins
+  namespace: openedx
+spec:
+  plugins:
+  - name: redirect
+    enable: true
+    config:
+      http_to_https: true
+  - name: prometheus
+    enable: true
+---
+# LMS — edx-platform learning management system.
+# edx-platform handles its own session/auth — no OIDC plugin at the ingress layer.
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: lms-route
+  namespace: openedx
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: lms
+    priority: 0
+    match:
+      hosts:
+      - "lms.mit.dev"
+      paths:
+      - "/*"
+    backends:
+    - serviceName: lms
+      servicePort: 8000
+    plugin_config_name: openedx-shared-plugins
+---
+# CMS (Studio) — edx-platform course authoring tool.
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: studio-route
+  namespace: openedx
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: studio
+    priority: 0
+    match:
+      hosts:
+      - "studio.mit.dev"
+      paths:
+      - "/*"
+    backends:
+    - serviceName: cms
+      servicePort: 8010
+    plugin_config_name: openedx-shared-plugins
+---
+# Notes API — edx-notes-api annotation service.
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: notes-route
+  namespace: openedx
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: notes
+    priority: 0
+    match:
+      hosts:
+      - "notes.mit.dev"
+      paths:
+      - "/*"
+    backends:
+    - serviceName: notes
+      servicePort: 8000
+    plugin_config_name: openedx-shared-plugins
+---
+# MFE — compiled nginx serving the default OEP-65 site project.
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: mfe-route
+  namespace: openedx
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: mfe
+    priority: 0
+    match:
+      hosts:
+      - "mfe.mit.dev"
+      paths:
+      - "/*"
+    backends:
+    - serviceName: mfe-default
+      servicePort: 80
+    plugin_config_name: openedx-shared-plugins
