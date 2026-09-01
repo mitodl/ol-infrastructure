@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 import bot
 import bot_config
 import pytest
+import slack_users
 
 
 @pytest.fixture
@@ -307,18 +308,57 @@ async def test_release_status_reports_checklist_progress(repos, slack, monkeypat
 # ---------------------------------------------------------------------------
 
 
+_NOT_FOUND = "users_not_found"
+
+
+def _slack_client(users=None):
+    """Return a Slack client resolving *users* by email and nothing else."""
+
+    class _Error(Exception):
+        def __init__(self, code):
+            super().__init__(code)
+            self.response = {"error": code}
+
+    resolved = users or {}
+
+    async def _lookup(email):
+        if email not in resolved:
+            raise _Error(_NOT_FOUND)
+        return {"user": {"id": resolved[email]}}
+
+    client = MagicMock()
+    client.users_lookupByEmail = _lookup
+    client.chat_postMessage = AsyncMock()
+    return client
+
+
 @pytest.fixture(autouse=True)
 def _clear_watchers(monkeypatch):
     """Reset the module-global watcher state so it cannot leak between tests.
 
     `_slack_app` is set here because create_app() always populates it before
     the socket handler starts accepting commands, so a handler observing it
-    unset is unreachable in the running bot.
+    unset is unreachable in the running bot. Its client resolves the fixture
+    authors to Slack ids so mention rendering is exercised rather than stubbed.
     """
-    monkeypatch.setattr(bot, "_slack_app", object())
+    app = MagicMock()
+    app.client = _slack_client(
+        {
+            "alice@example.com": "UALICE",
+            "bob@example.com": "UBOB",
+            "carol@example.com": "UCAROL",
+        }
+    )
+    monkeypatch.setattr(bot, "_slack_app", app)
     bot._checkbox_watchers.clear()
+    bot._release_requesters.clear()
+    slack_users._cache.clear()
+    slack_users._lookups_disabled = False
     yield
     bot._checkbox_watchers.clear()
+    bot._release_requesters.clear()
+    slack_users._cache.clear()
+    slack_users._lookups_disabled = False
 
 
 async def test_wait_for_checkboxes_names_who_is_outstanding(repos, slack, monkeypatch):
@@ -356,8 +396,10 @@ async def test_wait_for_checkboxes_names_who_is_outstanding(repos, slack, monkey
 
     said = slack.said
     assert "1/3 checked" in said
-    assert "bob@example.com, carol@example.com" in said
-    assert "alice@example.com" not in said
+    # Mentions, not the raw commit emails: only `<@U…>` notifies anyone.
+    assert "<@UBOB>, <@UCAROL>" in said
+    assert "bob@example.com" not in said
+    assert "<@UALICE>" not in said
     assert len(started) == 1
 
 
@@ -525,3 +567,151 @@ async def test_watch_checkboxes_sleeps_before_retrying_a_failed_refresh(
 
     # One sleep for the normal cadence, one after the failed refresh.
     assert sleeps == [bot._CHECKBOX_POLL_SECONDS, bot._CHECKBOX_POLL_SECONDS]
+
+
+async def test_watch_checkboxes_thanks_people_by_mention(repos, monkeypatch):
+    """The thank-you is also the signal that a box was seen; it must notify."""
+    issue = {
+        "number": 1,
+        "title": "Release my-app",
+        "url": "https://github.com/mitodl/my-app/issues/1",
+        "body": (
+            "- [ ] **A** (#1) by alice@example.com\n"
+            "- [ ] **B** (#2) by bob@example.com\n"
+        ),
+        "labels": ["release"],
+    }
+    alice_done = (
+        "- [x] **A** (#1) by alice@example.com\n- [ ] **B** (#2) by bob@example.com\n"
+    )
+    refreshed = {**issue, "body": alice_done}
+    done = {**issue, "body": alice_done.replace("- [ ]", "- [x]")}
+    bodies = [issue, refreshed, done]
+
+    async def _issues(_repo):
+        return [bodies.pop(0)] if bodies else [done]
+
+    monkeypatch.setattr(bot.github, "open_release_issues", _issues)
+    monkeypatch.setattr(bot.asyncio, "sleep", AsyncMock())
+    app = MagicMock()
+    app.client = _slack_client({"alice@example.com": "UALICE"})
+
+    await bot._watch_checkboxes(app, "my-app", repos["my-app"], "C123")
+
+    posted = app.client.chat_postMessage.call_args_list[0].kwargs["text"]
+    assert "<@UALICE>" in posted
+    assert "alice@example.com" not in posted
+
+
+# ---------------------------------------------------------------------------
+# ready-to-promote notification
+# ---------------------------------------------------------------------------
+
+
+async def test_release_records_who_asked_for_it(repos, slack, monkeypatch):
+    """The requester is who the ready-to-promote message has to ping."""
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+    monkeypatch.setattr(bot.concourse, "check_resource", AsyncMock())
+    monkeypatch.setattr(
+        bot.concourse, "trigger_job", AsyncMock(return_value="http://build/1")
+    )
+
+    await bot._cmd_release(
+        repos, slack.ack, slack.respond, _command("my-app"), {"user_id": "UDANA"}
+    )
+
+    assert bot._release_requesters["my-app"] == "UDANA"
+
+
+async def test_ready_to_promote_pings_the_release_requester(repos, monkeypatch):
+    """Posting "ready to promote" addressed to nobody chases nobody.
+
+    Doof pinged the release manager here; the closest thing this bot knows is
+    whoever ran `/doof release`.
+    """
+    bot._release_requesters["my-app"] = "UDANA"
+    monkeypatch.setattr(
+        bot.github,
+        "open_release_issues",
+        AsyncMock(
+            return_value=[
+                {
+                    "number": 1,
+                    "title": "Release my-app",
+                    "url": "https://github.com/mitodl/my-app/issues/1",
+                    "body": (
+                        "## Release 2026.9.1.1\n\n- [x] **A** (#1) by alice@example.com"
+                    ),
+                    "labels": ["release"],
+                }
+            ]
+        ),
+    )
+    monkeypatch.setattr(bot.github, "add_issue_label", AsyncMock())
+    app = MagicMock()
+    app.client.chat_postMessage = AsyncMock()
+
+    await bot._notify_ready_to_promote(app, repos)
+
+    blocks = app.client.chat_postMessage.call_args.kwargs["blocks"]
+    assert "<@UDANA>" in blocks[0]["text"]["text"]
+
+
+async def test_ready_to_promote_omits_the_ping_when_nobody_is_recorded(
+    repos, monkeypatch
+):
+    """A bot restart loses the requester; the notification still has to go out."""
+    monkeypatch.setattr(
+        bot.github,
+        "open_release_issues",
+        AsyncMock(
+            return_value=[
+                {
+                    "number": 1,
+                    "title": "Release my-app",
+                    "url": "https://github.com/mitodl/my-app/issues/1",
+                    "body": (
+                        "## Release 2026.9.1.1\n\n- [x] **A** (#1) by alice@example.com"
+                    ),
+                    "labels": ["release"],
+                }
+            ]
+        ),
+    )
+    monkeypatch.setattr(bot.github, "add_issue_label", AsyncMock())
+    app = MagicMock()
+    app.client.chat_postMessage = AsyncMock()
+
+    await bot._notify_ready_to_promote(app, repos)
+
+    blocks = app.client.chat_postMessage.call_args.kwargs["blocks"]
+    assert "cc" not in blocks[0]["text"]["text"]
+    assert blocks[1]["elements"][0]["value"] == "my-app:2026.9.1.1"
+
+
+async def test_promote_clears_the_recorded_requester(repos, slack, monkeypatch):
+    """A stale requester would ping the wrong person on the next release."""
+    bot._release_requesters["my-app"] = "UDANA"
+    monkeypatch.setattr(
+        bot.github,
+        "open_release_issues",
+        AsyncMock(
+            return_value=[
+                {
+                    "number": 1,
+                    "title": "Release my-app",
+                    "url": "https://github.com/mitodl/my-app/issues/1",
+                    "body": "## Release 2026.9.1.1\n",
+                    "labels": ["release"],
+                }
+            ]
+        ),
+    )
+    monkeypatch.setattr(bot.github, "close_release_issue", AsyncMock())
+    monkeypatch.setattr(bot.concourse, "check_resource", AsyncMock())
+
+    await bot._cmd_promote(
+        repos, slack.ack, slack.respond, _command("my-app"), {"user_id": "UOTHER"}
+    )
+
+    assert "my-app" not in bot._release_requesters
